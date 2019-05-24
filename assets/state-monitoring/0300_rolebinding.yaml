@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: openshift-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nvidia-dcgm-exporter
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dcgm-exporter
+userNames:
+- system:serviceaccount:openshift-monitoring:nvidia-dcgm-exporter
