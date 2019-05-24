@@ -1,0 +1,11 @@
+apiVersion: sro.openshift.io/v1alpha1
+kind: SpecialResource
+metadata:
+  name: gpu
+  namespace: openshift-sro
+spec:
+  schedulingType: "TaintsTolerations"
+  taints: 
+  - key: nvidia.com/gpu
+    value: NA
+    effect: NoSchedule

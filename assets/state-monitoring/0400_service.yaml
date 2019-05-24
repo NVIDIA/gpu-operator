@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: openshift-monitoring
+  name: nvidia-dcgm-exporter
+  labels:
+    app: nvidia-dcgm-exporter
+spec:
+  selector:
+    app: nvidia-dcgm-exporter
+  type: ClusterIP
+  ports:
+  - name: dcgm
+    port: 9600
+    targetPort: 9600
+    protocol: TCP

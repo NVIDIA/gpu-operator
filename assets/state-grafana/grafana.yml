@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: scale-ci-grafana
+  annotations:
+    description: "Deploys a mutable Grafana Deployment"
+    tags: "grafana,scale-ci"
+parameters:
+- description: External URL for the grafana route
+  name: ROUTE_URL
+  value: ""
+- description: Prometheus URL
+  name: PROMETHEUS_URL
+  value: ""
+- description: Prometheus User
+  name: PROMETHEUS_USER
+  value: ""
+- description: Prometheus Password
+  name: PROMETHEUS_PASSWORD
+  value: ""
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: scale-ci-grafana
+    namespace: scale-ci-grafana
+    labels:
+      metrics-infra: scale-ci-grafana
+      name: scale-ci-grafana
+  spec:
+    ports:
+    - name: scale-ci-grafana
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
+    selector:
+      app: scale-ci-grafana
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: scale-ci-grafana
+    namespace: scale-ci-grafana
+  spec:
+    host: "${ROUTE_URL}"
+    to:
+      name: scale-ci-grafana
+    port:
+      targetPort: 3000
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    labels:
+      app: scale-ci-grafana
+    name: scale-ci-grafana
+    namespace: scale-ci-grafana
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: scale-ci-grafana
+    template:
+      metadata:
+        labels:
+          app: scale-ci-grafana
+        name: scale-ci-grafana
+      spec:
+        containers:
+        - name: scale-ci-grafana
+          image: docker.io/grafana/grafana:master
+          ports:
+          - name: sc-grafana-http
+            containerPort: 3000
+          volumeMounts:
+          - mountPath: /etc/grafana/provisioning/datasources
+            name: sc-ocp-prom
+
+        volumes:
+        - name: sc-ocp-prom
+          configMap:
+            name: sc-ocp-prom
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: sc-ocp-prom
+    namespace: scale-ci-grafana
+  data:
+    ocp-prometheus.yml: |
+      apiVersion: 1
+      datasources:
+      - name: Cluster Prometheus
+        type: prometheus
+        access: proxy
+        orgId: 1
+        url: ${PROMETHEUS_URL}
+        basicAuth: true
+        basicAuthUser: ${PROMETHEUS_USER}
+        basicAuthPassword: ${PROMETHEUS_PASSWORD}
+        withCredentials: false
+        isDefault: true
+        jsonData:
+          tlsSkipVerify: true
+        version: 1
+        editable: false
