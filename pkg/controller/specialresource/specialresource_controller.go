@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	srov1alpha1 "github.com/zvonkok/special-resource-operator/pkg/apis/sro/v1alpha1"
+	srov1alpha1 "github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
 	kappsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 
