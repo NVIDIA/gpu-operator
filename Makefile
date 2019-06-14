@@ -1,4 +1,4 @@
-PACKAGE=github.com/zvonkok/special-resource-operator
+PACKAGE=github.com/NVIDIA/gpu-operator
 MAIN_PACKAGE=$(PACKAGE)/cmd/manager
 
 BIN=$(lastword $(subst /, ,$(PACKAGE)))
@@ -7,7 +7,7 @@ BINDATA=pkg/manifests/bindata.go
 GOFMT_CHECK=$(shell find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' | sort -u | xargs gofmt -s -l)
 
 DOCKERFILE=Dockerfile
-IMAGE_TAG=zvonkok/special-resource-operator
+IMAGE_TAG=NVIDIA/gpu-operator
 IMAGE_REGISTRY=quay.io
 
 ENVVAR=GOOS=linux CGO_ENABLED=0

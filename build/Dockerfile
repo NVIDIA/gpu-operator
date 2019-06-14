@@ -4,4 +4,4 @@ RUN apk upgrade --update --no-cache
 
 USER nobody
 
-ADD build/_output/bin/special-resource-operator /usr/local/bin/special-resource-operator
+ADD build/_output/bin/gpu-operator /usr/local/bin/gpu-operator

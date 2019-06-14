@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/zvonkok/special-resource-operator/pkg/controller/specialresource"
+	"github.com/NVIDIA/gpu-operator/pkg/controller/specialresource"
 )
 
 func init() {

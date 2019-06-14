@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"github.com/zvonkok/special-resource-operator/pkg/apis/sro/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
 )
 
 func init() {
