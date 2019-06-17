@@ -2,7 +2,7 @@ apiVersion: sro.openshift.io/v1alpha1
 kind: SpecialResource
 metadata:
   name: gpu
-  namespace: openshift-sro
+  namespace: gpu-operator-resources
 spec:
   schedulingType: "PriorityPreemption"
   priorityClasses:
@@ -10,7 +10,7 @@ spec:
     kind: PriorityClass
     metadata:
       name: gpu-high-priority
-      namespace: openshift-sro # Add here your project
+      namespace: gpu-operator-resources # Add here your project
     value: 1000000
     globalDefault: false
     description: "This priority class should be used for GPU workload pods only."
@@ -18,7 +18,7 @@ spec:
     kind: PriorityClass
     metadata:
       name: gpu-low-priority
-      namespace: openshift-sro # Add here your project
+      namespace: gpu-operator-resources # Add here your project
     value: 100000
     globalDefault: false
     description: "This priority class should be used for CPU workload pods only."

@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: nvidia-device-plugin
-  namespace: openshift-sro
+  namespace: gpu-operator-resources
 rules:
 - apiGroups:
   - security.openshift.io
