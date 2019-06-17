@@ -35,7 +35,7 @@ seLinuxContext:
 supplementalGroups:
   type: RunAsAny
 users: 
-- system:serviceaccount:openshift-sro-operator:special-resource-operator
+- system:serviceaccount:gpu-operator:special-resource-operator
 volumes:
 - configMap
 - downwardAPI

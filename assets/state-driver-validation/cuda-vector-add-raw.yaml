@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-driver-validation
   name: nvidia-driver-validation
-  namespace: openshift-sro
+  namespace: gpu-operator-resources
 spec:
 #  serviceAccount: nvidia-readonly
 #  serviceAccountName: nvidia-readonly

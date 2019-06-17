@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-device-plugin-daemonset
   name: nvidia-device-plugin-daemonset
-  namespace: openshift-sro
+  namespace: gpu-operator-resources
   annotations:
     openshift.io/scc: hostmount-anyuid
 spec:

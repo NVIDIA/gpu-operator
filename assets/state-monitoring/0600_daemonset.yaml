@@ -7,7 +7,7 @@ metadata:
   labels: 
     app: nvidia-dcgm-exporter
   name: nvidia-dcgm-exporter
-  namespace: openshift-monitoring
+  namespace: gpu-operator-monitoring
 spec:
   selector:
     matchLabels:
