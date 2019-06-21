@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         name: special-resource-operator
+      annotations:
+        openshift.io/scc: restricted-readonly
     spec:
       serviceAccount: special-resource-operator
       serviceAccountName: special-resource-operator
@@ -19,9 +21,6 @@ spec:
       containers:
         - name: special-resource-operator
           image: quay.io/zvonkok/special-resource-operator:p3
-          securityContext:
-            capabilities:
-              drop: ["KILL", "MKNOD", "SETUID", "SETGID"]
           ports:
           - containerPort: 60000
             name: metrics

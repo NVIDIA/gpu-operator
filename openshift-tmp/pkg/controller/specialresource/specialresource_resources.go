@@ -13,6 +13,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 
+	secv1 "github.com/openshift/api/security/v1"
+
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -34,6 +36,7 @@ type Resources struct {
 	ServiceMonitor             promv1.ServiceMonitor
 	PriorityClass              schedv1.PriorityClass
 	Taint                      corev1.Taint
+	SecurityContextConstraints secv1.SecurityContextConstraints
 }
 
 func filePathWalkDir(root string) ([]string, error) {
