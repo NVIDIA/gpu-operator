@@ -14,7 +14,8 @@ include $(MAKE_DIR)/common.mk
 DOCKERFILE   ?= $(CURDIR)/docker/rhel/Dockerfile.rhel7
 DOCKERDEVEL  ?= $(CURDIR)/docker/builder.Dockerfile
 BIN_NAME     ?= gpu-operator
-IMAGE        ?= nvidia/gpu-operator
+IMAGE        ?= nvidia/gpu-operator:latest
+BUILDER      ?= nvidia/gpu-operator:builder
 
 
 ##### File definitions #####
@@ -36,8 +37,8 @@ all: build verify
 verify: fmt lint test
 
 devel:
-	$(DOCKER) build -t $(IMAGE):devel -f $(DOCKERDEVEL) .
-	@echo $(DOCKER) run -it -v $(CURDIR):/go/src/$(PACKAGE) $(IMAGE):devel bash
+	$(DOCKER) build -t $(BUILDER) -f $(DOCKERDEVEL) .
+	@echo $(DOCKER) run -it $v $(CURDIR):/go/src/$(PACKAGE) $(BUILDER):devel bash
 
 build:
 	GOOS=$(GOOS) CGO_ENABLED=$(CGO_ENABLED) go build -o $(BIN_NAME) $(MAIN_PACKAGE)
@@ -58,4 +59,4 @@ clean:
 	rm -f $(BIN)
 
 image:
-	$(DOCKER) build -t $(IMAGE):latest -f $(DOCKERFILE) .
+	$(DOCKER) build -t $(IMAGE) -f $(DOCKERFILE) .
