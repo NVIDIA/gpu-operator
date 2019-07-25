@@ -15,21 +15,23 @@ gitlab-builder:
   stage: gitlab
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $BUILDER -f ./docker/builder.Dockerfile
+    - apk add --update make
+
     - make devel BUILDER=$BUILDER
     - docker push $BUILDER
 
 unit-tests:
   stage: unit
-  image: $BUILDER_IMAGE
+  image: $BUILDER
   script:
     - make verify
-
 
 build-image:
   stage: build
   image: docker:stable
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - make image IMAGE=$(IMAGE_NAME)
-    - docker push $IMAGE_NAME
+    - apk add --update make
+
+    - make image IMAGE=$IMAGE
+    - docker push $IMAGE
