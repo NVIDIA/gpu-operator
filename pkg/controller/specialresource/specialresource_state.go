@@ -1,9 +1,9 @@
 package specialresource
 
 import (
+	srov1alpha1 "github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	secv1 "github.com/openshift/api/security/v1"
-	srov1alpha1 "github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
