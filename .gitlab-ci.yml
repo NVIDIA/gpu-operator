@@ -1,0 +1,34 @@
+services:
+  - docker:stable-dind
+
+variables:
+  IMAGE_NAME: $CI_REGISTRY_IMAGE:latest
+  BUILDER_IMAGE : $CI_REGISTRY_IMAGE:builder
+
+stages:
+  - gitlab
+  - unit
+  - build
+
+gitlab-builder:
+  image: docker:stable
+  stage: gitlab
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - make devel IMAGE=$(BUILDER_IMAGE)
+    - docker push $BUILDER_IMAGE
+
+unit-tests:
+  stage: unit
+  image: $BUILDER_IMAGE
+  script:
+    - make verify
+
+
+build-image:
+  stage: build
+  image: docker:stable
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - make image IMAGE=$(IMAGE_NAME)
+    - docker push $IMAGE_NAME
