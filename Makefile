@@ -11,7 +11,7 @@ include $(MAKE_DIR)/common.mk
 
 ##### Global variables #####
 
-DOCKERFILE   ?= $(CURDIR)/docker/rhel/Dockerfile.rhel7
+DOCKERFILE   ?= $(CURDIR)/docker/ubuntu/Dockerfile.ubuntu18.04
 DOCKERDEVEL  ?= $(CURDIR)/docker/builder.Dockerfile
 BIN_NAME     ?= gpu-operator
 IMAGE        ?= nvidia/gpu-operator:latest
