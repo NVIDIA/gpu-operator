@@ -42,12 +42,32 @@ type Resources struct {
 func filePathWalkDir(root string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Info("DEBUG: error in filepath.Walk on %s: %v", root, err)
+			return nil
+		}
 		if !info.IsDir() {
 			files = append(files, path)
 		}
 		return nil
 	})
 	return files, err
+}
+
+func matchKubeFlavor(path string) bool {
+	// e.g. KUBE_UNSUPPORTED_FLAVOR=openshift
+	// then the manifest path will be skipped if it contains that name
+	// TODO: make the value of env var be a list (e.g. "openshift,nutanix,pks" will ensure specific files get ignored)
+	flavor := os.Getenv("KUBE_UNSUPPORTED_FLAVOR")
+	if flavor == "" {
+		return true
+	}
+	matched := strings.Contains(path, flavor)
+	if matched {
+		log.Info("OpenShift is not supported. Skipping %s", path)
+		return false
+	}
+	return true
 }
 
 func getAssetsFrom(path string) []assetsFromFile {
@@ -58,6 +78,9 @@ func getAssetsFrom(path string) []assetsFromFile {
 		panic(err)
 	}
 	for _, file := range files {
+		if !matchKubeFlavor(file) {
+			continue
+		}
 		buffer, err := ioutil.ReadFile(file)
 		if err != nil {
 			panic(err)

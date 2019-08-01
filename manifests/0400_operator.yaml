@@ -17,7 +17,7 @@ spec:
     spec:
       serviceAccount: special-resource-operator
       serviceAccountName: special-resource-operator
-      readOnlyRootFilesystem: true
+      # readOnlyRootFilesystem: true
       containers:
         - name: special-resource-operator
           image: quay.io/zvonkok/special-resource-operator:p3

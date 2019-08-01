@@ -224,6 +224,13 @@ func kernelFullVersion(n SRO) string {
 	if err != nil {
 		logger.Info("Could not get NodeList", err)
 	}
+
+	if len(list.Items) == 0 {
+		// none of the nodes matched a pci-10de label
+		// either the nodes do not have GPUs, or NFD is not running
+		return ""
+	}
+
 	// Assuming all nodes are running the same kernel version,
 	// One could easily add driver-kernel-versions for each node.
 	node := list.Items[0]

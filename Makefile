@@ -12,6 +12,7 @@ include $(MAKE_DIR)/common.mk
 ##### Global variables #####
 
 DOCKERFILE   ?= $(CURDIR)/docker/ubuntu/Dockerfile.ubuntu18.04
+DEBUG_DOCKERFILE ?= $(CURDIR)/docker/debug/Dockerfile.debug
 DOCKERDEVEL  ?= $(CURDIR)/docker/builder.Dockerfile
 BIN_NAME     ?= gpu-operator
 IMAGE        ?= nvidia/gpu-operator:latest
@@ -60,3 +61,6 @@ clean:
 
 image:
 	$(DOCKER) build -t $(IMAGE) -f $(DOCKERFILE) .
+
+debug_image:
+	$(DOCKER) build -t $(IMAGE) -f $(DEBUG_DOCKERFILE) .
