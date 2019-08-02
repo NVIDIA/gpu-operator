@@ -25,8 +25,8 @@ spec:
           - containerPort: 60000
             name: metrics
           command:
-          - special-resource-operator
-          imagePullPolicy: Always
+          - gpu-operator
+          imagePullPolicy: IfNotPresent
           readinessProbe:
             exec:
               command:
