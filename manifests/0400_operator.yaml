@@ -36,6 +36,11 @@ spec:
             periodSeconds: 10
             failureThreshold: 1
           env:
+            - name: GPU_DRIVER_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: driverVersion
             - name: KUBE_UNSUPPORTED_FLAVOR
               valueFrom:
                 configMapKeyRef:

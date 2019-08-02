@@ -5,3 +5,4 @@ metadata:
   namespace: gpu-operator
 data:
   unsupported: openshift
+  driverVersion: "418.40.04"

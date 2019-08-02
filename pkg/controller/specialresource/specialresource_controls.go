@@ -3,7 +3,7 @@ package specialresource
 import (
 	"context"
 	"fmt"
-	"strings"
+	"os"
 
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -25,7 +25,9 @@ type ResourceStatus string
 const (
 	Ready    ResourceStatus = "Ready"
 	NotReady ResourceStatus = "NotReady"
+	DefaultDriverVersion = "418.40.04"
 )
+
 
 func ServiceAccount(n SRO) (ResourceStatus, error) {
 
@@ -213,7 +215,7 @@ func ConfigMap(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func kernelFullVersion(n SRO) string {
+func kernelFullVersion(n SRO) (string, string) {
 
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
@@ -223,12 +225,13 @@ func kernelFullVersion(n SRO) string {
 	err := n.rec.client.List(context.TODO(), opts, list)
 	if err != nil {
 		logger.Info("Could not get NodeList", err)
+		return "", ""
 	}
 
 	if len(list.Items) == 0 {
 		// none of the nodes matched a pci-10de label
 		// either the nodes do not have GPUs, or NFD is not running
-		return ""
+		return "", ""
 	}
 
 	// Assuming all nodes are running the same kernel version,
@@ -244,17 +247,38 @@ func kernelFullVersion(n SRO) string {
 		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
 			"feature.node.kubernetes.io/kernel-version.full")
 		logger.Info("Couldn't get kernelVersion", err)
-		return ""
+		return "", ""
 	}
-	return kernelFullVersion
+
+	osName, ok := labels["feature.node.kubernetes.io/system-os_release.ID"]
+	if !ok {
+		return kernelFullVersion, ""
+	}
+	osVersion, ok := labels["feature.node.kubernetes.io/system-os_release.VERSION_ID"]
+	if !ok {
+		return kernelFullVersion, ""
+	}
+	osTag := fmt.Sprintf("%s%s", osName, osVersion)
+
+	return kernelFullVersion, osTag
+}
+
+func getDriverVersion() string {
+	driverVersion := os.Getenv("GPU_DRIVER_VERSION")
+	if driverVersion == "" {
+		driverVersion = DefaultDriverVersion
+	}
+	return driverVersion
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	if obj.Name == "nvidia-driver-daemonset" {
-		kernelVersion := kernelFullVersion(n)
-		img := obj.Spec.Template.Spec.Containers[0].Image
-		img = strings.Replace(img, "KERNEL_FULL_VERSION", kernelVersion, -1)
-		obj.Spec.Template.Spec.Containers[0].Image = img
+		kernelVersion, osTag := kernelFullVersion(n)
+		if osTag != "" {
+			img := obj.Spec.Template.Spec.Containers[0].Image
+			img =  fmt.Sprintf("nvidia/driver:%s-%s", getDriverVersion(), osTag)
+			obj.Spec.Template.Spec.Containers[0].Image = img
+		}
 		sel := "feature.node.kubernetes.io/kernel-version.full"
 		obj.Spec.Template.Spec.NodeSelector[sel] = kernelVersion
 	}
