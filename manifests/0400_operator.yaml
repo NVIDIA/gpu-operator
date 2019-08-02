@@ -20,7 +20,7 @@ spec:
       # readOnlyRootFilesystem: true
       containers:
         - name: special-resource-operator
-          image: quay.io/zvonkok/special-resource-operator:p3
+          image: nvidia/gpu-operator:latest
           ports:
           - containerPort: 60000
             name: metrics
@@ -36,6 +36,11 @@ spec:
             periodSeconds: 10
             failureThreshold: 1
           env:
+            - name: KUBE_UNSUPPORTED_FLAVOR
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: unsupported
             - name: WATCH_NAMESPACE
               value: ""
             - name: POD_NAME
