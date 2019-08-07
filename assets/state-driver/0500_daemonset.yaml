@@ -29,7 +29,7 @@ spec:
       serviceAccountName: nvidia-driver
       hostPID: true
       containers:
-      - image: quay.io/zvonkok/nvidia-driver:v410.79-KERNEL_FULL_VERSION
+      - image: nvidia/driver:418.40.04-ubuntu18.04
         imagePullPolicy: Always
         name: nvidia-driver-ctr
         command: ["nvidia-driver"]
@@ -60,5 +60,5 @@ spec:
               - key: oci-nvidia-hook-json
                 path: oci-nvidia-hook.json
       nodeSelector:
-        feature.node.kubernetes.io/pci-10de.present: "true"
+        feature.node.kubernetes.io/pci-0302_10de.present: "true"
         feature.node.kubernetes.io/kernel-version.full: "KERNEL_FULL_VERSION"
