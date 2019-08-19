@@ -9,6 +9,9 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+platform:
+  openshift: false
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

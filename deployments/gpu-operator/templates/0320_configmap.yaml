@@ -4,5 +4,9 @@ metadata:
   name: operator-config
   namespace: gpu-operator
 data:
+{{- if .Values.platform.openshift }}
+  unsupported: ""
+{{ else }}
   unsupported: openshift
+{{- end }}
   driverVersion: "418.40.04"

@@ -4,12 +4,14 @@ metadata:
   creationTimestamp: null
   name: special-resource-operator
 rules:
+{{- if .Values.platform.openshift }}
 - apiGroups:
   - security.openshift.io
   resources:
   - securitycontextconstraints
   verbs:
   - '*'
+{{- end }}
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
