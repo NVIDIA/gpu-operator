@@ -2,6 +2,7 @@ FROM golang:1.10 AS builder
 WORKDIR /go/src/github.com/NVIDIA/gpu-operator
 COPY . .
 RUN make build
+RUN make test
 
 FROM ubuntu:18.04
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
