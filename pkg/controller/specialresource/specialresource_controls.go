@@ -220,7 +220,7 @@ func kernelFullVersion(n SRO) (string, string) {
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := &client.ListOptions{}
-	opts.SetLabelSelector("feature.node.kubernetes.io/pci-0302_10de.present=true")
+	opts.SetLabelSelector("feature.node.kubernetes.io/pci-10de.present=true")
 	list := &corev1.NodeList{}
 	err := n.rec.client.List(context.TODO(), opts, list)
 	if err != nil {
@@ -534,7 +534,7 @@ func Taint(n SRO) (ResourceStatus, error) {
 
 	logger.Info("Looking for")
 	opts := &client.ListOptions{}
-	opts.SetLabelSelector("feature.node.kubernetes.io/pci-0300_10de.present=true")
+	opts.SetLabelSelector("feature.node.kubernetes.io/pci-10de.present=true")
 	list := &corev1.NodeList{}
 	err := n.rec.client.List(context.TODO(), opts, list)
 	if err != nil {
