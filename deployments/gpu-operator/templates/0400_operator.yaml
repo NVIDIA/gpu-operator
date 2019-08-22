@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: special-resource-operator
+  namespace: gpu-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: special-resource-operator
+  template:
+    metadata:
+      labels:
+        name: special-resource-operator
+      annotations:
+        openshift.io/scc: restricted-readonly
+    spec:
+      serviceAccount: special-resource-operator
+      serviceAccountName: special-resource-operator
+      # readOnlyRootFilesystem: true
+      containers:
+        - name: special-resource-operator
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          ports:
+          - containerPort: 60000
+            name: metrics
+          command:
+          - gpu-operator
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          readinessProbe:
+            exec:
+              command:
+                - stat
+                - /tmp/operator-sdk-ready
+            initialDelaySeconds: 4
+            periodSeconds: 10
+            failureThreshold: 1
+          env:
+            - name: GPU_DRIVER_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: driverVersion
+            - name: KUBE_UNSUPPORTED_FLAVOR
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: unsupported
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "special-resource-operator"
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Equal"
+          value: ""
+          effect: "NoSchedule"

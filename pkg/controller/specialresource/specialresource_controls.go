@@ -224,13 +224,14 @@ func kernelFullVersion(n SRO) (string, string) {
 	list := &corev1.NodeList{}
 	err := n.rec.client.List(context.TODO(), opts, list)
 	if err != nil {
-		logger.Info("Could not get NodeList", err)
+		logger.Info("Could not get NodeList", "ERROR", err)
 		return "", ""
 	}
 
 	if len(list.Items) == 0 {
 		// none of the nodes matched a pci-10de label
 		// either the nodes do not have GPUs, or NFD is not running
+		logger.Info("Could not get any nodes to match pci-0302_10de.present=true label", "ERROR", "")
 		return "", ""
 	}
 

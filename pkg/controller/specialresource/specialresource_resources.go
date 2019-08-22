@@ -64,7 +64,7 @@ func matchKubeFlavor(path string) bool {
 	}
 	matched := strings.Contains(path, flavor)
 	if matched {
-		log.Info("OpenShift is not supported. Skipping %s", path)
+		log.Info("OpenShift is not supported. Skipping", "PATH", path)
 		return false
 	}
 	return true
