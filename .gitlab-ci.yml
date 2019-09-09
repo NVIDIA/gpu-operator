@@ -4,11 +4,15 @@ services:
 variables:
   IMAGE: $CI_REGISTRY_IMAGE:latest
   BUILDER: $CI_REGISTRY_IMAGE:builder
+  TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
 
 stages:
   - gitlab
   - unit
   - build
+  - aws_kube_setup
+  - e2e_tests
+  - aws_kube_clean
 
 gitlab-builder:
   image: docker:stable
@@ -35,3 +39,17 @@ build-image:
 
     - make image IMAGE=$IMAGE
     - docker push $IMAGE
+
+e2e_tests:
+  stage: e2e_tests
+  image: alpine
+  script:
+    - source aws-kube-ci/hostname
+    - apk add --no-cache openssh-client
+    - ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} echo
+  dependencies:
+    - aws_kube_setup
+
+include:
+  project: nvidia/container-infrastructure/aws-kube-ci
+  file: aws-kube-ci.yml
