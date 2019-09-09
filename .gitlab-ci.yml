@@ -1,8 +1,6 @@
-services:
-  - docker:stable-dind
-
 variables:
-  IMAGE: $CI_REGISTRY_IMAGE:latest
+  IMAGE: $CI_REGISTRY_IMAGE
+  TAG: latest
   BUILDER: $CI_REGISTRY_IMAGE:builder
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
 
@@ -17,6 +15,8 @@ stages:
 gitlab-builder:
   image: docker:stable
   stage: gitlab
+  services:
+    - docker:stable-dind
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
@@ -33,20 +33,23 @@ unit-tests:
 build-image:
   stage: build
   image: docker:stable
+  services:
+    - docker:stable-dind
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make image IMAGE=$IMAGE
-    - docker push $IMAGE
+    - make image IMAGE=$IMAGE:$TAG
+    - docker push $IMAGE:$TAG
 
 e2e_tests:
   stage: e2e_tests
   image: alpine
   script:
     - source aws-kube-ci/hostname
-    - apk add --no-cache openssh-client
-    - ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} echo
+    - apk add --no-cache openssh-client rsync
+    - rsync -e "ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no" -av --exclude="vendor/" "${CI_PROJECT_DIR}" "${instance_hostname}:~/"
+    - ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${IMAGE} ${TAG}"
   dependencies:
     - aws_kube_setup
 
