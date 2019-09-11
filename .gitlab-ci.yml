@@ -49,9 +49,16 @@ e2e_tests:
     - source aws-kube-ci/hostname
     - apk add --no-cache openssh-client rsync
     - rsync -e "ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no" -av --exclude="vendor/" "${CI_PROJECT_DIR}" "${instance_hostname}:~/"
-    - ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${IMAGE} ${TAG}"
+    - rc=0
+    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${IMAGE} ${TAG}") || rc=$?
+    - rsync -e "ssh -i aws-kube-ci/key" -av "${instance_hostname}:/tmp/logs/" logs
+    - exit $rc
   dependencies:
     - aws_kube_setup
+  artifacts:
+    when: always
+    paths:
+      - logs/
 
 include:
   project: nvidia/container-infrastructure/aws-kube-ci

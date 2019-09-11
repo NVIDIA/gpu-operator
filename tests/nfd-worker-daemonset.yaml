@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nfd-worker
+  name: nfd-worker
+  namespace: node-feature-discovery
+spec:
+  selector:
+    matchLabels:
+      app: nfd-worker
+  template:
+    metadata:
+      labels:
+        app: nfd-worker
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          image: quay.io/kubernetes_incubator/node-feature-discovery:v0.4.0
+          name: nfd-worker
+          command:
+            - "nfd-worker"
+          args:
+            - "--sleep-interval=60s"
+            - "--server=nfd-master:8080"
+            - "--options={\"sources\": {\"pci\": { \"deviceLabelFields\": [\"vendor\"] }}}"
+## Enable TLS authentication (1/3)
+## The example below assumes having the root certificate named ca.crt stored in
+## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored
+## in a TLS Secret named nfd-worker-cert
+#            - "--ca-file=/etc/kubernetes/node-feature-discovery/trust/ca.crt"
+#            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+#            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+          volumeMounts:
+            - name: host-boot
+              mountPath: "/host-boot"
+              readOnly: true
+            - name: host-os-release
+              mountPath: "/host-etc/os-release"
+              readOnly: true
+            - name: host-sys
+              mountPath: "/host-sys"
+            - name: source-d
+              mountPath: "/etc/kubernetes/node-feature-discovery/source.d/"
+            - name: features-d
+              mountPath: "/etc/kubernetes/node-feature-discovery/features.d/"
+## Enable TLS authentication (2/3)
+#            - name: nfd-ca-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/trust"
+#              readOnly: true
+#            - name: nfd-worker-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+#              readOnly: true
+      volumes:
+        - name: host-boot
+          hostPath:
+            path: "/boot"
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
+        - name: host-sys
+          hostPath:
+            path: "/sys"
+        - name: source-d
+          hostPath:
+            path: "/etc/kubernetes/node-feature-discovery/source.d/"
+        - name: features-d
+          hostPath:
+            path: "/etc/kubernetes/node-feature-discovery/features.d/"
+## Enable TLS authentication (3/3)
+#        - name: nfd-ca-cert
+#          configMap:
+#            name: nfd-ca-cert
+#        - name: nfd-worker-cert
+#          secret:
+#            secretName: nfd-worker-cert
