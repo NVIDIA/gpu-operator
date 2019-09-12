@@ -2,7 +2,7 @@ FROM registry.svc.ci.openshift.org/ocp/builder:golang-1.10 AS builder
 WORKDIR /go/src/github.com/NVIDIA/gpu-operator
 COPY . .
 RUN make build
-RUN make test
+RUN make verify
 
 FROM registry.svc.ci.openshift.org/ocp/4.0:base
 COPY --from=builder /go/src/github.com/NVIDIA/gpu-operator/gpu-operator  /usr/bin/
