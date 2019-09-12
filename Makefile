@@ -54,10 +54,10 @@ lint:
 		| sort -u | xargs golint -set_exit_status
 
 vet:
-	go vet ./...
+	go vet $(PACKAGE)/...
 
 test:
-	go test $(PACKAGES)/cmd/... $(PACKAGE)/pkg/... -coverprofile cover.out
+	go test $(PACKAGE)/cmd/... $(PACKAGE)/pkg/... -coverprofile cover.out
 
 assign:
 	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
