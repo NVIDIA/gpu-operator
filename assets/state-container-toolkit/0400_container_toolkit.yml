@@ -30,7 +30,7 @@ spec:
         operator: Exists
         effect: NoSchedule
       serviceAccount: nvidia-container-toolkit
-      hostPid: true
+      hostPID: true
       containers:
       - image: nvidia/container-toolkit:docker19.03
         command: ["/work/run.sh"]
