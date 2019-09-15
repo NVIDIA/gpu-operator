@@ -35,7 +35,7 @@ GOOS         := linux
 ##### Public rules #####
 
 all: build verify
-verify: fmt lint test
+verify: fmt lint test vet assign
 
 devel:
 	$(DOCKER) build -t $(BUILDER) -f $(DOCKERDEVEL) .
@@ -46,14 +46,22 @@ build:
 
 fmt:
 	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
-		| sort -u | xargs gofmt -s -l
+		| sort -u | xargs gofmt -s -l -d > fmt.out
+	if [ -s fmt.out ]; then cat fmt.out; rm fmt.out; exit 1; else rm fmt.out; fi
 
 lint:
 	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
-		| sort -u | xargs golint
+		| sort -u | xargs golint -set_exit_status
+
+vet:
+	go vet $(PACKAGE)/...
 
 test:
-	go test $(PACKAGES)/cmd/... $(PACKAGE)/pkg/... -coverprofile cover.out
+	go test $(PACKAGE)/cmd/... $(PACKAGE)/pkg/... -coverprofile cover.out
+
+assign:
+	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
+		| sort -u | xargs ineffassign
 
 clean:
 	go clean

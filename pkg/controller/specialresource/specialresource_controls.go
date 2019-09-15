@@ -23,11 +23,10 @@ type controlFunc []func(n SRO) (ResourceStatus, error)
 type ResourceStatus string
 
 const (
-	Ready    ResourceStatus = "Ready"
-	NotReady ResourceStatus = "NotReady"
-	DefaultDriverVersion = "418.40.04"
+	Ready                ResourceStatus = "Ready"
+	NotReady             ResourceStatus = "NotReady"
+	DefaultDriverVersion                = "418.40.04"
 )
-
 
 func ServiceAccount(n SRO) (ResourceStatus, error) {
 
@@ -276,8 +275,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	if obj.Name == "nvidia-driver-daemonset" {
 		kernelVersion, osTag := kernelFullVersion(n)
 		if osTag != "" {
-			img := obj.Spec.Template.Spec.Containers[0].Image
-			img =  fmt.Sprintf("nvidia/driver:%s-%s", getDriverVersion(), osTag)
+			img := fmt.Sprintf("nvidia/driver:%s-%s", getDriverVersion(), osTag)
 			obj.Spec.Template.Spec.Containers[0].Image = img
 		}
 		sel := "feature.node.kubernetes.io/kernel-version.full"
