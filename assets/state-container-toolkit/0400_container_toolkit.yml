@@ -30,7 +30,7 @@ spec:
         operator: Exists
         effect: NoSchedule
       serviceAccount: nvidia-container-toolkit
-      hostPid: true
+      hostPID: true
       containers:
       - image: nvidia/container-toolkit:docker19.03
         command: ["/work/run.sh"]
@@ -39,15 +39,16 @@ spec:
         name: nvidia-container-toolkit-ctr
         securityContext:
           privileged: true
+          seLinuxOptions:
+            level: "s0"
         volumeMounts:
           - name: docker-socket
             mountPath: /var/run/docker.sock
           - name: nvidia-install-path
             mountPath: /run/nvidia
+            mountPropagation: Bidirectional
           - name: docker-config
             mountPath: /etc/docker
-          - name: nvidia-config
-            mountPath: /etc/nvidia-container-runtime
       volumes:
         - name: docker-socket
           hostPath:
@@ -58,8 +59,5 @@ spec:
         - name: docker-config
           hostPath:
             path: /etc/docker
-        - name: nvidia-config
-          hostPath:
-            path: /etc/nvidia-container-runtime
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
