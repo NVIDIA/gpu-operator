@@ -78,6 +78,7 @@ func (n *SRO) init(r *ReconcileSpecialResource,
 
 	addClient(n)
 
+	addState(n, "/opt/sro/state-container-toolkit")
 	addState(n, "/opt/sro/state-driver")
 	addState(n, "/opt/sro/state-driver-validation")
 	addState(n, "/opt/sro/state-device-plugin")
