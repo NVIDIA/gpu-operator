@@ -39,11 +39,14 @@ spec:
         name: nvidia-container-toolkit-ctr
         securityContext:
           privileged: true
+          seLinuxOptions:
+            level: "s0"
         volumeMounts:
           - name: docker-socket
             mountPath: /var/run/docker.sock
           - name: nvidia-install-path
             mountPath: /run/nvidia
+            mountPropagation: Bidirectional
           - name: docker-config
             mountPath: /etc/docker
       volumes:
