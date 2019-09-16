@@ -46,8 +46,6 @@ spec:
             mountPath: /run/nvidia
           - name: docker-config
             mountPath: /etc/docker
-          - name: nvidia-config
-            mountPath: /etc/nvidia-container-runtime
       volumes:
         - name: docker-socket
           hostPath:
@@ -58,8 +56,5 @@ spec:
         - name: docker-config
           hostPath:
             path: /etc/docker
-        - name: nvidia-config
-          hostPath:
-            path: /etc/nvidia-container-runtime
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
