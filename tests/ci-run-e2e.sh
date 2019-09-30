@@ -16,8 +16,8 @@ echo "Install dependencies"
 sudo apt update && sudo apt install -y jq
 
 echo "Deploy NFD"
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/node-feature-discovery/master/nfd-master.yaml.template
-kubectl apply -f ./nfd-worker-daemonset.yaml
+#kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/node-feature-discovery/master/nfd-master.yaml.template
+#kubectl apply -f ./nfd-worker-daemonset.yaml
 
 echo "Install Helm"
 curl -L https://git.io/get_helm.sh | bash
@@ -30,7 +30,7 @@ helm install ../deployments/gpu-operator --set image.repository="${IMAGE}" --set
 
 # Should be done by default by helm deployment
 echo "Deploy default CRD"
-kubectl apply -f ../manifests/cr/sro_cr_sched_none.yaml
+#kubectl apply -f ../manifests/cr/sro_cr_sched_none.yaml
 
 echo "Deploy GPU pod"
 kubectl apply -f gpu-pod.yaml

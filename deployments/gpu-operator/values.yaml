@@ -4,6 +4,9 @@
 
 replicaCount: 1
 
+nfd:
+  enabled: true
+
 image:
   repository: nvidia/gpu-operator
   tag: latest
