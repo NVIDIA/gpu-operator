@@ -34,7 +34,7 @@ spec:
       containers:
       - image: nvidia/container-toolkit:docker19.03
         command: ["/work/run.sh"]
-        args: ["/run/nvidia", "unix://var/run/docker.sock"]
+        args: ["/run/nvidia", "/var/run/docker.sock"]
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:
