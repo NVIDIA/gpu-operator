@@ -12,7 +12,7 @@ spec:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-  restartPolicy: Never
+  restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
       image: "quay.io/zvonkok/cuda-vector-add:v0.1"
