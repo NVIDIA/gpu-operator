@@ -3,7 +3,7 @@
 The GPU operator manages NVIDIA GPU resources in a Kubernetes cluster and automates tasks related to bootstrapping GPU nodes. Since the GPU is a special resource in the cluster, it requires a few components to be installed before application workloads can be deployed onto the GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin, container runtime and others such as automatic node labelling, monitoring etc.
 
 ## Project Status
-This is a technical preview release of the GPU operator. The operator is available on NGC and can be deployed using a Helm chart. 
+This is a technical preview release of the GPU operator. The operator can be deployed using a Helm chart. 
 
 
 #### Quickstart
