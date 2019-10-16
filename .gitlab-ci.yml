@@ -1,7 +1,6 @@
 variables:
-  IMAGE: $CI_REGISTRY_IMAGE
-  TAG: latest
-  BUILDER: $CI_REGISTRY_IMAGE:builder
+  DOCKERHUB: nvidia/gpu-operator
+  NVCRIO: nvcr.io/nvidia/cloud-native/gpu-operator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
 
 stages:
@@ -11,6 +10,7 @@ stages:
   - aws_kube_setup
   - e2e_tests
   - aws_kube_clean
+  - release
 
 gitlab-builder:
   image: docker:stable
@@ -21,12 +21,12 @@ gitlab-builder:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make devel BUILDER=$BUILDER
-    - docker push $BUILDER
+    - make devel BUILDER=$CI_REGISTRY_IMAGE:builder
+    - docker push $CI_REGISTRY_IMAGE:builder
 
 unit-tests:
   stage: unit
-  image: $BUILDER
+  image: $CI_REGISTRY_IMAGE:builder
   script:
     - make verify
 
@@ -39,8 +39,8 @@ build-image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make image IMAGE=$IMAGE:$TAG
-    - docker push $IMAGE:$TAG
+    - make image IMAGE=$CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
 
 e2e_tests:
   stage: e2e_tests
@@ -63,3 +63,27 @@ e2e_tests:
 include:
   project: nvidia/container-infrastructure/aws-kube-ci
   file: aws-kube-ci.yml
+
+release-containers:
+    stage: release
+    only:
+    - tags
+
+    script:
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}"
+    - apk add --update make
+
+    - make image IMAGE=$DOCKERHUB:$CI_COMMIT_TAG
+    - docker push $DOCKERHUB:$CI_COMMIT_TAG
+
+release-nvcrio-containers:
+    stage: release
+    only:
+    - tags
+
+    script:
+    - docker login -u "${NVCRIO_USER}" -p "${NVCRIO_TOKEN}"
+    - apk add --update make
+
+    - make image IMAGE=$NVCRIO:$CI_COMMIT_TAG
+    - docker push $NVCRIO:$CI_COMMIT_TAG
