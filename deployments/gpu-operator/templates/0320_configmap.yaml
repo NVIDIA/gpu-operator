@@ -9,4 +9,7 @@ data:
 {{ else }}
   unsupported: openshift
 {{- end }}
-  driverVersion: "418.40.04"
+
+  driver: "{{ .Values.nvidia.driver.repository }}/{{ .Values.nvidia.driver.image }}:{{ .Values.nvidia.driver.version }}"
+  toolkit: "{{ .Values.nvidia.toolkit.repository }}/{{ .Values.nvidia.toolkit.image }}:{{ .Values.nvidia.toolkit.version }}"
+  devicePlugin: "{{ .Values.nvidia.devicePlugin.repository }}/{{ .Values.nvidia.devicePlugin.image }}:{{ .Values.nvidia.devicePlugin.version }}"

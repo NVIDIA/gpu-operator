@@ -36,11 +36,21 @@ spec:
             periodSeconds: 10
             failureThreshold: 1
           env:
-            - name: GPU_DRIVER_VERSION
+            - name: NVIDIA_DRIVER
               valueFrom:
                 configMapKeyRef:
                   name: operator-config
-                  key: driverVersion
+                  key: driver
+            - name: NVIDIA_TOOLKIT
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: toolkit
+            - name: NVIDIA_DEVICE_PLUGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: operator-config
+                  key: devicePlugin
             - name: KUBE_UNSUPPORTED_FLAVOR
               valueFrom:
                 configMapKeyRef:
