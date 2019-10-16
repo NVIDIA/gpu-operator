@@ -23,9 +23,11 @@ type controlFunc []func(n SRO) (ResourceStatus, error)
 type ResourceStatus string
 
 const (
-	Ready                ResourceStatus = "Ready"
-	NotReady             ResourceStatus = "NotReady"
-	DefaultDriverVersion                = "418.40.04"
+	Ready               ResourceStatus = "Ready"
+	NotReady            ResourceStatus = "NotReady"
+	DefaultDriver                      = "nvidia/driver:418.40.04"
+	DefaultToolkit                     = "nvidia/container-toolkit:1.0.0-alpha1"
+	DefaultDevicePlugin                = "nvidia/k8s-device-plugin:1.0.0-beta4"
 )
 
 func ServiceAccount(n SRO) (ResourceStatus, error) {
@@ -263,23 +265,43 @@ func kernelFullVersion(n SRO) (string, string) {
 	return kernelFullVersion, osTag
 }
 
-func getDriverVersion() string {
-	driverVersion := os.Getenv("GPU_DRIVER_VERSION")
-	if driverVersion == "" {
-		driverVersion = DefaultDriverVersion
+func getDriver() string {
+	driver := os.Getenv("NVIDIA_DRIVER")
+	if driver == "" {
+		driver = DefaultDriver
 	}
-	return driverVersion
+	return driver
+}
+
+func getToolkit() string {
+	toolkit := os.Getenv("NVIDIA_TOOLKIT")
+	if toolkit == "" {
+		toolkit = DefaultToolkit
+	}
+	return toolkit
+}
+
+func getDevicePlugin() string {
+	devicePlugin := os.Getenv("NVIDIA_DEVICE_PLUGIN")
+	if devicePlugin == "" {
+		devicePlugin = DefaultDevicePlugin
+	}
+	return devicePlugin
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	if obj.Name == "nvidia-driver-daemonset" {
 		kernelVersion, osTag := kernelFullVersion(n)
 		if osTag != "" {
-			img := fmt.Sprintf("nvidia/driver:%s-%s", getDriverVersion(), osTag)
+			img := fmt.Sprintf("%s-%s", getDriver(), osTag)
 			obj.Spec.Template.Spec.Containers[0].Image = img
 		}
 		sel := "feature.node.kubernetes.io/kernel-version.full"
 		obj.Spec.Template.Spec.NodeSelector[sel] = kernelVersion
+	} else if obj.Name == "nvidia-container-toolkit-daemonset" {
+		obj.Spec.Template.Spec.Containers[0].Image = getToolkit()
+	} else if obj.Name == "nvidia-device-plugin-daemonset" {
+		obj.Spec.Template.Spec.Containers[0].Image = getDevicePlugin()
 	}
 }
 

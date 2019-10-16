@@ -29,7 +29,7 @@ spec:
       serviceAccountName: nvidia-driver
       hostPID: true
       containers:
-      - image: nvidia/driver:418.40.04-ubuntu18.04
+      - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
         name: nvidia-driver-ctr
         command: ["nvidia-driver"]

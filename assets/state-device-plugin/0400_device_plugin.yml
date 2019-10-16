@@ -31,7 +31,7 @@ spec:
         effect: NoSchedule
       serviceAccount: nvidia-device-plugin
       containers:
-      - image: quay.io/zvonkok/k8s-device-plugin:4.0 #nvidia/k8s-device-plugin:1.11
+      - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin-ctr
         securityContext:
           privileged: true

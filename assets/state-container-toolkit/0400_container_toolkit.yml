@@ -32,7 +32,7 @@ spec:
       serviceAccount: nvidia-container-toolkit
       hostPID: true
       containers:
-      - image: nvidia/container-toolkit:docker19.03
+      - image: "FILLED_BY_THE_OPERATOR"
         command: ["/work/run.sh"]
         args: ["/run/nvidia", "/var/run/docker.sock"]
         imagePullPolicy: IfNotPresent
