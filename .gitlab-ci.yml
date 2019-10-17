@@ -65,11 +65,12 @@ include:
   file: aws-kube-ci.yml
 
 release-containers:
-    stage: release
-    only:
+  stage: release
+  image: $CI_REGISTRY_IMAGE:builder
+  only:
     - tags
 
-    script:
+  script:
     - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}"
     - apk add --update make
 
@@ -77,11 +78,11 @@ release-containers:
     - docker push $DOCKERHUB:$CI_COMMIT_TAG
 
 release-nvcrio-containers:
-    stage: release
-    only:
+  stage: release
+  only:
     - tags
 
-    script:
+  script:
     - docker login -u "${NVCRIO_USER}" -p "${NVCRIO_TOKEN}"
     - apk add --update make
 
