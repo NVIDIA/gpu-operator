@@ -6,18 +6,77 @@ The GPU operator manages NVIDIA GPU resources in a Kubernetes cluster and automa
 This is a technical preview release of the GPU operator. The operator can be deployed using a Helm chart. 
 
 
-#### Quickstart
+## Platform Support
+- Pascal+ GPUs are supported (incl. Tesla V100 and T4)
+- Kubernetes v1.13+
+- Helm 2
+- Ubuntu 18.04.3 LTS
+- The GPU operator has been validated with the following NVIDIA components:
+  - Docker CE 19.03.2
+  - NVIDIA Container Toolkit 1.0.5
+  - NVIDIA Kubernetes Device Plugin 1.0.0-beta4
+  - NVIDIA Tesla Driver 418.87.01
+
+
+## Prerequisites
+- Nodes must not be pre-configured with NVIDIA components (driver, container runtime, device plugin).
+- i2c_core and ipmi_msghandler kernel modules need to be loaded (Use the following command to ensure these modules are loaded with the following command)
+  - $ sudo modprobe -a i2c_core ipmi_msghandler
+  - Note that this step is not persistent across reboots. To make this persistent across reboots, add the modules to the configuration file as shown:
+    - $ echo -e "i2c_core\nipmi_msghandler" | sudo tee /etc/modules-load.d/driver.conf
+- Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed . If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
+  - Set the variable nfd.enabled=false at the helm install step:
+    - $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
+  - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
+
+
+## Installation
+
+#### Install Helm
 ```sh
-# If this is your first run of helm
+$ curl -L https://git.io/get_helm.sh | bash
+
+# Create service-account for helm
+$ kubectl create serviceaccount -n kube-system tiller
+$ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+
+# Initialize Helm
+$ helm init --service-account tiller --wait
+
+# Note that if you have helm already deployed in your cluster and you are adding a new node, run this instead
 $ helm init --client-only
 
-# Install helm https://docs.helm.sh/using_helm/ then run:
+# Additional step required for Kubernetes v1.16. See: https://github.com/helm/helm/issues/6374
+$ helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
+$ kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
+```
+
+#### Install GPU Operator
+```sh
+# Before running this, make sure helm is installed and initialized:
 $ helm repo add nvidia https://nvidia.github.io/gpu-operator
 $ helm repo update
 
+# Note that after running this command, NFD will be automatically deployed. If you have NFD already setup, follow the NFD instruction from the Prerequisites.
 $ helm install --devel nvidia/gpu-operator -n test-operator --wait
 $ kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/manifests/cr/sro_cr_sched_none.yaml
 
+# To check the gpu-operator version
+$ helm ls
+```
+
+#### Uninstall GPU Operator
+```sh
+$ helm del --purge test-operator
+$ sudo reboot
+
+# Check if the operator got uninstalled properly
+$ kubectl get pods -n gpu-operator-resources
+No resources found.
+```
+
+#### Running a Sample GPU Application
+```sh
 # Create a tensorflow notebook example
 $ kubectl apply -f https://nvidia.github.io/gpu-operator/notebook-example.yml
 
@@ -30,42 +89,22 @@ $ kubectl logs tf-notebook
 JupyterLab v0.24.1
 Known labextensions:
 [I 23:20:42.933 NotebookApp] Serving notebooks from local directory: /home/jovyan
-    
-        Copy/paste this URL into your browser when you connect for the first time,
-            to login with a token:
-                    http://localhost:8888/?token=MY_TOKEN
-```
 
+   Copy/paste this URL into your browser when you connect for the first time,
+       to login with a token:
+          http://localhost:8888/?token=MY_TOKEN
 You can now access the notebook on http://localhost:30001/?token=MY_TOKEN
-
-#### Install Helm
-```sh
-curl -L https://git.io/get_helm.sh | bash
-kubectl create serviceaccount -n kube-system tiller
-kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-
-# See: https://github.com/helm/helm/issues/6374
-helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
-kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
 ```
 
-## Prerequisites and Platform Support 
-- Pascal+ GPUs are supported (incl. Tesla V100 and T4) 
-- Kubernetes v1.13+
-- Helm 2
-- Ubuntu 18.04.3 LTS
-- `i2c_core` and `ipmi_msghandler` kernel modules loaded (`sudo modprobe -a i2c_core ipmi_msghandler`)
-- NFD deployed on each node (see how to [setup](https://github.com/kubernetes-sigs/node-feature-discovery))
-  **(only if helm option nfd.enabled is set to false)**
-  - Nodes must not be already setup with NVIDIA Components (driver, runtime, device plugin)
+### Known Limitations
+- With Kubernetes v1.16, Helm may fail to initialize. See [this issue](https://github.com/helm/helm/issues/6374) for more details. A workaround has already been included in the Helm installation steps above in this document.
+- GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin).
+- Removing the GPU Operator will require you to reboot your nodes.
 
-## Known Limitations
-  - With Kubernetes v1.16, Helm may fail to initialize. See [this issue](https://github.com/helm/helm/issues/6374) for more details.
-  - GPU Operator will fail on nodes already setup with NVIDIA Components (driver, runtime, device plugin)
-  - Removing the GPU Operator will require you to reboot your nodes
 
-## Contributions
-  [Read the document on contributions](https://github.com/NVIDIA/gpu-operator/blob/master/CONTRIBUTING.md). You can contribute by opening a [pull request](https://help.github.com/en/articles/about-pull-requests).
+### Contributions
+[Read the document on contributions](https://github.com/NVIDIA/gpu-operator/blob/master/CONTRIBUTING.md). You can contribute by opening a [pull request](https://help.github.com/en/articles/about-pull-requests).
 
-## Getting Help
-  Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
+### Getting Help
+Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
+
