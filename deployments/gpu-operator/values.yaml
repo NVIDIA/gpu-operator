@@ -9,7 +9,7 @@ nfd:
 
 image:
   repository: nvidia/gpu-operator
-  tag: 1.0.0-techpreview.0
+  tag: 1.0.0-techpreview.2
 
   pullPolicy: IfNotPresent
 
@@ -18,15 +18,15 @@ platform:
 
 nvidia:
   driver:
-    repository: nvidia
+    repository: nvcr.io/nvidia
     image: driver
-    version: "418.40.04"
+    version: "418.87.01-ubuntu18.04"
   toolkit:
-    repository: nvidia
+    repository: nvcr.io/nvidia
     image: container-toolkit
     version: 1.0.0-alpha1
   devicePlugin:
-    repository: nvidia
+    repository: nvcr.io/nvidia
     image: k8s-device-plugin
     version: 1.0.0-beta4
 

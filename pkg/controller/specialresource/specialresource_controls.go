@@ -25,9 +25,9 @@ type ResourceStatus string
 const (
 	Ready               ResourceStatus = "Ready"
 	NotReady            ResourceStatus = "NotReady"
-	DefaultDriver                      = "nvidia/driver:418.40.04"
-	DefaultToolkit                     = "nvidia/container-toolkit:1.0.0-alpha1"
-	DefaultDevicePlugin                = "nvidia/k8s-device-plugin:1.0.0-beta4"
+	DefaultDriver                      = "nvcr.io/nvidia/driver:418.87.01-ubuntu18.04"
+	DefaultToolkit                     = "nvcr.io/nvidia/container-toolkit:1.0.0-alpha1"
+	DefaultDevicePlugin                = "nvcr.io/nvidia/k8s-device-plugin:1.0.0-beta4"
 )
 
 func ServiceAccount(n SRO) (ResourceStatus, error) {
