@@ -20,7 +20,7 @@ nvidia:
   driver:
     repository: nvcr.io/nvidia
     image: driver
-    version: "418.87.01-ubuntu18.04"
+    version: "418.87.01"
   toolkit:
     repository: nvcr.io/nvidia
     image: container-toolkit
