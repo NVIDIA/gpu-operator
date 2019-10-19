@@ -8,8 +8,8 @@ nfd:
   enabled: true
 
 image:
-  repository: nvidia/gpu-operator
-  tag: 1.0.0-techpreview.2
+  repository: nvcr.io/nvidia/gpu-operator
+  tag: 1.0.0-techpreview.1
 
   pullPolicy: IfNotPresent
 
