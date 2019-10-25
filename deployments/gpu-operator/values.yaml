@@ -9,7 +9,7 @@ nfd:
 
 image:
   repository: nvcr.io/nvidia/gpu-operator
-  tag: 1.0.0-techpreview.1
+  tag: @OPERATOR_VERSION@
 
   pullPolicy: IfNotPresent
 

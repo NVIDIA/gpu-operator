@@ -33,7 +33,7 @@ Before a 1.0.0 release the artifacts will be versioned as follows:
 After every commit that successfully passes all tests, the following actions are performed:
 - The GPU Operator container is persisted on the gitlab registry
   - The tag for that container is the commit sha
-- The GPU Operator helm chart is pushed on the repositorie's github pages
+- The GPU Operator helm chart is pushed on the repository's github pages
   - The tag for that helm chart is the commit sha
 
 # Release Process
@@ -41,5 +41,5 @@ After every commit that successfully passes all tests, the following actions are
 After a commit that successfully passes all tests, a maintainer tags that commit with the release version (e.g: `1.0.0+techpreview.1`):
 - The GPU Operator container is persisted on the dockerhub and NGC registry
   - The tag for that container is the commit tag
-- The GPU Operator helm chart is pushed on the repositorie's github pages and NGC registry
+- The GPU Operator helm chart is pushed on the repository's github pages and NGC registry
   - The tag for that container is the commit tag
