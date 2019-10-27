@@ -33,8 +33,12 @@ spec:
       hostPID: true
       containers:
       - image: "FILLED_BY_THE_OPERATOR"
-        command: ["/work/run.sh"]
-        args: ["/run/nvidia", "/var/run/docker.sock"]
+        args: ["/run/nvidia"]
+        env:
+        - name: TOOLKIT_ARGS
+          value: "--symlink /usr/local/nvidia"
+        - name: RUNTIME_ARGS
+          value: "--socket /var/run/docker.sock"
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:
@@ -49,6 +53,8 @@ spec:
             mountPropagation: Bidirectional
           - name: docker-config
             mountPath: /etc/docker
+          - name: nvidia-local
+            mountPath: /usr/local/nvidia
       volumes:
         - name: docker-socket
           hostPath:
@@ -59,5 +65,8 @@ spec:
         - name: docker-config
           hostPath:
             path: /etc/docker
+        - name: nvidia-local
+          hostPath:
+            path: /usr/local/nvidia
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
