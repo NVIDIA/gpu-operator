@@ -22,9 +22,9 @@ nvidia:
     image: driver
     version: "418.87.01"
   toolkit:
-    repository: nvcr.io/nvidia
+    repository: nvidia
     image: container-toolkit
-    version: 1.0.0-alpha1
+    version: 1.0.0-alpha2
   devicePlugin:
     repository: nvcr.io/nvidia
     image: k8s-device-plugin

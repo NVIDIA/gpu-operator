@@ -44,12 +44,7 @@ spec:
             mountPropagation: Bidirectional
           - name: config
             mountPath: /etc/containers/oci/hooks.d
-          - name: host
-            mountPath: /host
       volumes:
-        - name: host
-          hostPath:
-            path: /
         - name: run-nvidia
           hostPath:
             path: /run/nvidia
