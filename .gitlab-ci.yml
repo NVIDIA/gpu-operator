@@ -45,8 +45,8 @@ build-image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make image IMAGE=$CI_REGISTRY_IMAGE:latest
-    - docker push $CI_REGISTRY_IMAGE:latest
+    - make image IMAGE=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
 
 e2e_tests:
   stage: e2e_tests
@@ -56,7 +56,7 @@ e2e_tests:
     - apk add --no-cache openssh-client rsync
     - rsync -e "ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no" -av --exclude="vendor/" "${CI_PROJECT_DIR}" "${instance_hostname}:~/"
     - rc=0
-    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE} latest") || rc=$?
+    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${CI_COMMIT_SHA}") || rc=$?
     - rsync -e "ssh -i aws-kube-ci/key" -av "${instance_hostname}:/tmp/logs/" logs
     - exit $rc
   dependencies:
