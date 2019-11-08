@@ -16,15 +16,15 @@ nvidia:
     image: gpu-operator
     tag: @OPERATOR_VERSION@
   driver:
-    repository: nvcr.io/nvidia
+    repository: nvidia
     image: driver
     version: "418.87.01"
   toolkit:
     repository: nvidia
     image: container-toolkit
-    version: 1.0.0-alpha2
+    version: 1.0.0-alpha.3
   devicePlugin:
-    repository: nvcr.io/nvidia
+    repository: nvidia
     image: k8s-device-plugin
     version: 1.0.0-beta4
 
