@@ -20,13 +20,13 @@ spec:
       # readOnlyRootFilesystem: true
       containers:
         - name: special-resource-operator
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: {{ .Values.nvidia.operator.repository }}/{{ .Values.nvidia.operator.image }}:{{ .Values.nvidia.operator.tag }}
+          imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 60000
             name: metrics
           command:
           - gpu-operator
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
           readinessProbe:
             exec:
               command:

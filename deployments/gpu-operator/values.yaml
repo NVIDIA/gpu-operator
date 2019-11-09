@@ -7,16 +7,14 @@ replicaCount: 1
 nfd:
   enabled: true
 
-image:
-  repository: nvcr.io/nvidia/gpu-operator
-  tag: @OPERATOR_VERSION@
-
-  pullPolicy: IfNotPresent
-
 platform:
   openshift: false
 
 nvidia:
+  operator:
+    repository: registry.gitlab.com/nvidia/kubernetes
+    image: gpu-operator
+    tag: @OPERATOR_VERSION@
   driver:
     repository: nvcr.io/nvidia
     image: driver

@@ -29,7 +29,8 @@ helm init --service-account tiller --override spec.selector.matchLabels.'name'='
 kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
 
 echo "Deploy operator"
-helm install ../deployments/gpu-operator --set image.repository="${IMAGE}" --set image.tag="${TAG}" -n test-operator --wait
+REPOSITORY="$(dirname "${IMAGE}")"
+helm install ../deployments/gpu-operator --set nvidia.operator.repository="${REPOSITORY}" --set nvidia.operator.tag="${TAG}" -n test-operator --wait
 
 # Should be done by default by helm deployment
 echo "Deploy default CRD"
