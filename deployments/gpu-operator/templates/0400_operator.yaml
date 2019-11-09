@@ -18,6 +18,7 @@ spec:
       serviceAccount: special-resource-operator
       serviceAccountName: special-resource-operator
       # readOnlyRootFilesystem: true
+
       containers:
       - name: special-resource-operator
         image: {{ .Values.nvidia.operator.repository }}/{{ .Values.nvidia.operator.image }}:{{ .Values.nvidia.operator.tag }}
@@ -30,6 +31,8 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: driver
+        - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
+          value: "{{ .Values.nvidia.operator.defaultRuntime }}"
         - name: NVIDIA_TOOLKIT
           valueFrom:
             configMapKeyRef:
@@ -63,6 +66,7 @@ spec:
         ports:
         - containerPort: 60000
           name: metrics
+
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
