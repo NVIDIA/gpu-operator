@@ -38,7 +38,7 @@ spec:
         - name: TOOLKIT_ARGS
           value: "--symlink /usr/local/nvidia"
         - name: RUNTIME_ARGS
-          value: "--socket /var/run/docker.sock"
+          value: ""
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:

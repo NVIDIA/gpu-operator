@@ -289,6 +289,14 @@ func getDevicePlugin() string {
 	return devicePlugin
 }
 
+func getRuntimeValue() string {
+	runtime := os.Getenv("NVIDIA_TOOLKIT_DEFAULT_RUNTIME")
+	if runtime == "" {
+		runtime = "docker"
+	}
+	return runtime
+}
+
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	if obj.Name == "nvidia-driver-daemonset" {
 		kernelVersion, osTag := kernelFullVersion(n)
@@ -300,9 +308,27 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 		obj.Spec.Template.Spec.NodeSelector[sel] = kernelVersion
 	} else if obj.Name == "nvidia-container-toolkit-daemonset" {
 		obj.Spec.Template.Spec.Containers[0].Image = getToolkit()
+		runtime := getRuntimeValue()
+
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
+		if runtime == "docker" {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS",
+				"--socket /var/run/docker.sock")
+		}
 	} else if obj.Name == "nvidia-device-plugin-daemonset" {
 		obj.Spec.Template.Spec.Containers[0].Image = getDevicePlugin()
 	}
+}
+
+func setContainerEnv(c *corev1.Container, key, value string) {
+	for i, val := range c.Env {
+		if val.Name != "RUNTIME" {
+			continue
+		}
+		c.Env[i].Value = value
+		return
+	}
+	log.Info(fmt.Sprintf("ERROR: Could not find environment variable %s in container %s", key, c.Name))
 }
 
 func isDaemonSetReady(name string, n SRO) ResourceStatus {
