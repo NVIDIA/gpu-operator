@@ -93,6 +93,8 @@ release-helm:
   stage: release # Should be after each successful commit
   variables:
     GIT_STRATEGY: clone
+  only:
+    - master
 
   script:
     - apk add --update curl openssl bash git openssh
