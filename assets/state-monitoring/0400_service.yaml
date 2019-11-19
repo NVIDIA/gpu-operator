@@ -5,12 +5,13 @@ metadata:
   name: nvidia-dcgm-exporter
   labels:
     app: nvidia-dcgm-exporter
+  annotations:
+    prometheus.io/scrape: "true"
 spec:
   selector:
     app: nvidia-dcgm-exporter
-  type: ClusterIP
   ports:
-  - name: dcgm
-    port: 9600
-    targetPort: 9600
+  - name: gpu-metrics
+    port: 9400
+    targetPort: 9400
     protocol: TCP

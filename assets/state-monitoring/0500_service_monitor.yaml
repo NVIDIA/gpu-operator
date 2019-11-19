@@ -5,11 +5,10 @@ metadata:
   name: nvidia-dcgm-exporter
 spec:
   endpoints:
-  - port: dcgm 
-#  namespaceSelector:
-#    matchNames:
-#    - gpu-operator
+  - port: gpu-metrics
+  namespaceSelector:
+    matchNames:
+    - gpu-operator-monitoring
   selector:
     matchLabels:
       app: nvidia-dcgm-exporter
-
