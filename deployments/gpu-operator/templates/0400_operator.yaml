@@ -43,6 +43,16 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: devicePlugin
+        - name: NVIDIA_DCGM_EXPORTER
+          valueFrom:
+            configMapKeyRef:
+              name: operator-monitoring-config
+              key: dcgmExporter
+        - name: NVIDIA_DCGM_POD_EXPORTER
+          valueFrom:
+            configMapKeyRef:
+              name: operator-monitoring-config
+              key: dcgmPodExporterg
         - name: KUBE_UNSUPPORTED_FLAVOR
           valueFrom:
             configMapKeyRef:

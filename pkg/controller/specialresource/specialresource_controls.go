@@ -298,6 +298,22 @@ func getRuntimeValue() string {
 	return runtime
 }
 
+func getDcgmExporter() string {
+	dcgmExporter := os.Getenv("NVIDIA_DCGM_EXPORTER")
+	if dcgmExporter == "" {
+		dcgmExporter = DefaultDcgmExporter
+	}
+	return dcgmExporter
+}
+
+func getDcgmPodExporter() string {
+	dcgmPodExporter := os.Getenv("NVIDIA_DCGM_POD_EXPORTER")
+	if dcgmPodExporter == "" {
+		dcgmPodExporter = DefaultDcgmPodExporter
+	}
+	return dcgmPodExporter
+}
+
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	if obj.Name == "nvidia-driver-daemonset" {
 		kernelVersion, osTag := kernelFullVersion(n)
@@ -318,6 +334,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 		}
 	} else if obj.Name == "nvidia-device-plugin-daemonset" {
 		obj.Spec.Template.Spec.Containers[0].Image = getDevicePlugin()
+	} else if obj.Name == "nvidia-dcgm-exporter" {
+		obj.Spec.Template.Spec.Containers[0].Image = getDcgmPodExporter()
+		obj.Spec.Template.Spec.Containers[1].Image = getDcgmExporter()
 	}
 }
 
