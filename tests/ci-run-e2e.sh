@@ -69,4 +69,8 @@ while :; do
   sleep 5;
 done
 
+echo "Checking gpu metrics"
+dcgm_pod_ip=$(kubectl get pods -n gpu-operator-monitoring -o wide | tail -n 1 | awk '{print $6}')
+curl $dcgm_pod_ip:9400/gpu/metrics | grep temp
+
 exit $rc
