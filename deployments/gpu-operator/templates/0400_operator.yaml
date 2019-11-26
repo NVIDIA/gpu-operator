@@ -21,7 +21,7 @@ spec:
 
       containers:
       - name: special-resource-operator
-        image: {{ .Values.nvidia.operator.repository }}/{{ .Values.nvidia.operator.image }}:{{ .Values.nvidia.operator.tag }}
+        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
 
@@ -32,7 +32,7 @@ spec:
               name: operator-config
               key: driver
         - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
-          value: "{{ .Values.nvidia.operator.defaultRuntime }}"
+          value: "{{ .Values.operator.defaultRuntime }}"
         - name: NVIDIA_TOOLKIT
           valueFrom:
             configMapKeyRef:
