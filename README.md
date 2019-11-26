@@ -28,7 +28,8 @@ This is a technical preview release of the GPU operator. The operator can be dep
   - Set the variable nfd.enabled=false at the helm install step:
     - $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
-
+- For monitoring, enable the kubelet KubeletPodResources feature gate
+  - $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
 
 ## Installation
 
