@@ -7,7 +7,13 @@ This repository outputs two artifacts:
 # Versioning
 
 This repository follows Semantic Versioning 2.0.0
-Before a 1.0.0 release the artifacts will be versioned as follows:
+The artifacts will be versioned as follows:
+- **nightly**: nightly-shortSHA
+    - The version names contain "nightly".
+    - May be buggy
+    - Features may be removed at any time.
+    - The API may change in incompatible ways in a later software release without notice.
+    - Recommended for use in short-lived clusters
 - **alpha**: 1.0.0+techpreview.N
     - The version names contain "techpreview".
     - May be buggy, enabling features may expose bugs.
@@ -28,13 +34,11 @@ Before a 1.0.0 release the artifacts will be versioned as follows:
 
 **The GPU Operator helm chart MUST be the same as the GPU Operator container.**
 
-# Staging Release Process
+# Nightly Release Process
 
 After every commit that successfully passes all tests, the following actions are performed:
-- The GPU Operator container is persisted on the gitlab registry
-  - The tag for that container is the commit sha
-- The GPU Operator helm chart is pushed on the repository's github pages
-  - The tag for that helm chart is the commit sha
+- The GPU Operator container is persisted on the dockerhub registry (e.g: 1.X.Y+nightly.shortSHA)
+- The GPU Operator helm chart is pushed on the repository's github pages (e.g: 1.X.Y+nightly.shortSHA)
 
 # Release Process
 
