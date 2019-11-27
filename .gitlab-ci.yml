@@ -73,6 +73,8 @@ include:
 
 release-github:
   image: docker:stable
+  services:
+    - docker:stable-dind
   stage: release # Should be after each successful commit
   variables:
     GIT_STRATEGY: clone
