@@ -301,7 +301,8 @@ func getRuntimeValue() string {
 func getDcgmExporter() string {
 	dcgmExporter := os.Getenv("NVIDIA_DCGM_EXPORTER")
 	if dcgmExporter == "" {
-		dcgmExporter = DefaultDcgmExporter
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_DCGM_EXPORTER"))
+		os.Exit(1)
 	}
 	return dcgmExporter
 }
@@ -309,7 +310,8 @@ func getDcgmExporter() string {
 func getDcgmPodExporter() string {
 	dcgmPodExporter := os.Getenv("NVIDIA_DCGM_POD_EXPORTER")
 	if dcgmPodExporter == "" {
-		dcgmPodExporter = DefaultDcgmPodExporter
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_DCGM_POD_EXPORTER"))
+		os.Exit(1)
 	}
 	return dcgmPodExporter
 }
