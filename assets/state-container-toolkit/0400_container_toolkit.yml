@@ -55,6 +55,8 @@ spec:
             mountPath: /etc/docker
           - name: nvidia-local
             mountPath: /usr/local/nvidia
+          - name: crio-hooks
+            mountPath: /usr/share/containers/oci/hooks.d
       volumes:
         - name: docker-socket
           hostPath:
@@ -68,5 +70,8 @@ spec:
         - name: nvidia-local
           hostPath:
             path: /usr/local/nvidia
+        - name: crio-hooks
+          hostPath:
+            path: /usr/share/containers/oci/hooks.d
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
