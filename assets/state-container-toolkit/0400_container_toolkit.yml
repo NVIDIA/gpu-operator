@@ -72,6 +72,6 @@ spec:
             path: /usr/local/nvidia
         - name: crio-hooks
           hostPath:
-            path: /usr/share/containers/oci/hooks.d
+            path: /etc/containers/oci/hooks.d
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
