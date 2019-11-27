@@ -23,11 +23,8 @@ type controlFunc []func(n SRO) (ResourceStatus, error)
 type ResourceStatus string
 
 const (
-	Ready               ResourceStatus = "Ready"
-	NotReady            ResourceStatus = "NotReady"
-	DefaultDriver                      = "nvcr.io/nvidia/driver:418.87.01-ubuntu18.04"
-	DefaultToolkit                     = "nvcr.io/nvidia/container-toolkit:1.0.0-alpha1"
-	DefaultDevicePlugin                = "nvcr.io/nvidia/k8s-device-plugin:1.0.0-beta4"
+	Ready    ResourceStatus = "Ready"
+	NotReady ResourceStatus = "NotReady"
 )
 
 func ServiceAccount(n SRO) (ResourceStatus, error) {
@@ -268,7 +265,8 @@ func kernelFullVersion(n SRO) (string, string) {
 func getDriver() string {
 	driver := os.Getenv("NVIDIA_DRIVER")
 	if driver == "" {
-		driver = DefaultDriver
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_DRIVER"))
+		os.Exit(1)
 	}
 	return driver
 }
@@ -276,7 +274,8 @@ func getDriver() string {
 func getToolkit() string {
 	toolkit := os.Getenv("NVIDIA_TOOLKIT")
 	if toolkit == "" {
-		toolkit = DefaultToolkit
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_TOOLKIT"))
+		os.Exit(1)
 	}
 	return toolkit
 }
@@ -284,7 +283,8 @@ func getToolkit() string {
 func getDevicePlugin() string {
 	devicePlugin := os.Getenv("NVIDIA_DEVICE_PLUGIN")
 	if devicePlugin == "" {
-		devicePlugin = DefaultDevicePlugin
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_DEVICE_PLUGIN"))
+		os.Exit(1)
 	}
 	return devicePlugin
 }
@@ -292,7 +292,8 @@ func getDevicePlugin() string {
 func getRuntimeValue() string {
 	runtime := os.Getenv("NVIDIA_TOOLKIT_DEFAULT_RUNTIME")
 	if runtime == "" {
-		runtime = "docker"
+		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_TOOLKIT_DEFAULT_RUNTIME"))
+		os.Exit(1)
 	}
 	return runtime
 }
