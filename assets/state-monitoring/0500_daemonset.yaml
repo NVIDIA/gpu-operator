@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter
+  namespace: gpu-operator-monitoring
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  template:
+    metadata:
+      # Mark this pod as a critical add-on; when enabled, the critical add-on scheduler
+      # reserves resources for critical add-on pods so that they can be rescheduled after
+      # a failure.  This annotation works in tandem with the toleration below.
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        app: nvidia-dcgm-exporter
+    spec:
+      tolerations:
+      # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
+      # This, along with the annotation above marks this pod as a critical add-on.
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      serviceAccount: nvidia-dcgm-exporter
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        name: pod-nvidia-gpu-metrics-exporter
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        volumeMounts:
+        - name: pod-gpu-resources
+          readOnly: true
+          mountPath: /var/lib/kubelet/pod-resources
+        - name: device-metrics
+          readOnly: true
+          mountPath: /run/prometheus
+      - image: "FILLED BY THE OPERATOR"
+        name: nvidia-dcgm-exporter
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        volumeMounts:
+        - name: device-metrics
+          mountPath: /run/prometheus
+
+      volumes:
+      - name: pod-gpu-resources
+        hostPath:
+          path: /var/lib/kubelet/pod-resources
+      - name: device-metrics
+        emptyDir:
+          medium: Memory
+
+      nodeSelector:
+        feature.node.kubernetes.io/pci-10de.present: "true"

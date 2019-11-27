@@ -13,3 +13,5 @@ data:
   driver: "{{ .Values.nvidia.driver.repository }}/{{ .Values.nvidia.driver.image }}:{{ .Values.nvidia.driver.version }}"
   toolkit: "{{ .Values.nvidia.toolkit.repository }}/{{ .Values.nvidia.toolkit.image }}:{{ .Values.nvidia.toolkit.version }}"
   devicePlugin: "{{ .Values.nvidia.devicePlugin.repository }}/{{ .Values.nvidia.devicePlugin.image }}:{{ .Values.nvidia.devicePlugin.version }}"
+  dcgmExporter: "{{ .Values.nvidia.dcgmExporter.repository }}/{{ .Values.nvidia.dcgmExporter.image }}:{{ .Values.nvidia.dcgmExporter.version }}"
+  dcgmPodExporter: "{{ .Values.nvidia.dcgmPodExporter.repository }}/{{ .Values.nvidia.dcgmPodExporter.image }}:{{ .Values.nvidia.dcgmPodExporter.version }}"

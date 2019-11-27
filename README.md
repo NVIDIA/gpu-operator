@@ -28,7 +28,8 @@ This is a technical preview release of the GPU operator. The operator can be dep
   - Set the variable nfd.enabled=false at the helm install step:
     - $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
-
+- For monitoring, enable the kubelet KubeletPodResources feature gate
+  - $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
 
 ## Installation
 
@@ -94,6 +95,46 @@ Known labextensions:
        to login with a token:
           http://localhost:8888/?token=MY_TOKEN
 You can now access the notebook on http://localhost:30001/?token=MY_TOKEN
+```
+
+#### GPU Monitoring
+```sh
+# Check if the dcgm-exporter is successufully deployed
+$ kubectl get pods -n gpu-operator-monitoring
+
+# Check gpu metrics locally
+$ dcgm_pod_ip=$(kubectl get pods -n gpu-operator-monitoring -o wide | tail -n 1 | awk '{print $6}')
+$ curl $dcgm_pod_ip:9400/gpu/metrics
+
+# To scrape gpu metrics from Prometheus, add dcgm endpoint to Prometheus via a configmap
+
+$ tee dcgmScrapeConfig.yaml <<EOF
+- job_name: gpu-metrics
+  scrape_interval: 1s
+  metrics_path: /gpu/metrics
+  scheme: http
+
+  kubernetes_sd_configs:
+  - role: endpoints
+    namespaces:
+      names:
+      - gpu-operator-monitoring
+
+  relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_node_name]
+    action: replace 
+    target_label: kubernetes_node 
+EOF
+
+# Deploy Prometheus
+$ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrapeConfig.yaml stable/prometheus
+
+# Alternatively, if you find your prometheus pod pending and get this error "no persistent volumes available...", disable persistentVolumes. [Refer this](https://stackoverflow.com/questions/47235014/why-prometheus-pod-pending-after-setup-it-by-helm-in-kubernetes-cluster-on-ranch).
+$ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrapeConfig.yaml --set alertmanager.persistentVolumes.enabled=false --set server.persistentVolume.enabled=false stable/prometheus
+
+# To check the metrics in browser
+$ kubectl port-forward $(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}') 9090 &
+# Open in browser http://localhost:9090
 ```
 
 ### Known Limitations

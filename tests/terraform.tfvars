@@ -1,2 +1,2 @@
-instance_type = "g2.2xlarge"
+instance_type = "p2.xlarge"
 project_name = "gpu-operator"
