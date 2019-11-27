@@ -70,7 +70,8 @@ while :; do
       dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-monitoring -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
       if [ "${dcgm_pod_status}" = "Running" ]; then
 	 dcgm_pod_ip=$(kubectl get pods -n gpu-operator-monitoring -o wide | tail -n 1 | awk '{print $6}')
-	 curl $dcgm_pod_ip:9400/gpu/metrics | grep temp
+	 sleep 5 
+	 curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
 	 break;
       fi
       echo "Sleeping 5 seconds"
