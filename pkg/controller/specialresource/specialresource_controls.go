@@ -323,13 +323,16 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 
 func setContainerEnv(c *corev1.Container, key, value string) {
 	for i, val := range c.Env {
-		if val.Name != "RUNTIME" {
+		if val.Name != key {
 			continue
 		}
+
 		c.Env[i].Value = value
 		return
 	}
-	log.Info(fmt.Sprintf("ERROR: Could not find environment variable %s in container %s", key, c.Name))
+
+	log.Info(fmt.Sprintf("Info: Could not find environment variable %s in container %s, appending it", key, c.Name))
+	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
 func isDaemonSetReady(name string, n SRO) ResourceStatus {
