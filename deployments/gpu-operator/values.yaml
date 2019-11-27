@@ -12,7 +12,7 @@ platform:
 
 nvidia:
   operator:
-    repository: registry.gitlab.com/nvidia/kubernetes
+    repository: nvidia
     image: gpu-operator
     tag: @OPERATOR_VERSION@
 
