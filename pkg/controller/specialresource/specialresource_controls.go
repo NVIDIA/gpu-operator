@@ -322,6 +322,13 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 		if osTag != "" {
 			img := fmt.Sprintf("%s-%s", getDriver(), osTag)
 			obj.Spec.Template.Spec.Containers[0].Image = img
+			if osTag == "RHCOS4.2" || osTag == "RHEL7" {
+				vm := corev1.VolumeMount{Name: "openshift-entitlements", MountPath: "/etc/pki/entitlements"}
+				obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, vm)
+
+				vol := corev1.Volume{Name: "openshift-entitlements", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "entitlement"}}}
+				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
+			}
 		}
 		sel := "feature.node.kubernetes.io/kernel-version.full"
 		obj.Spec.Template.Spec.NodeSelector[sel] = kernelVersion
