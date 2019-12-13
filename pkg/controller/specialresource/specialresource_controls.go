@@ -322,11 +322,17 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 		if osTag != "" {
 			img := fmt.Sprintf("%s-%s", getDriver(), osTag)
 			obj.Spec.Template.Spec.Containers[0].Image = img
-			if osTag == "RHCOS4.2" || osTag == "RHEL7" {
-				vm := corev1.VolumeMount{Name: "openshift-entitlements", MountPath: "/etc/pki/entitlements"}
-				obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, vm)
+			if osTag == "rhel" {
+				entitlementPath := "/etc/pki/entitlements"
+				if _, err := os.Stat(entitlementPath); os.IsNotExist(err) {
+					log.Info(fmt.Sprintf("ERROR: Could not find RedHat entitlements at %s", entitlementPath))
+					os.Exit(1)
+				}
+				volName, volSecretName := "openshift-entitlements", "entitlement"
+				volMount := corev1.VolumeMount{Name: volName, ReadOnly: true, MountPath: entitlementPath}
+				obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
 
-				vol := corev1.Volume{Name: "openshift-entitlements", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "entitlement"}}}
+				vol := corev1.Volume{Name: volName, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: volSecretName}}}
 				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
 			}
 		}
