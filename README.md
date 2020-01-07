@@ -130,7 +130,7 @@ EOF
 $ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrapeConfig.yaml stable/prometheus
 
 # Alternatively, if you find your prometheus pod pending and get this error "no persistent volumes available...", disable persistentVolumes. [Refer this](https://stackoverflow.com/questions/47235014/why-prometheus-pod-pending-after-setup-it-by-helm-in-kubernetes-cluster-on-ranch).
-$ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrapeConfig.yaml --set alertmanager.persistentVolumes.enabled=false --set server.persistentVolume.enabled=false stable/prometheus
+$ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrapeConfig.yaml --set alertmanager.persistentVolume.enabled=false --set server.persistentVolume.enabled=false stable/prometheus
 
 # To check the metrics in browser
 $ kubectl port-forward $(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}') 9090 &
