@@ -6,8 +6,6 @@ metadata:
   name: nvidia-driver-validation
   namespace: gpu-operator-resources
 spec:
-#  serviceAccount: nvidia-readonly
-#  serviceAccountName: nvidia-readonly
   tolerations:
     - key: nvidia.com/gpu
       operator: Exists
@@ -15,20 +13,13 @@ spec:
   restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
-      image: "quay.io/zvonkok/cuda-vector-add:v0.1"
-      #image: "quay.io/zvonkok/cuda:10.1-samples-ubi8"
-      #command: ["/usr/local/cuda/samples/bin/x86_64/linux/release/vectorAdd"]
+      image: "nvidia/cuda:10.2-devel-ubi8"
+      command: ["/bin/bash"]
+      args: ["-c","dnf update -y && dnf install -y git make && cd /usr/local/cuda-10.2/ && git clone https://github.com/NVIDIA/cuda-samples.git && cd cuda-samples/ && make -k ; cd Samples/vectorAdd_nvrtc && ./vectorAdd_nvrtc"]
       env:
         - name: NVIDIA_VISIBLE_DEVICES
           value: all
-        - name: NVIDIA_DRIVER_CAPABILITIES
-          value: "compute,utility"
-        - name: NVIDIA_REQUIRE_CUDA  
-          value: "cuda>=5.0"
       securityContext:
-        readOnlyRootFilesystem: true
         allowPrivilegeEscalation: false
-        capabilities:
-          drop: ["ALL"]
   nodeSelector:
     feature.node.kubernetes.io/pci-10de.present: "true"
