@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-dcgm-exporter
   name: nvidia-dcgm-exporter
-  namespace: gpu-operator-monitoring
+  namespace: gpu-operator-resources
 spec:
   selector:
     matchLabels:
