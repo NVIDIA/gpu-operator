@@ -41,45 +41,45 @@ kubectl apply -f gpu-pod.yaml
 
 rc=1
 while :; do
-  echo "Get all pods"
-  pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
+	echo "Get all pods"
+	pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
 
-  echo "Checking GPU pod status"
-  status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
-  if [ "${status}" = "Succeeded" ]; then
-    echo "GPU pod terminated successfully";
-    rc=0
-    break;
-  fi
-  echo "GPU pod status: ${status}";
+	echo "Checking GPU pod status"
+	status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
+	if [ "${status}" = "Succeeded" ]; then
+		echo "GPU pod terminated successfully";
+		rc=0
+		break;
+	fi
+	echo "GPU pod status: ${status}";
 
-  for pod in $(echo "$pods" | jq -r .[].name); do
-    ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
-    echo "Generating logs for pod: ${pod} ns: ${ns}"
-    echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
-    kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
-    kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
-  done
+	for pod in $(echo "$pods" | jq -r .[].name); do
+		ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
+		echo "Generating logs for pod: ${pod} ns: ${ns}"
+		echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
+		kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
+		kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
+	done
 
-  echo "Generating cluster logs"
-  echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
-  kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
+	echo "Generating cluster logs"
+	echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
+	kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
 
-  while :; do
-      echo "Checking gpu metrics"
-      dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
-      if [ "${dcgm_pod_status}" = "Running" ]; then
-          dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
-          sleep 5
-          curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
-          break;
-      fi
-      echo "Sleeping 5 seconds"
-      sleep 5
-  done
+	while :; do
+		echo "Checking gpu metrics"
+		dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
+		if [ "${dcgm_pod_status}" = "Running" ]; then
+			dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+			sleep 5
+			curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
+			break;
+		fi
+		echo "Sleeping 5 seconds"
+		sleep 5
+	done
 
-  echo "Sleeping 5 seconds"
-  sleep 5;
+	echo "Sleeping 5 seconds"
+	sleep 5;
 done
 
 exit $rc
