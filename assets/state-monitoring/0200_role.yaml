@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: nvidia-dcgm-exporter
-  namespace: gpu-operator-monitoring
+  namespace: gpu-operator-resources
   labels:
     app: nvidia-dcgm-exporter
 rules:

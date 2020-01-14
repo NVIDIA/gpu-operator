@@ -60,24 +60,24 @@ while :; do
     kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
     kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
   done
-  
+
   echo "Generating cluster logs"
   echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
   kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
-  
+
   while :; do
       echo "Checking gpu metrics"
-      dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-monitoring -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
+      dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
       if [ "${dcgm_pod_status}" = "Running" ]; then
-	 dcgm_pod_ip=$(kubectl get pods -n gpu-operator-monitoring -o wide | tail -n 1 | awk '{print $6}')
-	 sleep 5 
-	 curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
-	 break;
+          dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+          sleep 5
+          curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
+          break;
       fi
       echo "Sleeping 5 seconds"
       sleep 5
   done
-  
+
   echo "Sleeping 5 seconds"
   sleep 5;
 done
