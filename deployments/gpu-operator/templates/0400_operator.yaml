@@ -70,9 +70,10 @@ spec:
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
-            initialDelaySeconds: 4
-            periodSeconds: 10
-            failureThreshold: 1
+
+          initialDelaySeconds: 4
+          periodSeconds: 10
+          failureThreshold: 1
         ports:
         - containerPort: 60000
           name: metrics
