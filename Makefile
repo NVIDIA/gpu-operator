@@ -11,12 +11,14 @@ include $(MAKE_DIR)/common.mk
 
 ##### Global variables #####
 
-DOCKERFILE   ?= $(CURDIR)/docker/ubuntu/Dockerfile.ubuntu18.04
-DEBUG_DOCKERFILE ?= $(CURDIR)/docker/debug/Dockerfile.debug
-DOCKERDEVEL  ?= $(CURDIR)/docker/builder.Dockerfile
-BIN_NAME     ?= gpu-operator
-IMAGE        ?= nvidia/gpu-operator:latest
-BUILDER      ?= nvidia/gpu-operator:builder
+DOCKERFILE       ?= $(CURDIR)/docker/Dockerfile.ubuntu18.04.prod
+DOCKERFILE_DEVEL ?= $(CURDIR)/docker/Dockerfile.devel
+
+BIN_NAME  ?= gpu-operator
+REPO      ?= nvidia
+IMAGE     ?= gpu-operator
+TAG       ?= latest
+TAG_DEVEL ?= devel
 
 
 ##### File definitions #####
@@ -36,10 +38,6 @@ GOOS         := linux
 
 all: build verify
 verify: fmt lint test vet assign
-
-devel:
-	$(DOCKER) build -t $(BUILDER) -f $(DOCKERDEVEL) .
-	@echo $(DOCKER) run -it $v $(CURDIR):/go/src/$(PACKAGE) $(BUILDER):devel bash
 
 build:
 	GOOS=$(GOOS) CGO_ENABLED=$(CGO_ENABLED) go build -o $(BIN_NAME) $(MAIN_PACKAGE)
@@ -67,8 +65,8 @@ clean:
 	go clean
 	rm -f $(BIN)
 
-image:
-	$(DOCKER) build -t $(IMAGE) -f $(DOCKERFILE) .
+prod-image:
+	$(DOCKER) build -t $(REPO)/$(IMAGE):$(TAG) -f $(DOCKERFILE) .
 
-debug_image:
-	$(DOCKER) build -t $(IMAGE) -f $(DEBUG_DOCKERFILE) .
+devel-image:
+	$(DOCKER) build -t $(REPO)/$(IMAGE):$(TAG_DEVEL) -f $(DOCKERFILE_DEVEL) .

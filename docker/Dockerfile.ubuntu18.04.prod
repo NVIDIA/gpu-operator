@@ -3,11 +3,7 @@ WORKDIR /go/src/github.com/NVIDIA/gpu-operator
 
 COPY . .
 
-RUN go get -u golang.org/x/lint/golint && \
-    go get -u github.com/gordonklaus/ineffassign
-
 RUN make build
-RUN make verify
 
 FROM ubuntu:18.04
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
