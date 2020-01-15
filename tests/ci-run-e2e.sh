@@ -3,7 +3,6 @@
 set -e
 
 IMAGE=$1
-TAG=$2
 LOG_DIR="/tmp/logs"
 
 echo "Create log dir ${LOG_DIR}"
@@ -35,47 +34,70 @@ helm install ../deployments/gpu-operator --set operator.repository="${REPOSITORY
 echo "Deploy GPU pod"
 kubectl apply -f gpu-pod.yaml
 
-rc=1
+current_time=0
 while :; do
-  echo "Get all pods"
-  pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
+	pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
+	status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
+	if [ "${status}" = "Succeeded" ]; then
+		echo "GPU pod terminated successfully"
+		rc=0
+		break;
+	fi
 
-  echo "Checking GPU pod status"
-  status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
-  if [ "${status}" = "Succeeded" ]; then
-    echo "GPU pod terminated successfully";
-    rc=0
-    break;
-  fi
-  echo "GPU pod status: ${status}";
+	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		echo "timeout reached"
+		exit 1
+	fi
 
-  for pod in $(echo "$pods" | jq -r .[].name); do
-    ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
-    echo "Generating logs for pod: ${pod} ns: ${ns}"
-    echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
-    kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
-    kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
-  done
+	# Echo useful information on stdout
+	kubectl get pods --all-namespaces
 
-  echo "Generating cluster logs"
-  echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
-  kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
+	for pod in $(echo "$pods" | jq -r .[].name); do
+		ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
+		echo "Generating logs for pod: ${pod} ns: ${ns}"
+		echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
+		kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
+		kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
+	done
 
-  while :; do
-      echo "Checking gpu metrics"
-      dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
-      if [ "${dcgm_pod_status}" = "Running" ]; then
-          dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
-          sleep 5
-          curl -s $dcgm_pod_ip:9400/gpu/metrics | grep "dcgm_gpu_temp"
-          break;
-      fi
-      echo "Sleeping 5 seconds"
-      sleep 5
-  done
+	echo "Generating cluster logs"
+	echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
+	kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
 
-  echo "Sleeping 5 seconds"
-  sleep 5;
+	echo "Sleeping 5 seconds"
+	current_time=$((${current_time} + 5))
+	sleep 5;
+done
+
+current_time=0
+while :; do
+	echo "Checking dcgm pod status"
+	kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources
+
+	dcgm_pod_status=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')
+	if [ "${dcgm_pod_status}" = "Running" ]; then
+		# Sleep to give the gpu-exporter enough time to output it's metrics
+		# TODO need to add a readiness probe
+		sleep 5
+
+		dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+		curl -s "$dcgm_pod_ip:9400/gpu/metrics" | grep "dcgm_gpu_temp"
+		rc=0
+
+		break;
+	fi
+
+	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		echo "timeout reached"
+		exit 1
+	fi
+
+	# Echo useful information on stdout
+	kubectl get pods --all-namespaces
+
+	echo "Sleeping 5 seconds"
+	current_time=$((${current_time} + 5))
+	sleep 5
 done
 
 exit $rc
