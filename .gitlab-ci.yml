@@ -24,7 +24,7 @@ unit-tests:
     - docker:stable-dind
   script:
     - apk add --update make
-    - make image-devel REPO=nvidia IMAGE=gpu-operator TAG_DEVEL=devel
+    - make devel-image REPO=nvidia IMAGE=gpu-operator TAG_DEVEL=devel
     - docker run -t nvidia/gpu-operator:devel make verify
 
 build-image:
@@ -36,7 +36,7 @@ build-image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make image REPO=$CI_REGISTRY IMAGE=$CI_PROJECT_PATH TAG=$CI_COMMIT_TAG
+    - make prod-image REPO=$CI_REGISTRY IMAGE=$CI_PROJECT_PATH TAG=$CI_COMMIT_TAG
     - docker push $CI_REGISTRY/$CI_PROJECT_PATH:$CI_COMMIT_TAG
 
 e2e_tests:
