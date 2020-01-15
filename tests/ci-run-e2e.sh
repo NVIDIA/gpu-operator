@@ -3,7 +3,6 @@
 set -e
 
 IMAGE=$1
-TAG=$2
 LOG_DIR="/tmp/logs"
 
 echo "Create log dir ${LOG_DIR}"
@@ -39,14 +38,19 @@ kubectl apply -f ../manifests/cr/sro_cr_sched_none.yaml
 echo "Deploy GPU pod"
 kubectl apply -f gpu-pod.yaml
 
-rc=1
+current_time=0
 while :; do
 	pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
 	status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
 	if [ "${status}" = "Succeeded" ]; then
-		echo "GPU pod terminated successfully";
+		echo "GPU pod terminated successfully"
 		rc=0
 		break;
+	fi
+
+	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		echo "timeout reached"
+		exit 1
 	fi
 
 	# Echo useful information on stdout
@@ -65,9 +69,11 @@ while :; do
 	kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
 
 	echo "Sleeping 5 seconds"
+	current_time=$((${current_time} + 5))
 	sleep 5;
 done
 
+current_time=0
 while :; do
 	echo "Checking dcgm pod status"
 	kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources
@@ -80,12 +86,21 @@ while :; do
 
 		dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
 		curl -s "$dcgm_pod_ip:9400/gpu/metrics" | grep "dcgm_gpu_temp"
-		rc=0;
+		rc=0
 
 		break;
 	fi
 
+	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		echo "timeout reached"
+		exit 1
+	fi
+
+	# Echo useful information on stdout
+	kubectl get pods --all-namespaces
+
 	echo "Sleeping 5 seconds"
+	current_time=$((${current_time} + 5))
 	sleep 5
 done
 
