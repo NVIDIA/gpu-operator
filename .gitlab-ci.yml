@@ -69,6 +69,7 @@ release-github:
     GIT_STRATEGY: clone
   only:
     - master
+    - tags
 
   script:
     - apk add --update curl openssl bash git openssh make
@@ -109,16 +110,3 @@ release-github:
     - git remote set-url --push origin "${PUSH_REPO}"
     - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
     - git push origin gh-pages
-
-release-nvcr:
-  stage: release
-  image: docker:stable
-  only:
-    - tags # Only when a protected tag is pushed
-
-  script:
-    - apk add --update make
-    - docker login -u "${NVCRIO_USER}" -p "${NVCRIO_TOKEN}"
-    - make image IMAGE="${NVCRIO}:${CI_COMMIT_TAG}"
-    - docker push "${NVCRIO}:${CI_COMMIT_TAG}"
-
