@@ -97,10 +97,14 @@ func main() {
 
 	client := mgr.GetClient()
 	// create new objectSpecialResource
-	cr := v1alpha1.SpecialResource{ObjectMeta: metav1.ObjectMeta{Name: "gpu", Namespace: "gpu-operator"}, Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"}}
-	if err := client.Create(context.TODO(), &cr); err != nil {
-		log.Error(err, "")
-		os.Exit(1)
+
+	err := client.Get(context.TODO(), types.NamespacedName{Name: "gpu", Namespace: "gpu-operator-resources"}, &v1alpha1.ServiceAccount{})
+	if err != nil && errors.IsNotFound(err) {
+		cr := v1alpha1.SpecialResource{ObjectMeta: metav1.ObjectMeta{Name: "gpu", Namespace: "gpu-operator-resources"}, Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"}}
+		if err := client.Create(context.TODO(), &cr); err != nil {
+			log.Error(err, "")
+			os.Exit(1)
+		}
 	}
 
 	log.Info("Starting the Cmd.")
