@@ -15,8 +15,7 @@ DOCKERFILE       ?= $(CURDIR)/docker/Dockerfile.ubuntu18.04.prod
 DOCKERFILE_DEVEL ?= $(CURDIR)/docker/Dockerfile.devel
 
 BIN_NAME  ?= gpu-operator
-REPO      ?= nvidia
-IMAGE     ?= gpu-operator
+IMAGE     ?= nvidia/gpu-operator
 TAG       ?= latest
 TAG_DEVEL ?= devel
 
@@ -66,7 +65,7 @@ clean:
 	rm -f $(BIN)
 
 prod-image:
-	$(DOCKER) build -t $(REPO)/$(IMAGE):$(TAG) -f $(DOCKERFILE) .
+	$(DOCKER) build -t $(IMAGE):$(TAG) -f $(DOCKERFILE) .
 
 devel-image:
-	$(DOCKER) build -t $(REPO)/$(IMAGE):$(TAG_DEVEL) -f $(DOCKERFILE_DEVEL) .
+	$(DOCKER) build -t $(IMAGE):$(TAG_DEVEL) -f $(DOCKERFILE_DEVEL) .
