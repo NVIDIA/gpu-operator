@@ -14,7 +14,9 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/ready"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -98,7 +100,7 @@ func main() {
 	client := mgr.GetClient()
 	// create new objectSpecialResource
 
-	err := client.Get(context.TODO(), types.NamespacedName{Name: "gpu", Namespace: "gpu-operator-resources"}, &v1alpha1.ServiceAccount{})
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "gpu", Namespace: "gpu-operator-resources"}, &v1alpha1.SpecialResource{})
 	if err != nil && errors.IsNotFound(err) {
 		cr := v1alpha1.SpecialResource{ObjectMeta: metav1.ObjectMeta{Name: "gpu", Namespace: "gpu-operator-resources"}, Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"}}
 		if err := client.Create(context.TODO(), &cr); err != nil {
