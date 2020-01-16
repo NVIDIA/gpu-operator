@@ -85,18 +85,7 @@ release-github:
 
     # Package helm chart
     - helm init --client-only
-    - >
-      if [[ "${CI_COMMIT_TAG}" != "${NIGHTLY}" ]]; then # this is a tag
-          helm package --set "operator.repository=nvcr.io/nvidia" \
-                       --set "driver.repository=nvcr.io/nvidia" \
-                       --set "toolkit.repository=nvcr.io/nvidia" \
-                       --set "devicePlugin.repository=nvcr.io/nvidia" \
-                       --set "dcgmExporter.repository=nvcr.io/nvidia" \
-                       --set "dcgmPodExporter.repository=nvcr.io/nvidia" \
-                       deployments/gpu-operator
-      else
-          helm package deployments/gpu-operator
-      fi
+    - helm package deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
