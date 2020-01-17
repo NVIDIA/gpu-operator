@@ -1,18 +1,6 @@
 {{- if .Values.platform.openshift }}
-allowHostDirVolumePlugin: false
-allowHostIPC: false
-allowHostNetwork: false
-allowHostPID: false
-allowHostPorts: false
-allowPrivilegeEscalation: true
-allowPrivilegedContainer: false
-allowedCapabilities: null
+
 apiVersion: security.openshift.io/v1
-defaultAddCapabilities: null
-fsGroup:
-  type: MustRunAs
-groups:
-- system:authenticated
 kind: SecurityContextConstraints
 metadata:
   annotations:
@@ -20,9 +8,22 @@ metadata:
       pods to be run with a UID, read-only root filesystem and SELinux context that are 
       allocated to the namespace.  This SCC is more restrictive than the default
       restritive SCC and it is used by default for authenticated users and operators and operands.
-  creationTimestamp: 2019-02-01T08:06:43Z
   name: restricted-readonly
-priority: null
+
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+groups:
+- system:authenticated
+priority: []
 readOnlyRootFilesystem: true
 requiredDropCapabilities:
 - KILL
