@@ -23,7 +23,7 @@ fsGroup:
   type: MustRunAs
 groups:
 - system:authenticated
-priority: []
+priority: 0
 readOnlyRootFilesystem: true
 requiredDropCapabilities:
 - KILL
