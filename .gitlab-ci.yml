@@ -14,7 +14,6 @@ stages:
   - aws_kube_setup
   - e2e_tests
   - aws_kube_clean
-  - release
 
 unit-tests:
   stage: aws_kube_setup
@@ -64,7 +63,7 @@ release-github:
   image: docker:stable
   services:
     - docker:stable-dind
-  stage: release # Should be after each successful commit
+  stage: aws_kube_clean # Should be after each successful commit
   variables:
     GIT_STRATEGY: clone
   only:
