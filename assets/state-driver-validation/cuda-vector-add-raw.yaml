@@ -13,12 +13,7 @@ spec:
   restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
-      image: "nvidia/cuda:10.2-devel-ubi8"
-      command: ["/bin/bash"]
-      args: ["-c","dnf update -y && dnf install -y git make && cd /usr/local/cuda-10.2/ && git clone https://github.com/NVIDIA/cuda-samples.git && cd cuda-samples/ && make -k ; cd Samples/vectorAdd_nvrtc && ./vectorAdd_nvrtc"]
-      env:
-        - name: NVIDIA_VISIBLE_DEVICES
-          value: all
+      image: "nvidia/samples:cuda10.2-vectorAdd"
       securityContext:
         allowPrivilegeEscalation: false
   nodeSelector:
