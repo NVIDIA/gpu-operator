@@ -31,6 +31,12 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: pod-nvidia-gpu-metrics-exporter
+        readinessProbe:
+          httpGet:
+            path: /gpu/metrics
+            port: 9400
+          initialDelaySeconds: 5
+          periodSeconds: 5
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
