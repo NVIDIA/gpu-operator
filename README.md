@@ -100,10 +100,10 @@ You can now access the notebook on http://localhost:30001/?token=MY_TOKEN
 #### GPU Monitoring
 ```sh
 # Check if the dcgm-exporter is successufully deployed
-$ kubectl get pods -n gpu-operator-monitoring
+$ kubectl get pods -n gpu-operator-resources | grep dcgm
 
 # Check gpu metrics locally
-$ dcgm_pod_ip=$(kubectl get pods -n gpu-operator-monitoring -o wide | tail -n 1 | awk '{print $6}')
+$ dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -lapp=nvidia-dcgm-exporter -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -o wide | tail -n 1 | awk '{print $6}')
 $ curl $dcgm_pod_ip:9400/gpu/metrics
 
 # To scrape gpu metrics from Prometheus, add dcgm endpoint to Prometheus via a configmap
@@ -118,7 +118,7 @@ $ tee dcgmScrapeConfig.yaml <<EOF
   - role: endpoints
     namespaces:
       names:
-      - gpu-operator-monitoring
+      - gpu-operator-resources
 
   relabel_configs:
   - source_labels: [__meta_kubernetes_pod_node_name]
@@ -135,6 +135,26 @@ $ helm install --name prom-monitoring --set-file extraScrapeConfigs=./dcgmScrape
 # To check the metrics in browser
 $ kubectl port-forward $(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}') 9090 &
 # Open in browser http://localhost:9090
+
+# Deploy Grafana
+$ helm install --name grafana-gpu-dashboard stable/grafana
+
+# Decode the admin user and password to login in the dashboard
+$ kubectl get secret grafana-test -o jsonpath="{.data.admin-user}" | base64 --decode ; echo
+$ kubectl get secret grafana-test -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+# To open dashboard in browser
+$ kubectl port-forward $(kubectl get pods --namespace default -l "app=grafana,release=grafana-test" -o jsonpath="{.items[0].metadata.name}") 3000 &
+# In browser: http://localhost:3000
+# On AWS: ssh -L 3000:localhost:3000 -i YOUR_SECRET_KEY INSTANCE_NAME@PUBLIC_IP
+
+# Login in the dashboard with the decoded credentials and add Promethues datasource 
+# Get Promethues IP to add to the Grafana datasource
+$ prom_server_ip=$(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -o wide | tail -n 1 | awk '{print $6}')
+# Check if Prometheus is reachable
+$ curl $prom_server_ip:9090
+
+# Import this GPU metrics dashboard from Grafana https://grafana.com/grafana/dashboards/11578
 ```
 
 ### Known Limitations
