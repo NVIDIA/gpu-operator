@@ -2,13 +2,14 @@ variables:
   DOCKERHUB: nvidia/gpu-operator
   NVCRIO: nvcr.io/nvstaging/cloud-native/gpu-operator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
-  NIGHTLY: "nightly-${CI_COMMIT_SHORT_SHA}"
+  NIGHTLY: "1.0.0-nightly-build${CI_BUILD_ID}-${CI_COMMIT_SHORT_SHA}"
 
 # Ensure the @OPERATOR_VERSION@ is rewritten before any action is taken
 default:
   before_script:
     - if [ -z "${CI_COMMIT_TAG}" ]; then SUBCHART_DIR="nightly" ; NIGHTLY_OPTIONS="-d ${SUBCHART_DIR}" ; fi
     - CI_COMMIT_TAG=${CI_COMMIT_TAG:-"${NIGHTLY}"}
+    - echo "${CI_COMMIT_TAG}" | grep -qe '^[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^+]\+\)\?\(+.*\)\?$' # check that tag follows SemVer 2.0 form
     - sed -i "s/@OPERATOR_VERSION@/${CI_COMMIT_TAG}/" $(find ./deployments/gpu-operator -type f)
 
 stages:
@@ -21,6 +22,7 @@ unit-tests:
   image: docker:stable
   services:
     - docker:stable-dind
+
   script:
     - apk add --update make
     - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
@@ -70,7 +72,6 @@ release-github:
   only:
     - master
     - tags
-
   script:
     - apk add --update curl openssl bash git openssh make
     - curl -L https://git.io/get_helm.sh | bash
