@@ -30,7 +30,7 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/ansible/runner"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/runner/eventapi"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +53,7 @@ type AnsibleOperatorReconciler struct {
 	GVK             schema.GroupVersionKind
 	Runner          runner.Runner
 	Client          client.Client
+	APIReader       client.Reader
 	EventHandlers   []events.EventHandler
 	ReconcilePeriod time.Duration
 	ManageStatus    bool
@@ -95,7 +96,7 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		finalizers := append(pendingFinalizers, finalizer)
 		u.SetFinalizers(finalizers)
 		err := r.Client.Update(context.TODO(), u)
-		if err != nil {
+		if exit, err := determineReturn(err); exit {
 			return reconcileResult, err
 		}
 	}
@@ -110,14 +111,14 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		logger.V(1).Info("Spec was not found")
 		u.Object["spec"] = map[string]interface{}{}
 		err = r.Client.Update(context.TODO(), u)
-		if err != nil {
+		if exit, err := determineReturn(err); exit {
 			return reconcileResult, err
 		}
 	}
 
 	if r.ManageStatus {
 		err = r.markRunning(u, request.NamespacedName)
-		if err != nil {
+		if exit, err := determineReturn(err); exit {
 			return reconcileResult, err
 		}
 	}
@@ -133,7 +134,11 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 	if err != nil {
 		return reconcileResult, err
 	}
-	defer os.Remove(kc.Name())
+	defer func() {
+		if err := os.Remove(kc.Name()); err != nil {
+			logger.Error(err, "Failed to remove generated kubeconfig file")
+		}
+	}()
 	result, err := r.Runner.Run(ident, u, kc.Name())
 	if err != nil {
 		return reconcileResult, err
@@ -172,6 +177,12 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		return reconcileResult, eventErr
 	}
 
+	err = r.APIReader.Get(context.TODO(), request.NamespacedName, u)
+	if err != nil {
+		log.Error(err, "Unable to get updated object from api")
+		return reconcile.Result{}, err
+	}
+
 	// We only want to update the CustomResource once, so we'll track changes and do it at the end
 	runSuccessful := len(failureMessages) == 0
 	// The finalizer has run successfully, time to remove it
@@ -184,66 +195,53 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		}
 		u.SetFinalizers(finalizers)
 		err := r.Client.Update(context.TODO(), u)
-		if err != nil {
+		if exit, err := determineReturn(err); exit {
 			return reconcileResult, err
 		}
-		return reconcileResult, nil
 	}
 	if r.ManageStatus {
 		err = r.markDone(u, request.NamespacedName, statusEvent, failureMessages)
-		if err != nil {
-			logger.Error(err, "Failed to mark status done")
+		if exit, err := determineReturn(err); exit {
+			return reconcileResult, err
 		}
+
 	}
 	return reconcileResult, err
 }
 
 func (r *AnsibleOperatorReconciler) markRunning(u *unstructured.Unstructured, namespacedName types.NamespacedName) error {
 	// Get the latest resource to prevent updating a stale status
-	err := r.Client.Get(context.TODO(), namespacedName, u)
-	if err != nil {
-		return err
-	}
 	statusInterface := u.Object["status"]
 	statusMap, _ := statusInterface.(map[string]interface{})
 	crStatus := ansiblestatus.CreateFromMap(statusMap)
 
 	// If there is no current status add that we are working on this resource.
 	errCond := ansiblestatus.GetCondition(crStatus, ansiblestatus.FailureConditionType)
-	succCond := ansiblestatus.GetCondition(crStatus, ansiblestatus.RunningConditionType)
 
+	if errCond != nil {
+		errCond.Status = v1.ConditionFalse
+		ansiblestatus.SetCondition(&crStatus, *errCond)
+	}
 	// If the condition is currently running, making sure that the values are correct.
 	// If they are the same a no-op, if they are different then it is a good thing we
 	// are updating it.
-	if (errCond == nil && succCond == nil) || (succCond != nil && succCond.Reason != ansiblestatus.SuccessfulReason) {
-		c := ansiblestatus.NewCondition(
-			ansiblestatus.RunningConditionType,
-			v1.ConditionTrue,
-			nil,
-			ansiblestatus.RunningReason,
-			ansiblestatus.RunningMessage,
-		)
-		ansiblestatus.SetCondition(&crStatus, *c)
-		u.Object["status"] = crStatus.GetJSONMap()
-		err := r.Client.Status().Update(context.TODO(), u)
-		if err != nil {
-			return err
-		}
+	c := ansiblestatus.NewCondition(
+		ansiblestatus.RunningConditionType,
+		v1.ConditionTrue,
+		nil,
+		ansiblestatus.RunningReason,
+		ansiblestatus.RunningMessage,
+	)
+	ansiblestatus.SetCondition(&crStatus, *c)
+	u.Object["status"] = crStatus.GetJSONMap()
+	err := r.Client.Status().Update(context.TODO(), u)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 func (r *AnsibleOperatorReconciler) markDone(u *unstructured.Unstructured, namespacedName types.NamespacedName, statusEvent eventapi.StatusJobEvent, failureMessages eventapi.FailureMessages) error {
-	logger := logf.Log.WithName("markDone")
-	// Get the latest resource to prevent updating a stale status
-	err := r.Client.Get(context.TODO(), namespacedName, u)
-	if apierrors.IsNotFound(err) {
-		logger.Info("Resource not found, assuming it was deleted", err)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
 	statusInterface := u.Object["status"]
 	statusMap, _ := statusInterface.(map[string]interface{})
 	crStatus := ansiblestatus.CreateFromMap(statusMap)
@@ -288,4 +286,22 @@ func contains(l []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// determineReturn - if the object was updated outside of our controller
+// this means that the current reconcilation is over and we should use the
+// latest version. To do this, we just exit without error because the
+// latest version should be queued for update.
+func determineReturn(err error) (bool, error) {
+	exit := false
+	if err == nil {
+		return exit, err
+	}
+	exit = true
+
+	if apierrors.IsConflict(err) {
+		log.V(1).Info("Conflict found during an update; re-running reconcilation")
+		return exit, nil
+	}
+	return exit, err
 }

@@ -1,0 +1,43 @@
+# Default values for gpu-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+nfd:
+  enabled: true
+
+platform:
+  openshift: false
+
+operator:
+  repository: nvidia
+  image: gpu-operator
+  tag: @OPERATOR_VERSION@
+
+  defaultRuntime: docker
+
+driver:
+  repository: nvidia
+  image: driver
+  version: "440.33.01"
+
+toolkit:
+  repository: nvidia
+  image: container-toolkit
+  version: 1.0.0-alpha.3
+
+devicePlugin:
+  repository: nvidia
+  image: k8s-device-plugin
+  version: 1.0.0-beta4
+
+dcgmExporter:
+  repository: nvidia
+  image: dcgm-exporter
+  version: 1.0.0-beta-ubuntu18.04
+
+dcgmPodExporter:
+  repository: nvidia
+  image: pod-gpu-metrics-exporter
+  version: v1.0.0-alpha

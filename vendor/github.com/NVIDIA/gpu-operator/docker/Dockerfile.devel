@@ -1,0 +1,9 @@
+FROM golang:1.13 AS builder
+WORKDIR /go/src/github.com/NVIDIA/gpu-operator
+
+RUN go get -u golang.org/x/lint/golint && \
+    go get -u github.com/gordonklaus/ineffassign
+
+COPY . .
+
+CMD ["/bin/bash"]

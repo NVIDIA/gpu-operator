@@ -144,13 +144,16 @@ func buildFunc(cmd *cobra.Command, args []string) {
 
 	projutil.MustInProjectRoot()
 	goBuildEnv := append(os.Environ(), "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
+	goTrimFlags := []string{"-gcflags", "all=-trimpath=${GOPATH}", "-asmflags", "all=-trimpath=${GOPATH}"}
 	absProjectPath := projutil.MustGetwd()
+	projectName := filepath.Base(absProjectPath)
 
 	// Don't need to build go code if Ansible Operator
 	if mainExists() {
 		managerDir := filepath.Join(projutil.CheckAndGetProjectGoPkg(), scaffold.ManagerDir)
-		outputBinName := filepath.Join(absProjectPath, scaffold.BuildBinDir, filepath.Base(absProjectPath))
-		buildCmd := exec.Command("go", "build", "-o", outputBinName, managerDir)
+		outputBinName := filepath.Join(absProjectPath, scaffold.BuildBinDir, projectName)
+		goBuildArgs := append(append([]string{"build"}, goTrimFlags...), "-o", outputBinName, managerDir)
+		buildCmd := exec.Command("go", goBuildArgs...)
 		buildCmd.Env = goBuildEnv
 		buildCmd.Stdout = os.Stdout
 		buildCmd.Stderr = os.Stderr
@@ -181,14 +184,17 @@ func buildFunc(cmd *cobra.Command, args []string) {
 	}
 
 	if enableTests {
-		testBinary := filepath.Join(absProjectPath, scaffold.BuildBinDir, filepath.Base(absProjectPath)+"-test")
-		buildTestCmd := exec.Command("go", "test", "-c", "-o", testBinary, testLocationBuild+"/...")
-		buildTestCmd.Env = goBuildEnv
-		buildTestCmd.Stdout = os.Stdout
-		buildTestCmd.Stderr = os.Stderr
-		err = buildTestCmd.Run()
-		if err != nil {
-			log.Fatalf("Failed to build test binary: (%v)", err)
+		if projutil.GetOperatorType() == projutil.OperatorTypeGo {
+			testBinary := filepath.Join(absProjectPath, scaffold.BuildBinDir, projectName+"-test")
+			goTestBuildArgs := append(append([]string{"test"}, goTrimFlags...), "-c", "-o", testBinary, testLocationBuild+"/...")
+			buildTestCmd := exec.Command("go", goTestBuildArgs...)
+			buildTestCmd.Env = goBuildEnv
+			buildTestCmd.Stdout = os.Stdout
+			buildTestCmd.Stderr = os.Stderr
+			err = buildTestCmd.Run()
+			if err != nil {
+				log.Fatalf("Failed to build test binary: (%v)", err)
+			}
 		}
 		// if a user is using an older sdk repo as their library, make sure they have required build files
 		testDockerfile := filepath.Join(scaffold.BuildTestDir, scaffold.DockerfileFile)
@@ -205,11 +211,21 @@ func buildFunc(cmd *cobra.Command, args []string) {
 			}
 
 			s := &scaffold.Scaffold{}
-			err = s.Execute(cfg,
-				&scaffold.TestFrameworkDockerfile{},
-				&scaffold.GoTestScript{},
-				&scaffold.TestPod{Image: image, TestNamespaceEnv: test.TestNamespaceEnv},
-			)
+			switch projutil.GetOperatorType() {
+			case projutil.OperatorTypeGo:
+				err = s.Execute(cfg,
+					&scaffold.TestFrameworkDockerfile{},
+					&scaffold.GoTestScript{},
+					&scaffold.TestPod{Image: image, TestNamespaceEnv: test.TestNamespaceEnv},
+				)
+			case projutil.OperatorTypeAnsible:
+				log.Fatal("Test scaffolding for Ansible Operators is not implemented")
+			case projutil.OperatorTypeHelm:
+				log.Fatal("Test scaffolding for Helm Operators is not implemented")
+			default:
+				log.Fatal("Failed to determine operator type")
+			}
+
 			if err != nil {
 				log.Fatalf("Test framework manifest scaffold failed: (%v)", err)
 			}

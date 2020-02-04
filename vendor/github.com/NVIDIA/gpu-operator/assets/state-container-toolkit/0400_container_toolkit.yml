@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-container-toolkit-daemonset
+  name: nvidia-container-toolkit-daemonset
+  namespace: gpu-operator-resources
+  annotations:
+    openshift.io/scc: hostmount-anyuid
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-container-toolkit-daemonset
+  template:
+    metadata:
+      # Mark this pod as a critical add-on; when enabled, the critical add-on scheduler
+      # reserves resources for critical add-on pods so that they can be rescheduled after
+      # a failure.  This annotation works in tandem with the toleration below.
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        app: nvidia-container-toolkit-daemonset
+    spec:
+      tolerations:
+      # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
+      # This, along with the annotation above marks this pod as a critical add-on.
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      serviceAccount: nvidia-container-toolkit
+      hostPID: true
+      containers:
+      - image: "FILLED_BY_THE_OPERATOR"
+        args: ["/run/nvidia"]
+        env:
+        - name: TOOLKIT_ARGS
+          value: "--symlink /usr/local/nvidia"
+        - name: RUNTIME_ARGS
+          value: ""
+        imagePullPolicy: IfNotPresent
+        name: nvidia-container-toolkit-ctr
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: docker-socket
+            mountPath: /var/run/docker.sock
+          - name: nvidia-install-path
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: docker-config
+            mountPath: /etc/docker
+          - name: nvidia-local
+            mountPath: /usr/local/nvidia
+          - name: crio-hooks
+            mountPath: /usr/share/containers/oci/hooks.d
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: nvidia-install-path
+          hostPath:
+            path: /run/nvidia
+        - name: docker-config
+          hostPath:
+            path: /etc/docker
+        - name: nvidia-local
+          hostPath:
+            path: /usr/local/nvidia
+        - name: crio-hooks
+          hostPath:
+            path: /etc/containers/oci/hooks.d
+      nodeSelector:
+        feature.node.kubernetes.io/pci-10de.present: "true"

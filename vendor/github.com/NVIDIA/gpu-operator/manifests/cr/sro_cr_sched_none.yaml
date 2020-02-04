@@ -1,0 +1,7 @@
+apiVersion: sro.openshift.io/v1alpha1
+kind: SpecialResource
+metadata:
+  name: gpu
+  namespace: gpu-operator-resources
+spec:
+  schedulingType: "None"

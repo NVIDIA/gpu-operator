@@ -1,0 +1,112 @@
+{{- if .Values.nfd.enabled -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-feature-discovery # NFD namespace
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfd-master
+  namespace: node-feature-discovery
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfd-master
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nfd-master
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nfd-master
+subjects:
+- kind: ServiceAccount
+  name: nfd-master
+  namespace: node-feature-discovery
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nfd-master
+  name: nfd-master
+  namespace: node-feature-discovery
+spec:
+  selector:
+    matchLabels:
+      app: nfd-master
+  template:
+    metadata:
+      labels:
+        app: nfd-master
+    spec:
+      serviceAccount: nfd-master
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Equal"
+          value: ""
+          effect: "NoSchedule"
+      containers:
+        - env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          image: quay.io/kubernetes_incubator/node-feature-discovery:v0.4.0
+          name: nfd-master
+          command:
+            - "nfd-master"
+## Enable TLS authentication
+## The example below assumes having the root certificate named ca.crt stored in
+## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored
+## in a TLS Secret named nfd-master-cert.
+## Additional hardening can be enabled by specifying --verify-node-name in
+## args, in which case every nfd-worker requires a individual node-specific
+## TLS certificate.
+#          args:
+#            - "--ca-file=/etc/kubernetes/node-feature-discovery/trust/ca.crt"
+#            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+#            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+#          volumeMounts:
+#            - name: nfd-ca-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/trust"
+#              readOnly: true
+#            - name: nfd-master-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+#              readOnly: true
+#      volumes:
+#        - name: nfd-ca-cert
+#          configMap:
+#            name: nfd-ca-cert
+#        - name: nfd-master-cert
+#          secret:
+#            secretName: nfd-master-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfd-master
+  namespace: node-feature-discovery
+spec:
+  selector:
+    app: nfd-master
+  ports:
+  - protocol: TCP
+    port: 8080
+  type: ClusterIP
+{{ end }}
