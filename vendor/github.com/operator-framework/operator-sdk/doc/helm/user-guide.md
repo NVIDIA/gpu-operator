@@ -13,7 +13,7 @@ powered by Helm using tools and libraries provided by the Operator SDK.
 - Access to a Kubernetes v.1.11.3+ cluster.
 
 **Note**: This guide uses [minikube][minikube_tool] version v0.25.0+ as the
-local Kubernetes cluster and quay.io for the public registry.
+local Kubernetes cluster and [quay.io][quay_link] for the public registry.
 
 ## Install the Operator SDK CLI
 
@@ -33,6 +33,12 @@ make install
 ```
 
 This installs the CLI binary `operator-sdk` at `$GOPATH/bin`.
+
+Alternatively, if you are using [Homebrew][homebrew_tool], you can install the SDK CLI tool with the following command:
+
+```sh
+$ brew install operator-sdk
+```
 
 ## Create a new project
 
@@ -354,6 +360,7 @@ kubectl delete -f deploy/crds/example_v1alpha1_nginx_crd.yaml
 ```
 
 [layout_doc]:./project_layout.md
+[homebrew_tool]:https://brew.sh/
 [dep_tool]:https://golang.github.io/dep/docs/installation.html
 [git_tool]:https://git-scm.com/downloads
 [go_tool]:https://golang.org/dl/
@@ -362,3 +369,4 @@ kubectl delete -f deploy/crds/example_v1alpha1_nginx_crd.yaml
 [minikube_tool]:https://github.com/kubernetes/minikube#installation
 [helm_charts]:https://helm.sh/docs/developing_charts/
 [helm_values]:https://helm.sh/docs/using_helm/#customizing-the-chart-before-installing
+[quay_link]:https://quay.io
