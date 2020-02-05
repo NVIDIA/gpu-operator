@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/operator-framework/operator-sdk/internal/util/diffutil"
+	"github.com/operator-framework/operator-sdk/internal/util/fileutil"
 	"github.com/operator-framework/operator-sdk/pkg/scaffold"
 	"github.com/operator-framework/operator-sdk/pkg/scaffold/input"
 
@@ -30,15 +31,14 @@ import (
 	"github.com/ghodss/yaml"
 	olmapiv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 	olminstall "github.com/operator-framework/operator-lifecycle-manager/pkg/controller/install"
+	"github.com/spf13/afero"
 )
 
 const testDataDir = "testdata"
 
-var (
-	testOLMDir = filepath.Join(testDataDir, scaffold.OLMCatalogDir)
-)
+var testDeployDir = filepath.Join(testDataDir, scaffold.DeployDir)
 
-func TestCSV(t *testing.T) {
+func TestCSVNew(t *testing.T) {
 	buf := &bytes.Buffer{}
 	s := &scaffold.Scaffold{
 		GetWriter: func(_ string, _ os.FileMode) (io.Writer, error) {
@@ -48,34 +48,93 @@ func TestCSV(t *testing.T) {
 	csvVer := "0.1.0"
 	projectName := "app-operator"
 
-	err := s.Execute(&input.Config{ProjectName: projectName},
-		&CSV{
-			CSVVersion:     csvVer,
-			ConfigFilePath: filepath.Join(testOLMDir, CSVConfigYamlFile),
-		},
-	)
+	sc := &CSV{CSVVersion: csvVer, pathPrefix: testDataDir}
+	err := s.Execute(&input.Config{ProjectName: projectName}, sc)
 	if err != nil {
 		t.Fatalf("Failed to execute the scaffold: (%v)", err)
 	}
 
 	// Get the expected CSV manifest from test data dir.
-	csvFilePath := projectName + CSVYamlFileExt
-	csvExpBytes, err := ioutil.ReadFile(filepath.Join(testOLMDir, csvFilePath))
+	csvExpBytes, err := afero.ReadFile(s.Fs, sc.getCSVPath(csvVer))
 	if err != nil {
 		t.Fatal(err)
 	}
 	csvExp := string(csvExpBytes)
-
 	if csvExp != buf.String() {
 		diffs := diffutil.Diff(csvExp, buf.String())
-		t.Fatalf("Expected vs actual differs.\n%v", diffs)
+		t.Errorf("Expected vs actual differs.\n%v", diffs)
+	}
+}
+
+func writeOSPathToFS(fromFs, toFs afero.Fs, root string) error {
+	if _, err := fromFs.Stat(root); err != nil {
+		return err
+	}
+	return afero.Walk(fromFs, root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return err
+		}
+		if !info.IsDir() {
+			b, err := afero.ReadFile(fromFs, path)
+			if err != nil {
+				return err
+			}
+			return afero.WriteFile(toFs, path, b, fileutil.DefaultFileMode)
+		}
+		return nil
+	})
+}
+
+func TestCSVFromOld(t *testing.T) {
+	s := &scaffold.Scaffold{Fs: afero.NewMemMapFs()}
+	projectName := "app-operator"
+	oldCSVVer, newCSVVer := "0.1.0", "0.2.0"
+
+	// Write all files in testdata/deploy to fs so manifests are present when
+	// writing a new CSV.
+	if err := writeOSPathToFS(afero.NewOsFs(), s.Fs, testDeployDir); err != nil {
+		t.Fatalf("Failed to write %s to in-memory test fs: (%v)", testDeployDir, err)
+	}
+
+	sc := &CSV{
+		CSVVersion:  newCSVVer,
+		FromVersion: oldCSVVer,
+		pathPrefix:  testDataDir,
+	}
+	err := s.Execute(&input.Config{ProjectName: projectName}, sc)
+	if err != nil {
+		t.Fatalf("Failed to execute the scaffold: (%v)", err)
+	}
+
+	// Check if a new file was written at the expected path.
+	newCSVPath := sc.getCSVPath(newCSVVer)
+	newCSV, newExists, err := getCSVFromFSIfExists(s.Fs, newCSVPath)
+	if err != nil {
+		t.Fatalf("Failed to get new CSV %s: (%v)", newCSVPath, err)
+	}
+	if !newExists {
+		t.Fatalf("New CSV does not exist at %s", newCSVPath)
+	}
+
+	expName := getCSVName(projectName, newCSVVer)
+	if newCSV.ObjectMeta.Name != expName {
+		t.Errorf("Expected CSV metadata.name %s, got %s", expName, newCSV.ObjectMeta.Name)
+	}
+	expReplaces := getCSVName(projectName, oldCSVVer)
+	if newCSV.Spec.Replaces != expReplaces {
+		t.Errorf("Expected CSV spec.replaces %s, got %s", expReplaces, newCSV.Spec.Replaces)
 	}
 }
 
 func TestUpdateVersion(t *testing.T) {
 	projectName := "app-operator"
-	csvFilePath := projectName + CSVYamlFileExt
-	csvExpBytes, err := ioutil.ReadFile(filepath.Join(testOLMDir, csvFilePath))
+	oldCSVVer, newCSVVer := "0.1.0", "0.2.0"
+	sc := &CSV{
+		Input:      input.Input{ProjectName: projectName},
+		CSVVersion: newCSVVer,
+		pathPrefix: testDataDir,
+	}
+	csvExpBytes, err := ioutil.ReadFile(sc.getCSVPath(oldCSVVer))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,14 +143,7 @@ func TestUpdateVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newCSVVer := "0.2.0"
-	c := &CSV{
-		Input: input.Input{
-			ProjectName: projectName,
-		},
-		CSVVersion: newCSVVer,
-	}
-	if err := c.updateCSVVersions(csv); err != nil {
+	if err := sc.updateCSVVersions(csv); err != nil {
 		t.Fatalf("Failed to update csv with version %s: (%v)", newCSVVer, err)
 	}
 

@@ -220,8 +220,8 @@
 [[projects]]
   name = "github.com/operator-framework/operator-sdk"
   packages = ["pkg/k8sutil","pkg/leader","pkg/ready","version"]
-  revision = "6754b70169f1b62355516947270e33b9f73d8159"
-  version = "v0.5.0"
+  revision = "61e0c23e9d2e217f8d95ac104a8f2545c102b5c3"
+  version = "v0.6.0"
 
 [[projects]]
   name = "github.com/pborman/uuid"
@@ -430,6 +430,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "aede320d5fc5efffe3e95a342a14b9a5fec2fe677e91ece1c965e7220f711e4e"
+  inputs-digest = "bfba00de1546a982f6973b1fc8acd7d754fb783d66f1ab34da24a778717a9e90"
   solver-name = "gps-cdcl"
   solver-version = 1
