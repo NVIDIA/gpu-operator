@@ -15,6 +15,8 @@
 package add
 
 import (
+	"fmt"
+
 	"github.com/operator-framework/operator-sdk/commands/operator-sdk/cmd/generate"
 	"github.com/operator-framework/operator-sdk/internal/util/projutil"
 	"github.com/operator-framework/operator-sdk/pkg/scaffold"
@@ -34,8 +36,17 @@ func NewApiCmd() *cobra.Command {
 		Use:   "api",
 		Short: "Adds a new api definition under pkg/apis",
 		Long: `operator-sdk add api --kind=<kind> --api-version=<group/version> creates the
-api definition for a new custom resource under pkg/apis. This command must be run from the project root directory.
-If the api already exists at pkg/apis/<group>/<version> then the command will not overwrite and return an error.
+api definition for a new custom resource under pkg/apis. This command must be
+run from the project root directory. If the api already exists at
+pkg/apis/<group>/<version> then the command will not overwrite and return an
+error.
+
+This command runs Kubernetes deepcopy and OpenAPI V3 generators on tagged
+types in all paths under pkg/apis. Go code is generated under
+pkg/apis/<group>/<version>/zz_generated.{deepcopy,openapi}.go. CRD's are
+generated, or updated if they exist for a particular group + version + kind,
+under deploy/crds/<group>_<version>_<kind>_crd.yaml; OpenAPI V3 validation YAML
+is generated as a 'validation' object.
 
 Example:
 	$ operator-sdk add api --api-version=app.example.com/v1alpha1 --kind=AppService
@@ -47,10 +58,14 @@ Example:
 		└── v1alpha1
 			├── doc.go
 			├── register.go
-			├── types.go
-
+			├── appservice_types.go
+			├── zz_generated.deepcopy.go
+			├── zz_generated.openapi.go
+	$ tree deploy/crds
+	├── deploy/crds/app_v1alpha1_appservice_cr.yaml
+	├── deploy/crds/app_v1alpha1_appservice_crd.yaml
 `,
-		Run: apiRun,
+		RunE: apiRun,
 	}
 
 	apiCmd.Flags().StringVar(&apiVersion, "api-version", "", "Kubernetes APIVersion that has a format of $GROUP_NAME/$VERSION (e.g app.example.com/v1alpha1)")
@@ -65,18 +80,20 @@ Example:
 	return apiCmd
 }
 
-func apiRun(cmd *cobra.Command, args []string) {
-	// Only Go projects can add apis.
-	projutil.MustGoProjectCmd(cmd)
-
-	// Create and validate new resource
+func apiRun(cmd *cobra.Command, args []string) error {
 	projutil.MustInProjectRoot()
+
+	// Only Go projects can add apis.
+	if err := projutil.CheckGoProjectCmd(cmd); err != nil {
+		return err
+	}
 
 	log.Infof("Generating api version %s for kind %s.", apiVersion, kind)
 
+	// Create and validate new resource.
 	r, err := scaffold.NewResource(apiVersion, kind)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	absProjectPath := projutil.MustGetwd()
@@ -92,20 +109,28 @@ func apiRun(cmd *cobra.Command, args []string) {
 		&scaffold.AddToScheme{Resource: r},
 		&scaffold.Register{Resource: r},
 		&scaffold.Doc{Resource: r},
-		&scaffold.Cr{Resource: r},
-		&scaffold.Crd{Resource: r},
+		&scaffold.CR{Resource: r},
+		&scaffold.CRD{Resource: r, IsOperatorGo: projutil.IsOperatorGo()},
 	)
 	if err != nil {
-		log.Fatalf("Add scaffold failed: (%v)", err)
+		return fmt.Errorf("api scaffold failed: (%v)", err)
 	}
 
 	// update deploy/role.yaml for the given resource r.
 	if err := scaffold.UpdateRoleForResource(r, absProjectPath); err != nil {
-		log.Fatalf("Failed to update the RBAC manifest for the resource (%v, %v): (%v)", r.APIVersion, r.Kind, err)
+		return fmt.Errorf("failed to update the RBAC manifest for the resource (%v, %v): (%v)", r.APIVersion, r.Kind, err)
 	}
 
 	// Run k8s codegen for deepcopy
-	generate.K8sCodegen()
+	if err := generate.K8sCodegen(); err != nil {
+		return err
+	}
 
-	log.Info("Api generation complete.")
+	// Generate a validation spec for the new CRD.
+	if err := generate.OpenAPIGen(); err != nil {
+		return err
+	}
+
+	log.Info("API generation complete.")
+	return nil
 }

@@ -75,7 +75,7 @@ func (s *Scaffold) configure(cfg *input.Config) {
 // Execute executes scaffolding the Files
 func (s *Scaffold) Execute(cfg *input.Config, files ...input.File) error {
 	if s.GetWriter == nil {
-		s.GetWriter = (&fileutil.FileWriter{}).WriteCloser
+		s.GetWriter = fileutil.NewFileWriter().WriteCloser
 	}
 
 	// Configure s using common fields from cfg.
@@ -167,6 +167,12 @@ func (s *Scaffold) doRender(i input.Input, e input.File, absPath string) error {
 		}
 	}
 
+	// Files being overwritten must be trucated to len 0 so no old bytes remain.
+	if _, err = os.Stat(absPath); err == nil && i.IfExistsAction == input.Overwrite {
+		if err = os.Truncate(absPath, 0); err != nil {
+			return err
+		}
+	}
 	_, err = f.Write(b)
 	log.Infoln("Create", i.Path)
 	return err

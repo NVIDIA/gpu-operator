@@ -30,19 +30,23 @@ required = ["sigs.k8s.io/testing_frameworks/integration",
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.12.3"
+  version = "kubernetes-1.13.1"
 
 [[constraint]]
   name = "k8s.io/apiextensions-apiserver"
-  version = "kubernetes-1.12.3"
+  version = "kubernetes-1.13.1"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.12.3"
+  version = "kubernetes-1.13.1"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "kubernetes-1.12.3"
+  version = "kubernetes-1.13.1"
+
+[[constraint]]
+  name = "sigs.k8s.io/testing_frameworks"
+  version = "v0.1.1"
 
 [[constraint]]
   name = "github.com/onsi/ginkgo"
@@ -67,9 +71,6 @@ required = ["sigs.k8s.io/testing_frameworks/integration",
 # these are not listed explicitly until we get version tags,
 # since dep doesn't like bare revision dependencies
 
-# [[constraint]]
-#   name = "sigs.k8s.io/testing_frameworks"
-#
 # [[constraint]]
 #   name = "github.com/go-logr/logr"
 #

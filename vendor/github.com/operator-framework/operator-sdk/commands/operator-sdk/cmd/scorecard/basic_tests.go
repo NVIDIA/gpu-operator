@@ -27,6 +27,7 @@ import (
 	"github.com/operator-framework/operator-sdk/internal/util/fileutil"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,7 +44,7 @@ import (
 func checkSpecAndStat(runtimeClient client.Client, obj *unstructured.Unstructured, noStore bool) error {
 	testSpec := scorecardTest{testType: basicOperator, name: "Spec Block Exists", maximumPoints: 1}
 	testStat := scorecardTest{testType: basicOperator, name: "Status Block Exist", maximumPoints: 1}
-	err := wait.Poll(time.Second*1, time.Second*time.Duration(SCConf.InitTimeout), func() (bool, error) {
+	err := wait.Poll(time.Second*1, time.Second*time.Duration(viper.GetInt64(InitTimeoutOpt)), func() (bool, error) {
 		err := runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, obj)
 		if err != nil {
 			return false, fmt.Errorf("error getting custom resource: %v", err)
@@ -65,6 +66,12 @@ func checkSpecAndStat(runtimeClient client.Client, obj *unstructured.Unstructure
 	}
 	if err != nil && err != wait.ErrWaitTimeout {
 		return err
+	}
+	if testSpec.earnedPoints != 1 {
+		scSuggestions = append(scSuggestions, "Add a 'spec' field to your Custom Resource")
+	}
+	if testStat.earnedPoints != 1 {
+		scSuggestions = append(scSuggestions, "Add a 'status' field to your Custom Resource")
 	}
 	return nil
 }
@@ -93,6 +100,7 @@ func checkStatusUpdate(runtimeClient client.Client, obj *unstructured.Unstructur
 	err = modifySpecAndCheck(specMap, obj)
 	if err != nil {
 		test.earnedPoints = 0
+		scSuggestions = append(scSuggestions, "Make sure that the 'status' block is always updated to reflect changes after the 'spec' block is changed")
 		scTests = append(scTests, test)
 		return nil
 	}
@@ -211,5 +219,8 @@ func writingIntoCRsHasEffect(obj *unstructured.Unstructured) (string, error) {
 		}
 	}
 	scTests = append(scTests, test)
+	if test.earnedPoints != 1 {
+		scSuggestions = append(scSuggestions, "The operator should write into objects to update state. No PUT or POST requests from you operator were recorded by the scorecard.")
+	}
 	return buf.String(), nil
 }

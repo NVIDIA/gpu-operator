@@ -1,0 +1,10 @@
+echo stdout stdout
+testreadfile stdout
+
+echo stderr stderr
+testreadfile stderr
+
+testreadfile x/somefile
+
+-- x/somefile --
+x/somefile

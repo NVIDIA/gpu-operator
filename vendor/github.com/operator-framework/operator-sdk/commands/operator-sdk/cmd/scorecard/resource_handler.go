@@ -25,11 +25,13 @@ import (
 
 	proxyConf "github.com/operator-framework/operator-sdk/pkg/ansible/proxy/kubeconfig"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
+	"github.com/spf13/viper"
 
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -56,7 +58,7 @@ func yamlToUnstructured(yamlPath string) (*unstructured.Unstructured, error) {
 		return nil, fmt.Errorf("failed to unmarshal custom resource manifest to unstructured: %s", err)
 	}
 	// set the namespace
-	obj.SetNamespace(SCConf.Namespace)
+	obj.SetNamespace(viper.GetString(NamespaceOpt))
 	return obj, nil
 }
 
@@ -81,7 +83,7 @@ func createFromYAMLFile(yamlPath string) error {
 		if err := obj.UnmarshalJSON(jsonSpec); err != nil {
 			return fmt.Errorf("could not unmarshal resource spec: %v", err)
 		}
-		obj.SetNamespace(SCConf.Namespace)
+		obj.SetNamespace(viper.GetString(NamespaceOpt))
 
 		// dirty hack to merge scorecard proxy into operator deployment; lots of serialization and deserialization
 		if obj.GetKind() == "Deployment" {
@@ -136,7 +138,7 @@ func createFromYAMLFile(yamlPath string) error {
 // the kubeconfig for communicating with the proxy
 func createKubeconfigSecret() error {
 	kubeconfigMap := make(map[string][]byte)
-	kc, err := proxyConf.Create(metav1.OwnerReference{Name: "scorecard"}, "http://localhost:8889", SCConf.Namespace)
+	kc, err := proxyConf.Create(metav1.OwnerReference{Name: "scorecard"}, "http://localhost:8889", viper.GetString(NamespaceOpt))
 	if err != nil {
 		return err
 	}
@@ -157,7 +159,7 @@ func createKubeconfigSecret() error {
 	kubeconfigSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "scorecard-kubeconfig",
-			Namespace: SCConf.Namespace,
+			Namespace: viper.GetString(NamespaceOpt),
 		},
 		Data: kubeconfigMap,
 	}
@@ -199,8 +201,9 @@ func addMountKubeconfigSecret(dep *appsv1.Deployment) {
 
 // addProxyContainer adds the container spec for the scorecard-proxy to the deployment's podspec
 func addProxyContainer(dep *appsv1.Deployment) {
+	pullPolicyString := viper.GetString(ProxyPullPolicyOpt)
 	var pullPolicy v1.PullPolicy
-	switch SCConf.ProxyPullPolicy {
+	switch pullPolicyString {
 	case "Always":
 		pullPolicy = v1.PullAlways
 	case "Never":
@@ -213,7 +216,7 @@ func addProxyContainer(dep *appsv1.Deployment) {
 	}
 	dep.Spec.Template.Spec.Containers = append(dep.Spec.Template.Spec.Containers, v1.Container{
 		Name:            "scorecard-proxy",
-		Image:           SCConf.ProxyImage,
+		Image:           viper.GetString(ProxyImageOpt),
 		ImagePullPolicy: pullPolicy,
 		Command:         []string{"scorecard-proxy"},
 		Env: []v1.EnvVar{{
@@ -221,6 +224,24 @@ func addProxyContainer(dep *appsv1.Deployment) {
 			ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.namespace"}},
 		}},
 	})
+}
+
+// unstructuredToCRD converts an unstructured object to a CRD
+func unstructuredToCRD(obj *unstructured.Unstructured) (*apiextv1beta1.CustomResourceDefinition, error) {
+	jsonByte, err := obj.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert CRD to json: %v", err)
+	}
+	crdObj, _, err := dynamicDecoder.Decode(jsonByte, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode CRD object: %v", err)
+	}
+	switch o := crdObj.(type) {
+	case *apiextv1beta1.CustomResourceDefinition:
+		return o, nil
+	default:
+		return nil, fmt.Errorf("conversion of runtime object to CRD failed (resulting runtime object not CRD type)")
+	}
 }
 
 // unstructuredToDeployment converts an unstructured object to a deployment

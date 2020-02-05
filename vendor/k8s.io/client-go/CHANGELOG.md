@@ -5,6 +5,295 @@ https://github.com/kubernetes/test-infra/issues/5843.
 Changes in `k8s.io/api` and `k8s.io/apimachinery` are mentioned here
 because `k8s.io/client-go` depends on them.
 
+# v10.0.0
+
+**Breaking Changes:**
+
+* Action required: client-go will no longer have bootstrap
+(`k8s.io/client-go/tools/bootstrap`) related code. Any reference to it will
+break. Please redirect all references to `k8s.io/bootstrap` instead.
+([#67356](https://github.com/kubernetes/kubernetes/pull/67356))
+
+* The methods `NewSelfSignedCACert` and `NewSignedCert` now use `crypto.Signer`
+interface instead of `rsa.PrivateKey` for certificate creation. This is done
+to allow different kind of private keys (for example: ecdsa).
+([#69329](https://github.com/kubernetes/kubernetes/pull/69329))
+
+* `GetScale` and `UpdateScale` methods have been added for `apps/v1` clients
+and with this, no-verb scale clients have been removed.
+([#70437](https://github.com/kubernetes/kubernetes/pull/70437))
+
+* `k8s.io/client-go/util/cert/triple` package has been removed.
+([#70966](https://github.com/kubernetes/kubernetes/pull/70966))
+
+**New Features:**
+
+* `unfinished_work_microseconds` is added to the workqueue metrics.
+It can be used to detect stuck worker threads (kube-controller-manager runs many workqueues.).
+([#70884](https://github.com/kubernetes/kubernetes/pull/70884))
+
+* A method `GetPorts` is added to expose the ports that were forwarded.
+This can be used to retrieve the locally-bound port in cases where the input was port 0.
+([#67513](https://github.com/kubernetes/kubernetes/pull/67513))
+
+* Dynamic listers and informers, that work with `runtime.Unstructured` objects,
+are added. These are useful for writing generic, non-generated controllers.
+([68748](https://github.com/kubernetes/kubernetes/pull/68748))
+
+* The dynamic fake client now supports JSONPatch.
+([#69330](https://github.com/kubernetes/kubernetes/pull/69330))
+
+* The `GetBinding` method is added for pods in the fake client.
+([#69412](https://github.com/kubernetes/kubernetes/pull/69412))
+
+**Bug fixes and Improvements:**
+
+* The `apiVersion` and action name values for fake evictions are now set.
+([#69035](https://github.com/kubernetes/kubernetes/pull/69035))
+
+* PEM files containing both TLS certificate and key can now be parsed in
+arbitrary order. Previously key was always required to be first.
+([#69536](https://github.com/kubernetes/kubernetes/pull/69536))
+
+* Go clients created from a kubeconfig that specifies a `TokenFile` now
+periodically reload the token from the specified file.
+([#70606](https://github.com/kubernetes/kubernetes/pull/70606))
+
+* It is now ensured that oversized data frames are not written to
+spdystreams in `remotecommand.NewSPDYExecutor`.
+([#70999](https://github.com/kubernetes/kubernetes/pull/70999))
+
+* A panic occuring on calling `scheme.Convert` is fixed by populating the fake
+dynamic client scheme. ([#69125](https://github.com/kubernetes/kubernetes/pull/69125))
+
+* Add step to correctly setup permissions for the in-cluster-client-configuration example.
+([#69232](https://github.com/kubernetes/kubernetes/pull/69232))
+
+* The function `Parallelize` is deprecated. Use `ParallelizeUntil` instead.
+([#68403](https://github.com/kubernetes/kubernetes/pull/68403))
+
+* [k8s.io/apimachinery] Restrict redirect following from the apiserver to
+same-host redirects, and ignore redirects in some cases.
+([#66516](https://github.com/kubernetes/kubernetes/pull/66516))
+
+## API changes
+
+**New Features:**
+
+* GlusterFS PersistentVolumes sources can now reference endpoints in any
+namespace using the `spec.glusterfs.endpointsNamespace` field.
+Ensure all kubelets are upgraded to 1.13+ before using this capability.
+([#60195](https://github.com/kubernetes/kubernetes/pull/60195))
+
+* The [dynamic audit configuration](https://github.com/kubernetes/community/blob/master/keps/sig-auth/0014-dynamic-audit-configuration.md)
+API is added. ([#67547](https://github.com/kubernetes/kubernetes/pull/67547))
+
+* A new field `EnableServiceLinks` is added to the `PodSpec` to indicate whether
+information about services should be injected into pod's environment variables.
+([#68754](https://github.com/kubernetes/kubernetes/pull/68754))
+
+* `CSIPersistentVolume` feature, i.e. `PersistentVolumes` with
+`CSIPersistentVolumeSource`, is GA. `CSIPersistentVolume` feature gate is now
+deprecated and will be removed according to deprecation policy.
+([#69929](https://github.com/kubernetes/kubernetes/pull/69929))
+
+* Raw block volume support is promoted to beta, and enabled by default.
+This is accessible via the `volumeDevices` container field in pod specs,
+and the `volumeMode` field in persistent volume and persistent volume claims definitions.
+([#71167](https://github.com/kubernetes/kubernetes/pull/71167))
+
+**Bug fixes and Improvements:**
+
+* The default value of extensions/v1beta1 Deployment's `RevisionHistoryLimit`
+is set to `MaxInt32`. ([#66605](https://github.com/kubernetes/kubernetes/pull/66605))
+
+* `procMount` field is no longer incorrectly marked as required in openapi schema.
+([#69694](https://github.com/kubernetes/kubernetes/pull/69694))
+
+* The caBundle and service fields in admission webhook API objects now correctly
+indicate they are optional. ([#70138](https://github.com/kubernetes/kubernetes/pull/70138))
+
+# v9.0.0
+
+**Breaking Changes:**
+
+* client-go now supports additional non-alpha-numeric characters in UserInfo
+"extra" data keys. It should be updated in order to properly support extra
+data containing "/" characters or other characters disallowed in HTTP headers.
+Old clients sending keys which were `%`-escaped by the user will have their
+values unescaped by new API servers.
+([#65799](https://github.com/kubernetes/kubernetes/pull/65799))
+
+* `apimachinery/pkg/watch.Until` has been moved to
+`client-go/tools/watch.UntilWithoutRetry`. While switching please consider
+using the new `client-go/tools/watch.UntilWithSync` or `client-go/tools/watch.Until`.
+([#66906](https://github.com/kubernetes/kubernetes/pull/66906))
+
+* [k8s.io/apimachinery] `Unstructured` metadata accessors now respect omitempty semantics
+i.e. a field having zero value will now be removed from the unstructured metadata map.
+([#67635](https://github.com/kubernetes/kubernetes/pull/67635))
+
+* [k8s.io/apimachinery] The `ObjectConvertor` interface is now changed such that
+`ConvertFieldLabel` func takes GroupVersionKind as an argument instead of just
+version and kind. ([#65780](https://github.com/kubernetes/kubernetes/pull/65780))
+
+* [k8s.io/apimachinery] componentconfig `ClientConnectionConfiguration` is
+moved to `k8s.io/apimachinery/pkg/apis/config`.
+([#66058](https://github.com/kubernetes/kubernetes/pull/66058))
+
+* [k8s.io/apimachinery] Renamed ` KubeConfigFile` to `Kubeconfig` in
+`ClientConnectionConfiguration`.
+([#67149](https://github.com/kubernetes/kubernetes/pull/67149))
+
+* [k8s.io/apimachinery] JSON patch no longer supports `int`.
+([#63522](https://github.com/kubernetes/kubernetes/pull/63522))
+
+**New Features:**
+
+* Add ability to cancel leader election.
+This also proves useful in integration tests where the whole app is started and
+stopped in each test. ([#57932](https://github.com/kubernetes/kubernetes/pull/57932))
+
+* An example showing how to use fake clients in tests is added.
+([#65291](https://github.com/kubernetes/kubernetes/pull/65291))
+
+* [k8s.io/apimachinery] Create and Update now support `CreateOptions` and `UpdateOptions`.
+([#65105](https://github.com/kubernetes/kubernetes/pull/65105))
+
+**Bug fixes and Improvements:**
+
+* Decrease the amount of time it takes to modify kubeconfig
+files with large amounts of contexts.
+([#67093](https://github.com/kubernetes/kubernetes/pull/67093))
+
+* The leader election client now renews timeout.
+([#65094](https://github.com/kubernetes/kubernetes/pull/65094))
+
+* Switched certificate data replacement from `REDACTED` to `DATA+OMITTED`.
+([#66023](https://github.com/kubernetes/kubernetes/pull/66023))
+
+* Fix listing in the fake dynamic client.
+([#66078](https://github.com/kubernetes/kubernetes/pull/66078))
+
+* Fix discovery so that plural names are no longer ignored if a singular name is not specified.
+([#66249](https://github.com/kubernetes/kubernetes/pull/66249))
+
+* Fix kubelet startup failure when using `ExecPlugin` in kubeconfig.
+([#66395](https://github.com/kubernetes/kubernetes/pull/66395))
+
+* Fix panic in the fake `SubjectAccessReview` client when object is nil.
+([#66837](https://github.com/kubernetes/kubernetes/pull/66837))
+
+* Periodically reload `InClusterConfig` token.
+([#67359](https://github.com/kubernetes/kubernetes/pull/67359))
+
+* [k8s.io/apimachinery] Report parsing error in json serializer.
+([#63668](https://github.com/kubernetes/kubernetes/pull/63668))
+
+* [k8s.io/apimachinery] The `metav1.ObjectMeta` accessor does not deepcopy
+owner references anymore. In general, the accessor interface does not enforce
+deepcopy nor does it forbid it (e.g. for `unstructured.Unstructured`).
+([#64915](https://github.com/kubernetes/kubernetes/pull/64915))
+
+* [k8s.io/apimachinery] Utility functions `SetTransportDefaults` and `DialerFor`
+once again respect custom Dial functions set on transports.
+([#65547](https://github.com/kubernetes/kubernetes/pull/65547))
+
+* [k8s.io/apimachinery] Speed-up conversion function invocation by avoiding
+`reflect.Call`. Action required: regenerated conversion with conversion-gen.
+([#65771](https://github.com/kubernetes/kubernetes/pull/65771))
+
+* [k8s.io/apimachinery] Establish "406 Not Acceptable" response for
+unmarshable protobuf serialization error.
+([#67041](https://github.com/kubernetes/kubernetes/pull/67041))
+
+* [k8s.io/apimachinery] Immediately close the other side of the connection by
+exiting once one side closes when proxying.
+([#67288](https://github.com/kubernetes/kubernetes/pull/67288))
+
+
+## API changes
+
+**Breaking Changes:**
+
+* Volume dynamic provisioning scheduling has been promoted to beta.
+ACTION REQUIRED: The DynamicProvisioningScheduling alpha feature gate has been removed.
+The VolumeScheduling beta feature gate is still required for this feature.
+([#67432](https://github.com/kubernetes/kubernetes/pull/67432))
+
+* The CSI file system type is no longer defaulted to ext4.
+All the production drivers listed under https://kubernetes-csi.github.io/docs/Drivers.html
+were inspected and should not be impacted after this change.
+If you are using a driver not in that list,
+please test the drivers on an updated test cluster first.
+([#65499](https://github.com/kubernetes/kubernetes/pull/65499))
+
+**New Features:**
+
+* Support annotations for remote admission webhooks.
+([#58679](https://github.com/kubernetes/kubernetes/pull/58679))
+
+* Support both directory and block device for local volume
+plugin `FileSystem` `VolumeMode`.
+([#63011](https://github.com/kubernetes/kubernetes/pull/63011))
+
+* Introduce `autoscaling/v2beta2` and `custom_metrics/v1beta2`,
+which implement metric selectors for Object and Pods metrics,
+as well as allowing AverageValue targets on Objects, similar to External metrics.
+([#64097](https://github.com/kubernetes/kubernetes/pull/64097))
+
+*  Add `Lease` API in the `coordination.k8s.io` API group.
+([#64246](https://github.com/kubernetes/kubernetes/pull/64246))
+
+* `ProcMount` added to `SecurityContext` and `AllowedProcMounts` added to `PodSecurityPolicy`
+to allow paths in the container's `/proc` to not be masked.
+([#64283](https://github.com/kubernetes/kubernetes/pull/64283))
+
+* Add the `AuditAnnotations` field to `ImageReviewStatus` to allow the
+`ImageReview` backend to return annotations to be added to the created pod.
+([#64597](https://github.com/kubernetes/kubernetes/pull/64597))
+
+* SCTP is now supported as additional protocol (alpha) alongside TCP and UDP in
+Pod, Service, Endpoint, and NetworkPolicy.
+([#64973](https://github.com/kubernetes/kubernetes/pull/64973))
+
+* The `PodShareProcessNamespace` feature to configure PID namespace sharing
+within a pod has been promoted to beta.
+([#66507](https://github.com/kubernetes/kubernetes/pull/66507))
+
+* Add `TTLSecondsAfterFinished` to `JobSpec` for cleaning up Jobs after they finish.
+([#66840](https://github.com/kubernetes/kubernetes/pull/66840))
+
+* Add `DataSource` and `TypedLocalObjectReference` fields to support
+restoring a volume from a volume snapshot data source.
+([#67087](https://github.com/kubernetes/kubernetes/pull/67087))
+
+* `RuntimeClass` is a new API resource for defining different classes of runtimes
+that may be used to run containers in the cluster.
+Pods can select a `RunitmeClass` to use via the `RuntimeClassName` field.
+This feature is in alpha, and the `RuntimeClass` feature gate must be enabled
+in order to use it. ([#67737](https://github.com/kubernetes/kubernetes/pull/67737))
+
+* To address the possibility dry-run requests overwhelming admission webhooks
+that rely on side effects and a reconciliation mechanism, a new field is being
+added to `admissionregistration.k8s.io/v1beta1.ValidatingWebhookConfiguration`
+and `admissionregistration.k8s.io/v1beta1.MutatingWebhookConfiguration` so that
+webhooks can explicitly register as having dry-run support.
+If a dry-run request is made on a resource that triggers a non dry-run supporting
+webhook, the request will be completely rejected, with "400: Bad Request".
+Additionally, a new field is being added to the
+`admission.k8s.io/v1beta1.AdmissionReview` API object, exposing to webhooks
+whether or not the request being reviewed is a dry-run.
+([#66936](https://github.com/kubernetes/kubernetes/pull/66936))
+
+**Bug fixes and Improvements:**
+
+* The `DisruptedPods` field in `PodDisruptionBudgetStatus` is now optional.
+([#63757](https://github.com/kubernetes/kubernetes/pull/63757))
+
+* `extensions/v1beta1` Deployment's `ProgressDeadlineSeconds` now defaults to `MaxInt32`.
+([#66581](https://github.com/kubernetes/kubernetes/pull/66581))
+
 # v8.0.0
 
 **Breaking Changes:**
