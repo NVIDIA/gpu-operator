@@ -1,0 +1,14 @@
+# Set to false for GKE
+https: true
+
+insecureSkipVerify: true
+
+# default rules are in templates/kubelet.rules.yaml
+# prometheusRules: {}
+
+## Custom Labels to be added to ServiceMonitor
+##
+additionalServiceMonitorLabels: {}
+##Custom Labels to be added to Prometheus Rules CRD
+##
+additionalRulesLabels: {}

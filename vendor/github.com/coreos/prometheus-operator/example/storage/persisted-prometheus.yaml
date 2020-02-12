@@ -1,0 +1,12 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: persisted
+spec:
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ssd
+        resources:
+          requests:
+            storage: 40Gi

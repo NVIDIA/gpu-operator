@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: operator-config
+  namespace: gpu-operator
+data:
+{{- if .Values.platform.openshift }}
+  unsupported: ""
+{{ else }}
+  unsupported: openshift
+{{- end }}
+
+  driver: "{{ .Values.driver.repository }}/{{ .Values.driver.image }}:{{ .Values.driver.version }}"
+  toolkit: "{{ .Values.toolkit.repository }}/{{ .Values.toolkit.image }}:{{ .Values.toolkit.version }}"
+  devicePlugin: "{{ .Values.devicePlugin.repository }}/{{ .Values.devicePlugin.image }}:{{ .Values.devicePlugin.version }}"
+  dcgmExporter: "{{ .Values.dcgmExporter.repository }}/{{ .Values.dcgmExporter.image }}:{{ .Values.dcgmExporter.version }}"
+  dcgmPodExporter: "{{ .Values.dcgmPodExporter.repository }}/{{ .Values.dcgmPodExporter.image }}:{{ .Values.dcgmPodExporter.version }}"

@@ -1,0 +1,4 @@
+[submodule "aws-kube-ci"]
+	path = aws-kube-ci
+	url = https://gitlab.com/nvidia/container-infrastructure/aws-kube-ci.git
+	branch = master

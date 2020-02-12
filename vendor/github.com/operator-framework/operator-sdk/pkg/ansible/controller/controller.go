@@ -26,7 +26,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	crthandler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -38,13 +40,14 @@ var log = logf.Log.WithName("ansible-controller")
 
 // Options - options for your controller
 type Options struct {
-	EventHandlers           []events.EventHandler
-	LoggingLevel            events.LogLevel
-	Runner                  runner.Runner
-	GVK                     schema.GroupVersionKind
-	ReconcilePeriod         time.Duration
-	ManageStatus            bool
-	WatchDependentResources bool
+	EventHandlers               []events.EventHandler
+	LoggingLevel                events.LogLevel
+	Runner                      runner.Runner
+	GVK                         schema.GroupVersionKind
+	ReconcilePeriod             time.Duration
+	ManageStatus                bool
+	WatchDependentResources     bool
+	WatchClusterScopedResources bool
 }
 
 // Add - Creates a new ansible operator controller and adds it to the manager
@@ -54,9 +57,20 @@ func Add(mgr manager.Manager, options Options) *controller.Controller {
 		options.EventHandlers = []events.EventHandler{}
 	}
 	eventHandlers := append(options.EventHandlers, events.NewLoggingEventHandler(options.LoggingLevel))
+	apiReader, err := client.New(mgr.GetConfig(), client.Options{})
+	if err != nil {
+		log.Error(err, "Unable to get new api client")
+	}
 
 	aor := &AnsibleOperatorReconciler{
-		Client:          mgr.GetClient(),
+		// The default client will use the DelegatingReader for reads
+		// this forces it to use the cache for unstructured types.
+		Client: client.DelegatingClient{
+			Reader:       mgr.GetCache(),
+			Writer:       mgr.GetClient(),
+			StatusClient: mgr.GetClient(),
+		},
+		APIReader:       apiReader,
 		GVK:             options.GVK,
 		Runner:          options.Runner,
 		EventHandlers:   eventHandlers,
@@ -64,19 +78,19 @@ func Add(mgr manager.Manager, options Options) *controller.Controller {
 		ManageStatus:    options.ManageStatus,
 	}
 
-	if mgr.GetScheme().IsVersionRegistered(schema.GroupVersion{
-		Group:   options.GVK.Group,
-		Version: options.GVK.Version,
-	}) {
-		log.Info("Version already registered... skipping")
-		return nil
+	scheme := mgr.GetScheme()
+	_, err = scheme.New(options.GVK)
+	if runtime.IsNotRegisteredError(err) {
+		// Register the GVK with the schema
+		scheme.AddKnownTypeWithName(options.GVK, &unstructured.Unstructured{})
+		metav1.AddToGroupVersion(mgr.GetScheme(), schema.GroupVersion{
+			Group:   options.GVK.Group,
+			Version: options.GVK.Version,
+		})
+	} else if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
 	}
-	// Register the GVK with the schema
-	mgr.GetScheme().AddKnownTypeWithName(options.GVK, &unstructured.Unstructured{})
-	metav1.AddToGroupVersion(mgr.GetScheme(), schema.GroupVersion{
-		Group:   options.GVK.Group,
-		Version: options.GVK.Version,
-	})
 
 	//Create new controller runtime controller and set the controller to watch GVK.
 	c, err := controller.New(fmt.Sprintf("%v-controller", strings.ToLower(options.GVK.Kind)), mgr, controller.Options{

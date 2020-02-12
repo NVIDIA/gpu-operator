@@ -15,13 +15,16 @@
 package ansible
 
 import (
+	"context"
 	"os"
 	"runtime"
 
 	aoflags "github.com/operator-framework/operator-sdk/pkg/ansible/flags"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/operator"
 	proxy "github.com/operator-framework/operator-sdk/pkg/ansible/proxy"
+	"github.com/operator-framework/operator-sdk/pkg/ansible/proxy/controllermap"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
+	"github.com/operator-framework/operator-sdk/pkg/leader"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,6 +45,8 @@ func printVersion() {
 func Run(flags *aoflags.AnsibleOperatorFlags) {
 	logf.SetLogger(logf.ZapLogger(false))
 
+	printVersion()
+
 	namespace, found := os.LookupEnv(k8sutil.WatchNamespaceEnvVar)
 	if found {
 		log.Infof("Watching %v namespace.", namespace)
@@ -58,9 +63,19 @@ func Run(flags *aoflags.AnsibleOperatorFlags) {
 		log.Fatal(err)
 	}
 
-	printVersion()
+	name, found := os.LookupEnv(k8sutil.OperatorNameEnvVar)
+	if !found {
+		log.Fatal("OPERATOR_NAME environment variable not set")
+	}
+	// Become the leader before proceeding
+	err = leader.Become(context.TODO(), name+"-lock")
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	done := make(chan error)
-	cMap := proxy.NewControllerMap()
+	cMap := controllermap.NewControllerMap()
 
 	// start the proxy
 	err = proxy.Run(done, proxy.Options{
