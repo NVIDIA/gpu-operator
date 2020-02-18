@@ -7,6 +7,7 @@ variables:
 # Ensure the @OPERATOR_VERSION@ is rewritten before any action is taken
 default:
   before_script:
+    - NIGHTLY_OPTIONS=${CI_COMMIT_TAG:+"-d nightly"}
     - CI_COMMIT_TAG=${CI_COMMIT_TAG:-"${NIGHTLY}"}
     - sed -i "s/@OPERATOR_VERSION@/${CI_COMMIT_TAG}/" $(find ./deployments/gpu-operator -type f)
 
@@ -83,13 +84,15 @@ release-github:
     - docker push "${DOCKERHUB}:${CI_COMMIT_TAG}"
 
     # Package helm chart
+    - mkdir -p nightly
     - helm init --client-only
-    - helm package deployments/gpu-operator
+    - helm package ${NIGHTLY_OPTIONS} deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
     - helm repo index . --url https://nvidia.github.io/gpu-operator
-    - git add ./*.tgz index.yaml
+    - helm repo index nightly --url https://nvidia.github.io/gpu-operator/nightly
+    - git add ./*.tgz index.yaml ./nightly/*.tgz ./nightly/index.yaml
     - git commit -m "Release version ${CI_COMMIT_TAG}"
 
     # CI_REPOSITORY_URL=https://gitlab-ci-token:xxxxxxxxxxxxxxxxxxxx@example.com/gitlab-examples/ci-debug-trace.git
