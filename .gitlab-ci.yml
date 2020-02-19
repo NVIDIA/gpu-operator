@@ -92,7 +92,7 @@ release-github:
     - git fetch origin gh-pages && git checkout gh-pages
     - helm repo index . --url https://nvidia.github.io/gpu-operator
     - helm repo index nightly --url https://nvidia.github.io/gpu-operator/nightly
-    - git add $(find . nightly -maxdepth 1 -name "*.tgz" -o -name index.html)
+    - git add ./*.tgz index.yaml ./nightly/*.tgz ./nightly/index.yaml
     - git commit -m "Release version ${CI_COMMIT_TAG}"
 
     # CI_REPOSITORY_URL=https://gitlab-ci-token:xxxxxxxxxxxxxxxxxxxx@example.com/gitlab-examples/ci-debug-trace.git
