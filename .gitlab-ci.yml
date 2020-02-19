@@ -92,7 +92,6 @@ release-github:
     - git fetch origin gh-pages && git checkout gh-pages
     - helm repo index . --url https://nvidia.github.io/gpu-operator
     - helm repo index nightly --url https://nvidia.github.io/gpu-operator/nightly
-    - shopt -o nullglob
     - git add ./*.tgz index.yaml ./nightly/*.tgz ./nightly/index.yaml
     - git commit -m "Release version ${CI_COMMIT_TAG}"
 
