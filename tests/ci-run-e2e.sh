@@ -97,4 +97,34 @@ while :; do
 	sleep 5
 done
 
+# This function kills the operator and waits for the operator to be back in a running state
+# Timeout is 100 seconds
+test_restart_operator() {
+	# The operator is the only container that has the string '"gpu-operator"'
+	docker kill "$(docker ps --format '{{.ID}} {{.Command}}' | grep '"gpu-operator"' | cut -f 1 -d ' ')"
+
+	for i in $(seq 1 10); do
+		# Sleep a reasonable amount of time for k8s to update the container status to crashing
+		sleep 10
+
+		num="$(kubectl get pods -n gpu-operator -o json | jq '.items | length')"
+		if [ "$num" -ne 1 ]; then
+			echo "Expected only one pod in the gpu-operator namespace"
+			exit 1
+		fi
+
+		state=$(kubectl get pods -n gpu-operator -o json | jq -r '.items[0].status.containerStatuses[0].state.running')
+		echo "Checking state of the GPU Operator, it is: '$state'"
+		if [ "$state" != "null" ]; then
+			return 0
+		fi
+	done
+
+	echo "Timeout reached, the GPU Operator is still not ready. See below for logs:"
+	kubectl logs -n gpu-operator "$(kubectl get pods -n gpu-operator -o json | jq -r '.items[0].metadata.name')"
+	exit 1
+}
+
+test_restart_operator
+
 exit $rc

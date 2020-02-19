@@ -16,7 +16,6 @@ import (
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -25,6 +24,11 @@ import (
 )
 
 var log = logf.Log.WithName("cmd")
+
+const (
+	resourceName      = "gpu"
+	resourceNamespace = "gpu-operator-resources"
+)
 
 func printVersion() {
 	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
@@ -100,13 +104,20 @@ func main() {
 	client := mgr.GetClient()
 	// create new objectSpecialResource
 
-	err = client.Get(context.TODO(), types.NamespacedName{Name: "gpu", Namespace: "gpu-operator-resources"}, &v1alpha1.SpecialResource{})
-	if err != nil && errors.IsNotFound(err) {
-		cr := v1alpha1.SpecialResource{ObjectMeta: metav1.ObjectMeta{Name: "gpu", Namespace: "gpu-operator-resources"}, Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"}}
-		if err := client.Create(context.TODO(), &cr); err != nil {
-			log.Error(err, "")
-			os.Exit(1)
-		}
+	cr := v1alpha1.SpecialResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		},
+		Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"},
+	}
+
+	err = client.Create(context.TODO(), &cr)
+	if !errors.IsAlreadyExists(err) {
+		log.Error(err, "Failed to create CRD")
+		os.Exit(1)
+	} else {
+		log.Info("CRD already exists, ignoring")
 	}
 
 	log.Info("Starting the Cmd.")
