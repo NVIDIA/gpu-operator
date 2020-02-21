@@ -113,11 +113,8 @@ func main() {
 	}
 
 	err = client.Create(context.TODO(), &cr)
-	if !errors.IsAlreadyExists(err) {
-		log.Error(err, "Failed to create CRD")
-		os.Exit(1)
-	} else {
-		log.Info("CRD already exists, ignoring")
+	if err != nil {
+		log.Info(err, "Failed to create CRD")
 	}
 
 	log.Info("Starting the Cmd.")

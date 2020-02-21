@@ -27,8 +27,8 @@ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admi
 helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
 kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
 
-echo "Deploy operator"
 REPOSITORY="$(dirname "${IMAGE}")"
+echo "Deploy operator with repository: ${REPOSITORY}"
 helm install ../deployments/gpu-operator --set operator.repository="${REPOSITORY}" -n test-operator --wait
 
 echo "Deploy GPU pod"
