@@ -14,7 +14,6 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/ready"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -114,7 +113,7 @@ func main() {
 
 	err = client.Create(context.TODO(), &cr)
 	if err != nil {
-		log.Info(err, "Failed to create CRD")
+		log.Error(err, "Failed to create CRD")
 	}
 
 	log.Info("Starting the Cmd.")
