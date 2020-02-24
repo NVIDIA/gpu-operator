@@ -8,12 +8,16 @@ This repository outputs two artifacts:
 
 This repository follows Semantic Versioning 2.0.0
 The artifacts will be versioned as follows:
-- **nightly**: 1.0.0-nightly+shortSHA
+- **nightly**: 1.0.0-nightly-buildBUILDID-shortSHA
     - The version names contain "nightly".
+    - Leading number of pre-release version tracked in master.
+    - build date and time is part of version string.
+    - build meta data of SHA hash is appended to version string.
     - May be buggy
     - Features may be removed at any time.
     - The API may change in incompatible ways in a later software release without notice.
     - Recommended for use in short-lived clusters
+    - when Docker supports it, we'll use +shortSHA in SemVer 2.0 fashion
 - **alpha**: 1.0.0-alpha.N
     - The version names contain "alpha".
     - May be buggy, enabling features may expose bugs.
@@ -37,8 +41,8 @@ The artifacts will be versioned as follows:
 # Nightly Release Process
 
 After every commit that successfully passes all tests, the following actions are performed:
-- The GPU Operator container is persisted on the dockerhub registry (e.g: 1.X.Y-nightly+shortSHA)
-- The GPU Operator helm chart is pushed on the repository's github pages (e.g: 1.X.Y-nightly+shortSHA)
+- The GPU Operator container is persisted on the dockerhub registry (e.g: 1.X.Y-nightly-buildBUILDID-shortSHA)
+- The GPU Operator helm chart is pushed on the repository's github pages (e.g: 1.X.Y-nightly-buildBUILDID-shortSHA)
 
 # Release Process
 
