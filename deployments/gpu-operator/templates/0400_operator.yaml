@@ -43,6 +43,7 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: devicePlugin
+        {{- if not .Values.platform.openshift }}
         - name: NVIDIA_DCGM_EXPORTER
           valueFrom:
             configMapKeyRef:
@@ -53,6 +54,7 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: dcgmPodExporter
+        {{- end }}
         - name: KUBE_UNSUPPORTED_FLAVOR
           valueFrom:
             configMapKeyRef:
