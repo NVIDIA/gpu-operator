@@ -2,7 +2,7 @@ variables:
   DOCKERHUB: nvidia/gpu-operator
   NVCRIO: nvcr.io/nvstaging/cloud-native/gpu-operator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
-  NIGHTLY: "1.0.0-nightly-build${CI_BUILD_ID}-${CI_COMMIT_SHORT_SHA}"
+  NIGHTLY: "1.0.0-nightly-${CI_COMMIT_SHORT_SHA}"
 
 # Ensure the @OPERATOR_VERSION@ is rewritten before any action is taken
 default:
