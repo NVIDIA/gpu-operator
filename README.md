@@ -19,7 +19,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
   - Note that the Kubernetes community supports only the last three minor releases as of v1.17. Older releases may be supported through enterprise distributions of Kubernetes such as Red Hat OpenShift. See the prerequisites for enabling monitoring in Kubernetes releases before v1.16.
 - Helm v3 (v3.1.1)
 - Docker CE 19.03.6
-- Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS)
+- Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS) and CRI-O container runtime
 - Ubuntu 18.04.4 LTS
   - Note that the GA has been validated with the 4.15 LTS kernel. When using the HWE kernel (v5.3), there are additional prerequisites before deploying the operator.
 - The GPU operator has been validated with the following NVIDIA components:
@@ -32,7 +32,8 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 ## Getting Started
 ### Prerequisites
 - Nodes must not be pre-configured with NVIDIA components (driver, container runtime, device plugin).
-- Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed . If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
+- If the HWE kernel is used with Ubuntu 18.04, then the nouveau driver for NVIDIA GPUs must be blacklisted before starting the GPU Operator. Follow the steps in this [guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile-nouveau-ubuntu) to blacklist the nouveau driver. 
+- Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed. If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
 ```sh
 # Set the variable nfd.enabled=false at the helm install step:
 $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
@@ -186,7 +187,7 @@ $ curl $prom_server_ip:9090
 ## Changelog
 ### New Features
 - Added support for Helm v3. Note that installing the GPU Operator using Helm v2 is no longer supported. 
-- Added support for Red Hat OpenShift 4 (4.1, 4.2 and 4.3) using Red Hat Enterprise Linux Core OS (RHCOS) on GPU worker nodes.
+- Added support for Red Hat OpenShift 4 (4.1, 4.2 and 4.3) using Red Hat Enterprise Linux Core OS (RHCOS) and CRI-O runtime on GPU worker nodes.
 - GPU Operator now deploys NVIDIA DCGM for GPU telemetry on Ubuntu 18.04 LTS
 
 ### Fixed Issues
@@ -195,8 +196,13 @@ $ curl $prom_server_ip:9090
 - The SRO custom resource definition is setup as part of the operator. 
 - Fixed an issue with the clean up of driver mount files when deleting the operator from the cluster. This issue used to require a reboot of the node, which is no longer required.
 ### Known Limitations
+- After the removal of the GPU Operator, a restart of the Docker daemon is required as the default container runtime is setup to be the NVIDIA runtime. Run the following command:
+```sh
+$ sudo systemctl restart docker
+```
 - GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin). Support for better error handling will be added in a future release.
-- This release of the operator does not support accessing images from private registries. This may be required for air-gapped deployments. 
+- The GPU Operator currently does not handle updates to the underlying software components (e.g. drivers) in an automated manner.
+- This release of the operator does not support accessing images from private registries, which may be equired for air-gapped deployments. 
 
 
 ## Contributions
