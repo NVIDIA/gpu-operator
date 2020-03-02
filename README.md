@@ -1,75 +1,101 @@
 # NVIDIA GPU Operator
 
-The GPU operator manages NVIDIA GPU resources in a Kubernetes cluster and automates tasks related to bootstrapping GPU nodes. Since the GPU is a special resource in the cluster, it requires a few components to be installed before application workloads can be deployed onto the GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin, container runtime and others such as automatic node labelling, monitoring etc.
+Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the [device plugin framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/). However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which  are difficult and prone to errors. 
+The NVIDIA GPU Operator uses the [operator framework](https://coreos.com/blog/introducing-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling and others.
 
-## Project Status
-This is a technical preview release of the GPU operator. The operator can be deployed using a Helm chart. 
+This is the v1.0.0 release of the GPU Operator and is now available for deployment. This release of the GPU Operator adds support for Red Hat OpenShift 4 and includes deployment of [DCGM](https://developer.nvidia.com/dcgm) based monitoring as part of the GPU Operator.
+
+## Audience and Use-Cases
+The GPU Operator allows administrators of Kubernetes clusters to manage GPU nodes just like CPU nodes in the cluster. Instead of provisioning a special OS image for GPU nodes, administrators can rely on a standard OS image for both CPU and GPU nodes and then rely on the GPU Operator to provision the required software components for GPUs. 
+
+Note that the GPU Operator is specifically useful for scenarios where the Kubernetes cluster needs to scale quickly - for example provisioning additional GPU nodes on the cloud or on-prem and managing the lifecycle of the underlying software components. Since the GPU Operator runs everything as containers including NVIDIA drivers, the administrators can easily swap various components - simply by starting or stopping containers. 
+
+The GPU Operator is not a good fit for scenarios when special OS images are already being provisioned in a GPU cluster (for example using [NVIDIA DGX systems](https://www.nvidia.com/en-us/data-center/dgx-systems/)) or when using hybrid environments that use a combination of Kubernetes and Slurm for workload management. 
 
 
 ## Platform Support
 - Pascal+ GPUs are supported (incl. Tesla V100 and T4)
 - Kubernetes v1.13+
-- Helm 2
-- Ubuntu 18.04.3 LTS
+  - Note that the Kubernetes community supports only the last three minor releases as of v1.17. Older releases may be supported through enterprise distributions of Kubernetes such as Red Hat OpenShift. See the prerequisites for enabling monitoring in Kubernetes releases before v1.16.
+- Helm v3 (v3.1.1)
+- Docker CE 19.03.6
+- Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS)
+- Ubuntu 18.04.4 LTS
+  - Note that the GA has been validated with the 4.15 LTS kernel. When using the HWE kernel (v5.3), there are additional prerequisites before deploying the operator.
 - The GPU operator has been validated with the following NVIDIA components:
-  - Docker CE 19.03.2
   - NVIDIA Container Toolkit 1.0.5
   - NVIDIA Kubernetes Device Plugin 1.0.0-beta4
-  - NVIDIA Tesla Driver 418.87.01
+  - NVIDIA Tesla Driver 440.33.01
+  - NVIDIA DCGM 1.7.2 (only supported on Ubuntu 18.04.4 LTS)
 
 
-## Prerequisites
+## Getting Started
+### Prerequisites
 - Nodes must not be pre-configured with NVIDIA components (driver, container runtime, device plugin).
-- i2c_core and ipmi_msghandler kernel modules need to be loaded (Use the following command to ensure these modules are loaded with the following command)
-  - $ sudo modprobe -a i2c_core ipmi_msghandler
-  - Note that this step is not persistent across reboots. To make this persistent across reboots, add the modules to the configuration file as shown:
-    - $ echo -e "i2c_core\nipmi_msghandler" | sudo tee /etc/modules-load.d/driver.conf
 - Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed . If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
-  - Set the variable nfd.enabled=false at the helm install step:
-    - $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
+```sh
+# Set the variable nfd.enabled=false at the helm install step:
+$ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
+```
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
 - For monitoring in Kubernetes <= 1.13 and > 1.15, enable the kubelet "KubeletPodResources" feature gate. From Kubernetes 1.15 onwards, its enabled by default.
-  - $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
+```sh
+$ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
+```
 
-## Installation
+### Red Hat OpenShift 4
+For installing the GPU Operator on clusters with Red Hat OpenShift 4.1, 4.2 and 4.3 using RHCOS worker nodes, follow this [guide](https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html).
+
+### Ubuntu 18.04 LTS
 
 #### Install Helm
 ```sh
-$ curl -L https://git.io/get_helm.sh | bash
+# Install Helm from the official installer script
+$ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+$ chmod 700 get_helm.sh
+$ ./get_helm.sh
 
-# Create service-account for helm
-$ kubectl create serviceaccount -n kube-system tiller
-$ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-
-# Initialize Helm
-$ helm init --service-account tiller --wait
-
-# Note that if you have helm already deployed in your cluster and you are adding a new node, run this instead
-$ helm init --client-only
-
-# Additional step required for Kubernetes v1.16. See: https://github.com/helm/helm/issues/6374
-$ helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
-$ kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
 ```
 
 #### Install GPU Operator
 ```sh
-# Before running this, make sure helm is installed and initialized:
+# Add the NVIDIA repo:
 $ helm repo add nvidia https://nvidia.github.io/gpu-operator
 $ helm repo update
 
 # Note that after running this command, NFD will be automatically deployed. If you have NFD already setup, follow the NFD instruction from the Prerequisites.
-$ helm install --devel nvidia/gpu-operator -n test-operator --wait
-$ kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/manifests/cr/sro_cr_sched_none.yaml
+$ helm install --devel nvidia/gpu-operator --wait --generate-name
 
 # To check the gpu-operator version
 $ helm ls
+
+# Check the status of the pods to ensure all the containers are running. A sample output is shown below in the cluster
+$ kubectl get pods -A
+NAMESPACE                NAME                                         READY   STATUS      RESTARTS   AGE
+gpu-operator-resources   nvidia-container-toolkit-daemonset-fjgjt     1/1     Running     0          5m11s
+gpu-operator-resources   nvidia-dcgm-exporter-fzpwp                   2/2     Running     0          2m36s
+gpu-operator-resources   nvidia-device-plugin-daemonset-8kd64         1/1     Running     0          2m51s
+gpu-operator-resources   nvidia-device-plugin-validation              0/1     Completed   0          2m47s
+gpu-operator-resources   nvidia-driver-daemonset-8nwcb                1/1     Running     0          5m4s
+gpu-operator-resources   nvidia-driver-validation                     0/1     Completed   0          4m37s
+gpu-operator             special-resource-operator-576bf567c7-c9z9g   1/1     Running     0          5m19s
+kube-system              calico-kube-controllers-6b9d4c8765-7w5pb     1/1     Running     0          12m
+kube-system              calico-node-scfwp                            1/1     Running     0          12m
+kube-system              coredns-6955765f44-9zjk6                     1/1     Running     0          12m
+kube-system              coredns-6955765f44-r8v7r                     1/1     Running     0          12m
+kube-system              etcd-ip-172-31-82-11                         1/1     Running     0          13m
+kube-system              kube-apiserver-ip-172-31-82-11               1/1     Running     0          13m
+kube-system              kube-controller-manager-ip-172-31-82-11      1/1     Running     0          13m
+kube-system              kube-proxy-qmplb                             1/1     Running     0          12m
+kube-system              kube-scheduler-ip-172-31-82-11               1/1     Running     0          13m
+node-feature-discovery   nfd-master-z2mxn                             1/1     Running     0          5m19s
+node-feature-discovery   nfd-worker-s62kd                             1/1     Running     1          5m19s
+
 ```
 
 #### Uninstall GPU Operator
 ```sh
-$ helm del --purge test-operator
-$ sudo reboot
+$ helm delete <gpu-operator-name>
 
 # Check if the operator got uninstalled properly
 $ kubectl get pods -n gpu-operator-resources
@@ -157,15 +183,25 @@ $ curl $prom_server_ip:9090
 # Import this GPU metrics dashboard from Grafana https://grafana.com/grafana/dashboards/11578
 ```
 
+## Changelog
+### New Features
+- Added support for Helm v3. Note that installing the GPU Operator using Helm v2 is no longer supported. 
+- Added support for Red Hat OpenShift 4 (4.1, 4.2 and 4.3) using Red Hat Enterprise Linux Core OS (RHCOS) on GPU worker nodes.
+- GPU Operator now deploys NVIDIA DCGM for GPU telemetry on Ubuntu 18.04 LTS
+
+### Fixed Issues
+- The driver container now sets up the required dependencies on i2c and ipmi_msghandler modules. 
+- Fixed an issue with the validation steps (for the driver and device plugin) taking considerable time. Node provisioning times are now improved by 5x.
+- The SRO custom resource definition is setup as part of the operator. 
+- Fixed an issue with the clean up of driver mount files when deleting the operator from the cluster. This issue used to require a reboot of the node, which is no longer required.
 ### Known Limitations
-- With Kubernetes v1.16, Helm may fail to initialize. See [this issue](https://github.com/helm/helm/issues/6374) for more details. A workaround has already been included in the Helm installation steps above in this document.
-- GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin).
-- Removing the GPU Operator will require you to reboot your nodes.
+- GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin). Support for better error handling will be added in a future release.
+- This release of the operator does not support accessing images from private registries. This may be required for air-gapped deployments. 
 
 
-### Contributions
+## Contributions
 [Read the document on contributions](https://github.com/NVIDIA/gpu-operator/blob/master/CONTRIBUTING.md). You can contribute by opening a [pull request](https://help.github.com/en/articles/about-pull-requests).
 
-### Getting Help
+## Support and Getting Help
 Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
 
