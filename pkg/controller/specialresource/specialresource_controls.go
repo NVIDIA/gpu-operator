@@ -352,6 +352,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	} else if obj.Name == "nvidia-dcgm-exporter" {
 		obj.Spec.Template.Spec.Containers[0].Image = getDcgmPodExporter()
 		obj.Spec.Template.Spec.Containers[1].Image = getDcgmExporter()
+		obj.Spec.Template.Spec.InitContainers[0].Image = getDcgmPodExporter()
 	}
 }
 
