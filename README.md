@@ -39,7 +39,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
 ```
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
-- For monitoring in Kubernetes <= 1.13 and > 1.15, enable the kubelet "KubeletPodResources" feature gate. From Kubernetes 1.15 onwards, its enabled by default.
+- For monitoring in Kubernetes >=1.13 and <1.15, enable the kubelet ["KubeletPodResources" feature gate](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). From Kubernetes 1.15 onwards, its enabled by default.
 ```sh
 $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
 ```
@@ -149,8 +149,8 @@ $ tee dcgmScrapeConfig.yaml <<EOF
 
   relabel_configs:
   - source_labels: [__meta_kubernetes_pod_node_name]
-    action: replace 
-    target_label: kubernetes_node 
+    action: replace
+    target_label: kubernetes_node
 EOF
 
 # Deploy Prometheus
@@ -175,7 +175,7 @@ $ kubectl port-forward $(kubectl get pods --namespace default -l "app=grafana,re
 # In browser: http://localhost:3000
 # On AWS: ssh -L 3000:localhost:3000 -i YOUR_SECRET_KEY INSTANCE_NAME@PUBLIC_IP
 
-# Login in the dashboard with the decoded credentials and add Promethues datasource 
+# Login in the dashboard with the decoded credentials and add Prometheus datasource
 # Get Promethues IP to add to the Grafana datasource
 $ prom_server_ip=$(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -o wide | tail -n 1 | awk '{print $6}')
 # Check if Prometheus is reachable
@@ -210,4 +210,3 @@ $ sudo systemctl restart docker
 
 ## Support and Getting Help
 Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
-
