@@ -43,7 +43,7 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: devicePlugin
-        {{- if not .Values.platform.openshift }}
+        {{- if and (eq .Values.operator.clusterversion "4.3") (gt .Values.operator.clusterversion "4.3") }}
         - name: NVIDIA_DCGM_EXPORTER
           valueFrom:
             configMapKeyRef:
