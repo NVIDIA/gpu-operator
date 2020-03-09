@@ -24,42 +24,12 @@ spec:
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
-
+        envFrom:
+        - configMapRef:
+            name: operator-config
         env:
-        - name: NVIDIA_DRIVER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: driver
         - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
           value: "{{ .Values.operator.defaultRuntime }}"
-        - name: NVIDIA_TOOLKIT
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: toolkit
-        - name: NVIDIA_DEVICE_PLUGIN
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: devicePlugin
-        {{- if not .Values.platform.openshift }}
-        - name: NVIDIA_DCGM_EXPORTER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: dcgmExporter
-        - name: NVIDIA_DCGM_POD_EXPORTER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: dcgmPodExporter
-        {{- end }}
-        - name: KUBE_UNSUPPORTED_FLAVOR
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: unsupported
         - name: WATCH_NAMESPACE
           value: ""
         - name: POD_NAME
