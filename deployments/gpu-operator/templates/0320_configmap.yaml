@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: operator-config
-  namespace: gpu-operator
+  namespace: {{ $.Release.Namespace }}
 data:
 {{- if .Values.platform.openshift }}
   KUBE_UNSUPPORTED_FLAVOR: ""
