@@ -1,7 +1,7 @@
 apiVersion: v2
 name: gpu-operator
-version: @OPERATOR_VERSION@
+version: 1.0.1
 kubeVersion: ">= 1.13.0-0"
 description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
-appVersion: "@OPERATOR_VERSION@"
+appVersion: 1.0.0
 home: https://github.com/NVIDIA/gpu-operator
