@@ -5,7 +5,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: special-resource-operator
-  namespace: gpu-operator
+  namespace: {{ $.Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: special-resource-operator
