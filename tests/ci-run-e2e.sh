@@ -23,6 +23,7 @@ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bas
 
 REPOSITORY="$(dirname "${IMAGE}")"
 echo "Deploy operator with repository: ${REPOSITORY}"
+kubectl create namespace test-operator
 helm install ../deployments/gpu-operator --generate-name --set operator.repository="${REPOSITORY}" -n test-operator --wait
 
 echo "Deploy GPU pod"
