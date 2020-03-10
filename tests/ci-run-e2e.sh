@@ -103,15 +103,11 @@ test_restart_operator() {
 		# Sleep a reasonable amount of time for k8s to update the container status to crashing
 		sleep 10
 
-		num="$(kubectl get pods -n "$NS" -o json | jq '.items | length')"
-		if [ "$num" -ne 1 ]; then
-			echo "Expected only one pod in the gpu-operator namespace"
-			exit 1
-		fi
+		state=$(kubectl get pods -n "$NS" -l name=special-resource-operator \
+			-o jsonpath='{.items[0].status.phase}')
 
-		state=$(kubectl get pods -n "$NS" -o json | jq -r '.items[0].status.containerStatuses[0].state.running')
 		echo "Checking state of the GPU Operator, it is: '$state'"
-		if [ "$state" != "null" ]; then
+		if [ "$state" = "Running" ]; then
 			return 0
 		fi
 	done
