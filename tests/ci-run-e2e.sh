@@ -19,13 +19,7 @@ echo "Deploy NFD"
 #kubectl apply -f ./nfd-worker-daemonset.yaml
 
 echo "Install Helm"
-curl -L https://git.io/get_helm.sh | bash
-kubectl create serviceaccount -n kube-system tiller
-kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-
-# See: https://github.com/helm/helm/issues/6374
-helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
-kubectl wait --for=condition=available -n kube-system deployment tiller-deploy
+curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
 REPOSITORY="$(dirname "${IMAGE}")"
 echo "Deploy operator with repository: ${REPOSITORY}"
