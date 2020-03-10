@@ -19,6 +19,12 @@ node-feature-discovery:
       value: "present"
       effect: "NoSchedule"
 
+    options:
+      sources:
+        pci:
+          deviceLabelFields:
+          - vendor
+
 platform:
   openshift: false
 
