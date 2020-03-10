@@ -44,6 +44,9 @@ spec:
         args:
         - "--sleep-interval=60s"
         - "--server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
+        {{- with .Values.worker.options }}
+        - --options={{- toJson . }}
+        {{- end }}
 ## Enable TLS authentication (1/3)
 ## The example below assumes having the root certificate named ca.crt stored in
 ## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored

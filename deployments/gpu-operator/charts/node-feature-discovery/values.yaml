@@ -68,6 +68,8 @@ master:
                 values: [""]
 
 worker:
+  options: {}
+
   podSecurityContext: {}
     # fsGroup: 2000
 
