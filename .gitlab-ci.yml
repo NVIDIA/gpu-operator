@@ -87,7 +87,6 @@ release-github:
 
     # Package helm chart
     - if [ -n "${SUBCHART_DIR}" ]; then mkdir -p "${SUBCHART_DIR}" ; fi
-    - helm init --client-only
     - helm package ${NIGHTLY_OPTIONS} deployments/gpu-operator
 
     - git checkout .
