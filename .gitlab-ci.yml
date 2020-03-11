@@ -74,7 +74,7 @@ release-github:
     - tags
   script:
     - apk add --update curl openssl bash git openssh make
-    - curl -L https://git.io/get_helm.sh | bash
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
     - mkdir ~/.ssh && echo "$PRIVATE_SSH_KEY" &> ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa
     - git config --global user.email "rgaubert@nvidia.com"
     - git config --global user.name "Renaud Gaubert"
