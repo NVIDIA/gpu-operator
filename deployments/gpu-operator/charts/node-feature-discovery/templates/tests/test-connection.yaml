@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "node-feature-discovery.fullname" . }}-test-master-connection"
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "node-feature-discovery.fullname" . }}:{{ .Values.master.service.port }}']
+  restartPolicy: Never

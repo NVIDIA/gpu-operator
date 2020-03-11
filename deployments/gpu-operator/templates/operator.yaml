@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: special-resource-operator
-  namespace: gpu-operator
+  namespace: {{ $.Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -24,42 +24,12 @@ spec:
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
-
+        envFrom:
+        - configMapRef:
+            name: operator-config
         env:
-        - name: NVIDIA_DRIVER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: driver
         - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
           value: "{{ .Values.operator.defaultRuntime }}"
-        - name: NVIDIA_TOOLKIT
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: toolkit
-        - name: NVIDIA_DEVICE_PLUGIN
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: devicePlugin
-        {{- if not .Values.platform.openshift }}
-        - name: NVIDIA_DCGM_EXPORTER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: dcgmExporter
-        - name: NVIDIA_DCGM_POD_EXPORTER
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: dcgmPodExporter
-        {{- end }}
-        - name: KUBE_UNSUPPORTED_FLAVOR
-          valueFrom:
-            configMapKeyRef:
-              name: operator-config
-              key: unsupported
         - name: WATCH_NAMESPACE
           value: ""
         - name: POD_NAME
@@ -80,10 +50,16 @@ spec:
         - containerPort: 60000
           name: metrics
 
+    {{- with .Values.operator.nodeSelector }}
       nodeSelector:
-        node-role.kubernetes.io/master: ""
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.operator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.operator.tolerations }}
       tolerations:
-        - key: "node-role.kubernetes.io/master"
-          operator: "Equal"
-          value: ""
-          effect: "NoSchedule"
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+
