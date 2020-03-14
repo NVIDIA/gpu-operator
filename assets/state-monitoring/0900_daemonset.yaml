@@ -5,6 +5,8 @@ metadata:
     app: nvidia-dcgm-exporter
   name: nvidia-dcgm-exporter
   namespace: gpu-operator-resources
+  annotations:
+    openshift.io/scc: nvidia-dcgm-exporter
 spec:
   selector:
     matchLabels:
@@ -28,6 +30,7 @@ spec:
         operator: Exists
         effect: NoSchedule
       serviceAccount: nvidia-dcgm-exporter
+      serviceAccountName: nvidia-dcgm-exporter
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: pod-nvidia-gpu-metrics-exporter
@@ -59,10 +62,6 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: init-pod-nvidia-gpu-metrics-exporter
         command: ["/bin/entrypoint.sh"]
-        securityContext:
-          privileged: true
-          seLinuxOptions:
-            level: "s0:c174,c284"
         volumeMounts:
         - name: pod-gpu-resources
           mountPath: /var/lib/kubelet/pod-resources
