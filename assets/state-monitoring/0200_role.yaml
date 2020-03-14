@@ -3,8 +3,6 @@ kind: Role
 metadata:
   name: nvidia-dcgm-exporter
   namespace: gpu-operator-resources
-  labels:
-    app: nvidia-dcgm-exporter
 rules:
 - apiGroups:
   - security.openshift.io
