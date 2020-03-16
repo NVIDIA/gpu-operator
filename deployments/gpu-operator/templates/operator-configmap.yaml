@@ -13,7 +13,7 @@ data:
   NVIDIA_DRIVER: "{{ .Values.driver.repository }}/{{ .Values.driver.image }}:{{ .Values.driver.version }}"
   NVIDIA_TOOLKIT: "{{ .Values.toolkit.repository }}/{{ .Values.toolkit.image }}:{{ .Values.toolkit.version }}"
   NVIDIA_DEVICE_PLUGIN: "{{ .Values.devicePlugin.repository }}/{{ .Values.devicePlugin.image }}:{{ .Values.devicePlugin.version }}"
-  {{- if or (eq (float64 (toString (.Values.operator.clusterversion))) 4.3) (gt (float64 (toString (.Values.operator.clusterversion))) 4.3) }}
+  {{- if and (ne (float64 (toString (.Values.operator.clusterversion))) 4.1) (ne (float64 (toString (.Values.operator.clusterversion))) 4.2) }}
   NVIDIA_DCGM_EXPORTER: "{{ .Values.dcgmExporter.repository }}/{{ .Values.dcgmExporter.image }}:{{ .Values.dcgmExporter.version }}"
   NVIDIA_DCGM_POD_EXPORTER: "{{ .Values.dcgmPodExporter.repository }}/{{ .Values.dcgmPodExporter.image }}:{{ .Values.dcgmPodExporter.version }}"
   {{- end }}
