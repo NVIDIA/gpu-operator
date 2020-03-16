@@ -16,7 +16,7 @@ operator:
   tag: @OPERATOR_VERSION@
 
   defaultRuntime: docker
-  clusterversion: ""
+  clusterversion: 0.0
 
 driver:
   repository: nvidia

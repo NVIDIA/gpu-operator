@@ -59,7 +59,7 @@ spec:
         - name: device-metrics
           mountPath: /run/prometheus
       initContainers:
-      - image: "FILLED BY THE OPERATOR"
+      - image: ubuntu:18.04
         name: init-pod-nvidia-gpu-metrics-exporter
         command: ["/bin/entrypoint.sh"]
         volumeMounts:

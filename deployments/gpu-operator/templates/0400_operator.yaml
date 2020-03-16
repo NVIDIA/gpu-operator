@@ -43,7 +43,7 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: devicePlugin
-        {{- if and (eq .Values.operator.clusterversion "4.3") (gt .Values.operator.clusterversion "4.3") }}
+	{{- if or (eq (float64 (toString (.Values.operator.clusterversion))) 4.3) (gt (float64 (toString (.Values.operator.clusterversion))) 4.3) }}
         - name: NVIDIA_DCGM_EXPORTER
           valueFrom:
             configMapKeyRef:
@@ -54,7 +54,7 @@ spec:
             configMapKeyRef:
               name: operator-config
               key: dcgmPodExporter
-        {{- end }}
+	{{- end }}
         - name: KUBE_UNSUPPORTED_FLAVOR
           valueFrom:
             configMapKeyRef:
