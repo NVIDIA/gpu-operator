@@ -31,7 +31,7 @@ platform:
 operator:
   repository: nvidia
   image: gpu-operator
-  tag: @OPERATOR_VERSION@
+  tag: 1.0.0
 
   defaultRuntime: docker
 

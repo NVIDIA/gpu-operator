@@ -2,7 +2,8 @@
 
 set -e
 
-IMAGE=$1
+IMAGE="$1"
+TAG="$2"
 LOG_DIR="/tmp/logs"
 
 echo "Create log dir ${LOG_DIR}"
@@ -14,18 +15,14 @@ sudo modprobe -a i2c_core ipmi_msghandler
 echo "Install dependencies"
 sudo apt update && sudo apt install -y jq
 
-echo "Deploy NFD"
-#kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/node-feature-discovery/master/nfd-master.yaml.template
-#kubectl apply -f ./nfd-worker-daemonset.yaml
-
 echo "Install Helm"
 curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
 REPOSITORY="$(dirname "${IMAGE}")"
 NS="test-operator"
 echo "Deploy operator with repository: ${REPOSITORY}"
-kubectl create namespace "$NS"
-helm install ../deployments/gpu-operator --generate-name --set operator.repository="${REPOSITORY}" -n "$NS" --wait
+kubectl create namespace "${NS}"
+helm install ../deployments/gpu-operator --generate-name --set operator.tag="${TAG}" --set operator.repository="${REPOSITORY}" -n "${NS}" --wait
 
 echo "Deploy GPU pod"
 kubectl apply -f gpu-pod.yaml
