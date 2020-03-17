@@ -317,8 +317,8 @@ func getDcgmPodExporter() string {
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
+	kernelVersion, osTag := kernelFullVersion(n)
 	if obj.Name == "nvidia-driver-daemonset" {
-		kernelVersion, osTag := kernelFullVersion(n)
 		if osTag != "" {
 			img := fmt.Sprintf("%s-%s", getDriver(), osTag)
 			obj.Spec.Template.Spec.Containers[0].Image = img
@@ -350,6 +350,24 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 	} else if obj.Name == "nvidia-device-plugin-daemonset" {
 		obj.Spec.Template.Spec.Containers[0].Image = getDevicePlugin()
 	} else if obj.Name == "nvidia-dcgm-exporter" {
+		if osTag == "rhel" {
+			initContainerImage, initContainerName, initContainerCmd := "ubuntu:18.04", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+			obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
+			obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
+			obj.Spec.Template.Spec.InitContainers[0].Command[0] = initContainerCmd
+
+			volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
+			volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
+			obj.Spec.Template.Spec.InitContainers[0].VolumeMounts = append(obj.Spec.Template.Spec.InitContainers[0].VolumeMounts, volMountSock)
+
+			volMountConfigName, volMountConfigPath, volMountConfigSubPath := "init-config", "/bin/entrypoint.sh", "entrypoint.sh"
+			volMountConfig := corev1.VolumeMount{Name: volMountConfigName, ReadOnly: true, MountPath: volMountConfigPath, SubPath: volMountConfigSubPath}
+			obj.Spec.Template.Spec.InitContainers[0].VolumeMounts = append(obj.Spec.Template.Spec.InitContainers[0].VolumeMounts, volMountConfig)
+
+			volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
+			initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
+		}
 		obj.Spec.Template.Spec.Containers[0].Image = getDcgmPodExporter()
 		obj.Spec.Template.Spec.Containers[1].Image = getDcgmExporter()
 	}

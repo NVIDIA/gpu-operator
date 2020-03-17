@@ -1,14 +1,18 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-dcgm-exporter
+  name: prometheus-k8s
   namespace: gpu-operator-resources
   labels:
     app: nvidia-dcgm-exporter
 rules:
 - apiGroups:
-  - security.openshift.io
+  - ""
   resources:
-  - securitycontextconstraints
+  - services
+  - endpoints
+  - pods
   verbs:
-  - use
+  - get
+  - list
+  - watch
