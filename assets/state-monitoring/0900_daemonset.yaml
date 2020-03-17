@@ -58,17 +58,6 @@ spec:
         volumeMounts:
         - name: device-metrics
           mountPath: /run/prometheus
-      initContainers:
-      - image: ubuntu:18.04
-        name: init-pod-nvidia-gpu-metrics-exporter
-        command: ["/bin/entrypoint.sh"]
-        volumeMounts:
-        - name: pod-gpu-resources
-          mountPath: /var/lib/kubelet/pod-resources
-        - name: init-config
-          mountPath: /bin/entrypoint.sh
-          readOnly: true
-          subPath: entrypoint.sh
 
       volumes:
       - name: pod-gpu-resources
@@ -77,10 +66,6 @@ spec:
       - name: device-metrics
         emptyDir:
           medium: Memory
-      - name: init-config
-        configMap:
-          name: nvidia-dcgm-exporter
-          defaultMode: 0700
 
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"
