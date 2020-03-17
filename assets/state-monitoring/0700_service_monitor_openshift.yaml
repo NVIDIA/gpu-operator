@@ -3,6 +3,8 @@ kind: ServiceMonitor
 metadata:
   name: nvidia-dcgm-exporter
   namespace: gpu-operator-resources
+  labels:
+    app: nvidia-dcgm-exporter
 spec:
   endpoints:
   - port: gpu-metrics
