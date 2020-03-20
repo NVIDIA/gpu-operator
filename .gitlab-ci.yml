@@ -10,7 +10,6 @@ default:
     - if [ -z "${CI_COMMIT_TAG}" ]; then SUBCHART_DIR="nightly" ; NIGHTLY_OPTIONS="-d ${SUBCHART_DIR}" ; fi
     - CI_COMMIT_TAG=${CI_COMMIT_TAG:-"${NIGHTLY}"}
     - echo "${CI_COMMIT_TAG}" | grep -qe '^[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^+]\+\)\?\(+.*\)\?$' # check that tag follows SemVer 2.0 form
-    - sed -i "s/@OPERATOR_VERSION@/${CI_COMMIT_TAG}/" $(find ./deployments/gpu-operator -type f)
 
 stages:
   - aws_kube_setup
@@ -48,7 +47,7 @@ e2e_tests:
     - apk add --no-cache openssh-client rsync
     - rsync -e "ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no" -av --exclude="vendor/" "${CI_PROJECT_DIR}" "${instance_hostname}:~/"
     - rc=0
-    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE}") || rc=$?
+    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${CI_COMMIT_TAG}") || rc=$?
     - rsync -e "ssh -i aws-kube-ci/key" -av "${instance_hostname}:/tmp/logs/" logs
     - exit $rc
   dependencies:
@@ -74,7 +73,7 @@ release-github:
     - tags
   script:
     - apk add --update curl openssl bash git openssh make
-    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+    - curl -L https://git.io/get_helm.sh | bash
     - mkdir ~/.ssh && echo "$PRIVATE_SSH_KEY" &> ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa
     - git config --global user.email "rgaubert@nvidia.com"
     - git config --global user.name "Renaud Gaubert"
@@ -87,7 +86,8 @@ release-github:
 
     # Package helm chart
     - if [ -n "${SUBCHART_DIR}" ]; then mkdir -p "${SUBCHART_DIR}" ; fi
-    - helm package ${NIGHTLY_OPTIONS} deployments/gpu-operator
+    - helm init --client-only
+    - helm package --set operator.reposito ${NIGHTLY_OPTIONS} deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages

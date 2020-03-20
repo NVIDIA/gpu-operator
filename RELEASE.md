@@ -51,3 +51,5 @@ After a commit that successfully passes all tests, a maintainer tags that commit
   - The tag for that container is the commit tag
 - The GPU Operator helm chart is pushed on the repository's github pages and NGC registry
   - The tag for that container is the commit tag
+- The Readme should be updated with the changelog
+- The helm chart values.yaml and Chart.yaml should be updated with the newer version
