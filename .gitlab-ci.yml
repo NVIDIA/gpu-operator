@@ -73,7 +73,7 @@ release-github:
     - tags
   script:
     - apk add --update curl openssl bash git openssh make
-    - curl -L https://git.io/get_helm.sh | bash
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
     - mkdir ~/.ssh && echo "$PRIVATE_SSH_KEY" &> ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa
     - git config --global user.email "rgaubert@nvidia.com"
     - git config --global user.name "Renaud Gaubert"
@@ -86,8 +86,8 @@ release-github:
 
     # Package helm chart
     - if [ -n "${SUBCHART_DIR}" ]; then mkdir -p "${SUBCHART_DIR}" ; fi
-    - helm init --client-only
-    - helm package --set operator.reposito ${NIGHTLY_OPTIONS} deployments/gpu-operator
+    - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
+    - helm package --set operator.tag="${CI_COMMIT_TAG}" --set operator.repository="${REPOSITORY}" ${NIGHTLY_OPTIONS} deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
