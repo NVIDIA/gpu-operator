@@ -21,7 +21,11 @@ spec:
 
       containers:
       - name: special-resource-operator
+        {{- if .Values.operator.tag}}
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
+        {{- else }}
+        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Chart.AppVersion }}
+        {{- end }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
         envFrom:
