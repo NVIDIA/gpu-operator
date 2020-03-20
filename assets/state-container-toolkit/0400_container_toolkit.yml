@@ -33,10 +33,8 @@ spec:
       hostPID: true
       containers:
       - image: "FILLED_BY_THE_OPERATOR"
-        args: ["/run/nvidia"]
+        args: ["/usr/local/nvidia"]
         env:
-        - name: TOOLKIT_ARGS
-          value: "--symlink /usr/local/nvidia"
         - name: RUNTIME_ARGS
           value: ""
         imagePullPolicy: IfNotPresent

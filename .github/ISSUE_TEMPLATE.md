@@ -23,6 +23,6 @@ _The template below is mostly useful for bug reports and support questions. Feel
  - [ ] Docker runtime configuration: `docker info | grep runtime`
 
  - [ ] NVIDIA shared directory: `ls -la /run/nvidia`
- - [ ] NVIDIA packages directory: `ls -la /run/nvidia/toolkit`
+ - [ ] NVIDIA packages directory: `ls -la /usr/local/nvidia/toolkit`
  - [ ] NVIDIA driver directory: `ls -la /run/nvidia/driver`
  - [ ] kubelet logs `journalctl -u kubelet > kubelet.logs`

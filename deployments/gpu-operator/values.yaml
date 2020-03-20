@@ -63,7 +63,7 @@ driver:
 toolkit:
   repository: nvidia
   image: container-toolkit
-  version: 1.0.0-alpha.3
+  version: 1.0.0-beta.0
 
 devicePlugin:
   repository: nvidia
