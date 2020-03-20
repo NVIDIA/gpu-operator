@@ -317,7 +317,7 @@ func getDcgmPodExporter() string {
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
-	kernelVersion, osTag := kernelFullVersion(n)
+	_, osTag := kernelFullVersion(n)
 	if obj.Name == "nvidia-driver-daemonset" {
 		if osTag != "" {
 			img := fmt.Sprintf("%s-%s", getDriver(), osTag)
@@ -336,8 +336,6 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
 				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
 			}
 		}
-		sel := "feature.node.kubernetes.io/kernel-version.full"
-		obj.Spec.Template.Spec.NodeSelector[sel] = kernelVersion
 	} else if obj.Name == "nvidia-container-toolkit-daemonset" {
 		obj.Spec.Template.Spec.Containers[0].Image = getToolkit()
 		runtime := getRuntimeValue()
