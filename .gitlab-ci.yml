@@ -87,7 +87,7 @@ release-github:
     # Package helm chart
     - if [ -n "${SUBCHART_DIR}" ]; then mkdir -p "${SUBCHART_DIR}" ; fi
     - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
-    - helm package --app-version "${CI_COMMIT_TAG}" ${NIGHTLY_OPTIONS} deployments/gpu-operator
+    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" ${NIGHTLY_OPTIONS} deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
