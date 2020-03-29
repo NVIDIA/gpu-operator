@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/NVIDIA/gpu-operator/pkg/apis"
-	"github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	"github.com/NVIDIA/gpu-operator/pkg/controller"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -103,12 +103,12 @@ func main() {
 	client := mgr.GetClient()
 	// create new objectSpecialResource
 
-	cr := v1alpha1.SpecialResource{
+	cr := gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceName,
 			Namespace: resourceNamespace,
 		},
-		Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"},
+		Spec: gpuv1.ClusterPolicySpec{},
 	}
 
 	err = client.Create(context.TODO(), &cr)

@@ -1,4 +1,4 @@
-package specialresource
+package clusterpolicy
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	schedv1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-type controlFunc []func(n SRO) (ResourceStatus, error)
+type controlFunc []func(n ClusterPolicyController) (ResourceStatus, error)
 
 type ResourceStatus string
 
@@ -27,7 +26,7 @@ const (
 	NotReady ResourceStatus = "NotReady"
 )
 
-func ServiceAccount(n SRO) (ResourceStatus, error) {
+func ServiceAccount(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].ServiceAccount
@@ -58,7 +57,7 @@ func ServiceAccount(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func Role(n SRO) (ResourceStatus, error) {
+func Role(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].Role
@@ -89,7 +88,7 @@ func Role(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func RoleBinding(n SRO) (ResourceStatus, error) {
+func RoleBinding(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].RoleBinding
@@ -120,7 +119,7 @@ func RoleBinding(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func ClusterRole(n SRO) (ResourceStatus, error) {
+func ClusterRole(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].ClusterRole
@@ -151,7 +150,7 @@ func ClusterRole(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func ClusterRoleBinding(n SRO) (ResourceStatus, error) {
+func ClusterRoleBinding(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].ClusterRoleBinding
@@ -182,7 +181,7 @@ func ClusterRoleBinding(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func ConfigMap(n SRO) (ResourceStatus, error) {
+func ConfigMap(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := n.resources[state].ConfigMap
@@ -213,7 +212,7 @@ func ConfigMap(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func kernelFullVersion(n SRO) (string, string) {
+func kernelFullVersion(n ClusterPolicyController) (string, string) {
 
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
@@ -316,7 +315,7 @@ func getDcgmPodExporter() string {
 	return dcgmPodExporter
 }
 
-func preProcessDaemonSet(obj *appsv1.DaemonSet, n SRO) {
+func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	_, osTag := kernelFullVersion(n)
 	if obj.Name == "nvidia-driver-daemonset" {
 		if osTag != "" {
@@ -385,7 +384,7 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
-func isDaemonSetReady(name string, n SRO) ResourceStatus {
+func isDaemonSetReady(name string, n ClusterPolicyController) ResourceStatus {
 
 	opts := &client.ListOptions{}
 	opts.SetLabelSelector(fmt.Sprintf("app=%s", name))
@@ -410,7 +409,7 @@ func isDaemonSetReady(name string, n SRO) ResourceStatus {
 	return isPodReady(name, n, "Running")
 }
 
-func DaemonSet(n SRO) (ResourceStatus, error) {
+func DaemonSet(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := &n.resources[state].DaemonSet
@@ -447,7 +446,7 @@ func DaemonSet(n SRO) (ResourceStatus, error) {
 // the correct working of the DaemonSets (driver and dp). Therefore
 // the operator waits until the Pod completes and checks the error status
 // to advance to the next state.
-func isPodReady(name string, n SRO, phase corev1.PodPhase) ResourceStatus {
+func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) ResourceStatus {
 	opts := &client.ListOptions{}
 	opts.SetLabelSelector(fmt.Sprintf("app=%s", name))
 	log.Info("DEBUG: Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
@@ -471,7 +470,7 @@ func isPodReady(name string, n SRO, phase corev1.PodPhase) ResourceStatus {
 	return Ready
 }
 
-func Pod(n SRO) (ResourceStatus, error) {
+func Pod(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := &n.resources[state].Pod
@@ -502,7 +501,7 @@ func Pod(n SRO) (ResourceStatus, error) {
 	return isPodReady(obj.Name, n, "Succeeded"), nil
 }
 
-func SecurityContextConstraints(n SRO) (ResourceStatus, error) {
+func SecurityContextConstraints(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := &n.resources[state].SecurityContextConstraints
@@ -533,7 +532,7 @@ func SecurityContextConstraints(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func Service(n SRO) (ResourceStatus, error) {
+func Service(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := &n.resources[state].Service
@@ -564,7 +563,7 @@ func Service(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func ServiceMonitor(n SRO) (ResourceStatus, error) {
+func ServiceMonitor(n ClusterPolicyController) (ResourceStatus, error) {
 
 	state := n.idx
 	obj := &n.resources[state].ServiceMonitor
@@ -595,69 +594,7 @@ func ServiceMonitor(n SRO) (ResourceStatus, error) {
 	return Ready, nil
 }
 
-func PriorityClass(n SRO) (ResourceStatus, error) {
-
-	state := n.idx
-	obj := &n.resources[state].PriorityClass
-
-	found := &schedv1.PriorityClass{}
-	logger := log.WithValues("PriorityClass", obj.Name, "Namespace", obj.Namespace)
-
-	if err := controllerutil.SetControllerReference(n.ins, obj, n.rec.scheme); err != nil {
-		return NotReady, err
-	}
-
-	logger.Info("Looking for")
-	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
-		logger.Info("Not found, creating")
-		err = n.rec.client.Create(context.TODO(), obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return NotReady, err
-		}
-		return Ready, nil
-	} else if err != nil {
-		return NotReady, err
-	}
-
-	logger.Info("Found")
-
-	return Ready, nil
-}
-
-func Taint(n SRO) (ResourceStatus, error) {
-
-	state := n.idx
-	obj := &n.resources[state].Taint
-
-	logger := log.WithValues("Taint", obj.Key, "Namespace", "default")
-
-	logger.Info("Looking for")
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector("feature.node.kubernetes.io/pci-10de.present=true")
-	list := &corev1.NodeList{}
-	err := n.rec.client.List(context.TODO(), opts, list)
-	if err != nil {
-		logger.Info("Could not get NodeList", "ERROR", err)
-	}
-
-	for _, node := range list.Items {
-		if gotTaint(n, obj, node) {
-			logger.Info("Found")
-			return Ready, nil
-		}
-		logger.Info("Not found, creating")
-		err := setTaint(n, *obj, node)
-		if err != nil {
-			logger.Info("Could not set Taint", "ERROR", err)
-			return NotReady, nil
-		}
-	}
-	return Ready, nil
-}
-
-func gotTaint(n SRO, taint *corev1.Taint, node corev1.Node) bool {
+func gotTaint(n ClusterPolicyController, taint *corev1.Taint, node corev1.Node) bool {
 	for _, existing := range node.Spec.Taints {
 		if existing.Key == taint.Key {
 			return true
@@ -666,7 +603,7 @@ func gotTaint(n SRO, taint *corev1.Taint, node corev1.Node) bool {
 	return false
 }
 
-func setTaint(n SRO, t corev1.Taint, node corev1.Node) error {
+func setTaint(n ClusterPolicyController, t corev1.Taint, node corev1.Node) error {
 	node.Spec.Taints = append(node.Spec.Taints, t)
 	update, err := n.clientset.CoreV1().Nodes().Update(&node)
 	if err != nil || update == nil {

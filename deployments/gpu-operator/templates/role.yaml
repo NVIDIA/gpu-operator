@@ -58,7 +58,7 @@ rules:
   - create
   - watch
 - apiGroups:
-  - sro.openshift.io
+  - nvidia.com
   resources:
   - '*'
   verbs:
