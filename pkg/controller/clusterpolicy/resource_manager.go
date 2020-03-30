@@ -1,4 +1,4 @@
-package specialresource
+package clusterpolicy
 
 import (
 	"io/ioutil"
