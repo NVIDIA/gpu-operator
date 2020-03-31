@@ -86,6 +86,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info("Creating CRD if it doesn't exist.")
+	client := mgr.GetClient()
+	// create new objectSpecialResource
+
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
@@ -93,15 +97,6 @@ func main() {
 		log.Error(err, "")
 		os.Exit(1)
 	}
-
-	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
-
-	client := mgr.GetClient()
-	// create new objectSpecialResource
 
 	cr := gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -114,6 +109,12 @@ func main() {
 	err = client.Create(context.TODO(), &cr)
 	if err != nil {
 		log.Error(err, "Failed to create CRD")
+	}
+
+	// Setup all Controllers
+	if err := controller.AddToManager(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
 	}
 
 	log.Info("Starting the Cmd.")
