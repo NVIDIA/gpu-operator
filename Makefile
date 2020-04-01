@@ -11,7 +11,7 @@ include $(MAKE_DIR)/common.mk
 
 ##### Global variables #####
 
-DOCKERFILE       ?= $(CURDIR)/docker/Dockerfile.ubuntu18.04.prod
+DOCKERFILE       ?= $(CURDIR)/docker/Dockerfile.ubi8.prod
 DOCKERFILE_DEVEL ?= $(CURDIR)/docker/Dockerfile.devel
 
 BIN_NAME  ?= gpu-operator
