@@ -27,7 +27,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 - The GPU operator has been validated with the following NVIDIA components:
   - NVIDIA Container Toolkit 1.0.5
   - NVIDIA Kubernetes Device Plugin 1.0.0-beta4
-  - NVIDIA Tesla Driver 440 ( Current release is 440.64.00. See driver [release notes](https://docs.nvidia.com/datacenter/tesla/#r440-driver-release-notes))
+  - NVIDIA Tesla Driver 440 (Current release is 440.64.00. See driver [release notes](https://docs.nvidia.com/datacenter/tesla/#r440-driver-release-notes))
   - NVIDIA DCGM 1.7.2 
 
 
@@ -189,13 +189,13 @@ $ curl $prom_server_ip:9090
 ## Changelog 
 ### v1.2.0
 ### New Features
-- DCGM is now deployed as part of the GPU Operator on OpenShift 4.3
+- DCGM is now deployed as part of the GPU Operator on OpenShift 4.3.
 ### Improvements
+- The operator CRD has been renamed to `ClusterPolicy`.
+- The operator image is now based on UBI8.
 ### Fixed Issues
-### Known Limitations
-- GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin). Support for better error handling will be added in a future release.
-- The GPU Operator currently does not handle updates to the underlying software components (e.g. drivers) in an automated manner.
-- This release of the operator does not support accessing images from private registries, which may be required for air-gapped deployments.
+- Fixed an issue with the toolkit container which would setup the NVIDIA runtime under `/run/nvidia` with a symlink to `/usr/local/nvidia`. If a node was rebooted, this would prevent any containers from being run with Docker as the container runtime configured in `/etc/docker/daemon.json` would not be available after reboot.
+- Fixed a race condition with the creation of the CRD and registration.
 
 ### v1.0.0
 #### New Features
@@ -208,7 +208,8 @@ $ curl $prom_server_ip:9090
 - Fixed an issue with the validation steps (for the driver and device plugin) taking considerable time. Node provisioning times are now improved by 5x.
 - The SRO custom resource definition is setup as part of the operator.
 - Fixed an issue with the clean up of driver mount files when deleting the operator from the cluster. This issue used to require a reboot of the node, which is no longer required.
-#### Known Limitations
+
+### Known Limitations
 - After the removal of the GPU Operator, a restart of the Docker daemon is required as the default container runtime is setup to be the NVIDIA runtime. Run the following command:
 ```sh
 $ sudo systemctl restart docker
