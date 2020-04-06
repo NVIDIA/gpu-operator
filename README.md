@@ -1,4 +1,8 @@
+[![GitHub license](https://img.shields.io/github/license/NVIDIA/gpu-operator?style=flat-square)](https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/LICENSE)
+
 # NVIDIA GPU Operator
+
+![nvidia-gpu-operator](https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/egx/nvidia-egx-platform-gold-image-full-2c50-d@2x.jpg)
 
 Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the [device plugin framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/). However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which  are difficult and prone to errors.
 The NVIDIA GPU Operator uses the [operator framework](https://coreos.com/blog/introducing-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling, [DCGM](https://developer.nvidia.com/dcgm) based monitoring and others.
@@ -15,7 +19,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 - Pascal+ GPUs are supported (incl. Tesla V100 and T4)
 - Kubernetes v1.13+
   - Note that the Kubernetes community supports only the last three minor releases as of v1.17. Older releases may be supported through enterprise distributions of Kubernetes such as Red Hat OpenShift. See the prerequisites for enabling monitoring in Kubernetes releases before v1.16.
-- Helm v3 (v3.1.1)
+- Helm v3 (v3.1.z)
 - Docker CE 19.03.z
 - Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS) and CRI-O container runtime
 - Ubuntu 18.04.z LTS
@@ -34,7 +38,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 - Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed. If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
 ```sh
 # Set the variable nfd.enabled=false at the helm install step:
-$ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
+$ helm install --devel --set nfd.enabled=false nvidia/gpu-operator --wait --generate-name
 ```
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
 - For monitoring in Kubernetes 1.13 and 1.14, enable the kubelet ["KubeletPodResources" feature gate](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). From Kubernetes 1.15 onwards, its enabled by default.
