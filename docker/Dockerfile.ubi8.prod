@@ -10,8 +10,8 @@ LABEL io.k8s.display-name="NVIDIA GPU Operator"
 
 COPY --from=builder /go/src/github.com/NVIDIA/gpu-operator/gpu-operator  /usr/bin/
 
-RUN mkdir -p /opt/sro
-COPY assets/* /opt/sro/.
+RUN mkdir -p /opt/gpu-operator
+COPY assets/* /opt/gpu-operator/.
 
 RUN useradd gpu-operator
 USER gpu-operator

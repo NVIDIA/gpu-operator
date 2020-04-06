@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/NVIDIA/gpu-operator/pkg/apis"
-	"github.com/NVIDIA/gpu-operator/pkg/apis/sro/v1alpha1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	"github.com/NVIDIA/gpu-operator/pkg/controller"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -86,6 +86,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info("Creating CRD if it doesn't exist.")
+	client := mgr.GetClient()
+	// create new objectSpecialResource
+
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
@@ -94,26 +98,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
-
-	client := mgr.GetClient()
-	// create new objectSpecialResource
-
-	cr := v1alpha1.SpecialResource{
+	cr := gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceName,
 			Namespace: resourceNamespace,
 		},
-		Spec: v1alpha1.SpecialResourceSpec{Scheduling: "none"},
+		Spec: gpuv1.ClusterPolicySpec{},
 	}
 
 	err = client.Create(context.TODO(), &cr)
 	if err != nil {
 		log.Error(err, "Failed to create CRD")
+	}
+
+	// Setup all Controllers
+	if err := controller.AddToManager(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
 	}
 
 	log.Info("Starting the Cmd.")

@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: special-resource-operator
+subjects:
+- kind: ServiceAccount
+  name: special-resource-operator
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: special-resource-operator
+  apiGroup: rbac.authorization.k8s.io

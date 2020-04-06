@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "node-feature-discovery.fullname" . }}-master
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+    role: master
+spec:
+  type: {{ .Values.master.service.type }}
+  ports:
+    - port: {{ .Values.master.service.port }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    {{- include "node-feature-discovery.selectorLabels" . | nindent 4 }}

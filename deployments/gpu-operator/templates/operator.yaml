@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: special-resource-operator
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: special-resource-operator
+  template:
+    metadata:
+      labels:
+        name: special-resource-operator
+      annotations:
+        openshift.io/scc: restricted-readonly
+    spec:
+      serviceAccount: special-resource-operator
+      serviceAccountName: special-resource-operator
+      # readOnlyRootFilesystem: true
+
+      containers:
+      - name: special-resource-operator
+        {{- if .Values.operator.tag}}
+        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
+        {{- else }}
+        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Chart.AppVersion }}
+        {{- end }}
+        imagePullPolicy: IfNotPresent
+        command: ["gpu-operator"]
+        envFrom:
+        - configMapRef:
+            name: operator-config
+        env:
+        - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
+          value: "{{ .Values.operator.defaultRuntime }}"
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "special-resource-operator"
+
+        readinessProbe:
+          exec:
+            command: ["stat", "/tmp/operator-sdk-ready"]
+
+          initialDelaySeconds: 4
+          periodSeconds: 10
+          failureThreshold: 1
+        ports:
+        - containerPort: 60000
+          name: metrics
+
+    {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.operator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+

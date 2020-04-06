@@ -5,12 +5,15 @@ go 1.13
 require (
 	github.com/appscode/jsonpatch v1.0.1 // indirect
 	github.com/coreos/prometheus-operator v0.29.0
+	github.com/gordonklaus/ineffassign v0.0.0-20200309095847-7953dde2c7bf // indirect
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/operator-framework/operator-sdk v0.8.2
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/tools v0.0.0-20200329025819-fd4102a86c65 // indirect
 	k8s.io/api v0.0.0-20190612125737-db0771252981
 	k8s.io/apimachinery v0.0.0-20190612125636-6a5db36e93ad
 	k8s.io/client-go v11.0.0+incompatible

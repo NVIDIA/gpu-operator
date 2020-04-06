@@ -7,15 +7,53 @@ replicaCount: 1
 nfd:
   enabled: true
 
+node-feature-discovery:
+  worker:
+    tolerations:
+    - key: "node-role.kubernetes.io/master"
+      operator: "Equal"
+      value: ""
+      effect: "NoSchedule"
+    - key: "nvidia.com/gpu"
+      operator: "Equal"
+      value: "present"
+      effect: "NoSchedule"
+
+    options:
+      sources:
+        pci:
+          deviceLabelFields:
+          - vendor
+
 platform:
   openshift: false
 
 operator:
   repository: nvidia
   image: gpu-operator
-  tag: @OPERATOR_VERSION@
+# If not set, the tag defaults to Chart.AppVersion
+# tag: "foo"
 
   defaultRuntime: docker
+  clusterversion: 0.0
+
+  nodeSelector: {}
+
+  tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/master"
+                operator: In
+                values: [""]
 
 driver:
   repository: nvidia
@@ -25,7 +63,7 @@ driver:
 toolkit:
   repository: nvidia
   image: container-toolkit
-  version: 1.0.0-alpha.3
+  version: 1.0.0-beta.0
 
 devicePlugin:
   repository: nvidia

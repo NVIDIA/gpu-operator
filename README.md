@@ -1,16 +1,16 @@
 # NVIDIA GPU Operator
 
-Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the [device plugin framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/). However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which  are difficult and prone to errors. 
+Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the [device plugin framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/). However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which  are difficult and prone to errors.
 The NVIDIA GPU Operator uses the [operator framework](https://coreos.com/blog/introducing-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling and others.
 
-This is the v1.0.0 release of the GPU Operator and is now available for deployment. This release of the GPU Operator adds support for Red Hat OpenShift 4 and includes deployment of [DCGM](https://developer.nvidia.com/dcgm) based monitoring as part of the GPU Operator.
+The GPU Operator is now G.A (Generally Available). This release of the GPU Operator adds support for Red Hat OpenShift 4 and includes deployment of [DCGM](https://developer.nvidia.com/dcgm) based monitoring as part of the GPU Operator.
 
 ## Audience and Use-Cases
-The GPU Operator allows administrators of Kubernetes clusters to manage GPU nodes just like CPU nodes in the cluster. Instead of provisioning a special OS image for GPU nodes, administrators can rely on a standard OS image for both CPU and GPU nodes and then rely on the GPU Operator to provision the required software components for GPUs. 
+The GPU Operator allows administrators of Kubernetes clusters to manage GPU nodes just like CPU nodes in the cluster. Instead of provisioning a special OS image for GPU nodes, administrators can rely on a standard OS image for both CPU and GPU nodes and then rely on the GPU Operator to provision the required software components for GPUs.
 
-Note that the GPU Operator is specifically useful for scenarios where the Kubernetes cluster needs to scale quickly - for example provisioning additional GPU nodes on the cloud or on-prem and managing the lifecycle of the underlying software components. Since the GPU Operator runs everything as containers including NVIDIA drivers, the administrators can easily swap various components - simply by starting or stopping containers. 
+Note that the GPU Operator is specifically useful for scenarios where the Kubernetes cluster needs to scale quickly - for example provisioning additional GPU nodes on the cloud or on-prem and managing the lifecycle of the underlying software components. Since the GPU Operator runs everything as containers including NVIDIA drivers, the administrators can easily swap various components - simply by starting or stopping containers.
 
-The GPU Operator is not a good fit for scenarios when special OS images are already being provisioned in a GPU cluster (for example using [NVIDIA DGX systems](https://www.nvidia.com/en-us/data-center/dgx-systems/)) or when using hybrid environments that use a combination of Kubernetes and Slurm for workload management. 
+The GPU Operator is not a good fit for scenarios when special OS images are already being provisioned in a GPU cluster (for example using [NVIDIA DGX systems](https://www.nvidia.com/en-us/data-center/dgx-systems/)) or when using hybrid environments that use a combination of Kubernetes and Slurm for workload management.
 
 
 ## Platform Support
@@ -32,14 +32,14 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 ## Getting Started
 ### Prerequisites
 - Nodes must not be pre-configured with NVIDIA components (driver, container runtime, device plugin).
-- If the HWE kernel is used with Ubuntu 18.04, then the nouveau driver for NVIDIA GPUs must be blacklisted before starting the GPU Operator. Follow the steps in this [guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile-nouveau-ubuntu) to blacklist the nouveau driver. 
+- If the HWE kernel is used with Ubuntu 18.04, then the nouveau driver for NVIDIA GPUs must be blacklisted before starting the GPU Operator. Follow the steps in this [guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile-nouveau-ubuntu) to blacklist the nouveau driver.
 - Node Feature Discovery (NFD) is required on each node. By default, NFD master and worker are automatically deployed. If NFD is already running in the cluster prior to the deployment of the operator, follow this step:
 ```sh
 # Set the variable nfd.enabled=false at the helm install step:
 $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator -n test-operator
 ```
   - See notes on [NFD setup](https://github.com/kubernetes-sigs/node-feature-discovery)
-- For monitoring in Kubernetes <= 1.13 and > 1.15, enable the kubelet "KubeletPodResources" feature gate. From Kubernetes 1.15 onwards, its enabled by default.
+- For monitoring in Kubernetes >=1.13 and <1.15, enable the kubelet ["KubeletPodResources" feature gate](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/). From Kubernetes 1.15 onwards, its enabled by default.
 ```sh
 $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
 ```
@@ -149,8 +149,8 @@ $ tee dcgmScrapeConfig.yaml <<EOF
 
   relabel_configs:
   - source_labels: [__meta_kubernetes_pod_node_name]
-    action: replace 
-    target_label: kubernetes_node 
+    action: replace
+    target_label: kubernetes_node
 EOF
 
 # Deploy Prometheus
@@ -175,7 +175,7 @@ $ kubectl port-forward $(kubectl get pods --namespace default -l "app=grafana,re
 # In browser: http://localhost:3000
 # On AWS: ssh -L 3000:localhost:3000 -i YOUR_SECRET_KEY INSTANCE_NAME@PUBLIC_IP
 
-# Login in the dashboard with the decoded credentials and add Promethues datasource 
+# Login in the dashboard with the decoded credentials and add Prometheus datasource
 # Get Promethues IP to add to the Grafana datasource
 $ prom_server_ip=$(kubectl get pods -lapp=prometheus -lcomponent=server -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -o wide | tail -n 1 | awk '{print $6}')
 # Check if Prometheus is reachable
@@ -184,16 +184,16 @@ $ curl $prom_server_ip:9090
 # Import this GPU metrics dashboard from Grafana https://grafana.com/grafana/dashboards/11578
 ```
 
-## Changelog
+## Changelog for v1.0.0
 ### New Features
-- Added support for Helm v3. Note that installing the GPU Operator using Helm v2 is no longer supported. 
+- Added support for Helm v3. Note that installing the GPU Operator using Helm v2 is no longer supported.
 - Added support for Red Hat OpenShift 4 (4.1, 4.2 and 4.3) using Red Hat Enterprise Linux Core OS (RHCOS) and CRI-O runtime on GPU worker nodes.
 - GPU Operator now deploys NVIDIA DCGM for GPU telemetry on Ubuntu 18.04 LTS
 
 ### Fixed Issues
-- The driver container now sets up the required dependencies on i2c and ipmi_msghandler modules. 
+- The driver container now sets up the required dependencies on i2c and ipmi_msghandler modules.
 - Fixed an issue with the validation steps (for the driver and device plugin) taking considerable time. Node provisioning times are now improved by 5x.
-- The SRO custom resource definition is setup as part of the operator. 
+- The SRO custom resource definition is setup as part of the operator.
 - Fixed an issue with the clean up of driver mount files when deleting the operator from the cluster. This issue used to require a reboot of the node, which is no longer required.
 ### Known Limitations
 - After the removal of the GPU Operator, a restart of the Docker daemon is required as the default container runtime is setup to be the NVIDIA runtime. Run the following command:
@@ -202,7 +202,7 @@ $ sudo systemctl restart docker
 ```
 - GPU Operator will fail on nodes already setup with NVIDIA components (driver, runtime, device plugin). Support for better error handling will be added in a future release.
 - The GPU Operator currently does not handle updates to the underlying software components (e.g. drivers) in an automated manner.
-- This release of the operator does not support accessing images from private registries, which may be equired for air-gapped deployments. 
+- This release of the operator does not support accessing images from private registries, which may be required for air-gapped deployments.
 
 
 ## Contributions
@@ -210,4 +210,3 @@ $ sudo systemctl restart docker
 
 ## Support and Getting Help
 Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
-
