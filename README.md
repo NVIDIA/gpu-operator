@@ -187,7 +187,7 @@ $ curl $prom_server_ip:9090
 ```
 
 ## Changelog 
-### v1.2.0
+### v1.1.0
 ### New Features
 - DCGM is now deployed as part of the GPU Operator on OpenShift 4.3.
 ### Improvements
