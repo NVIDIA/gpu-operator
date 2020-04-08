@@ -17,19 +17,24 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
 
 ## Platform Support
 - Pascal+ GPUs are supported (incl. Tesla V100 and T4)
-- Kubernetes v1.13+
-  - Note that the Kubernetes community supports only the last three minor releases as of v1.17. Older releases may be supported through enterprise distributions of Kubernetes such as Red Hat OpenShift. See the prerequisites for enabling monitoring in Kubernetes releases before v1.16.
+- Container Platforms
+  - Kubernetes v1.13+
+    - Note that the Kubernetes community supports only the last three minor releases as of v1.17. Older releases may be supported through enterprise distributions of Kubernetes such as Red Hat OpenShift. See the prerequisites for enabling monitoring in Kubernetes releases before v1.16.
+  - Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS) and CRI-O container runtime
 - Helm v3 (v3.1.z)
 - Docker CE 19.03.z
-- Red Hat OpenShift 4.1, 4.2 and 4.3 using Red Hat Enterprise Linux CoreOS (RHCOS) and CRI-O container runtime
-- Ubuntu 18.04.z LTS
-  - Note that the GA has been validated with the 4.15 LTS kernel. When using the HWE kernel (e.g. v5.3), there are additional prerequisites before deploying the operator.
+- Linux distributions
+  - Ubuntu 18.04.z LTS
+    - Note that the GA has been validated with the 4.15 LTS kernel. When using the HWE kernel (e.g. v5.3), there are additional prerequisites before deploying the operator.
+  - Red Hat Enterprise Linux CoreOS (RHCOS) for use with OpenShift
 - The GPU operator has been validated with the following NVIDIA components:
   - NVIDIA Container Toolkit 1.0.5
   - NVIDIA Kubernetes Device Plugin 1.0.0-beta4
   - NVIDIA Tesla Driver 440 (Current release is 440.64.00. See driver [release notes](https://docs.nvidia.com/datacenter/tesla/#r440-driver-release-notes))
   - NVIDIA DCGM 1.7.2 
-
+- Deployment Scenarios
+  - Bare-metal 
+  - GPU passthrough virtualization
 
 ## Getting Started
 ### Prerequisites
@@ -193,6 +198,7 @@ $ curl $prom_server_ip:9090
 ### Improvements
 - The operator CRD has been renamed to `ClusterPolicy`.
 - The operator image is now based on UBI8.
+- Helm chart has been refactored to fix issues and follow some best practices.
 ### Fixed Issues
 - Fixed an issue with the toolkit container which would setup the NVIDIA runtime under `/run/nvidia` with a symlink to `/usr/local/nvidia`. If a node was rebooted, this would prevent any containers from being run with Docker as the container runtime configured in `/etc/docker/daemon.json` would not be available after reboot.
 - Fixed a race condition with the creation of the CRD and registration.
