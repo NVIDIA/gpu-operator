@@ -5,7 +5,7 @@ _The template below is mostly useful for bug reports and support questions. Feel
 - [ ] Are you running Kubernetes v1.13+?
 - [ ] Are you running Docker (>= 18.06) or CRIO (>= 1.13+)?
 - [ ] Do you have `i2c_core` and `ipmi_msghandler` loaded on the nodes?
-- [ ] Did you apply the CRD (`kubectl describe specialresources --all-namespaces`)
+- [ ] Did you apply the CRD (`kubectl describe clusterpolicies --all-namespaces`)
 
 ### 1. Issue or feature description
 

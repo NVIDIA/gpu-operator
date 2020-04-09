@@ -1,26 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: special-resource-operator
+  name: gpu-operator
   namespace: {{ $.Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: special-resource-operator
+      name: gpu-operator
   template:
     metadata:
       labels:
-        name: special-resource-operator
+        name: gpu-operator
       annotations:
         openshift.io/scc: restricted-readonly
     spec:
-      serviceAccount: special-resource-operator
-      serviceAccountName: special-resource-operator
+      serviceAccountName: gpu-operator
       # readOnlyRootFilesystem: true
 
       containers:
-      - name: special-resource-operator
+      - name: gpu-operator
         {{- if .Values.operator.tag}}
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
         {{- else }}
@@ -41,7 +40,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         - name: OPERATOR_NAME
-          value: "special-resource-operator"
+          value: "gpu-operator"
 
         readinessProbe:
           exec:

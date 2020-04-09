@@ -37,7 +37,7 @@ seLinuxContext:
 supplementalGroups:
   type: RunAsAny
 users: 
-- system:serviceaccount:gpu-operator:special-resource-operator
+- system:serviceaccount:gpu-operator:gpu-operator
 volumes:
 - configMap
 - downwardAPI

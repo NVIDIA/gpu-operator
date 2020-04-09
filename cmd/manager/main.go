@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Become the leader before proceeding
-	err = leader.Become(context.TODO(), "special-resource-operator-lock")
+	err = leader.Become(context.TODO(), "gpu-operator-lock")
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
