@@ -3,6 +3,8 @@ kind: Role
 metadata:
   name: nvidia-container-toolkit
   namespace: gpu-operator-resources
+  labels:
+    app.kubernetes.io/component: "container-toolkit"
 rules:
 - apiGroups:
   - security.openshift.io

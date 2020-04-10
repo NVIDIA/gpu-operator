@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  labels:
-    app: nvidia-driver-validation
   name: nvidia-driver-validation
+  labels:
+    app.kubernetes.io/component: "driver-validation"
   namespace: gpu-operator-resources
 spec:
   tolerations:

@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: nvidia-driver
   namespace: gpu-operator-resources
+  labels:
+    app.kubernetes.io/component: "driver"
 data:
   oci-nvidia-hook-json: | 
     {

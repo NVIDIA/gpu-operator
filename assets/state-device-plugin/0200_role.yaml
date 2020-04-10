@@ -3,6 +3,8 @@ kind: Role
 metadata:
   name: nvidia-device-plugin
   namespace: gpu-operator-resources
+  labels:
+    app.kubernetes.io/component: "device-plugin"
 rules:
 - apiGroups:
   - security.openshift.io
