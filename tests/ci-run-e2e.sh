@@ -65,16 +65,16 @@ done
 current_time=0
 while :; do
 	echo "Checking dcgm pod"
-	kubectl get pods -l "app.kubernetes.io/component=dcgm-exporter" -n gpu-operator-resources
+	kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources
 
 	echo "Checking dcgm pod readiness"
-	is_dcgm_ready=$(kubectl get pods -l "app.kubernetes.io/component=dcgm-exporter" gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
+	is_dcgm_ready=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
 	if [ "${is_dcgm_ready}" = "True" ]; then
-		dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l "app.kubernetes.io/component=dcgm-exporter" | tail -n 1 | awk '{print $6}')
-		curl -s "$dcgm_pod_ip:9400/gpu/metrics" | grep "dcgm_gpu_temp"
-		rc=0
-		break;
+	    dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+	    curl -s "$dcgm_pod_ip:9400/gpu/metrics" | grep "dcgm_gpu_temp"
+	    rc=0
+	    break;
 	fi
 
 	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
