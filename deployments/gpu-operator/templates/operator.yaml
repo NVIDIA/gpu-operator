@@ -3,15 +3,20 @@ kind: Deployment
 metadata:
   name: gpu-operator
   namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ gpu-operator.labels }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: gpu-operator
+      {{ gpu-operator.matchlabels }}
+      app.kubernetes.io/component: "gpu-operator"
   template:
     metadata:
       labels:
-        name: gpu-operator
+        {{ gpu-operator.matchlabels }}
+        app.kubernetes.io/component: "gpu-operator"
       annotations:
         openshift.io/scc: restricted-readonly
     spec:

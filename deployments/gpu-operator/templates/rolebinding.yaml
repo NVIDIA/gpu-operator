@@ -2,6 +2,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: gpu-operator
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ gpu-operator.labels }}
 subjects:
 - kind: ServiceAccount
   name: gpu-operator

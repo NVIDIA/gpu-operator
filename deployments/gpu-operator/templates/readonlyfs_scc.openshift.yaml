@@ -3,6 +3,9 @@
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ gpu-operator.labels }}
   annotations:
     kubernetes.io/description: restricted denies access to all host features and requires
       pods to be run with a UID, read-only root filesystem and SELinux context that are 
