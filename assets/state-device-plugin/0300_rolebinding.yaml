@@ -3,8 +3,6 @@ kind: RoleBinding
 metadata:
   name: nvidia-device-plugin
   namespace: gpu-operator-resources
-  labels:
-    app.kubernetes.io/component: "device-plugin"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

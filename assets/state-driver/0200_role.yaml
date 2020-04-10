@@ -3,8 +3,6 @@ kind: Role
 metadata:
   name: nvidia-driver
   namespace: gpu-operator-resources
-  labels:
-    app.kubernetes.io/component: "driver"
 rules:
 - apiGroups:
   - security.openshift.io

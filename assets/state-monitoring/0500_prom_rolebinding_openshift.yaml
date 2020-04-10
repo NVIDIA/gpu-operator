@@ -4,7 +4,7 @@ metadata:
   name: prometheus-k8s
   namespace: gpu-operator-resources
   labels:
-    app.kubernetes.io/component: "dcgm-exporter"
+    app: nvidia-dcgm-exporter
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

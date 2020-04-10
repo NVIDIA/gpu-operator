@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nvidia-dcgm-exporter
   labels:
-    app.kubernetes.io/component: "dcgm-exporter"
+    app: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter
   namespace: gpu-operator-resources
   annotations:
     openshift.io/scc: nvidia-dcgm-exporter

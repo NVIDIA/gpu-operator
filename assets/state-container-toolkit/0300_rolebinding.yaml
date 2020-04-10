@@ -3,8 +3,6 @@ kind: RoleBinding
 metadata:
   name: nvidia-container-toolkit
   namespace: gpu-operator-resources
-  labels:
-    app.kubernetes.io/component: "container-toolkit"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

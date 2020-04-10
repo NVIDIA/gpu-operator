@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   labels:
-    app.kubernetes.io/component: "device-plugin-validation"
+    app: nvidia-device-plugin-validation
   name: nvidia-device-plugin-validation
   namespace: gpu-operator-resources
 spec:

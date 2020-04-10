@@ -3,8 +3,6 @@ kind: RoleBinding
 metadata:
   name: nvidia-driver
   namespace: gpu-operator-resources
-  labels:
-    app.kubernetes.io/component: "driver"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

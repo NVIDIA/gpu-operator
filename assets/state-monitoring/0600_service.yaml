@@ -4,7 +4,7 @@ metadata:
   namespace: gpu-operator-resources
   name: nvidia-dcgm-exporter
   labels:
-    app.kubernetes.io/component: "dcgm-exporter"
+    app: nvidia-dcgm-exporter
   annotations:
     prometheus.io/scrape: "true"
 spec:

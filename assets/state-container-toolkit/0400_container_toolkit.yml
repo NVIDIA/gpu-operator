@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    app.kubernetes.io/component: "container-toolkit"
+    app: nvidia-container-toolkit-daemonset
   name: nvidia-container-toolkit-daemonset
   namespace: gpu-operator-resources
   annotations:
@@ -10,7 +10,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/component: "container-toolkit"
+      app: nvidia-container-toolkit-daemonset
   template:
     metadata:
       # Mark this pod as a critical add-on; when enabled, the critical add-on scheduler
@@ -19,7 +19,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ""
       labels:
-        app.kubernetes.io/component: "container-toolkit"
+        app: nvidia-container-toolkit-daemonset
     spec:
       tolerations:
       # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.

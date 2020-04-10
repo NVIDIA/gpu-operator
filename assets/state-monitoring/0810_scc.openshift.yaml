@@ -2,17 +2,6 @@
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
 #
-kind: SecurityContextConstraints
-metadata:
-  name: nvidia-dcgm-exporter
-  labels:
-    app.kubernetes.io/component: "dcgm-exporter"
-  annotations:
-    kubernetes.io/description: 'privileged allows access to all privileged and host
-      features and the ability to run as any user, any group, any fsGroup, and with
-      any SELinux context.  WARNING: this is the most relaxed SCC and should be used
-      only for cluster administration. Grant with caution.'
-
 allowHostDirVolumePlugin: true
 allowHostIPC: false
 allowHostNetwork: false
@@ -32,6 +21,15 @@ groups:
 - system:cluster-admins
 - system:nodes
 - system:masters
+kind: SecurityContextConstraints
+metadata:
+  annotations:
+    kubernetes.io/description: 'privileged allows access to all privileged and host
+      features and the ability to run as any user, any group, any fsGroup, and with
+      any SELinux context.  WARNING: this is the most relaxed SCC and should be used
+      only for cluster administration. Grant with caution.'
+
+  name: nvidia-dcgm-exporter
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
