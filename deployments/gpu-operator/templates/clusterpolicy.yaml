@@ -1,0 +1,9 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: cluster-policy
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+spec: {}
