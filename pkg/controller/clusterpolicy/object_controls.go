@@ -27,6 +27,7 @@ const (
 )
 
 func ServiceAccount(n ClusterPolicyController) (ResourceStatus, error) {
+
 	state := n.idx
 	obj := n.resources[state].ServiceAccount
 	found := &corev1.ServiceAccount{}
@@ -35,10 +36,6 @@ func ServiceAccount(n ClusterPolicyController) (ResourceStatus, error) {
 
 	if err := controllerutil.SetControllerReference(n.ins, &obj, n.rec.scheme); err != nil {
 		return NotReady, err
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
 	}
 
 	logger.Info("Looking for")
@@ -72,10 +69,6 @@ func Role(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -105,10 +98,6 @@ func RoleBinding(n ClusterPolicyController) (ResourceStatus, error) {
 
 	if err := controllerutil.SetControllerReference(n.ins, &obj, n.rec.scheme); err != nil {
 		return NotReady, err
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
 	}
 
 	logger.Info("Looking for")
@@ -142,10 +131,6 @@ func ClusterRole(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -177,10 +162,6 @@ func ClusterRoleBinding(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -210,10 +191,6 @@ func ConfigMap(n ClusterPolicyController) (ResourceStatus, error) {
 
 	if err := controllerutil.SetControllerReference(n.ins, &obj, n.rec.scheme); err != nil {
 		return NotReady, err
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
 	}
 
 	logger.Info("Looking for")
@@ -291,16 +268,6 @@ func getDriver() string {
 		os.Exit(1)
 	}
 	return driver
-}
-
-func getEnv(name string) string {
-	e := os.Getenv(name)
-	if e == "" {
-		log.Info(fmt.Sprintf("ERROR: Could not find environment variable %s", e))
-		os.Exit(1)
-	}
-
-	return e
 }
 
 func getToolkit() string {
@@ -456,18 +423,6 @@ func DaemonSet(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.Spec.Selector.MatchLabels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.Spec.Template.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -527,10 +482,6 @@ func Pod(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -560,10 +511,6 @@ func SecurityContextConstraints(n ClusterPolicyController) (ResourceStatus, erro
 
 	if err := controllerutil.SetControllerReference(n.ins, obj, n.rec.scheme); err != nil {
 		return NotReady, err
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
 	}
 
 	logger.Info("Looking for")
@@ -597,10 +544,6 @@ func Service(n ClusterPolicyController) (ResourceStatus, error) {
 		return NotReady, err
 	}
 
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
-	}
-
 	logger.Info("Looking for")
 	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -630,10 +573,6 @@ func ServiceMonitor(n ClusterPolicyController) (ResourceStatus, error) {
 
 	if err := controllerutil.SetControllerReference(n.ins, obj, n.rec.scheme); err != nil {
 		return NotReady, err
-	}
-
-	if err := SetObjectLabels(n.rec.client, obj.ObjectMeta.Labels); err != nil {
-		log.Info("Failed to add labels to object with error:", err)
 	}
 
 	logger.Info("Looking for")
