@@ -5,7 +5,7 @@ metadata:
   name: gpu-operator
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
 rules:
 {{- if .Values.platform.openshift }}
 - apiGroups:

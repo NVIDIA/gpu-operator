@@ -4,5 +4,5 @@ metadata:
   name: gpu-operator-resources
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
     openshift.io/cluster-monitoring: "true"

@@ -4,7 +4,7 @@ metadata:
   name: gpu-operator
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
 subjects:
 - kind: ServiceAccount
   name: gpu-operator

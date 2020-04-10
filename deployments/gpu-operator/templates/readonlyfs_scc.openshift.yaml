@@ -5,7 +5,7 @@ kind: SecurityContextConstraints
 metadata:
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
   annotations:
     kubernetes.io/description: restricted denies access to all host features and requires
       pods to be run with a UID, read-only root filesystem and SELinux context that are 

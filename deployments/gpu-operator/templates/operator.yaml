@@ -5,17 +5,17 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{ gpu-operator.matchlabels }}
+      {{ $.Release.matchLabels }}
       app.kubernetes.io/component: "gpu-operator"
   template:
     metadata:
       labels:
-        {{ gpu-operator.matchlabels }}
+        {{ $.Release.matchLabels }}
         app.kubernetes.io/component: "gpu-operator"
       annotations:
         openshift.io/scc: restricted-readonly

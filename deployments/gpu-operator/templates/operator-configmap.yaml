@@ -5,7 +5,7 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ gpu-operator.labels }}
+    {{ $.Release.labels }}
 data:
 {{- if .Values.platform.openshift }}
   KUBE_UNSUPPORTED_FLAVOR: ""
