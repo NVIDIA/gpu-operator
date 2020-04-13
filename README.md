@@ -79,7 +79,7 @@ gpu-operator-resources   nvidia-device-plugin-daemonset-8kd64         1/1     Ru
 gpu-operator-resources   nvidia-device-plugin-validation              0/1     Completed   0          2m47s
 gpu-operator-resources   nvidia-driver-daemonset-8nwcb                1/1     Running     0          5m4s
 gpu-operator-resources   nvidia-driver-validation                     0/1     Completed   0          4m37s
-gpu-operator             special-resource-operator-576bf567c7-c9z9g   1/1     Running     0          5m19s
+gpu-operator             gpu-operator-576bf567c7-c9z9g                1/1     Running     0          5m19s
 kube-system              calico-kube-controllers-6b9d4c8765-7w5pb     1/1     Running     0          12m
 kube-system              calico-node-scfwp                            1/1     Running     0          12m
 kube-system              coredns-6955765f44-9zjk6                     1/1     Running     0          12m

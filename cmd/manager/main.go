@@ -8,13 +8,11 @@ import (
 	"runtime"
 
 	"github.com/NVIDIA/gpu-operator/pkg/apis"
-	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	"github.com/NVIDIA/gpu-operator/pkg/controller"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/ready"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -60,7 +58,7 @@ func main() {
 	}
 
 	// Become the leader before proceeding
-	err = leader.Become(context.TODO(), "special-resource-operator-lock")
+	err = leader.Become(context.TODO(), "gpu-operator-lock")
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
@@ -86,29 +84,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info("Creating CRD if it doesn't exist.")
-	client := mgr.GetClient()
-	// create new objectSpecialResource
-
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
-	}
-
-	cr := gpuv1.ClusterPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resourceName,
-			Namespace: resourceNamespace,
-		},
-		Spec: gpuv1.ClusterPolicySpec{},
-	}
-
-	err = client.Create(context.TODO(), &cr)
-	if err != nil {
-		log.Error(err, "Failed to create CRD")
 	}
 
 	// Setup all Controllers

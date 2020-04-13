@@ -1,8 +1,9 @@
-apiVersion: v1
-kind: ServiceAccount
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
 metadata:
-  name: gpu-operator
+  name: cluster-policy
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}
+spec: {}

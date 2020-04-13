@@ -58,7 +58,7 @@ operator:
 driver:
   repository: nvidia
   image: driver
-  version: "440.33.01"
+  version: "440.64.00"
 
 toolkit:
   repository: nvidia

@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-    name: gpu-operator-resources
-    labels:
-      openshift.io/cluster-monitoring: "true"
+  name: gpu-operator-resources
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+    openshift.io/cluster-monitoring: "true"

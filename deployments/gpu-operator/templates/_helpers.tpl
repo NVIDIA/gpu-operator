@@ -34,9 +34,19 @@ Create chart name and version as used by the chart label.
 {{/*
 Common labels
 */}}
+
 {{- define "gpu-operator.labels" -}}
 app.kubernetes.io/name: {{ include "gpu-operator.name" . }}
 helm.sh/chart: {{ include "gpu-operator.chart" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{- define "gpu-operator.matchLabels" -}}
+app.kubernetes.io/name: {{ include "gpu-operator.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}

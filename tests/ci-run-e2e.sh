@@ -100,7 +100,7 @@ test_restart_operator() {
 		# Sleep a reasonable amount of time for k8s to update the container status to crashing
 		sleep 10
 
-		state=$(kubectl get pods -n "$NS" -l name=special-resource-operator \
+		state=$(kubectl get pods -n "$NS" -l "app.kubernetes.io/component=gpu-operator" \
 			-o jsonpath='{.items[0].status.phase}')
 
 		echo "Checking state of the GPU Operator, it is: '$state'"

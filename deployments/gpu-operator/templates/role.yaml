@@ -2,7 +2,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: special-resource-operator
+  name: gpu-operator
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
 rules:
 {{- if .Values.platform.openshift }}
 - apiGroups:
