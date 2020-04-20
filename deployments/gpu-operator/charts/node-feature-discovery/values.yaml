@@ -57,6 +57,8 @@ master:
     value: ""
     effect: "NoSchedule"
 
+  annotations: {}
+
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -100,6 +102,8 @@ worker:
     operator: "Equal"
     value: ""
     effect: "NoSchedule"
+
+  annotations: {}
 
   affinity:
     nodeAffinity:
