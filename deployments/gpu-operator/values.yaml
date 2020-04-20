@@ -45,6 +45,9 @@ operator:
     value: ""
     effect: "NoSchedule"
 
+  annotations:
+    openshift.io/scc: restricted-readonly
+
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
