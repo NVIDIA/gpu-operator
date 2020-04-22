@@ -33,39 +33,10 @@ spec:
       serviceAccountName: nvidia-dcgm-exporter
       containers:
       - image: "FILLED BY THE OPERATOR"
-        name: pod-nvidia-gpu-metrics-exporter
-        readinessProbe:
-          httpGet:
-            path: /gpu/metrics
-            port: 9400
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-        volumeMounts:
-        - name: pod-gpu-resources
-          readOnly: true
-          mountPath: /var/lib/kubelet/pod-resources
-        - name: device-metrics
-          readOnly: true
-          mountPath: /run/prometheus
-      - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
-        volumeMounts:
-        - name: device-metrics
-          mountPath: /run/prometheus
-
-      volumes:
-      - name: pod-gpu-resources
-        hostPath:
-          path: /var/lib/kubelet/pod-resources
-      - name: device-metrics
-        emptyDir:
-          medium: Memory
 
       nodeSelector:
         feature.node.kubernetes.io/pci-10de.present: "true"

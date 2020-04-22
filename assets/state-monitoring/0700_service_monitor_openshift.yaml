@@ -8,7 +8,7 @@ metadata:
 spec:
   endpoints:
   - port: gpu-metrics
-    path: "/gpu/metrics"
+    path: "/metrics"
   jobLabel: app
   namespaceSelector:
     matchNames:

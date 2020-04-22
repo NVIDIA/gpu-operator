@@ -138,14 +138,14 @@ $ kubectl get pods -n gpu-operator-resources | grep dcgm
 
 # Check gpu metrics locally
 $ dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -lapp=nvidia-dcgm-exporter -ojsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' -o wide | tail -n 1 | awk '{print $6}')
-$ curl $dcgm_pod_ip:9400/gpu/metrics
+$ curl $dcgm_pod_ip:9400/metrics
 
 # To scrape gpu metrics from Prometheus, add dcgm endpoint to Prometheus via a configmap
 
 $ tee dcgmScrapeConfig.yaml <<EOF
 - job_name: gpu-metrics
   scrape_interval: 1s
-  metrics_path: /gpu/metrics
+  metrics_path: /metrics
   scheme: http
 
   kubernetes_sd_configs:
