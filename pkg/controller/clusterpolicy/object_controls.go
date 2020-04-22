@@ -306,15 +306,6 @@ func getDcgmExporter() string {
 	return dcgmExporter
 }
 
-func getDcgmPodExporter() string {
-	dcgmPodExporter := os.Getenv("NVIDIA_DCGM_POD_EXPORTER")
-	if dcgmPodExporter == "" {
-		log.Info(fmt.Sprintf("ERROR: Could not find environment variable NVIDIA_DCGM_POD_EXPORTER"))
-		os.Exit(1)
-	}
-	return dcgmPodExporter
-}
-
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	_, osTag := kernelFullVersion(n)
 	if obj.Name == "nvidia-driver-daemonset" {
@@ -365,8 +356,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 			initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
 			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
 		}
-		obj.Spec.Template.Spec.Containers[0].Image = getDcgmPodExporter()
-		obj.Spec.Template.Spec.Containers[1].Image = getDcgmExporter()
+		obj.Spec.Template.Spec.Containers[0].Image = getDcgmExporter()
 	}
 }
 

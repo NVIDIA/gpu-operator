@@ -76,9 +76,4 @@ devicePlugin:
 dcgmExporter:
   repository: nvidia
   image: dcgm-exporter
-  version: 1.0.0-beta-ubuntu18.04
-
-dcgmPodExporter:
-  repository: nvidia
-  image: pod-gpu-metrics-exporter
-  version: v1.0.0-alpha
+  version: 1.7.2-2.0.0-rc.5-ubuntu18.04
