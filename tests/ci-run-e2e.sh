@@ -72,7 +72,7 @@ while :; do
 
 	if [ "${is_dcgm_ready}" = "True" ]; then
 	    dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
-	    curl -s "$dcgm_pod_ip:9400/metrics" | grep "dcgm_gpu_temp"
+	    curl -s "$dcgm_pod_ip:8080/metrics" | grep "dcgm_gpu_temp"
 	    rc=0
 	    break;
 	fi
