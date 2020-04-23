@@ -6,12 +6,21 @@ COPY . .
 RUN make build
 
 FROM registry.access.redhat.com/ubi8:latest
+ARG VERSION
+
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
+LABEL name="NVIDIA GPU Operator"
+LABEL vendor="NVIDIA"
+LABEL version="${VERSION}"
+LABEL release="N/A"
+LABEL summary="Automate the management and monitoring of NVIDIA GPUs."
+LABEL description="See summary"
 
 COPY --from=builder /go/src/github.com/NVIDIA/gpu-operator/gpu-operator  /usr/bin/
 
 RUN mkdir -p /opt/gpu-operator
 COPY assets /opt/gpu-operator/
+COPY ./LICENSE /licenses/LICENSE
 
 RUN useradd gpu-operator
 USER gpu-operator
