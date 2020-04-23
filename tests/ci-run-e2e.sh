@@ -71,10 +71,10 @@ while :; do
 	is_dcgm_ready=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
 	if [ "${is_dcgm_ready}" = "True" ]; then
-	    dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
-	    curl -s "$dcgm_pod_ip:8080/metrics" | grep "dcgm_gpu_temp"
-	    rc=0
-	    break;
+		dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+		curl -s "$dcgm_pod_ip:8080/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
+		rc=0
+		break;
 	fi
 
 	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
