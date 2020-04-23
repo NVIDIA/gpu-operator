@@ -16,6 +16,7 @@ DOCKERFILE_DEVEL ?= $(CURDIR)/docker/Dockerfile.devel
 
 BIN_NAME  ?= gpu-operator
 IMAGE     ?= nvidia/gpu-operator
+VERSION   ?= 1.1.2
 TAG       ?= latest
 TAG_DEVEL ?= devel
 
@@ -65,7 +66,7 @@ clean:
 	rm -f $(BIN)
 
 prod-image:
-	$(DOCKER) build -t $(IMAGE):$(TAG) -f $(DOCKERFILE) .
+	$(DOCKER) build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(TAG) -f $(DOCKERFILE) .
 
 devel-image:
 	$(DOCKER) build -t $(IMAGE):$(TAG_DEVEL) -f $(DOCKERFILE_DEVEL) .
