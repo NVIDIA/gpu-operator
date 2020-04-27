@@ -104,6 +104,14 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 	for {
 		stat, err := ctrl.step()
+
+		// Update the CR status
+		instance.Status.State = string(stat)
+		errr := r.client.Status().Update(context.TODO(), instance)
+		if errr != nil {
+			log.Error(errr, "Failed to update ClusterPolicy status")
+			return reconcile.Result{}, errr
+		}
 		if stat == "NotReady" {
 			// If the resource is not ready, wait 5 secs and reconcile
 			log.Info("ClusterPolicy", "ResourceStatus", stat)
