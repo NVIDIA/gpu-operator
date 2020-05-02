@@ -6,27 +6,66 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// INSERT ADDITIONAL SPEC/Status FIELDS
+// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 
 // ClusterPolicySpec defines the desired state of ClusterPolicy
 type ClusterPolicySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	Operator     OperatorSpec  `json:"operator"`
+	Driver       ComponentSpec `json:"driver"`
+	Toolkit      ComponentSpec `json:"toolkit"`
+	DevicePlugin ComponentSpec `json:"devicePlugin"`
+	DCGMExporter ComponentSpec `json:"dcgmExporter"`
 }
+
+type Runtime string
+
+const (
+	Docker Runtime = "docker"
+	CRIO   Runtime = "crio"
+)
+
+// OperatorSpec describes configuration options for the operator
+type OperatorSpec struct {
+	// +kubebuilder:validation:Enum=docker;crio
+	DefaultRuntime Runtime `json:"defaultRuntime"`
+}
+
+// Note these regex are obviously not handling well edge cases.
+// Though we probably don't need to.
+
+// ComponentSpec defines the path to the container image
+type ComponentSpec struct {
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.\-\/]+
+	Repository string `json:"repository"`
+
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image"`
+
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.-]+
+	Version string `json:"version"`
+}
+
+type State string
+
+const (
+	Ignored  State = "ignored"
+	Ready    State = "ready"
+	NotReady State = "notReady"
+)
 
 // ClusterPolicyStatus defines the observed state of ClusterPolicy
 type ClusterPolicyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	State string `json:"state"`
+	// +kubebuilder:validation:Enum=ignored;ready;notReady
+	State State `json:"state"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterPolicy is the Schema for the clusterpolicies API
+// ClusterPolicy allows you to configure the GPU Operator
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=clusterpolicies,scope=Namespaced
+// +kubebuilder:resource:path=clusterpolicies,scope=Cluster
 type ClusterPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -46,4 +85,12 @@ type ClusterPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterPolicy{}, &ClusterPolicyList{})
+}
+
+func (p *ClusterPolicy) SetState(s State) {
+	p.Status.State = s
+}
+
+func (c *ComponentSpec) ImagePath() string {
+	return c.Repository + "/" + c.Image + ":" + c.Version
 }

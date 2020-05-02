@@ -1,4 +1,5 @@
 cover.out
 /gpu-operator
+build/_output/
 *.swp
 *.swo

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	nvidiav1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,7 +44,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(&source.Kind{Type: &nvidiav1.ClusterPolicy{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &gpuv1.ClusterPolicy{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to secondary resource Pods and requeue the owner ClusterPolicy
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &nvidiav1.ClusterPolicy{},
+		OwnerType:    &gpuv1.ClusterPolicy{},
 	})
 	if err != nil {
 		return err
@@ -76,17 +76,15 @@ type ReconcileClusterPolicy struct {
 
 // Reconcile reads that state of the cluster for a ClusterPolicy object and makes changes based on the state read
 // and what is in the ClusterPolicy.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling ClusterPolicy")
+	ctx := log.WithValues("Request.Name", request.Name)
+	ctx.Info("Reconciling ClusterPolicy")
 
 	// Fetch the ClusterPolicy instance
-	instance := &nvidiav1.ClusterPolicy{}
+	instance := &gpuv1.ClusterPolicy{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -99,31 +97,43 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	ctrl.init(r, instance)
+	// TODO: Handle deletion of the main ClusterPolicy and cycle to the next one.
+	// We already have a main Clusterpolicy
+	if ctrl.singleton != nil && ctrl.singleton.ObjectMeta.Name != instance.ObjectMeta.Name {
+		instance.SetState(gpuv1.Ignored)
+		return reconcile.Result{}, err
+	}
+
+	err = ctrl.init(r, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	for {
 		stat, err := ctrl.step()
-
 		// Update the CR status
-		instance.Status.State = string(stat)
+		instance.Status.State = stat
 		errr := r.client.Status().Update(context.TODO(), instance)
 		if errr != nil {
 			log.Error(errr, "Failed to update ClusterPolicy status")
-			return reconcile.Result{}, errr
+			return reconcile.Result{RequeueAfter: time.Second * 5}, err
 		}
+
+		if err != nil {
+			return reconcile.Result{RequeueAfter: time.Second * 5}, err
+		}
+
 		if stat == "NotReady" {
 			// If the resource is not ready, wait 5 secs and reconcile
-			log.Info("ClusterPolicy", "ResourceStatus", stat)
+			log.Info("ClusterPolicy step wasn't ready", "State:", stat)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+
 		if ctrl.last() {
 			break
 		}
 	}
 
+	instance.SetState(gpuv1.Ready)
 	return reconcile.Result{}, nil
 }

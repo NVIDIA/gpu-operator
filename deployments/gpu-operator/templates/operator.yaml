@@ -32,21 +32,15 @@ spec:
         {{- end }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
-        envFrom:
-        - configMapRef:
-            name: operator-config
         env:
-        - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
-          value: "{{ .Values.operator.defaultRuntime }}"
         - name: WATCH_NAMESPACE
           value: ""
+        - name: OPERATOR_NAME
+          value: "gpu-operator"
         - name: POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: OPERATOR_NAME
-          value: "gpu-operator"
-
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]

@@ -6,4 +6,22 @@ metadata:
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}
-spec: {}
+spec:
+  operator:
+    defaultRuntime: docker
+  driver:
+    repository: "{{ .Values.driver.repository }}"
+    image: "{{ .Values.driver.image }}"
+    version: "{{ .Values.driver.version }}"
+  toolkit:
+    repository: "{{ .Values.toolkit.repository }}"
+    image: "{{ .Values.toolkit.image }}"
+    version: "{{ .Values.toolkit.version }}"
+  devicePlugin:
+    repository: "{{ .Values.devicePlugin.repository }}"
+    image: "{{ .Values.devicePlugin.image }}"
+    version: "{{ .Values.devicePlugin.version }}"
+  dcgmExporter:
+    repository: "{{ .Values.dcgmExporter.repository }}"
+    image: "{{ .Values.dcgmExporter.image }}"
+    version: "{{ .Values.dcgmExporter.version }}"

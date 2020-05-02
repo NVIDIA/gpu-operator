@@ -1,0 +1,137 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clusterpolicies.nvidia.com
+spec:
+  group: nvidia.com
+  names:
+    kind: ClusterPolicy
+    listKind: ClusterPolicyList
+    plural: clusterpolicies
+    singular: clusterpolicy
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ClusterPolicy allows you to configure the GPU Operator
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterPolicySpec defines the desired state of ClusterPolicy
+          properties:
+            dcgmExporter:
+              description: ComponentSpec defines the path to the container image
+              properties:
+                image:
+                  pattern: '[a-zA-Z0-9\-]+'
+                  type: string
+                repository:
+                  pattern: '[a-zA-Z0-9\.\-\/]+'
+                  type: string
+                version:
+                  pattern: '[a-zA-Z0-9\.-]+'
+                  type: string
+              required:
+              - image
+              - repository
+              - version
+              type: object
+            devicePlugin:
+              description: ComponentSpec defines the path to the container image
+              properties:
+                image:
+                  pattern: '[a-zA-Z0-9\-]+'
+                  type: string
+                repository:
+                  pattern: '[a-zA-Z0-9\.\-\/]+'
+                  type: string
+                version:
+                  pattern: '[a-zA-Z0-9\.-]+'
+                  type: string
+              required:
+              - image
+              - repository
+              - version
+              type: object
+            driver:
+              description: ComponentSpec defines the path to the container image
+              properties:
+                image:
+                  pattern: '[a-zA-Z0-9\-]+'
+                  type: string
+                repository:
+                  pattern: '[a-zA-Z0-9\.\-\/]+'
+                  type: string
+                version:
+                  pattern: '[a-zA-Z0-9\.-]+'
+                  type: string
+              required:
+              - image
+              - repository
+              - version
+              type: object
+            operator:
+              description: OperatorSpec describes configuration options for the operator
+              properties:
+                defaultRuntime:
+                  enum:
+                  - docker
+                  - crio
+                  type: string
+              required:
+              - defaultRuntime
+              type: object
+            toolkit:
+              description: ComponentSpec defines the path to the container image
+              properties:
+                image:
+                  pattern: '[a-zA-Z0-9\-]+'
+                  type: string
+                repository:
+                  pattern: '[a-zA-Z0-9\.\-\/]+'
+                  type: string
+                version:
+                  pattern: '[a-zA-Z0-9\.-]+'
+                  type: string
+              required:
+              - image
+              - repository
+              - version
+              type: object
+          required:
+          - dcgmExporter
+          - devicePlugin
+          - driver
+          - operator
+          - toolkit
+          type: object
+        status:
+          description: ClusterPolicyStatus defines the observed state of ClusterPolicy
+          properties:
+            state:
+              enum:
+              - ignored
+              - ready
+              - notReady
+              type: string
+          required:
+          - state
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true

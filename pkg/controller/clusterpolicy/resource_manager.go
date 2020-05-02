@@ -54,33 +54,17 @@ func filePathWalkDir(root string) ([]string, error) {
 	return files, err
 }
 
-func matchKubeFlavor(path string) bool {
-	// e.g. KUBE_UNSUPPORTED_FLAVOR=openshift
-	// then the manifest path will be skipped if it contains that name
-	// TODO: make the value of env var be a list (e.g. "openshift,nutanix,pks" will ensure specific files get ignored)
-	flavor := os.Getenv("KUBE_UNSUPPORTED_FLAVOR")
-	if flavor == "" {
-		return true
-	}
-	matched := strings.Contains(path, flavor)
-	if matched {
-		log.Info("OpenShift is not supported. Skipping", "PATH", path)
-		return false
-	}
-	return true
-}
-
-func getAssetsFrom(path string) []assetsFromFile {
-
+func getAssetsFrom(path, openshiftVersion string) []assetsFromFile {
 	manifests := []assetsFromFile{}
 	files, err := filePathWalkDir(path)
 	if err != nil {
 		panic(err)
 	}
 	for _, file := range files {
-		if !matchKubeFlavor(file) {
+		if strings.Contains(file, "openshift") && openshiftVersion == "" {
 			continue
 		}
+
 		buffer, err := ioutil.ReadFile(file)
 		if err != nil {
 			panic(err)
@@ -90,12 +74,12 @@ func getAssetsFrom(path string) []assetsFromFile {
 	return manifests
 }
 
-func addResourcesControls(path string) (Resources, controlFunc) {
-
+func addResourcesControls(path, openshiftVersion string) (Resources, controlFunc) {
 	res := Resources{}
 	ctrl := controlFunc{}
 
-	manifests := getAssetsFrom(path)
+	log.Info("Getting assets from: ", "path:", path)
+	manifests := getAssetsFrom(path, openshiftVersion)
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)
@@ -106,7 +90,7 @@ func addResourcesControls(path string) (Resources, controlFunc) {
 		slce := strings.Split(kind, ":")
 		kind = strings.TrimSpace(slce[1])
 
-		log.Info("DEBUG: Looking for ", "Kind", kind)
+		log.Info("DEBUG: Looking for ", "Kind", kind, "in path:", path)
 
 		switch kind {
 		case "ServiceAccount":

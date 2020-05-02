@@ -1,39 +1,28 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   creationTimestamp: null
   name: gpu-operator
-  labels:
-    app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
 rules:
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - '*'
 - apiGroups:
   - ""
   resources:
   - pods
   - services
+  - services/finalizers
   - endpoints
   - persistentvolumeclaims
   - events
   - configmaps
   - secrets
-  - serviceaccounts
-  - nodes
   verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
+  - create
+  - delete
   - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:
@@ -42,42 +31,50 @@ rules:
   - replicasets
   - statefulsets
   verbs:
-  - '*'
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors
   verbs:
   - get
-  - list
-  - create
-  - watch
-- apiGroups:
-  - nvidia.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - scheduling.k8s.io
-  resources:
-  - priorityclasses
-  verbs:
-  - get
-  - list
-  - watch
   - create
 - apiGroups:
-  - security.openshift.io
+  - apps
+  resourceNames:
+  - app-operator
   resources:
-  - securitycontextconstraints
+  - deployments/finalizers
   verbs:
-  - '*'
+  - update
 - apiGroups:
-  - config.openshift.io
+  - ""
   resources:
-  - clusterversions
+  - pods
   verbs:
   - get
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  - deployments
+  verbs:
+  - get
+- apiGroups:
+  - app.example.com
+  resources:
+  - '*'
+  verbs:
+  - create
+  - delete
+  - get
   - list
+  - patch
+  - update
   - watch
