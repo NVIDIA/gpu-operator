@@ -1,0 +1,5 @@
+channels:
+- currentCSV: gpu-operator.v1.1.4
+  name: alpha
+defaultChannel: alpha
+packageName: gpu-operator

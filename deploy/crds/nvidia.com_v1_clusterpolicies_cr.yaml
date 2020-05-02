@@ -1,0 +1,23 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  operator:
+    defaultRuntime: docker
+  driver:
+    image: driver
+    repository: nvidia
+    version: 440.64.00
+  toolkit:
+    image: container-toolkit
+    repository: nvidia
+    version: 1.0.0-beta.0
+  devicePlugin:
+    image: k8s-device-plugin
+    repository: nvidia
+    version: 1.0.0-beta4
+  dcgmExporter:
+    image: dcgm-exporter
+    repository: nvidia
+    version: 1.7.2-2.0.0-rc.5-ubuntu18.04

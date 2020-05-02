@@ -1,12 +1,16 @@
 package clusterpolicy
 
 import (
+	"fmt"
+
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	secv1 "github.com/openshift/api/security/v1"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 type state interface {
@@ -17,30 +21,18 @@ type state interface {
 }
 
 type ClusterPolicyController struct {
+	singleton *gpuv1.ClusterPolicy
+
 	resources []Resources
 	controls  []controlFunc
 	rec       *ReconcileClusterPolicy
-	ins       *gpuv1.ClusterPolicy
 	idx       int
-	clientset *kubernetes.Clientset
-}
-
-func addClient(n *ClusterPolicyController) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		panic(err.Error())
-	}
-	n.clientset, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
+	openshift string
 }
 
 func addState(n *ClusterPolicyController, path string) error {
-
 	// TODO check for path
-
-	res, ctrl := addResourcesControls(path)
+	res, ctrl := addResourcesControls(path, n.openshift)
 
 	n.controls = append(n.controls, ctrl)
 	n.resources = append(n.resources, res)
@@ -48,15 +40,43 @@ func addState(n *ClusterPolicyController, path string) error {
 	return nil
 }
 
+func OpenshiftVersion() (string, error) {
+	cfg := config.GetConfigOrDie()
+	client, err := configv1.NewForConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	v, err := client.ClusterVersions().Get("version", metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, condition := range v.Status.History {
+		if condition.State != "Completed" {
+			continue
+		}
+
+		return condition.Version, nil
+	}
+
+	return "", fmt.Errorf("Failed to find Completed Cluster Version")
+}
+
 func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.ClusterPolicy) error {
+	version, err := OpenshiftVersion()
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	n.openshift = version
+	n.singleton = i
+
 	n.rec = r
-	n.ins = i
 	n.idx = 0
 
 	promv1.AddToScheme(r.scheme)
 	secv1.AddToScheme(r.scheme)
-
-	addClient(n)
 
 	addState(n, "/opt/gpu-operator/state-container-toolkit")
 	addState(n, "/opt/gpu-operator/state-driver")
@@ -68,22 +88,21 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	return nil
 }
 
-func (n *ClusterPolicyController) step() (ResourceStatus, error) {
-
+func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	for _, fs := range n.controls[n.idx] {
-
 		stat, err := fs(*n)
 		if err != nil {
 			return stat, err
 		}
-		if stat != Ready {
+
+		if stat != gpuv1.Ready {
 			return stat, nil
 		}
 	}
 
 	n.idx = n.idx + 1
 
-	return Ready, nil
+	return gpuv1.Ready, nil
 }
 
 func (n ClusterPolicyController) validate() {

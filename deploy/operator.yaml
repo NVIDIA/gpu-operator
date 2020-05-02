@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-operator
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: app-operator
+      app.kubernetes.io/component: "gpu-operator"
+  template:
+    metadata:
+      labels:
+        name: app-operator
+        app.kubernetes.io/component: "gpu-operator"
+    spec:
+      serviceAccountName: app-operator
+      containers:
+      - name: app-operator
+        image: nvidia/gpu-operator: 1.1.4
+        imagePullPolicy: IfNotPresent
+        command: ["gpu-operator"]
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: OPERATOR_NAME
+          value: "gpu-operator"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        readinessProbe:
+          exec:
+            command: ["stat", "/tmp/operator-sdk-ready"]
+          initialDelaySeconds: 4
+          periodSeconds: 10
+          failureThreshold: 1
+        ports:
+        - containerPort: 60000
+          name: metrics

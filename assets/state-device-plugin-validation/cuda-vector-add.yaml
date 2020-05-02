@@ -10,8 +10,6 @@ spec:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-  serviceAccount: nvidia-device-plugin
-  serviceAccountName: nvidia-device-plugin
   readOnlyRootFilesystem: true
   restartPolicy: OnFailure
   containers:
