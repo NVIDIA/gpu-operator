@@ -11,13 +11,14 @@ import (
 	"github.com/NVIDIA/gpu-operator/pkg/controller"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
+	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/ready"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var log = logf.Log.WithName("cmd")
@@ -36,11 +37,15 @@ func printVersion() {
 func main() {
 	flag.Parse()
 
+	// Use a zap logr.Logger implementation. If none of the zap
+	// flags are configured (or if the zap flag set is not being
+	// used), this defaults to a production zap logger.
+	//
 	// The logger instantiated here can be changed to any logger
 	// implementing the logr.Logger interface. This logger will
 	// be propagated through the whole operator, generating
 	// uniform and structured logs.
-	logf.SetLogger(logf.ZapLogger(false))
+	logf.SetLogger(zap.Logger())
 
 	printVersion()
 
