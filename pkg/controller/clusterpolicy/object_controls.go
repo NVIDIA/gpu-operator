@@ -216,10 +216,12 @@ func kernelFullVersion(n ClusterPolicyController) (string, string) {
 
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector("feature.node.kubernetes.io/pci-10de.present=true")
+	opts := []client.ListOption{
+		client.MatchingLabels{"feature.node.kubernetes.io/pci-10de.present": "true"},
+	}
+
 	list := &corev1.NodeList{}
-	err := n.rec.client.List(context.TODO(), opts, list)
+	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
 		return "", ""
@@ -376,11 +378,13 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 
 func isDaemonSetReady(name string, n ClusterPolicyController) ResourceStatus {
 
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector(fmt.Sprintf("app=%s", name))
+	opts := []client.ListOption{
+		client.MatchingLabels{"app": name},
+	}
+
 	log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.client.List(context.TODO(), opts, list)
+	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		log.Info("Could not get DaemonSetList", err)
 	}
@@ -437,11 +441,13 @@ func DaemonSet(n ClusterPolicyController) (ResourceStatus, error) {
 // the operator waits until the Pod completes and checks the error status
 // to advance to the next state.
 func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) ResourceStatus {
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector(fmt.Sprintf("app=%s", name))
+	opts := []client.ListOption{
+		client.MatchingLabels{"app": name},
+	}
+
 	log.Info("DEBUG: Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
-	err := n.rec.client.List(context.TODO(), opts, list)
+	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		log.Info("Could not get PodList", err)
 	}
