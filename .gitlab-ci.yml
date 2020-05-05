@@ -7,7 +7,7 @@ variables:
 # Ensure the @OPERATOR_VERSION@ is rewritten before any action is taken
 default:
   before_script:
-    - if [ -z "${CI_COMMIT_TAG}" ]; then SUBCHART_DIR="nightly" ; NIGHTLY_OPTIONS="-d ${SUBCHART_DIR}" ; fi
+    - if [ -z "${CI_COMMIT_TAG}" ]; then SUBCHART_DIR="nightly" ; else SUBCHART_DIR="stable"; fi
     - CI_COMMIT_TAG=${CI_COMMIT_TAG:-"${NIGHTLY}"}
     - echo "${CI_COMMIT_TAG}" | grep -qe '^[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^+]\+\)\?\(+.*\)\?$' # check that tag follows SemVer 2.0 form
 
@@ -85,14 +85,13 @@ release-github:
     - docker push "${DOCKERHUB}:${CI_COMMIT_TAG}"
 
     # Package helm chart
-    - if [ -n "${SUBCHART_DIR}" ]; then mkdir -p "${SUBCHART_DIR}" ; fi
+    - mkdir -p "${SUBCHART_DIR}"
     - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
-    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" ${NIGHTLY_OPTIONS} deployments/gpu-operator
+    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" -d "${SUBCHART_DIR}" deployments/gpu-operator
 
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
-    - helm repo index . --url https://nvidia.github.io/gpu-operator
-    - if [ -n "${SUBCHART_DIR}" ]; then helm repo index ${SUBCHART_DIR} --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR} ; fi
+    - helm repo index ${SUBCHART_DIR} --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR}
     - git add $(find . ${SUBCHART_DIR} -maxdepth 1 -name "*.tgz" -o -name index.yaml)
     - git commit -m "Release version ${CI_COMMIT_TAG}"
 
