@@ -60,6 +60,7 @@ e2e_tests:
 include:
   project: nvidia/container-infrastructure/aws-kube-ci
   file: aws-kube-ci.yml
+  ref: 20.05.05
 
 release-github:
   image: docker:stable
