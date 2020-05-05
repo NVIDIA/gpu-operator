@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-operator
-  namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}
