@@ -8,7 +8,7 @@ metadata:
     {{ $.Release.labels }}
 spec:
   operator:
-    defaultRuntime: docker
+    defaultRuntime: "{{ .Values.operator.defaultRuntime }}"
   driver:
     repository: "{{ .Values.driver.repository }}"
     image: "{{ .Values.driver.image }}"
