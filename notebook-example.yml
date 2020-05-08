@@ -25,7 +25,7 @@ spec:
     fsGroup: 0
   containers:
   - name: tf-notebook
-    image: gcr.io/kubeflow/tensorflow-notebook-gpu:latest
+    image: tensorflow/tensorflow:latest-gpu-jupyter
     resources:
       limits:
         nvidia.com/gpu: 1
