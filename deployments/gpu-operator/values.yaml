@@ -66,14 +66,14 @@ driver:
 toolkit:
   repository: nvidia
   image: container-toolkit
-  version: 1.0.0-beta.0
+  version: 1.0.2
 
 devicePlugin:
   repository: nvidia
   image: k8s-device-plugin
-  version: 1.0.0-beta4
+  version: 1.0.0-beta6
 
 dcgmExporter:
   repository: nvidia
   image: dcgm-exporter
-  version: 1.7.2-2.0.0-rc.5-ubuntu18.04
+  version: 1.7.2-2.0.0-rc.9-ubuntu18.04
