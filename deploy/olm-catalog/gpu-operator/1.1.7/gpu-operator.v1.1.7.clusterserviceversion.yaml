@@ -1,0 +1,252 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[{"apiVersion":"nvidia.com/v1","kind":"ClusterPolicy","metadata":{"name":"nvidia-gpu"},"spec":{"size":1},"status":{"state":"N/A"}}]'
+    capabilities: Basic Install
+    categories: AI/Machine Learning, OpenShift Optional
+    certified: "false"
+    containerImage: nvidia/gpu-operator:1.1.7
+    createdAt: "2019-02-27T00:21:25Z"
+    description: Automate the management and monitoring of NVIDIA GPUs.
+    provider: NVIDIA
+    repository: http://github.com/NVIDIA/gpu-operator
+    support: NVIDIA
+  generation: 1
+  name: gpu-operator-certified.v1.1.7
+  selfLink: /apis/operators.coreos.com/v1alpha1/namespaces/gpu-operator-resources/clusterserviceversions/gpu-operator-certified.v1.1.7
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Cluster policy resource
+      displayName: ClusterPolicy
+      kind: ClusterPolicy
+      name: clusterpolicies.nvidia.com
+      version: v1
+    required:
+    - description: Discovers special resources and labels the nodes with the PCI vendor
+        ID.
+      displayName: Node Feature Discovery
+      kind: NodeFeatureDiscovery
+      name: nodefeaturediscoveries.nfd.openshift.io
+      version: v1alpha1
+  description: >
+    Kubernetes provides access to special hardware resources such as NVIDIA
+    GPUs, NICs, Infiniband adapters and other devices through the [device plugin
+    framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/).
+    However, configuring and managing nodes with these hardware resources
+    requires configuration of multiple software components such as drivers,
+    container runtimes or other libraries which are difficult and prone to
+    errors.
+    The NVIDIA GPU Operator uses the [operator
+    framework](https://coreos.com/blog/introducing-operator-framework) within
+    Kubernetes to automate the management of all NVIDIA software components
+    needed to provision and monitor GPUs.
+    These components include the NVIDIA drivers (to enable CUDA), Kubernetes
+    device plugin for GPUs, the NVIDIA Container Runtime, automatic node
+    labelling and NVIDIA DCGM exporter.
+    Visit the official site of the [GPU
+    Operator](https://github.com/NVIDIA/gpu-operator) for more information.
+    For getting started with using the GPU Operator with OpenShift, see the
+    instructions
+    [here](https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html).
+
+  displayName: NVIDIA GPU Operator
+  icon:
+  - base64data: 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
+    mediatype: image/png
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          - securitycontextconstraints/finalizers
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - '*'
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - get
+          - watch
+          - list
+        serviceAccountName: gpu-operator
+      deployments:
+      - name: gpu-operator
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              name: gpu-operator
+          strategy: {}
+          template:
+            metadata:
+              creationTimestamp: null
+              labels:
+                name: gpu-operator
+            spec:
+              containers:
+              - command:
+                - gpu-operator
+                env:
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: OPERATOR_NAME
+                  value: gpu-operator
+                - name: NVIDIA_DCGM_EXPORTER
+                  value: nvidia/dcgm-exporter:1.7.2-2.0.0-rc.9-ubi8
+                - name: NVIDIA_DEVICE_PLUGIN
+                  value: nvidia/k8s-device-plugin:1.0.0-beta6-ubi8
+                - name: NVIDIA_DRIVER
+                  value: nvidia/driver:440.64.00
+                - name: NVIDIA_TOOLKIT
+                  value: nvidia/container-toolkit:1.0.2-ubi8
+                - name: NVIDIA_TOOLKIT_DEFAULT_RUNTIME
+                  value: crio
+                - name: KUBE_UNSUPPORTED_FLAVOR
+                  value: ""
+                image: nvidia/gpu-operator:1.1.7
+                imagePullPolicy: Always
+                name: gpu-operator
+                resources: {}
+              serviceAccountName: gpu-operator
+      permissions:
+      - rules:
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - configmaplists
+          - secrets
+          - serviceaccounts
+          - nodes
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - scheduling.k8s.io
+          resources:
+          - priorityclasses
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+        serviceAccountName: gpu-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - gpu
+  - cuda
+  - compute
+  - operator
+  - deep learning
+  - monitoring
+  - tesla
+  links:
+  - name: GPU Operator home
+    url: https://github.com/NVIDIA/gpu-operator
+  - name: Support
+    url: https://github.com/NVIDIA/gpu-operator/issues/new
+  - name: OpenShift on GPU Install Guide
+    url: https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html
+  - name: Docker Repository
+    url: https://hub.docker.com/u/nvidia
+  maintainers:
+  - name: NVIDIA
+  maturity: alpha
+  provider:
+    name: NVIDIA Corporation
+  version: 1.1.7
