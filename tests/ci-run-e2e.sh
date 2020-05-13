@@ -6,6 +6,8 @@ IMAGE="$1"
 TAG="$2"
 LOG_DIR="/tmp/logs"
 
+export DEBIAN_FRONTEND=noninteractive
+
 echo "Create log dir ${LOG_DIR}"
 mkdir -p "${LOG_DIR}"
 
