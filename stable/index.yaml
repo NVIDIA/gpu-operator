@@ -2,8 +2,24 @@ apiVersion: v1
 entries:
   gpu-operator:
   - apiVersion: v2
+    appVersion: 1.1.7
+    created: "2020-05-14T00:57:56.803358341Z"
+    dependencies:
+    - condition: nfd.enabled
+      name: node-feature-discovery
+      repository: ""
+      version: 0.1.0
+    description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
+    digest: d67294e0fff3c92f987bfbe1ad0f4f784be3c8f6a94802730f910fffa35ef9f3
+    home: https://github.com/NVIDIA/gpu-operator
+    kubeVersion: '>= 1.13.0-0'
+    name: gpu-operator
+    urls:
+    - https://nvidia.github.io/gpu-operator/stable/gpu-operator-1.1.7.tgz
+    version: 1.1.7
+  - apiVersion: v2
     appVersion: 1.1.6
-    created: "2020-05-05T08:15:59.864016826Z"
+    created: "2020-05-14T00:57:56.800840162Z"
     dependencies:
     - condition: nfd.enabled
       name: node-feature-discovery
@@ -19,7 +35,7 @@ entries:
     version: 1.1.6
   - apiVersion: v2
     appVersion: 1.1.5
-    created: "2020-05-05T08:15:59.862246445Z"
+    created: "2020-05-14T00:57:56.799381483Z"
     dependencies:
     - condition: nfd.enabled
       name: node-feature-discovery
@@ -35,7 +51,7 @@ entries:
     version: 1.1.5
   - apiVersion: v2
     appVersion: 1.1.4
-    created: "2020-05-05T08:15:59.860448687Z"
+    created: "2020-05-14T00:57:56.798015022Z"
     dependencies:
     - condition: nfd.enabled
       name: node-feature-discovery
@@ -51,7 +67,7 @@ entries:
     version: 1.1.4
   - apiVersion: v2
     appVersion: 1.1.0
-    created: "2020-05-05T08:15:59.858617775Z"
+    created: "2020-05-14T00:57:56.795411482Z"
     dependencies:
     - condition: nfd.enabled
       name: node-feature-discovery
@@ -67,11 +83,11 @@ entries:
     version: 1.1.0
   - apiVersion: v1
     appVersion: 1.0.0
-    created: "2020-05-05T08:15:59.856777625Z"
+    created: "2020-05-14T00:57:56.793385286Z"
     description: A Helm chart for Kubernetes
     digest: 44704de699c019778ecf2a4ec521739373328bfba690d54b3826e31d0b4d66fd
     name: gpu-operator
     urls:
     - https://nvidia.github.io/gpu-operator/stable/gpu-operator-1.0.0.tgz
     version: 1.0.0
-generated: "2020-05-05T08:15:59.855333645Z"
+generated: "2020-05-14T00:57:56.791829319Z"
