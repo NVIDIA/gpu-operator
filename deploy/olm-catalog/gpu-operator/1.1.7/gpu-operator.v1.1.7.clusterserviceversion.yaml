@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: '[{"apiVersion":"nvidia.com/v1","kind":"ClusterPolicy","metadata":{"name":"nvidia-gpu"},"spec":{"size":1},"status":{"state":"N/A"}}]'
+    alm-examples: '[{"apiVersion":"nvidia.com/v1","kind":"ClusterPolicy","metadata":{"name":"cluster-policy"},"spec":{"dcgmExporter":{"image":"dcgm-exporter","repository":"nvidia","version":"1.7.2-2.0.0-rc.9-ubi8"},"devicePlugin":{"image":"k8s-device-plugin","repository":"nvidia","version":"1.0.0-beta6-ubi8"},"driver":{"image":"driver","repository":"nvidia","version":"440.64.00"},"operator":{"defaultRuntime":"crio"},"toolkit":{"image":"container-toolkit","repository":"nvidia","version":"1.0.2-ubi8"}}}]'
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "false"
@@ -83,6 +83,14 @@ spec:
           - ""
           resources:
           - secrets
+          verbs:
+          - get
+          - watch
+          - list
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
           verbs:
           - get
           - watch
