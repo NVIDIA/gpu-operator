@@ -27,6 +27,7 @@ The GPU Operator is not a good fit for scenarios when special OS images are alre
   - Ubuntu 18.04.z LTS
     - Note that the GA has been validated with the 4.15 LTS kernel. When using the HWE kernel (e.g. v5.3), there are additional prerequisites before deploying the operator.
   - Red Hat Enterprise Linux CoreOS (RHCOS) for use with OpenShift
+  - CentOS 7 & 8 (HVM only, PV not supported)
 - The GPU operator has been validated with the following NVIDIA components:
   - NVIDIA Container Toolkit 1.0.5
   - NVIDIA Kubernetes Device Plugin 1.0.0-beta4
@@ -51,10 +52,24 @@ $ helm install --devel --set nfd.enabled=false nvidia/gpu-operator --wait --gene
 $ echo -e "KUBELET_EXTRA_ARGS=--feature-gates=KubeletPodResources=true" | sudo tee /etc/default/kubelet
 ```
 
+#### CentOS 7 /w Kubernetes repo
+
+```sh
+$ cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+```
+
 ### Red Hat OpenShift 4
 For installing the GPU Operator on clusters with Red Hat OpenShift 4.1, 4.2 and 4.3 using RHCOS worker nodes, follow this [guide](https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html).
 
-### Ubuntu 18.04 LTS
+### Kubernetes (Ubuntu 18.04 LTS, CentOS 7 & CentOS 8)
 
 #### Install Helm
 ```sh
