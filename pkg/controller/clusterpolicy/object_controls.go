@@ -237,7 +237,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	img := fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	if osTag != "rhel" && osTag != "centos" {
+	if osTag != "rhel" {
 		return nil
 	}
 
@@ -284,7 +284,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	if osTag != "rhel" && osTag != "centos" {
+	if osTag != "rhel" {
 		return nil
 	}
 
