@@ -123,7 +123,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 			return reconcile.Result{RequeueAfter: time.Second * 5}, err
 		}
 
-		if stat == "NotReady" {
+		if stat == gpuv1.NotReady {
 			// If the resource is not ready, wait 5 secs and reconcile
 			log.Info("ClusterPolicy step wasn't ready", "State:", stat)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
