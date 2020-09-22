@@ -116,7 +116,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		errr := r.client.Status().Update(context.TODO(), instance)
 		if errr != nil {
 			log.Error(errr, "Failed to update ClusterPolicy status")
-			return reconcile.Result{RequeueAfter: time.Second * 5}, err
+			return reconcile.Result{RequeueAfter: time.Second * 5}, errr
 		}
 
 		if err != nil {
