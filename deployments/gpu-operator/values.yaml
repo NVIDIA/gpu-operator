@@ -58,6 +58,9 @@ operator:
                 operator: In
                 values: [""]
 
+  logging:
+    timeEncoding: epoch
+
 driver:
   repository: nvidia
   image: driver

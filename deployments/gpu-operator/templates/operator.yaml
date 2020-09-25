@@ -31,6 +31,8 @@ spec:
         {{- end }}
         imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
+        args:
+        - "--zap-time-encoding={{ .Values.operator.logging.timeEncoding }}"
         env:
         - name: WATCH_NAMESPACE
           value: ""
