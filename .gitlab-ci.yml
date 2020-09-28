@@ -85,14 +85,20 @@ release-github:
     - docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" "$DOCKERHUB:$CI_COMMIT_TAG"
     - docker push "${DOCKERHUB}:${CI_COMMIT_TAG}"
 
-    # Package helm chart
+    # Package helm chart into temporary directory
     - mkdir -p "${SUBCHART_DIR}"
+    - rm -rf new-chart && mkdir new-chart
     - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
-    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" -d "${SUBCHART_DIR}" deployments/gpu-operator
+    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" -d new-chart deployments/gpu-operator
 
+    # Generate new index for the chart repo merging with existing one
     - git checkout .
     - git fetch origin gh-pages && git checkout gh-pages
-    - helm repo index ${SUBCHART_DIR} --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR}
+    - helm repo index new-chart --merge ${SUBCHART_DIR}/index.yaml --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR}
+
+    # Update final chart directory, index and commit
+    - mv new-chart/*.tgz ${SUBCHART_DIR}
+    - mv new-chart/index.yaml ${SUBCHART_DIR}
     - git add $(find . ${SUBCHART_DIR} -maxdepth 1 -name "*.tgz" -o -name index.yaml)
     - git commit -m "Release version ${CI_COMMIT_TAG}"
 
