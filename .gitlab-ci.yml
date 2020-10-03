@@ -56,11 +56,20 @@ e2e_tests:
     when: always
     paths:
       - logs/
-
 include:
   project: nvidia/container-infrastructure/aws-kube-ci
   file: aws-kube-ci.yml
-  ref: 20.05.05
+  ref: 20.10.03
+
+aws_kube_setup:
+  extends: .aws_kube_setup
+  except:
+    - schedules
+
+aws_kube_clean:
+  extends: .aws_kube_clean
+  except:
+    - schedules
 
 release-github:
   image: docker:stable
