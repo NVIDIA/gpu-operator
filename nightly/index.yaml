@@ -145,4 +145,20 @@ entries:
     urls:
     - https://nvidia.github.io/gpu-operator/nightly/gpu-operator-1.0.0-nightly-2b42f747.tgz
     version: 1.0.0-nightly-2b42f747
-generated: "2020-08-06T17:42:28.875188447Z"
+  - apiVersion: v2
+    appVersion: 1.0.0-nightly-1b475886
+    created: "2020-10-05T23:24:05.556395204Z"
+    dependencies:
+    - condition: nfd.enabled
+      name: node-feature-discovery
+      repository: ""
+      version: 0.1.0
+    description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
+    digest: e5beccd5a31939c4b9e42f5c23ccbd5abf9f19de123855ff3a29d14d98b28512
+    home: https://github.com/NVIDIA/gpu-operator
+    kubeVersion: '>= 1.13.0-0'
+    name: gpu-operator
+    urls:
+    - https://nvidia.github.io/gpu-operator/nightly/gpu-operator-1.0.0-nightly-1b475886.tgz
+    version: 1.0.0-nightly-1b475886
+generated: "2020-10-05T23:24:05.553292268Z"
