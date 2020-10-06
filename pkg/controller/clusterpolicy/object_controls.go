@@ -1,9 +1,12 @@
 package clusterpolicy
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -148,7 +151,7 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func kernelFullVersion(n ClusterPolicyController) (string, string) {
+func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := []client.ListOption{
@@ -159,14 +162,14 @@ func kernelFullVersion(n ClusterPolicyController) (string, string) {
 	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
-		return "", ""
+		return "", "", ""
 	}
 
 	if len(list.Items) == 0 {
 		// none of the nodes matched a pci-10de label
 		// either the nodes do not have GPUs, or NFD is not running
 		logger.Info("Could not get any nodes to match pci-0302_10de.present=true label", "ERROR", "")
-		return "", ""
+		return "", "", ""
 	}
 
 	// Assuming all nodes are running the same kernel version,
@@ -175,27 +178,26 @@ func kernelFullVersion(n ClusterPolicyController) (string, string) {
 	labels := node.GetLabels()
 
 	var ok bool
-	kernelFullVersion, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
+	kvers, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
 	if ok {
-		logger.Info(kernelFullVersion)
+		logger.Info(kvers)
 	} else {
 		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
 			"feature.node.kubernetes.io/kernel-version.full")
 		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", err)
-		return "", ""
+		return "", "", ""
 	}
 
 	osName, ok := labels["feature.node.kubernetes.io/system-os_release.ID"]
 	if !ok {
-		return kernelFullVersion, ""
+		return kvers, "", ""
 	}
 	osVersion, ok := labels["feature.node.kubernetes.io/system-os_release.VERSION_ID"]
 	if !ok {
-		return kernelFullVersion, ""
+		return kvers, "", ""
 	}
-	osTag := fmt.Sprintf("%s%s", osName, osVersion)
 
-	return kernelFullVersion, osTag
+	return kvers, osName, osVersion
 }
 
 func getDcgmExporter() string {
@@ -228,31 +230,91 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	}
 }
 
-func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	kvers, osTag := kernelFullVersion(n)
-	if osTag == "" {
-		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
+// Read and parse os-release file
+func parseOSRelease() (map[string]string, error) {
+	release := map[string]string{}
+
+	f, err := os.Open("/host-etc/os-release")
+	if err != nil {
+		return nil, err
 	}
 
-	img := fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
+	re := regexp.MustCompile(`^(?P<key>\w+)=(?P<value>.+)`)
+
+	// Read line-by-line
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
+		if m := re.FindStringSubmatch(line); m != nil {
+			release[m[1]] = strings.Trim(m[2], `"`)
+		}
+	}
+
+	return release, nil
+}
+
+func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	kvers, osName, osVer := kernelFullVersion(n)
+	if kvers == "" {
+		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osName)
+	}
+
+	img := fmt.Sprintf("%s-%s%s", config.Driver.ImagePath(), osName, osVer)
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	if osTag != "rhel" {
-		return nil
+	// Inject EUS kernel RPM's as an override to the entrypoint
+	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
+	release, err := parseOSRelease()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
 	}
+	rhel_version := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
+	ocp_version := corev1.EnvVar{Name: "VERSION_ID", Value: osVer}
 
-	entitlementPath := "/etc/pki/entitlements"
-	if _, err := os.Stat(entitlementPath); os.IsNotExist(err) {
-		log.Info(fmt.Sprintf("ERROR: Could not find RedHat entitlement on current node at path %s", entitlementPath))
-		os.Exit(1)
-	}
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhel_version)
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocp_version)
+	// Overlay volume
+	//	volName, overlayPath := "overlay", "/tmp/overlay"
+	//	volMount := corev1.VolumeMount{
+	//		Name:      volName,
+	//		ReadOnly:  true,
+	//		MountPath: overlayPath,
+	//	}
+	//	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
+	//
+	//	vol := corev1.Volume{
+	//		Name: volName,
+	//		VolumeSource: corev1.VolumeSource{
+	//			HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/containers/storage/overlay"}},
+	//	}
+	//	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
 
-	volName, volSecretName := "openshift-entitlements", "entitlement"
-	volMount := corev1.VolumeMount{Name: volName, ReadOnly: true, MountPath: entitlementPath}
-	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
-
-	vol := corev1.Volume{Name: volName, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: volSecretName}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
+	// EUS entrypoint script
+	//	volName, entrypointPath, configMapName := "entrypoint", "/bin/entrypoint.sh", "nvidia-driver"
+	//	configMapMode := int32(0700)
+	//	volMount = corev1.VolumeMount{
+	//		Name:      volName,
+	//		ReadOnly:  true,
+	//		MountPath: entrypointPath,
+	//		SubPath:   "entrypoint.sh",
+	//	}
+	//	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
+	//
+	//	volSourceCm := corev1.VolumeSource{
+	//		ConfigMap: &corev1.ConfigMapVolumeSource{
+	//			LocalObjectReference: corev1.LocalObjectReference{Name: configMapName},
+	//			Items: []corev1.KeyToPath{
+	//				corev1.KeyToPath{Key: "entrypoint.sh", Path: "entrypoint.sh"}},
+	//			DefaultMode: &configMapMode,
+	//		}}
+	//	volEUS := corev1.Volume{
+	//		Name:         volName,
+	//		VolumeSource: volSourceCm,
+	//	}
+	//	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volEUS)
+	//
+	// Use the injected entrypoint script
+	//	obj.Spec.Template.Spec.Containers[0].Command = []string{"/bin/entrypoint.sh"}
 
 	return nil
 }
@@ -279,7 +341,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	obj.Spec.Template.Spec.Containers[0].Image = config.DCGMExporter.ImagePath()
 
-	kvers, osTag := kernelFullVersion(n)
+	kvers, osTag, _ := kernelFullVersion(n)
 	if osTag == "" {
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}

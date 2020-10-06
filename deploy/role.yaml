@@ -48,7 +48,7 @@ rules:
 - apiGroups:
   - apps
   resourceNames:
-  - app-operator
+  - gpu-operator
   resources:
   - deployments/finalizers
   verbs:
