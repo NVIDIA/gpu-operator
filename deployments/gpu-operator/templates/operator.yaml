@@ -22,6 +22,11 @@ spec:
       serviceAccountName: gpu-operator
       # readOnlyRootFilesystem: true
 
+      volumes:
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
+
       containers:
       - name: gpu-operator
         {{- if .Values.operator.tag}}
@@ -45,6 +50,11 @@ spec:
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
+
+        volumeMounts:
+          - name: host-os-release
+            mountPath: "/host-etc/os-release"
+            readOnly: true
 
           initialDelaySeconds: 4
           periodSeconds: 10
