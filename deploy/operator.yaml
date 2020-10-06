@@ -19,7 +19,7 @@ spec:
       serviceAccountName: gpu-operator
       containers:
       - name: gpu-operator
-        image: quay.io/eduardoarango/gpu-operator:eus
+        image: nvidia/gpu-operator:1.1.4
         imagePullPolicy: Always
         command: ["gpu-operator"]
         env:

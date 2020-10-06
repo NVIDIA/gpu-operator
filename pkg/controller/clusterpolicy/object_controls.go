@@ -273,48 +273,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhel_version)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocp_version)
-	// Overlay volume
-	//	volName, overlayPath := "overlay", "/tmp/overlay"
-	//	volMount := corev1.VolumeMount{
-	//		Name:      volName,
-	//		ReadOnly:  true,
-	//		MountPath: overlayPath,
-	//	}
-	//	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
-	//
-	//	vol := corev1.Volume{
-	//		Name: volName,
-	//		VolumeSource: corev1.VolumeSource{
-	//			HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/containers/storage/overlay"}},
-	//	}
-	//	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
-
-	// EUS entrypoint script
-	//	volName, entrypointPath, configMapName := "entrypoint", "/bin/entrypoint.sh", "nvidia-driver"
-	//	configMapMode := int32(0700)
-	//	volMount = corev1.VolumeMount{
-	//		Name:      volName,
-	//		ReadOnly:  true,
-	//		MountPath: entrypointPath,
-	//		SubPath:   "entrypoint.sh",
-	//	}
-	//	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
-	//
-	//	volSourceCm := corev1.VolumeSource{
-	//		ConfigMap: &corev1.ConfigMapVolumeSource{
-	//			LocalObjectReference: corev1.LocalObjectReference{Name: configMapName},
-	//			Items: []corev1.KeyToPath{
-	//				corev1.KeyToPath{Key: "entrypoint.sh", Path: "entrypoint.sh"}},
-	//			DefaultMode: &configMapMode,
-	//		}}
-	//	volEUS := corev1.Volume{
-	//		Name:         volName,
-	//		VolumeSource: volSourceCm,
-	//	}
-	//	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volEUS)
-	//
-	// Use the injected entrypoint script
-	//	obj.Spec.Template.Spec.Containers[0].Command = []string{"/bin/entrypoint.sh"}
 
 	return nil
 }
