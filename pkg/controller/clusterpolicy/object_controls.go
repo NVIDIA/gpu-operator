@@ -152,7 +152,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string) {
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := []client.ListOption{
-		client.MatchingLabels{"feature.node.kubernetes.io/pci-10de.present": "true"},
+		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
 	}
 
 	list := &corev1.NodeList{}
@@ -163,9 +163,9 @@ func kernelFullVersion(n ClusterPolicyController) (string, string) {
 	}
 
 	if len(list.Items) == 0 {
-		// none of the nodes matched a pci-10de label
+		// none of the nodes matched nvidia GPU label
 		// either the nodes do not have GPUs, or NFD is not running
-		logger.Info("Could not get any nodes to match pci-0302_10de.present=true label", "ERROR", "")
+		logger.Info("Could not get any nodes to match nvidia.com/gpu.present label", "ERROR", "")
 		return "", ""
 	}
 

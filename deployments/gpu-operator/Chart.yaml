@@ -8,5 +8,5 @@ home: https://github.com/NVIDIA/gpu-operator
 
 dependencies:
   - name: node-feature-discovery
-    version: 0.1.0
+    version: 0.2.0
     condition: nfd.enabled
