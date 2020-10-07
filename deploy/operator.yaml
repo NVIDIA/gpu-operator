@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gpu-operator
+  name: app-operator
   labels:
     app.kubernetes.io/component: "gpu-operator"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: gpu-operator
+      name: app-operator
       app.kubernetes.io/component: "gpu-operator"
   template:
     metadata:
       labels:
-        name: gpu-operator
+        name: app-operator
         app.kubernetes.io/component: "gpu-operator"
     spec:
-      serviceAccountName: gpu-operator
+      serviceAccountName: app-operator
       containers:
-      - name: gpu-operator
-        image: nvidia/gpu-operator:1.1.4
-        imagePullPolicy: Always
+      - name: app-operator
+        image: nvidia/gpu-operator: 1.1.4
+        imagePullPolicy: IfNotPresent
         command: ["gpu-operator"]
         env:
         - name: WATCH_NAMESPACE
@@ -31,14 +31,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        volumeMounts:
-          - name: host-os-release
-            mountPath: "/host-etc/os-release"
-            readOnly: true
-      volumes:
-        - name: host-os-release
-          hostPath:
-            path: "/etc/os-release"
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
