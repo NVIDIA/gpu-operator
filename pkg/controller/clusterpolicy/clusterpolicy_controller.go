@@ -106,6 +106,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 	err = ctrl.init(r, instance)
 	if err != nil {
+		log.Error(err, "Failed to initialize ClusterPolicy controller")
 		return reconcile.Result{}, err
 	}
 

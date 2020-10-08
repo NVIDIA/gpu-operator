@@ -4,7 +4,7 @@ metadata:
   name: gpu-cluster-policy
 spec:
   operator:
-    defaultRuntime: crio
+    defaultRuntime: docker
   driver:
     image: driver
     repository: nvidia
@@ -12,7 +12,7 @@ spec:
   toolkit:
     image: container-toolkit
     repository: nvidia
-    version: 1.0.2-ubi8
+    version: 1.0.0-beta.0
   devicePlugin:
     image: k8s-device-plugin
     repository: nvidia

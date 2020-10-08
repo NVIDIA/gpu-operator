@@ -1,12 +1,9 @@
 package clusterpolicy
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -151,25 +148,25 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
+func kernelFullVersion(n ClusterPolicyController) (string, string) {
 	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := []client.ListOption{
-		client.MatchingLabels{"feature.node.kubernetes.io/pci-10de.present": "true"},
+		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
 	}
 
 	list := &corev1.NodeList{}
 	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
-		return "", "", ""
+		return "", ""
 	}
 
 	if len(list.Items) == 0 {
-		// none of the nodes matched a pci-10de label
+		// none of the nodes matched nvidia GPU label
 		// either the nodes do not have GPUs, or NFD is not running
-		logger.Info("Could not get any nodes to match pci-0302_10de.present=true label", "ERROR", "")
-		return "", "", ""
+		logger.Info("Could not get any nodes to match nvidia.com/gpu.present label", "ERROR", "")
+		return "", ""
 	}
 
 	// Assuming all nodes are running the same kernel version,
@@ -178,26 +175,27 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	labels := node.GetLabels()
 
 	var ok bool
-	kvers, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
+	kernelFullVersion, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
 	if ok {
-		logger.Info(kvers)
+		logger.Info(kernelFullVersion)
 	} else {
 		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
 			"feature.node.kubernetes.io/kernel-version.full")
 		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", err)
-		return "", "", ""
+		return "", ""
 	}
 
 	osName, ok := labels["feature.node.kubernetes.io/system-os_release.ID"]
 	if !ok {
-		return kvers, "", ""
+		return kernelFullVersion, ""
 	}
 	osVersion, ok := labels["feature.node.kubernetes.io/system-os_release.VERSION_ID"]
 	if !ok {
-		return kvers, "", ""
+		return kernelFullVersion, ""
 	}
+	osTag := fmt.Sprintf("%s%s", osName, osVersion)
 
-	return kvers, osName, osVersion
+	return kernelFullVersion, osTag
 }
 
 func getDcgmExporter() string {
@@ -230,49 +228,31 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	}
 }
 
-// Read and parse os-release file
-func parseOSRelease() (map[string]string, error) {
-	release := map[string]string{}
-
-	f, err := os.Open("/host-etc/os-release")
-	if err != nil {
-		return nil, err
-	}
-
-	re := regexp.MustCompile(`^(?P<key>\w+)=(?P<value>.+)`)
-
-	// Read line-by-line
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if m := re.FindStringSubmatch(line); m != nil {
-			release[m[1]] = strings.Trim(m[2], `"`)
-		}
-	}
-
-	return release, nil
-}
-
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	kvers, osName, osVer := kernelFullVersion(n)
-	if kvers == "" {
-		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osName)
+	kvers, osTag := kernelFullVersion(n)
+	if osTag == "" {
+		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	img := fmt.Sprintf("%s-%s%s", config.Driver.ImagePath(), osName, osVer)
+	img := fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	// Inject EUS kernel RPM's as an override to the entrypoint
-	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
-	release, err := parseOSRelease()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	if osTag != "rhel" {
+		return nil
 	}
-	rhel_version := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-	ocp_version := corev1.EnvVar{Name: "VERSION_ID", Value: osVer}
 
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhel_version)
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocp_version)
+	entitlementPath := "/etc/pki/entitlements"
+	if _, err := os.Stat(entitlementPath); os.IsNotExist(err) {
+		log.Info(fmt.Sprintf("ERROR: Could not find RedHat entitlement on current node at path %s", entitlementPath))
+		os.Exit(1)
+	}
+
+	volName, volSecretName := "openshift-entitlements", "entitlement"
+	volMount := corev1.VolumeMount{Name: volName, ReadOnly: true, MountPath: entitlementPath}
+	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
+
+	vol := corev1.Volume{Name: volName, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: volSecretName}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
 
 	return nil
 }
@@ -299,7 +279,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	obj.Spec.Template.Spec.Containers[0].Image = config.DCGMExporter.ImagePath()
 
-	kvers, osTag, _ := kernelFullVersion(n)
+	kvers, osTag := kernelFullVersion(n)
 	if osTag == "" {
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
