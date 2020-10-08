@@ -361,7 +361,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+			return isDaemonSetReady(obj.Name, n), nil
 		}
 
 		logger.Info("Couldn't create", "Error", err)
