@@ -72,4 +72,4 @@ spec:
           hostPath:
             path: /etc/containers/oci/hooks.d
       nodeSelector:
-        feature.node.kubernetes.io/pci-10de.present: "true"
+        nvidia.com/gpu.present: "true"
