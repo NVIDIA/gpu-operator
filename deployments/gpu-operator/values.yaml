@@ -67,14 +67,14 @@ driver:
   version: "450.80.02"
 
 toolkit:
-  repository: nvcr.io/nvidia
+  repository: nvcr.io/nvidia/k8s
   image: container-toolkit
   version: 1.3.0-rc.10
 
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: 0.7.0
+  version: v0.7.0
 
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
