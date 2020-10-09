@@ -77,6 +77,6 @@ devicePlugin:
   version: 0.7.0
 
 dcgmExporter:
-  repository: nvcr.io/nvidia
+  repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.0.10-2.1.0-rc.1-ubuntu18.04
+  version: 2.0.10-2.1.0-rc.2-ubuntu20.04
