@@ -62,21 +62,21 @@ operator:
     timeEncoding: epoch
 
 driver:
-  repository: nvidia
+  repository: nvcr.io/nvidia
   image: driver
-  version: "440.64.00"
+  version: "450.80.02"
 
 toolkit:
-  repository: nvidia
+  repository: nvcr.io/nvidia
   image: container-toolkit
-  version: 1.0.2
+  version: 1.3.0-rc.10
 
 devicePlugin:
-  repository: nvidia
+  repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: 1.0.0-beta6
+  version: 0.7.0
 
 dcgmExporter:
-  repository: nvidia
+  repository: nvcr.io/nvidia
   image: dcgm-exporter
-  version: 1.7.2-2.0.0-rc.9-ubuntu18.04
+  version: 2.0.10-2.1.0-rc.1-ubuntu18.04
