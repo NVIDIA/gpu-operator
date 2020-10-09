@@ -17,4 +17,4 @@ spec:
       securityContext:
         allowPrivilegeEscalation: false
   nodeSelector:
-    feature.node.kubernetes.io/pci-10de.present: "true"
+    nvidia.com/gpu.present: "true"

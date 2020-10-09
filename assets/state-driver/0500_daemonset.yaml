@@ -28,6 +28,8 @@ spec:
       serviceAccount: nvidia-driver
       serviceAccountName: nvidia-driver
       hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always

@@ -37,6 +37,5 @@ spec:
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
-
       nodeSelector:
         nvidia.com/gpu.present: "true"
