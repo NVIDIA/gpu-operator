@@ -69,7 +69,7 @@ driver:
 toolkit:
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: 1.3.0-rc.10
+  version: 1.3.0
 
 devicePlugin:
   repository: nvcr.io/nvidia
