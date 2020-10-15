@@ -1,5 +1,4 @@
 {{- if .Values.platform.openshift }}
-
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
@@ -12,7 +11,6 @@ metadata:
       allocated to the namespace.  This SCC is more restrictive than the default
       restritive SCC and it is used by default for authenticated users and operators and operands.
   name: restricted-readonly
-
 allowHostDirVolumePlugin: false
 allowHostIPC: false
 allowHostNetwork: false
@@ -40,7 +38,7 @@ seLinuxContext:
 supplementalGroups:
   type: RunAsAny
 users: 
-- system:serviceaccount:gpu-operator:gpu-operator
+- system:serviceaccount:{{ $.Release.Namespace }}:gpu-operator
 volumes:
 - configMap
 - downwardAPI

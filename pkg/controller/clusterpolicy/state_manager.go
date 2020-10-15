@@ -162,7 +162,10 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	addState(n, "/opt/gpu-operator/state-device-plugin")
 	addState(n, "/opt/gpu-operator/state-device-plugin-validation")
 	addState(n, "/opt/gpu-operator/state-monitoring")
-
+	// if requested, deploy GFD to utilitize Multi-Instance GPU's.
+	if i.Spec.Operator.DeployGFD {
+		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+	}
 	return nil
 }
 

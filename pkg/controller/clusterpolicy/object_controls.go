@@ -213,6 +213,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
+		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -228,6 +229,60 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	}
 }
 
+// TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
+func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
+	obj.Spec.Template.Spec.Containers[0].Image = config.GroupFeatureDiscovery.ImagePath()
+
+	// update image pull policy
+	if config.GroupFeatureDiscovery.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.GroupFeatureDiscovery.ImagePolicy(config.GroupFeatureDiscovery.ImagePullPolicy)
+	}
+
+	// set node selector if specified
+	if len(config.GroupFeatureDiscovery.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.GroupFeatureDiscovery.NodeSelector
+	}
+
+	// set node affinity if specified
+	if config.GroupFeatureDiscovery.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.GroupFeatureDiscovery.Affinity
+	}
+
+	// set tolerations if specified
+	if len(config.GroupFeatureDiscovery.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.GroupFeatureDiscovery.Tolerations
+	}
+
+	// set resource limits
+	if config.GroupFeatureDiscovery.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.GroupFeatureDiscovery.Resources
+		}
+	}
+
+	// update MIG strategy and discovery intervals
+	var migStrategy gpuv1.MigStrategy = gpuv1.MigStrategyNone
+	if config.GroupFeatureDiscovery.MigStrategy != "" {
+		migStrategy = config.GroupFeatureDiscovery.MigStrategy
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_MIG_STRATEGY", fmt.Sprintf("%s", migStrategy))
+	if migStrategy != gpuv1.MigStrategyNone {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "NVIDIA_MIG_MONITOR_DEVICES", "all")
+	}
+
+	// update discovery interval
+	discoveryIntervalSeconds := 60
+	if config.GroupFeatureDiscovery.DiscoveryIntervalSeconds != 0 {
+		discoveryIntervalSeconds = config.GroupFeatureDiscovery.DiscoveryIntervalSeconds
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_SLEEP_INTERVAL", fmt.Sprintf("%ds", discoveryIntervalSeconds))
+
+	return nil
+}
+
+// TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	kvers, osTag := kernelFullVersion(n)
 	if osTag == "" {
@@ -254,9 +309,34 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	vol := corev1.Volume{Name: volName, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: volSecretName}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vol)
 
+	// update image pull policy
+	if config.Driver.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Driver.ImagePolicy(config.Driver.ImagePullPolicy)
+	}
+	// set node selector if specified
+	if len(config.Driver.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.Driver.NodeSelector
+	}
+	// set node affinity if specified
+	if config.Driver.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.Driver.Affinity
+	}
+	// set tolerations if specified
+	if len(config.Driver.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Driver.Tolerations
+	}
+	// set resource limits
+	if config.Driver.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
+		}
+	}
+
 	return nil
 }
 
+// TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	obj.Spec.Template.Spec.Containers[0].Image = config.Toolkit.ImagePath()
 	runtime := string(config.Operator.DefaultRuntime)
@@ -267,17 +347,91 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			"--socket /var/run/docker.sock")
 	}
 
+	// update image pull policy
+	if config.Toolkit.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Toolkit.ImagePolicy(config.Toolkit.ImagePullPolicy)
+	}
+	// set node selector if specified
+	if len(config.Toolkit.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.Toolkit.NodeSelector
+	}
+	// set node affinity if specified
+	if config.Toolkit.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.Toolkit.Affinity
+	}
+	// set tolerations if specified
+	if len(config.Toolkit.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Toolkit.Tolerations
+	}
+	// set resource limits
+	if config.Toolkit.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.Toolkit.Resources
+		}
+	}
+
 	return nil
 }
 
+// TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.DevicePlugin.ImagePath()
-
+	// update image pull policy
+	if config.DevicePlugin.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DevicePlugin.ImagePolicy(config.DevicePlugin.ImagePullPolicy)
+	}
+	// set node selector if specified
+	if len(config.DevicePlugin.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.DevicePlugin.NodeSelector
+	}
+	// set node affinity if specified
+	if config.DevicePlugin.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.DevicePlugin.Affinity
+	}
+	// set tolerations if specified
+	if len(config.DevicePlugin.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.DevicePlugin.Tolerations
+	}
+	// set resource limits
+	if config.DevicePlugin.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.DevicePlugin.Resources
+		}
+	}
 	return nil
 }
 
+// TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.DCGMExporter.ImagePath()
+
+	// update image pull policy
+	if config.DCGMExporter.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DevicePlugin.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
+	}
+	// set node selector if specified
+	if len(config.DCGMExporter.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.DCGMExporter.NodeSelector
+	}
+	// set node affinity if specified
+	if config.DCGMExporter.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.DCGMExporter.Affinity
+	}
+	// set tolerations if specified
+	if len(config.DCGMExporter.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.DCGMExporter.Tolerations
+	}
+	// set resource limits
+	if config.DCGMExporter.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.DCGMExporter.Resources
+		}
+	}
 
 	kvers, osTag := kernelFullVersion(n)
 	if osTag == "" {
@@ -288,6 +442,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return nil
 	}
 
+	// update init container config
 	initContainerImage, initContainerName, initContainerCmd := "ubuntu:18.04", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
 	obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
 	obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
@@ -322,6 +477,31 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
+func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
+	opts := []client.ListOption{
+		client.MatchingLabels{"app": name},
+	}
+	log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
+	list := &appsv1.DeploymentList{}
+	err := n.rec.client.List(context.TODO(), list, opts...)
+	if err != nil {
+		log.Info("Could not get DaemonSetList", err)
+	}
+	log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
+	if len(list.Items) == 0 {
+		return gpuv1.NotReady
+	}
+
+	ds := list.Items[0]
+	log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.UnavailableReplicas)
+
+	if ds.Status.UnavailableReplicas != 0 {
+		return gpuv1.NotReady
+	}
+
+	return isPodReady(name, n, "Running")
+}
+
 func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
@@ -345,6 +525,29 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	}
 
 	return isPodReady(name, n, "Running")
+}
+
+func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
+	state := n.idx
+	obj := n.resources[state].Deployment.DeepCopy()
+
+	logger := log.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
+		if errors.IsAlreadyExists(err) {
+			logger.Info("Found Resource")
+			return isDeploymentReady(obj.Name, n), nil
+		}
+
+		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	return isDeploymentReady(obj.Name, n), nil
 }
 
 func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gpu-feature-discovery
+  namespace: gpu-operator-resources
+  labels:
+    app: gpu-feature-discovery
+    app.kubernetes.io/version: 0.2.0
+    app.kubernetes.io/part-of: nvidia-gpu
+spec:
+  selector:
+    matchLabels:
+      app: gpu-feature-discovery
+      app.kubernetes.io/part-of: nvidia-gpu
+  template:
+    metadata:
+      labels:
+        app: gpu-feature-discovery
+        app.kubernetes.io/version: 0.2.0
+        app.kubernetes.io/part-of: nvidia-gpu
+    spec:
+      serviceAccount: nvidia-gpu-feature-discovery
+      containers:
+        - image: nvidia/gpu-feature-discovery:v0.2.0
+          name: gpu-feature-discovery
+          volumeMounts:
+            - name: output-dir
+              mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
+            - name: dmi-product-name
+              mountPath: "/sys/class/dmi/id/product_name"
+          env:
+            - name: GFD_SLEEP_INTERVAL
+              value: 60s
+            - name: GFD_MIG_STRATEGY
+              value: none
+          securityContext:
+            privileged: true
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      volumes:
+        - name: output-dir
+          hostPath:
+            path: "/etc/kubernetes/node-feature-discovery/features.d"
+        - name: dmi-product-name
+          hostPath:
+            path: "/sys/class/dmi/id/product_name"
