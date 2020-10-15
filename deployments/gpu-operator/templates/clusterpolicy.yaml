@@ -2,26 +2,192 @@ apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
-  namespace: {{ $.Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
+    {{ .Release.labels }}
 spec:
   operator:
-    defaultRuntime: "{{ .Values.operator.defaultRuntime }}"
+    deployGFD: {{ .Values.operator.deployGFD }}
+    {{- if .Values.operator.defaultRuntime }}
+    defaultRuntime: {{ .Values.operator.defaultRuntime }}
+    {{- end }}
+    {{- if .Values.operator.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.operator.imagePullSecrets | nindent 6 }}
+    {{- end }}
   driver:
-    repository: "{{ .Values.driver.repository }}"
-    image: "{{ .Values.driver.image }}"
-    version: "{{ .Values.driver.version }}"
+    {{- if .Values.driver.repository }}
+    repository: {{ .Values.driver.repository }}
+    {{- end }}
+    {{- if .Values.driver.image }}
+    image: {{ .Values.driver.image }}
+    {{- end }}
+    {{- if .Values.driver.version }}
+    version: {{ .Values.driver.version }}
+    {{- end }}
+    {{- if .Values.driver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.driver.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.driver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.driver.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.tolerations }}
+    tolerations: {{ toYaml .Values.driver.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.driver.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.affinity }}
+    affinity: {{ toYaml .Values.driver.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.driver.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.securityContext }}
+    securityContext: {{ toYaml .Values.driver.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.resources }}
+    resources: {{ toYaml .Values.driver.resources | nindent 6 }}
+    {{- end }}
   toolkit:
-    repository: "{{ .Values.toolkit.repository }}"
-    image: "{{ .Values.toolkit.image }}"
-    version: "{{ .Values.toolkit.version }}"
+    {{- if .Values.toolkit.repository }}
+    repository: {{ .Values.toolkit.repository }}
+    {{- end }}
+    {{- if .Values.toolkit.image }}
+    image: {{ .Values.toolkit.image }}
+    {{- end }}
+    {{- if .Values.toolkit.version }}
+    version: {{ .Values.toolkit.version }}
+    {{- end }}
+    {{- if .Values.toolkit.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.toolkit.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.toolkit.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.toolkit.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.tolerations }}
+    tolerations: {{ toYaml .Values.toolkit.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.toolkit.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.affinity }}
+    affinity: {{ toYaml .Values.toolkit.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.toolkit.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.securityContext }}
+    securityContext: {{ toYaml .Values.toolkit.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.resources }}
+    resources: {{ toYaml .Values.toolkit.resources | nindent 6 }}
+    {{- end }}
   devicePlugin:
-    repository: "{{ .Values.devicePlugin.repository }}"
-    image: "{{ .Values.devicePlugin.image }}"
-    version: "{{ .Values.devicePlugin.version }}"
+    {{- if .Values.devicePlugin.repository }}
+    repository: {{ .Values.devicePlugin.repository }}
+    {{- end }}
+    {{- if .Values.devicePlugin.image }}
+    image: {{ .Values.devicePlugin.image }}
+    {{- end }}
+    {{- if .Values.devicePlugin.version }}
+    version: {{ .Values.devicePlugin.version }}
+    {{- end }}
+    {{- if .Values.devicePlugin.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.devicePlugin.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.devicePlugin.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.devicePlugin.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.tolerations }}
+    tolerations: {{ toYaml .Values.devicePlugin.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.devicePlugin.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.affinity }}
+    affinity: {{ toYaml .Values.devicePlugin.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.devicePlugin.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.securityContext }}
+    securityContext: {{ toYaml .Values.devicePlugin.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.resources }}
+    resources: {{ toYaml .Values.devicePlugin.resources | nindent 6 }}
+    {{- end }}
   dcgmExporter:
-    repository: "{{ .Values.dcgmExporter.repository }}"
-    image: "{{ .Values.dcgmExporter.image }}"
-    version: "{{ .Values.dcgmExporter.version }}"
+    {{- if .Values.dcgmExporter.repository }}
+    repository: {{ .Values.dcgmExporter.repository }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.image }}
+    image: {{ .Values.dcgmExporter.image }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.version }}
+    version: {{ .Values.dcgmExporter.version }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.dcgmExporter.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.dcgmExporter.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.tolerations }}
+    tolerations: {{ toYaml .Values.dcgmExporter.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.dcgmExporter.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.affinity }}
+    affinity: {{ toYaml .Values.dcgmExporter.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.dcgmExporter.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.securityContext }}
+    securityContext: {{ toYaml .Values.dcgmExporter.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.resources }}
+    resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
+    {{- end }}
+  gfd:
+    {{- if .Values.gfd.repository }}
+    repository: {{ .Values.gfd.repository }}
+    {{- end }}
+    {{- if .Values.gfd.image }}
+    image: {{ .Values.gfd.image }}
+    {{- end }}
+    {{- if .Values.gfd.version }}
+    version: {{ .Values.gfd.version }}
+    {{- end }}
+    {{- if .Values.gfd.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.gfd.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.gfd.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.gfd.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.tolerations }}
+    tolerations: {{ toYaml .Values.gfd.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.gfd.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.affinity }}
+    affinity: {{ toYaml .Values.gfd.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.gfd.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.securityContext }}
+    securityContext: {{ toYaml .Values.gfd.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.resources }}
+    resources: {{ toYaml .Values.gfd.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.migStrategy }}
+    migStrategy: {{ .Values.gfd.migStrategy }}
+    {{- end }}
+    {{- if .Values.gfd.discoveryIntervalSeconds }}
+    discoveryIntervalSeconds: {{ .Values.gfd.discoveryIntervalSeconds }}
+    {{- end }}

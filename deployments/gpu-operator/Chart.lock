@@ -1,0 +1,6 @@
+dependencies:
+- name: node-feature-discovery
+  repository: https://k8s-at-home.com/charts/
+  version: 2.0.0
+digest: sha256:5315df92eca650944f6e7f910b439b9052f30b731ccb8eb56f4c5ad63c35554a
+generated: "2020-10-14T16:14:16.601207-07:00"

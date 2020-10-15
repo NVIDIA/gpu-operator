@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -31,6 +32,7 @@ type Resources struct {
 	ClusterRoleBinding         rbacv1.ClusterRoleBinding
 	ConfigMap                  corev1.ConfigMap
 	DaemonSet                  appsv1.DaemonSet
+	Deployment                 appsv1.Deployment
 	Pod                        corev1.Pod
 	Service                    corev1.Service
 	ServiceMonitor             promv1.ServiceMonitor
@@ -60,6 +62,7 @@ func getAssetsFrom(path, openshiftVersion string) []assetsFromFile {
 	if err != nil {
 		panic(err)
 	}
+	sort.Strings(files)
 	for _, file := range files {
 		if strings.Contains(file, "openshift") && openshiftVersion == "" {
 			continue
@@ -121,6 +124,10 @@ func addResourcesControls(path, openshiftVersion string) (Resources, controlFunc
 			_, _, err := s.Decode(m, nil, &res.DaemonSet)
 			panicIfError(err)
 			ctrl = append(ctrl, DaemonSet)
+		case "Deployment":
+			_, _, err := s.Decode(m, nil, &res.Deployment)
+			panicIfError(err)
+			ctrl = append(ctrl, Deployment)
 		case "Service":
 			_, _, err := s.Decode(m, nil, &res.Service)
 			panicIfError(err)

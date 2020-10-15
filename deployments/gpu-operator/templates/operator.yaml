@@ -20,12 +20,16 @@ spec:
         {{- toYaml .Values.operator.annotations | nindent 8 }}
     spec:
       serviceAccountName: gpu-operator
-      # readOnlyRootFilesystem: true
-
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.operator.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
       containers:
       - name: gpu-operator
-        {{- if .Values.operator.tag}}
-        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag }}
+        {{- if .Values.operator.version}}
+        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.version }}
         {{- else }}
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Chart.AppVersion }}
         {{- end }}
@@ -51,7 +55,6 @@ spec:
         ports:
         - containerPort: 60000
           name: metrics
-
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
