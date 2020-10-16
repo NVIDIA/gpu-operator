@@ -16,6 +16,10 @@ operator:
   imagePullSecrets: []
   defaultRuntime: docker
   deployGFD: true
+  validator:
+    image: samples
+    repository: nvidia
+    version: cuda10.2-vectorAdd
   tolerations:
   - key: "node-role.kubernetes.io/master"
     operator: "Equal"

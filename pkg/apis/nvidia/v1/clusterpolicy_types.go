@@ -31,8 +31,31 @@ const (
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio
-	DefaultRuntime Runtime `json:"defaultRuntime"`
-	DeployGFD      bool    `json:"deployGFD"`
+	DefaultRuntime Runtime       `json:"defaultRuntime"`
+	DeployGFD      bool          `json:"deployGFD"`
+	Validator      ValidatorSpec `json:"validator,omitempty"`
+}
+
+type ValidatorSpec struct {
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.\-\/]+
+	Repository string `json:"repository,omitempty"`
+
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.-]+
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 }
 
 // Note these regex are obviously not handling well edge cases.
@@ -58,7 +81,7 @@ type ComponentSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
-	ImagePullSecrets []string `json:"imagePullSecrets"`
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// Node selector to control the selection of nodes (optional)
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -107,7 +130,7 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
-	ImagePullSecrets []string `json:"imagePullSecrets"`
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// Node selector to control the selection of nodes (optional)
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -220,6 +243,25 @@ func (g *GPUFeatureDiscoverySpec) ImagePath() string {
 }
 
 func (g *GPUFeatureDiscoverySpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
+	var imagePullPolicy corev1.PullPolicy
+	switch pullPolicy {
+	case "Always":
+		imagePullPolicy = corev1.PullAlways
+	case "Never":
+		imagePullPolicy = corev1.PullNever
+	case "IfNotPresent":
+		imagePullPolicy = corev1.PullIfNotPresent
+	default:
+		imagePullPolicy = corev1.PullIfNotPresent
+	}
+	return imagePullPolicy
+}
+
+func (v *ValidatorSpec) ImagePath() string {
+	return v.Repository + "/" + v.Image + ":" + v.Version
+}
+
+func (g *ValidatorSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 	var imagePullPolicy corev1.PullPolicy
 	switch pullPolicy {
 	case "Always":
