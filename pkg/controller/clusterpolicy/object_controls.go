@@ -8,6 +8,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -239,6 +240,13 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.GroupFeatureDiscovery.ImagePolicy(config.GroupFeatureDiscovery.ImagePullPolicy)
 	}
 
+	// set image pull secrets
+	if len(config.GroupFeatureDiscovery.ImagePullSecrets) > 0 {
+		for _, secret := range config.GroupFeatureDiscovery.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
 	// set node selector if specified
 	if len(config.GroupFeatureDiscovery.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.GroupFeatureDiscovery.NodeSelector
@@ -313,6 +321,12 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	if config.Driver.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Driver.ImagePolicy(config.Driver.ImagePullPolicy)
 	}
+	// set image pull secrets
+	if len(config.Driver.ImagePullSecrets) > 0 {
+		for _, secret := range config.Driver.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
 	// set node selector if specified
 	if len(config.Driver.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.Driver.NodeSelector
@@ -351,6 +365,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if config.Toolkit.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Toolkit.ImagePolicy(config.Toolkit.ImagePullPolicy)
 	}
+	// set image pull secrets
+	if len(config.Toolkit.ImagePullSecrets) > 0 {
+		for _, secret := range config.Toolkit.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
 	// set node selector if specified
 	if len(config.Toolkit.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.Toolkit.NodeSelector
@@ -382,6 +402,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if config.DevicePlugin.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DevicePlugin.ImagePolicy(config.DevicePlugin.ImagePullPolicy)
 	}
+	// set image pull secrets
+	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
+		for _, secret := range config.DevicePlugin.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
 	// set node selector if specified
 	if len(config.DevicePlugin.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.DevicePlugin.NodeSelector
@@ -412,6 +438,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update image pull policy
 	if config.DCGMExporter.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DevicePlugin.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
+	}
+	// set image pull secrets
+	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
+		for _, secret := range config.DCGMExporter.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
 	}
 	// set node selector if specified
 	if len(config.DCGMExporter.NodeSelector) > 0 {
@@ -475,6 +507,25 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 
 	log.Info(fmt.Sprintf("Info: Could not find environment variable %s in container %s, appending it", key, c.Name))
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
+}
+
+// TransformValidator transforms driver and device plugin validator pods with required config as per ClusterPolicy
+func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
+	if config.Operator.Validator.Repository != "" {
+		obj.Spec.Containers[0].Image = config.Operator.Validator.ImagePath()
+	}
+	// update image pull policy
+	if config.Operator.Validator.ImagePullPolicy != "" {
+		obj.Spec.Containers[0].ImagePullPolicy = config.Operator.Validator.ImagePolicy(config.Operator.Validator.ImagePullPolicy)
+	}
+	// set image pull secrets
+	if config.Operator.Validator.ImagePullSecrets != nil {
+		for _, secret := range config.Operator.Validator.ImagePullSecrets {
+			obj.Spec.ImagePullSecrets = append(obj.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	return nil
 }
 
 func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
@@ -605,6 +656,8 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
+
+	preProcessPod(obj, n)
 	logger := log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
@@ -614,7 +667,7 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+			return isPodReady(obj.Name, n, "Succeeded"), nil
 		}
 
 		logger.Info("Couldn't create", "Error", err)
@@ -622,6 +675,25 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return isPodReady(obj.Name, n, "Succeeded"), nil
+}
+
+func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
+	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
+		"nvidia-driver-validation":        TransformValidator,
+		"nvidia-device-plugin-validation": TransformValidator,
+	}
+
+	t, ok := transformations[obj.Name]
+	if !ok {
+		log.Info(fmt.Sprintf("No transformation for Pod '%s'", obj.Name))
+		return
+	}
+
+	err := t(obj, &n.singleton.Spec, n)
+	if err != nil {
+		log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
+		os.Exit(1)
+	}
 }
 
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {

@@ -63,7 +63,13 @@ metadata:
             },
             "operator": {
               "defaultRuntime": "docker",
-              "deployGFD": true
+              "deployGFD": true,
+              "validator": {
+                "image": "samples",
+                "repository": "nvidia",
+                "version": "cuda10.2-vectorAdd",
+                "imagePullSecrets": []
+              }
             },
             "toolkit": {
               "affinity": {},
@@ -160,6 +166,16 @@ spec:
         - description: Operator config
           displayName: Operator config
           path: operator
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: operator.validator.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: operator.validator.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
         - description: DCGM Exporter config
           displayName: DCGM Exporter config
           path: dcgmExporter

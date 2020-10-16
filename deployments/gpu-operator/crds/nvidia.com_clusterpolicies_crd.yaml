@@ -3453,7 +3453,7 @@ spec:
                   type: object
                 discoveryIntervalSeconds:
                   description: 'Optional: Discovery Interval for GPU feature discovery
-                    plugin (default: 60)'
+                    plugin'
                   type: integer
                 image:
                   pattern: '[a-zA-Z0-9\-]+'
@@ -3808,6 +3808,26 @@ spec:
                   type: string
                 deployGFD:
                   type: boolean
+                validator:
+                  properties:
+                    image:
+                      pattern: '[a-zA-Z0-9\-]+'
+                      type: string
+                    imagePullPolicy:
+                      description: Image pull policy
+                      type: string
+                    imagePullSecrets:
+                      description: Image pull secrets
+                      items:
+                        type: string
+                      type: array
+                    repository:
+                      pattern: '[a-zA-Z0-9\.\-\/]+'
+                      type: string
+                    version:
+                      pattern: '[a-zA-Z0-9\.-]+'
+                      type: string
+                  type: object
               required:
               - defaultRuntime
               - deployGFD
