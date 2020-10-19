@@ -46,6 +46,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        volumeMounts:
+          - name: host-os-release
+            mountPath: "/host-etc/os-release"
+            readOnly: true
+      volumes:
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
@@ -67,4 +75,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
-

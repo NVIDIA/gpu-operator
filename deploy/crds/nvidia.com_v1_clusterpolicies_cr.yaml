@@ -4,7 +4,7 @@ metadata:
   name: gpu-cluster-policy
 spec:
   operator:
-    defaultRuntime: docker
+    defaultRuntime: crio
     deployGFD: true
   driver:
     repository: nvcr.io/nvidia
