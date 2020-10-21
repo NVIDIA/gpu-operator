@@ -3,6 +3,7 @@ package clusterpolicy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -71,7 +72,12 @@ func OpenshiftVersion() (string, error) {
 			continue
 		}
 
-		return condition.Version, nil
+		ocpV := strings.Split(condition.Version, ".")
+		if len(ocpV) > 1 {
+			return ocpV[0] + "." + ocpV[1], nil
+		} else {
+			return ocpV[0], nil
+		}
 	}
 
 	return "", fmt.Errorf("Failed to find Completed Cluster Version")
