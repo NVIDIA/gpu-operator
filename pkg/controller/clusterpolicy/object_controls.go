@@ -496,16 +496,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	kvers, osTag, _ := kernelFullVersion(n)
-	if osTag == "" {
-		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
-	}
-
-	if !strings.Contains(osTag, "rhel") {
-		return nil
-	}
-
-	// update init container config
+	// update init container config for per pod specific resources
 	initContainerImage, initContainerName, initContainerCmd := "ubuntu:18.04", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
 	initContainer := v1.Container{}
 	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
