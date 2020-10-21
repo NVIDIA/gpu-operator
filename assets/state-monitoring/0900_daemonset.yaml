@@ -35,7 +35,8 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          capabilities:
+            add:
+            - CAP_SYS_ADMIN
       nodeSelector:
         nvidia.com/gpu.present: "true"

@@ -41,7 +41,7 @@ metadata:
               "imagePullSecrets": [],
               "nodeSelector": {},
               "podSecurityContext": {},
-              "repository": "nvcr.io/nvidia",
+              "repository": "nvcr.io/k8s",
               "resources": {},
               "securityContext": {},
               "tolerations": [],
@@ -62,7 +62,7 @@ metadata:
               "version": "v0.2.0"
             },
             "operator": {
-              "defaultRuntime": "docker",
+              "defaultRuntime": "crio",
               "deployGFD": true,
               "validator": {
                 "image": "samples",
@@ -90,12 +90,12 @@ metadata:
     categories: AI/Machine Learning, OpenShift Optional
     certified: "false"
     containerImage: nvidia/gpu-operator:latest
-    createdAt: "Mon Oct  5 10:45:24 PDT 2020"
+    createdAt: "Wed Oct 21 08:16:10 PDT 2020"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator.v1.2.0
+  name: gpu-operator.v1.3.0
   namespace: placeholder
 spec:
   displayName: NVIDIA GPU Operator
@@ -376,6 +376,10 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
+                volumeMounts:
+                  - name: host-os-release
+                    mountPath: "/host-etc/os-release"
+                    readOnly: true
                 image: nvidia/gpu-operator:latest
                 imagePullPolicy: Always
                 name: gpu-operator
@@ -391,6 +395,10 @@ spec:
                   initialDelaySeconds: 4
                   periodSeconds: 10
                 resources: {}
+              volumes:
+                - name: host-os-release
+                  hostPath:
+                    path: "/etc/os-release"
               serviceAccountName: gpu-operator
       clusterPermissions:
         - rules:
@@ -575,7 +583,7 @@ spec:
   - tesla
   maintainers:
   - name: NVIDIA
-  maturity: alpha
+  maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.2.0
+  version: 1.3.0

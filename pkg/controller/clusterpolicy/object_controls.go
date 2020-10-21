@@ -326,24 +326,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	img := fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	// Inject EUS kernel RPM's as an override to the entrypoint
-	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
-	release, err := parseOSRelease()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
-	}
-
-	ocpV, err := OpenshiftVersion()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get OpenShift version: %s", err)
-	}
-
-	rhel_version := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-	ocp_version := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
-
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhel_version)
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocp_version)
-
 	// update image pull policy
 	if config.Driver.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Driver.ImagePolicy(config.Driver.ImagePullPolicy)
@@ -373,6 +355,28 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
 		}
 	}
+
+	// Inject EUS kernel RPM's as an override to the entrypoint
+	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
+	if !strings.Contains(osTag, "rhel") {
+		return nil
+	}
+
+	release, err := parseOSRelease()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	}
+
+	ocpV, err := OpenshiftVersion()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get OpenShift version: %s", err)
+	}
+
+	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
+	ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
+
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhelVersion)
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocpVersion)
 
 	return nil
 }
@@ -497,15 +501,17 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	if osTag != "rhel" {
+	if !strings.Contains(osTag, "rhel") {
 		return nil
 	}
 
 	// update init container config
 	initContainerImage, initContainerName, initContainerCmd := "ubuntu:18.04", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+	initContainer := v1.Container{}
+	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
 	obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
 	obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
-	obj.Spec.Template.Spec.InitContainers[0].Command[0] = initContainerCmd
+	obj.Spec.Template.Spec.InitContainers[0].Command = []string{initContainerCmd}
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
 	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
@@ -518,6 +524,9 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
 	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
+
+	podResourcesVolume := corev1.Volume{Name: volMountSockName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/kubelet/pod-resources"}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, podResourcesVolume)
 
 	return nil
 }
