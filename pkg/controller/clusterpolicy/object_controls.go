@@ -318,7 +318,7 @@ func parseOSRelease() (map[string]string, error) {
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	kvers, osTag, osVer := kernelFullVersion(n)
+	kvers, osTag, _ := kernelFullVersion(n)
 	if kvers == "" {
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
@@ -333,8 +333,13 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
 	}
 
+	ocpV, err := OpenshiftVersion()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get OpenShift version: %s", err)
+	}
+
 	rhel_version := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-	ocp_version := corev1.EnvVar{Name: "VERSION_ID", Value: osVer}
+	ocp_version := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
 
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhel_version)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocp_version)
