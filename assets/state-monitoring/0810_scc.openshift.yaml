@@ -7,8 +7,8 @@ allowHostIPC: false
 allowHostNetwork: false
 allowHostPID: false
 allowHostPorts: false
-allowPrivilegeEscalation: false
-allowPrivilegedContainer: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
 allowedCapabilities:
 - '*'
 allowedUnsafeSysctls:

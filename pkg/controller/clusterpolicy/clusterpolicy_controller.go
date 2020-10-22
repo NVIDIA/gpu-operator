@@ -111,22 +111,29 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	for {
-		stat, err := ctrl.step()
+		status, statusError := ctrl.step()
 		// Update the CR status
-		instance.Status.State = stat
-		errr := r.client.Status().Update(context.TODO(), instance)
-		if errr != nil {
-			log.Error(errr, "Failed to update ClusterPolicy status")
-			return reconcile.Result{RequeueAfter: time.Second * 5}, errr
-		}
-
+		instance = &gpuv1.ClusterPolicy{}
+		err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 		if err != nil {
+			log.Error(err, "Failed to get ClusterPolicy instance for status update")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, err
 		}
+		if instance.Status.State != status {
+			instance.Status.State = status
+			err = r.client.Status().Update(context.TODO(), instance)
+			if err != nil {
+				log.Error(err, "Failed to update ClusterPolicy status")
+				return reconcile.Result{RequeueAfter: time.Second * 5}, err
+			}
+		}
+		if statusError != nil {
+			return reconcile.Result{RequeueAfter: time.Second * 5}, statusError
+		}
 
-		if stat == gpuv1.NotReady {
+		if status == gpuv1.NotReady {
 			// If the resource is not ready, wait 5 secs and reconcile
-			log.Info("ClusterPolicy step wasn't ready", "State:", stat)
+			log.Info("ClusterPolicy step wasn't ready", "State:", status)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 

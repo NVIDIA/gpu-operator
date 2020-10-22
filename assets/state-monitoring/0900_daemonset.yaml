@@ -35,7 +35,6 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          privileged: true
       nodeSelector:
         nvidia.com/gpu.present: "true"

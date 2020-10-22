@@ -6,6 +6,11 @@ spec:
   operator:
     defaultRuntime: crio
     deployGFD: true
+    validator:
+      repository: nvidia
+      image: samples
+      version: "cuda10.2-vectorAdd"
+      imagePullSecrets: []
   driver:
     repository: nvcr.io/nvidia
     image: driver
