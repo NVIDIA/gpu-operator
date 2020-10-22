@@ -1,0 +1,128 @@
+variables:
+  DOCKERHUB: nvidia/gpu-operator
+  NVCRIO: nvcr.io/nvstaging/cloud-native/gpu-operator
+  TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - versioning
+  - lint
+  - build
+  - tests
+  - scan
+  - aws_kube_setup
+  - e2e_tests
+  - aws_kube_clean
+  - release
+
+versioning:
+  stage: versioning
+  image:
+    name: alpine/git
+    entrypoint: ['/usr/bin/env']
+  script:
+    # generate version information, an artifact sourced as a script in other jobs
+    - VERSION="$(git describe --tags --dirty --always)"
+    - echo export VERSION=${VERSION} | tee .VERSION_INFO
+    - echo export LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1)) | tee -a .VERSION_INFO
+    - if [ -z "${CI_COMMIT_TAG}" ]; then echo SUBCHART_DIR="nightly" ; else echo SUBCHART_DIR="stable"; fi | tee -a .VERSION_INFO
+    # check that index is not dirty - to avoid some annoying to debug CI failures
+    - "git diff-index --quiet HEAD -- || ( echo ERROR: Unstaged files or dirty index ; exit 1 )"
+    # check version data and that it follows SemVer 2.0 format
+    - echo "${VERSION}" | grep -qe '^[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^+]\+\)\?\(+.*\)\?$'
+  artifacts:
+    paths:
+      - .VERSION_INFO
+
+helm-lint:
+  stage: lint
+  allow_failure: true
+  image:
+    name: alpine/git
+    entrypoint: ['/usr/bin/env']
+  before_script:
+    - apk add --update curl openssl bash git openssh make
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+  script:
+    - helm lint deployments/gpu-operator/
+
+go-lint:
+  stage: lint
+  allow_failure: true
+  image: golang:1.13
+  services:
+    - docker:stable-dind
+  before_script:
+    - mkdir -p ${GOPATH}/src/github.com/NVIDIA/
+    - ln -s ${CI_PROJECT_DIR} ${GOPATH}/src/github.com/NVIDIA/gpu-feature-discovery
+  script:
+    - go get -u golang.org/x/lint/golint
+    - golint -set_exit_status github.com/NVIDIA/gpu-feature-discovery
+
+go-fmt:
+  stage: lint
+  allow_failure: true
+  image: golang:1.13
+  services:
+    - docker:stable-dind
+  script:
+    - res=$(gofmt -l pkg/ cmd/)
+    - echo "$res"
+    - test -z "$res"
+
+ineffassign:
+  stage: lint
+  allow_failure: true
+  image: golang:1.13
+  script:
+    - go get -u github.com/gordonklaus/ineffassign
+    - ineffassign *.go
+
+misspell:
+  stage: lint
+  allow_failure: true
+  image: golang:1.13
+  script:
+    - go get -u github.com/client9/misspell/cmd/misspell
+    - misspell *.go
+
+build-image:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  script:
+    - source .VERSION_INFO
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - apk add --update make
+
+    - make prod-image IMAGE=$CI_REGISTRY_IMAGE TAG=$VERSION
+    - docker push "$CI_REGISTRY_IMAGE:$VERSION"
+
+unit-tests:
+  stage: tests
+  image: docker:stable
+  services:
+    - docker:stable-dind
+
+  script:
+    - apk add --update make
+    - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
+    - docker run -t nvidia/gpu-operator:devel make verify
+  dependencies:
+    - build-image
+
+.scan:
+  stage: scan
+  services:
+    - docker:dind
+  image: docker:dind
+  before_script:
+    - source .VERSION_INFO
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - docker pull ${CI_REGISTRY_IMAGE}:${VERSION}
+  script:
+    - 'false'
+  dependencies:
+    - build-image
+    - versioning

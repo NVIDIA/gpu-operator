@@ -1,65 +1,28 @@
-variables:
-  DOCKERHUB: nvidia/gpu-operator
-  NVCRIO: nvcr.io/nvstaging/cloud-native/gpu-operator
-  TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
-  NIGHTLY: "1.0.0-nightly-${CI_COMMIT_SHORT_SHA}"
-
-# Ensure the @OPERATOR_VERSION@ is rewritten before any action is taken
-default:
-  before_script:
-    - if [ -z "${CI_COMMIT_TAG}" ]; then SUBCHART_DIR="nightly" ; else SUBCHART_DIR="stable"; fi
-    - CI_COMMIT_TAG=${CI_COMMIT_TAG:-"${NIGHTLY}"}
-    - echo "${CI_COMMIT_TAG}" | grep -qe '^[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^+]\+\)\?\(+.*\)\?$' # check that tag follows SemVer 2.0 form
-
-stages:
-  - aws_kube_setup
-  - e2e_tests
-  - aws_kube_clean
-
-unit-tests:
-  stage: aws_kube_setup
-  image: docker:stable
-  services:
-    - docker:stable-dind
-
-  script:
-    - apk add --update make
-    - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
-    - docker run -t nvidia/gpu-operator:devel make verify
-
-build-image:
-  stage: aws_kube_setup
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - apk add --update make
-
-    - make prod-image IMAGE=$CI_REGISTRY_IMAGE TAG=$CI_COMMIT_TAG
-    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+include:
+  - local: '.common-ci.yml'
+  - project: nvidia/container-infrastructure/aws-kube-ci
+    file: aws-kube-ci.yml
+    ref: 20.10.03
 
 e2e_tests:
   stage: e2e_tests
   image: alpine
   script:
+    - source .VERSION_INFO
     - source aws-kube-ci/hostname
     - apk add --no-cache openssh-client rsync
     - rsync -e "ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no" -av --exclude="vendor/" "${CI_PROJECT_DIR}" "${instance_hostname}:~/"
     - rc=0
-    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${CI_COMMIT_TAG}") || rc=$?
+    - (ssh -i aws-kube-ci/key -o StrictHostKeyChecking=no ${instance_hostname} "cd ~/gpu-operator/tests && ./ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${VERSION}") || rc=$?
     - rsync -e "ssh -i aws-kube-ci/key" -av "${instance_hostname}:/tmp/logs/" logs
     - exit $rc
   dependencies:
     - aws_kube_setup
+    - versioning
   artifacts:
     when: always
     paths:
       - logs/
-include:
-  project: nvidia/container-infrastructure/aws-kube-ci
-  file: aws-kube-ci.yml
-  ref: 20.10.03
 
 aws_kube_setup:
   extends: .aws_kube_setup
@@ -70,50 +33,3 @@ aws_kube_clean:
   extends: .aws_kube_clean
   except:
     - schedules
-
-release-github:
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  stage: aws_kube_clean # Should be after each successful commit
-  variables:
-    GIT_STRATEGY: clone
-  only:
-    - master
-    - tags
-  script:
-    - apk add --update curl openssl bash git openssh make
-    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-    - mkdir ~/.ssh && echo "$PRIVATE_SSH_KEY" &> ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa
-    - git config --global user.email "rgaubert@nvidia.com"
-    - git config --global user.name "Renaud Gaubert"
-
-    # Push Container to Dockerhub
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}"
-    - docker pull "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    - docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" "$DOCKERHUB:$CI_COMMIT_TAG"
-    - docker push "${DOCKERHUB}:${CI_COMMIT_TAG}"
-
-    # Package helm chart into temporary directory
-    - mkdir -p "${SUBCHART_DIR}"
-    - rm -rf new-chart && mkdir new-chart
-    - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
-    - helm package --version "${CI_COMMIT_TAG}" --app-version "${CI_COMMIT_TAG}" -d new-chart deployments/gpu-operator
-
-    # Generate new index for the chart repo merging with existing one
-    - git checkout .
-    - git fetch origin gh-pages && git checkout gh-pages
-    - helm repo index new-chart --merge ${SUBCHART_DIR}/index.yaml --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR}
-
-    # Update final chart directory, index and commit
-    - mv new-chart/*.tgz ${SUBCHART_DIR}
-    - mv new-chart/index.yaml ${SUBCHART_DIR}
-    - git add $(find . ${SUBCHART_DIR} -maxdepth 1 -name "*.tgz" -o -name index.yaml)
-    - git commit -m "Release version ${CI_COMMIT_TAG}"
-
-    # CI_REPOSITORY_URL=https://gitlab-ci-token:xxxxxxxxxxxxxxxxxxxx@example.com/gitlab-examples/ci-debug-trace.git
-    # should be git@example.com:/gitlab-examples/ci-debug-trace.git
-    - PUSH_REPO=$(echo "${CI_REPOSITORY_URL}" | sed -e "s|.*@\(.*\)|git@\1|" -e "s|/|:/|" )
-    - git remote set-url --push origin "${PUSH_REPO}"
-    - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
-    - git push origin gh-pages
