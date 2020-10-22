@@ -1,0 +1,106 @@
+default:
+  tags:
+    - type/docker
+    - docker/privileged
+    - cnt
+    - container-dev
+    - os/linux
+
+include:
+  - local: '.common-ci.yml'
+
+contamer:
+  extends: .scan
+  script:
+    - apk add --no-cache bash findutils libmagic curl make git
+    - apk add --no-cache python3 python3-dev py3-pip py3-wheel
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/sectooling/scanning/contamer.git
+    - cd contamer
+    - pip3 install -r requirements.txt
+    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${CI_PROJECT_NAME}:${VERSION}
+    - python3 contamer.py -ls --fail-on-non-os -- ${CI_PROJECT_NAME}:${VERSION}
+
+release:ngc:
+  stage: release
+  image: docker:dind
+  services:
+    - docker:dind
+  script:
+    - source .VERSION_INFO
+    - docker login -u ${NGC_REGISTRY_USER} -p ${NGC_REGISTRY_TOKEN}
+    - docker pull ${CI_REGISTRY_IMAGE}:${VERSION}
+    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:${VERSION}
+    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:latest
+    - docker push ${NGC_PROD_IMAGE}:${VERSION}
+    - docker push ${NGC_PROD_IMAGE}:latest
+  dependencies:
+    - build-image
+    - versioning
+  only:
+    - tags
+    - /^\d+\.\d+\.\d+$/
+
+release:dockerhub:
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  stage: release
+  variables:
+    GIT_STRATEGY: clone
+  only:
+    - master
+    - tags
+  script:
+    # Push Container to Dockerhub
+    - source .VERSION_INFO
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}"
+    - docker pull "$CI_REGISTRY_IMAGE:$VERSION"
+    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:$VERSION"
+    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:latest"
+    - docker push "${DOCKERHUB}:${VERSION}"
+    - docker push "${DOCKERHUB}:latest"
+  dependencies:
+    - versioning
+
+release:helm:
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  stage: release
+  variables:
+    GIT_STRATEGY: clone
+  only:
+    - master
+    - tags
+  script:
+    - source .VERSION_INFO
+    - apk add --update curl openssl bash git openssh make
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+    - mkdir ~/.ssh && echo "$PRIVATE_SSH_KEY" &> ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa
+    - git config --global user.email "container-dev@nvidia.com"
+    - git config --global user.name "Cloud Native (build automation)"
+
+    # Package helm chart into temporary directory
+    - mkdir -p "${SUBCHART_DIR}"
+    - rm -rf new-chart && mkdir new-chart
+    - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
+    - helm package --version "${VERSION}" --app-version "${VERSION}" -d new_chart deployments/gpu-operator
+
+    # Generate new index for the chart repo merging with existing one
+    - git checkout .
+    - git fetch origin gh-pages && git checkout gh-pages
+    - helm repo index new-chart --merge ${SUBCHART_DIR}/index.yaml --url https://nvidia.github.io/gpu-operator/${SUBCHART_DIR}
+
+    # copy into final chart and create commit
+    - mv new-chart/*.tgz new-chart/index.yaml ${SUBCHART_DIR}
+    - git add $(find . ${SUBCHART_DIR} -maxdepth 1 -name "*.tgz" -o -name index.yaml)
+    - git commit -m "Release version ${VERSION}"
+
+    # CI_REPOSITORY_URL=https://gitlab-ci-token:xxxxxxxxxxxxxxxxxxxx@example.com/gitlab-examples/ci-debug-trace.git
+    # should be git@example.com:/gitlab-examples/ci-debug-trace.git
+    - PUSH_REPO=$(echo "${CI_REPOSITORY_URL}" | sed -e "s|.*@\(.*\)|git@\1|" -e "s|/|:/|" )
+    - git remote set-url --push origin "${PUSH_REPO}"
+    - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+    - git push origin gh-pages
+  dependencies:
+    - versioning
