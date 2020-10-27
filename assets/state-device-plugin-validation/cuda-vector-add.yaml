@@ -14,7 +14,7 @@ spec:
   restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
-      image: "nvidia/samples:cuda10.2-vectorAdd"
+      image: "nvidia/samples:vectoradd-cuda10.2"
       securityContext:
         allowPrivilegeEscalation: false
       resources:

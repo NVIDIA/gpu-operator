@@ -358,7 +358,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	// Inject EUS kernel RPM's as an override to the entrypoint
 	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
-	if !strings.Contains(osTag, "rhel") {
+	if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
 		return nil
 	}
 
@@ -496,13 +496,29 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
+	kvers, osTag, _ := kernelFullVersion(n)
+	if kvers == "" {
+		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
+	}
+
+	if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
+		return nil
+	}
+
 	// update init container config for per pod specific resources
-	initContainerImage, initContainerName, initContainerCmd := "ubuntu:18.04", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+	initContainerImage, initContainerName, initContainerCmd := "ubi8/ubi-minimal:8.2-349", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
 	initContainer := v1.Container{}
 	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
 	obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
 	obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
 	obj.Spec.Template.Spec.InitContainers[0].Command = []string{initContainerCmd}
+
+	// need CAP_SYS_ADMIN privileges for collecting pod specific resources
+	privileged := true
+	securityContext := &corev1.SecurityContext{
+		Privileged: &privileged,
+	}
+	obj.Spec.Template.Spec.InitContainers[0].SecurityContext = securityContext
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
 	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}

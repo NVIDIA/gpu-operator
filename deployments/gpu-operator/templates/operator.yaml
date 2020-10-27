@@ -50,10 +50,6 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
-      volumes:
-        - name: host-os-release
-          hostPath:
-            path: "/etc/os-release"
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
@@ -63,6 +59,10 @@ spec:
         ports:
         - containerPort: 60000
           name: metrics
+      volumes:
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
