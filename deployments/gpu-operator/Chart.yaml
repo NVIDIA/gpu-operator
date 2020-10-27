@@ -4,6 +4,7 @@ version: 1.3.0
 kubeVersion: ">= 1.13.0-0"
 description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
 appVersion: "1.3.0"
+icon: https://assets.nvidiagrid.net/ngc/logos/GPUoperator.png
 sources:
 - https://github.com/NVIDIA/gpu-operator
 home: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html

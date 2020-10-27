@@ -9,7 +9,7 @@ spec:
     validator:
       repository: nvidia
       image: samples
-      version: "cuda10.2-vectorAdd"
+      version: "vectoradd-cuda10.2-ubi8"
       imagePullSecrets: []
   driver:
     repository: nvcr.io/nvidia
@@ -23,7 +23,7 @@ spec:
     resources: {}
   toolkit:
     repository: nvcr.io/nvidia/k8s
-    version: 1.3.0
+    version: 1.3.0-ubi8
     image: container-toolkit
     tolerations: []
     nodeSelector: {}
@@ -34,7 +34,7 @@ spec:
   devicePlugin:
     repository: nvcr.io/nvidia
     image: k8s-device-plugin
-    version: v0.7.0
+    version: v0.7.0-ubi8
     tolerations: []
     nodeSelector: {}
     affinity: {}
@@ -44,7 +44,7 @@ spec:
   dcgmExporter:
     repository: nvcr.io/nvidia/k8s
     image: dcgm-exporter
-    version: 2.0.10-2.1.0-rc.2-ubuntu20.04
+    version: 2.0.13-2.1.0-ubi8
     tolerations: []
     nodeSelector: {}
     affinity: {}
@@ -52,9 +52,9 @@ spec:
     securityContext: {}
     resources: {}
   gfd:
-    repository: nvidia
+    repository: nvcr.io/nvidia
     image: gpu-feature-discovery
-    version: v0.2.0
+    version: v0.2.1
     tolerations: []
     nodeSelector: {}
     affinity: {}

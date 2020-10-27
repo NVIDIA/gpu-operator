@@ -19,7 +19,7 @@ spec:
       serviceAccountName: gpu-operator
       containers:
       - name: gpu-operator
-        image: nvidia/gpu-operator:latest
+        image: nvcr.io/nvidia/gpu-operator:1.3.0-rc.1
         imagePullPolicy: Always
         command: ["gpu-operator"]
         env:
@@ -35,10 +35,6 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
-      volumes:
-        - name: host-os-release
-          hostPath:
-            path: "/etc/os-release"
         readinessProbe:
           exec:
             command: ["stat", "/tmp/operator-sdk-ready"]
@@ -48,3 +44,7 @@ spec:
         ports:
         - containerPort: 60000
           name: metrics
+      volumes:
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"

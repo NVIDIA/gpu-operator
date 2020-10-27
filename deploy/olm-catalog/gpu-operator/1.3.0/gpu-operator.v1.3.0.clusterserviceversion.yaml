@@ -21,7 +21,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "2.0.10-2.1.0-rc.2-ubuntu20.04"
+              "version": "2.0.13-2.1.0-ubi8"
             },
             "devicePlugin": {
               "affinity": {},
@@ -33,7 +33,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "v0.7.0"
+              "version": "v0.7.0-ubi8"
             },
             "driver": {
               "affinity": {},
@@ -41,7 +41,7 @@ metadata:
               "imagePullSecrets": [],
               "nodeSelector": {},
               "podSecurityContext": {},
-              "repository": "nvcr.io/k8s",
+              "repository": "nvcr.io/nvidia",
               "resources": {},
               "securityContext": {},
               "tolerations": [],
@@ -54,20 +54,20 @@ metadata:
               "migStrategy": "none",
               "nodeSelector": {},
               "podSecurityContext": {},
-              "repository": "nvidia",
+              "repository": "nvcr.io/nvidia",
               "resources": {},
               "securityContext": {},
               "sleepInterval": "60s",
               "tolerations": [],
-              "version": "v0.2.0"
+              "version": "v0.2.1"
             },
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
               "validator": {
                 "image": "samples",
-                "repository": "nvidia",
-                "version": "cuda10.2-vectorAdd",
+                "repository": "nvcr.io/nvidia",
+                "version": "vectoradd-cuda10.2-ubi8",
                 "imagePullSecrets": []
               }
             },
@@ -81,7 +81,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "1.3.0"
+              "version": "1.3.0-ubi8"
             }
           }
         }
@@ -89,7 +89,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "false"
-    containerImage: nvidia/gpu-operator:latest
+    containerImage: nvcr.io/nvidia/gpu-operator:1.3.0
     createdAt: "Wed Oct 21 08:16:10 PDT 2020"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
@@ -380,7 +380,7 @@ spec:
                   - name: host-os-release
                     mountPath: "/host-etc/os-release"
                     readOnly: true
-                image: nvidia/gpu-operator:latest
+                image: nvcr.io/nvidia/gpu-operator:1.3.0
                 imagePullPolicy: Always
                 name: gpu-operator
                 ports:
@@ -565,13 +565,13 @@ spec:
           serviceAccountName: gpu-operator
     strategy: deployment
   installModes:
-  - supported: true
+  - supported: false
     type: OwnNamespace
-  - supported: true
+  - supported: false
     type: SingleNamespace
-  - supported: false
+  - supported: true
     type: MultiNamespace
-  - supported: false
+  - supported: true
     type: AllNamespaces
   keywords:
   - gpu

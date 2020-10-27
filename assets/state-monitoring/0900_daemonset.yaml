@@ -34,6 +34,9 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
+        args:
+        - "-f"
+        - "/etc/dcgm-exporter/dcp-metrics-included.csv"
         securityContext:
           privileged: true
       nodeSelector:
