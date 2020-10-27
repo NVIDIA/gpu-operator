@@ -7,8 +7,8 @@ spec:
     defaultRuntime: crio
     deployGFD: true
     validator:
-      repository: nvidia
-      image: samples
+      repository: nvcr.io/nvidia/k8s
+      image: cuda-sample
       version: "vectoradd-cuda10.2-ubi8"
       imagePullSecrets: []
   driver:
