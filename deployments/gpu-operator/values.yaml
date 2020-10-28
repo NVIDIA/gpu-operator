@@ -18,8 +18,8 @@ operator:
   defaultRuntime: docker
   deployGFD: true
   validator:
-    image: samples
-    repository: nvcr.io/nvidia
+    image: cuda-sample
+    repository: nvcr.io/nvidia/k8s
     version: vectoradd-cuda10.2
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -114,7 +114,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.2.2
+  version: v0.2.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
