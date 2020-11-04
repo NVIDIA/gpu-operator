@@ -369,7 +369,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	ocpV, err := OpenshiftVersion()
 	if err != nil {
-		return fmt.Errorf("ERROR: failed to get OpenShift version: %s", err)
+		// might be RHEL node using upstream k8s, don't error out.
+		log.Info(fmt.Sprintf("ERROR: failed to get OpenShift version: %s", err))
 	}
 
 	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
