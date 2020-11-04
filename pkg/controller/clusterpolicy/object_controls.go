@@ -369,7 +369,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	ocpV, err := OpenshiftVersion()
 	if err != nil {
-		return fmt.Errorf("ERROR: failed to get OpenShift version: %s", err)
+		// might be RHEL node using upstream k8s, don't error out.
+		log.Info(fmt.Sprintf("ERROR: failed to get OpenShift version: %s", err))
 	}
 
 	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
@@ -518,6 +519,8 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	securityContext := &corev1.SecurityContext{
 		Privileged: &privileged,
 	}
+
+	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
 	obj.Spec.Template.Spec.InitContainers[0].SecurityContext = securityContext
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
@@ -531,9 +534,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
 	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
-
-	podResourcesVolume := corev1.Volume{Name: volMountSockName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/var/lib/kubelet/pod-resources"}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, podResourcesVolume)
 
 	return nil
 }
