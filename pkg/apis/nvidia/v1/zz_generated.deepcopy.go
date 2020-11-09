@@ -78,7 +78,7 @@ func (in *ClusterPolicySpec) DeepCopyInto(out *ClusterPolicySpec) {
 	in.Toolkit.DeepCopyInto(&out.Toolkit)
 	in.DevicePlugin.DeepCopyInto(&out.DevicePlugin)
 	in.DCGMExporter.DeepCopyInto(&out.DCGMExporter)
-	in.GroupFeatureDiscovery.DeepCopyInto(&out.GroupFeatureDiscovery)
+	in.GPUFeatureDiscovery.DeepCopyInto(&out.GPUFeatureDiscovery)
 	return
 }
 
@@ -150,6 +150,18 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		*out = new(corev1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Args != nil {
+		in, out := &in.Args, &out.Args
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -204,6 +216,18 @@ func (in *GPUFeatureDiscoverySpec) DeepCopyInto(out *GPUFeatureDiscoverySpec) {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Args != nil {
+		in, out := &in.Args, &out.Args
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }

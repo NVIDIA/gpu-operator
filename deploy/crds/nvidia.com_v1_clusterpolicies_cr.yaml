@@ -35,6 +35,11 @@ spec:
     repository: nvcr.io/nvidia
     image: k8s-device-plugin
     version: v0.7.0-ubi8
+    args:
+      - "--mig-strategy=none"
+      - "--pass-device-specs=false"
+      - "--fail-on-init-error=true"
+      - "--device-list-strategy=envvar"
     tolerations: []
     nodeSelector: {}
     affinity: {}
@@ -45,6 +50,9 @@ spec:
     repository: nvcr.io/nvidia/k8s
     image: dcgm-exporter
     version: 2.0.13-2.1.0-ubi8
+    args:
+      - "-f"
+      - "/etc/dcgm-exporter/default-counters.csv"
     tolerations: []
     nodeSelector: {}
     affinity: {}
