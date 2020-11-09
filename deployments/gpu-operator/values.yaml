@@ -90,6 +90,12 @@ devicePlugin:
   version: v0.7.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  args:
+    - "--mig-strategy=none"
+    - "--pass-device-specs=false"
+    - "--fail-on-init-error=true"
+    - "--device-list-strategy=envvar"
+  env: []
   tolerations: []
   nodeSelector:
     nvidia.com/gpu.present: "true"
@@ -104,6 +110,10 @@ dcgmExporter:
   image: dcgm-exporter
   version: 2.0.13-2.1.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
+  args:
+    - "-f"
+    - "/etc/dcgm-exporter/default-counters.csv"
+  env: []
   tolerations: []
   nodeSelector: {}
   affinity: {}

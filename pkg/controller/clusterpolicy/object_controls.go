@@ -236,47 +236,59 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
 func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = config.GroupFeatureDiscovery.ImagePath()
+	obj.Spec.Template.Spec.Containers[0].Image = config.GPUFeatureDiscovery.ImagePath()
 
 	// update image pull policy
-	if config.GroupFeatureDiscovery.ImagePullPolicy != "" {
-		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.GroupFeatureDiscovery.ImagePolicy(config.GroupFeatureDiscovery.ImagePullPolicy)
+	if config.GPUFeatureDiscovery.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.GPUFeatureDiscovery.ImagePolicy(config.GPUFeatureDiscovery.ImagePullPolicy)
 	}
 
 	// set image pull secrets
-	if len(config.GroupFeatureDiscovery.ImagePullSecrets) > 0 {
-		for _, secret := range config.GroupFeatureDiscovery.ImagePullSecrets {
+	if len(config.GPUFeatureDiscovery.ImagePullSecrets) > 0 {
+		for _, secret := range config.GPUFeatureDiscovery.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
 
 	// set node selector if specified
-	if len(config.GroupFeatureDiscovery.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.GroupFeatureDiscovery.NodeSelector
+	if len(config.GPUFeatureDiscovery.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.GPUFeatureDiscovery.NodeSelector
 	}
 
 	// set node affinity if specified
-	if config.GroupFeatureDiscovery.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.GroupFeatureDiscovery.Affinity
+	if config.GPUFeatureDiscovery.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.GPUFeatureDiscovery.Affinity
 	}
 
 	// set tolerations if specified
-	if len(config.GroupFeatureDiscovery.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.GroupFeatureDiscovery.Tolerations
+	if len(config.GPUFeatureDiscovery.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.GPUFeatureDiscovery.Tolerations
 	}
 
 	// set resource limits
-	if config.GroupFeatureDiscovery.Resources != nil {
+	if config.GPUFeatureDiscovery.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.GroupFeatureDiscovery.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.GPUFeatureDiscovery.Resources
+		}
+	}
+
+	// set arguments if specified for driver container
+	if len(config.GPUFeatureDiscovery.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.GPUFeatureDiscovery.Args
+	}
+
+	// set/append environment variables for exporter container
+	if len(config.GPUFeatureDiscovery.Env) > 0 {
+		for _, env := range config.GPUFeatureDiscovery.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
 
 	// update MIG strategy and discovery intervals
 	var migStrategy gpuv1.MigStrategy = gpuv1.MigStrategyNone
-	if config.GroupFeatureDiscovery.MigStrategy != "" {
-		migStrategy = config.GroupFeatureDiscovery.MigStrategy
+	if config.GPUFeatureDiscovery.MigStrategy != "" {
+		migStrategy = config.GPUFeatureDiscovery.MigStrategy
 	}
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_MIG_STRATEGY", fmt.Sprintf("%s", migStrategy))
 	if migStrategy != gpuv1.MigStrategyNone {
@@ -285,8 +297,8 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 
 	// update discovery interval
 	discoveryIntervalSeconds := 60
-	if config.GroupFeatureDiscovery.DiscoveryIntervalSeconds != 0 {
-		discoveryIntervalSeconds = config.GroupFeatureDiscovery.DiscoveryIntervalSeconds
+	if config.GPUFeatureDiscovery.DiscoveryIntervalSeconds != 0 {
+		discoveryIntervalSeconds = config.GPUFeatureDiscovery.DiscoveryIntervalSeconds
 	}
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_SLEEP_INTERVAL", fmt.Sprintf("%ds", discoveryIntervalSeconds))
 
@@ -353,6 +365,16 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
+		}
+	}
+	// set arguments if specified for driver container
+	if len(config.Driver.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.Driver.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.Driver.Env) > 0 {
+		for _, env := range config.Driver.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
 
@@ -422,6 +444,16 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Toolkit.Resources
 		}
 	}
+	// set arguments if specified for toolkit container
+	if len(config.Toolkit.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.Toolkit.Args
+	}
+	// set/append environment variables for toolkit container
+	if len(config.Toolkit.Env) > 0 {
+		for _, env := range config.Toolkit.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
 
 	return nil
 }
@@ -459,6 +491,16 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.DevicePlugin.Resources
 		}
 	}
+	// set arguments if specified for device-plugin container
+	if len(config.DevicePlugin.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.DevicePlugin.Args
+	}
+	// set/append environment variables for device-plugin container
+	if len(config.DevicePlugin.Env) > 0 {
+		for _, env := range config.DevicePlugin.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
 	return nil
 }
 
@@ -494,6 +536,16 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.DCGMExporter.Resources
+		}
+	}
+	// set arguments if specified for exporter container
+	if len(config.DCGMExporter.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.DCGMExporter.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.DCGMExporter.Env) > 0 {
+		for _, env := range config.DCGMExporter.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
 

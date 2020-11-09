@@ -13,12 +13,12 @@ import (
 
 // ClusterPolicySpec defines the desired state of ClusterPolicy
 type ClusterPolicySpec struct {
-	Operator              OperatorSpec            `json:"operator"`
-	Driver                ComponentSpec           `json:"driver"`
-	Toolkit               ComponentSpec           `json:"toolkit"`
-	DevicePlugin          ComponentSpec           `json:"devicePlugin"`
-	DCGMExporter          ComponentSpec           `json:"dcgmExporter"`
-	GroupFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
+	Operator            OperatorSpec            `json:"operator"`
+	Driver              ComponentSpec           `json:"driver"`
+	Toolkit             ComponentSpec           `json:"toolkit"`
+	DevicePlugin        ComponentSpec           `json:"devicePlugin"`
+	DCGMExporter        ComponentSpec           `json:"dcgmExporter"`
+	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
 }
 
 type Runtime string
@@ -74,6 +74,9 @@ type ComponentSpec struct {
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// Image pull secrets
@@ -97,7 +100,8 @@ type ComponentSpec struct {
 
 	// Optional: Set Node affinity
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node affinity"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
 	// Optional: Pod Security Context
@@ -106,8 +110,23 @@ type ComponentSpec struct {
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
-	// Optional: Resources
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin
@@ -123,6 +142,9 @@ type GPUFeatureDiscoverySpec struct {
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// Image pull secrets
@@ -147,6 +169,7 @@ type GPUFeatureDiscoverySpec struct {
 	// Optional: Set Node affinity
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node affinity"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
 	// Optional: Pod Security Context
@@ -155,7 +178,10 @@ type GPUFeatureDiscoverySpec struct {
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
-	// Optional: Resources
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: MigStrategy for GPU feature discovery plugin
@@ -164,6 +190,18 @@ type GPUFeatureDiscoverySpec struct {
 
 	// Optional: Discovery Interval for GPU feature discovery plugin
 	DiscoveryIntervalSeconds int `json:"discoveryIntervalSeconds,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 type MigStrategy string

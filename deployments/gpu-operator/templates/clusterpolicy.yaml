@@ -14,9 +14,6 @@ spec:
     {{- end }}
     {{- if .Values.operator.validator }}
     validator:
-      {{- if .Values.operator.imagePullSecrets }}
-      imagePullSecrets: {{ toYaml .Values.operator.imagePullSecrets | nindent 8 }}
-      {{- end }}
       {{- if .Values.operator.validator.repository }}
       repository: {{ .Values.operator.validator.repository }}
       {{- end }}
@@ -67,6 +64,12 @@ spec:
     {{- if .Values.driver.resources }}
     resources: {{ toYaml .Values.driver.resources | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.env }}
+    env: {{ toYaml .Values.driver.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.args }}
+    args: {{ toYaml .Values.driver.args | nindent 6 }}
+    {{- end }}
   toolkit:
     {{- if .Values.toolkit.repository }}
     repository: {{ .Values.toolkit.repository }}
@@ -100,6 +103,12 @@ spec:
     {{- end }}
     {{- if .Values.toolkit.resources }}
     resources: {{ toYaml .Values.toolkit.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.env }}
+    env: {{ toYaml .Values.toolkit.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.args }}
+    args: {{ toYaml .Values.toolkit.args | nindent 6 }}
     {{- end }}
   devicePlugin:
     {{- if .Values.devicePlugin.repository }}
@@ -135,6 +144,12 @@ spec:
     {{- if .Values.devicePlugin.resources }}
     resources: {{ toYaml .Values.devicePlugin.resources | nindent 6 }}
     {{- end }}
+    {{- if .Values.devicePlugin.env }}
+    env: {{ toYaml .Values.devicePlugin.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.args }}
+    args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
+    {{- end }}
   dcgmExporter:
     {{- if .Values.dcgmExporter.repository }}
     repository: {{ .Values.dcgmExporter.repository }}
@@ -168,6 +183,12 @@ spec:
     {{- end }}
     {{- if .Values.dcgmExporter.resources }}
     resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.env }}
+    env: {{ toYaml .Values.dcgmExporter.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.args }}
+    args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
     {{- end }}
   gfd:
     {{- if .Values.gfd.repository }}
@@ -208,4 +229,10 @@ spec:
     {{- end }}
     {{- if .Values.gfd.discoveryIntervalSeconds }}
     discoveryIntervalSeconds: {{ .Values.gfd.discoveryIntervalSeconds }}
+    {{- end }}
+    {{- if .Values.gfd.env }}
+    env: {{ toYaml .Values.gfd.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.args }}
+    args: {{ toYaml .Values.gfd.args | nindent 6 }}
     {{- end }}
