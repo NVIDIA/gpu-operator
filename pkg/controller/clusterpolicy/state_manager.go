@@ -153,21 +153,23 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	n.rec = r
 	n.idx = 0
 
-	promv1.AddToScheme(r.scheme)
-	secv1.AddToScheme(r.scheme)
+	if len(n.controls) == 0 {
+		promv1.AddToScheme(r.scheme)
+		secv1.AddToScheme(r.scheme)
+
+		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+		addState(n, "/opt/gpu-operator/state-driver")
+		addState(n, "/opt/gpu-operator/state-container-toolkit")
+		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
+		addState(n, "/opt/gpu-operator/state-monitoring")
+	}
 
 	// fetch all nodes and label gpu nodes
 	err = n.labelGPUNodes()
 	if err != nil {
 		return err
 	}
-
-	addState(n, "/opt/gpu-operator/gpu-feature-discovery")
-	addState(n, "/opt/gpu-operator/state-driver")
-	addState(n, "/opt/gpu-operator/state-container-toolkit")
-	addState(n, "/opt/gpu-operator/state-device-plugin")
-	addState(n, "/opt/gpu-operator/state-device-plugin-validation")
-	addState(n, "/opt/gpu-operator/state-monitoring")
 
 	return nil
 }
