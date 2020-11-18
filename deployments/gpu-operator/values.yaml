@@ -154,3 +154,7 @@ node-feature-discovery:
         pci:
           deviceLabelFields:
           - vendor
+
+  master:
+    extraLabelNs:
+      - nvidia.com

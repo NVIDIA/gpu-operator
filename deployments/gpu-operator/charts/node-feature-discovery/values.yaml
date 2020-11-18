@@ -1,0 +1,218 @@
+# Default values for node-feature-discovery.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: quay.io/kubernetes_incubator/node-feature-discovery
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.6.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+rbac:
+  # Specifies whether RBAC roles should be created
+  create: true
+
+# Comma separated list of feature sources.
+sources: []
+  # - cpu
+  # - custom
+  # - iommu
+  # - kernel
+  # - local
+  # - memory
+  # - network
+  # - pci
+  # - storage
+  # - system
+  # - usb
+
+# node-feature-discovery configuration - see https://github.com/kubernetes-sigs/node-feature-discovery/blob/master/nfd-worker.conf.example for example
+config: |
+  #sources:
+  #  cpu:
+  #    cpuid:
+  ##     NOTE: whitelist has priority over blacklist
+  #      attributeBlacklist:
+  #        - "BMI1"
+  #        - "BMI2"
+  #        - "CLMUL"
+  #        - "CMOV"
+  #        - "CX16"
+  #        - "ERMS"
+  #        - "F16C"
+  #        - "HTT"
+  #        - "LZCNT"
+  #        - "MMX"
+  #        - "MMXEXT"
+  #        - "NX"
+  #        - "POPCNT"
+  #        - "RDRAND"
+  #        - "RDSEED"
+  #        - "RDTSCP"
+  #        - "SGX"
+  #        - "SSE"
+  #        - "SSE2"
+  #        - "SSE3"
+  #        - "SSE4.1"
+  #        - "SSE4.2"
+  #        - "SSSE3"
+  #      attributeWhitelist:
+  #  kernel:
+  #    kconfigFile: "/path/to/kconfig"
+  #    configOpts:
+  #      - "NO_HZ"
+  #      - "X86"
+  #      - "DMI"
+  #  pci:
+  #    deviceClassWhitelist:
+  #      - "0200"
+  #      - "03"
+  #      - "12"
+  #    deviceLabelFields:
+  #      - "class"
+  #      - "vendor"
+  #      - "device"
+  #      - "subsystem_vendor"
+  #      - "subsystem_device"
+  #  usb:
+  #    deviceClassWhitelist:
+  #      - "0e"
+  #      - "ef"
+  #      - "fe"
+  #      - "ff"
+  #    deviceLabelFields:
+  #      - "class"
+  #      - "vendor"
+  #      - "device"
+  #  custom:
+  #    - name: "my.kernel.feature"
+  #      matchOn:
+  #        - loadedKMod: ["example_kmod1", "example_kmod2"]
+  #    - name: "my.pci.feature"
+  #      matchOn:
+  #        - pciId:
+  #            class: ["0200"]
+  #            vendor: ["15b3"]
+  #            device: ["1014", "1017"]
+  #        - pciId :
+  #            vendor: ["8086"]
+  #            device: ["1000", "1100"]
+  #    - name: "my.usb.feature"
+  #      matchOn:
+  #        - usbId:
+  #          class: ["ff"]
+  #          vendor: ["03e7"]
+  #          device: ["2485"]
+  #        - usbId:
+  #          class: ["fe"]
+  #          vendor: ["1a6e"]
+  #          device: ["089a"]
+  #    - name: "my.combined.feature"
+  #      matchOn:
+  #        - pciId:
+  #            vendor: ["15b3"]
+  #            device: ["1014", "1017"]
+  #          loadedKMod : ["vendor_kmod1", "vendor_kmod2"]
+
+service:
+  type: ClusterIP
+  clusterIP: ""
+  port: 8080
+
+  ## Specify the nodePort value for the LoadBalancer and NodePort service types.
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+  # nodePort:
+  ## List of IP addresses at which the hass-configurator service is available
+  ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+  externalIPs: []
+  ## Use loadBalancerIP to request a specific static IP, otherwise leave blank
+  loadBalancerIP: ""
+  # loadBalancerSourceRanges: []
+  ## Set the externalTrafficPolicy in the Service to either Cluster or Local
+  externalTrafficPolicy:  # Local
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+master:
+  replicaCount: 1
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+  #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations:
+    - key: "node-role.kubernetes.io/master"
+      operator: "Equal"
+      value: ""
+      effect: "NoSchedule"
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/master"
+                operator: In
+                values: [""]
+
+worker:
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+  # runAsUser: 1000
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
