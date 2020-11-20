@@ -1,3 +1,4 @@
+{{ if not (lookup "v1" "Namespace" "" "gpu-operator-resources") -}}
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -6,3 +7,4 @@ metadata:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}
     openshift.io/cluster-monitoring: "true"
+{{- end }}
