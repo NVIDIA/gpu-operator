@@ -881,6 +881,14 @@ spec:
                           type: string
                       type: object
                   type: object
+                repoConfig:
+                  description: 'Optional: Custom repo configuration for driver container'
+                  properties:
+                    configMapName:
+                      type: string
+                    destinationDir:
+                      type: string
+                  type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
                   type: string
@@ -1932,6 +1940,14 @@ spec:
                           type: string
                       type: object
                   type: object
+                repoConfig:
+                  description: 'Optional: Custom repo configuration for driver container'
+                  properties:
+                    configMapName:
+                      type: string
+                    destinationDir:
+                      type: string
+                  type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
                   type: string
@@ -2982,6 +2998,14 @@ spec:
                             WindowsRunAsUserName feature flag.
                           type: string
                       type: object
+                  type: object
+                repoConfig:
+                  description: 'Optional: Custom repo configuration for driver container'
+                  properties:
+                    configMapName:
+                      type: string
+                    destinationDir:
+                      type: string
                   type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
@@ -5129,6 +5153,14 @@ spec:
                             WindowsRunAsUserName feature flag.
                           type: string
                       type: object
+                  type: object
+                repoConfig:
+                  description: 'Optional: Custom repo configuration for driver container'
+                  properties:
+                    configMapName:
+                      type: string
+                    destinationDir:
+                      type: string
                   type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
