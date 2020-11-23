@@ -511,7 +511,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	// update image pull policy
 	if config.DCGMExporter.ImagePullPolicy != "" {
-		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DevicePlugin.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
+		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.DCGMExporter.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
 	}
 	// set image pull secrets
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
@@ -559,11 +559,18 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	// update init container config for per pod specific resources
-	initContainerImage, initContainerName, initContainerCmd := "ubi8/ubi-minimal:8.2-349", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+	// using cuda 11.0 base image(ubi) as default for initContainer on RHEL/OCP as this is minimal and used as base image for most gpu-operator images.
+	// Also, this allows us to not having separate configurable for initContainer repo/image/tag etc.
+	initContainerImage, initContainerName, initContainerCmd := "nvcr.io/nvidia/cuda:11.0-base-ubi8", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+	if config.DCGMExporter.Repository != "" && !strings.HasPrefix(config.DCGMExporter.Repository, "nvcr.io") {
+		// if custom repository is provided for dcgm-exporter, then use that for init container as well (air-gapped etc)
+		initContainerImage = fmt.Sprintf("%s/cuda:11.0-base-ubi8", config.DCGMExporter.Repository)
+	}
 	initContainer := v1.Container{}
 	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
 	obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
 	obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
+	obj.Spec.Template.Spec.InitContainers[0].ImagePullPolicy = config.DCGMExporter.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
 	obj.Spec.Template.Spec.InitContainers[0].Command = []string{initContainerCmd}
 
 	// need CAP_SYS_ADMIN privileges for collecting pod specific resources
