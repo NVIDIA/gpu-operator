@@ -4277,6 +4277,7 @@ spec:
                   enum:
                   - docker
                   - crio
+                  - containerd
                   type: string
                 deployGFD:
                   type: boolean
