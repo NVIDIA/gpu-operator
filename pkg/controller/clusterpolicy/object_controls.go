@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 
@@ -21,7 +22,7 @@ import (
 const (
 	DefaultContainerdConfigFile = "/etc/containerd/config.toml"
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
-	DefaultDockerConfigPath     = "/etc/docker/"
+	DefaultDockerConfigFile     = "/etc/docker/daemon.json"
 	DefaultDockerSocketFile     = "/var/run/docker.sock"
 )
 
@@ -428,27 +429,27 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// setup mounts for runtime config file and socket file
 	if runtime == gpuv1.Docker.String() || runtime == gpuv1.Containerd.String() {
-		volumeMountConfigPath := getRuntimeConfigPath(runtime)
-		volumeMountSocketPath := getRuntimeSocketPath(runtime)
+		runtimeConfigFile := getRuntimeConfigFile(runtime)
+		runtimeSocketFile := getRuntimeSocketFile(runtime)
 
 		// docker needs socket file as runtime arg
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS",
-			"--socket "+volumeMountSocketPath)
+			"--socket "+runtimeSocketFile+" --config "+runtimeConfigFile)
 
 		// setup config file mount
 		volMountConfigName := fmt.Sprintf("%s-config", runtime)
-		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: volumeMountConfigPath}
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: path.Dir(runtimeConfigFile)}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountConfig)
 
-		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: volumeMountConfigPath}}}
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
 
 		// setup socket file mount
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
-		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: volumeMountSocketPath}
+		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: runtimeSocketFile}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountSocket)
 
-		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: volumeMountSocketPath}}}
+		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: runtimeSocketFile}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
 
@@ -635,35 +636,35 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 }
 
 // get runtime(docker, containerd) config file path based on env or default
-func getRuntimeConfigPath(runtime string) (volumeMountConfigPath string) {
+func getRuntimeConfigFile(runtime string) (runtimeConfigFile string) {
 	if runtime == gpuv1.Docker.String() {
-		volumeMountConfigPath = DefaultDockerConfigPath
-		if os.Getenv("DOCKER_CONFIG_PATH") != "" {
-			volumeMountConfigPath = os.Getenv("DOCKER_CONFIG_FILE")
+		runtimeConfigFile = DefaultDockerConfigFile
+		if os.Getenv("DOCKER_CONFIG") != "" {
+			runtimeConfigFile = os.Getenv("DOCKER_CONFIG")
 		}
 	} else if runtime == gpuv1.Containerd.String() {
-		volumeMountConfigPath = DefaultContainerdConfigFile
-		if os.Getenv("CONTAINERD_CONFIG_FILE") != "" {
-			volumeMountConfigPath = os.Getenv("CONTAINERD_CONFIG_FILE")
+		runtimeConfigFile = DefaultContainerdConfigFile
+		if os.Getenv("CONTAINERD_CONFIG") != "" {
+			runtimeConfigFile = os.Getenv("CONTAINERD_CONFIG")
 		}
 	}
-	return volumeMountConfigPath
+	return runtimeConfigFile
 }
 
 // get runtime(docker, containerd) socket file path based on env or default
-func getRuntimeSocketPath(runtime string) (volumeMountSocketPath string) {
+func getRuntimeSocketFile(runtime string) (runtimeSocketFile string) {
 	if runtime == gpuv1.Docker.String() {
-		volumeMountSocketPath = DefaultDockerSocketFile
-		if os.Getenv("DOCKER_SOCKET_FILE") != "" {
-			volumeMountSocketPath = os.Getenv("DOCKER_SOCKET_FILE")
+		runtimeSocketFile = DefaultDockerSocketFile
+		if os.Getenv("DOCKER_SOCKET") != "" {
+			runtimeSocketFile = os.Getenv("DOCKER_SOCKET")
 		}
 	} else if runtime == gpuv1.Containerd.String() {
-		volumeMountSocketPath = DefaultContainerdSocketFile
-		if os.Getenv("CONTAINERD_SOCKET_FILE") != "" {
-			volumeMountSocketPath = os.Getenv("CONTAINERD_SOCKET_FILE")
+		runtimeSocketFile = DefaultContainerdSocketFile
+		if os.Getenv("CONTAINERD_SOCKET") != "" {
+			runtimeSocketFile = os.Getenv("CONTAINERD_SOCKET")
 		}
 	}
-	return volumeMountSocketPath
+	return runtimeSocketFile
 }
 
 func setContainerEnv(c *corev1.Container, key, value string) {
