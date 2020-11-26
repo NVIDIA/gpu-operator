@@ -500,10 +500,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 		// setup socket file mount
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
-		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: targetSocketDir + sourceSocketFileName}
+		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: targetSocketDir}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountSocket)
 
-		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: runtimeSocketFile}}}
+		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
 
