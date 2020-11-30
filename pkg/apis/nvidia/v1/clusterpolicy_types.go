@@ -24,13 +24,27 @@ type ClusterPolicySpec struct {
 type Runtime string
 
 const (
-	Docker Runtime = "docker"
-	CRIO   Runtime = "crio"
+	Docker     Runtime = "docker"
+	CRIO       Runtime = "crio"
+	Containerd Runtime = "containerd"
 )
+
+func (r Runtime) String() string {
+	switch r {
+	case Docker:
+		return "docker"
+	case CRIO:
+		return "crio"
+	case Containerd:
+		return "containerd"
+	default:
+		return ""
+	}
+}
 
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
-	// +kubebuilder:validation:Enum=docker;crio
+	// +kubebuilder:validation:Enum=docker;crio;containerd
 	DefaultRuntime Runtime       `json:"defaultRuntime"`
 	DeployGFD      bool          `json:"deployGFD"`
 	Validator      ValidatorSpec `json:"validator,omitempty"`

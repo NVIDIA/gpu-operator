@@ -44,27 +44,17 @@ spec:
           seLinuxOptions:
             level: "s0"
         volumeMounts:
-          - name: docker-socket
-            mountPath: /var/run/docker.sock
           - name: nvidia-install-path
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
-          - name: docker-config
-            mountPath: /etc/docker
           - name: nvidia-local
             mountPath: /usr/local/nvidia
           - name: crio-hooks
             mountPath: /usr/share/containers/oci/hooks.d
       volumes:
-        - name: docker-socket
-          hostPath:
-            path: /var/run/docker.sock
         - name: nvidia-install-path
           hostPath:
             path: /run/nvidia
-        - name: docker-config
-          hostPath:
-            path: /etc/docker
         - name: nvidia-local
           hostPath:
             path: /usr/local/nvidia
