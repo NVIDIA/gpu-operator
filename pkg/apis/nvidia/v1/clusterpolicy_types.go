@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -278,6 +280,10 @@ func (p *ClusterPolicy) SetState(s State) {
 }
 
 func (c *ComponentSpec) ImagePath() string {
+	// use @ if image digest is specified instead of tag
+	if strings.HasPrefix(c.Version, "sha256:") {
+		return c.Repository + "/" + c.Image + "@" + c.Version
+	}
 	return c.Repository + "/" + c.Image + ":" + c.Version
 }
 
@@ -297,6 +303,10 @@ func (c *ComponentSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 }
 
 func (g *GPUFeatureDiscoverySpec) ImagePath() string {
+	// use @ if image digest is specified instead of tag
+	if strings.HasPrefix(g.Version, "sha256:") {
+		return g.Repository + "/" + g.Image + "@" + g.Version
+	}
 	return g.Repository + "/" + g.Image + ":" + g.Version
 }
 
@@ -316,6 +326,10 @@ func (g *GPUFeatureDiscoverySpec) ImagePolicy(pullPolicy string) corev1.PullPoli
 }
 
 func (v *ValidatorSpec) ImagePath() string {
+	// use @ if image digest is specified instead of tag
+	if strings.HasPrefix(v.Version, "sha256:") {
+		return v.Repository + "/" + v.Image + "@" + v.Version
+	}
 	return v.Repository + "/" + v.Image + ":" + v.Version
 }
 
