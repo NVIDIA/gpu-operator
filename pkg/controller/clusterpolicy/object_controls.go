@@ -343,7 +343,14 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	img := fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
+	var img string
+	// if image digest is specified, use it directly
+	if strings.HasPrefix(config.Driver.Version, "sha256:") {
+		img = config.Driver.ImagePath()
+	} else {
+		// append os-tag to the provided driver version
+		img = fmt.Sprintf("%s-%s", config.Driver.ImagePath(), osTag)
+	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
 	// update image pull policy
@@ -611,12 +618,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	// update init container config for per pod specific resources
-	// using cuda 11.0 base image(ubi) as default for initContainer on RHEL/OCP as this is minimal and used as base image for most gpu-operator images.
+	// using cuda 11.0 base image(11.0-base-ubi8) as default for initContainer on RHEL/OCP as this is minimal and used as base image for most gpu-operator images.
 	// Also, this allows us to not having separate configurable for initContainer repo/image/tag etc.
-	initContainerImage, initContainerName, initContainerCmd := "nvcr.io/nvidia/cuda:11.0-base-ubi8", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
+	initContainerImage, initContainerName, initContainerCmd := "nvcr.io/nvidia/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59", "init-pod-nvidia-metrics-exporter", "/bin/entrypoint.sh"
 	if config.DCGMExporter.Repository != "" && !strings.HasPrefix(config.DCGMExporter.Repository, "nvcr.io") {
 		// if custom repository is provided for dcgm-exporter, then use that for init container as well (air-gapped etc)
-		initContainerImage = fmt.Sprintf("%s/cuda:11.0-base-ubi8", config.DCGMExporter.Repository)
+		initContainerImage = fmt.Sprintf("%s/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59", config.DCGMExporter.Repository)
 	}
 	initContainer := v1.Container{}
 	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
