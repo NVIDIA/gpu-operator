@@ -96,7 +96,7 @@ done
 # Timeout is 100 seconds
 test_restart_operator() {
 	# The operator is the only container that has the string '"gpu-operator"'
-	docker kill "$(docker ps --format '{{.ID}} {{.Command}}' | grep '"gpu-operator"' | cut -f 1 -d ' ')"
+	docker kill "$(docker ps --format '{{.ID}} {{.Command}}' | grep "gpu-operator" | cut -f 1 -d ' ')"
 
 	for i in $(seq 1 10); do
 		# Sleep a reasonable amount of time for k8s to update the container status to crashing
