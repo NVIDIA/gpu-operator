@@ -12,7 +12,7 @@ operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
-  #version: 1.3.0
+  #version: 1.4.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   defaultRuntime: docker
@@ -46,6 +46,7 @@ driver:
   version: "450.80.02"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  env: []
   tolerations:
   - key: nvidia.com/gpu
     operator: Exists
@@ -66,6 +67,7 @@ toolkit:
   version: 1.4.0-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  env: []
   tolerations:
   # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
   # This, along with the annotation above marks this pod as a critical add-on.
@@ -112,7 +114,7 @@ dcgmExporter:
   imagePullPolicy: IfNotPresent
   args:
     - "-f"
-    - "/etc/dcgm-exporter/default-counters.csv"
+    - "/etc/dcgm-exporter/dcp-metrics-included.csv"
   env: []
   tolerations: []
   nodeSelector: {}
@@ -128,6 +130,7 @@ gfd:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
+  env: []
   nodeSelector:
     nvidia.com/gpu.present: "true"
   affinity: {}

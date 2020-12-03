@@ -22,7 +22,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:8340fc6326f1c3c09dca6b9c528870fb19319369e19710376a5383aa920b6d5f"
+              "version": "sha256:85016e39f73749ef9769a083ceb849cae80c31c5a7f22485b3ba4aa590ec7b88"
             },
             "devicePlugin": {
               "affinity": {},
@@ -86,7 +86,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:d16c443e4cf260545e95ff1dcb0eb3f26fbdc9e552432458b06ff0cd99fd01f1"
+              "version": "sha256:b3f48033d7d9e1d5703b6ecffe35d219a45a17bdcf85374d78924dee9c8917be"
             }
           }
         }
@@ -129,13 +129,13 @@ spec:
     - name: gpu-operator-image
       image: nvcr.io/nvidia/gpu-operator@sha256:1a1c95d392ea2c055b09c9d074ab4d577a42d5d338109234d7a868bf2ebdfa8d
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:8340fc6326f1c3c09dca6b9c528870fb19319369e19710376a5383aa920b6d5f
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:85016e39f73749ef9769a083ceb849cae80c31c5a7f22485b3ba4aa590ec7b88
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:d16c443e4cf260545e95ff1dcb0eb3f26fbdc9e552432458b06ff0cd99fd01f1
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:b3f48033d7d9e1d5703b6ecffe35d219a45a17bdcf85374d78924dee9c8917be
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:324e9dc265dec320207206aa94226b0c8735fd93ce19b36a415478c95826d934
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:d53c5932eeb970411030abb6e35ff9f3e420d5872ba7a5d533ab4e3887feb728
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:45b459c59d13a1ebf37260a33c4498046d4ade7cc243f2ed71115cd81054cd85
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:82e6f61b715d710c60ac14be78953336ea5dbc712244beb51036139d1cc8d526
     - name: cuda-sample-image
