@@ -33,7 +33,7 @@ spec:
         {{- else }}
         image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Chart.AppVersion }}
         {{- end }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
         command: ["gpu-operator"]
         args:
         - "--zap-time-encoding={{ .Values.operator.logging.timeEncoding }}"
