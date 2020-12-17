@@ -12,11 +12,21 @@ spec:
       effect: NoSchedule
   readOnlyRootFilesystem: true
   restartPolicy: OnFailure
+  initContainers:
+  - name: device-plugin-validation-init
+    image: "FILLED BY THE OPERATOR"
+    command: ['sh', '-c']
+    args: ["until /tmp/vectorAdd; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
+    securityContext:
+      allowPrivilegeEscalation: false
+    resources:
+      limits:
+        nvidia.com/gpu: 1 # requesting 1 GPU
   containers:
-    - name: cuda-vector-add
-      image: "nvidia/samples:vectoradd-cuda10.2"
+    - name: device-plugin-validation
+      image: "FILLED BY THE OPERATOR"
+      # override command and args as validation is already done by initContainer
+      command: ['sh', '-c']
+      args: ["echo device-plugin validation is successful"]
       securityContext:
         allowPrivilegeEscalation: false
-      resources:
-        limits:
-          nvidia.com/gpu: 1 # requesting 1 GPU

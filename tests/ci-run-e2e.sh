@@ -24,7 +24,7 @@ REPOSITORY="$(dirname "${IMAGE}")"
 NS="test-operator"
 echo "Deploy operator with repository: ${REPOSITORY}"
 kubectl create namespace "${NS}"
-helm install ../deployments/gpu-operator --generate-name --set operator.tag="${TAG}" --set operator.repository="${REPOSITORY}" -n "${NS}" --wait
+helm install ../deployments/gpu-operator --generate-name --set operator.version="${TAG}" --set operator.repository="${REPOSITORY}" -n "${NS}" --wait
 
 echo "Deploy GPU pod"
 kubectl apply -f gpu-pod.yaml
@@ -74,7 +74,7 @@ while :; do
 
 	if [ "${is_dcgm_ready}" = "True" ]; then
 		dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
-		curl -s "$dcgm_pod_ip:9400/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
+		kubectl run -i nginx --image=nginx --restart=Never -- curl -s "$dcgm_pod_ip:9400/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
 		rc=0
 		break;
 	fi

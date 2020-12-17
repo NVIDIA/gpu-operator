@@ -31,6 +31,20 @@ spec:
         effect: NoSchedule
       serviceAccount: nvidia-container-toolkit
       hostPID: true
+      initContainers:
+      - name: driver-validation
+        image: "FILLED_BY_THE_OPERATOR"
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c']
+        args: ["LD_LIBRARY_PATH=/run/nvidia/driver/usr/lib/x86_64-linux-gnu/:/run/nvidia/driver/usr/lib64/:$LD_LIBRARY_PATH; PATH=/run/nvidia/driver/usr/bin/:$PATH && until nvidia-smi; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: nvidia-install-path
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
       containers:
       - image: "FILLED_BY_THE_OPERATOR"
         args: ["/usr/local/nvidia"]
