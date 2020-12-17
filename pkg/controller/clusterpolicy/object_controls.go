@@ -243,6 +243,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
 func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
+
 	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.GPUFeatureDiscovery.ImagePath()
 
@@ -429,6 +432,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+
+	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.Toolkit.ImagePath()
 
 	// update image pull policy
@@ -514,11 +519,35 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
 
+	// update init container spec for waiting on driver-initialization
+	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+		// skip if not toolkit-init container
+		if initContainer.Name != "driver-validation" {
+			continue
+		}
+
+		// using cuda 11.0 base image(11.0-base-ubi8) as default for initContainer on RHEL/OCP as this is minimal and used as base image for most gpu-operator images.
+		// Also, this allows us to not having separate configurable for initContainer repo/image/tag etc.
+		initContainerImage := "nvcr.io/nvidia/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59"
+		if config.Toolkit.Repository != "" && !strings.HasPrefix(config.Toolkit.Repository, "nvcr.io") {
+			// if custom repository is provided for toolkit, then use that for init container as well (air-gapped etc)
+			initContainerImage = fmt.Sprintf("%s/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59", config.Toolkit.Repository)
+		}
+
+		obj.Spec.Template.Spec.InitContainers[i].Image = initContainerImage
+		// update validation image pull policy
+		if config.Toolkit.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = config.Toolkit.ImagePolicy(config.Toolkit.ImagePullPolicy)
+		}
+	}
+
 	return nil
 }
 
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
 	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.DevicePlugin.ImagePath()
 	// update image pull policy
@@ -565,6 +594,8 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
 	// update image
 	obj.Spec.Template.Spec.Containers[0].Image = config.DCGMExporter.ImagePath()
 
@@ -626,11 +657,10 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		initContainerImage = fmt.Sprintf("%s/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59", config.DCGMExporter.Repository)
 	}
 	initContainer := v1.Container{}
-	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
-	obj.Spec.Template.Spec.InitContainers[0].Image = initContainerImage
-	obj.Spec.Template.Spec.InitContainers[0].Name = initContainerName
-	obj.Spec.Template.Spec.InitContainers[0].ImagePullPolicy = config.DCGMExporter.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
-	obj.Spec.Template.Spec.InitContainers[0].Command = []string{initContainerCmd}
+	initContainer.Image = initContainerImage
+	initContainer.Name = initContainerName
+	initContainer.ImagePullPolicy = config.DCGMExporter.ImagePolicy(config.DCGMExporter.ImagePullPolicy)
+	initContainer.Command = []string{initContainerCmd}
 
 	// need CAP_SYS_ADMIN privileges for collecting pod specific resources
 	privileged := true
@@ -639,15 +669,17 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
-	obj.Spec.Template.Spec.InitContainers[0].SecurityContext = securityContext
+	initContainer.SecurityContext = securityContext
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
 	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
-	obj.Spec.Template.Spec.InitContainers[0].VolumeMounts = append(obj.Spec.Template.Spec.InitContainers[0].VolumeMounts, volMountSock)
+	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountSock)
 
 	volMountConfigName, volMountConfigPath, volMountConfigSubPath := "init-config", "/bin/entrypoint.sh", "entrypoint.sh"
 	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, ReadOnly: true, MountPath: volMountConfigPath, SubPath: volMountConfigSubPath}
-	obj.Spec.Template.Spec.InitContainers[0].VolumeMounts = append(obj.Spec.Template.Spec.InitContainers[0].VolumeMounts, volMountConfig)
+	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountConfig)
+
+	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
 
 	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
 	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
@@ -711,15 +743,36 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
-// TransformValidator transforms driver and device plugin validator pods with required config as per ClusterPolicy
-func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update image
+func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+		// skip if not validation initContainer
+		if initContainer.Name != "toolkit-validation" {
+			continue
+		}
+
+		// update validation image
+		if config.Operator.Validator.Repository != "" {
+			obj.Spec.Template.Spec.InitContainers[i].Image = config.Operator.Validator.ImagePath()
+		}
+		// update validation image pull policy
+		if config.Operator.Validator.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = config.Operator.Validator.ImagePolicy(config.Operator.Validator.ImagePullPolicy)
+		}
+	}
+	return nil
+}
+
+// TransformDevicePluginValidator transforms device plugin validator pods with required config as per ClusterPolicy
+func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image paths for validation containers(init and main both use validator image)
 	if config.Operator.Validator.Repository != "" {
 		obj.Spec.Containers[0].Image = config.Operator.Validator.ImagePath()
+		obj.Spec.InitContainers[0].Image = config.Operator.Validator.ImagePath()
 	}
 	// update image pull policy
 	if config.Operator.Validator.ImagePullPolicy != "" {
 		obj.Spec.Containers[0].ImagePullPolicy = config.Operator.Validator.ImagePolicy(config.Operator.Validator.ImagePullPolicy)
+		obj.Spec.InitContainers[0].ImagePullPolicy = config.Operator.Validator.ImagePolicy(config.Operator.Validator.ImagePullPolicy)
 	}
 	// set image pull secrets
 	if config.Operator.Validator.ImagePullSecrets != nil {
@@ -727,6 +780,7 @@ func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterP
 			obj.Spec.ImagePullSecrets = append(obj.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
+
 	return nil
 }
 
@@ -881,8 +935,7 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 
 func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
 	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-validation":        TransformValidator,
-		"nvidia-device-plugin-validation": TransformValidator,
+		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
 	}
 
 	t, ok := transformations[obj.Name]

@@ -21,6 +21,7 @@ operator:
     image: cuda-sample
     repository: nvcr.io/nvidia/k8s
     version: vectoradd-cuda10.2
+    imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
     operator: "Equal"

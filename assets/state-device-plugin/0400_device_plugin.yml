@@ -30,6 +30,13 @@ spec:
         operator: Exists
         effect: NoSchedule
       serviceAccount: nvidia-device-plugin
+      initContainers:
+      - name: toolkit-validation
+        image: "FILLED BY THE OPERATOR"
+        command: ['sh', '-c']
+        args: ["until /tmp/vectorAdd; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
+        securityContext:
+          allowPrivilegeEscalation: false
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin-ctr

@@ -5,7 +5,6 @@ metadata:
   namespace: gpu-operator-resources
   labels:
     app: gpu-feature-discovery
-    app.kubernetes.io/version: 0.2.0
     app.kubernetes.io/part-of: nvidia-gpu
 spec:
   selector:
@@ -16,12 +15,11 @@ spec:
     metadata:
       labels:
         app: gpu-feature-discovery
-        app.kubernetes.io/version: 0.2.0
         app.kubernetes.io/part-of: nvidia-gpu
     spec:
       serviceAccount: nvidia-gpu-feature-discovery
       containers:
-        - image: nvidia/gpu-feature-discovery:v0.2.0
+        - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
           volumeMounts:
             - name: output-dir
