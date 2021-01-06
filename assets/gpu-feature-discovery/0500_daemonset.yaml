@@ -26,11 +26,16 @@ spec:
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
             - name: dmi-product-name
               mountPath: "/sys/class/dmi/id/product_name"
+            - name: nvidia-install-path
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
           env:
             - name: GFD_SLEEP_INTERVAL
               value: 60s
             - name: GFD_MIG_STRATEGY
               value: none
+            - name: LD_LIBRARY_PATH
+              value: /run/nvidia/driver/usr/lib/x86_64-linux-gnu/:/run/nvidia/driver/usr/lib64/
           securityContext:
             privileged: true
       nodeSelector:
@@ -42,3 +47,6 @@ spec:
         - name: dmi-product-name
           hostPath:
             path: "/sys/class/dmi/id/product_name"
+        - name: nvidia-install-path
+          hostPath:
+            path: /run/nvidia
