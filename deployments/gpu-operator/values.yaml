@@ -131,8 +131,6 @@ gfd:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
-  args:
-    - "--fail-on-init-error=false"
   env: []
   nodeSelector:
     nvidia.com/gpu.present: "true"
