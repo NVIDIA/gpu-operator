@@ -127,7 +127,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.2.2
+  version: v0.3.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
