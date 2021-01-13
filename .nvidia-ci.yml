@@ -27,7 +27,7 @@ release:ngc:
     - docker:dind
   script:
     - source .VERSION_INFO
-    - docker login -u ${NGC_REGISTRY_USER} -p ${NGC_REGISTRY_TOKEN}
+    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
     - docker pull ${CI_REGISTRY_IMAGE}:${VERSION}
     - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:${VERSION}
     - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:latest
@@ -53,7 +53,7 @@ release:dockerhub:
   script:
     # Push Container to Dockerhub
     - source .VERSION_INFO
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}"
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${NGC_REGISTRY}"
     - docker pull "$CI_REGISTRY_IMAGE:$VERSION"
     - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:$VERSION"
     - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:latest"
