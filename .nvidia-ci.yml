@@ -18,7 +18,7 @@ contamer:
     - cd contamer
     - pip3 install -r requirements.txt
     - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${CI_PROJECT_NAME}:${VERSION}
-    - python3 contamer.py -ls --fail-on-non-os -- ${CI_PROJECT_NAME}:${VERSION}
+    - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- ${CI_PROJECT_NAME}:${VERSION}
 
 release:ngc:
   stage: release
