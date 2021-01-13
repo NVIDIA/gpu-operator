@@ -24,6 +24,9 @@ const (
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
 	DefaultDockerConfigFile     = "/etc/docker/daemon.json"
 	DefaultDockerSocketFile     = "/var/run/docker.sock"
+	VGPUPresentLabel            = "nvidia.com/vgpu.present"
+	VGPUHostDriverVersionLabel  = "nvidia.com/vgpu.host-driver-version"
+	VGPUHostDriverBranchLabel   = "nvidia.com/vgpu.host-driver-branch"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -219,7 +222,7 @@ func getDcgmExporter() string {
 	return dcgmExporter
 }
 
-func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
+func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":            TransformDriver,
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
@@ -231,14 +234,16 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	t, ok := transformations[obj.Name]
 	if !ok {
 		log.Info(fmt.Sprintf("No transformation for Daemonset '%s'", obj.Name))
-		return
+		return nil
 	}
 
 	err := t(obj, &n.singleton.Spec, n)
 	if err != nil {
 		log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
-		os.Exit(1)
+		return err
 	}
+
+	return nil
 }
 
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
@@ -402,6 +407,27 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 		repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: config.Driver.RepoConfig.ConfigMapName}}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
+	}
+
+	// for vGPU mode, ensure vgpu host-version and host-branch labels are passed to driver
+	if config.Operator.DefaultGPUMode == gpuv1.VGPU {
+		vgpuLabels, err := getVGPULabels(n)
+		if err != nil {
+			return err
+		}
+		if len(vgpuLabels) == 0 {
+			// cannot deploy driver without vgpu labels
+			return err
+		}
+
+		if value, ok := vgpuLabels[VGPUHostDriverVersionLabel]; ok {
+			hostDriverLabelEnv := corev1.EnvVar{Name: "VGPU_HOST_DRIVER_VERSION", Value: value}
+			obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, hostDriverLabelEnv)
+		}
+		if value, ok := vgpuLabels[VGPUHostDriverBranchLabel]; ok {
+			hostDriverBranchLabelEnv := corev1.EnvVar{Name: "VGPU_HOST_DRIVER_BRANCH", Value: value}
+			obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, hostDriverBranchLabelEnv)
+		}
 	}
 
 	// Inject EUS kernel RPM's as an override to the entrypoint
@@ -861,8 +887,13 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].DaemonSet.DeepCopy()
 
-	preProcessDaemonSet(obj, n)
 	logger := log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
+
+	err := preProcessDaemonSet(obj, n)
+	if err != nil {
+		logger.Info("Could not pre-process", "Error", err)
+		return gpuv1.NotReady, err
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -913,8 +944,12 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
 
-	preProcessPod(obj, n)
 	logger := log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
+	err := preProcessPod(obj, n)
+	if err != nil {
+		logger.Info("could not pre-process", "Error", err)
+		return gpuv1.NotReady, err
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -933,7 +968,7 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	return isPodReady(obj.Name, n, "Succeeded"), nil
 }
 
-func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
+func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
 	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
 	}
@@ -941,14 +976,15 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
 	t, ok := transformations[obj.Name]
 	if !ok {
 		log.Info(fmt.Sprintf("No transformation for Pod '%s'", obj.Name))
-		return
+		return nil
 	}
 
 	err := t(obj, &n.singleton.Spec, n)
 	if err != nil {
 		log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
@@ -1015,4 +1051,49 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
+}
+
+func getVGPULabels(n ClusterPolicyController) (map[string]string, error) {
+	var vgpuLabels map[string]string
+	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
+	// We need the node labels to fetch the correct container
+	opts := []client.ListOption{
+		client.MatchingLabels{VGPUPresentLabel: "true"},
+	}
+
+	list := &corev1.NodeList{}
+	err := n.rec.client.List(context.TODO(), list, opts...)
+	if err != nil {
+		logger.Info("Could not get nodes with vgpu labels", "ERROR", err)
+		return nil, fmt.Errorf("cannot get node list with vgpu labels, %v", err)
+	}
+
+	if len(list.Items) == 0 {
+		// none of the nodes matched nvidia vGPU label
+		// either the nodes do not have vGPUs, or GFD is not running
+		logger.Info("no nodes found with vgpu label nvidia.com/vgpu.present", "ERROR", "")
+		return nil, fmt.Errorf("no nodes found wiht vgpu label of nvidia.com/vgpu.present")
+	}
+
+	// Assuming all nodes are running on hosts with same vGPU driver version
+	for _, node := range list.Items {
+		nodeLabels := node.GetLabels()
+		// check all required labels are present
+		if _, ok := nodeLabels[VGPUPresentLabel]; !ok {
+			continue
+		}
+		if _, ok := nodeLabels[VGPUHostDriverVersionLabel]; !ok {
+			continue
+		}
+		if _, ok := nodeLabels[VGPUHostDriverBranchLabel]; !ok {
+			continue
+		}
+		vgpuLabels = make(map[string]string)
+		vgpuLabels[VGPUPresentLabel] = nodeLabels[VGPUPresentLabel]
+		vgpuLabels[VGPUHostDriverVersionLabel] = nodeLabels[VGPUHostDriverVersionLabel]
+		vgpuLabels[VGPUHostDriverBranchLabel] = nodeLabels[VGPUHostDriverBranchLabel]
+		break
+	}
+
+	return vgpuLabels, nil
 }

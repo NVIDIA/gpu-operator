@@ -4279,8 +4279,12 @@ spec:
                   - crio
                   - containerd
                   type: string
-                deployGFD:
-                  type: boolean
+                defaultGPUMode:
+                  enum:
+                  - passthrough
+                  - baremetal
+                  - vgpu
+                  type: string
                 validator:
                   properties:
                     image:
@@ -4303,7 +4307,6 @@ spec:
                   type: object
               required:
               - defaultRuntime
-              - deployGFD
               type: object
             toolkit:
               description: ComponentSpec defines the properties for individual GPU

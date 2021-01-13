@@ -8,9 +8,11 @@ metadata:
     {{ .Release.labels }}
 spec:
   operator:
-    deployGFD: {{ .Values.operator.deployGFD }}
     {{- if .Values.operator.defaultRuntime }}
     defaultRuntime: {{ .Values.operator.defaultRuntime }}
+    {{- end }}
+    {{- if .Values.operator.defaultGPUMode }}
+    defaultGPUMode: {{ .Values.operator.defaultGPUMode }}
     {{- end }}
     {{- if .Values.operator.validator }}
     validator:
