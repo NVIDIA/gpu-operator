@@ -12,11 +12,12 @@ operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
-  #version: 1.4.0
+  #version: 1.5.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   defaultRuntime: docker
-  deployGFD: true
+  # Indicates if attached GPU mode is passthrough/vgpu
+  defaultGPUMode: passthrough
   validator:
     image: cuda-sample
     repository: nvcr.io/nvidia/k8s
