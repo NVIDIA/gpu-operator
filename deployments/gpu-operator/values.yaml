@@ -66,7 +66,7 @@ driver:
 toolkit:
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: 1.4.0-ubuntu18.04
+  version: 1.4.1-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -91,7 +91,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.7.1
+  version: v0.7.3
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args:
