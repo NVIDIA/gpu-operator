@@ -2,6 +2,33 @@ apiVersion: v1
 entries:
   gpu-operator:
   - apiVersion: v2
+    appVersion: 1.5.0
+    created: "2021-01-19T08:47:21.5669-08:00"
+    dependencies:
+    - condition: nfd.enabled
+      name: node-feature-discovery
+      repository: ""
+      version: 2.0.0
+    description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
+    digest: 1663bd8c9641209a9785070fe39a5c22cfa44eb9150798b0fa9d56e6f23fd897
+    home: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html
+    icon: https://assets.nvidiagrid.net/ngc/logos/GPUoperator.png
+    keywords:
+    - gpu
+    - cuda
+    - compute
+    - operator
+    - deep learning
+    - monitoring
+    - tesla
+    kubeVersion: '>= 1.13.0-0'
+    name: gpu-operator
+    sources:
+    - https://github.com/NVIDIA/gpu-operator
+    urls:
+    - https://nvidia.github.io/gpu-operator/stable/gpu-operator-1.5.0.tgz
+    version: 1.5.0
+  - apiVersion: v2
     appVersion: 1.4.0
     created: "2020-12-02T17:07:02.8129-08:00"
     dependencies:
@@ -186,4 +213,4 @@ entries:
     urls:
     - https://nvidia.github.io/gpu-operator/stable/gpu-operator-1.0.0.tgz
     version: 1.0.0
-generated: "2020-12-02T17:07:02.809047-08:00"
+generated: "2021-01-19T08:47:21.558125-08:00"
