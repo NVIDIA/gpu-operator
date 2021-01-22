@@ -84,7 +84,7 @@ release:helm:
     - mkdir -p "${SUBCHART_DIR}"
     - rm -rf new-chart && mkdir new-chart
     - REPOSITORY="$(dirname "${CI_REGISTRY_IMAGE}")"
-    - helm package --version "${VERSION}" --app-version "${VERSION}" -d new_chart deployments/gpu-operator
+    - helm package --version "${VERSION}" --app-version "${VERSION}" -d new-chart deployments/gpu-operator
 
     # Generate new index for the chart repo merging with existing one
     - git checkout .
