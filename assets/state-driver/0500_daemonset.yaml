@@ -44,10 +44,15 @@ spec:
             mountPropagation: Bidirectional
           - name: config
             mountPath: /etc/containers/oci/hooks.d
+          - name: var-log
+            mountPath: /var/log
       volumes:
         - name: run-nvidia
           hostPath:
             path: /run/nvidia
+        - name: var-log
+          hostPath:
+            path: /var/log
         - name: config
           configMap:
             name: nvidia-driver
