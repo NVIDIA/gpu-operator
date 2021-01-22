@@ -16,7 +16,7 @@ spec:
   - name: device-plugin-validation-init
     image: "FILLED BY THE OPERATOR"
     command: ['sh', '-c']
-    args: ["until /tmp/vectorAdd; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
+    args: ["/tmp/vectorAdd"]
     securityContext:
       allowPrivilegeEscalation: false
     resources:
