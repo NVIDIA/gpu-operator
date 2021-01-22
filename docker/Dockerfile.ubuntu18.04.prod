@@ -5,7 +5,7 @@ COPY . .
 
 RUN make build
 
-FROM nvidia/cuda:11.0-base-ubuntu18.04
+FROM nvidia/cuda:11.2.0-base-ubuntu18.04
 
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
 
