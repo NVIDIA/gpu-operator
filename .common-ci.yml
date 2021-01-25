@@ -108,7 +108,7 @@ unit-tests:
   script:
     - apk add --update make
     - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
-    - docker run -t nvidia/gpu-operator:devel make verify
+    - docker run -t nvidia/gpu-operator:devel make lint test
   dependencies:
     - build-image
 
