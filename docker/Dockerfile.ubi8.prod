@@ -5,7 +5,7 @@ COPY . .
 
 RUN make build
 
-FROM nvidia/cuda:11.0-base-ubi8
+FROM nvidia/cuda:11.2.0-base-ubi8
 
 ENV NVIDIA_DISABLE_REQUIRE="true"
 ENV NVIDIA_VISIBLE_DEVICES=all
