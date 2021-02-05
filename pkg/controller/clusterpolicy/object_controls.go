@@ -24,9 +24,6 @@ const (
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
 	DefaultDockerConfigFile     = "/etc/docker/daemon.json"
 	DefaultDockerSocketFile     = "/var/run/docker.sock"
-	VGPUPresentLabel            = "nvidia.com/vgpu.present"
-	VGPUHostDriverVersionLabel  = "nvidia.com/vgpu.host-driver-version"
-	VGPUHostDriverBranchLabel   = "nvidia.com/vgpu.host-driver-branch"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -407,27 +404,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 		repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: config.Driver.RepoConfig.ConfigMapName}}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
-	}
-
-	// for vGPU mode, ensure vgpu host-version and host-branch labels are passed to driver
-	if config.Operator.DefaultGPUMode == gpuv1.VGPU {
-		vgpuLabels, err := getVGPULabels(n)
-		if err != nil {
-			return err
-		}
-		if len(vgpuLabels) == 0 {
-			// cannot deploy driver without vgpu labels
-			return err
-		}
-
-		if value, ok := vgpuLabels[VGPUHostDriverVersionLabel]; ok {
-			hostDriverLabelEnv := corev1.EnvVar{Name: "VGPU_HOST_DRIVER_VERSION", Value: value}
-			obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, hostDriverLabelEnv)
-		}
-		if value, ok := vgpuLabels[VGPUHostDriverBranchLabel]; ok {
-			hostDriverBranchLabelEnv := corev1.EnvVar{Name: "VGPU_HOST_DRIVER_BRANCH", Value: value}
-			obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, hostDriverBranchLabelEnv)
-		}
 	}
 
 	// Inject EUS kernel RPM's as an override to the entrypoint
@@ -1051,49 +1027,4 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
-}
-
-func getVGPULabels(n ClusterPolicyController) (map[string]string, error) {
-	var vgpuLabels map[string]string
-	logger := log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
-	// We need the node labels to fetch the correct container
-	opts := []client.ListOption{
-		client.MatchingLabels{VGPUPresentLabel: "true"},
-	}
-
-	list := &corev1.NodeList{}
-	err := n.rec.client.List(context.TODO(), list, opts...)
-	if err != nil {
-		logger.Info("Could not get nodes with vgpu labels", "ERROR", err)
-		return nil, fmt.Errorf("cannot get node list with vgpu labels, %v", err)
-	}
-
-	if len(list.Items) == 0 {
-		// none of the nodes matched nvidia vGPU label
-		// either the nodes do not have vGPUs, or GFD is not running
-		logger.Info("no nodes found with vgpu label nvidia.com/vgpu.present", "ERROR", "")
-		return nil, fmt.Errorf("no nodes found wiht vgpu label of nvidia.com/vgpu.present")
-	}
-
-	// Assuming all nodes are running on hosts with same vGPU driver version
-	for _, node := range list.Items {
-		nodeLabels := node.GetLabels()
-		// check all required labels are present
-		if _, ok := nodeLabels[VGPUPresentLabel]; !ok {
-			continue
-		}
-		if _, ok := nodeLabels[VGPUHostDriverVersionLabel]; !ok {
-			continue
-		}
-		if _, ok := nodeLabels[VGPUHostDriverBranchLabel]; !ok {
-			continue
-		}
-		vgpuLabels = make(map[string]string)
-		vgpuLabels[VGPUPresentLabel] = nodeLabels[VGPUPresentLabel]
-		vgpuLabels[VGPUHostDriverVersionLabel] = nodeLabels[VGPUHostDriverVersionLabel]
-		vgpuLabels[VGPUHostDriverBranchLabel] = nodeLabels[VGPUHostDriverBranchLabel]
-		break
-	}
-
-	return vgpuLabels, nil
 }

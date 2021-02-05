@@ -44,34 +44,10 @@ func (r Runtime) String() string {
 	}
 }
 
-// GPUMode defines mode in which GPU is attached to the host
-type GPUMode string
-
-const (
-	Passthrough GPUMode = "passthrough"
-	Baremetal   GPUMode = "baremetal"
-	VGPU        GPUMode = "vgpu"
-)
-
-func (r GPUMode) String() string {
-	switch r {
-	case Passthrough:
-		return "passthrough"
-	case Baremetal:
-		return "baremetal"
-	case VGPU:
-		return "vgpu"
-	default:
-		return ""
-	}
-}
-
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio;containerd
-	DefaultRuntime Runtime `json:"defaultRuntime"`
-	// +kubebuilder:validation:Enum=passthrough;baremetal;vgpu
-	DefaultGPUMode GPUMode       `json:"defaultGPUMode"`
+	DefaultRuntime Runtime       `json:"defaultRuntime"`
 	Validator      ValidatorSpec `json:"validator,omitempty"`
 }
 

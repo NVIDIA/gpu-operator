@@ -4279,12 +4279,6 @@ spec:
                   - crio
                   - containerd
                   type: string
-                defaultGPUMode:
-                  enum:
-                  - passthrough
-                  - baremetal
-                  - vgpu
-                  type: string
                 validator:
                   properties:
                     image:
