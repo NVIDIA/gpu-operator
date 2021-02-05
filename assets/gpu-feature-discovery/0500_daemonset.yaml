@@ -21,25 +21,18 @@ spec:
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
-          command: ["sh", "-c"]
-          args: ["export SYS_LIBRARY_PATH=$(ldconfig -v 2>/dev/null | grep -v '^[[:space:]]' | cut -d':' -f1 | tr '[[:space:]]' ':'); \
-          export NVIDIA_LIBRARY_PATH=/run/nvidia/driver/usr/lib/x86_64-linux-gnu/:/run/nvidia/driver/usr/lib64; \
-          export LD_LIBRARY_PATH=${SYS_LIBRARY_PATH}:${NVIDIA_LIBRARY_PATH}; echo ${LD_LIBRARY_PATH}; gpu-feature-discovery"]
           volumeMounts:
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
             - name: dmi-product-name
               mountPath: "/sys/class/dmi/id/product_name"
-            - name: nvidia-install-path
-              mountPath: /run/nvidia
-              mountPropagation: Bidirectional
           env:
             - name: GFD_SLEEP_INTERVAL
               value: 60s
             - name: GFD_MIG_STRATEGY
-              value: none
+              value: single
             - name: GFD_FAIL_ON_INIT_ERROR
-              value: "false"
+              value: "true"
           securityContext:
             privileged: true
       nodeSelector:
@@ -51,6 +44,3 @@ spec:
         - name: dmi-product-name
           hostPath:
             path: "/sys/class/dmi/id/product_name"
-        - name: nvidia-install-path
-          hostPath:
-            path: /run/nvidia

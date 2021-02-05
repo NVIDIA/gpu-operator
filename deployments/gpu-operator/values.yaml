@@ -16,8 +16,6 @@ operator:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   defaultRuntime: docker
-  # Indicates if attached GPU mode is passthrough/vgpu
-  defaultGPUMode: passthrough
   validator:
     image: cuda-sample
     repository: nvcr.io/nvidia/k8s
