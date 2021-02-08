@@ -4279,6 +4279,8 @@ spec:
                   - crio
                   - containerd
                   type: string
+                deployGFD:
+                  type: boolean
                 validator:
                   properties:
                     image:
@@ -4301,6 +4303,7 @@ spec:
                   type: object
               required:
               - defaultRuntime
+              - deployGFD
               type: object
             toolkit:
               description: ComponentSpec defines the properties for individual GPU
