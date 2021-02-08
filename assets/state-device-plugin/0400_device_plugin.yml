@@ -36,7 +36,7 @@ spec:
         command: ['sh', '-c']
         args: ["/tmp/vectorAdd"]
         securityContext:
-          allowPrivilegeEscalation: false
+          privileged: true
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin-ctr
@@ -44,6 +44,8 @@ spec:
           privileged: true
         env:
           - name: NVIDIA_VISIBLE_DEVICES
+            value: all
+          - name: NVIDIA_DRIVER_CAPABILITIES
             value: all
         volumeMounts:
           - name: device-plugin
