@@ -64,7 +64,7 @@ driver:
 toolkit:
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: 1.4.3-ubuntu18.04
+  version: 1.4.4-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -89,14 +89,15 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.7.3
+  version: v0.8.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args:
-    - "--mig-strategy=none"
+    - "--mig-strategy=single"
     - "--pass-device-specs=false"
     - "--fail-on-init-error=true"
     - "--device-list-strategy=envvar"
+    - "--nvidia-driver-root=/run/nvidia/driver"
   env: []
   tolerations: []
   nodeSelector:
@@ -126,7 +127,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.3.0
+  version: v0.4.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
@@ -137,7 +138,7 @@ gfd:
   podSecurityContext: {}
   securityContext: {}
   resources: {}
-  migStrategy: none
+  migStrategy: single
   discoveryIntervalSeconds: 60
 
 node-feature-discovery:
