@@ -37,7 +37,7 @@ GOOS         := linux
 ##### Public rules #####
 
 all: build verify
-verify: fmt lint test vet assign
+verify: fmt lint test vet misspell assign
 
 build:
 	GOOS=$(GOOS) CGO_ENABLED=$(CGO_ENABLED) go build -o $(BIN_NAME) $(MAIN_PACKAGE)
@@ -48,8 +48,7 @@ fmt:
 	if [ -s fmt.out ]; then cat fmt.out; rm fmt.out; exit 1; else rm fmt.out; fi
 
 lint:
-	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
-		| sort -u | xargs golint -set_exit_status
+	golint -set_exit_status ./...
 
 vet:
 	go vet $(PACKAGE)/...
@@ -58,8 +57,10 @@ test:
 	go test $(PACKAGE)/cmd/... $(PACKAGE)/pkg/... -coverprofile cover.out
 
 assign:
-	find . -not \( \( -wholename './.*' -o -wholename '*/vendor/*' \) -prune \) -name '*.go' \
-		| sort -u | xargs ineffassign
+	ineffassign $(PACKAGE)/...
+
+misspell:
+	misspell $(CURDIR)
 
 clean:
 	go clean
