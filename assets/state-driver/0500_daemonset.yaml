@@ -46,6 +46,8 @@ spec:
             mountPath: /etc/containers/oci/hooks.d
           - name: var-log
             mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
       volumes:
         - name: run-nvidia
           hostPath:
@@ -53,6 +55,9 @@ spec:
         - name: var-log
           hostPath:
             path: /var/log
+        - name: dev-log
+          hostPath:
+            path: /dev/log
         - name: config
           configMap:
             name: nvidia-driver
