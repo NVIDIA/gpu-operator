@@ -52,12 +52,9 @@ go-lint:
   image: golang:1.13
   services:
     - docker:stable-dind
-  before_script:
-    - mkdir -p ${GOPATH}/src/github.com/NVIDIA/
-    - ln -s ${CI_PROJECT_DIR} ${GOPATH}/src/github.com/NVIDIA/gpu-feature-discovery
   script:
-    - go get -u golang.org/x/lint/golint
-    - golint -set_exit_status github.com/NVIDIA/gpu-feature-discovery
+    - GO111MODULE=off go get -u golang.org/x/lint/golint
+    - make lint
 
 go-fmt:
   stage: lint
@@ -66,25 +63,23 @@ go-fmt:
   services:
     - docker:stable-dind
   script:
-    - res=$(gofmt -l pkg/ cmd/)
-    - echo "$res"
-    - test -z "$res"
+    - make fmt
 
 ineffassign:
   stage: lint
   allow_failure: true
   image: golang:1.13
   script:
-    - go get -u github.com/gordonklaus/ineffassign
-    - ineffassign *.go
+    - GO111MODULE=off go get -u github.com/gordonklaus/ineffassign
+    - make assign
 
 misspell:
   stage: lint
   allow_failure: true
   image: golang:1.13
   script:
-    - go get -u github.com/client9/misspell/cmd/misspell
-    - misspell *.go
+    - GO111MODULE=off go get -u github.com/client9/misspell/cmd/misspell
+    - make misspell
 
 build-image:
   stage: build
@@ -108,7 +103,7 @@ unit-tests:
   script:
     - apk add --update make
     - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
-    - docker run -t nvidia/gpu-operator:devel make lint test
+    - docker run -t nvidia/gpu-operator:devel make test
   dependencies:
     - build-image
 
