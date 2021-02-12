@@ -15,19 +15,29 @@ import (
 
 // ClusterPolicySpec defines the desired state of ClusterPolicy
 type ClusterPolicySpec struct {
-	Operator            OperatorSpec            `json:"operator"`
-	Driver              ComponentSpec           `json:"driver"`
-	Toolkit             ComponentSpec           `json:"toolkit"`
-	DevicePlugin        ComponentSpec           `json:"devicePlugin"`
-	DCGMExporter        ComponentSpec           `json:"dcgmExporter"`
+	// Operator component spec
+	Operator OperatorSpec `json:"operator"`
+	// Driver component spec
+	Driver ComponentSpec `json:"driver"`
+	// Toolkit component spec
+	Toolkit ComponentSpec `json:"toolkit"`
+	// DevicePlugin component spec
+	DevicePlugin ComponentSpec `json:"devicePlugin"`
+	// DCGMExporter spec
+	DCGMExporter ComponentSpec `json:"dcgmExporter"`
+	// GPUFeatureDiscovery spec
 	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
 }
 
+// Runtime defines container runtime type
 type Runtime string
 
 const (
-	Docker     Runtime = "docker"
-	CRIO       Runtime = "crio"
+	// Docker runtime
+	Docker Runtime = "docker"
+	// CRIO runtime
+	CRIO Runtime = "crio"
+	// Containerd runtime
 	Containerd Runtime = "containerd"
 )
 
@@ -51,6 +61,7 @@ type OperatorSpec struct {
 	Validator      ValidatorSpec `json:"validator,omitempty"`
 }
 
+// ValidatorSpec describes configuration options for validation pod
 type ValidatorSpec struct {
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.\-\/]+
 	Repository string `json:"repository,omitempty"`
@@ -239,20 +250,28 @@ type GPUFeatureDiscoverySpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// MigStrategy indicates MIG mode
 type MigStrategy string
 
 // Constants representing different MIG strategies.
 const (
-	MigStrategyNone   MigStrategy = "none"
+	// MigStrategyNone indicates MIG mode disabled.
+	MigStrategyNone MigStrategy = "none"
+	// MigStrategySingle indicates Single MIG mode
 	MigStrategySingle MigStrategy = "single"
-	MigStrategyMixed  MigStrategy = "mixed"
+	// MigStrategyMixed indicates Mixed MIG mode
+	MigStrategyMixed MigStrategy = "mixed"
 )
 
+// State indicates state of GPU operator components
 type State string
 
 const (
-	Ignored  State = "ignored"
-	Ready    State = "ready"
+	// Ignored indicates duplicate ClusterPolicy instances and rest are ignored.
+	Ignored State = "ignored"
+	// Ready indicates all components of ClusterPolicy are ready
+	Ready State = "ready"
+	// NotReady indicates some/all components of ClusterPolicy are not ready
 	NotReady State = "notReady"
 )
 
@@ -288,10 +307,12 @@ func init() {
 	SchemeBuilder.Register(&ClusterPolicy{}, &ClusterPolicyList{})
 }
 
+// SetState sets state of ClusterPolicy instance
 func (p *ClusterPolicy) SetState(s State) {
 	p.Status.State = s
 }
 
+// ImagePath sets component image path
 func (c *ComponentSpec) ImagePath() string {
 	// use @ if image digest is specified instead of tag
 	if strings.HasPrefix(c.Version, "sha256:") {
@@ -300,6 +321,7 @@ func (c *ComponentSpec) ImagePath() string {
 	return c.Repository + "/" + c.Image + ":" + c.Version
 }
 
+// ImagePolicy sets component image pull policy
 func (c *ComponentSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 	var imagePullPolicy corev1.PullPolicy
 	switch pullPolicy {
@@ -315,6 +337,7 @@ func (c *ComponentSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 	return imagePullPolicy
 }
 
+// ImagePath sets image path for GFD component
 func (g *GPUFeatureDiscoverySpec) ImagePath() string {
 	// use @ if image digest is specified instead of tag
 	if strings.HasPrefix(g.Version, "sha256:") {
@@ -323,6 +346,7 @@ func (g *GPUFeatureDiscoverySpec) ImagePath() string {
 	return g.Repository + "/" + g.Image + ":" + g.Version
 }
 
+// ImagePolicy sets image pull policy for GFD component
 func (g *GPUFeatureDiscoverySpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 	var imagePullPolicy corev1.PullPolicy
 	switch pullPolicy {
@@ -338,6 +362,7 @@ func (g *GPUFeatureDiscoverySpec) ImagePolicy(pullPolicy string) corev1.PullPoli
 	return imagePullPolicy
 }
 
+// ImagePath sets image path for GFD component
 func (v *ValidatorSpec) ImagePath() string {
 	// use @ if image digest is specified instead of tag
 	if strings.HasPrefix(v.Version, "sha256:") {
@@ -346,7 +371,8 @@ func (v *ValidatorSpec) ImagePath() string {
 	return v.Repository + "/" + v.Image + ":" + v.Version
 }
 
-func (g *ValidatorSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
+// ImagePolicy sets image pull policy for validation pod
+func (v *ValidatorSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
 	var imagePullPolicy corev1.PullPolicy
 	switch pullPolicy {
 	case "Always":

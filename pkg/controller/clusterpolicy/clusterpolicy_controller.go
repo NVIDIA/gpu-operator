@@ -120,17 +120,17 @@ func addWatchNewGPUNode(c controller.Controller, mgr manager.Manager, r reconcil
 				return []reconcile.Request{}
 			}
 
-			cp_to_rec := []reconcile.Request{}
+			cpToRec := []reconcile.Request{}
 
 			for _, cp := range list.Items {
-				cp_to_rec = append(cp_to_rec, reconcile.Request{NamespacedName: types.NamespacedName{
+				cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
 					Name:      cp.ObjectMeta.GetName(),
 					Namespace: cp.ObjectMeta.GetNamespace(),
 				}})
 			}
-			log.Info("Reconciliate ClusterPolicies after node label update", "nb", len(cp_to_rec))
+			log.Info("Reconciliate ClusterPolicies after node label update", "nb", len(cpToRec))
 
-			return cp_to_rec
+			return cpToRec
 		})
 
 	err := c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestsFromMapFunc{

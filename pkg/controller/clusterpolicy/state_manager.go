@@ -35,6 +35,7 @@ type state interface {
 	last()
 }
 
+// ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
 	singleton *gpuv1.ClusterPolicy
 
@@ -55,6 +56,7 @@ func addState(n *ClusterPolicyController, path string) error {
 	return nil
 }
 
+// OpenshiftVersion fetches OCP version
 func OpenshiftVersion() (string, error) {
 	cfg := config.GetConfigOrDie()
 	client, err := configv1.NewForConfig(cfg)
@@ -75,9 +77,8 @@ func OpenshiftVersion() (string, error) {
 		ocpV := strings.Split(condition.Version, ".")
 		if len(ocpV) > 1 {
 			return ocpV[0] + "." + ocpV[1], nil
-		} else {
-			return ocpV[0], nil
 		}
+		return ocpV[0], nil
 	}
 
 	return "", fmt.Errorf("Failed to find Completed Cluster Version")
