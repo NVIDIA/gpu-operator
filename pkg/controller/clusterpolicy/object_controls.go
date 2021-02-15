@@ -20,14 +20,19 @@ import (
 )
 
 const (
+	// DefaultContainerdConfigFile indicates default config file path for containerd
 	DefaultContainerdConfigFile = "/etc/containerd/config.toml"
+	// DefaultContainerdSocketFile indicates default containerd socket file
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
-	DefaultDockerConfigFile     = "/etc/docker/daemon.json"
-	DefaultDockerSocketFile     = "/var/run/docker.sock"
+	// DefaultDockerConfigFile indicates default config file path for docker
+	DefaultDockerConfigFile = "/etc/docker/daemon.json"
+	// DefaultDockerSocketFile indicates default docker socket file
+	DefaultDockerSocketFile = "/var/run/docker.sock"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
+// ServiceAccount creates ServiceAccount resource
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
@@ -50,6 +55,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// Role creates Role resource
 func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
@@ -72,6 +78,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// RoleBinding creates RoleBinding resource
 func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].RoleBinding.DeepCopy()
@@ -94,6 +101,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// ClusterRole creates ClusterRole resource
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ClusterRole.DeepCopy()
@@ -116,6 +124,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// ClusterRoleBinding creates ClusterRoleBinding resource
 func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
@@ -138,6 +147,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// ConfigMap creates ConfigMap resource
 func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ConfigMap.DeepCopy()
@@ -836,6 +846,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	return isPodReady(name, n, "Running")
 }
 
+// Deployment creates Deployment resource
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Deployment.DeepCopy()
@@ -859,6 +870,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	return isDeploymentReady(obj.Name, n), nil
 }
 
+// DaemonSet creates Daemonset resource
 func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].DaemonSet.DeepCopy()
@@ -916,6 +928,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	return gpuv1.Ready
 }
 
+// Pod creates pod resource
 func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
@@ -963,6 +976,7 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
 	return nil
 }
 
+// SecurityContextConstraints creates SCC resources
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
@@ -985,6 +999,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	return gpuv1.Ready, nil
 }
 
+// Service creates Service object
 func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Service.DeepCopy()
@@ -1007,6 +1022,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+// ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()

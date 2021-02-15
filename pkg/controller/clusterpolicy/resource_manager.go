@@ -24,6 +24,7 @@ type assetsFromFile []byte
 
 var manifests []assetsFromFile
 
+// Resources indicates resources managed by GPU operator
 type Resources struct {
 	ServiceAccount             corev1.ServiceAccount
 	Role                       rbacv1.Role
