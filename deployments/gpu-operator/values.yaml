@@ -94,7 +94,7 @@ devicePlugin:
   imagePullSecrets: []
   args:
     - "--mig-strategy=single"
-    - "--pass-device-specs=false"
+    - "--pass-device-specs=true"
     - "--fail-on-init-error=true"
     - "--device-list-strategy=envvar"
     - "--nvidia-driver-root=/run/nvidia/driver"
