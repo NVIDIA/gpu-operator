@@ -37,7 +37,7 @@ spec:
         command: ['sh', '-c']
         args: ["/tmp/vectorAdd"]
         securityContext:
-          allowPrivilegeEscalation: false
+          privileged: true
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
