@@ -10,11 +10,14 @@ import (
 	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/pkg/apis/nvidia/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -28,6 +31,14 @@ const (
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
+	// TrustedCAConfigMapName indicates configmap with custom user CA injected
+	TrustedCAConfigMapName = "gpu-operator-trusted-ca"
+	// TrustedCABundleFileName indicates custom user ca certificate filename
+	TrustedCABundleFileName = "ca-bundle.crt"
+	// TrustedCABundleMountDir indicates target mount directory of user ca bundle
+	TrustedCABundleMountDir = "/etc/pki/ca-trust/extracted/pem"
+	// TrustedCACertificate indicates injected CA certificate name
+	TrustedCACertificate = "tls-ca-bundle.pem"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -439,7 +450,143 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhelVersion)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocpVersion)
 
+	// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+	// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
+	if ocpV != "" {
+		err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// applyOCPProxySpec applies proxy settings to podSpec
+func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error {
+	// Pass HTTPS_PROXY, HTTP_PROXY and NO_PROXY env if set in clusterwide proxy for OCP
+	proxy, err := GetClusterWideProxy()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get clusterwide proxy object: %s", err)
+	}
+
+	if proxy == nil {
+		// no clusterwide proxy configured
+		return nil
+	}
+
+	proxyEnv := getProxyEnv(proxy)
+	if len(proxyEnv) != 0 {
+		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, proxyEnv...)
+	}
+
+	// if user-ca-bundle is setup in proxy,  create a trusted-ca configmap and add volume mount
+	if proxy.Spec.TrustedCA.Name == "" {
+		return nil
+	}
+
+	// create trusted-ca configmap to inject custom user ca bundle into it
+	_, err = getOrCreateTrustedCAConfigMap(n, TrustedCAConfigMapName)
+	if err != nil {
+		return err
+	}
+
+	// mount trusted-ca configmap
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+		corev1.VolumeMount{
+			Name:      TrustedCAConfigMapName,
+			ReadOnly:  true,
+			MountPath: TrustedCABundleMountDir,
+		})
+	podSpec.Volumes = append(podSpec.Volumes,
+		v1.Volume{
+			Name: TrustedCAConfigMapName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: TrustedCAConfigMapName,
+					},
+					Items: []v1.KeyToPath{
+						{
+							Key:  TrustedCABundleFileName,
+							Path: TrustedCACertificate,
+						},
+					},
+				},
+			},
+		})
+	return nil
+}
+
+// getOrCreateTrustedCAConfigMap creates or returns an existing Trusted CA Bundle ConfigMap.
+func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "gpu-operator-resources",
+		},
+		Data: map[string]string{
+			TrustedCABundleFileName: "",
+		},
+	}
+
+	// apply label "config.openshift.io/inject-trusted-cabundle: true", so that cert is automatically filled/updated.
+	configMap.ObjectMeta.Labels = make(map[string]string)
+	configMap.ObjectMeta.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
+
+	logger := log.WithValues("ConfigMap", configMap.ObjectMeta.Name, "Namespace", configMap.ObjectMeta.Namespace)
+
+	if err := controllerutil.SetControllerReference(n.singleton, configMap, n.rec.scheme); err != nil {
+		return nil, err
+	}
+
+	found := &corev1.ConfigMap{}
+	err := n.rec.client.Get(context.TODO(), types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating")
+		err = n.rec.client.Create(context.TODO(), configMap)
+		if err != nil {
+			logger.Info("Couldn't create")
+			return nil, fmt.Errorf("failed to create trusted CA bundle config map %q: %s", name, err)
+		}
+		return configMap, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get trusted CA bundle config map %q: %s", name, err)
+	}
+
+	return found, nil
+}
+
+// get proxy env variables from cluster wide proxy in OCP
+func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
+	envVars := []v1.EnvVar{}
+	if proxyConfig == nil {
+		return envVars
+	}
+	proxies := map[string]string{
+		"HTTPS_PROXY": proxyConfig.Spec.HTTPSProxy,
+		"HTTP_PROXY":  proxyConfig.Spec.HTTPProxy,
+		"NO_PROXY":    proxyConfig.Spec.NoProxy,
+	}
+	for e, v := range proxies {
+		if len(v) == 0 {
+			continue
+		}
+		upperCaseEnvvar := v1.EnvVar{
+			Name:  strings.ToUpper(e),
+			Value: v,
+		}
+		lowerCaseEnvvar := v1.EnvVar{
+			Name:  strings.ToLower(e),
+			Value: v,
+		}
+		envVars = append(envVars, upperCaseEnvvar, lowerCaseEnvvar)
+	}
+
+	return envVars
 }
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy

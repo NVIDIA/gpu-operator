@@ -8,6 +8,12 @@ metadata:
     {{ $.Release.labels }}
 rules:
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - proxies
+  verbs:
+  - get
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - roles
