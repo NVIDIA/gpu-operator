@@ -9,6 +9,7 @@ import (
 	promv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	secv1 "github.com/openshift/api/security/v1"
 
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -82,6 +83,21 @@ func OpenshiftVersion() (string, error) {
 	}
 
 	return "", fmt.Errorf("Failed to find Completed Cluster Version")
+}
+
+// GetClusterWideProxy returns cluster wide proxy object setup in OCP
+func GetClusterWideProxy() (*apiconfigv1.Proxy, error) {
+	cfg := config.GetConfigOrDie()
+	client, err := configv1.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	proxy, err := client.Proxies().Get("cluster", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return proxy, nil
 }
 
 // hasCommonGPULabel returns true if common Nvidia GPU label exists among provided node labels
