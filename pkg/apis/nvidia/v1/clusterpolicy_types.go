@@ -158,6 +158,11 @@ type ComponentSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For Driver Container"
 	RepoConfig *DriverRepoConfigSpec `json:"repoConfig,omitempty"`
+
+	// Optional: Licensing configuration for vGPU drivers
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For Driver Container"
+	LicensingConfig *DriverLicensingConfigSpec `json:"licensingConfig,omitempty"`
 }
 
 // DriverRepoConfigSpec defines custom repo configuration for driver container
@@ -173,6 +178,15 @@ type DriverRepoConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Destination Mount Directory"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	DestinationDir string `json:"destinationDir,omitempty"`
+}
+
+// DriverLicensingConfigSpec defines licensing server configuration for driver container
+type DriverLicensingConfigSpec struct {
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\.\-\/]+
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	ConfigMapName string `json:"configMapName,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin

@@ -60,6 +60,13 @@ driver:
     seLinuxOptions:
       level: "s0"
   resources: {}
+  # private mirror repository configuration
+  repoConfig:
+    configMapName: ""
+    destinationDir: ""
+  # vGPU licensing configuration
+  licensingConfig:
+    configMapName: ""
 
 toolkit:
   repository: nvcr.io/nvidia/k8s

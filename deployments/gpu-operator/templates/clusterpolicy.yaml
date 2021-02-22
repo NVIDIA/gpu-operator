@@ -51,6 +51,9 @@ spec:
     {{- if .Values.driver.repoConfig }}
     repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.licensingConfig }}
+    licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
+    {{- end }}
     {{- if .Values.driver.tolerations }}
     tolerations: {{ toYaml .Values.driver.tolerations | nindent 6 }}
     {{- end }}
