@@ -889,6 +889,12 @@ spec:
                     destinationDir:
                       type: string
                   type: object
+                licensingConfig:
+                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
+                  properties:
+                    configMapName:
+                      type: string
+                  type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
                   type: string
@@ -1948,6 +1954,12 @@ spec:
                     destinationDir:
                       type: string
                   type: object
+                licensingConfig:
+                  description: 'Optional: Licensing configuration for NVIDIA vGPU driver'
+                  properties:
+                    configMapName:
+                      type: string
+                  type: object
                 repository:
                   pattern: '[a-zA-Z0-9\.\-\/]+'
                   type: string
@@ -3005,6 +3017,12 @@ spec:
                     configMapName:
                       type: string
                     destinationDir:
+                      type: string
+                  type: object
+                licensingConfig:
+                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
+                  properties:
+                    configMapName:
                       type: string
                   type: object
                 repository:
@@ -5158,6 +5176,12 @@ spec:
                     configMapName:
                       type: string
                     destinationDir:
+                      type: string
+                  type: object
+                licensingConfig:
+                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
+                  properties:
+                    configMapName:
                       type: string
                   type: object
                 repository:

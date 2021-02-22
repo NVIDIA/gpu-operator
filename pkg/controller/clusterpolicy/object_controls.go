@@ -39,6 +39,10 @@ const (
 	TrustedCABundleMountDir = "/etc/pki/ca-trust/extracted/pem"
 	// TrustedCACertificate indicates injected CA certificate name
 	TrustedCACertificate = "tls-ca-bundle.pem"
+	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration file
+	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
+	// VGPULicensingFileName is the vGPU licensing configuration filename
+	VGPULicensingFileName = "gridd.conf"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -423,8 +427,37 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		repoConfigVolMount := corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: config.Driver.RepoConfig.DestinationDir}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, repoConfigVolMount)
 
-		repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: config.Driver.RepoConfig.ConfigMapName}}}}
+		repoConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.RepoConfig.ConfigMapName,
+				},
+			},
+		}
+		repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: repoConfigVolumeSource}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
+	}
+
+	// set any licensing configuration required
+	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
+		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, licensingConfigVolMount)
+
+		licensingConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.LicensingConfig.ConfigMapName,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  VGPULicensingFileName,
+						Path: VGPULicensingFileName,
+					},
+				},
+			},
+		}
+		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
 	}
 
 	// Inject EUS kernel RPM's as an override to the entrypoint
