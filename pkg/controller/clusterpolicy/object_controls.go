@@ -973,6 +973,19 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 		}
 	}
 
+	// set node selector if specified for device-plugin
+	if len(config.DevicePlugin.NodeSelector) > 0 {
+		obj.Spec.NodeSelector = config.DevicePlugin.NodeSelector
+	}
+	// set node affinity if specified for device-plugin
+	if config.DevicePlugin.Affinity != nil {
+		obj.Spec.Affinity = config.DevicePlugin.Affinity
+	}
+	// set tolerations if specified for device-plugin
+	if len(config.DevicePlugin.Tolerations) > 0 {
+		obj.Spec.Tolerations = config.DevicePlugin.Tolerations
+	}
+
 	return nil
 }
 
