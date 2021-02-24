@@ -43,7 +43,7 @@ operator:
 driver:
   repository: nvcr.io/nvidia
   image: driver
-  version: "450.80.02"
+  version: "460.32.03"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -71,7 +71,7 @@ driver:
 toolkit:
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: 1.4.4-ubuntu18.04
+  version: 1.4.5-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -96,7 +96,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.8.1
+  version: v0.8.2-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args:
@@ -118,7 +118,7 @@ devicePlugin:
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.0.13-2.1.2-ubuntu20.04
+  version: 2.1.4-2.2.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   args:
     - "-f"
@@ -134,7 +134,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.4.0
+  version: v0.4.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []

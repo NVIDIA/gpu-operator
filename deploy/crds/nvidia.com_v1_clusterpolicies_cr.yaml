@@ -5,69 +5,120 @@ metadata:
 spec:
   operator:
     defaultRuntime: crio
-    deployGFD: true
+    repository: nvcr.io/nvidia
+    image: gpu-operator
+    version: 1.6.0
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    defaultRuntime: docker
     validator:
-      repository: nvcr.io/nvidia/k8s
       image: cuda-sample
-      version: "vectoradd-cuda10.2-ubi8"
-      imagePullSecrets: []
+      repository: nvcr.io/nvidia/k8s
+      version: vectoradd-cuda10.2-ubi8
+      imagePullPolicy: IfNotPresent
+    tolerations: []
+    affinity: {}
+    logging:
+      timeEncoding: epoch
+
   driver:
     repository: nvcr.io/nvidia
     image: driver
-    version: "450.80.02"
-    tolerations: []
-    nodeSelector: {}
+    version: "460.32.03"
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    env: []
+    tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     affinity: {}
     podSecurityContext: {}
-    securityContext: {}
+    securityContext:
+      privileged: true
+      seLinuxOptions:
+        level: "s0"
     resources: {}
+    # private mirror repository configuration
+    repoConfig:
+      configMapName: ""
+      destinationDir: ""
+    # vGPU licensing configuration
+    licensingConfig:
+      configMapName: ""
+
   toolkit:
     repository: nvcr.io/nvidia/k8s
-    version: 1.4.3-ubi8
     image: container-toolkit
+    version: 1.4.5-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    env: []
     tolerations: []
-    nodeSelector: {}
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     affinity: {}
     podSecurityContext: {}
-    securityContext: {}
+    securityContext:
+      privileged: true
+      seLinuxOptions:
+        level: "s0"
     resources: {}
+
   devicePlugin:
     repository: nvcr.io/nvidia
     image: k8s-device-plugin
-    version: v0.7.3-ubi8
+    version: v0.8.1-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
     args:
-      - "--mig-strategy=none"
-      - "--pass-device-specs=false"
+      - "--mig-strategy=single"
+      - "--pass-device-specs=true"
       - "--fail-on-init-error=true"
       - "--device-list-strategy=envvar"
+      - "--nvidia-driver-root=/run/nvidia/driver"
+    env: []
     tolerations: []
-    nodeSelector: {}
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     affinity: {}
     podSecurityContext: {}
-    securityContext: {}
+    securityContext:
+      privileged: true
     resources: {}
+
   dcgmExporter:
     repository: nvcr.io/nvidia/k8s
     image: dcgm-exporter
-    version: 2.0.13-2.1.2-ubi8
+    version: 2.1.4-2.2.0-ubi8
+    imagePullPolicy: IfNotPresent
     args:
       - "-f"
-      - "/etc/dcgm-exporter/default-counters.csv"
+      - "/etc/dcgm-exporter/dcp-metrics-included.csv"
+    env: []
     tolerations: []
-    nodeSelector: {}
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext: {}
     resources: {}
+
   gfd:
     repository: nvcr.io/nvidia
     image: gpu-feature-discovery
-    version: v0.3.0
+    version: v0.4.0
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
     tolerations: []
-    nodeSelector: {}
+    env: []
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext: {}
     resources: {}
-    migStrategy: none
+    migStrategy: single
     discoveryIntervalSeconds: 60
