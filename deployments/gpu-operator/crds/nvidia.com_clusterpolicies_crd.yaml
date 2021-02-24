@@ -1095,101 +1095,17 @@ spec:
                         required:
                         - type
                         type: object
-                      type: array
-                    windowsOptions:
-                      description: The Windows specific settings applied to all containers.
-                        If unspecified, the options within a container's SecurityContext
-                        will be used. If set in both SecurityContext and PodSecurityContext,
-                        the value specified in SecurityContext takes precedence.
-                      properties:
-                        gmsaCredentialSpec:
-                          description: GMSACredentialSpec is where the GMSA admission
-                            webhook (https://github.com/kubernetes-sigs/windows-gmsa)
-                            inlines the contents of the GMSA credential spec named
-                            by the GMSACredentialSpecName field. This field is alpha-level
-                            and is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        gmsaCredentialSpecName:
-                          description: GMSACredentialSpecName is the name of the GMSA
-                            credential spec to use. This field is alpha-level and
-                            is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        runAsUserName:
-                          description: The UserName in Windows to run the entrypoint
-                            of the container process. Defaults to the user specified
-                            in image metadata if unspecified. May also be set in PodSecurityContext.
-                            If set in both SecurityContext and PodSecurityContext,
-                            the value specified in SecurityContext takes precedence.
-                            This field is beta-level and may be disabled with the
-                            WindowsRunAsUserName feature flag.
-                          type: string
-                      type: object
-                  type: object
-                repoConfig:
-                  description: 'Optional: Custom repo configuration for driver container'
-                  properties:
-                    configMapName:
-                      type: string
-                    destinationDir:
-                      type: string
-                  type: object
-                licensingConfig:
-                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
-                  properties:
-                    configMapName:
-                      type: string
-                  type: object
-                repository:
-                  pattern: '[a-zA-Z0-9\.\-\/]+'
-                  type: string
-                resources:
-                  description: 'Optional: Define resources requests and limits for
-                    each pod'
-                  properties:
-                    limits:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                    requests:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Requests describes the minimum amount of compute
-                        resources required. If Requests is omitted for a container,
-                        it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                  type: object
-                securityContext:
-                  description: 'Optional: Security Context'
-                  properties:
-                    allowPrivilegeEscalation:
-                      description: 'AllowPrivilegeEscalation controls whether a process
-                        can gain more privileges than its parent process. This bool
-                        directly controls if the no_new_privs flag will be set on
-                        the container process. AllowPrivilegeEscalation is true always
-                        when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
-                      type: boolean
-                    capabilities:
-                      description: The capabilities to add/drop when running containers.
-                        Defaults to the default set of capabilities granted by the
-                        container runtime.
-                      properties:
-                        add:
-                          description: Added capabilities
-                          items:
-                            description: Capability represent POSIX capabilities type
+                      windowsOptions:
+                        description: The Windows specific settings applied to all
+                          containers. If unspecified, the options from the PodSecurityContext
+                          will be used. If set in both SecurityContext and PodSecurityContext,
+                          the value specified in SecurityContext takes precedence.
+                        properties:
+                          gmsaCredentialSpec:
+                            description: GMSACredentialSpec is where the GMSA admission
+                              webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                              inlines the contents of the GMSA credential spec named
+                              by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
                             description: GMSACredentialSpecName is the name of the
@@ -2314,101 +2230,17 @@ spec:
                         required:
                         - type
                         type: object
-                      type: array
-                    windowsOptions:
-                      description: The Windows specific settings applied to all containers.
-                        If unspecified, the options within a container's SecurityContext
-                        will be used. If set in both SecurityContext and PodSecurityContext,
-                        the value specified in SecurityContext takes precedence.
-                      properties:
-                        gmsaCredentialSpec:
-                          description: GMSACredentialSpec is where the GMSA admission
-                            webhook (https://github.com/kubernetes-sigs/windows-gmsa)
-                            inlines the contents of the GMSA credential spec named
-                            by the GMSACredentialSpecName field. This field is alpha-level
-                            and is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        gmsaCredentialSpecName:
-                          description: GMSACredentialSpecName is the name of the GMSA
-                            credential spec to use. This field is alpha-level and
-                            is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        runAsUserName:
-                          description: The UserName in Windows to run the entrypoint
-                            of the container process. Defaults to the user specified
-                            in image metadata if unspecified. May also be set in PodSecurityContext.
-                            If set in both SecurityContext and PodSecurityContext,
-                            the value specified in SecurityContext takes precedence.
-                            This field is beta-level and may be disabled with the
-                            WindowsRunAsUserName feature flag.
-                          type: string
-                      type: object
-                  type: object
-                repoConfig:
-                  description: 'Optional: Custom repo configuration for driver container'
-                  properties:
-                    configMapName:
-                      type: string
-                    destinationDir:
-                      type: string
-                  type: object
-                licensingConfig:
-                  description: 'Optional: Licensing configuration for NVIDIA vGPU driver'
-                  properties:
-                    configMapName:
-                      type: string
-                  type: object
-                repository:
-                  pattern: '[a-zA-Z0-9\.\-\/]+'
-                  type: string
-                resources:
-                  description: 'Optional: Define resources requests and limits for
-                    each pod'
-                  properties:
-                    limits:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                    requests:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Requests describes the minimum amount of compute
-                        resources required. If Requests is omitted for a container,
-                        it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                  type: object
-                securityContext:
-                  description: 'Optional: Security Context'
-                  properties:
-                    allowPrivilegeEscalation:
-                      description: 'AllowPrivilegeEscalation controls whether a process
-                        can gain more privileges than its parent process. This bool
-                        directly controls if the no_new_privs flag will be set on
-                        the container process. AllowPrivilegeEscalation is true always
-                        when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
-                      type: boolean
-                    capabilities:
-                      description: The capabilities to add/drop when running containers.
-                        Defaults to the default set of capabilities granted by the
-                        container runtime.
-                      properties:
-                        add:
-                          description: Added capabilities
-                          items:
-                            description: Capability represent POSIX capabilities type
+                      windowsOptions:
+                        description: The Windows specific settings applied to all
+                          containers. If unspecified, the options from the PodSecurityContext
+                          will be used. If set in both SecurityContext and PodSecurityContext,
+                          the value specified in SecurityContext takes precedence.
+                        properties:
+                          gmsaCredentialSpec:
+                            description: GMSACredentialSpec is where the GMSA admission
+                              webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                              inlines the contents of the GMSA credential spec named
+                              by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
                             description: GMSACredentialSpecName is the name of the
@@ -3533,101 +3365,17 @@ spec:
                         required:
                         - type
                         type: object
-                      type: array
-                    windowsOptions:
-                      description: The Windows specific settings applied to all containers.
-                        If unspecified, the options within a container's SecurityContext
-                        will be used. If set in both SecurityContext and PodSecurityContext,
-                        the value specified in SecurityContext takes precedence.
-                      properties:
-                        gmsaCredentialSpec:
-                          description: GMSACredentialSpec is where the GMSA admission
-                            webhook (https://github.com/kubernetes-sigs/windows-gmsa)
-                            inlines the contents of the GMSA credential spec named
-                            by the GMSACredentialSpecName field. This field is alpha-level
-                            and is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        gmsaCredentialSpecName:
-                          description: GMSACredentialSpecName is the name of the GMSA
-                            credential spec to use. This field is alpha-level and
-                            is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        runAsUserName:
-                          description: The UserName in Windows to run the entrypoint
-                            of the container process. Defaults to the user specified
-                            in image metadata if unspecified. May also be set in PodSecurityContext.
-                            If set in both SecurityContext and PodSecurityContext,
-                            the value specified in SecurityContext takes precedence.
-                            This field is beta-level and may be disabled with the
-                            WindowsRunAsUserName feature flag.
-                          type: string
-                      type: object
-                  type: object
-                repoConfig:
-                  description: 'Optional: Custom repo configuration for driver container'
-                  properties:
-                    configMapName:
-                      type: string
-                    destinationDir:
-                      type: string
-                  type: object
-                licensingConfig:
-                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
-                  properties:
-                    configMapName:
-                      type: string
-                  type: object
-                repository:
-                  pattern: '[a-zA-Z0-9\.\-\/]+'
-                  type: string
-                resources:
-                  description: 'Optional: Define resources requests and limits for
-                    each pod'
-                  properties:
-                    limits:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                    requests:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Requests describes the minimum amount of compute
-                        resources required. If Requests is omitted for a container,
-                        it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                  type: object
-                securityContext:
-                  description: 'Optional: Security Context'
-                  properties:
-                    allowPrivilegeEscalation:
-                      description: 'AllowPrivilegeEscalation controls whether a process
-                        can gain more privileges than its parent process. This bool
-                        directly controls if the no_new_privs flag will be set on
-                        the container process. AllowPrivilegeEscalation is true always
-                        when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
-                      type: boolean
-                    capabilities:
-                      description: The capabilities to add/drop when running containers.
-                        Defaults to the default set of capabilities granted by the
-                        container runtime.
-                      properties:
-                        add:
-                          description: Added capabilities
-                          items:
-                            description: Capability represent POSIX capabilities type
+                      windowsOptions:
+                        description: The Windows specific settings applied to all
+                          containers. If unspecified, the options from the PodSecurityContext
+                          will be used. If set in both SecurityContext and PodSecurityContext,
+                          the value specified in SecurityContext takes precedence.
+                        properties:
+                          gmsaCredentialSpec:
+                            description: GMSACredentialSpec is where the GMSA admission
+                              webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                              inlines the contents of the GMSA credential spec named
+                              by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
                             description: GMSACredentialSpecName is the name of the
@@ -5920,101 +5668,17 @@ spec:
                         required:
                         - type
                         type: object
-                      type: array
-                    windowsOptions:
-                      description: The Windows specific settings applied to all containers.
-                        If unspecified, the options within a container's SecurityContext
-                        will be used. If set in both SecurityContext and PodSecurityContext,
-                        the value specified in SecurityContext takes precedence.
-                      properties:
-                        gmsaCredentialSpec:
-                          description: GMSACredentialSpec is where the GMSA admission
-                            webhook (https://github.com/kubernetes-sigs/windows-gmsa)
-                            inlines the contents of the GMSA credential spec named
-                            by the GMSACredentialSpecName field. This field is alpha-level
-                            and is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        gmsaCredentialSpecName:
-                          description: GMSACredentialSpecName is the name of the GMSA
-                            credential spec to use. This field is alpha-level and
-                            is only honored by servers that enable the WindowsGMSA
-                            feature flag.
-                          type: string
-                        runAsUserName:
-                          description: The UserName in Windows to run the entrypoint
-                            of the container process. Defaults to the user specified
-                            in image metadata if unspecified. May also be set in PodSecurityContext.
-                            If set in both SecurityContext and PodSecurityContext,
-                            the value specified in SecurityContext takes precedence.
-                            This field is beta-level and may be disabled with the
-                            WindowsRunAsUserName feature flag.
-                          type: string
-                      type: object
-                  type: object
-                repoConfig:
-                  description: 'Optional: Custom repo configuration for driver container'
-                  properties:
-                    configMapName:
-                      type: string
-                    destinationDir:
-                      type: string
-                  type: object
-                licensingConfig:
-                  description: 'Optional: Licensing configuration for Nvidia vGPU driver'
-                  properties:
-                    configMapName:
-                      type: string
-                  type: object
-                repository:
-                  pattern: '[a-zA-Z0-9\.\-\/]+'
-                  type: string
-                resources:
-                  description: 'Optional: Define resources requests and limits for
-                    each pod'
-                  properties:
-                    limits:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                    requests:
-                      additionalProperties:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
-                      description: 'Requests describes the minimum amount of compute
-                        resources required. If Requests is omitted for a container,
-                        it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                      type: object
-                  type: object
-                securityContext:
-                  description: 'Optional: Security Context'
-                  properties:
-                    allowPrivilegeEscalation:
-                      description: 'AllowPrivilegeEscalation controls whether a process
-                        can gain more privileges than its parent process. This bool
-                        directly controls if the no_new_privs flag will be set on
-                        the container process. AllowPrivilegeEscalation is true always
-                        when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
-                      type: boolean
-                    capabilities:
-                      description: The capabilities to add/drop when running containers.
-                        Defaults to the default set of capabilities granted by the
-                        container runtime.
-                      properties:
-                        add:
-                          description: Added capabilities
-                          items:
-                            description: Capability represent POSIX capabilities type
+                      windowsOptions:
+                        description: The Windows specific settings applied to all
+                          containers. If unspecified, the options from the PodSecurityContext
+                          will be used. If set in both SecurityContext and PodSecurityContext,
+                          the value specified in SecurityContext takes precedence.
+                        properties:
+                          gmsaCredentialSpec:
+                            description: GMSACredentialSpec is where the GMSA admission
+                              webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                              inlines the contents of the GMSA credential spec named
+                              by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
                             description: GMSACredentialSpecName is the name of the
