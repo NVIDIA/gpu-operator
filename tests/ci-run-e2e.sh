@@ -73,9 +73,15 @@ while :; do
 	is_dcgm_ready=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
 	if [ "${is_dcgm_ready}" = "True" ]; then
+<<<<<<< HEAD
 	    #TODO: debug pod-ip not reachable with Calico update
 		#dcgm_cluster_ip=$(kubectl get service -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $3}')
 		#kubectl run -i nginx --image=nginx --restart=Never -- curl -s "$dcgm_cluster_ip:9400/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
+=======
+	    # TODO: cluster-ip is not reachable with Calico in test-env. Need Debug
+		#dcgm_pod_ip=$(kubectl get pods -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $6}')
+		#kubectl run -i nginx --image=nginx --restart=Never -- curl -s "$dcgm_pod_ip:9400/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
+>>>>>>> 878a2d95... Initial commit to migrate project to v1.x to use latest kubebuilder style layout
 		rc=0
 		break;
 	fi

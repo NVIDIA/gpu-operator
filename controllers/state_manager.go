@@ -1,0 +1,273 @@
+package controllers
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/common/log"
+
+	apiconfigv1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+)
+
+const (
+	commonGPULabelKey   = "nvidia.com/gpu.present"
+	commonGPULabelValue = "true"
+)
+
+var gpuStateLabels = map[string]string{
+	"nvidia.com/gpu.deploy.driver":                "true",
+	"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
+	"nvidia.com/gpu.deploy.container-toolkit":     "true",
+	"nvidia.com/gpu.deploy.device-plugin":         "true",
+	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+}
+
+var gpuNodeLabels = map[string]string{
+	"feature.node.kubernetes.io/pci-10de.present":      "true",
+	"feature.node.kubernetes.io/pci-0302_10de.present": "true",
+	"feature.node.kubernetes.io/pci-0300_10de.present": "true",
+}
+
+type state interface {
+	init(*ClusterPolicyReconciler, *gpuv1.ClusterPolicy)
+	step()
+	validate()
+	last()
+}
+
+// ClusterPolicyController represents clusterpolicy controller spec for GPU operator
+type ClusterPolicyController struct {
+	singleton *gpuv1.ClusterPolicy
+
+	resources []Resources
+	controls  []controlFunc
+	rec       *ClusterPolicyReconciler
+	idx       int
+	openshift string
+}
+
+func addState(n *ClusterPolicyController, path string) error {
+	// TODO check for path
+	res, ctrl := addResourcesControls(n, path, n.openshift)
+
+	n.controls = append(n.controls, ctrl)
+	n.resources = append(n.resources, res)
+
+	return nil
+}
+
+// OpenshiftVersion fetches OCP version
+func OpenshiftVersion() (string, error) {
+	cfg := config.GetConfigOrDie()
+	client, err := configv1.NewForConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	v, err := client.ClusterVersions().Get(context.TODO(), "version", metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, condition := range v.Status.History {
+		if condition.State != "Completed" {
+			continue
+		}
+
+		ocpV := strings.Split(condition.Version, ".")
+		if len(ocpV) > 1 {
+			return ocpV[0] + "." + ocpV[1], nil
+		}
+		return ocpV[0], nil
+	}
+
+	return "", fmt.Errorf("Failed to find Completed Cluster Version")
+}
+
+// GetClusterWideProxy returns cluster wide proxy object setup in OCP
+func GetClusterWideProxy() (*apiconfigv1.Proxy, error) {
+	cfg := config.GetConfigOrDie()
+	client, err := configv1.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	proxy, err := client.Proxies().Get(context.TODO(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return proxy, nil
+}
+
+// hasCommonGPULabel returns true if common Nvidia GPU label exists among provided node labels
+func hasCommonGPULabel(labels map[string]string) bool {
+	if _, ok := labels[commonGPULabelKey]; ok {
+		if labels[commonGPULabelKey] == commonGPULabelValue {
+			// node is already labelled with common label
+			return true
+		}
+	}
+	return false
+}
+
+// addMissingGPUStateLabels checks if the nodeLabels contain the GPUState labels,
+// and it adds them when missing (the label value is *not* checked, only the key)
+// addMissingGPUStateLabels returns true if the nodeLabels map has been updated
+func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
+	modified := false
+	for key, value := range gpuStateLabels {
+		if _, ok := nodeLabels[key]; !ok {
+			nodeLabels[key] = value
+			modified = true
+		}
+		log.Info(" - ", "Label", key, "value", nodeLabels[key])
+	}
+
+	return modified
+}
+
+// hasGPULabels return true if node labels contain Nvidia GPU labels
+func hasGPULabels(labels map[string]string) bool {
+	for key, val := range labels {
+		if _, ok := gpuNodeLabels[key]; ok {
+			if gpuNodeLabels[key] == val {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// labelGPUNodes labels nodes with GPU's with Nvidia common label
+func (n *ClusterPolicyController) labelGPUNodes() error {
+	// fetch all nodes
+	opts := []client.ListOption{}
+	list := &corev1.NodeList{}
+	err := n.rec.Client.List(context.TODO(), list, opts...)
+	if err != nil {
+		return fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
+	}
+
+	for _, node := range list.Items {
+		// get node labels
+		labels := node.GetLabels()
+		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
+			// label the node with common Nvidia GPU label
+			labels[commonGPULabelKey] = commonGPULabelValue
+			// label the node with the state GPU labels
+			for key, value := range gpuStateLabels {
+				labels[key] = value
+			}
+			node.SetLabels(labels)
+			err = n.rec.Client.Update(context.TODO(), &node)
+			if err != nil {
+				return fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
+					node.ObjectMeta.Name, err.Error())
+			}
+		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
+			// previously labelled node and no longer has GPU's
+			// label node to reset common Nvidia GPU label
+			labels[commonGPULabelKey] = "false"
+<<<<<<< HEAD
+			for key, _ := range gpuStateLabels {
+=======
+			for key := range gpuStateLabels {
+>>>>>>> 5306ea98... Use one label per state to deploy
+				delete(labels, key)
+			}
+			node.SetLabels(labels)
+			err = n.rec.Client.Update(context.TODO(), &node)
+			if err != nil {
+				return fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
+					node.ObjectMeta.Name, err.Error())
+			}
+		}
+		if hasCommonGPULabel(labels) {
+			log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
+			if addMissingGPUStateLabels(labels) {
+				log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+<<<<<<< HEAD
+				err = n.rec.client.Update(context.TODO(), &node)
+=======
+				err = n.rec.Client.Update(context.TODO(), &node)
+>>>>>>> 5306ea98... Use one label per state to deploy
+				if err != nil {
+					return fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
+						node.ObjectMeta.Name, err.Error())
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (n *ClusterPolicyController) init(r *ClusterPolicyReconciler, i *gpuv1.ClusterPolicy) error {
+	version, err := OpenshiftVersion()
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	n.openshift = version
+	n.singleton = i
+
+	n.rec = r
+	n.idx = 0
+
+	if len(n.controls) == 0 {
+		promv1.AddToScheme(r.Scheme)
+		secv1.AddToScheme(r.Scheme)
+
+		addState(n, "/opt/gpu-operator/state-driver")
+		addState(n, "/opt/gpu-operator/state-container-toolkit")
+		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
+		addState(n, "/opt/gpu-operator/state-monitoring")
+		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+	}
+
+	// fetch all nodes and label gpu nodes
+	err = n.labelGPUNodes()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *ClusterPolicyController) step() (gpuv1.State, error) {
+	for _, fs := range n.controls[n.idx] {
+		stat, err := fs(*n)
+		if err != nil {
+			return stat, err
+		}
+
+		if stat != gpuv1.Ready {
+			return stat, nil
+		}
+	}
+
+	n.idx = n.idx + 1
+
+	return gpuv1.Ready, nil
+}
+
+func (n ClusterPolicyController) validate() {
+	// TODO add custom validation functions
+}
+
+func (n ClusterPolicyController) last() bool {
+	if n.idx == len(n.controls) {
+		return true
+	}
+	return false
+}

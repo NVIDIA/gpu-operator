@@ -49,7 +49,7 @@ helm-lint:
 go-lint:
   stage: lint
   allow_failure: true
-  image: golang:1.13
+  image: golang:1.15
   services:
     - docker:stable-dind
   script:
@@ -59,7 +59,7 @@ go-lint:
 go-fmt:
   stage: lint
   allow_failure: true
-  image: golang:1.13
+  image: golang:1.15
   services:
     - docker:stable-dind
   script:
@@ -68,7 +68,7 @@ go-fmt:
 ineffassign:
   stage: lint
   allow_failure: true
-  image: golang:1.13
+  image: golang:1.15
   script:
     - GO111MODULE=off go get -u github.com/gordonklaus/ineffassign
     - make assign
@@ -76,7 +76,7 @@ ineffassign:
 misspell:
   stage: lint
   allow_failure: true
-  image: golang:1.13
+  image: golang:1.15
   script:
     - GO111MODULE=off go get -u github.com/client9/misspell/cmd/misspell
     - make misspell
@@ -91,7 +91,7 @@ build-image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk add --update make
 
-    - make prod-image IMAGE=$CI_REGISTRY_IMAGE TAG=$VERSION
+    - make docker-build IMG=$CI_REGISTRY_IMAGE:$VERSION
     - docker push "$CI_REGISTRY_IMAGE:$VERSION"
 
 unit-tests:
@@ -102,8 +102,8 @@ unit-tests:
 
   script:
     - apk add --update make
-    - make devel-image IMAGE=nvidia/gpu-operator TAG_DEVEL=devel
-    - docker run -t nvidia/gpu-operator:devel make test
+    - make devel-image IMG=nvidia/gpu-operator:devel
+    - docker run -t nvidia/gpu-operator:devel make unit-test
   dependencies:
     - build-image
 
