@@ -76,10 +76,6 @@ toolkit:
   imagePullSecrets: []
   env: []
   tolerations:
-  # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
-  # This, along with the annotation above marks this pod as a critical add-on.
-  - key: CriticalAddonsOnly
-    operator: Exists
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
