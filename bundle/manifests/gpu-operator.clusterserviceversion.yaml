@@ -22,7 +22,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:85016e39f73749ef9769a083ceb849cae80c31c5a7f22485b3ba4aa590ec7b88"
+              "version": "sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8"
             },
             "devicePlugin": {
               "affinity": {},
@@ -30,7 +30,7 @@ metadata:
               "imagePullSecrets": [],
               "args": [
                 "--mig-strategy=single",
-                "--pass-device-specs=false",
+                "--pass-device-specs=true",
                 "--fail-on-init-error=true",
                 "--device-list-strategy=envvar",
                 "--nvidia-driver-root=/run/nvidia/driver"
@@ -41,7 +41,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:f7bf5955a689fee4c1c74dc7928220862627adc97e00a4b585f9c31965e79625"
+              "version": "sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92"
             },
             "driver": {
               "affinity": {},
@@ -57,7 +57,10 @@ metadata:
                 "configMapName": "",
                 "destinationDir": ""
               },
-              "version": "sha256:324e9dc265dec320207206aa94226b0c8735fd93ce19b36a415478c95826d934"
+              "licensingConfig": {
+                "configMapName": ""
+              },
+              "version": "sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469"
             },
             "gfd": {
               "affinity": {},
@@ -71,7 +74,7 @@ metadata:
               "securityContext": {},
               "sleepInterval": "60s",
               "tolerations": [],
-              "version": "sha256:8d068b7b2e3c0b00061bbff07f4207bd49be7d5bfbff51fdf247bc91e3f27a14"
+              "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
             },
             "operator": {
               "defaultRuntime": "crio",
@@ -93,7 +96,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:81295a9eca36cbe5d94b80732210b8dc7276c6ef08d5a60d12e50479b9e542cd"
+              "version": "sha256:1cba398a04ec14a5dc3c6229e3674436fdcb574c329cff9ce5048099c8ff2fad"
             }
           }
         }
@@ -101,13 +104,13 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "false"
-    containerImage: nvcr.io/nvidia/gpu-operator:1.5.2
-    createdAt: "Mon Feb  8 09:55:49 PST 2021"
+    containerImage: nvcr.io/nvidia/gpu-operator:1.6.0
+    createdAt: "Wed Feb 24 13:49:07 PST 2021"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.5.2
+  name: gpu-operator-certified.v1.6.0
   namespace: placeholder
 spec:
   displayName: NVIDIA GPU Operator
@@ -134,17 +137,17 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator@sha256:679fea62eb2c207d26354ac088fbe4625457a329dee080d90479a411603eb694
+      image: nvcr.io/nvidia/gpu-operator@sha256:cde4d202a0773a9cd6d4e8266982eae0bfc358a49862fcfcfe8609e344acafa1
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:85016e39f73749ef9769a083ceb849cae80c31c5a7f22485b3ba4aa590ec7b88
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:81295a9eca36cbe5d94b80732210b8dc7276c6ef08d5a60d12e50479b9e542cd
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:1cba398a04ec14a5dc3c6229e3674436fdcb574c329cff9ce5048099c8ff2fad
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:324e9dc265dec320207206aa94226b0c8735fd93ce19b36a415478c95826d934
+      image: nvcr.io/nvidia/driver@sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:f7bf5955a689fee4c1c74dc7928220862627adc97e00a4b585f9c31965e79625
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:8d068b7b2e3c0b00061bbff07f4207bd49be7d5bfbff51fdf247bc91e3f27a14
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
     - name: cuda-sample-image
       image: nvcr.io/nvidia/k8s/cuda-sample@sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2
     - name: dcgm-init-container-image
@@ -403,7 +406,7 @@ spec:
                   - name: host-os-release
                     mountPath: "/host-etc/os-release"
                     readOnly: true
-                image: nvcr.io/nvidia/gpu-operator@sha256:679fea62eb2c207d26354ac088fbe4625457a329dee080d90479a411603eb694
+                image: nvcr.io/nvidia/gpu-operator@sha256:cde4d202a0773a9cd6d4e8266982eae0bfc358a49862fcfcfe8609e344acafa1
                 imagePullPolicy: Always
                 name: gpu-operator
                 ports:
@@ -425,12 +428,6 @@ spec:
               serviceAccountName: gpu-operator
       clusterPermissions:
         - rules:
-          - apiGroups:
-            - config.openshift.io
-            resources:
-            - proxies
-            verbs:
-            - get
           - apiGroups:
             - rbac.authorization.k8s.io
             resources:
@@ -503,6 +500,7 @@ spec:
             - config.openshift.io
             resources:
             - clusterversions
+            - proxies
             verbs:
             - get
             - list
@@ -510,6 +508,12 @@ spec:
           serviceAccountName: gpu-operator
       permissions:
         - rules:
+          - apiGroups:
+            - config.openshift.io
+            resources:
+            - proxies
+            verbs:
+            - get
           - apiGroups:
             - rbac.authorization.k8s.io
             resources:
@@ -616,5 +620,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.5.2
-  replaces: gpu-operator-certified.v1.5.1
+  version: 1.6.0
+  replaces: gpu-operator-certified.v1.5.2
