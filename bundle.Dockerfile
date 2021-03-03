@@ -11,9 +11,9 @@ LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
 LABEL operators.operatorframework.io.metrics.project_layout=go
 LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
 LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
-LABEL com.redhat.openshift.versions="v4.5,v4.6,v4.7"
+LABEL com.redhat.openshift.versions="v4.6,v4.7"
 LABEL com.redhat.delivery.operator.bundle=true
-LABEL com.redhat.delivery.backport=true
+LABEL com.redhat.delivery.backport=false
 
 COPY bundle/manifests /manifests/
 COPY bundle/metadata /metadata/
