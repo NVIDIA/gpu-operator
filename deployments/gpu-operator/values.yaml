@@ -12,7 +12,7 @@ operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
-  #version: 1.5.2
+  #version: 1.6.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   defaultRuntime: docker
@@ -71,7 +71,7 @@ driver:
 toolkit:
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: 1.4.5-ubuntu18.04
+  version: 1.4.6-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
