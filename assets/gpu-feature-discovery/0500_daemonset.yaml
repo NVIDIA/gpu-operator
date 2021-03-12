@@ -35,8 +35,6 @@ spec:
               value: "true"
           securityContext:
             privileged: true
-      nodeSelector:
-        nvidia.com/gpu.present: "true"
       volumes:
         - name: output-dir
           hostPath:

@@ -23,6 +23,14 @@ const (
 	commonGPULabelValue = "true"
 )
 
+var gpuStateLabels = map[string]string{
+	"nvidia.com/gpu.deploy.driver":                "true",
+	"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
+	"nvidia.com/gpu.deploy.container-toolkit":     "true",
+	"nvidia.com/gpu.deploy.device-plugin":         "true",
+	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+}
+
 var gpuNodeLabels = map[string]string{
 	"feature.node.kubernetes.io/pci-10de.present":      "true",
 	"feature.node.kubernetes.io/pci-0302_10de.present": "true",
@@ -111,6 +119,22 @@ func hasCommonGPULabel(labels map[string]string) bool {
 	return false
 }
 
+// addMissingGPUStateLabels checks if the nodeLabels contain the GPUState labels,
+// and it adds them when missing (the label value is *not* checked, only the key)
+// addMissingGPUStateLabels returns true if the nodeLabels map has been updated
+func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
+	modified := false
+	for key, value := range gpuStateLabels {
+		if _, ok := nodeLabels[key]; !ok {
+			nodeLabels[key] = value
+			modified = true
+		}
+		log.Info(" - ", "Label", key, "value", nodeLabels[key])
+	}
+
+	return modified
+}
+
 // hasGPULabels return true if node labels contain Nvidia GPU labels
 func hasGPULabels(labels map[string]string) bool {
 	for key, val := range labels {
@@ -137,21 +161,41 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 		// get node labels
 		labels := node.GetLabels()
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
-			// label node with common Nvidia GPU label
+			// label the node with common Nvidia GPU label
 			labels[commonGPULabelKey] = commonGPULabelValue
+			// label the node with the state GPU labels
+			for key, value := range gpuStateLabels {
+				labels[key] = value
+			}
 			node.SetLabels(labels)
 			err = n.rec.client.Update(context.TODO(), &node)
 			if err != nil {
-				return fmt.Errorf("Unable to label node %s with nvidia.com/gpu.present=true, err %s", node.ObjectMeta.Name, err.Error())
+				return fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
+					node.ObjectMeta.Name, err.Error())
 			}
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
 			// previously labelled node and no longer has GPU's
 			// label node to reset common Nvidia GPU label
 			labels[commonGPULabelKey] = "false"
+			for key, _ := range gpuStateLabels {
+				delete(labels, key)
+			}
 			node.SetLabels(labels)
 			err = n.rec.client.Update(context.TODO(), &node)
 			if err != nil {
-				return fmt.Errorf("Unable to reset node label for %s with nvidia.com/gpu.present=false, err %s", node.ObjectMeta.Name, err.Error())
+				return fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
+					node.ObjectMeta.Name, err.Error())
+			}
+		}
+		if hasCommonGPULabel(labels) {
+			log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
+			if addMissingGPUStateLabels(labels) {
+				log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+				err = n.rec.client.Update(context.TODO(), &node)
+				if err != nil {
+					return fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
+						node.ObjectMeta.Name, err.Error())
+				}
 			}
 		}
 	}
