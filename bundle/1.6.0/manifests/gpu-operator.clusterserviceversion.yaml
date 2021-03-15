@@ -96,7 +96,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae"
+              "version": "sha256:1cba398a04ec14a5dc3c6229e3674436fdcb574c329cff9ce5048099c8ff2fad"
             }
           }
         }
@@ -104,13 +104,13 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "false"
-    containerImage: nvcr.io/nvidia/gpu-operator:1.6.2
+    containerImage: nvcr.io/nvidia/gpu-operator:1.6.0
     createdAt: "Wed Feb 24 13:49:07 PST 2021"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.6.2
+  name: gpu-operator-certified.v1.6.0
   namespace: placeholder
 spec:
   displayName: NVIDIA GPU Operator
@@ -137,11 +137,11 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator@sha256:98878888117a2e3d53924c39f300e4263ce3a25ed7fb12125ed0eaf5d16ec03a
+      image: nvcr.io/nvidia/gpu-operator@sha256:cde4d202a0773a9cd6d4e8266982eae0bfc358a49862fcfcfe8609e344acafa1
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:1cba398a04ec14a5dc3c6229e3674436fdcb574c329cff9ce5048099c8ff2fad
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469
     - name: device-plugin-image
@@ -406,7 +406,7 @@ spec:
                   - name: host-os-release
                     mountPath: "/host-etc/os-release"
                     readOnly: true
-                image: nvcr.io/nvidia/gpu-operator@sha256:98878888117a2e3d53924c39f300e4263ce3a25ed7fb12125ed0eaf5d16ec03a
+                image: nvcr.io/nvidia/gpu-operator@sha256:cde4d202a0773a9cd6d4e8266982eae0bfc358a49862fcfcfe8609e344acafa1
                 imagePullPolicy: Always
                 name: gpu-operator
                 ports:
@@ -620,5 +620,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.6.2
-  replaces: gpu-operator-certified.v1.6.0
+  version: 1.6.0
+  replaces: gpu-operator-certified.v1.5.2
