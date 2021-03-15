@@ -7,7 +7,7 @@ spec:
     defaultRuntime: crio
     repository: nvcr.io/nvidia
     image: gpu-operator
-    version: 1.6.0
+    version: 1.6.2
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     defaultRuntime: docker
@@ -52,7 +52,7 @@ spec:
   toolkit:
     repository: nvcr.io/nvidia/k8s
     image: container-toolkit
-    version: 1.4.5-ubi8
+    version: 1.4.7-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
@@ -70,7 +70,7 @@ spec:
   devicePlugin:
     repository: nvcr.io/nvidia
     image: k8s-device-plugin
-    version: v0.8.1-ubi8
+    version: v0.8.2-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     args:
@@ -109,7 +109,7 @@ spec:
   gfd:
     repository: nvcr.io/nvidia
     image: gpu-feature-discovery
-    version: v0.4.0
+    version: v0.4.1
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     tolerations: []
