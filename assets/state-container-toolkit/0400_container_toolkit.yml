@@ -36,7 +36,7 @@ spec:
         image: "FILLED_BY_THE_OPERATOR"
         imagePullPolicy: IfNotPresent
         command: ['sh', '-c']
-        args: ["export SYS_LIBRARY_PATH=$(ldconfig -v 2>/dev/null | grep -v '^[[:space:]]' | cut -d':' -f1 | tr '[[:space:]]' ':'); \ 
+        args: ["export SYS_LIBRARY_PATH=$(ldconfig -v 2>/dev/null | grep -v '^[[:space:]]' | cut -d':' -f1 | tr '[[:space:]]' ':'); \
         export NVIDIA_LIBRARY_PATH=/run/nvidia/driver/usr/lib/x86_64-linux-gnu/:/run/nvidia/driver/usr/lib64; \
         export LD_LIBRARY_PATH=${SYS_LIBRARY_PATH}:${NVIDIA_LIBRARY_PATH}; echo ${LD_LIBRARY_PATH}; \
         export PATH=/run/nvidia/driver/usr/bin/:${PATH}; \
