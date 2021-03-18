@@ -64,5 +64,3 @@ spec:
             items:
               - key: oci-nvidia-hook-json
                 path: oci-nvidia-hook.json
-      nodeSelector:
-        nvidia.com/gpu.present: "true"

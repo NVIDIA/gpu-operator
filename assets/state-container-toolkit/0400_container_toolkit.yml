@@ -79,5 +79,3 @@ spec:
         - name: crio-hooks
           hostPath:
             path: /run/containers/oci/hooks.d
-      nodeSelector:
-        nvidia.com/gpu.present: "true"

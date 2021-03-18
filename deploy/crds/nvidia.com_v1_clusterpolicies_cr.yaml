@@ -33,7 +33,7 @@ spec:
       operator: Exists
       effect: NoSchedule
     nodeSelector:
-      nvidia.com/gpu.present: "true"
+      nvidia.com/gpu.deploy.driver: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext:
@@ -58,7 +58,7 @@ spec:
     env: []
     tolerations: []
     nodeSelector:
-      nvidia.com/gpu.present: "true"
+      nvidia.com/gpu.deploy.container-toolkit: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext:
@@ -82,7 +82,7 @@ spec:
     env: []
     tolerations: []
     nodeSelector:
-      nvidia.com/gpu.present: "true"
+      nvidia.com/gpu.deploy.device-plugin: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext:
@@ -100,7 +100,7 @@ spec:
     env: []
     tolerations: []
     nodeSelector:
-      nvidia.com/gpu.present: "true"
+      nvidia.com/gpu.deploy.dcgm-exporter: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext: {}
@@ -115,7 +115,7 @@ spec:
     tolerations: []
     env: []
     nodeSelector:
-      nvidia.com/gpu.present: "true"
+      nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext: {}
