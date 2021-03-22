@@ -21,7 +21,6 @@ spec:
         operator: Exists
         effect: NoSchedule
       serviceAccount: nvidia-container-toolkit
-      priorityClassName: system-node-critical
       hostPID: true
       initContainers:
       - name: driver-validation

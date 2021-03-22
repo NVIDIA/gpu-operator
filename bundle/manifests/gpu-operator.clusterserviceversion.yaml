@@ -24,6 +24,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
+              "priorityClassName": "system-node-critical",
               "version": "sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8"
             },
             "devicePlugin": {
@@ -45,6 +46,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
+              "priorityClassName": "system-node-critical",
               "version": "sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92"
             },
             "driver": {
@@ -59,6 +61,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
+              "priorityClassName": "system-node-critical",
               "repoConfig": {
                 "configMapName": "",
                 "destinationDir": ""
@@ -82,6 +85,7 @@ metadata:
               "securityContext": {},
               "sleepInterval": "60s",
               "tolerations": [],
+              "priorityClassName": "system-node-critical",
               "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
             },
             "operator": {
@@ -106,6 +110,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
+              "priorityClassName": "system-node-critical",
               "version": "sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae"
             }
           }
@@ -398,6 +403,7 @@ spec:
               labels:
                 control-plane: gpu-operator
             spec:
+              priorityClassName: system-node-critical
               containers:
               - args:
                 - --leader-elect

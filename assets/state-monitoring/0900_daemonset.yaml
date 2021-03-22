@@ -22,7 +22,6 @@ spec:
         effect: NoSchedule
       serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
-      priorityClassName: system-node-critical
       initContainers:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"

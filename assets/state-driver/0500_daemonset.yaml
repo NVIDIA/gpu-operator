@@ -22,7 +22,6 @@ spec:
         effect: NoSchedule
       serviceAccount: nvidia-driver
       serviceAccountName: nvidia-driver
-      priorityClassName: system-node-critical
       hostPID: true
       containers:
       - image: "FILLED BY THE OPERATOR"
