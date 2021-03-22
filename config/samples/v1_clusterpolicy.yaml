@@ -1,0 +1,105 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  operator:
+    defaultRuntime: crio
+    validator:
+      image: cuda-sample
+      repository: nvcr.io/nvidia/k8s
+      version: vectoradd-cuda10.2
+      imagePullPolicy: IfNotPresent
+
+  driver:
+    repository: nvcr.io/nvidia
+    image: driver
+    version: "460.32.03"
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    env: []
+    tolerations: []
+    nodeSelector:
+      nvidia.com/gpu.deploy.driver: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+    # private mirror repository configuration
+    repoConfig:
+      configMapName: ""
+      destinationDir: ""
+    # vGPU licensing configuration
+    licensingConfig:
+      configMapName: ""
+
+  toolkit:
+    repository: nvcr.io/nvidia/k8s
+    image: container-toolkit
+    version: 1.4.7-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    env: []
+    tolerations: []
+    nodeSelector:
+      nvidia.com/gpu.deploy.container-toolkit: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+
+  devicePlugin:
+    repository: nvcr.io/nvidia
+    image: k8s-device-plugin
+    version: v0.8.2-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    args:
+      - "--mig-strategy=single"
+      - "--pass-device-specs=true"
+      - "--fail-on-init-error=true"
+      - "--device-list-strategy=envvar"
+      - "--nvidia-driver-root=/run/nvidia/driver"
+    env: []
+    tolerations: []
+    nodeSelector:
+      nvidia.com/gpu.deploy.device-plugin: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+
+  dcgmExporter:
+    repository: nvcr.io/nvidia/k8s
+    image: dcgm-exporter
+    version: 2.1.4-2.2.0-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    args:
+      - "-f"
+      - "/etc/dcgm-exporter/dcp-metrics-included.csv"
+    env: []
+    tolerations: []
+    nodeSelector:
+      nvidia.com/gpu.deploy.dcgm-exporter: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+
+  gfd:
+    repository: nvcr.io/nvidia
+    image: gpu-feature-discovery
+    version: v0.4.1
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    tolerations: []
+    env: []
+    nodeSelector:
+      nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+    migStrategy: single
+    discoveryIntervalSeconds: 60

@@ -36,29 +36,33 @@ spec:
         imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
         command: ["gpu-operator"]
         args:
-        - "--zap-time-encoding={{ .Values.operator.logging.timeEncoding }}"
+        - --leader-elect
         env:
         - name: WATCH_NAMESPACE
           value: ""
-        - name: OPERATOR_NAME
-          value: "gpu-operator"
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         volumeMounts:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
         readinessProbe:
-          exec:
-            command: ["stat", "/tmp/operator-sdk-ready"]
-          initialDelaySeconds: 4
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
           periodSeconds: 10
-          failureThreshold: 1
-        ports:
-        - containerPort: 60000
-          name: metrics
+        resources:
+          limits:
+            cpu: 300m
+            memory: 100Mi
+          requests:
+            cpu: 200m
+            memory: 50Mi
       volumes:
         - name: host-os-release
           hostPath:

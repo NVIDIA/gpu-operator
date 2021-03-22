@@ -1,5 +1,0 @@
-channels:
-- currentCSV: gpu-operator-certified.v1.3.1
-  name: stable
-defaultChannel: stable
-packageName: gpu-operator-certified

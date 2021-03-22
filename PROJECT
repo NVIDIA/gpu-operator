@@ -1,1 +1,13 @@
-version: 2
+domain: com
+layout: go.kubebuilder.io/v3
+projectName: gpu-operator
+repo: github.com/NVIDIA/gpu-operator
+resources:
+- crdVersion: v1
+  group: nvidia
+  kind: ClusterPolicy
+  version: v1
+version: 3-alpha
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}

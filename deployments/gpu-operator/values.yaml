@@ -141,7 +141,7 @@ gfd:
   tolerations: []
   env: []
   nodeSelector:
-   nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+    nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
   affinity: {}
   podSecurityContext: {}
   securityContext: {}
