@@ -178,11 +178,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			// previously labelled node and no longer has GPU's
 			// label node to reset common Nvidia GPU label
 			labels[commonGPULabelKey] = "false"
-<<<<<<< HEAD
-			for key, _ := range gpuStateLabels {
-=======
 			for key := range gpuStateLabels {
->>>>>>> 5306ea98... Use one label per state to deploy
 				delete(labels, key)
 			}
 			node.SetLabels(labels)
@@ -196,11 +192,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
 			if addMissingGPUStateLabels(labels) {
 				log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
-<<<<<<< HEAD
-				err = n.rec.client.Update(context.TODO(), &node)
-=======
 				err = n.rec.Client.Update(context.TODO(), &node)
->>>>>>> 5306ea98... Use one label per state to deploy
 				if err != nil {
 					return fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
 						node.ObjectMeta.Name, err.Error())
