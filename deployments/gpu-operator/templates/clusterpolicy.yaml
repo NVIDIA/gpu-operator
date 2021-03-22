@@ -78,6 +78,9 @@ spec:
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.priorityClassName }}
+    priorityClassName: {{ .Values.driver.priorityClassName }}
+    {{- end }}
   toolkit:
     {{- if .Values.toolkit.repository }}
     repository: {{ .Values.toolkit.repository }}
@@ -117,6 +120,9 @@ spec:
     {{- end }}
     {{- if .Values.toolkit.args }}
     args: {{ toYaml .Values.toolkit.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.priorityClassName }}
+    priorityClassName: {{ .Values.toolkit.priorityClassName }}
     {{- end }}
   devicePlugin:
     {{- if .Values.devicePlugin.repository }}
@@ -158,6 +164,9 @@ spec:
     {{- if .Values.devicePlugin.args }}
     args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.devicePlugin.priorityClassName }}
+    priorityClassName: {{ .Values.devicePlugin.priorityClassName }}
+    {{- end }}
   dcgmExporter:
     {{- if .Values.dcgmExporter.repository }}
     repository: {{ .Values.dcgmExporter.repository }}
@@ -197,6 +206,9 @@ spec:
     {{- end }}
     {{- if .Values.dcgmExporter.args }}
     args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.priorityClassName }}
+    priorityClassName: {{ .Values.dcgmExporter.priorityClassName }}
     {{- end }}
   gfd:
     {{- if .Values.gfd.repository }}
@@ -243,4 +255,7 @@ spec:
     {{- end }}
     {{- if .Values.gfd.args }}
     args: {{ toYaml .Values.gfd.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.priorityClassName }}
+    priorityClassName: {{ .Values.gfd.priorityClassName }}
     {{- end }}

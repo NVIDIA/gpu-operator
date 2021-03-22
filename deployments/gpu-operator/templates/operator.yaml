@@ -26,7 +26,9 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- end }}
+      {{- if .Values.operator.priorityClassName }}
       priorityClassName: system-node-critical
+      {{- end }}
       containers:
       - name: gpu-operator
         {{- if .Values.operator.version}}

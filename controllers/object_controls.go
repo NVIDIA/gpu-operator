@@ -280,6 +280,11 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		}
 	}
 
+	// update PriorityClass
+	if config.Driver.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Driver.PriorityClassName
+	}
+
 	// set node selector if specified
 	if len(config.GPUFeatureDiscovery.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.GPUFeatureDiscovery.NodeSelector
@@ -376,6 +381,10 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
+	// update PriorityClass
+	if config.Driver.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Driver.PriorityClassName
+	}
 	// update image pull policy
 	if config.Driver.ImagePullPolicy != "" {
 		obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = config.Driver.ImagePolicy(config.Driver.ImagePullPolicy)
@@ -631,6 +640,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
+	// update PriorityClass
+	if config.Toolkit.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Toolkit.PriorityClassName
+	}
 	// set node selector if specified
 	if len(config.Toolkit.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.Toolkit.NodeSelector
@@ -745,6 +758,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
+	// update PriorityClass
+	if config.DevicePlugin.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.DevicePlugin.PriorityClassName
+	}
 	// set node selector if specified
 	if len(config.DevicePlugin.NodeSelector) > 0 {
 		obj.Spec.Template.Spec.NodeSelector = config.DevicePlugin.NodeSelector
@@ -793,6 +810,10 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		for _, secret := range config.DCGMExporter.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
+	}
+	// update PriorityClass
+	if config.DCGMExporter.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.DCGMExporter.PriorityClassName
 	}
 	// set node selector if specified
 	if len(config.DCGMExporter.NodeSelector) > 0 {
