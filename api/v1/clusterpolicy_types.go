@@ -76,10 +76,6 @@ type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio;containerd
 	DefaultRuntime Runtime       `json:"defaultRuntime"`
 	Validator      ValidatorSpec `json:"validator,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // ValidatorSpec describes configuration options for validation pod
@@ -551,8 +547,7 @@ const (
 
 // ClusterPolicyStatus defines the observed state of ClusterPolicy
 type ClusterPolicyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +kubebuilder:validation:Enum=ignored;ready;notReady
 	// State indicates status of ClusterPolicy
 	State State `json:"state"`
 }

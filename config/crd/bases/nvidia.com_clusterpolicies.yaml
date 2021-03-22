@@ -14,7 +14,7 @@ spec:
     listKind: ClusterPolicyList
     plural: clusterpolicies
     singular: clusterpolicy
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1
     schema:
@@ -4560,8 +4560,6 @@ spec:
                     - crio
                     - containerd
                     type: string
-                  priorityClassName:
-                    type: string
                   validator:
                     description: ValidatorSpec describes configuration options for
                       validation pod
@@ -5719,9 +5717,11 @@ spec:
             description: ClusterPolicyStatus defines the observed state of ClusterPolicy
             properties:
               state:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file State indicates status of ClusterPolicy'
+                description: State indicates status of ClusterPolicy
+                enum:
+                - ignored
+                - ready
+                - notReady
                 type: string
             required:
             - state

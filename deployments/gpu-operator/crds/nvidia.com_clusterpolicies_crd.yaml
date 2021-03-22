@@ -1,3 +1,4 @@
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -770,6 +771,7 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: DCGM image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -780,12 +782,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  licensingConfig:
-                    description: 'Optional: Licensing configuration for vGPU drivers'
-                    properties:
-                      configMapName:
-                        type: string
-                    type: object
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -938,16 +934,10 @@ spec:
                             type: string
                         type: object
                     type: object
-                  repoConfig:
-                    description: 'Optional: Custom repo configuration for driver container'
-                    properties:
-                      configMapName:
-                        type: string
-                      destinationDir:
-                        type: string
-                    type: object
+                  priorityClassName:
+                    type: string
                   repository:
-                    pattern: '[a-zA-Z0-9\.\-\/]+'
+                    description: DCGM image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -1163,12 +1153,10 @@ spec:
                       type: object
                     type: array
                   version:
-                    pattern: '[a-zA-Z0-9\.-]+'
+                    description: DCGM image tag
                     type: string
                 required:
                 - image
-                - repository
-                - version
                 type: object
               devicePlugin:
                 description: DevicePlugin component spec
@@ -1905,6 +1893,7 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: DevicePlugin image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -1915,12 +1904,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  licensingConfig:
-                    description: 'Optional: Licensing configuration for vGPU drivers'
-                    properties:
-                      configMapName:
-                        type: string
-                    type: object
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -2073,16 +2056,10 @@ spec:
                             type: string
                         type: object
                     type: object
-                  repoConfig:
-                    description: 'Optional: Custom repo configuration for driver container'
-                    properties:
-                      configMapName:
-                        type: string
-                      destinationDir:
-                        type: string
-                    type: object
+                  priorityClassName:
+                    type: string
                   repository:
-                    pattern: '[a-zA-Z0-9\.\-\/]+'
+                    description: DevicePlugin image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -2298,12 +2275,10 @@ spec:
                       type: object
                     type: array
                   version:
-                    pattern: '[a-zA-Z0-9\.-]+'
+                    description: DevicePlugin image tag
                     type: string
                 required:
                 - image
-                - repository
-                - version
                 type: object
               driver:
                 description: Driver component spec
@@ -3040,6 +3015,7 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: Driver image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -3208,6 +3184,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                  priorityClassName:
+                    type: string
                   repoConfig:
                     description: 'Optional: Custom repo configuration for driver container'
                     properties:
@@ -3217,7 +3195,7 @@ spec:
                         type: string
                     type: object
                   repository:
-                    pattern: '[a-zA-Z0-9\.\-\/]+'
+                    description: Driver image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -3433,12 +3411,10 @@ spec:
                       type: object
                     type: array
                   version:
-                    pattern: '[a-zA-Z0-9\.-]+'
+                    description: Driver image tag
                     type: string
                 required:
                 - image
-                - repository
-                - version
                 type: object
               gfd:
                 description: GPUFeatureDiscovery spec
@@ -4179,6 +4155,7 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: GFD image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -4349,8 +4326,10 @@ spec:
                             type: string
                         type: object
                     type: object
+                  priorityClassName:
+                    type: string
                   repository:
-                    pattern: '[a-zA-Z0-9\.\-\/]+'
+                    description: GFD image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -4566,12 +4545,10 @@ spec:
                       type: object
                     type: array
                   version:
-                    pattern: '[a-zA-Z0-9\.-]+'
+                    description: GFD image tag
                     type: string
                 required:
                 - image
-                - repository
-                - version
                 type: object
               operator:
                 description: Operator component spec
@@ -4599,10 +4576,8 @@ spec:
                           type: string
                         type: array
                       repository:
-                        pattern: '[a-zA-Z0-9\.\-\/]+'
                         type: string
                       version:
-                        pattern: '[a-zA-Z0-9\.-]+'
                         type: string
                     type: object
                 required:
@@ -5343,6 +5318,7 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: Toolkit image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -5353,12 +5329,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  licensingConfig:
-                    description: 'Optional: Licensing configuration for vGPU drivers'
-                    properties:
-                      configMapName:
-                        type: string
-                    type: object
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -5511,16 +5481,10 @@ spec:
                             type: string
                         type: object
                     type: object
-                  repoConfig:
-                    description: 'Optional: Custom repo configuration for driver container'
-                    properties:
-                      configMapName:
-                        type: string
-                      destinationDir:
-                        type: string
-                    type: object
+                  priorityClassName:
+                    type: string
                   repository:
-                    pattern: '[a-zA-Z0-9\.\-\/]+'
+                    description: Toolkit image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -5736,12 +5700,10 @@ spec:
                       type: object
                     type: array
                   version:
-                    pattern: '[a-zA-Z0-9\.-]+'
+                    description: Toolkit image tag
                     type: string
                 required:
                 - image
-                - repository
-                - version
                 type: object
             required:
             - dcgmExporter
@@ -5755,6 +5717,7 @@ spec:
             description: ClusterPolicyStatus defines the observed state of ClusterPolicy
             properties:
               state:
+                description: State indicates status of ClusterPolicy
                 enum:
                 - ignored
                 - ready
