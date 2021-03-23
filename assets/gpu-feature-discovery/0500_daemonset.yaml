@@ -18,7 +18,6 @@ spec:
         app.kubernetes.io/part-of: nvidia-gpu
     spec:
       serviceAccount: nvidia-gpu-feature-discovery
-      priorityClassName: system-node-critical
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery

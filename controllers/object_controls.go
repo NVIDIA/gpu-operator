@@ -281,8 +281,8 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// update PriorityClass
-	if config.Driver.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Driver.PriorityClassName
+	if config.GPUFeatureDiscovery.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.GPUFeatureDiscovery.PriorityClassName
 	}
 
 	// set node selector if specified
