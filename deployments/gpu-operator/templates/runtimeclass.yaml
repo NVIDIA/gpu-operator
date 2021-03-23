@@ -1,0 +1,10 @@
+{{ if not (lookup "node.k8s.io/v1beta1" "RuntimeClass" "" "nvidia") -}}
+apiVersion: node.k8s.io/v1beta1 
+kind: RuntimeClass
+metadata:
+  name: nvidia
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+handler: nvidia
+{{- end }}

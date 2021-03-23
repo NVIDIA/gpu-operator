@@ -31,6 +31,7 @@ spec:
         effect: NoSchedule
       serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
+      runtimeClassName: nvidia
       initContainers:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
