@@ -26,6 +26,9 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- end }}
+      {{- if .Values.operator.priorityClassName }}
+      priorityClassName: {{ .Values.operator.priorityClassName }}
+      {{- end }}
       containers:
       - name: gpu-operator
         {{- if .Values.operator.version}}

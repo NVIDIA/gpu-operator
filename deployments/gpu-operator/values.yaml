@@ -15,6 +15,7 @@ operator:
   #version: 1.6.2
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  priorityClassName: system-node-critical
   defaultRuntime: docker
   validator:
     image: cuda-sample
@@ -67,6 +68,7 @@ driver:
   # vGPU licensing configuration
   licensingConfig:
     configMapName: ""
+  priorityClassName: system-node-critical
 
 toolkit:
   repository: nvcr.io/nvidia/k8s
@@ -76,10 +78,6 @@ toolkit:
   imagePullSecrets: []
   env: []
   tolerations:
-  # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
-  # This, along with the annotation above marks this pod as a critical add-on.
-  - key: CriticalAddonsOnly
-    operator: Exists
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
@@ -92,6 +90,7 @@ toolkit:
     seLinuxOptions:
       level: "s0"
   resources: {}
+  priorityClassName: system-node-critical
 
 devicePlugin:
   repository: nvcr.io/nvidia
@@ -114,6 +113,7 @@ devicePlugin:
   securityContext:
     privileged: true
   resources: {}
+  priorityClassName: system-node-critical
 
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
@@ -131,6 +131,7 @@ dcgmExporter:
   podSecurityContext: {}
   securityContext: {}
   resources: {}
+  priorityClassName: system-node-critical
 
 gfd:
   repository: nvcr.io/nvidia
@@ -148,6 +149,7 @@ gfd:
   resources: {}
   migStrategy: single
   discoveryIntervalSeconds: 60
+  priorityClassName: system-node-critical
 
 node-feature-discovery:
   worker:
