@@ -42,6 +42,7 @@ rules:
   - namespaces
   verbs:
   - get
+  - create
 - apiGroups:
   - apps
   resources:
@@ -103,3 +104,11 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - node.k8s.io
+  resources:
+  - runtimeclasses
+  verbs:
+  - get
+  - list
+  - create

@@ -11,6 +11,7 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 
@@ -40,6 +41,8 @@ type Resources struct {
 	PriorityClass              schedv1.PriorityClass
 	Taint                      corev1.Taint
 	SecurityContextConstraints secv1.SecurityContextConstraints
+	Namespace                  corev1.Namespace
+	RuntimeClass               nodev1.RuntimeClass
 }
 
 func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) {
@@ -145,6 +148,14 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			_, _, err := s.Decode(m, nil, &res.SecurityContextConstraints)
 			panicIfError(err)
 			ctrl = append(ctrl, SecurityContextConstraints)
+		case "Namespace":
+			_, _, err := s.Decode(m, nil, &res.Namespace)
+			panicIfError(err)
+			ctrl = append(ctrl, Namespace)
+		case "RuntimeClass":
+			_, _, err := s.Decode(m, nil, &res.RuntimeClass)
+			panicIfError(err)
+			ctrl = append(ctrl, RuntimeClass)
 		default:
 			n.rec.Log.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}
