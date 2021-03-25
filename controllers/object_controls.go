@@ -43,6 +43,8 @@ const (
 	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
 	// VGPULicensingFileName is the vGPU licensing configuration filename
 	VGPULicensingFileName = "gridd.conf"
+	// DefaultRuntimeClass represents "nvidia" RuntimeClass
+	DefaultRuntimeClass = "nvidia"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -314,6 +316,9 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
+	// set RuntimeClass if runtime is either Containerd or CRI-O
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
 	// update MIG strategy and discovery intervals
 	var migStrategy gpuv1.MigStrategy = gpuv1.MigStrategyNone
@@ -774,6 +779,8 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// set RuntimeClass if runtime is either Containerd or CRI-O
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 	return nil
 }
 
@@ -823,6 +830,8 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// set RuntimeClass if runtime is either Containerd or CRI-O
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
 	kvers, osTag, _ := kernelFullVersion(n)
 	if kvers == "" {
@@ -926,6 +935,13 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
+func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime) {
+	if runtime == gpuv1.Containerd || runtime == gpuv1.CRIO {
+		nvidiaRuntimeClass := DefaultRuntimeClass
+		podSpec.RuntimeClassName = &nvidiaRuntimeClass
+	}
+}
+
 func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
 	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
 		// skip if not validation initContainer
@@ -974,6 +990,8 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 	if len(config.DevicePlugin.Tolerations) > 0 {
 		obj.Spec.Tolerations = config.DevicePlugin.Tolerations
 	}
+	// set RuntimeClass if runtime is either Containerd or CRI-O
+	setRuntimeClass(&obj.Spec, config.Operator.DefaultRuntime)
 
 	return nil
 }
@@ -1209,6 +1227,52 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+		if errors.IsAlreadyExists(err) {
+			logger.Info("Found Resource")
+			return gpuv1.Ready, nil
+		}
+
+		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	return gpuv1.Ready, nil
+}
+
+// Namespace creates Namespace object
+func Namespace(n ClusterPolicyController) (gpuv1.State, error) {
+	state := n.idx
+	obj := n.resources[state].Namespace.DeepCopy()
+	logger := n.rec.Log.WithValues("Namespace", obj.Name)
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+		if errors.IsAlreadyExists(err) {
+			logger.Info("Found Resource")
+			return gpuv1.Ready, nil
+		}
+
+		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	return gpuv1.Ready, nil
+}
+
+// RuntimeClass creates RuntimeClass object
+func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
+	state := n.idx
+	obj := n.resources[state].RuntimeClass.DeepCopy()
+	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err

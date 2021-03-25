@@ -219,6 +219,7 @@ func (n *ClusterPolicyController) init(r *ClusterPolicyReconciler, i *gpuv1.Clus
 		promv1.AddToScheme(r.Scheme)
 		secv1.AddToScheme(r.Scheme)
 
+		addState(n, "/opt/gpu-operator/pre-requisites")
 		addState(n, "/opt/gpu-operator/state-driver")
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-device-plugin")

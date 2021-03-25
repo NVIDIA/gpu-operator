@@ -50,6 +50,7 @@ rules:
   - configmaps
   - secrets
   - nodes
+  - namespaces
   verbs:
   - create
   - delete
@@ -73,3 +74,11 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - node.k8s.io
+  resources:
+  - runtimeclasses
+  verbs:
+  - get
+  - list
+  - create
