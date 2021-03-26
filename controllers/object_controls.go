@@ -322,7 +322,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		}
 	}
 
-	// set RuntimeClass if runtime is either Containerd or CRI-O
+	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
 	// update MIG strategy and discovery intervals
@@ -796,7 +796,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-	// set RuntimeClass if runtime is either Containerd or CRI-O
+	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 	return nil
 }
@@ -851,7 +851,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-	// set RuntimeClass if runtime is either Containerd or CRI-O
+	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
 	kvers, osTag, _ := kernelFullVersion(n)
@@ -957,7 +957,7 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 }
 
 func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime) {
-	if runtime == gpuv1.Containerd || runtime == gpuv1.CRIO {
+	if runtime == gpuv1.Containerd {
 		nvidiaRuntimeClass := DefaultRuntimeClass
 		podSpec.RuntimeClassName = &nvidiaRuntimeClass
 	}
@@ -1011,7 +1011,7 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 	if len(config.DevicePlugin.Tolerations) > 0 {
 		obj.Spec.Tolerations = config.DevicePlugin.Tolerations
 	}
-	// set RuntimeClass if runtime is either Containerd or CRI-O
+	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec, config.Operator.DefaultRuntime)
 
 	return nil
