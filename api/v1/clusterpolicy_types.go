@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"log"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,8 +75,30 @@ func (r Runtime) String() string {
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio;containerd
-	DefaultRuntime Runtime       `json:"defaultRuntime"`
-	Validator      ValidatorSpec `json:"validator,omitempty"`
+	DefaultRuntime Runtime           `json:"defaultRuntime"`
+	Validator      ValidatorSpec     `json:"validator,omitempty"`
+	InitContainer  InitContainerSpec `json:"initContainer,omitempty"`
+}
+
+// InitContainerSpec describes configuration for initContainer image used with all components
+type InitContainerSpec struct {
+	Repository string `json:"repository,omitempty"`
+
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 }
 
 // ValidatorSpec describes configuration options for validation pod
@@ -582,142 +605,46 @@ func (p *ClusterPolicy) SetState(s State) {
 	p.Status.State = s
 }
 
-// ImagePath sets Driver image path
-func (c *DriverSpec) ImagePath() string {
+func imagePath(repository string, image string, version string) string {
 	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(c.Version, "sha256:") {
-		return c.Repository + "/" + c.Image + "@" + c.Version
+	if strings.HasPrefix(version, "sha256:") {
+		return repository + "/" + image + "@" + version
 	}
-	return c.Repository + "/" + c.Image + ":" + c.Version
+	return repository + "/" + image + ":" + version
 }
 
-// ImagePolicy sets Driver image pull policy
-func (c *DriverSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
-	var imagePullPolicy corev1.PullPolicy
-	switch pullPolicy {
-	case "Always":
-		imagePullPolicy = corev1.PullAlways
-	case "Never":
-		imagePullPolicy = corev1.PullNever
-	case "IfNotPresent":
-		imagePullPolicy = corev1.PullIfNotPresent
+// ImagePath sets image path for given component type
+func ImagePath(spec interface{}) string {
+	switch v := spec.(type) {
+	case *DriverSpec:
+		config := spec.(*DriverSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *ToolkitSpec:
+		config := spec.(*ToolkitSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *DevicePluginSpec:
+		config := spec.(*DevicePluginSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *DCGMExporterSpec:
+		config := spec.(*DCGMExporterSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *GPUFeatureDiscoverySpec:
+		config := spec.(*GPUFeatureDiscoverySpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *ValidatorSpec:
+		config := spec.(*ValidatorSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *InitContainerSpec:
+		config := spec.(*InitContainerSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
 	default:
-		imagePullPolicy = corev1.PullIfNotPresent
+		log.Fatal("Invalid type to construct image path", v)
 	}
-	return imagePullPolicy
+	return ""
 }
 
-// ImagePath sets Toolkit image path
-func (c *ToolkitSpec) ImagePath() string {
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(c.Version, "sha256:") {
-		return c.Repository + "/" + c.Image + "@" + c.Version
-	}
-	return c.Repository + "/" + c.Image + ":" + c.Version
-}
-
-// ImagePolicy sets Toolkit image pull policy
-func (c *ToolkitSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
-	var imagePullPolicy corev1.PullPolicy
-	switch pullPolicy {
-	case "Always":
-		imagePullPolicy = corev1.PullAlways
-	case "Never":
-		imagePullPolicy = corev1.PullNever
-	case "IfNotPresent":
-		imagePullPolicy = corev1.PullIfNotPresent
-	default:
-		imagePullPolicy = corev1.PullIfNotPresent
-	}
-	return imagePullPolicy
-}
-
-// ImagePath sets Device Plugin image path
-func (c *DevicePluginSpec) ImagePath() string {
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(c.Version, "sha256:") {
-		return c.Repository + "/" + c.Image + "@" + c.Version
-	}
-	return c.Repository + "/" + c.Image + ":" + c.Version
-}
-
-// ImagePolicy sets Device Plugin image pull policy
-func (c *DevicePluginSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
-	var imagePullPolicy corev1.PullPolicy
-	switch pullPolicy {
-	case "Always":
-		imagePullPolicy = corev1.PullAlways
-	case "Never":
-		imagePullPolicy = corev1.PullNever
-	case "IfNotPresent":
-		imagePullPolicy = corev1.PullIfNotPresent
-	default:
-		imagePullPolicy = corev1.PullIfNotPresent
-	}
-	return imagePullPolicy
-}
-
-// ImagePath sets DCGM Exporter image path
-func (c *DCGMExporterSpec) ImagePath() string {
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(c.Version, "sha256:") {
-		return c.Repository + "/" + c.Image + "@" + c.Version
-	}
-	return c.Repository + "/" + c.Image + ":" + c.Version
-}
-
-// ImagePolicy sets DCGM Exporter image pull policy
-func (c *DCGMExporterSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
-	var imagePullPolicy corev1.PullPolicy
-	switch pullPolicy {
-	case "Always":
-		imagePullPolicy = corev1.PullAlways
-	case "Never":
-		imagePullPolicy = corev1.PullNever
-	case "IfNotPresent":
-		imagePullPolicy = corev1.PullIfNotPresent
-	default:
-		imagePullPolicy = corev1.PullIfNotPresent
-	}
-	return imagePullPolicy
-}
-
-// ImagePath sets image path for GFD component
-func (g *GPUFeatureDiscoverySpec) ImagePath() string {
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(g.Version, "sha256:") {
-		return g.Repository + "/" + g.Image + "@" + g.Version
-	}
-	return g.Repository + "/" + g.Image + ":" + g.Version
-}
-
-// ImagePolicy sets image pull policy for GFD component
-func (g *GPUFeatureDiscoverySpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
-	var imagePullPolicy corev1.PullPolicy
-	switch pullPolicy {
-	case "Always":
-		imagePullPolicy = corev1.PullAlways
-	case "Never":
-		imagePullPolicy = corev1.PullNever
-	case "IfNotPresent":
-		imagePullPolicy = corev1.PullIfNotPresent
-	default:
-		imagePullPolicy = corev1.PullIfNotPresent
-	}
-	return imagePullPolicy
-}
-
-// ImagePath sets image path for GFD component
-func (v *ValidatorSpec) ImagePath() string {
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(v.Version, "sha256:") {
-		return v.Repository + "/" + v.Image + "@" + v.Version
-	}
-	return v.Repository + "/" + v.Image + ":" + v.Version
-}
-
-// ImagePolicy sets image pull policy for validation pod
-func (v *ValidatorSpec) ImagePolicy(pullPolicy string) corev1.PullPolicy {
+// ImagePullPolicy sets image pull policy
+func ImagePullPolicy(pullPolicy string) corev1.PullPolicy {
 	var imagePullPolicy corev1.PullPolicy
 	switch pullPolicy {
 	case "Always":

@@ -96,6 +96,12 @@ metadata:
                 "repository": "nvcr.io/nvidia/k8s",
                 "version": "sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2",
                 "imagePullSecrets": []
+              },
+              "initContainer": {
+                "image": "cuda",
+                "repository": "nvcr.io/nvidia",
+                "version": "sha256:ba39801ba34370d6444689a860790787ca89e38794a11952d89a379d2e9c87b5",
+                "imagePullSecrets": []
               }
             },
             "toolkit": {
@@ -146,8 +152,8 @@ spec:
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
     - name: cuda-sample-image
       image: nvcr.io/nvidia/k8s/cuda-sample@sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2
-    - name: dcgm-init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59
+    - name: init-container-image
+      image: nvcr.io/nvidia/cuda@sha256:ba39801ba34370d6444689a860790787ca89e38794a11952d89a379d2e9c87b5
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
