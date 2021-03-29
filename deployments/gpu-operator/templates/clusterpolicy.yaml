@@ -32,6 +32,24 @@ spec:
       imagePullSecrets: {{ toYaml .Values.operator.validator.imagePullSecrets | nindent 8 }}
       {{- end }}
     {{- end }}
+    {{- if .Values.operator.initContainer }}
+    initContainer:
+      {{- if .Values.operator.initContainer.repository }}
+      repository: {{ .Values.operator.initContainer.repository }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.image }}
+      image: {{ .Values.operator.initContainer.image }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.version }}
+      version: {{ .Values.operator.initContainer.version }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.operator.initContainer.imagePullPolicy }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml .Values.operator.initContainer.imagePullSecrets | nindent 8 }}
+      {{- end }}
+    {{- end }}
   driver:
     {{- if .Values.driver.repository }}
     repository: {{ .Values.driver.repository }}

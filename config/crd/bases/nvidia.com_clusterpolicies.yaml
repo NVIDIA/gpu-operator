@@ -4560,6 +4560,26 @@ spec:
                     - crio
                     - containerd
                     type: string
+                  initContainer:
+                    description: InitContainerSpec describes configuration for initContainer
+                      image used with all components
+                    properties:
+                      image:
+                        pattern: '[a-zA-Z0-9\-]+'
+                        type: string
+                      imagePullPolicy:
+                        description: Image pull policy
+                        type: string
+                      imagePullSecrets:
+                        description: Image pull secrets
+                        items:
+                          type: string
+                        type: array
+                      repository:
+                        type: string
+                      version:
+                        type: string
+                    type: object
                   validator:
                     description: ValidatorSpec describes configuration options for
                       validation pod

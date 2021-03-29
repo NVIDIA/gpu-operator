@@ -17,6 +17,11 @@ operator:
   imagePullSecrets: []
   priorityClassName: system-node-critical
   defaultRuntime: docker
+  initContainer:
+    image: cuda
+    repository: nvcr.io/nvidia
+    version: 11.2.1-base-ubi8
+    imagePullPolicy: IfNotPresent
   validator:
     image: cuda-sample
     repository: nvcr.io/nvidia/k8s
