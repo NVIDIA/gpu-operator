@@ -26,8 +26,8 @@ spec:
       - name: driver-validation
         image: "FILLED_BY_THE_OPERATOR"
         imagePullPolicy: IfNotPresent
-        command: ["chroot"]
-        args: ["/run/nvidia/driver", "nvidia-smi"]
+        command: ['sh', '-c']
+        args: ["until chroot /run/nvidia/driver nvidia-smi; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
         securityContext:
           privileged: true
           seLinuxOptions:
