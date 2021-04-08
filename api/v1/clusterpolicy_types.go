@@ -57,6 +57,8 @@ const (
 	CRIO Runtime = "crio"
 	// Containerd runtime
 	Containerd Runtime = "containerd"
+	// DefaultNvidiaDriverRoot indicates default root directory of driver installation with gpu-operator
+	DefaultNvidiaDriverRoot = "/run/nvidia/driver"
 )
 
 func (r Runtime) String() string {
@@ -124,6 +126,12 @@ type ValidatorSpec struct {
 
 // DriverSpec defines the properties for driver deployment
 type DriverSpec struct {
+	// Enabled indicates if deployment of driver through operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable driver deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// Driver image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository"`
@@ -657,4 +665,21 @@ func ImagePullPolicy(pullPolicy string) corev1.PullPolicy {
 		imagePullPolicy = corev1.PullIfNotPresent
 	}
 	return imagePullPolicy
+}
+
+// Root returns root path for driver install
+func (d *DriverSpec) Root() string {
+	if d.Enabled != nil && !*d.Enabled {
+		return "/"
+	}
+	return DefaultNvidiaDriverRoot
+}
+
+// IsDriverEnabled returns true if driver install is enabled(default) through gpu-operator
+func (d *DriverSpec) IsDriverEnabled() bool {
+	if d.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *d.Enabled
 }

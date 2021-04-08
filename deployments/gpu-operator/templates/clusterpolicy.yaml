@@ -51,6 +51,7 @@ spec:
       {{- end }}
     {{- end }}
   driver:
+    enabled: {{ .Values.driver.enabled }}
     {{- if .Values.driver.repository }}
     repository: {{ .Values.driver.repository }}
     {{- end }}
