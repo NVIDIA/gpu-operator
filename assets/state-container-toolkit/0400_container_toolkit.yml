@@ -33,8 +33,8 @@ spec:
           seLinuxOptions:
             level: "s0"
         volumeMounts:
-          - name: nvidia-install-path
-            mountPath: /run/nvidia
+          - name: driver-install-path
+            mountPath: /run/nvidia/driver
             mountPropagation: Bidirectional
       containers:
       - image: "FILLED_BY_THE_OPERATOR"
@@ -49,7 +49,7 @@ spec:
           seLinuxOptions:
             level: "s0"
         volumeMounts:
-          - name: nvidia-install-path
+          - name: nvidia-run-path
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
           - name: nvidia-local
@@ -57,9 +57,13 @@ spec:
           - name: crio-hooks
             mountPath: /usr/share/containers/oci/hooks.d
       volumes:
-        - name: nvidia-install-path
+        - name: nvidia-run-path
           hostPath:
             path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: driver-install-path
+          hostPath:
+            path: /run/nvidia/driver
         - name: nvidia-local
           hostPath:
             path: /usr/local/nvidia

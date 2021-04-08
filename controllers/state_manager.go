@@ -203,24 +203,26 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 	return nil
 }
 
-func (n *ClusterPolicyController) init(r *ClusterPolicyReconciler, i *gpuv1.ClusterPolicy) error {
+func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	version, err := OpenshiftVersion()
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
 	n.openshift = version
-	n.singleton = i
+	n.singleton = clusterPolicy
 
-	n.rec = r
+	n.rec = reconciler
 	n.idx = 0
 
 	if len(n.controls) == 0 {
-		promv1.AddToScheme(r.Scheme)
-		secv1.AddToScheme(r.Scheme)
+		promv1.AddToScheme(reconciler.Scheme)
+		secv1.AddToScheme(reconciler.Scheme)
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
-		addState(n, "/opt/gpu-operator/state-driver")
+		if clusterPolicy.Spec.Driver.IsDriverEnabled() {
+			addState(n, "/opt/gpu-operator/state-driver")
+		}
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
 		addState(n, "/opt/gpu-operator/state-device-plugin-validation")

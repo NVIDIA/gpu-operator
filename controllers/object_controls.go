@@ -45,6 +45,14 @@ const (
 	VGPULicensingFileName = "gridd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
+	// NvidiaDriverRootEnvName represents env name for indicating root directory of driver installation
+	NvidiaDriverRootEnvName = "NVIDIA_DRIVER_ROOT"
+	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
+	DriverInstallPathVolName = "driver-install-path"
+	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted
+	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
+	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
+	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -675,6 +683,19 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
+	// configure root directory of driver installation for toolkit if not already provided by user
+	nvidiaDriverRoot := config.Driver.Root()
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
+
+	// configure volume driver-install-path to use host root path if installed outside of operator
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == DriverInstallPathVolName && !config.Driver.IsDriverEnabled() {
+			// set host root path as driver-install-path
+			volume.HostPath.Path = "/"
+			break
+		}
+	}
+
 	// configure runtime
 	runtime := string(config.Operator.DefaultRuntime)
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
@@ -684,26 +705,16 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		runtimeConfigFile := getRuntimeConfigFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
 		runtimeSocketFile := getRuntimeSocketFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
 
-		// ensure we always mount at pre-defined target path based on runtime within container,
-		// irrespective of source directory path specified by the user
-		targetConfigDir := "/etc/docker/"
-		targetSocketDir := "/var/run/"
-
-		if runtime == gpuv1.Containerd.String() {
-			targetConfigDir = "/etc/containerd/"
-			targetSocketDir = "/run/containerd/"
-		}
-
 		sourceSocketFileName := path.Base(runtimeSocketFile)
 		sourceConfigFileName := path.Base(runtimeConfigFile)
 
 		// docker needs socket file as runtime arg
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS",
-			"--socket "+targetSocketDir+sourceSocketFileName+" --config "+targetConfigDir+sourceConfigFileName)
+			"--socket "+DefaultRuntimeSocketTargetDir+sourceSocketFileName+" --config "+DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 
 		// setup config file mount
 		volMountConfigName := fmt.Sprintf("%s-config", runtime)
-		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: targetConfigDir}
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountConfig)
 
 		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile)}}}
@@ -711,7 +722,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 		// setup socket file mount
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
-		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: targetSocketDir}
+		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountSocket)
 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
@@ -780,6 +791,9 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// configure root directory of driver installation for device-plugin if not already provided by user
+	nvidiaDriverRoot := config.Driver.Root()
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 	return nil
