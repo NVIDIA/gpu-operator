@@ -122,6 +122,7 @@ metadata:
               }
             },
             "toolkit": {
+              "enabled": true,
               "affinity": {},
               "image": "container-toolkit",
               "imagePullSecrets": [],

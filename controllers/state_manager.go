@@ -223,7 +223,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		if clusterPolicy.Spec.Driver.IsDriverEnabled() {
 			addState(n, "/opt/gpu-operator/state-driver")
 		}
-		addState(n, "/opt/gpu-operator/state-container-toolkit")
+		if clusterPolicy.Spec.Toolkit.IsToolkitEnabled() {
+			addState(n, "/opt/gpu-operator/state-container-toolkit")
+		}
 		addState(n, "/opt/gpu-operator/state-device-plugin")
 		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
 		addState(n, "/opt/gpu-operator/state-monitoring")
