@@ -218,6 +218,12 @@ type DriverSpec struct {
 
 // ToolkitSpec defines the properties for container-toolkit deployment
 type ToolkitSpec struct {
+	// Enabled indicates if deployment of container-toolkit through operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable container-toolkit deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// Toolkit image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository"`
@@ -682,4 +688,13 @@ func (d *DriverSpec) IsDriverEnabled() bool {
 		return true
 	}
 	return *d.Enabled
+}
+
+// IsToolkitEnabled returns true if container-toolkit install is enabled(default) through gpu-operator
+func (t *ToolkitSpec) IsToolkitEnabled() bool {
+	if t.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *t.Enabled
 }

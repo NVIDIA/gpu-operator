@@ -5232,6 +5232,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  enabled:
+                    description: Enabled indicates if deployment of container-toolkit
+                      through operator is enabled
+                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:
