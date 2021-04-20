@@ -37,11 +37,6 @@ spec:
         name: nvidia-device-plugin-ctr
         securityContext:
           privileged: true
-        env:
-          - name: NVIDIA_VISIBLE_DEVICES
-            value: all
-          - name: NVIDIA_DRIVER_CAPABILITIES
-            value: all
         volumeMounts:
           - name: device-plugin
             mountPath: /var/lib/kubelet/device-plugins

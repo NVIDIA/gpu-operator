@@ -4045,10 +4045,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  discoveryIntervalSeconds:
-                    description: 'Optional: Discovery Interval for GPU feature discovery
-                      plugin'
-                    type: integer
                   env:
                     description: 'Optional: List of environment variables'
                     items:
@@ -4170,14 +4166,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  migStrategy:
-                    description: 'Optional: MigStrategy for GPU feature discovery
-                      plugin'
-                    enum:
-                    - none
-                    - single
-                    - mixed
-                    type: string
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -4553,6 +4541,17 @@ spec:
                     type: string
                 required:
                 - image
+                type: object
+              mig:
+                description: MIG spec
+                properties:
+                  strategy:
+                    description: 'Optional: MIGStrategy to apply for GFD and Device-Plugin'
+                    enum:
+                    - none
+                    - single
+                    - mixed
+                    type: string
                 type: object
               operator:
                 description: Operator component spec

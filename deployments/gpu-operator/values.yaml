@@ -46,6 +46,9 @@ operator:
   logging:
     timeEncoding: epoch
 
+mig:
+  strategy: single
+
 driver:
   enabled: true
   repository: nvcr.io/nvidia
@@ -106,8 +109,6 @@ devicePlugin:
   imagePullSecrets: []
   args: []
   env:
-    - name: MIG_STRATEGY
-      value: single
     - name: PASS_DEVICE_SPECS
       value: "true"
     - name: FAIL_ON_INIT_ERROR
@@ -116,6 +117,10 @@ devicePlugin:
       value: envvar
     - name: DEVICE_ID_STRATEGY
       value: uuid
+    - name: NVIDIA_VISIBLE_DEVICES
+      value: all
+    - name: NVIDIA_DRIVER_CAPABILITIES
+      value: all
   tolerations: []
   nodeSelector:
     nvidia.com/gpu.deploy.device-plugin: "true"
@@ -151,15 +156,17 @@ gfd:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations: []
-  env: []
+  env:
+    - name: GFD_SLEEP_INTERVAL
+      value: 60s
+    - name: GFD_FAIL_ON_INIT_ERROR
+      value: "true"
   nodeSelector:
     nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
   affinity: {}
   podSecurityContext: {}
   securityContext: {}
   resources: {}
-  migStrategy: single
-  discoveryIntervalSeconds: 60
   priorityClassName: system-node-critical
 
 node-feature-discovery:

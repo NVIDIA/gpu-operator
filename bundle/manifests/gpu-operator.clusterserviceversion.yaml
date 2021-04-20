@@ -34,10 +34,6 @@ metadata:
               "args": [],
               "env": [
                 {
-                  "name": "MIG_STRATEGY",
-                  "value": "single"
-                },
-                {
                   "name": "PASS_DEVICE_SPECS",
                   "value": "true"
                 },
@@ -52,6 +48,14 @@ metadata:
                 {
                   "name": "DEVICE_UUID_STRATEGY",
                   "value": "uuid"
+                },
+                {
+                  "name": "NVIDIA_VISIBLE_DEVICES",
+                  "value": "all"
+                },
+                {
+                  "name": "NVIDIA_DRIVER_CAPABILITIES",
+                  "value": "all"
                 }
               ],
               "nodeSelector": {
@@ -92,7 +96,16 @@ metadata:
               "affinity": {},
               "image": "gpu-feature-discovery",
               "imagePullSecrets": [],
-              "migStrategy": "single",
+              "env": [
+                {
+                  "name": "GFD_SLEEP_INTERVAL",
+                  "value": "60s"
+                },
+                {
+                  "name": "FAIL_ON_INIT_ERROR",
+                  "value": "true"
+                }
+              ],
               "nodeSelector": {
                 "nvidia.com/gpu.deploy.gpu-feature-discovery": "true"
               },
@@ -100,7 +113,6 @@ metadata:
               "repository": "nvcr.io/nvidia",
               "resources": {},
               "securityContext": {},
-              "sleepInterval": "60s",
               "tolerations": [],
               "priorityClassName": "system-node-critical",
               "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
@@ -120,6 +132,9 @@ metadata:
                 "version": "sha256:ba39801ba34370d6444689a860790787ca89e38794a11952d89a379d2e9c87b5",
                 "imagePullSecrets": []
               }
+            },
+            "mig": {
+              "strategy": "single"
             },
             "toolkit": {
               "enabled": true,
