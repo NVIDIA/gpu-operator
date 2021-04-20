@@ -26,13 +26,6 @@ spec:
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
             - name: dmi-product-name
               mountPath: "/sys/class/dmi/id/product_name"
-          env:
-            - name: GFD_SLEEP_INTERVAL
-              value: 60s
-            - name: GFD_MIG_STRATEGY
-              value: single
-            - name: GFD_FAIL_ON_INIT_ERROR
-              value: "true"
           securityContext:
             privileged: true
       volumes:

@@ -331,22 +331,8 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
-	// update MIG strategy and discovery intervals
-	var migStrategy gpuv1.MigStrategy = gpuv1.MigStrategyNone
-	if config.GPUFeatureDiscovery.MigStrategy != "" {
-		migStrategy = config.GPUFeatureDiscovery.MigStrategy
-	}
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_MIG_STRATEGY", fmt.Sprintf("%s", migStrategy))
-	if migStrategy != gpuv1.MigStrategyNone {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "NVIDIA_MIG_MONITOR_DEVICES", "all")
-	}
-
-	// update discovery interval
-	discoveryIntervalSeconds := 60
-	if config.GPUFeatureDiscovery.DiscoveryIntervalSeconds != 0 {
-		discoveryIntervalSeconds = config.GPUFeatureDiscovery.DiscoveryIntervalSeconds
-	}
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GFD_SLEEP_INTERVAL", fmt.Sprintf("%ds", discoveryIntervalSeconds))
+	// update env required for MIG support
+	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, true)
 
 	return nil
 }
@@ -796,6 +782,8 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	// update env required for MIG support
+	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
 	return nil
 }
 
@@ -948,6 +936,24 @@ func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime) {
 	if runtime == gpuv1.Containerd {
 		nvidiaRuntimeClass := DefaultRuntimeClass
 		podSpec.RuntimeClassName = &nvidiaRuntimeClass
+	}
+}
+
+// applies MIG related configuration env to container spec
+func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy, isGFD bool) {
+	// if not set then default to "none" strategy
+	if strategy == "" {
+		strategy = gpuv1.MIGStrategyNone
+	}
+
+	if isGFD {
+		// this is temporary until we align env name for GFD with device-plugin
+		setContainerEnv(c, "GFD_MIG_STRATEGY", string(strategy))
+	} else {
+		setContainerEnv(c, "MIG_STRATEGY", string(strategy))
+	}
+	if strategy != gpuv1.MIGStrategyNone {
+		setContainerEnv(c, "NVIDIA_MIG_MONITOR_DEVICES", "all")
 	}
 }
 

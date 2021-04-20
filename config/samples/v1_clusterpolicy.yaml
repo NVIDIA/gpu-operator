@@ -11,6 +11,9 @@ spec:
       version: vectoradd-cuda10.2
       imagePullPolicy: IfNotPresent
 
+  mig:
+    strategy: single
+
   driver:
     repository: nvcr.io/nvidia
     image: driver
@@ -54,13 +57,20 @@ spec:
     version: v0.8.2-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
-    args:
-      - "--mig-strategy=single"
-      - "--pass-device-specs=true"
-      - "--fail-on-init-error=true"
-      - "--device-list-strategy=envvar"
-      - "--nvidia-driver-root=/run/nvidia/driver"
-    env: []
+    args: []
+    env:
+      - name: PASS_DEVICE_SPECS
+        value: "true"
+      - name: FAIL_ON_INIT_ERROR
+        value: "true"
+      - name: DEVICE_LIST_STRATEGY
+        value: envvar
+      - name: DEVICE_ID_STRATEGY
+        value: uuid
+      - name: NVIDIA_VISIBLE_DEVICES
+        value: all
+      - name: NVIDIA_DRIVER_CAPABILITIES
+        value: all
     tolerations: []
     nodeSelector:
       nvidia.com/gpu.deploy.device-plugin: "true"
@@ -94,12 +104,14 @@ spec:
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     tolerations: []
-    env: []
+    env:
+      - name: GFD_SLEEP_INTERVAL
+        value: 60s
+      - name: GFD_FAIL_ON_INIT_ERROR
+        value: "true"
     nodeSelector:
       nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
     affinity: {}
     podSecurityContext: {}
     securityContext: {}
     resources: {}
-    migStrategy: single
-    discoveryIntervalSeconds: 60

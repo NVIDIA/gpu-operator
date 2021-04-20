@@ -45,6 +45,8 @@ type ClusterPolicySpec struct {
 	DCGMExporter DCGMExporterSpec `json:"dcgmExporter"`
 	// GPUFeatureDiscovery spec
 	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
+	// MIG spec
+	MIG MIGSpec `json:"mig,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -122,6 +124,13 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+}
+
+// MIGSpec defines the configuration for MIG support
+type MIGSpec struct {
+	// Optional: MIGStrategy to apply for GFD and Device-Plugin
+	// +kubebuilder:validation:Enum=none;single;mixed
+	Strategy MIGStrategy `json:"strategy,omitempty"`
 }
 
 // DriverSpec defines the properties for driver deployment
@@ -532,13 +541,6 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// Optional: MigStrategy for GPU feature discovery plugin
-	// +kubebuilder:validation:Enum=none;single;mixed
-	MigStrategy MigStrategy `json:"migStrategy,omitempty"`
-
-	// Optional: Discovery Interval for GPU feature discovery plugin
-	DiscoveryIntervalSeconds int `json:"discoveryIntervalSeconds,omitempty"`
-
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
@@ -557,17 +559,17 @@ type GPUFeatureDiscoverySpec struct {
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
-// MigStrategy indicates MIG mode
-type MigStrategy string
+// MIGStrategy indicates MIG mode
+type MIGStrategy string
 
 // Constants representing different MIG strategies.
 const (
-	// MigStrategyNone indicates MIG mode disabled.
-	MigStrategyNone MigStrategy = "none"
-	// MigStrategySingle indicates Single MIG mode
-	MigStrategySingle MigStrategy = "single"
-	// MigStrategyMixed indicates Mixed MIG mode
-	MigStrategyMixed MigStrategy = "mixed"
+	// MIGStrategyNone indicates MIG mode disabled.
+	MIGStrategyNone MIGStrategy = "none"
+	// MIGStrategySingle indicates Single MIG mode
+	MIGStrategySingle MIGStrategy = "single"
+	// MIGStrategyMixed indicates Mixed MIG mode
+	MIGStrategyMixed MIGStrategy = "mixed"
 )
 
 // State indicates state of GPU operator components
