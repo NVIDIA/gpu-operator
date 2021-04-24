@@ -448,7 +448,7 @@ spec:
                 - --leader-elect
                 command:
                 - gpu-operator
-                image: nvidia/gpu-operator:latest
+                image: nvcr.io/nvidia/gpu-operator:1.7.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -475,13 +475,12 @@ spec:
                 - mountPath: /host-etc/os-release
                   name: host-os-release
                   readOnly: true
-              securityContext:
-                runAsUser: 65532
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
                   path: /etc/os-release
                 name: host-os-release
+              serviceAccountName: gpu-operator
     strategy: deployment
   installModes:
   - supported: false

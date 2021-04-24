@@ -32,10 +32,20 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+  resourceNames:
+  - hostmount-anyuid
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
   - clusterrolebindings
+  - roles
+  - rolebindings
   verbs:
   - '*'
 - apiGroups:
@@ -51,6 +61,7 @@ rules:
   - secrets
   - nodes
   - namespaces
+  - serviceaccounts
   verbs:
   - create
   - delete
@@ -82,3 +93,18 @@ rules:
   - get
   - list
   - create
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - '*'
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - get
+  - list
+  - create
+  - watch
