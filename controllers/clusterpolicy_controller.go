@@ -104,26 +104,15 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	for {
 		status, statusError := clusterPolicyCtrl.step()
-		// Update the CR status
-		instance = &gpuv1.ClusterPolicy{}
-		err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-		if err != nil {
-			r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
-			return ctrl.Result{RequeueAfter: time.Second * 5}, err
-		}
-		if instance.Status.State != status {
-			instance.Status.State = status
-			err = r.Client.Status().Update(context.TODO(), instance)
-			if err != nil {
-				log.Error(err, "Failed to update ClusterPolicy status")
-				return ctrl.Result{RequeueAfter: time.Second * 5}, err
-			}
-		}
 		if statusError != nil {
 			return ctrl.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
 		if status == gpuv1.NotReady {
+			// if CR was previously set to ready(prior reboot etc), reset it to current state
+			if instance.Status.State == gpuv1.Ready {
+				updateCRState(r, req.NamespacedName, gpuv1.NotReady)
+			}
 			// If the resource is not ready, wait 5 secs and reconcile
 			r.Log.Info("ClusterPolicy step wasn't ready", "State:", status)
 			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -134,41 +123,27 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	instance.SetState(gpuv1.Ready)
+	// Update CR state as ready as all states are complete
+	updateCRState(r, req.NamespacedName, gpuv1.Ready)
 	return ctrl.Result{}, nil
 }
 
-type filterNodeEvents struct {
-	log logr.Logger
-	predicate.Funcs
-}
-
-func (f filterNodeEvents) Create(e event.CreateEvent) bool {
-	labels := e.Object.GetLabels()
-
-	gpuCommonLabelMissing := hasGPULabels(labels) && !hasCommonGPULabel(labels)
-	if gpuCommonLabelMissing {
-		f.log.Info("New node needs an update, GPU common label missing.",
-			"name", e.Object.GetName())
+func updateCRState(r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) error {
+	// Fetch latest instance and update state to avoid version mismatch
+	instance := &gpuv1.ClusterPolicy{}
+	err := r.Client.Get(context.TODO(), namespacedName, instance)
+	if err != nil {
+		r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
+		return err
 	}
-
-	return gpuCommonLabelMissing
-}
-
-func (f filterNodeEvents) Update(e event.UpdateEvent) bool {
-	newLabels := e.ObjectNew.GetLabels()
-
-	gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
-	gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
-	needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated
-	if needsUpdate {
-		f.log.Info("Node needs an update",
-			"name", e.ObjectNew.GetName(),
-			"gpuCommonLabelMissing", gpuCommonLabelMissing,
-			"gpuCommonLabelOutdated", gpuCommonLabelOutdated)
+	// Update the CR state
+	instance.SetState(state)
+	err = r.Client.Status().Update(context.TODO(), instance)
+	if err != nil {
+		r.Log.Error(err, "Failed to update ClusterPolicy status")
+		return err
 	}
-
-	return needsUpdate
+	return nil
 }
 
 func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr manager.Manager) error {
@@ -198,11 +173,37 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		return cpToRec
 	}
 
+	p := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			labels := e.Object.GetLabels()
+
+			gpuCommonLabelMissing := hasGPULabels(labels) && !hasCommonGPULabel(labels)
+			if gpuCommonLabelMissing {
+				log.Info("New node needs an update, GPU common label missing.",
+					"name", e.Object.GetName())
+			}
+			return gpuCommonLabelMissing
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			newLabels := e.ObjectNew.GetLabels()
+
+			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
+			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
+			needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated
+			if needsUpdate {
+				log.Info("Node needs an update",
+					"name", e.ObjectNew.GetName(),
+					"gpuCommonLabelMissing", gpuCommonLabelMissing,
+					"gpuCommonLabelOutdated", gpuCommonLabelOutdated)
+			}
+			return needsUpdate
+		},
+	}
+
 	err := c.Watch(
-		&source.Kind{Type: &corev1.ConfigMap{}},
+		&source.Kind{Type: &corev1.Node{}},
 		handler.EnqueueRequestsFromMapFunc(mapFn),
-		filterNodeEvents{log: r.Log},
-	)
+		p)
 
 	return err
 }
