@@ -102,6 +102,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	overallStatus := gpuv1.Ready
 	for {
 		status, statusError := clusterPolicyCtrl.step()
 		if statusError != nil {
@@ -113,9 +114,9 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if instance.Status.State == gpuv1.Ready {
 				updateCRState(r, req.NamespacedName, gpuv1.NotReady)
 			}
-			// If the resource is not ready, wait 5 secs and reconcile
+			// If the resource is not ready, log status and proceed with other components
 			r.Log.Info("ClusterPolicy step wasn't ready", "State:", status)
-			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+			overallStatus = gpuv1.NotReady
 		}
 
 		if clusterPolicyCtrl.last() {
@@ -123,8 +124,14 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// if any state is not ready, requeue for reconfile after 5 seconds
+	if overallStatus != gpuv1.Ready {
+		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
 	// Update CR state as ready as all states are complete
 	updateCRState(r, req.NamespacedName, gpuv1.Ready)
+
 	return ctrl.Result{}, nil
 }
 

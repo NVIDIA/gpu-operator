@@ -18,6 +18,13 @@ spec:
         app.kubernetes.io/part-of: nvidia-gpu
     spec:
       serviceAccount: nvidia-gpu-feature-discovery
+      initContainers:
+      - name: toolkit-validation
+        image: "FILLED BY THE OPERATOR"
+        command: ['sh', '-c']
+        args: ["/tmp/vectorAdd"]
+        securityContext:
+          privileged: true
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery

@@ -242,20 +242,23 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 }
 
 func (n *ClusterPolicyController) step() (gpuv1.State, error) {
+	result := gpuv1.Ready
 	for _, fs := range n.controls[n.idx] {
 		stat, err := fs(*n)
 		if err != nil {
 			return stat, err
 		}
-
+		// successfully deployed resource, now check if its ready
 		if stat != gpuv1.Ready {
-			return stat, nil
+			// mark overall status of this component as not-ready and continue with other resources, while this becomes ready
+			result = gpuv1.NotReady
 		}
 	}
 
+	// move to next state
 	n.idx = n.idx + 1
 
-	return gpuv1.Ready, nil
+	return result, nil
 }
 
 func (n ClusterPolicyController) validate() {
