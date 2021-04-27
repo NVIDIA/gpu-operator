@@ -481,13 +481,17 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhelVersion)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocpVersion)
 
-	// Automatically apply proxy settings for OCP and inject custom CA if configured by user
-	// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
 	if ocpV != "" {
+		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
 		err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
 		if err != nil {
 			return err
 		}
+
+		// indicate driver container to automatically resolve OCP/RHEL versions to better handle node/cluster upgrades
+		autoResolveVersion := corev1.EnvVar{Name: "RESOLVE_OCP_VERSION", Value: "true"}
+		obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, autoResolveVersion)
 	}
 	return nil
 }

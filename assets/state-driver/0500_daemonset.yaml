@@ -43,6 +43,9 @@ spec:
             mountPath: /var/log
           - name: dev-log
             mountPath: /dev/log
+          - name: host-os-release
+            mountPath: "/host-etc/os-release"
+            readOnly: true
       volumes:
         - name: run-nvidia
           hostPath:
@@ -59,3 +62,6 @@ spec:
             items:
               - key: oci-nvidia-hook-json
                 path: oci-nvidia-hook.json
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
