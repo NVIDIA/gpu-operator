@@ -10,4 +10,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: gpu-operator
-  namespace: operator
+  namespace: openshift-operators
