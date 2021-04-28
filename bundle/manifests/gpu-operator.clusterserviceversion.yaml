@@ -90,7 +90,7 @@ metadata:
               "licensingConfig": {
                 "configMapName": ""
               },
-              "version": "sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469"
+              "version": "sha256:a71fa262844c29456a5231cc7aafbf510037d8290c50c5125501f860dc35b93c"
             },
             "gfd": {
               "affinity": {},
@@ -178,7 +178,7 @@ spec:
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469
+      image: nvcr.io/nvidia/driver@sha256:a71fa262844c29456a5231cc7aafbf510037d8290c50c5125501f860dc35b93c
     - name: device-plugin-image
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92
     - name: gpu-feature-discovery-image
