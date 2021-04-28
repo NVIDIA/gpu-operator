@@ -53,7 +53,7 @@ driver:
   enabled: true
   repository: nvcr.io/nvidia
   image: driver
-  version: "460.32.03"
+  version: "460.73.01"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
