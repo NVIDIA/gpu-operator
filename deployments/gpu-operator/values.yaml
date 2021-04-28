@@ -134,7 +134,7 @@ devicePlugin:
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.1.4-2.2.0-ubuntu20.04
+  version: 2.1.8-2.4.0-rc.2-ubuntu20.04
   imagePullPolicy: IfNotPresent
   args:
     - "-f"

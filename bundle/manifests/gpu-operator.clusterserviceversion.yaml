@@ -25,7 +25,7 @@ metadata:
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8"
+              "version": "sha256:8af02463a8b60b21202d0bf69bc1ee0bb12f684fa367f903d138df6cacc2d0ac"
             },
             "devicePlugin": {
               "affinity": {},
@@ -174,7 +174,7 @@ spec:
     - name: gpu-operator-image
       image: nvcr.io/nvidia/gpu-operator@sha256:98878888117a2e3d53924c39f300e4263ce3a25ed7fb12125ed0eaf5d16ec03a
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:8af02463a8b60b21202d0bf69bc1ee0bb12f684fa367f903d138df6cacc2d0ac
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae
     - name: driver-image
