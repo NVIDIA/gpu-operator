@@ -150,7 +150,7 @@ metadata:
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae"
+              "version": "sha256:ffa284f1f359d70f0e1d6d8e7752d7c92ef7445b0d74965a8682775de37febf8"
             }
           }
         }
@@ -176,7 +176,7 @@ spec:
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:8af02463a8b60b21202d0bf69bc1ee0bb12f684fa367f903d138df6cacc2d0ac
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:ffa284f1f359d70f0e1d6d8e7752d7c92ef7445b0d74965a8682775de37febf8
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:a71fa262844c29456a5231cc7aafbf510037d8290c50c5125501f860dc35b93c
     - name: device-plugin-image

@@ -39,7 +39,7 @@ spec:
   toolkit:
     repository: nvcr.io/nvidia/k8s
     image: container-toolkit
-    version: 1.4.7-ubi8
+    version: 1.5.0-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
