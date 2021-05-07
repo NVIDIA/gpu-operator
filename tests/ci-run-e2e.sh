@@ -8,90 +8,35 @@ LOG_DIR="/tmp/logs"
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "Create log dir ${LOG_DIR}"
-mkdir -p "${LOG_DIR}"
 
-echo "Load kernel modules i2c_core and ipmi_msghandler"
-sudo modprobe -a i2c_core ipmi_msghandler
+check_pod_ready() {
+	pod_label=$1
+	current_time=0
+	while :; do
+		echo "Checking $pod_label pod"
+		kubectl get pods -lapp=$pod_label -n gpu-operator-resources
 
-echo "Install dependencies"
-sudo apt update && sudo apt install -y jq
+		echo "Checking $pod_label pod readiness"
+		is_pod_ready=$(kubectl get pods -lapp=$pod_label -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
-echo "Install Helm"
-curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+		if [ "${is_pod_ready}" = "True" ]; then
+			echo "Pod $pod_label is ready"
+			break;
+		fi
 
-REPOSITORY="$(dirname "${IMAGE}")"
-NS="test-operator"
-echo "Deploy operator with repository: ${REPOSITORY}"
-kubectl create namespace "${NS}"
-helm install ../deployments/gpu-operator --generate-name --set operator.version="${TAG}" --set operator.repository="${REPOSITORY}" -n "${NS}" --wait
+		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+			echo "timeout reached"
+			exit 1;
+		fi
 
-echo "Deploy GPU pod"
-kubectl apply -f gpu-pod.yaml
+		# Echo useful information on stdout
+		kubectl get pods -n gpu-operator-resources
 
-current_time=0
-while :; do
-	pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
-	status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
-	if [ "${status}" = "Succeeded" ]; then
-		echo "GPU pod terminated successfully"
-		rc=0
-		break;
-	fi
-
-	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
-		echo "timeout reached"
-		exit 1
-	fi
-
-	# Echo useful information on stdout
-	kubectl get pods --all-namespaces
-
-	for pod in $(echo "$pods" | jq -r .[].name); do
-		ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
-		echo "Generating logs for pod: ${pod} ns: ${ns}"
-		echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
-		kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
-		kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
+		echo "Sleeping 5 seconds"
+		current_time=$((${current_time} + 5))
+		sleep 5
 	done
-
-	echo "Generating cluster logs"
-	echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
-	kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
-
-	echo "Sleeping 5 seconds"
-	current_time=$((${current_time} + 5))
-	sleep 5;
-done
-
-current_time=0
-while :; do
-	echo "Checking dcgm pod"
-	kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources
-
-	echo "Checking dcgm pod readiness"
-	is_dcgm_ready=$(kubectl get pods -lapp=nvidia-dcgm-exporter -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
-
-	if [ "${is_dcgm_ready}" = "True" ]; then
-	    #TODO: debug pod-ip not reachable with Calico update
-		#dcgm_cluster_ip=$(kubectl get service -n gpu-operator-resources -o wide -l app=nvidia-dcgm-exporter | tail -n 1 | awk '{print $3}')
-		#kubectl run -i nginx --image=nginx --restart=Never -- curl -s "$dcgm_cluster_ip:9400/metrics" | grep "DCGM_FI_DEV_GPU_TEMP"
-		rc=0
-		break;
-	fi
-
-	if [[ "${current_time}" -gt $((60 * 45)) ]]; then
-		echo "timeout reached"
-		exit 1
-	fi
-
-	# Echo useful information on stdout
-	kubectl get pods --all-namespaces
-
-	echo "Sleeping 5 seconds"
-	current_time=$((${current_time} + 5))
-	sleep 5
-done
+}
 
 # This function kills the operator and waits for the operator to be back in a running state
 # Timeout is 100 seconds
@@ -116,6 +61,68 @@ test_restart_operator() {
 	kubectl logs -n gpu-operator "$(kubectl get pods -n "$NS" -o json | jq -r '.items[0].metadata.name')"
 	exit 1
 }
+
+check_gpu_pod_ready() {
+	current_time=0
+	while :; do
+		pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
+		status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
+		if [ "${status}" = "Succeeded" ]; then
+			echo "GPU pod terminated successfully"
+			rc=0
+			break;
+		fi
+
+		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+			echo "timeout reached"
+			exit 1
+		fi
+
+		# Echo useful information on stdout
+		kubectl get pods --all-namespaces
+
+		for pod in $(echo "$pods" | jq -r .[].name); do
+			ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
+			echo "Generating logs for pod: ${pod} ns: ${ns}"
+			echo "------------------------------------------------" >> "${LOG_DIR}/${pod}.describe"
+			kubectl -n "${ns}" describe pods "${pod}" >> "${LOG_DIR}/${pod}.describe"
+			kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${LOG_DIR}/${pod}.logs" || true
+		done
+
+		echo "Generating cluster logs"
+		echo "------------------------------------------------" >> "${LOG_DIR}/cluster.logs"
+		kubectl get --all-namespaces pods >> "${LOG_DIR}/cluster.logs"
+
+		echo "Sleeping 5 seconds"
+		current_time=$((${current_time} + 5))
+		sleep 5;
+	done
+}
+
+echo "Create log dir ${LOG_DIR}"
+mkdir -p "${LOG_DIR}"
+
+echo "Load kernel modules i2c_core and ipmi_msghandler"
+sudo modprobe -a i2c_core ipmi_msghandler
+
+echo "Install dependencies"
+sudo apt update && sudo apt install -y jq
+
+echo "Install Helm"
+curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+REPOSITORY="$(dirname "${IMAGE}")"
+NS="test-operator"
+echo "Deploy operator with repository: ${REPOSITORY}"
+kubectl create namespace "${NS}"
+helm install ../deployments/gpu-operator --generate-name --set operator.version="${TAG}" --set operator.repository="${REPOSITORY}" -n "${NS}" --wait
+
+echo "Deploy GPU pod"
+kubectl apply -f gpu-pod.yaml
+
+check_gpu_pod_ready
+check_pod_ready "nvidia-dcgm-exporter"
+check_pod_ready "gpu-feature-discovery"
 
 test_restart_operator
 

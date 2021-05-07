@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	commonGPULabelKey   = "nvidia.com/gpu.present"
-	commonGPULabelValue = "true"
+	commonGPULabelKey    = "nvidia.com/gpu.present"
+	commonGPULabelValue  = "true"
+	migManagerLabelKey   = "nvidia.com/gpu.deploy.mig-manager"
+	migManagerLabelValue = "true"
+	gpuProductLabelKey   = "nvidia.com/gpu.product"
 )
 
 var gpuStateLabels = map[string]string{
@@ -133,6 +136,18 @@ func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
 		log.Info(" - ", "Label", key, "value", nodeLabels[key])
 	}
 
+	// add mig-manager label if missing
+	if hasMIGCapableGPU(nodeLabels) && !hasMIGManagerLabel(nodeLabels) {
+		nodeLabels[migManagerLabelKey] = migManagerLabelValue
+		modified = true
+		log.Info(" - ", "Label", migManagerLabelKey, "value", migManagerLabelValue)
+	} else if hasMIGManagerLabel(nodeLabels) && !hasMIGCapableGPU(nodeLabels) {
+		// reset mig-manager label to false if mig-capable GPU has been removed
+		nodeLabels[migManagerLabelKey] = "false"
+		modified = true
+		log.Info(" - ", "Label", migManagerLabelKey, "value", migManagerLabelValue)
+	}
+
 	return modified
 }
 
@@ -143,6 +158,32 @@ func hasGPULabels(labels map[string]string) bool {
 			if gpuNodeLabels[key] == val {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// hasMIGCapableGPU returns true if this node has GPU capable of MIG partitioning.
+func hasMIGCapableGPU(labels map[string]string) bool {
+	for key, value := range labels {
+		if strings.Contains(key, "vgpu.host-driver-version") && value != "" {
+			// vGPU node
+			return false
+		}
+		// update this once GFD supports mig.capable label
+		if key == gpuProductLabelKey {
+			if strings.Contains(strings.ToLower(value), "a100") || strings.Contains(strings.ToLower(value), "a30") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasMIGManagerLabel(labels map[string]string) bool {
+	for key, value := range labels {
+		if key == migManagerLabelKey && value == migManagerLabelValue {
+			return true
 		}
 	}
 	return false
@@ -168,6 +209,11 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			for key, value := range gpuStateLabels {
 				labels[key] = value
 			}
+			// add mig-manager label
+			if hasMIGCapableGPU(labels) {
+				labels[migManagerLabelKey] = migManagerLabelValue
+			}
+			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
 			if err != nil {
@@ -181,6 +227,9 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			for key := range gpuStateLabels {
 				delete(labels, key)
 			}
+			// delete mig-manager label
+			delete(labels, migManagerLabelKey)
+			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
 			if err != nil {
@@ -230,6 +279,7 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
 		addState(n, "/opt/gpu-operator/state-monitoring")
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+		addState(n, "/opt/gpu-operator/state-mig-manager")
 	}
 
 	// fetch all nodes and label gpu nodes

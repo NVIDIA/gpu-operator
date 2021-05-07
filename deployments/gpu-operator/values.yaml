@@ -169,6 +169,27 @@ gfd:
   resources: {}
   priorityClassName: system-node-critical
 
+
+migManager:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: k8s-mig-manager
+  version: v0.1.0-ubuntu20.04
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations: []
+  env:
+    - name: WITH_REBOOT
+      value: "false"
+  nodeSelector:
+    nvidia.com/gpu.deploy.mig-manager: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+  resources: {}
+  priorityClassName: system-node-critical
+
 node-feature-discovery:
   worker:
     tolerations:

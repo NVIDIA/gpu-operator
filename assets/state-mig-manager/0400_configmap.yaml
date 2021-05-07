@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mig-parted-config
+  namespace: gpu-operator-resources
+data:
+  config.yaml: |
+    version: v1
+    mig-configs:
+      all-disabled:
+        - devices: all
+          mig-enabled: false
+
+      # A100-40GB
+      all-1g.5gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.5gb": 7
+
+      all-2g.10gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.10gb": 3
+
+      all-3g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.20gb": 2
+
+      all-7g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.40gb": 1
+
+      # A100-80GB
+      all-1g.10gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 7
+
+      all-2g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.20gb": 3
+
+      all-3g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.40gb": 2
+
+      all-7g.80gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+
+      # A30-24GB
+      all-1g.6gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.6gb": 4
+
+      all-2g.12gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.12gb": 2
+
+      all-4g.24gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.24gb": 1
+
+      # A100-40GB, A100-80GB, A30-24GB
+      all-balanced:
+        # A100-40GB
+        - device-filter: ["0x20B010DE", "0x20B110DE", "0x20F110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.5gb": 2
+            "2g.10gb": 1
+            "3g.20gb": 1
+
+        # A100-80GB
+        - device-filter: ["0x20B210DE", "0x20B510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 2
+            "2g.20gb": 1
+            "3g.40gb": 1
+
+        # A30-24GB
+        - device-filter: "0x20B710DE"
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.6gb": 2
+            "2g.12gb": 1

@@ -189,12 +189,14 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
-			needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated
+			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
+			needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated || migManagerLabelMissing
 			if needsUpdate {
 				log.Info("Node needs an update",
 					"name", e.ObjectNew.GetName(),
 					"gpuCommonLabelMissing", gpuCommonLabelMissing,
-					"gpuCommonLabelOutdated", gpuCommonLabelOutdated)
+					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
+					"migManagerLabelMissing", migManagerLabelMissing)
 			}
 			return needsUpdate
 		},

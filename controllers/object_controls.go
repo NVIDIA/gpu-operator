@@ -253,6 +253,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
 		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
+		"nvidia-mig-manager":                 TransformMIGManager,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -883,6 +884,70 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	return nil
 }
 
+// TransformMIGManager transforms MIG Manager daemonset with required config as per ClusterPolicy
+func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
+
+	// update image
+	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.MIGManager)
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.MIGManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.MIGManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.MIGManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.MIGManager.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.MIGManager.PriorityClassName
+	}
+
+	// set node selector if specified
+	if len(config.MIGManager.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.MIGManager.NodeSelector
+	}
+
+	// set node affinity if specified
+	if config.MIGManager.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.MIGManager.Affinity
+	}
+
+	// set tolerations if specified
+	if len(config.MIGManager.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.MIGManager.Tolerations
+	}
+
+	// set resource limits
+	if config.MIGManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.MIGManager.Resources
+		}
+	}
+
+	// set arguments if specified for driver container
+	if len(config.MIGManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
+	}
+
+	// set/append environment variables for exporter container
+	if len(config.MIGManager.Env) > 0 {
+		for _, env := range config.MIGManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+
+	return nil
+}
+
 // get runtime(docker, containerd) config file path based on toolkit container env or default
 func getRuntimeConfigFile(c *corev1.Container, runtime string) (runtimeConfigFile string) {
 	if runtime == gpuv1.Docker.String() {
@@ -1061,7 +1126,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		return gpuv1.NotReady
 	}
 
-	return isPodReady(name, n, "Running")
+	return gpuv1.Ready
 }
 
 // Deployment creates Deployment resource

@@ -47,6 +47,8 @@ type ClusterPolicySpec struct {
 	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
 	// MIG spec
 	MIG MIGSpec `json:"mig,omitempty"`
+	// MIGManager for configuration to deploy MIG Manager
+	MIGManager MIGManagerSpec `json:"migManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -559,6 +561,88 @@ type GPUFeatureDiscoverySpec struct {
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
+// MIGManagerSpec defines the properties for deploying MIG manager
+type MIGManagerSpec struct {
+	// Enabled indicates if deployment of mig-manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable mig-manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// mig-manager image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository"`
+
+	// mig-manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image"`
+
+	// mig-manager image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Node selector to control the selection of nodes (optional)
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Optional: Set tolerations
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Optional: Set Node affinity
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Optional: Pod Security Context
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// Optional: Security Context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -652,6 +736,9 @@ func ImagePath(spec interface{}) string {
 		return imagePath(config.Repository, config.Image, config.Version)
 	case *InitContainerSpec:
 		config := spec.(*InitContainerSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *MIGManagerSpec:
+		config := spec.(*MIGManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version)
 	default:
 		log.Fatal("Invalid type to construct image path", v)
