@@ -117,6 +117,28 @@ metadata:
               "priorityClassName": "system-node-critical",
               "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
             },
+            "migManager": {
+              "enabled": true,
+              "affinity": {},
+              "image": "k8s-mig-manager",
+              "imagePullSecrets": [],
+              "env": [
+                {
+                  "name": "WITH_REBOOT",
+                  "value": "false"
+                }
+              ],
+              "nodeSelector": {
+                "nvidia.com/gpu.deploy.mig-manager": "true"
+              },
+              "podSecurityContext": {},
+              "repository": "nvcr.io/nvidia",
+              "resources": {},
+              "securityContext": {},
+              "tolerations": [],
+              "priorityClassName": "system-node-critical",
+              "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
+            },
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,

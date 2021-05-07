@@ -279,3 +279,47 @@ spec:
     {{- if .Values.gfd.priorityClassName }}
     priorityClassName: {{ .Values.gfd.priorityClassName }}
     {{- end }}
+  migManager:
+    enabled: {{ .Values.migManager.enabled }}
+    {{- if .Values.migManager.repository }}
+    repository: {{ .Values.migManager.repository }}
+    {{- end }}
+    {{- if .Values.migManager.image }}
+    image: {{ .Values.migManager.image }}
+    {{- end }}
+    {{- if .Values.migManager.version }}
+    version: {{ .Values.migManager.version }}
+    {{- end }}
+    {{- if .Values.migManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.migManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.migManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.migManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.tolerations }}
+    tolerations: {{ toYaml .Values.migManager.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.migManager.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.affinity }}
+    affinity: {{ toYaml .Values.migManager.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.migManager.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.securityContext }}
+    securityContext: {{ toYaml .Values.migManager.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.resources }}
+    resources: {{ toYaml .Values.migManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.env }}
+    env: {{ toYaml .Values.migManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.args }}
+    args: {{ toYaml .Values.migManager.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.priorityClassName }}
+    priorityClassName: {{ .Values.migManager.priorityClassName }}
+    {{- end }}
