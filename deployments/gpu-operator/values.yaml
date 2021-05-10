@@ -172,7 +172,7 @@ gfd:
 
 migManager:
   enabled: true
-  repository: nvcr.io/nvidia
+  repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
   version: v0.1.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
