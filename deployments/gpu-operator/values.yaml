@@ -80,6 +80,7 @@ driver:
   priorityClassName: system-node-critical
 
 toolkit:
+  enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
   version: 1.5.0-ubuntu18.04

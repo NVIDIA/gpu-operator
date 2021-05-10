@@ -108,6 +108,7 @@ spec:
     priorityClassName: {{ .Values.driver.priorityClassName }}
     {{- end }}
   toolkit:
+    enabled: {{ .Values.toolkit.enabled }}
     {{- if .Values.toolkit.repository }}
     repository: {{ .Values.toolkit.repository }}
     {{- end }}
