@@ -83,6 +83,23 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+  resourceNames:
+  - gpu-operator-restricted
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - create
+  - get
+  - update
+  - list
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions

@@ -11,6 +11,9 @@ spec:
       version: vectoradd-cuda10.2
       imagePullPolicy: IfNotPresent
 
+  psp:
+    enabled: false
+
   mig:
     strategy: single
 

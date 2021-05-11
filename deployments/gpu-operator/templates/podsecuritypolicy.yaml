@@ -1,0 +1,46 @@
+{{- if .Values.psp.enabled }}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: gpu-operator-restricted
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+  annotations:
+      kubernetes.io/description: "restricted denies access to all host features and requires
+      pods to be run with a UID, read-only root filesystem and SELinux context that are 
+      allocated to the namespace."
+spec:
+  allowedHostPaths: []
+  hostIPC: false
+  hostNetwork: false
+  hostPID: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  allowedCapabilities: []
+  defaultAddCapabilities: []
+  requiredDropCapabilities:
+  - KILL
+  - MKNOD
+  - SETUID
+  - SETGID
+  fsGroup:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  volumes:
+  - configMap
+  - hostPath
+  - secret
+  - downwardAPI
+{{- end }}

@@ -1,10 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-dcgm-exporter
+  name: nvidia-gpu-feature-discovery
   namespace: gpu-operator-resources
-  labels:
-    app: nvidia-dcgm-exporter
 rules:
 - apiGroups:
   - security.openshift.io
@@ -12,13 +10,8 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
+  resourceNames:
+  - privileged
 - apiGroups:
   - policy
   resources:

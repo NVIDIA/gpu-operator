@@ -49,6 +49,8 @@ type ClusterPolicySpec struct {
 	MIG MIGSpec `json:"mig,omitempty"`
 	// MIGManager for configuration to deploy MIG Manager
 	MIGManager MIGManagerSpec `json:"migManager,omitempty"`
+	// PSP defines spec for handling PodSecurityPolicies
+	PSP PSPSpec `json:"psp,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -84,6 +86,12 @@ type OperatorSpec struct {
 	DefaultRuntime Runtime           `json:"defaultRuntime"`
 	Validator      ValidatorSpec     `json:"validator,omitempty"`
 	InitContainer  InitContainerSpec `json:"initContainer,omitempty"`
+}
+
+// PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
+type PSPSpec struct {
+	// Enabled indicates if PodSecurityPolicies needs to be enabled for all Pods
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // InitContainerSpec describes configuration for initContainer image used with all components
@@ -786,4 +794,13 @@ func (t *ToolkitSpec) IsToolkitEnabled() bool {
 		return true
 	}
 	return *t.Enabled
+}
+
+// IsEnabled returns true if PodSecurityPolicies are enabled for all Pods
+func (p *PSPSpec) IsEnabled() bool {
+	if p.Enabled == nil {
+		// PSP is disabled by default
+		return false
+	}
+	return *p.Enabled
 }
