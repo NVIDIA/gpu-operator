@@ -13,4 +13,4 @@ subjects:
   name: nvidia-device-plugin
   namespace: gpu-operator-resources
 userNames:
-- system:serviceaccount:gpu-operator:nvidia-device-plugin
+- system:serviceaccount:gpu-operator-resources:nvidia-device-plugin

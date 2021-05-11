@@ -8,6 +8,9 @@ platform:
 nfd:
   enabled: true
 
+psp:
+  enabled: false
+
 operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
@@ -212,3 +215,6 @@ node-feature-discovery:
   master:
     extraLabelNs:
       - nvidia.com
+
+  serviceAccount:
+    name: node-feature-discovery

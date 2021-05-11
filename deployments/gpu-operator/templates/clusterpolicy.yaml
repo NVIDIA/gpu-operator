@@ -57,6 +57,8 @@ spec:
     {{- if .Values.mig.strategy }}
     strategy: {{ .Values.mig.strategy }}
     {{- end }}
+  psp:
+    enabled: {{ .Values.psp.enabled }}
   driver:
     enabled: {{ .Values.driver.enabled }}
     {{- if .Values.driver.repository }}

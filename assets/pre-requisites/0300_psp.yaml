@@ -1,0 +1,33 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: gpu-operator-privileged
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+  annotations:
+    kubernetes.io/description: "privileged allows access to all privileged and host
+      features and the ability to run as any user, any group, any fsGroup, and with
+      any SELinux context."
+spec:
+  privileged: true
+  hostIPC: false
+  hostNetwork: false
+  hostPID: true
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: false
+  allowedHostPaths: []
+  allowedCapabilities:
+  - '*'
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - hostPath
+  - secret
+  - downwardAPI

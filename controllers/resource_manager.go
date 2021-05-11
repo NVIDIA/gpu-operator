@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 
@@ -41,6 +42,7 @@ type Resources struct {
 	PriorityClass              schedv1.PriorityClass
 	Taint                      corev1.Taint
 	SecurityContextConstraints secv1.SecurityContextConstraints
+	PodSecurityPolicy          policyv1beta1.PodSecurityPolicy
 	Namespace                  corev1.Namespace
 	RuntimeClass               nodev1.RuntimeClass
 }
@@ -156,6 +158,10 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			_, _, err := s.Decode(m, nil, &res.RuntimeClass)
 			panicIfError(err)
 			ctrl = append(ctrl, RuntimeClass)
+		case "PodSecurityPolicy":
+			_, _, err := s.Decode(m, nil, &res.PodSecurityPolicy)
+			panicIfError(err)
+			ctrl = append(ctrl, PodSecurityPolicy)
 		default:
 			n.rec.Log.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}

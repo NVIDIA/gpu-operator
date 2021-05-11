@@ -1282,6 +1282,34 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	return gpuv1.Ready, nil
 }
 
+// PodSecurityPolicy creates PSP resources
+func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
+	// check if PSP's are disabled and ignore PSP creation
+	if !n.singleton.Spec.PSP.IsEnabled() {
+		return gpuv1.Ready, nil
+	}
+
+	state := n.idx
+	obj := n.resources[state].PodSecurityPolicy.DeepCopy()
+	logger := n.rec.Log.WithValues("PodSecurityPolicies", obj.Name)
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+		if errors.IsAlreadyExists(err) {
+			logger.Info("Found Resource")
+			return gpuv1.Ready, nil
+		}
+
+		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	return gpuv1.Ready, nil
+}
+
 // Service creates Service object
 func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
