@@ -46,7 +46,7 @@ metadata:
                   "value": "envvar"
                 },
                 {
-                  "name": "DEVICE_UUID_STRATEGY",
+                  "name": "DEVICE_ID_STRATEGY",
                   "value": "uuid"
                 },
                 {
@@ -67,7 +67,7 @@ metadata:
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92"
+              "version": "sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05"
             },
             "driver": {
               "enabled": true,
@@ -202,7 +202,7 @@ spec:
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:a71fa262844c29456a5231cc7aafbf510037d8290c50c5125501f860dc35b93c
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
     - name: cuda-sample-image
