@@ -17,24 +17,6 @@ spec:
     {{- if .Values.operator.migStrategy }}
     migStrategy: {{ .Values.operator.migStrategy }}
     {{- end }}
-    {{- if .Values.operator.validator }}
-    validator:
-      {{- if .Values.operator.validator.repository }}
-      repository: {{ .Values.operator.validator.repository }}
-      {{- end }}
-      {{- if .Values.operator.validator.image }}
-      image: {{ .Values.operator.validator.image }}
-      {{- end }}
-      {{- if .Values.operator.validator.version }}
-      version: {{ .Values.operator.validator.version }}
-      {{- end }}
-      {{- if .Values.operator.validator.imagePullPolicy }}
-      imagePullPolicy: {{ .Values.operator.validator.imagePullPolicy }}
-      {{- end }}
-      {{- if .Values.operator.validator.imagePullSecrets }}
-      imagePullSecrets: {{ toYaml .Values.operator.validator.imagePullSecrets | nindent 8 }}
-      {{- end }}
-    {{- end }}
     {{- if .Values.operator.initContainer }}
     initContainer:
       {{- if .Values.operator.initContainer.repository }}
@@ -51,6 +33,67 @@ spec:
       {{- end }}
       {{- if .Values.operator.initContainer.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.operator.initContainer.imagePullSecrets | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  validator:
+    {{- if .Values.validator.repository }}
+    repository: {{ .Values.validator.repository }}
+    {{- end }}
+    {{- if .Values.validator.image }}
+    image: {{ .Values.validator.image }}
+    {{- end }}
+    {{- if .Values.validator.version }}
+    version: {{ .Values.validator.version }}
+    {{- end }}
+    {{- if .Values.validator.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.validator.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.validator.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.validator.imagePullSecrets | nindent 8 }}
+    {{- end }}
+    {{- if .Values.validator.tolerations }}
+    tolerations: {{ toYaml .Values.validator.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.validator.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.affinity }}
+    affinity: {{ toYaml .Values.validator.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.validator.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.securityContext }}
+    securityContext: {{ toYaml .Values.validator.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.resources }}
+    resources: {{ toYaml .Values.validator.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.env }}
+    env: {{ toYaml .Values.validator.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.args }}
+    args: {{ toYaml .Values.validator.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.priorityClassName }}
+    priorityClassName: {{ .Values.validator.priorityClassName }}
+    {{- end }}
+    {{- if .Values.validator.plugin }}
+    plugin:
+      {{- if .Values.validator.plugin.env }}
+      env: {{ toYaml .Values.validator.plugin.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.driver }}
+    driver:
+      {{- if .Values.validator.driver.env }}
+      env: {{ toYaml .Values.validator.driver.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.toolkit }}
+    toolkit:
+      {{- if .Values.validator.toolkit.env }}
+      env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
       {{- end }}
     {{- end }}
   mig:

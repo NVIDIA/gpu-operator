@@ -33,6 +33,7 @@ var gpuStateLabels = map[string]string{
 	"nvidia.com/gpu.deploy.container-toolkit":     "true",
 	"nvidia.com/gpu.deploy.device-plugin":         "true",
 	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+	"nvidia.com/gpu.deploy.operator-validator":    "true",
 }
 
 var gpuNodeLabels = map[string]string{
@@ -141,13 +142,7 @@ func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
 		nodeLabels[migManagerLabelKey] = migManagerLabelValue
 		modified = true
 		log.Info(" - ", "Label", migManagerLabelKey, "value", migManagerLabelValue)
-	} else if hasMIGManagerLabel(nodeLabels) && !hasMIGCapableGPU(nodeLabels) {
-		// reset mig-manager label to false if mig-capable GPU has been removed
-		nodeLabels[migManagerLabelKey] = "false"
-		modified = true
-		log.Info(" - ", "Label", migManagerLabelKey, "value", migManagerLabelValue)
 	}
-
 	return modified
 }
 
@@ -275,11 +270,13 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		if clusterPolicy.Spec.Toolkit.IsToolkitEnabled() {
 			addState(n, "/opt/gpu-operator/state-container-toolkit")
 		}
+		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
-		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
 		addState(n, "/opt/gpu-operator/state-monitoring")
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
-		addState(n, "/opt/gpu-operator/state-mig-manager")
+		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
+			addState(n, "/opt/gpu-operator/state-mig-manager")
+		}
 	}
 
 	// fetch all nodes and label gpu nodes

@@ -26,9 +26,13 @@ spec:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
         command: ['sh', '-c']
-        args: ["/tmp/vectorAdd"]
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
         securityContext:
           privileged: true
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: "/run/nvidia"
+            mountPropagation: Bidirectional
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
@@ -53,3 +57,6 @@ spec:
       - name: "pod-gpu-resources"
         hostPath:
           path: "/var/lib/kubelet/pod-resources"
+      - name: run-nvidia
+        hostPath:
+          path: /run/nvidia

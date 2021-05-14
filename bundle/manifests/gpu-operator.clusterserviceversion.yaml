@@ -142,12 +142,6 @@ metadata:
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
-              "validator": {
-                "image": "cuda-sample",
-                "repository": "nvcr.io/nvidia/k8s",
-                "version": "sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2",
-                "imagePullSecrets": []
-              },
               "initContainer": {
                 "image": "cuda",
                 "repository": "nvcr.io/nvidia",
@@ -173,6 +167,27 @@ metadata:
               "tolerations": [],
               "priorityClassName": "system-node-critical",
               "version": "sha256:ffa284f1f359d70f0e1d6d8e7752d7c92ef7445b0d74965a8682775de37febf8"
+            },
+            "validator": {
+              "affinity": {},
+              "image": "gpu-operator-validator",
+              "imagePullSecrets": [],
+              "nodeSelector": {
+                "nvidia.com/gpu.deploy.operator-validator": "true"
+              },
+              "podSecurityContext": {},
+              "repository": "quay.io/shivamerla",
+              "resources": {},
+              "securityContext": {},
+              "tolerations": [],
+              "priorityClassName": "system-node-critical",
+              "version": "v1.7.0",
+              "env": [
+                {
+                  "name": "WITH_WORKLOAD",
+                  "value": "true"
+                }
+              ]
             }
           }
         }

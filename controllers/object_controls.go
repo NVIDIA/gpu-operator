@@ -53,6 +53,16 @@ const (
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
 	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
+	// ValidatorImageEnvName indicates env name for validator image passed
+	ValidatorImageEnvName = "VALIDATOR_IMAGE"
+	// ValidatorImagePullPolicyEnvName indicates env name for validator image pull policy passed
+	ValidatorImagePullPolicyEnvName = "VALIDATOR_IMAGE_PULL_POLICY"
+	// ValidatorImagePullSecretsEnvName indicates env name for validator image pull secrets passed
+	ValidatorImagePullSecretsEnvName = "VALIDATOR_IMAGE_PULL_SECRETS"
+	// ValidatorRuntimeClassEnvName indicates env name for validator image pull secrets passed
+	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIMECLASS"
+	// MigStrategyEnvName indicates env name for passing MIG strategy
+	MigStrategyEnvName = "MIG_STRATEGY"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -254,6 +264,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
 		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
 		"nvidia-mig-manager":                 TransformMIGManager,
+		"nvidia-operator-validator":          TransformValidator,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -727,9 +738,16 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			continue
 		}
 
-		obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Operator.InitContainer)
+		obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
 		// update initContainer image pull policy
-		obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.InitContainer.ImagePullPolicy)
+		obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+
+		// set/append environment variables for validation init container
+		if len(config.Validator.Toolkit.Env) > 0 {
+			for _, env := range config.Validator.Toolkit.Env {
+				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+			}
+		}
 	}
 
 	return nil
@@ -948,6 +966,148 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	return nil
 }
 
+// TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
+func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
+	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.Validator)
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+	// set image pull secrets
+	if len(config.Validator.ImagePullSecrets) > 0 {
+		for _, secret := range config.Validator.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// update PriorityClass
+	if config.Validator.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Validator.PriorityClassName
+	}
+	// set node selector if specified
+	if len(config.Validator.NodeSelector) > 0 {
+		obj.Spec.Template.Spec.NodeSelector = config.Validator.NodeSelector
+	}
+	// set node affinity if specified
+	if config.Validator.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.Validator.Affinity
+	}
+	// set tolerations if specified
+	if len(config.Validator.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Validator.Tolerations
+	}
+	// set resource limits
+	if config.Validator.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.Validator.Resources
+		}
+	}
+	// set arguments if specified for device-plugin container
+	if len(config.Validator.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.Validator.Args
+	}
+	// set/append environment variables for device-plugin container
+	if len(config.Validator.Env) > 0 {
+		for _, env := range config.Validator.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+
+	// configure volume driver-install-path to use host root path if installed outside of operator
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == DriverInstallPathVolName && !config.Driver.IsDriverEnabled() {
+			// set host root path as driver-install-path
+			volume.HostPath.Path = "/"
+			break
+		}
+	}
+
+	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
+
+	return nil
+}
+
+// TransformValidatorComponent applies changes to given validator component
+func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev1.PodSpec, component string) error {
+	for i, initContainer := range podSpec.InitContainers {
+		// skip if not component validation initContainer
+		if !strings.Contains(initContainer.Name, fmt.Sprintf("%s-validation", component)) {
+			continue
+		}
+		// update validation image
+		if config.Validator.Repository != "" {
+			podSpec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
+		}
+		// update validation image pull policy
+		if config.Validator.ImagePullPolicy != "" {
+			podSpec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+		}
+		switch component {
+		case "cuda":
+			// set/append environment variables for cuda-validation container
+			if len(config.Validator.CUDA.Env) > 0 {
+				for _, env := range config.Validator.CUDA.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+			// set additional env to indicate image, pullSecrets to spin-off cuda validation workload pod.
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, gpuv1.ImagePath(&config.Validator))
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
+			var pullSecrets string
+			if len(config.Validator.ImagePullSecrets) > 0 {
+				pullSecrets = strings.Join(config.Validator.ImagePullSecrets, ",")
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullSecretsEnvName, pullSecrets)
+			}
+			if podSpec.RuntimeClassName != nil {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
+			}
+		case "plugin":
+			// set/append environment variables for plugin-validation container
+			if len(config.Validator.Plugin.Env) > 0 {
+				for _, env := range config.Validator.Plugin.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+			// set additional env to indicate image, pullSecrets to spin-off plugin validation workload pod.
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, gpuv1.ImagePath(&config.Validator))
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
+			var pullSecrets string
+			if len(config.Validator.ImagePullSecrets) > 0 {
+				pullSecrets = strings.Join(config.Validator.ImagePullSecrets, ",")
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullSecretsEnvName, pullSecrets)
+			}
+			if podSpec.RuntimeClassName != nil {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
+			}
+			// apply mig-strategy env to spin off plugin-validation workload pod
+			setContainerEnv(&(podSpec.InitContainers[i]), MigStrategyEnvName, string(config.MIG.Strategy))
+		case "driver":
+			// set/append environment variables for driver-validation container
+			if len(config.Validator.Driver.Env) > 0 {
+				for _, env := range config.Validator.Driver.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "toolkit":
+			// set/append environment variables for toolkit-validation container
+			if len(config.Validator.Toolkit.Env) > 0 {
+				for _, env := range config.Validator.Toolkit.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		default:
+			return fmt.Errorf("invalid component provided to apply validator changes")
+		}
+	}
+	return nil
+}
+
 // get runtime(docker, containerd) config file path based on toolkit container env or default
 func getRuntimeConfigFile(c *corev1.Container, runtime string) (runtimeConfigFile string) {
 	if runtime == gpuv1.Docker.String() {
@@ -1033,49 +1193,14 @@ func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 			continue
 		}
 		// update validation image
-		if config.Operator.Validator.Repository != "" {
-			obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Operator.Validator)
+		if config.Validator.Repository != "" {
+			obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
 		}
 		// update validation image pull policy
-		if config.Operator.Validator.ImagePullPolicy != "" {
-			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.Validator.ImagePullPolicy)
+		if config.Validator.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
 	}
-	return nil
-}
-
-// TransformDevicePluginValidator transforms device plugin validator pods with required config as per ClusterPolicy
-func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update image paths for validation containers(init and main both use validator image)
-	if config.Operator.Validator.Repository != "" {
-		obj.Spec.Containers[0].Image = gpuv1.ImagePath(&config.Operator.Validator)
-		obj.Spec.InitContainers[0].Image = gpuv1.ImagePath(&config.Operator.Validator)
-	}
-	// update image pull policy
-	obj.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.Validator.ImagePullPolicy)
-	obj.Spec.InitContainers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.Validator.ImagePullPolicy)
-
-	// set image pull secrets
-	if config.Operator.Validator.ImagePullSecrets != nil {
-		for _, secret := range config.Operator.Validator.ImagePullSecrets {
-			obj.Spec.ImagePullSecrets = append(obj.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
-	}
-	// set node selector if specified for device-plugin
-	if len(config.DevicePlugin.NodeSelector) > 0 {
-		obj.Spec.NodeSelector = config.DevicePlugin.NodeSelector
-	}
-	// set node affinity if specified for device-plugin
-	if config.DevicePlugin.Affinity != nil {
-		obj.Spec.Affinity = config.DevicePlugin.Affinity
-	}
-	// set tolerations if specified for device-plugin
-	if len(config.DevicePlugin.Tolerations) > 0 {
-		obj.Spec.Tolerations = config.DevicePlugin.Tolerations
-	}
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec, config.Operator.DefaultRuntime)
-
 	return nil
 }
 
@@ -1209,54 +1334,6 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	}
 	n.rec.Log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "==", phase)
 	return gpuv1.Ready
-}
-
-// Pod creates pod resource
-func Pod(n ClusterPolicyController) (gpuv1.State, error) {
-	state := n.idx
-	obj := n.resources[state].Pod.DeepCopy()
-
-	logger := n.rec.Log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
-	err := preProcessPod(obj, n)
-	if err != nil {
-		logger.Info("could not pre-process", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return isPodReady(obj.Name, n, "Succeeded"), nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	return isPodReady(obj.Name, n, "Succeeded"), nil
-}
-
-func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
-	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
-	}
-
-	t, ok := transformations[obj.Name]
-	if !ok {
-		n.rec.Log.Info(fmt.Sprintf("No transformation for Pod '%s'", obj.Name))
-		return nil
-	}
-
-	err := t(obj, &n.singleton.Spec, n)
-	if err != nil {
-		n.rec.Log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
-		return err
-	}
-	return nil
 }
 
 // SecurityContextConstraints creates SCC resources

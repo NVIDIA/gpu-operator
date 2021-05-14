@@ -29,9 +29,13 @@ spec:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
         command: ['sh', '-c']
-        args: ["/tmp/vectorAdd"]
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
         securityContext:
           privileged: true
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin-ctr
@@ -44,3 +48,7 @@ spec:
         - name: device-plugin
           hostPath:
             path: /var/lib/kubelet/device-plugins
+        - name: run-nvidia
+          hostPath:
+            path: "/run/nvidia"
+            type: Directory

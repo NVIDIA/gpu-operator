@@ -138,10 +138,6 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			_, _, err := s.Decode(m, nil, &res.Service)
 			panicIfError(err)
 			ctrl = append(ctrl, Service)
-		case "Pod":
-			_, _, err := s.Decode(m, nil, &res.Pod)
-			panicIfError(err)
-			ctrl = append(ctrl, Pod)
 		case "ServiceMonitor":
 			_, _, err := s.Decode(m, nil, &res.ServiceMonitor)
 			panicIfError(err)

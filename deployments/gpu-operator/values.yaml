@@ -11,6 +11,33 @@ nfd:
 psp:
   enabled: false
 
+validator:
+  repository: quay.io/shivamerla
+  image: gpu-operator-validator
+  version: v1.7.0
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  args: []
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.operator-validator: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+    seLinuxOptions:
+      level: "s0"
+  resources: {}
+  priorityClassName: system-node-critical
+  plugin:
+    env:
+      - name: WITH_WORKLOAD
+        value: "true"
+
 operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
@@ -24,11 +51,6 @@ operator:
     image: cuda
     repository: nvcr.io/nvidia
     version: 11.2.1-base-ubi8
-    imagePullPolicy: IfNotPresent
-  validator:
-    image: cuda-sample
-    repository: nvcr.io/nvidia/k8s
-    version: vectoradd-cuda10.2
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -125,7 +147,10 @@ devicePlugin:
       value: all
     - name: NVIDIA_DRIVER_CAPABILITIES
       value: all
-  tolerations: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
   nodeSelector:
     nvidia.com/gpu.deploy.device-plugin: "true"
   affinity: {}
@@ -144,7 +169,10 @@ dcgmExporter:
     - "-f"
     - "/etc/dcgm-exporter/dcp-metrics-included.csv"
   env: []
-  tolerations: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
   nodeSelector:
     nvidia.com/gpu.deploy.dcgm-exporter: "true"
   affinity: {}
@@ -159,7 +187,10 @@ gfd:
   version: v0.4.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  tolerations: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
   env:
     - name: GFD_SLEEP_INTERVAL
       value: 60s
@@ -181,7 +212,10 @@ migManager:
   version: v0.1.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  tolerations: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
   env:
     - name: WITH_REBOOT
       value: "false"
