@@ -20,6 +20,17 @@ contamer:
     - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${CI_PROJECT_NAME}:${VERSION}
     - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- ${CI_PROJECT_NAME}:${VERSION}
 
+contamer:validator:
+  extends: .scan
+  script:
+    - apk add --no-cache bash findutils libmagic curl make git
+    - apk add --no-cache python3 python3-dev py3-pip py3-wheel
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/sectooling/scanning/contamer.git
+    - cd contamer
+    - pip3 install -r requirements.txt
+    - docker tag ${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION} ${VALIDATOR_IMAGE_NAME}:${VERSION}
+    - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- ${VALIDATOR_IMAGE_NAME}:${VERSION}
+
 release:ngc:
   stage: release
   dependencies:
@@ -33,15 +44,40 @@ release:ngc:
   only:
     refs:
       - master
-      - /^\d+\.\d+\.\d+$/
+      - /^v\d+\.\d+\.\d+$/
   script:
     - source .VERSION_INFO
+    # Push Operator Container to NGC
     - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
     - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
     - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:${VERSION}"
     - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:latest"
     - docker push ${NGC_PROD_IMAGE}:${VERSION}
     - docker push ${NGC_PROD_IMAGE}:latest
+
+release:ngc:validator:
+  stage: release
+  dependencies:
+    - build-image
+    - versioning
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  variables:
+    GIT_STRATEGY: clone
+  only:
+    refs:
+      - master
+      - /^v\d+\.\d+\.\d+$/
+  script:
+    - source .VERSION_INFO
+    # Push Operator Validator Container to NGC
+    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${NGC_PROD_VALIDATOR_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${NGC_PROD_VALIDATOR_IMAGE}:latest"
+    - docker push ${NGC_PROD_VALIDATOR_IMAGE}:${VERSION}
+    - docker push ${NGC_PROD_VALIDATOR_IMAGE}:latest
 
 release:dockerhub:
   stage: release
@@ -56,16 +92,40 @@ release:dockerhub:
   only:
     refs:
       - master
-      - /^\d+\.\d+\.\d+$/
+      - /^v\d+\.\d+\.\d+$/
   script:
-    # Push Container to Dockerhub
+    # Push Operator Container to Dockerhub
     - source .VERSION_INFO
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${REGISTRY}"
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${DOCKERHUB_REGISTRY}"
     - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DOCKERHUB}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DOCKERHUB}:latest"
-    - docker push "${DOCKERHUB}:${VERSION}"
-    - docker push "${DOCKERHUB}:latest"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DH_PROD_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DH_PROD_IMAGE}:latest"
+    - docker push "${DH_PROD_IMAGE}:${VERSION}"
+    - docker push "${DH_PROD_IMAGE}:latest"
+
+release:dockerhub:validator:
+  stage: release
+  dependencies:
+    - build-image
+    - versioning
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  variables:
+    GIT_STRATEGY: clone
+  only:
+    refs:
+      - master
+      - /^v\d+\.\d+\.\d+$/
+  script:
+    # Push Operator Validator Container to Dockerhub
+    - source .VERSION_INFO
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${DOCKERHUB_REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${DH_PROD_VALIDATOR_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${DH_PROD_VALIDATOR_IMAGE}:latest"
+    - docker push "${DH_PROD_VALIDATOR_IMAGE}:${VERSION}"
+    - docker push "${DH_PROD_VALIDATOR_IMAGE}:latest"
 
 release:helm:
   stage: release
@@ -79,7 +139,7 @@ release:helm:
   only:
     refs:
       - master
-      - /^\d+\.\d+\.\d+$/
+      - /^v\d+\.\d+\.\d+$/
   script:
     - source .VERSION_INFO
     - apk add --update curl openssl bash git openssh make

@@ -1,5 +1,7 @@
 variables:
-  DOCKERHUB: nvidia/gpu-operator
+  DH_PROD_IMAGE: nvidia/gpu-operator
+  DH_PROD_VALIDATOR_IMAGE: nvidia/gpu-operator-validator
+  VALIDATOR_IMAGE_NAME: gpu-operator-validator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
   GIT_SUBMODULE_STRATEGY: recursive
 
@@ -93,6 +95,18 @@ build-image:
     - make docker-build IMG=$CI_REGISTRY_IMAGE:$VERSION
     - docker push "$CI_REGISTRY_IMAGE:$VERSION"
 
+build-validator:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  script:
+    - source .VERSION_INFO
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - apk add --update make
+    - cd validator && make ubi8 IMAGE=$CI_REGISTRY_IMAGE/$VALIDATOR_IMAGE_NAME VERSION=$VERSION
+    - docker push "$CI_REGISTRY_IMAGE/$VALIDATOR_IMAGE_NAME:$VERSION"
+
 unit-tests:
   stage: tests
   image: docker:stable
@@ -121,6 +135,7 @@ unit-tests:
     - source .VERSION_INFO
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
     - docker pull ${CI_REGISTRY_IMAGE}:${VERSION}
+    - docker pull ${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}
   script:
     - 'false'
   dependencies:
