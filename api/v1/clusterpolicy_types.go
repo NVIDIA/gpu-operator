@@ -51,6 +51,8 @@ type ClusterPolicySpec struct {
 	MIGManager MIGManagerSpec `json:"migManager,omitempty"`
 	// PSP defines spec for handling PodSecurityPolicies
 	PSP PSPSpec `json:"psp,omitempty"`
+	// Validator defines the spec for operator-validator daemonset
+	Validator ValidatorSpec `json:"validator,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -84,7 +86,6 @@ func (r Runtime) String() string {
 type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio;containerd
 	DefaultRuntime Runtime           `json:"defaultRuntime"`
-	Validator      ValidatorSpec     `json:"validator,omitempty"`
 	InitContainer  InitContainerSpec `json:"initContainer,omitempty"`
 }
 
@@ -117,15 +118,35 @@ type InitContainerSpec struct {
 
 // ValidatorSpec describes configuration options for validation pod
 type ValidatorSpec struct {
-	Repository string `json:"repository,omitempty"`
+	// Plugin validator spec
+	Plugin PluginValidatorSpec `json:"plugin,omitempty"`
 
+	// Toolkit validator spec
+	Toolkit ToolkitValidatorSpec `json:"toolkit,omitempty"`
+
+	// Toolkit validator spec
+	Driver DriverValidatorSpec `json:"driver,omitempty"`
+
+	// CUDA validator spec
+	CUDA CUDAValidatorSpec `json:"cuda,omitempty"`
+
+	// Validator image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository"`
+
+	// Validator image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image,omitempty"`
+	Image string `json:"image"`
 
-	Version string `json:"version,omitempty"`
+	// Validator image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// Image pull secrets
@@ -134,6 +155,89 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Node selector to control the selection of nodes (optional)
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Optional: Set tolerations
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Optional: Set Node affinity
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Optional: Pod Security Context
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// Optional: Security Context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+}
+
+// PluginValidatorSpec defines validator spec for plugin component
+type PluginValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// ToolkitValidatorSpec defines validator spec for toolkit component
+type ToolkitValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// DriverValidatorSpec defines validator spec for driver component
+type DriverValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// CUDAValidatorSpec defines validator spec for cuda validation workload pod
+type CUDAValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // MIGSpec defines the configuration for MIG support
@@ -803,4 +907,13 @@ func (p *PSPSpec) IsEnabled() bool {
 		return false
 	}
 	return *p.Enabled
+}
+
+// IsMIGManagerEnabled returns true if mig-manager is enabled(default) through gpu-operator
+func (m *MIGManagerSpec) IsMIGManagerEnabled() bool {
+	if m.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *m.Enabled
 }

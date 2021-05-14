@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-operator-validator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - '*'
+- apiGroups:
+  - nvidia.com
+  resources:
+  - clusterpolicies/finalizers
+  verbs:
+  - '*'

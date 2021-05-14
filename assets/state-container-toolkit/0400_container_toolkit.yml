@@ -27,7 +27,12 @@ spec:
         image: "FILLED_BY_THE_OPERATOR"
         imagePullPolicy: IfNotPresent
         command: ['sh', '-c']
-        args: ["until chroot /run/nvidia/driver nvidia-smi; do echo waiting for nvidia drivers to be loaded; sleep 5; done"]
+        args: ["nvidia-validator"]
+        env:
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: driver
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -35,6 +40,9 @@ spec:
         volumeMounts:
           - name: driver-install-path
             mountPath: /run/nvidia/driver
+            mountPropagation: Bidirectional
+          - name: nvidia-run-path
+            mountPath: /run/nvidia
             mountPropagation: Bidirectional
       containers:
       - image: "FILLED_BY_THE_OPERATOR"

@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-operator-validator
+  namespace: gpu-operator-resources
+  labels:
+    app: nvidia-operator-validator
+    app.kubernetes.io/part-of: gpu-operator
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-operator-validator
+      app.kubernetes.io/part-of: gpu-operator
+  template:
+    metadata:
+      labels:
+        app: nvidia-operator-validator
+        app.kubernetes.io/part-of: gpu-operator
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      serviceAccount: nvidia-operator-validator
+      initContainers:
+        - name: driver-validation
+          image: "FILLED_BY_OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: driver
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: driver-install-path
+              mountPath: /run/nvidia/driver
+              mountPropagation: Bidirectional
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+        - name: toolkit-validation
+          image: "FILLED_BY_OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: WITH_WAIT
+            value: "false"
+          - name: COMPONENT
+            value: toolkit
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: "/run/nvidia"
+              mountPropagation: Bidirectional
+        - name: cuda-validation
+          image: "FILLED_BY_OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: WITH_WAIT
+            value: "false"
+          - name: COMPONENT
+            value: cuda
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: "/run/nvidia"
+              mountPropagation: Bidirectional
+        - name: plugin-validation
+          image: "FILLED_BY_OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: COMPONENT
+            value: plugin
+          - name: WITH_WAIT
+            value: "false"
+          - name: WITH_WORKLOAD
+            value: "true"
+          - name: MIG_STRATEGY
+            value: "FILLED BY OPERATOR"
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: "/run/nvidia"
+              mountPropagation: Bidirectional
+      containers:
+        - image: "FILLED_BY_OPERATOR"
+          name: nvidia-operator-validator
+          command: ['sh', '-c']
+          args: ["echo all validations are successful; sleep infinity"]
+          securityContext:
+            privileged: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/*-ready"]
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: "/run/nvidia"
+              mountPropagation: Bidirectional
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: "/run/nvidia"
+            type: DirectoryOrCreate
+        - name: driver-install-path
+          hostPath:
+            path: /run/nvidia/driver

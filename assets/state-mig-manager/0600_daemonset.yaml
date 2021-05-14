@@ -14,7 +14,22 @@ spec:
       labels:
         app: nvidia-mig-manager
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       serviceAccount: nvidia-mig-manager
+      initContainers:
+        - name: toolkit-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container toolkit to be setup; sleep 5; done"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
       containers:
       - name: nvidia-mig-manager
         image: "FILLED_BY_OPERATOR"
@@ -43,3 +58,7 @@ spec:
       - name: mig-parted-config
         configMap:
           name: mig-parted-config
+      - name: run-nvidia
+        hostPath:
+          path: "/run/nvidia"
+          type: Directory

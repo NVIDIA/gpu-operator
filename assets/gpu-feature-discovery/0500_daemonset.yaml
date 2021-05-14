@@ -17,14 +17,22 @@ spec:
         app: gpu-feature-discovery
         app.kubernetes.io/part-of: nvidia-gpu
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       serviceAccount: nvidia-gpu-feature-discovery
       initContainers:
-      - name: toolkit-validation
-        image: "FILLED BY THE OPERATOR"
-        command: ['sh', '-c']
-        args: ["/tmp/vectorAdd"]
-        securityContext:
-          privileged: true
+        - name: toolkit-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
@@ -42,3 +50,7 @@ spec:
         - name: dmi-product-name
           hostPath:
             path: "/sys/class/dmi/id/product_name"
+        - name: run-nvidia
+          hostPath:
+            path: "/run/nvidia"
+            type: Directory
