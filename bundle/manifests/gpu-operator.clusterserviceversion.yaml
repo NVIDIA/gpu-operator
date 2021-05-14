@@ -132,12 +132,12 @@ metadata:
                 "nvidia.com/gpu.deploy.mig-manager": "true"
               },
               "podSecurityContext": {},
-              "repository": "nvcr.io/nvidia",
+              "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
+              "version": "sha256:e39cbc761af14f330139788bfd173b44ab8e94274298a614cf870bbe69218553"
             },
             "operator": {
               "defaultRuntime": "crio",
@@ -205,6 +205,8 @@ spec:
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
+    - name: mig-manager-image
+      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e39cbc761af14f330139788bfd173b44ab8e94274298a614cf870bbe69218553
     - name: cuda-sample-image
       image: nvcr.io/nvidia/k8s/cuda-sample@sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2
     - name: init-container-image

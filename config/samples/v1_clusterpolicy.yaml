@@ -120,3 +120,23 @@ spec:
     podSecurityContext: {}
     securityContext: {}
     resources: {}
+
+  migManager:
+    enabled: true
+    repository: nvcr.io/nvidia/cloud-native
+    image: k8s-mig-manager
+    version: v0.1.0-ubi8
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    tolerations: []
+    env:
+      - name: WITH_REBOOT
+        value: "false"
+    nodeSelector:
+      nvidia.com/gpu.deploy.mig-manager: "true"
+    affinity: {}
+    podSecurityContext: {}
+    securityContext:
+      privileged: true
+    resources: {}
+    priorityClassName: system-node-critical
