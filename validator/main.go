@@ -597,54 +597,57 @@ func (p *Plugin) validateGPUResource() error {
 			return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 		}
 
-		for resourceName, quantity := range node.Status.Capacity {
-			if migStrategyFlag == migStrategySingle {
-				if quantity.Value() < 1 || !strings.HasPrefix(string(resourceName), genericGPUResourceType) {
-					continue
-				}
-				// found GPU resource
-				return nil
-			} else if migStrategyFlag == migStrategyMixed {
-				if quantity.Value() < 1 || !strings.HasPrefix(string(resourceName), migGPUResourcePrefix) {
-					continue
-				}
-				// found GPU resource
-				return nil
-			}
+		if _, present := p.isMIGResourcePresent(node.Status.Capacity); present {
+			return nil
 		}
+
+		if p.isFullGPUResourcePresent(node.Status.Capacity) {
+			return nil
+		}
+
 		log.Infof("GPU resources are not yet discovered by the node, retry: %d", retry)
 		time.Sleep(gpuResourceDiscoveryIntervalSeconds * time.Second)
 	}
-
 	return fmt.Errorf("GPU resources are not discovered by the node")
 }
 
-func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
-	// search first if there are GPUs exposed with the 'mixed' strategy
-	if migStrategyFlag != migStrategyMixed {
-		return genericGPUResourceType, nil
+func (p *Plugin) isMIGResourcePresent(resources v1.ResourceList) (v1.ResourceName, bool) {
+	for resourceName, quantity := range resources {
+		if strings.HasPrefix(string(resourceName), migGPUResourcePrefix) && quantity.Value() >= 1 {
+			log.Debugf("Found MIG GPU resource name %s quantity %d", resourceName, quantity.Value())
+			return resourceName, true
+		}
 	}
+	return "", false
+}
 
+func (p *Plugin) isFullGPUResourcePresent(resources v1.ResourceList) bool {
+	for resourceName, quantity := range resources {
+		if strings.HasPrefix(string(resourceName), genericGPUResourceType) && quantity.Value() >= 1 {
+			log.Debugf("Found GPU resource name %s quantity %d", resourceName, quantity.Value())
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
 	// get node info to check allocatable GPU resources
 	node, err := p.getNode()
 	if err != nil {
 		return "", fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 	}
 
-	for resourceName, quantity := range node.Status.Allocatable {
-		if quantity.Value() < 1 || !strings.HasPrefix(string(resourceName), migGPUResourcePrefix) {
-			continue
-		}
-
-		log.Debug("Found", "Node", node.ObjectMeta.Name, "MIG resource", resourceName, "quantity", quantity)
-
+	// use mig resource if one is available to run workload
+	if resourceName, present := p.isMIGResourcePresent(node.Status.Allocatable); present {
 		return resourceName, nil
 	}
 
-	log.Infof("MIG mixed strategy configured but %s* device found, using generic GPU resource type",
-		migGPUResourcePrefix)
+	if p.isFullGPUResourcePresent(node.Status.Allocatable) {
+		return genericGPUResourceType, nil
+	}
 
-	return genericGPUResourceType, nil
+	return "", fmt.Errorf("Unable to find any allocatable GPU resource")
 }
 
 func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
