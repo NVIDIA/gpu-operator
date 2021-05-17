@@ -22,56 +22,64 @@ contamer:
 
 release:ngc:
   stage: release
-  image: docker:dind
-  services:
-    - docker:dind
-  script:
-    - source .VERSION_INFO
-    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
-    - docker pull ${CI_REGISTRY_IMAGE}:${VERSION}
-    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:${VERSION}
-    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${NGC_PROD_IMAGE}:latest
-    - docker push ${NGC_PROD_IMAGE}:${VERSION}
-    - docker push ${NGC_PROD_IMAGE}:latest
   dependencies:
     - build-image
     - versioning
-  only:
-    - tags
-    - /^\d+\.\d+\.\d+$/
-
-release:dockerhub:
   image: docker:stable
   services:
     - docker:stable-dind
-  stage: release
   variables:
     GIT_STRATEGY: clone
   only:
-    - master
-    - tags
+    refs:
+      - master
+      - /^\d+\.\d+\.\d+$/
+  script:
+    - source .VERSION_INFO
+    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:latest"
+    - docker push ${NGC_PROD_IMAGE}:${VERSION}
+    - docker push ${NGC_PROD_IMAGE}:latest
+
+release:dockerhub:
+  stage: release
+  dependencies:
+    - build-image
+    - versioning
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  variables:
+    GIT_STRATEGY: clone
+  only:
+    refs:
+      - master
+      - /^\d+\.\d+\.\d+$/
   script:
     # Push Container to Dockerhub
     - source .VERSION_INFO
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${NGC_REGISTRY}"
-    - docker pull "$CI_REGISTRY_IMAGE:$VERSION"
-    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:$VERSION"
-    - docker tag "$CI_REGISTRY_IMAGE:$VERSION" "$DOCKERHUB:latest"
+    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DOCKERHUB}:${VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DOCKERHUB}:latest"
     - docker push "${DOCKERHUB}:${VERSION}"
     - docker push "${DOCKERHUB}:latest"
-  dependencies:
-    - versioning
 
 release:helm:
+  stage: release
+  dependencies:
+    - versioning
   image: docker:stable
   services:
     - docker:stable-dind
-  stage: release
   variables:
     GIT_STRATEGY: clone
   only:
-    - master
-    - tags
+    refs:
+      - master
+      - /^\d+\.\d+\.\d+$/
   script:
     - source .VERSION_INFO
     - apk add --update curl openssl bash git openssh make
@@ -102,5 +110,3 @@ release:helm:
     - git remote set-url --push origin "${PUSH_REPO}"
     - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
     - git push origin gh-pages
-  dependencies:
-    - versioning

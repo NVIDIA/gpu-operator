@@ -1,6 +1,5 @@
 variables:
   DOCKERHUB: nvidia/gpu-operator
-  NVCRIO: nvcr.io/nvstaging/cloud-native/gpu-operator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
   GIT_SUBMODULE_STRATEGY: recursive
 
@@ -104,6 +103,9 @@ unit-tests:
   image: docker:stable
   services:
     - docker:stable-dind
+  except:
+    variables:
+      - $SKIP_TESTS =~ /^y/
 
   script:
     - apk add --update make
@@ -114,9 +116,12 @@ unit-tests:
 
 .scan:
   stage: scan
+  image: docker:stable
   services:
-    - docker:dind
-  image: docker:dind
+    - docker:stable-dind
+  except:
+    variables:
+      - $SKIP_SCANS =~ /^y/
   before_script:
     - source .VERSION_INFO
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}

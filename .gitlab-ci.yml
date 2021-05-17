@@ -7,6 +7,11 @@ include:
 e2e_tests:
   stage: e2e_tests
   image: alpine
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/
+      - $SKIP_TESTS =~ /^y/
+      - $CI_PIPELINE_SOURCE == "schedule"
   script:
     - source .VERSION_INFO
     - source aws-kube-ci/hostname
@@ -27,9 +32,15 @@ e2e_tests:
 aws_kube_setup:
   extends: .aws_kube_setup
   except:
-    - schedules
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/
+      - $SKIP_TESTS =~ /^y/
+      - $CI_PIPELINE_SOURCE == "schedule"
 
 aws_kube_clean:
   extends: .aws_kube_clean
   except:
-    - schedules
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/
+      - $SKIP_TESTS =~ /^y/
+      - $CI_PIPELINE_SOURCE == "schedule"
