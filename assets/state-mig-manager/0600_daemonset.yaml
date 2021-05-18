@@ -29,7 +29,7 @@ spec:
           volumeMounts:
             - name: run-nvidia
               mountPath: /run/nvidia
-              mountPropagation: Bidirectional
+              mountPropagation: HostToContainer
       containers:
       - name: nvidia-mig-manager
         image: "FILLED_BY_OPERATOR"

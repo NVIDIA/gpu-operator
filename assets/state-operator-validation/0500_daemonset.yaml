@@ -40,8 +40,8 @@ spec:
             - name: driver-install-path
               mountPath: /run/nvidia/driver
               mountPropagation: Bidirectional
-            - name: run-nvidia
-              mountPath: /run/nvidia
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
         - name: toolkit-validation
           image: "FILLED_BY_OPERATOR"
@@ -55,8 +55,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: "/run/nvidia"
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
         - name: cuda-validation
           image: "FILLED_BY_OPERATOR"
@@ -74,8 +74,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: "/run/nvidia"
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
         - name: plugin-validation
           image: "FILLED_BY_OPERATOR"
@@ -97,8 +97,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: "/run/nvidia"
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
       containers:
         - image: "FILLED_BY_OPERATOR"
@@ -112,13 +112,13 @@ spec:
               exec:
                 command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/*-ready"]
           volumeMounts:
-            - name: run-nvidia
-              mountPath: "/run/nvidia"
+            - name: run-nvidia-validations
+              mountPath: "/run/nvidia/validations"
               mountPropagation: Bidirectional
       volumes:
-        - name: run-nvidia
+        - name: run-nvidia-validations
           hostPath:
-            path: "/run/nvidia"
+            path: /run/nvidia/validations
             type: DirectoryOrCreate
         - name: driver-install-path
           hostPath:
