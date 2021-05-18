@@ -31,11 +31,7 @@ spec:
       {{- end }}
       containers:
       - name: gpu-operator
-        {{- if .Values.operator.version}}
-        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.version }}
-        {{- else }}
-        image: {{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Chart.AppVersion }}
-        {{- end }}
+        image: {{ include "gpu-operator.fullimage" . }}
         imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
         command: ["gpu-operator"]
         args:

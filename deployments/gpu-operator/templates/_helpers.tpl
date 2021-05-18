@@ -53,3 +53,10 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
+
+{{/*
+Full image name with tag
+*/}}
+{{- define "gpu-operator.fullimage" -}}
+{{- .Values.operator.repository -}}/{{- .Values.operator.image -}}:{{- .Values.operator.version | default .Chart.AppVersion -}}
+{{- end }}
