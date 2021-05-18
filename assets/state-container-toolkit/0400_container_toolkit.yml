@@ -41,8 +41,8 @@ spec:
           - name: driver-install-path
             mountPath: /run/nvidia/driver
             mountPropagation: Bidirectional
-          - name: nvidia-run-path
-            mountPath: /run/nvidia
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
             mountPropagation: Bidirectional
       containers:
       - image: "FILLED_BY_THE_OPERATOR"
@@ -68,6 +68,10 @@ spec:
         - name: nvidia-run-path
           hostPath:
             path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
             type: DirectoryOrCreate
         - name: driver-install-path
           hostPath:
