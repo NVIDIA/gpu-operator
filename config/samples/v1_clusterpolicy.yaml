@@ -18,7 +18,7 @@ spec:
     strategy: single
 
   validator:
-    repository: quay.io/shivamerla
+    repository: nvcr.io/nvidia/cloud-native
     image: gpu-operator-validator
     version: v1.7.0
     imagePullPolicy: IfNotPresent

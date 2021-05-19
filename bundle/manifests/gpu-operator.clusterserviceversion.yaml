@@ -176,12 +176,12 @@ metadata:
                 "nvidia.com/gpu.deploy.operator-validator": "true"
               },
               "podSecurityContext": {},
-              "repository": "quay.io/shivamerla",
+              "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "v1.7.0",
+              "version": "sha256:2bb62b9ca89bf9ae26399eeeeaf920d7752e617fa070c1120bf800253f624a10",
               "env": [
                 {
                   "name": "WITH_WORKLOAD",
