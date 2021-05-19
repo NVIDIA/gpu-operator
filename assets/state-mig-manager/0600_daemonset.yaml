@@ -43,6 +43,8 @@ spec:
           value: "/mig-parted-config/config.yaml"
         - name: WITH_REBOOT
           value: "FILLED_BY_OPERATOR"
+        - name: HOST_ROOT_MOUNT
+          value: "/host"
         securityContext:
           privileged: true
         volumeMounts:
@@ -50,6 +52,8 @@ spec:
           name: host-sys
         - mountPath: /mig-parted-config
           name: mig-parted-config
+        - mountPath: /host
+          name: host-root
       volumes:
       - name: host-sys
         hostPath:
@@ -62,3 +66,6 @@ spec:
         hostPath:
           path: "/run/nvidia"
           type: Directory
+      - name: host-root
+        hostPath:
+          path: "/"
