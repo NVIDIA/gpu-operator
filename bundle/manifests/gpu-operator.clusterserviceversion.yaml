@@ -474,12 +474,14 @@ spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: gpu-operator
+              app.kubernetes.io/component: gpu-operator
+              name: gpu-operator
           strategy: {}
           template:
             metadata:
               labels:
-                control-plane: gpu-operator
+                app.kubernetes.io/component: gpu-operator
+                name: gpu-operator
             spec:
               priorityClassName: system-node-critical
               containers:
