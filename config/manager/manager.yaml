@@ -1,38 +1,33 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    control-plane: gpu-operator
-  name: system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-operator
-  namespace: system
   labels:
-    control-plane: gpu-operator
+    app.kubernetes.io/component: gpu-operator
+    name: gpu-operator
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      control-plane: gpu-operator
-  replicas: 1
+      app.kubernetes.io/component: gpu-operator
+      name: gpu-operator
+  strategy: {}
   template:
     metadata:
       labels:
-        control-plane: gpu-operator
-    spec:
-      securityContext:
-        runAsUser: 65532
-      containers:
-      - command:
-        - gpu-operator
-        args:
-        - --leader-elect
-        image: nvidia/gpu-operator:latest
+        app.kubernetes.io/component: gpu-operator
         name: gpu-operator
-        securityContext:
-          allowPrivilegeEscalation: false
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: gpu-operator
+      containers:
+      - name: gpu-operator
+        image: nvcr.io/nvidia/gpu-operator:1.7.0
+        args:
+          - --leader-elect
+        command:
+          - gpu-operator
         livenessProbe:
           httpGet:
             path: /healthz
@@ -52,12 +47,14 @@ spec:
           requests:
             cpu: 200m
             memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
         volumeMounts:
-          - name: host-os-release
-            mountPath: "/host-etc/os-release"
+          - mountPath: /host-etc/os-release
+            name: host-os-release
             readOnly: true
       terminationGracePeriodSeconds: 10
       volumes:
-        - name: host-os-release
-          hostPath:
-            path: "/etc/os-release"
+        - hostPath:
+            path: /etc/os-release
+          name: host-os-release
