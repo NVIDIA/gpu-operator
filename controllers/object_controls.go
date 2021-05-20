@@ -288,7 +288,11 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	updateValidationInitContainer(obj, config)
 
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.GPUFeatureDiscovery)
+	img, err := gpuv1.ImagePath(&config.GPUFeatureDiscovery)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = img
 
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUFeatureDiscovery.ImagePullPolicy)
@@ -380,13 +384,14 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	var img string
+	img, err := gpuv1.ImagePath(&config.Driver)
+	if err != nil {
+		return err
+	}
 	// if image digest is specified, use it directly
-	if strings.HasPrefix(config.Driver.Version, "sha256:") {
-		img = gpuv1.ImagePath(&config.Driver)
-	} else {
+	if !strings.HasPrefix(config.Driver.Version, "sha256:") {
 		// append os-tag to the provided driver version
-		img = fmt.Sprintf("%s-%s", gpuv1.ImagePath(&config.Driver), osTag)
+		img = fmt.Sprintf("%s-%s", img, osTag)
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
@@ -640,7 +645,11 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.Toolkit)
+	image, err := gpuv1.ImagePath(&config.Toolkit)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
 
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
@@ -738,7 +747,13 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			continue
 		}
 
-		obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
+		// update initContainer image
+		image, err := gpuv1.ImagePath(&config.Validator)
+		if err != nil {
+			return err
+		}
+
+		obj.Spec.Template.Spec.InitContainers[i].Image = image
 		// update initContainer image pull policy
 		obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 
@@ -758,7 +773,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update validation container
 	updateValidationInitContainer(obj, config)
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.DevicePlugin)
+	image, err := gpuv1.ImagePath(&config.DevicePlugin)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 	// set image pull secrets
@@ -815,7 +834,11 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update validation container
 	updateValidationInitContainer(obj, config)
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.DCGMExporter)
+	image, err := gpuv1.ImagePath(&config.DCGMExporter)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DCGMExporter.ImagePullPolicy)
 	// set image pull secrets
@@ -870,8 +893,13 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	// update init container config for per pod specific resources
+	initImage, err := gpuv1.ImagePath(&config.Operator.InitContainer)
+	if err != nil {
+		return err
+	}
+
 	initContainer := v1.Container{}
-	initContainer.Image = gpuv1.ImagePath(&config.Operator.InitContainer)
+	initContainer.Image = initImage
 	initContainer.Name = "init-pod-nvidia-metrics-exporter"
 	initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.InitContainer.ImagePullPolicy)
 	initContainer.Command = []string{"/bin/entrypoint.sh"}
@@ -908,7 +936,11 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	updateValidationInitContainer(obj, config)
 
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.MIGManager)
+	image, err := gpuv1.ImagePath(&config.MIGManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
 
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.MIGManager.ImagePullPolicy)
@@ -969,7 +1001,11 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
-	obj.Spec.Template.Spec.Containers[0].Image = gpuv1.ImagePath(&config.Validator)
+	image, err := gpuv1.ImagePath(&config.Validator)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 	// set image pull secrets
@@ -1041,9 +1077,11 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			continue
 		}
 		// update validation image
-		if config.Validator.Repository != "" {
-			podSpec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
+		image, err := gpuv1.ImagePath(&config.Validator)
+		if err != nil {
+			return err
 		}
+		podSpec.InitContainers[i].Image = image
 		// update validation image pull policy
 		if config.Validator.ImagePullPolicy != "" {
 			podSpec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
@@ -1057,7 +1095,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				}
 			}
 			// set additional env to indicate image, pullSecrets to spin-off cuda validation workload pod.
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, gpuv1.ImagePath(&config.Validator))
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
 			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
 			var pullSecrets string
 			if len(config.Validator.ImagePullSecrets) > 0 {
@@ -1075,7 +1113,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				}
 			}
 			// set additional env to indicate image, pullSecrets to spin-off plugin validation workload pod.
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, gpuv1.ImagePath(&config.Validator))
+			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
 			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
 			var pullSecrets string
 			if len(config.Validator.ImagePullSecrets) > 0 {
@@ -1193,9 +1231,11 @@ func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 			continue
 		}
 		// update validation image
-		if config.Validator.Repository != "" {
-			obj.Spec.Template.Spec.InitContainers[i].Image = gpuv1.ImagePath(&config.Validator)
+		image, err := gpuv1.ImagePath(&config.Validator)
+		if err != nil {
+			return err
 		}
+		obj.Spec.Template.Spec.InitContainers[i].Image = image
 		// update validation image pull policy
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)

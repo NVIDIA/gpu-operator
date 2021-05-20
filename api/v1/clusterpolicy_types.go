@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"log"
+	"fmt"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -817,16 +817,23 @@ func (p *ClusterPolicy) SetState(s State) {
 	p.Status.State = s
 }
 
-func imagePath(repository string, image string, version string) string {
+func imagePath(repository string, image string, version string) (string, error) {
+	if repository == "" && version == "" {
+		if image != "" {
+			// this is useful for tools like kbld(carvel) which transform templates into image as path@digest
+			return image, nil
+		}
+		return "", fmt.Errorf("Invalid values for building container image path provided, please update the ClusterPolicy instance")
+	}
 	// use @ if image digest is specified instead of tag
 	if strings.HasPrefix(version, "sha256:") {
-		return repository + "/" + image + "@" + version
+		return repository + "/" + image + "@" + version, nil
 	}
-	return repository + "/" + image + ":" + version
+	return repository + "/" + image + ":" + version, nil
 }
 
 // ImagePath sets image path for given component type
-func ImagePath(spec interface{}) string {
+func ImagePath(spec interface{}) (string, error) {
 	switch v := spec.(type) {
 	case *DriverSpec:
 		config := spec.(*DriverSpec)
@@ -853,9 +860,8 @@ func ImagePath(spec interface{}) string {
 		config := spec.(*MIGManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version)
 	default:
-		log.Fatal("Invalid type to construct image path", v)
+		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
-	return ""
 }
 
 // ImagePullPolicy sets image pull policy
