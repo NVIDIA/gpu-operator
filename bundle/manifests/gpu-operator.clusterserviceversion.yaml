@@ -197,7 +197,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: nvcr.io/nvidia/gpu-operator:1.7.0
+    containerImage: nvcr.io/nvidia/gpu-operator:v1.7.0
     createdAt: "Wed Feb 24 13:49:07 PST 2021"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
@@ -489,7 +489,7 @@ spec:
                 - --leader-elect
                 command:
                 - gpu-operator
-                image: nvcr.io/nvidia/gpu-operator:1.7.0
+                image: nvcr.io/nvidia/gpu-operator:v1.7.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
