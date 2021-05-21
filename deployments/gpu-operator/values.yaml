@@ -42,7 +42,7 @@ operator:
   repository: nvcr.io/nvidia
   image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
-  #version: 1.6.2
+  #version: v1.7.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   priorityClassName: system-node-critical
@@ -209,7 +209,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.1.0-ubuntu20.04
+  version: v0.1.1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations:
