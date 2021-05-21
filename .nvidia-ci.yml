@@ -137,6 +137,8 @@ release:helm:
   variables:
     GIT_STRATEGY: clone
   only:
+    variables:
+      - $RELEASE_HELM == "true"
     refs:
       - master
       - /^v\d+\.\d+\.\d+$/
