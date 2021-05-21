@@ -167,7 +167,7 @@ spec:
     enabled: true
     repository: nvcr.io/nvidia/cloud-native
     image: k8s-mig-manager
-    version: v0.1.0-ubi8
+    version: v0.1.1-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     tolerations:
