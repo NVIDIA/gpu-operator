@@ -145,7 +145,7 @@ metadata:
               "initContainer": {
                 "image": "cuda",
                 "repository": "nvcr.io/nvidia",
-                "version": "sha256:ba39801ba34370d6444689a860790787ca89e38794a11952d89a379d2e9c87b5",
+                "version": "sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce",
                 "imagePullSecrets": []
               }
             },
@@ -181,7 +181,7 @@ metadata:
               "securityContext": {},
               "tolerations": [],
               "priorityClassName": "system-node-critical",
-              "version": "sha256:2bb62b9ca89bf9ae26399eeeeaf920d7752e617fa070c1120bf800253f624a10",
+              "version": "sha256:cb7c89d0d336b61ac6624a0f1900dd2516faa12aa9cfe52cb3f2385a8aece1c7",
               "env": [
                 {
                   "name": "WITH_WORKLOAD",
@@ -209,7 +209,7 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator@sha256:98878888117a2e3d53924c39f300e4263ce3a25ed7fb12125ed0eaf5d16ec03a
+      image: nvcr.io/nvidia/gpu-operator@sha256:2fe9e7ee251762a9d862e780ecb45bd2d4b2ecf976cc7195adc3cbc3cb034733
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:8af02463a8b60b21202d0bf69bc1ee0bb12f684fa367f903d138df6cacc2d0ac
     - name: container-toolkit-image
@@ -222,10 +222,10 @@ spec:
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:495ed3b42e0541590c537ab1b33bda772aad530d3ef6a4f9384d3741a59e2bf8
-    - name: cuda-sample-image
-      image: nvcr.io/nvidia/k8s/cuda-sample@sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:ba39801ba34370d6444689a860790787ca89e38794a11952d89a379d2e9c87b5
+      image: nvcr.io/nvidia/cuda@sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce
+    - name: gpu-operator-validator
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:cb7c89d0d336b61ac6624a0f1900dd2516faa12aa9cfe52cb3f2385a8aece1c7
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
@@ -489,7 +489,7 @@ spec:
                 - --leader-elect
                 command:
                 - gpu-operator
-                image: nvcr.io/nvidia/gpu-operator:v1.7.0
+                image: nvcr.io/nvidia/gpu-operator@sha256:2fe9e7ee251762a9d862e780ecb45bd2d4b2ecf976cc7195adc3cbc3cb034733
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -547,4 +547,3 @@ spec:
   provider:
     name: NVIDIA Corporation
   version: 1.7.0
-  replaces: gpu-operator-certified.v1.6.2
