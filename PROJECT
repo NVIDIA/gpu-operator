@@ -3,11 +3,16 @@ layout: go.kubebuilder.io/v3
 projectName: gpu-operator
 repo: github.com/NVIDIA/gpu-operator
 resources:
-- crdVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: false
+  controller: true
+  domain: com
   group: nvidia
   kind: ClusterPolicy
+  path: github.com/NVIDIA/gpu-operator/api/v1
   version: v1
-version: 3-alpha
+version: "3"
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
