@@ -240,11 +240,11 @@ node-feature-discovery:
       value: "present"
       effect: "NoSchedule"
 
-  config: |
-    sources:
-      pci:
-        deviceLabelFields:
-        - vendor
+    config: |
+      sources:
+        pci:
+          deviceLabelFields:
+          - vendor
 
   master:
     extraLabelNs:

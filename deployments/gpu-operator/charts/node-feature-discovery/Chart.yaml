@@ -1,18 +1,13 @@
 apiVersion: v2
-appVersion: 0.6.0
-description: Detect hardware features available on each node in a Kubernetes cluster,
-  and advertises those features using node labels
-home: https://github.com/k8s-at-home/charts/tree/master/charts/node-feature-discovery
-icon: https://avatars1.githubusercontent.com/u/36015203?s=400&v=4
+appVersion: v0.8.2
+description: 'Detects hardware features available on each node in a Kubernetes cluster, and advertises those features using node labels. '
+home: https://github.com/kubernetes-sigs/node-feature-discovery
 keywords:
-- kubernetes
-- cluster
-- hardware
-maintainers:
-- email: jeff@billimek.com
-  name: billimek
+- feature-discovery
+- feature-detection
+- node-labels
 name: node-feature-discovery
 sources:
 - https://github.com/kubernetes-sigs/node-feature-discovery
-- https://github.com/k8s-at-home/charts
-version: 2.0.0
+type: application
+version: 0.8.2

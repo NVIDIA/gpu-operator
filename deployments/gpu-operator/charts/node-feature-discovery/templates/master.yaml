@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  {{ include "node-feature-discovery.fullname" . }}-master
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+    role: master
+spec:
+  replicas: {{ .Values.master.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: master
+  template:
+    metadata:
+      labels:
+        {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
+        role: master
+      annotations:
+        {{- toYaml .Values.master.annotations | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "node-feature-discovery.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.master.podSecurityContext | nindent 8 }}
+      containers:
+        - name: master
+          securityContext:
+            {{- toYaml .Values.master.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+          - containerPort: 8080
+            name: grpc
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          command:
+            - "nfd-master"
+          resources:
+            {{- toYaml .Values.master.resources | nindent 12 }}
+          args:
+            {{- if .Values.master.instance | empty | not }}
+            - "--instance={{ .Values.master.instance }}"
+            {{- end }}
+            {{- if .Values.master.extraLabelNs | empty | not }}
+            - "--extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
+            {{- end }}
+## Enable TLS authentication
+## The example below assumes having the root certificate named ca.crt stored in
+## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored
+## in a TLS Secret named nfd-master-cert.
+## Additional hardening can be enabled by specifying --verify-node-name in
+## args, in which case node name will be checked against the worker's
+## TLS certificate.
+#            - "--ca-file=/etc/kubernetes/node-feature-discovery/trust/ca.crt"
+#            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+#            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+#          volumeMounts:
+#            - name: nfd-ca-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/trust"
+#              readOnly: true
+#            - name: nfd-master-cert
+#              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+#              readOnly: true
+#      volumes:
+#        - name: nfd-ca-cert
+#          configMap:
+#            name: nfd-ca-cert
+#        - name: nfd-master-cert
+#          secret:
+#            secretName: nfd-master-cert
+    {{- with .Values.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.master.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.master.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
