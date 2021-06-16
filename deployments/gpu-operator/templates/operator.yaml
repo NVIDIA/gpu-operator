@@ -57,11 +57,11 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 300m
-            memory: 100Mi
+            cpu: 500m
+            memory: 250Mi
           requests:
             cpu: 200m
-            memory: 50Mi
+            memory: 100Mi
       volumes:
         - name: host-os-release
           hostPath:
