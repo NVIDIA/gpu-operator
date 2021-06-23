@@ -17,6 +17,13 @@ spec:
   mig:
     strategy: single
 
+  daemonsets:
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    priorityClassName: system-node-critical
+
   validator:
     repository: nvcr.io/nvidia/cloud-native
     image: gpu-operator-validator
@@ -25,20 +32,11 @@ spec:
     imagePullSecrets: []
     env: []
     args: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
-    nodeSelector:
-      nvidia.com/gpu.deploy.operator-validator: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext:
       privileged: true
       seLinuxOptions:
         level: "s0"
     resources: {}
-    priorityClassName: system-node-critical
     plugin:
       env:
         - name: WITH_WORKLOAD
@@ -52,14 +50,6 @@ spec:
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
-    nodeSelector:
-      nvidia.com/gpu.deploy.driver: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext: {}
     resources: {}
     # private mirror repository configuration
@@ -78,14 +68,6 @@ spec:
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
-    nodeSelector:
-      nvidia.com/gpu.deploy.container-toolkit: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext: {}
     resources: {}
 
@@ -109,14 +91,6 @@ spec:
         value: all
       - name: NVIDIA_DRIVER_CAPABILITIES
         value: all
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
-    nodeSelector:
-      nvidia.com/gpu.deploy.device-plugin: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext: {}
     resources: {}
 
@@ -130,14 +104,6 @@ spec:
       - "-f"
       - "/etc/dcgm-exporter/dcp-metrics-included.csv"
     env: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
-    nodeSelector:
-      nvidia.com/gpu.deploy.dcgm-exporter: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext: {}
     resources: {}
 
@@ -147,19 +113,11 @@ spec:
     version: v0.4.1
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     env:
       - name: GFD_SLEEP_INTERVAL
         value: 60s
       - name: GFD_FAIL_ON_INIT_ERROR
         value: "true"
-    nodeSelector:
-      nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext: {}
     resources: {}
 
@@ -170,18 +128,9 @@ spec:
     version: v0.1.1-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
-    tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     env:
       - name: WITH_REBOOT
         value: "false"
-    nodeSelector:
-      nvidia.com/gpu.deploy.mig-manager: "true"
-    affinity: {}
-    podSecurityContext: {}
     securityContext:
       privileged: true
     resources: {}
-    priorityClassName: system-node-critical

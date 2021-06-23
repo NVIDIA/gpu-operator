@@ -17,10 +17,8 @@ spec:
         app: nvidia-operator-validator
         app.kubernetes.io/part-of: gpu-operator
     spec:
-      tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.operator-validator: "true"
       serviceAccount: nvidia-operator-validator
       initContainers:
         - name: driver-validation

@@ -14,10 +14,8 @@ spec:
       labels:
         app: nvidia-mig-manager
     spec:
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.mig-manager: "true"
       serviceAccount: nvidia-mig-manager
       initContainers:
         - name: toolkit-validation

@@ -16,10 +16,8 @@ spec:
       labels:
         app: nvidia-container-toolkit-daemonset
     spec:
-      tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.container-toolkit: "true"
       serviceAccount: nvidia-container-toolkit
       hostPID: true
       initContainers:
