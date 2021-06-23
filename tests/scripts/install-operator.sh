@@ -17,6 +17,8 @@ if [[ -n "${OPERATOR_VERSION}" ]]; then
 OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION}"
 fi
 
+OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.defaultRuntime=${CONTAINER_RUNTIME}"
+
 # We set up the options for the toolkit container
 : ${TOOLKIT_CONTAINER_OPTIONS:=""}
 

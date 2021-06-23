@@ -26,7 +26,7 @@ ${SCRIPT_DIR}/launch.sh
 ${SCRIPT_DIR}/sync.sh
 
 # We trigger the installation of prerequisites on the remote instance
-remote ./tests/scripts/prerequisites.sh
+remote SKIP_PREREQUISITES="${SKIP_PREREQUISITES}" ./tests/scripts/prerequisites.sh
 
 # We trigger the specified test case on the remote instance
-remote ${TEST_CASE}
+remote CONTAINER_RUNTIME=${CONTAINER_RUNTIME} ${TEST_CASE}

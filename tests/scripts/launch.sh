@@ -8,6 +8,6 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/.definitions.sh
 
-${TERRAFORM} plan
-${TERRAFORM} apply
+${TERRAFORM} plan -var "legacy_setup=false"
+${TERRAFORM} apply -var "legacy_setup=false" -var "container_runtime=${CONTAINER_RUNTIME}"
 ${TERRAFORM} output

@@ -16,7 +16,7 @@ ${SCRIPT_DIR}/verify-workload.sh
 
 # TODO: This should be reusable
 source ${SCRIPT_DIR}/checks.sh
-test_restart_operator ${TEST_NAMESPACE}
+test_restart_operator ${TEST_NAMESPACE} ${CONTAINER_RUNTIME}
 
 # Uninstall the workload and operator
 ${SCRIPT_DIR}/uninstall-workload.sh
