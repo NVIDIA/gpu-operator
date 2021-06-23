@@ -24,10 +24,11 @@ include:
     - source .VERSION_INFO
     - source aws-kube-ci/hostname
     - export private_key="${CI_PROJECT_DIR}/aws-kube-ci/${private_key}"
-    - export instance_hostname
+    - export instance_hostname="${instance_hostname}"
+    - export DEBUG="yes"
     - rc=0
     - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${VERSION} || rc=$?
-    - rsync -e "ssh -i ${CI_PROJECT_DIR}/aws-kube-ci/${private_key} -o StrictHostKeyChecking=no" -av "${instance_hostname}:/tmp/logs/" logs
+    - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
     - exit $rc
   dependencies:
     - versioning

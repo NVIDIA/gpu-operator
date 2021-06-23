@@ -8,19 +8,10 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/.definitions.sh
 
-if [[ -z ${instance_hostname} ]]; then
-export instance_hostname=$(${TERRAFORM} output -raw instance_hostname)
-fi
+source ${SCRIPT_DIR}/.local.sh
 
-if [[ -z ${private_key} ]]; then
-export private_key=$(${TERRAFORM} output -raw private_key)
-fi
-
-REMOTE_PROJECT_FOLDER="~/${PROJECT}"
 # TODO: Create an exclude file for this instead
-# Copy over the contents of the project folder
 rsync -e "ssh -i ${private_key} -o StrictHostKeyChecking=no" \
     -avz --delete \
         --exclude="vendor/" --exclude=".git" --exclude="aws-kube-ci" \
-        "${PROJECT_DIR}/" \
-        "${instance_hostname}:${REMOTE_PROJECT_FOLDER}"
+        ${@}
