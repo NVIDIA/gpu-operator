@@ -305,23 +305,12 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// update PriorityClass
-	if config.GPUFeatureDiscovery.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.GPUFeatureDiscovery.PriorityClassName
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
-
-	// set node selector if specified
-	if len(config.GPUFeatureDiscovery.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.GPUFeatureDiscovery.NodeSelector
-	}
-
-	// set node affinity if specified
-	if config.GPUFeatureDiscovery.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.GPUFeatureDiscovery.Affinity
-	}
-
 	// set tolerations if specified
-	if len(config.GPUFeatureDiscovery.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.GPUFeatureDiscovery.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -395,10 +384,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	// update PriorityClass
-	if config.Driver.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Driver.PriorityClassName
-	}
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 
@@ -408,17 +393,13 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	// set node selector if specified
-	if len(config.Driver.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.Driver.NodeSelector
-	}
-	// set node affinity if specified
-	if config.Driver.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.Driver.Affinity
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
 	// set tolerations if specified
-	if len(config.Driver.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Driver.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.Driver.Resources != nil {
@@ -661,20 +642,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 	// update PriorityClass
-	if config.Toolkit.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Toolkit.PriorityClassName
-	}
-	// set node selector if specified
-	if len(config.Toolkit.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.Toolkit.NodeSelector
-	}
-	// set node affinity if specified
-	if config.Toolkit.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.Toolkit.Affinity
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
 	// set tolerations if specified
-	if len(config.Toolkit.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Toolkit.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.Toolkit.Resources != nil {
@@ -787,20 +760,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 	// update PriorityClass
-	if config.DevicePlugin.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.DevicePlugin.PriorityClassName
-	}
-	// set node selector if specified
-	if len(config.DevicePlugin.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.DevicePlugin.NodeSelector
-	}
-	// set node affinity if specified
-	if config.DevicePlugin.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.DevicePlugin.Affinity
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
 	// set tolerations if specified
-	if len(config.DevicePlugin.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.DevicePlugin.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.DevicePlugin.Resources != nil {
@@ -848,20 +813,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 	// update PriorityClass
-	if config.DCGMExporter.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.DCGMExporter.PriorityClassName
-	}
-	// set node selector if specified
-	if len(config.DCGMExporter.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.DCGMExporter.NodeSelector
-	}
-	// set node affinity if specified
-	if config.DCGMExporter.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.DCGMExporter.Affinity
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
 	// set tolerations if specified
-	if len(config.DCGMExporter.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.DCGMExporter.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.DCGMExporter.Resources != nil {
@@ -953,23 +910,12 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// update PriorityClass
-	if config.MIGManager.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.MIGManager.PriorityClassName
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
-
-	// set node selector if specified
-	if len(config.MIGManager.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.MIGManager.NodeSelector
-	}
-
-	// set node affinity if specified
-	if config.MIGManager.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.MIGManager.Affinity
-	}
-
 	// set tolerations if specified
-	if len(config.MIGManager.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.MIGManager.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -1015,20 +961,12 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		}
 	}
 	// update PriorityClass
-	if config.Validator.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Validator.PriorityClassName
-	}
-	// set node selector if specified
-	if len(config.Validator.NodeSelector) > 0 {
-		obj.Spec.Template.Spec.NodeSelector = config.Validator.NodeSelector
-	}
-	// set node affinity if specified
-	if config.Validator.Affinity != nil {
-		obj.Spec.Template.Spec.Affinity = config.Validator.Affinity
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
 	}
 	// set tolerations if specified
-	if len(config.Validator.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Validator.Tolerations
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.Validator.Resources != nil {

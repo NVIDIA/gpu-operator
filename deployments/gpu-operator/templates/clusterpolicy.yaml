@@ -35,6 +35,13 @@ spec:
       imagePullSecrets: {{ toYaml .Values.operator.initContainer.imagePullSecrets | nindent 8 }}
       {{- end }}
     {{- end }}
+  daemonsets:
+    {{- if .Values.daemonsets.tolerations }}
+    tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.daemonsets.priorityClassName }}
+    priorityClassName: {{ .Values.daemonsets.priorityClassName }}
+    {{- end }}
   validator:
     {{- if .Values.validator.repository }}
     repository: {{ .Values.validator.repository }}
@@ -51,18 +58,6 @@ spec:
     {{- if .Values.validator.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.validator.imagePullSecrets | nindent 8 }}
     {{- end }}
-    {{- if .Values.validator.tolerations }}
-    tolerations: {{ toYaml .Values.validator.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.validator.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.validator.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.validator.affinity }}
-    affinity: {{ toYaml .Values.validator.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.validator.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.validator.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.validator.securityContext }}
     securityContext: {{ toYaml .Values.validator.securityContext | nindent 6 }}
     {{- end }}
@@ -74,9 +69,6 @@ spec:
     {{- end }}
     {{- if .Values.validator.args }}
     args: {{ toYaml .Values.validator.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.validator.priorityClassName }}
-    priorityClassName: {{ .Values.validator.priorityClassName }}
     {{- end }}
     {{- if .Values.validator.plugin }}
     plugin:
@@ -125,18 +117,6 @@ spec:
     {{- if .Values.driver.licensingConfig }}
     licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
     {{- end }}
-    {{- if .Values.driver.tolerations }}
-    tolerations: {{ toYaml .Values.driver.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.driver.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.affinity }}
-    affinity: {{ toYaml .Values.driver.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.driver.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.driver.securityContext }}
     securityContext: {{ toYaml .Values.driver.securityContext | nindent 6 }}
     {{- end }}
@@ -148,9 +128,6 @@ spec:
     {{- end }}
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.priorityClassName }}
-    priorityClassName: {{ .Values.driver.priorityClassName }}
     {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
@@ -169,18 +146,6 @@ spec:
     {{- if .Values.toolkit.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.toolkit.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.toolkit.tolerations }}
-    tolerations: {{ toYaml .Values.toolkit.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.toolkit.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.toolkit.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.toolkit.affinity }}
-    affinity: {{ toYaml .Values.toolkit.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.toolkit.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.toolkit.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.toolkit.securityContext }}
     securityContext: {{ toYaml .Values.toolkit.securityContext | nindent 6 }}
     {{- end }}
@@ -192,9 +157,6 @@ spec:
     {{- end }}
     {{- if .Values.toolkit.args }}
     args: {{ toYaml .Values.toolkit.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.toolkit.priorityClassName }}
-    priorityClassName: {{ .Values.toolkit.priorityClassName }}
     {{- end }}
   devicePlugin:
     {{- if .Values.devicePlugin.repository }}
@@ -212,18 +174,6 @@ spec:
     {{- if .Values.devicePlugin.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.devicePlugin.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.devicePlugin.tolerations }}
-    tolerations: {{ toYaml .Values.devicePlugin.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.devicePlugin.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.devicePlugin.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.devicePlugin.affinity }}
-    affinity: {{ toYaml .Values.devicePlugin.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.devicePlugin.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.devicePlugin.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.devicePlugin.securityContext }}
     securityContext: {{ toYaml .Values.devicePlugin.securityContext | nindent 6 }}
     {{- end }}
@@ -235,9 +185,6 @@ spec:
     {{- end }}
     {{- if .Values.devicePlugin.args }}
     args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.devicePlugin.priorityClassName }}
-    priorityClassName: {{ .Values.devicePlugin.priorityClassName }}
     {{- end }}
   dcgmExporter:
     {{- if .Values.dcgmExporter.repository }}
@@ -255,18 +202,6 @@ spec:
     {{- if .Values.dcgmExporter.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.dcgmExporter.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.dcgmExporter.tolerations }}
-    tolerations: {{ toYaml .Values.dcgmExporter.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.dcgmExporter.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.dcgmExporter.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.dcgmExporter.affinity }}
-    affinity: {{ toYaml .Values.dcgmExporter.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.dcgmExporter.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.dcgmExporter.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.dcgmExporter.securityContext }}
     securityContext: {{ toYaml .Values.dcgmExporter.securityContext | nindent 6 }}
     {{- end }}
@@ -278,9 +213,6 @@ spec:
     {{- end }}
     {{- if .Values.dcgmExporter.args }}
     args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.dcgmExporter.priorityClassName }}
-    priorityClassName: {{ .Values.dcgmExporter.priorityClassName }}
     {{- end }}
   gfd:
     {{- if .Values.gfd.repository }}
@@ -298,18 +230,6 @@ spec:
     {{- if .Values.gfd.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.gfd.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.gfd.tolerations }}
-    tolerations: {{ toYaml .Values.gfd.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.gfd.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.gfd.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.gfd.affinity }}
-    affinity: {{ toYaml .Values.gfd.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.gfd.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.gfd.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.gfd.securityContext }}
     securityContext: {{ toYaml .Values.gfd.securityContext | nindent 6 }}
     {{- end }}
@@ -321,9 +241,6 @@ spec:
     {{- end }}
     {{- if .Values.gfd.args }}
     args: {{ toYaml .Values.gfd.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.gfd.priorityClassName }}
-    priorityClassName: {{ .Values.gfd.priorityClassName }}
     {{- end }}
   migManager:
     enabled: {{ .Values.migManager.enabled }}
@@ -342,18 +259,6 @@ spec:
     {{- if .Values.migManager.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.migManager.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.migManager.tolerations }}
-    tolerations: {{ toYaml .Values.migManager.tolerations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.migManager.nodeSelector }}
-    nodeSelector: {{ toYaml .Values.migManager.nodeSelector | nindent 6 }}
-    {{- end }}
-    {{- if .Values.migManager.affinity }}
-    affinity: {{ toYaml .Values.migManager.affinity | nindent 6 }}
-    {{- end }}
-    {{- if .Values.migManager.podSecurityContext }}
-    podSecurityContext: {{ toYaml .Values.migManager.podSecurityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.migManager.securityContext }}
     securityContext: {{ toYaml .Values.migManager.securityContext | nindent 6 }}
     {{- end }}
@@ -365,7 +270,4 @@ spec:
     {{- end }}
     {{- if .Values.migManager.args }}
     args: {{ toYaml .Values.migManager.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.migManager.priorityClassName }}
-    priorityClassName: {{ .Values.migManager.priorityClassName }}
     {{- end }}

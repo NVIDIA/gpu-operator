@@ -16,14 +16,8 @@ spec:
       labels:
         app: nvidia-device-plugin-daemonset
     spec:
-      tolerations:
-      # Allow this pod to be rescheduled while the node is in "critical add-ons only" mode.
-      # This, along with the annotation above marks this pod as a critical add-on.
-      - key: CriticalAddonsOnly
-        operator: Exists
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.device-plugin: "true"
       serviceAccount: nvidia-device-plugin
       initContainers:
       - name: toolkit-validation

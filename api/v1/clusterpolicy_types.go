@@ -35,6 +35,8 @@ type ClusterPolicySpec struct {
 
 	// Operator component spec
 	Operator OperatorSpec `json:"operator"`
+	// Daemonset defines common configuration for all Daemonsets
+	Daemonsets DaemonsetsSpec `json:"daemonsets"`
 	// Driver component spec
 	Driver DriverSpec `json:"driver"`
 	// Toolkit component spec
@@ -93,6 +95,20 @@ type OperatorSpec struct {
 type PSPSpec struct {
 	// Enabled indicates if PodSecurityPolicies needs to be enabled for all Pods
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// DaemonsetsSpec indicates common configuration for all Daemonsets managed by GPU Operator
+type DaemonsetsSpec struct {
+	// Optional: Set tolerations
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // InitContainerSpec describes configuration for initContainer image used with all components
@@ -156,27 +172,6 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -197,11 +192,6 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // PluginValidatorSpec defines validator spec for plugin component
@@ -281,27 +271,6 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -332,11 +301,6 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For Driver Container"
 	LicensingConfig *DriverLicensingConfigSpec `json:"licensingConfig,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // ToolkitSpec defines the properties for container-toolkit deployment
@@ -373,27 +337,6 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -414,11 +357,6 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // DevicePluginSpec defines the properties for device-plugin deployment
@@ -449,27 +387,6 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -490,11 +407,6 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // DCGMExporterSpec defines the properties for DCGM exporter deployment
@@ -525,27 +437,6 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -566,11 +457,6 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // DriverRepoConfigSpec defines custom repo configuration for driver container
@@ -625,27 +511,6 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -666,11 +531,6 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // MIGManagerSpec defines the properties for deploying MIG manager
@@ -707,27 +567,6 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Node selector to control the selection of nodes (optional)
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Selector"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:selector:Node"
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Optional: Set tolerations
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Optional: Set Node affinity
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node Affinity"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:nodeAffinity"
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Optional: Pod Security Context
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
@@ -748,11 +587,6 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
-	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // MIGStrategy indicates MIG mode

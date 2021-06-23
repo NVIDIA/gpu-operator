@@ -16,10 +16,8 @@ spec:
       labels:
         app: nvidia-dcgm-exporter
     spec:
-      tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.dcgm-exporter: "true"
       serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
       initContainers:
