@@ -2,7 +2,7 @@ include:
   - local: '.common-ci.yml'
   - project: nvidia/container-infrastructure/aws-kube-ci
     file: aws-kube-ci.yml
-    ref: 21.02.23
+    ref: 21.06.23
 
 e2e_tests:
   stage: e2e_tests
