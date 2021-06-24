@@ -25,7 +25,6 @@ include:
     - source aws-kube-ci/hostname
     - export private_key="${CI_PROJECT_DIR}/aws-kube-ci/${private_key}"
     - export instance_hostname="${instance_hostname}"
-    - export DEBUG="yes"
     - rc=0
     - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${CI_REGISTRY_IMAGE} ${VERSION} || rc=$?
     - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
@@ -37,11 +36,12 @@ include:
     paths:
       - logs/
 
-# e2e_tests_containerd:
-#   extends:
-#     - .e2e_tests
-#   dependencies:
-#     - aws_kube_setup_containerd
+e2e_tests_containerd:
+  extends:
+    - .e2e_tests
+  dependencies:
+    - aws_kube_setup_containerd
+    - versioning
 
 # e2e_tests_docker:
 #   extends:
@@ -56,13 +56,13 @@ e2e_tests_legacy:
     - aws_kube_setup_legacy
     - versioning
 
-# aws_kube_setup_containerd:
-#   extends:
-#     - .aws_kube_setup
-#     - .e2e_rules
-#   variables:
-#     TF_VAR_legacy_setup: "false"
-#     TF_VAR_container_runtime: "containerd"
+aws_kube_setup_containerd:
+  extends:
+    - .aws_kube_setup
+    - .e2e_rules
+  variables:
+    TF_VAR_legacy_setup: "false"
+    TF_VAR_container_runtime: "containerd"
 
 # aws_kube_setup_docker:
 #   extends:
@@ -77,12 +77,12 @@ aws_kube_setup_legacy:
     - .aws_kube_setup
     - .e2e_rules
 
-# aws_kube_clean_containerd:
-#   extends:
-#     - .aws_kube_clean
-#     - .e2e_rules
-#   dependencies:
-#     - aws_kube_setup_containerd
+aws_kube_clean_containerd:
+  extends:
+    - .aws_kube_clean
+    - .e2e_rules
+  dependencies:
+    - aws_kube_setup_containerd
 
 # aws_kube_clean_docker:
 #   extends:
