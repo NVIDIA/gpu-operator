@@ -69,7 +69,7 @@ e2e_tests_legacy:
     - .aws_kube_setup
     - .e2e_rules
   variables:
-    TF_VAR_additional_ingress_ip_ranges: '["216.228.112.0/26", "217.111.27.192/26"]'
+    TF_VAR_project_name: "gpu-operator"
 
 aws_kube_setup_containerd:
   extends:
