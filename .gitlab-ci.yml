@@ -42,6 +42,9 @@ e2e_tests_containerd:
   dependencies:
     - aws_kube_setup_containerd
     - versioning
+  needs:
+    - aws_kube_setup_containerd
+    - versioning
 
 # e2e_tests_docker:
 #   extends:
@@ -55,6 +58,9 @@ e2e_tests_legacy:
   dependencies:
     - aws_kube_setup_legacy
     - versioning
+  needs:
+    - aws_kube_setup_legacy
+    - versioning
 
 aws_kube_setup_containerd:
   extends:
@@ -63,6 +69,7 @@ aws_kube_setup_containerd:
   variables:
     TF_VAR_legacy_setup: "false"
     TF_VAR_container_runtime: "containerd"
+    TF_VAR_project_name: "gpu-operator-containerd"
 
 # aws_kube_setup_docker:
 #   extends:
@@ -81,6 +88,10 @@ aws_kube_clean_containerd:
   extends:
     - .aws_kube_clean
     - .e2e_rules
+  variables:
+    TF_VAR_legacy_setup: "false"
+    TF_VAR_container_runtime: "containerd"
+    TF_VAR_project_name: "gpu-operator-containerd"
   dependencies:
     - aws_kube_setup_containerd
 
