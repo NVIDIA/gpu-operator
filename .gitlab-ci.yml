@@ -45,6 +45,8 @@ e2e_tests_containerd:
   needs:
     - aws_kube_setup_containerd
     - versioning
+  variables:
+    CONTAINER_RUNTIME: "containerd"
 
 # e2e_tests_docker:
 #   extends:
