@@ -65,6 +65,10 @@ test_restart_operator() {
 check_gpu_pod_ready() {
 	local log_dir=$1
 	local current_time=0
+
+	# Ensure the log directory exists
+	mkdir -p ${log_dir}
+
 	while :; do
 		pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
 		status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)

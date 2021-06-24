@@ -7,9 +7,6 @@ source ${SCRIPT_DIR}/.definitions.sh
 ${SCRIPT_DIR}/install-operator.sh
 ${SCRIPT_DIR}/verify-operator.sh
 
-# Verify the installation
-${SCRIPT_DIR}/verify-operator.sh
-
 # Install a workload and verify that this works as expected
 ${SCRIPT_DIR}/install-workload.sh
 ${SCRIPT_DIR}/verify-workload.sh
