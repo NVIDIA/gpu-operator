@@ -3,6 +3,7 @@ variables:
   DH_PROD_VALIDATOR_IMAGE: nvidia/gpu-operator-validator
   VALIDATOR_IMAGE_NAME: gpu-operator-validator
   TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
+  TF_VAR_project_name: "gpu-operator"
   GIT_SUBMODULE_STRATEGY: recursive
 
 stages:

@@ -4,7 +4,10 @@ include:
     file: aws-kube-ci.yml
     ref: 21.06.24
 
-.e2e_rules:
+.e2e_defaults:
+  variables:
+    TF_VAR_project_name: "gpu-operator"
+    TF_VAR_additional_ingress_ip_ranges: '["216.228.112.0/26", "217.111.27.192/26"]'
   except:
     variables:
       - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/
@@ -13,7 +16,7 @@ include:
 
 .e2e_tests:
   extends:
-    - .e2e_rules
+    - .e2e_defaults
   stage: e2e_tests
   image: alpine
   variables:
@@ -67,9 +70,10 @@ e2e_tests_legacy:
 .launch_infra:
   extends:
     - .aws_kube_setup
-    - .e2e_rules
+    - .e2e_defaults
   variables:
     TF_VAR_project_name: "gpu-operator"
+    TF_VAR_additional_ingress_ip_ranges: '["216.228.112.0/26", "217.111.27.192/26"]'
 
 aws_kube_setup_containerd:
   extends:
@@ -82,7 +86,7 @@ aws_kube_setup_containerd:
 # aws_kube_setup_docker:
 #   extends:
 #     - .aws_kube_setup
-#     - .e2e_rules
+#     - .e2e_defaults
 #   variables:
 #     TF_VAR_legacy_setup: "false"
 #     TF_VAR_container_runtime: "docker"
@@ -94,7 +98,7 @@ aws_kube_setup_legacy:
 aws_kube_clean_containerd:
   extends:
     - .aws_kube_clean
-    - .e2e_rules
+    - .e2e_defaults
   variables:
     TF_VAR_legacy_setup: "false"
     TF_VAR_container_runtime: "containerd"
@@ -105,13 +109,13 @@ aws_kube_clean_containerd:
 # aws_kube_clean_docker:
 #   extends:
 #     - .aws_kube_clean
-#     - .e2e_rules
+#     - .e2e_defaults
 #   dependencies:
 #     - aws_kube_setup_docker
 
 aws_kube_clean_legacy:
   extends:
     - .aws_kube_clean
-    - .e2e_rules
+    - .e2e_defaults
   dependencies:
     - aws_kube_setup_legacy
