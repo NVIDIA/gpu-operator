@@ -33,8 +33,16 @@ check_pod_ready() {
 # Timeout is 100 seconds
 test_restart_operator() {
 	local ns=${1}
-	# The operator is the only container that has the string '"gpu-operator"'
-	docker kill "$(docker ps --format '{{.ID}} {{.Command}}' | grep "gpu-operator" | cut -f 1 -d ' ')"
+	local runtime=${2}
+
+	if [[ x"${runtime}" == x"containerd" ]]; then
+		# The operator is the only container that has the string '"gpu-operator"'
+		# TODO: This requires permissions on containerd.sock
+		sudo crictl rm --force "$(sudo crictl ps --name gpu-operator | awk '{if(NR>1)print $1}')"
+	else
+		# The operator is the only container that has the string '"gpu-operator"'
+	    docker kill "$(docker ps --format '{{.ID}} {{.Command}}' | grep "gpu-operator" | cut -f 1 -d ' ')"
+	fi
 
 	for i in $(seq 1 10); do
 		# Sleep a reasonable amount of time for k8s to update the container status to crashing
@@ -57,6 +65,10 @@ test_restart_operator() {
 check_gpu_pod_ready() {
 	local log_dir=$1
 	local current_time=0
+
+	# Ensure the log directory exists
+	mkdir -p ${log_dir}
+
 	while :; do
 		pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
 		status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)

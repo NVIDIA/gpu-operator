@@ -20,6 +20,4 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 
 : ${OPERATOR_IMAGE:="nvcr.io/nvidia/gpu-operator"}
 
-function remote() {
-    ${SCRIPT_DIR}/remote.sh "cd ${PROJECT} && $@"
-}
+: ${CONTAINER_RUNTIME:="docker"}
