@@ -20,3 +20,20 @@ rules:
   - use
   resourceNames:
   - gpu-operator-privileged
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  - nodes
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'

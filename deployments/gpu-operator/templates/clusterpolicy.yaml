@@ -111,6 +111,22 @@ spec:
     {{- if .Values.driver.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.driver.imagePullSecrets | nindent 6 }}
     {{- end }}
+    manager:
+      {{- if .Values.driver.manager.repository }}
+      repository: {{ .Values.driver.manager.repository }}
+      {{- end }}
+      {{- if .Values.driver.manager.image }}
+      image: {{ .Values.driver.manager.image }}
+      {{- end }}
+      {{- if .Values.driver.manager.version }}
+      version: {{ .Values.driver.manager.version }}
+      {{- end }}
+      {{- if .Values.driver.manager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.driver.manager.imagePullPolicy }}
+      {{- end }}
+      {{- if .Values.driver.manager.env }}
+      env: {{ toYaml .Values.driver.manager.env | nindent 8 }}
+      {{- end }}
     {{- if .Values.driver.repoConfig }}
     repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
     {{- end }}

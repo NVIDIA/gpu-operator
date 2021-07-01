@@ -70,6 +70,30 @@ metadata:
               "enabled": true,
               "image": "driver",
               "imagePullSecrets": [],
+              "manager": {
+                "image": "k8s-driver-manager",
+                "repository": "quay.io/shivamerla",
+                "version": "v0.1.0",
+                "imagePullSecrets": [],
+                "env": [
+                  {
+                    "name": "DRAIN_USE_FORCE",
+                    "value": "false"
+                  },
+                  {
+                    "name": "DRAIN_POD_SELECTOR_LABEL",
+                    "value": ""
+                  },
+                  {
+                    "name": "DRAIN_TIMEOUT_SECONDS",
+                    "value": "0s"
+                  },
+                  {
+                    "name": "DRAIN_DELETE_EMPTYDIR_DATA",
+                    "value": "false"
+                  }
+                ],
+              }
               "nodeSelector": {
                 "nvidia.com/gpu.deploy.driver": "true"
               },

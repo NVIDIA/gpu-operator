@@ -93,6 +93,8 @@ rules:
   - get
   - list
   - create
+  - update
+  - watch
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -108,3 +110,4 @@ rules:
   - list
   - create
   - watch
+  - update
