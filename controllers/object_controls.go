@@ -11,9 +11,13 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	apiconfigv1 "github.com/openshift/api/config/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,7 +83,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, skipping update")
 			return gpuv1.Ready, nil
 		}
 
@@ -102,7 +106,12 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Ready, nil
 		}
 
@@ -125,7 +134,12 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Ready, nil
 		}
 
@@ -148,7 +162,12 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Ready, nil
 		}
 
@@ -171,7 +190,12 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Ready, nil
 		}
 
@@ -194,7 +218,12 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Ready, nil
 		}
 
@@ -386,6 +415,24 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+
+	// update driver-manager(initContainer) image and pull policy
+	managerImage, err := gpuv1.ImagePath(&config.Driver.Manager)
+	if err != nil {
+		return err
+	}
+
+	obj.Spec.Template.Spec.InitContainers[0].Image = managerImage
+	if config.Driver.ImagePullPolicy != "" {
+		obj.Spec.Template.Spec.InitContainers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
+	}
+
+	// set/append environment variables for driver-manager initContainer
+	if len(config.Driver.Manager.Env) > 0 {
+		for _, env := range config.Driver.Manager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[0]), env.Name, env.Value)
+		}
+	}
 
 	// set image pull secrets
 	if len(config.Driver.ImagePullSecrets) > 0 {
@@ -1245,7 +1292,12 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return isDeploymentReady(obj.Name, n), nil
 		}
 
@@ -1275,7 +1327,12 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, updating...")
+			err = n.rec.Client.Update(context.TODO(), obj)
+			if err != nil {
+				logger.Info("Couldn't update", "Error", err)
+				return gpuv1.NotReady, err
+			}
 			return isDaemonSetReady(obj.Name, n), nil
 		}
 
@@ -1324,16 +1381,28 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+	found := &secv1.SecurityContextConstraints{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.Ready, nil
+	} else if err != nil {
 		return gpuv1.NotReady, err
 	}
 
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
 	return gpuv1.Ready, nil
 }
 
@@ -1352,16 +1421,28 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+	found := &policyv1beta1.PodSecurityPolicy{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.Ready, nil
+	} else if err != nil {
 		return gpuv1.NotReady, err
 	}
 
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
 	return gpuv1.Ready, nil
 }
 
@@ -1375,16 +1456,29 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+	found := &corev1.Service{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.Ready, nil
+	} else if err != nil {
 		return gpuv1.NotReady, err
 	}
 
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+	obj.Spec.ClusterIP = found.Spec.ClusterIP
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
 	return gpuv1.Ready, nil
 }
 
@@ -1398,16 +1492,28 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+	found := &promv1.ServiceMonitor{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.Ready, nil
+	} else if err != nil {
 		return gpuv1.NotReady, err
 	}
 
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
 	return gpuv1.Ready, nil
 }
 
@@ -1423,7 +1529,7 @@ func Namespace(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			logger.Info("Found Resource, skipping update...")
 			return gpuv1.Ready, nil
 		}
 
@@ -1444,15 +1550,27 @@ func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
-			return gpuv1.Ready, nil
+	found := &nodev1.RuntimeClass{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		return gpuv1.Ready, nil
+	} else if err != nil {
 		return gpuv1.NotReady, err
 	}
 
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
 	return gpuv1.Ready, nil
 }

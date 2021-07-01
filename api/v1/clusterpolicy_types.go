@@ -113,11 +113,14 @@ type DaemonsetsSpec struct {
 
 // InitContainerSpec describes configuration for initContainer image used with all components
 type InitContainerSpec struct {
+	// Repository represents image repository path
 	Repository string `json:"repository,omitempty"`
 
+	// Image represents image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
 	Image string `json:"image,omitempty"`
 
+	// Version represents image tag(version)
 	Version string `json:"version,omitempty"`
 
 	// Image pull policy
@@ -237,6 +240,36 @@ type MIGSpec struct {
 	Strategy MIGStrategy `json:"strategy,omitempty"`
 }
 
+// DriverManagerSpec describes configuration for driver-manager(initContainer)
+type DriverManagerSpec struct {
+	// Repository represents Driver-Manager repository path
+	Repository string `json:"repository,omitempty"`
+
+	// Image represents Driver-Manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// Version represents Driver-Manager image tag(version)
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
 // DriverSpec defines the properties for driver deployment
 type DriverSpec struct {
 	// Enabled indicates if deployment of driver through operator is enabled
@@ -270,6 +303,9 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Manager represents configuration for driver manager initContainer
+	Manager DriverManagerSpec `json:"manager,omitempty"`
 
 	// Optional: Security Context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
@@ -692,6 +728,9 @@ func ImagePath(spec interface{}) (string, error) {
 		return imagePath(config.Repository, config.Image, config.Version)
 	case *MIGManagerSpec:
 		config := spec.(*MIGManagerSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *DriverManagerSpec:
+		config := spec.(*DriverManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version)
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)

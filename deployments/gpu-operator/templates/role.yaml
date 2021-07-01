@@ -129,3 +129,5 @@ rules:
   - get
   - list
   - create
+  - update
+  - watch
