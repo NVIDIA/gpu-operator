@@ -92,8 +92,8 @@ metadata:
                     "name": "DRAIN_DELETE_EMPTYDIR_DATA",
                     "value": "false"
                   }
-                ],
-              }
+                ]
+              },
               "nodeSelector": {
                 "nvidia.com/gpu.deploy.driver": "true"
               },
