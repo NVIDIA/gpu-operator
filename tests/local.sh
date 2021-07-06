@@ -29,5 +29,12 @@ ${SCRIPT_DIR}/push.sh
 # We trigger the installation of prerequisites on the remote instance
 remote SKIP_PREREQUISITES="${SKIP_PREREQUISITES}" ./tests/scripts/prerequisites.sh
 
-# We trigger the specified test case on the remote instance
-remote CONTAINER_RUNTIME="${CONTAINER_RUNTIME}" ${TEST_CASE}
+# We trigger the specified test case on the remote instance.
+# Note: We need to ensure that the required environment variables
+# are forwarded to the remote shell.
+remote \
+    CONTAINER_RUNTIME="${CONTAINER_RUNTIME}" \
+    PROJECT="${PROJECT}" \
+    OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+    OPERATOR_VERSION="${OPERATOR_VERSION}" \
+        ${TEST_CASE}
