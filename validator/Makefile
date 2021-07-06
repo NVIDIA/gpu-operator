@@ -41,9 +41,12 @@ build-all: $(BUILD_TARGETS)
 $(PUSH_TARGETS): push-%:
 	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
 
-# For the default push target push the short tag
+# For the default push target we also push a short tag equal to the version.
+# We skip this for the development release
+RELEASE_DEVEL_TAG ?= devel
+ifneq ($(strip $(VERSION)),$(RELEASE_DEVEL_TAG))
 push-$(DEFAULT_PUSH_TARGET): push-short
-
+endif
 push-short:
 	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
 	$(DOCKER) push "$(IMAGE):$(VERSION)"
@@ -56,6 +59,6 @@ $(BUILD_TARGETS): build-%:
 			--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
 			--build-arg BASE_IMAGE=nvcr.io/nvidia/cuda:11.2.1-base-$(*) \
 			--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.2.1-$(*) \
-			--tag $(IMAGE):$(VERSION) \
+			--tag $(IMAGE):$(VERSION)-$(*) \
 			--file Dockerfile \
 			$(BUILD_DIR)

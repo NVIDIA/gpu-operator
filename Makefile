@@ -149,3 +149,50 @@ bundle: manifests kustomize
 .PHONY: bundle-build
 bundle-build:
 	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+
+CUDA_VERSION ?= 11.3.0
+GOLANG_VERSION ?= 1.15
+DOCKER   ?= docker
+ifeq ($(IMAGE),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE := $(REGISTRY)/gpu-operator
+endif
+
+##### Public rules #####
+DEFAULT_PUSH_TARGET := ubi8
+TARGETS := ubi8
+
+PUSH_TARGETS := $(patsubst %,push-%, $(TARGETS))
+BUILD_TARGETS := $(patsubst %,build-%, $(TARGETS))
+TEST_TARGETS := $(patsubst %,test-%, $(TARGETS))
+
+ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS)
+.PHONY: $(ALL_TARGETS)
+
+$(PUSH_TARGETS): push-%: validator-push-%
+	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
+
+# For the default push target we also push a short tag equal to the version.
+# We skip this for the development release
+RELEASE_DEVEL_TAG ?= devel
+ifneq ($(strip $(VERSION)),$(RELEASE_DEVEL_TAG))
+push-$(DEFAULT_PUSH_TARGET): push-short
+endif
+push-short:
+	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
+	$(DOCKER) push "$(IMAGE):$(VERSION)"
+
+build-ubi8: DOCKERFILE := docker/Dockerfile
+$(TARGETS): %: build-%
+$(BUILD_TARGETS): build-%: validator-build-%
+	$(DOCKER) build --pull \
+		--tag $(IMAGE):$(VERSION)-$(*) \
+		--build-arg BASE_DIST="$(BASE_DIST)" \
+		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+		--file $(DOCKERFILE) .
+
+validator-%:
+	make -C validator $(*)
