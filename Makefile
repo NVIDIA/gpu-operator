@@ -168,7 +168,8 @@ TEST_TARGETS := $(patsubst %,test-%, $(TARGETS))
 ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS)
 .PHONY: $(ALL_TARGETS)
 
-$(PUSH_TARGETS): push-%: validator-push-%
+ifeq ($(SUBCOMPONENT),)
+$(PUSH_TARGETS): push-%:
 	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
 
 # For the default push target we also push a short tag equal to the version.
@@ -185,7 +186,7 @@ build-ubi8: DOCKERFILE := docker/Dockerfile
 build-ubi8: BASE_DIST := ubi8
 
 $(TARGETS): %: build-%
-$(BUILD_TARGETS): build-%: validator-build-%
+$(BUILD_TARGETS): build-%:
 	$(DOCKER) build --pull \
 		--tag $(IMAGE):$(VERSION)-$(*) \
 		--build-arg BASE_DIST="$(BASE_DIST)" \
@@ -196,8 +197,11 @@ $(BUILD_TARGETS): build-%: validator-build-%
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--file $(DOCKERFILE) .
 
-validator-%:
-	make -C validator IMAGE=$(IMAGE)-validator $(*)
+else
+# SUBCOMPONENT is set; assume this is the target folder
+$(ALL_TARGETS): %:
+	make -C $(SUBCOMPONENT) $(*)
+endif
 
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts

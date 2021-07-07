@@ -101,13 +101,9 @@ unit-tests:
     - make devel-image IMG=nvidia/gpu-operator:devel
     - docker run -t nvidia/gpu-operator:devel make unit-test
   dependencies:
-    - build
+    - build:gpu-operator
 
 # Define targets for the gpu-operator and gpu-operator-validator images
-.target-ubi8:
-  variables:
-    TARGET: "ubi8"
-
 .target-gpu-operator:
   variables:
     TARGET: "ubi8"
@@ -116,6 +112,7 @@ unit-tests:
 .target-gpu-operator-validator:
   variables:
     TARGET: "ubi8"
+    SUBCOMPONENT: "validator"
     IMAGE_NAME: "gpu-operator-validator"
 
 # The .build step forms the base of the image builds with each variant
@@ -132,12 +129,15 @@ unit-tests:
     - make build-${TARGET}
     - make push-${TARGET}
 
-# The build target build and pushes both the gpu-operator and
-# gpu-operator-validator images
-build:
+build:gpu-operator:
   extends:
     - .build
-    - .target-ubi8
+    - .target-gpu-operator
+
+build:gpu-operator-validator:
+  extends:
+    - .build
+    - .target-gpu-operator-validator
 
 # .deploy forms the base of the deployment jobs which push images to the CI registry.
 # This is extended with the version to be deployed (e.g. the SHA or TAG) and the
@@ -177,14 +177,14 @@ deploy:sha-ci-gpu-operator:
     - .deploy:sha-ci
     - .target-gpu-operator
   dependencies:
-    - build
+    - build:gpu-operator
 
 deploy:sha-ci-gpu-operator-validator:
   extends:
     - .deploy:sha-ci
     - .target-gpu-operator-validator
   dependencies:
-    - build
+    - build:gpu-operator-validator
 
 # A release job is a deployment job that has a different output version / image
 .release:
