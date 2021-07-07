@@ -13,7 +13,9 @@ variables:
 
 stages:
   - versioning
+  - image
   - lint
+  - go-checks
   - build
   - tests
   - scan
@@ -52,15 +54,34 @@ helm-lint:
   script:
     - helm lint deployments/gpu-operator/
 
-go-lint:
-  stage: lint
-  allow_failure: true
-  image: golang:1.15
-  services:
-    - docker:stable-dind
+build-dev-image:
+  stage: image
+  before_script:
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   script:
-    - GO111MODULE=off go get -u golang.org/x/lint/golint
-    - make lint
+    - apk --no-cache add make bash
+    - make .build-image
+    - make .push-build-image
+
+.requires-build-image:
+  variables:
+    SKIP_IMAGE_BUILD: "yes"
+  before_script:
+    - apk --no-cache add make bash
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - make .pull-build-image
+
+.go-check:
+  extends:
+    - .requires-build-image
+  stage: go-checks
+
+go-lint:
+  extends:
+    - .go-check
+  script:
+    - make docker-lint
+  allow_failure: true
 
 go-fmt:
   stage: lint

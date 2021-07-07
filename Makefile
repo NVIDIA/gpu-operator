@@ -97,9 +97,57 @@ undeploy:
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=gpu-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+MODULE := github.com/NVIDIA/gpu-operator
+
+CUDA_IMAGE ?= nvidia/cuda
+CUDA_VERSION ?= 11.2.1
+GOLANG_VERSION ?= 1.15
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+ifeq ($(IMAGE),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE := $(REGISTRY)/gpu-operator
+endif
+IMAGE_TAG ?= $(GOLANG_VERSION)
+BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
+
+CHECK_TARGETS := lint
+MAKE_TARGETS := $(CHECK_TARGETS)
+DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
+.PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
+
+# Generate an image for containerized builds
+# Note: This image is local only
+.PHONY: .build-image .pull-build-image .push-build-image
+.build-image: docker/Dockerfile.devel
+	if [ x"$(SKIP_IMAGE_BUILD)" = x"" ]; then \
+		$(DOCKER) build \
+			--progress=plain \
+			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+			--tag $(BUILDIMAGE) \
+			-f $(^) \
+			docker; \
+	fi
+
+.pull-build-image:
+	$(DOCKER) pull $(BUILDIMAGE)
+
+.push-build-image:
+	$(DOCKER) push $(BUILDIMAGE)
+
+$(DOCKER_TARGETS): docker-%: .build-image
+	@echo "Running 'make $(*)' in docker container $(BUILDIMAGE)"
+	$(DOCKER) run \
+		--rm \
+		-e GOCACHE=/tmp/.cache \
+		-v $(PWD):$(PWD) \
+		-w $(PWD) \
+		--user $$(id -u):$$(id -g) \
+		$(BUILDIMAGE) \
+			make $(*)
+
 lint:
-# We use `go list -f '{{.Dir}}' ./...` to skip the `vendor` folder.
-	go list -f '{{.Dir}}' ./... | xargs golint -set_exit_status
+# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' $(MODULE)/... | xargs golint -set_exit_status
 
 # Run go fmt against code
 fmt:
@@ -163,15 +211,6 @@ bundle: manifests kustomize
 bundle-build:
 	$(DOCKER) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
 
-
-CUDA_IMAGE ?= nvidia/cuda
-CUDA_VERSION ?= 11.2.1
-GOLANG_VERSION ?= 1.15
-BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-ifeq ($(IMAGE),)
-REGISTRY ?= nvcr.io/nvidia/cloud-native
-IMAGE := $(REGISTRY)/gpu-operator
-endif
 
 ##### Public rules #####
 DEFAULT_PUSH_TARGET := ubi8
