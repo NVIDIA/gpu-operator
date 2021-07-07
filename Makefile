@@ -102,10 +102,6 @@ misspell:
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-# Build the docker image
-docker-build:
-	docker build -t ${IMG} -f docker/Dockerfile.devel .
-
 devel-image:
 	docker build -t $(IMG) -f docker/Dockerfile.devel .
 
@@ -151,8 +147,10 @@ bundle-build:
 	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 
-CUDA_VERSION ?= 11.3.0
+CUDA_IMAGE ?= nvidia/cuda
+CUDA_VERSION ?= 11.2.1
 GOLANG_VERSION ?= 1.15
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 DOCKER   ?= docker
 ifeq ($(IMAGE),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
@@ -184,15 +182,25 @@ push-short:
 	$(DOCKER) push "$(IMAGE):$(VERSION)"
 
 build-ubi8: DOCKERFILE := docker/Dockerfile
+build-ubi8: BASE_DIST := ubi8
+
 $(TARGETS): %: build-%
 $(BUILD_TARGETS): build-%: validator-build-%
 	$(DOCKER) build --pull \
 		--tag $(IMAGE):$(VERSION)-$(*) \
 		--build-arg BASE_DIST="$(BASE_DIST)" \
+		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
 		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--file $(DOCKERFILE) .
 
 validator-%:
 	make -C validator IMAGE=$(IMAGE)-validator $(*)
+
+# Provide a utility target to build the images to allow for use in external tools.
+# This includes https://github.com/openshift-psap/ci-artifacts
+.PHONY: docker-image
+docker-image: $(DEFAULT_PUSH_TARGET)
+	docker tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)

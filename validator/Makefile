@@ -15,7 +15,10 @@
 VERSION ?= v0.1.0
 
 DOCKER ?= docker
+CUDA_IMAGE ?= nvidia/cuda
+CUDA_VERSION ?= 11.2.1
 GOLANG_VERSION ?= 1.15
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 BUILD_DIR ?= ../
 
 ifeq ($(IMAGE),)
@@ -51,13 +54,18 @@ push-short:
 	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
 	$(DOCKER) push "$(IMAGE):$(VERSION)"
 
+%-ubi8: BASE_DIST := ubi8
+
 # Both ubi8 and build-ubi8 trigger a build of the relevant image
 $(TARGETS): %: build-%
 $(BUILD_TARGETS): build-%:
 		$(DOCKER) build --pull \
-			--build-arg VERSION=$(VERSION) \
-			--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
-			--build-arg BASE_IMAGE=nvcr.io/nvidia/cuda:11.2.1-base-$(*) \
+			--build-arg BASE_DIST="$(BASE_DIST)" \
+			--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
+			--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
+			--build-arg VERSION="$(VERSION)" \
+			--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
+			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 			--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.2.1-$(*) \
 			--tag $(IMAGE):$(VERSION)-$(*) \
 			--file Dockerfile \
