@@ -16,6 +16,7 @@ stages:
   - image
   - lint
   - go-checks
+  - go-build
   - unit-tests
   - build
   - tests
@@ -107,6 +108,13 @@ misspell:
     - .go-check
   script:
     - make docker-misspell
+
+go-build:
+  extends:
+    - .requires-build-image
+  stage: go-build
+  script:
+    - make docker-build
 
 unit-tests:
   extends:

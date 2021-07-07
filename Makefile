@@ -99,9 +99,6 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-docker-build:
-	docker build -t ${IMG} -f docker/Dockerfile.devel .
-
 devel-image:
 	docker build -t $(IMG) -f docker/Dockerfile.devel .
 
@@ -162,7 +159,7 @@ IMAGE_TAG ?= $(GOLANG_VERSION)
 BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
 
 CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
-MAKE_TARGETS := check coverage $(CHECK_TARGETS)
+MAKE_TARGETS := build check coverage $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
 
@@ -233,7 +230,7 @@ vet:
 	go vet $(MODULE)/...
 
 build:
-	@
+	go build $(MODULE)/...
 
 COVERAGE_FILE := coverage.out
 unit-test: build
