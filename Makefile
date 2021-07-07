@@ -82,7 +82,8 @@ manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=gpu-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 lint:
-	golint -set_exit_status ./...
+# We use `go list -f '{{.Dir}}' ./...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' ./... | xargs golint -set_exit_status
 
 # Run go fmt against code
 fmt:
