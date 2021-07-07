@@ -1,7 +1,8 @@
 default:
   image: docker:stable
   services:
-    - docker:stable-dind
+    - name: docker:stable-dind
+      command: ["--experimental"]
 
 variables:
   # DH_PROD_IMAGE: nvidia/gpu-operator
@@ -56,16 +57,24 @@ helm-lint:
   script:
     - helm lint deployments/gpu-operator/
 
+.dev-image:
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"
+
 build-dev-image:
+  extends:
+    - .dev-image
   stage: image
-  before_script:
-    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   script:
     - apk --no-cache add make bash
     - make .build-image
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
     - make .push-build-image
 
 .requires-build-image:
+  extends:
+    - .dev-image
   variables:
     SKIP_IMAGE_BUILD: "yes"
   before_script:
