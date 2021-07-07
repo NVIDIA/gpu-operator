@@ -65,9 +65,6 @@ test: generate fmt vet manifests
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
-unit-test:
-	go test ./... -coverprofile cover.out
-
 # Build gpu-operator binary
 gpu-operator: generate fmt vet
 	go build -o bin/gpu-operator main.go
@@ -111,7 +108,7 @@ IMAGE_TAG ?= $(GOLANG_VERSION)
 BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
 
 CHECK_TARGETS := lint
-MAKE_TARGETS := $(CHECK_TARGETS)
+MAKE_TARGETS := coverage $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
 
@@ -162,6 +159,17 @@ assign:
 
 misspell:
 	misspell .
+
+build:
+	@
+
+COVERAGE_FILE := coverage.out
+unit-test: build
+	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
+
+coverage: unit-test
+	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
+	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 # Generate code
 generate: controller-gen

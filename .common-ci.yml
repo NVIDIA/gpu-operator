@@ -16,6 +16,7 @@ stages:
   - image
   - lint
   - go-checks
+  - unit-tests
   - build
   - tests
   - scan
@@ -109,20 +110,11 @@ misspell:
     - make misspell
 
 unit-tests:
-  stage: tests
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  except:
-    variables:
-      - $SKIP_TESTS =~ /^y/
-
+  extends:
+    - .requires-build-image
+  stage: unit-tests
   script:
-    - apk add --update make
-    - make devel-image IMG=nvidia/gpu-operator:devel
-    - docker run -t nvidia/gpu-operator:devel make unit-test
-  dependencies:
-    - build:gpu-operator
+    - make docker-coverage
 
 # Define targets for the gpu-operator and gpu-operator-validator images
 .target-gpu-operator:
