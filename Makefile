@@ -195,4 +195,4 @@ $(BUILD_TARGETS): build-%: validator-build-%
 		--file $(DOCKERFILE) .
 
 validator-%:
-	make -C validator $(*)
+	make -C validator IMAGE=$(IMAGE)-validator $(*)
