@@ -94,93 +94,20 @@ undeploy:
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=gpu-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-MODULE := github.com/NVIDIA/gpu-operator
-
-CUDA_IMAGE ?= nvidia/cuda
-CUDA_VERSION ?= 11.2.1
-GOLANG_VERSION ?= 1.15
-BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-ifeq ($(IMAGE),)
-REGISTRY ?= nvcr.io/nvidia/cloud-native
-IMAGE := $(REGISTRY)/gpu-operator
-endif
-IMAGE_TAG ?= $(GOLANG_VERSION)
-BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
-
-CHECK_TARGETS := lint
-MAKE_TARGETS := coverage $(CHECK_TARGETS)
-DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
-.PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
-
-# Generate an image for containerized builds
-# Note: This image is local only
-.PHONY: .build-image .pull-build-image .push-build-image
-.build-image: docker/Dockerfile.devel
-	if [ x"$(SKIP_IMAGE_BUILD)" = x"" ]; then \
-		$(DOCKER) build \
-			--progress=plain \
-			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-			--tag $(BUILDIMAGE) \
-			-f $(^) \
-			docker; \
-	fi
-
-.pull-build-image:
-	$(DOCKER) pull $(BUILDIMAGE)
-
-.push-build-image:
-	$(DOCKER) push $(BUILDIMAGE)
-
-$(DOCKER_TARGETS): docker-%: .build-image
-	@echo "Running 'make $(*)' in docker container $(BUILDIMAGE)"
-	$(DOCKER) run \
-		--rm \
-		-e GOCACHE=/tmp/.cache \
-		-v $(PWD):$(PWD) \
-		-w $(PWD) \
-		--user $$(id -u):$$(id -g) \
-		$(BUILDIMAGE) \
-			make $(*)
-
-lint:
-# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
-	go list -f '{{.Dir}}' $(MODULE)/... | xargs golint -set_exit_status
-
-# Run go fmt against code
-fmt:
-	go fmt ./...
-
-# Run go vet against code
-vet:
-	go vet ./...
-
-assign:
-	ineffassign ./...
-
-misspell:
-	misspell .
-
-build:
-	@
-
-COVERAGE_FILE := coverage.out
-unit-test: build
-	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
-
-coverage: unit-test
-	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
-	go tool cover -func=$(COVERAGE_FILE).no-mocks
-
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+# Build the docker image
+docker-build:
+	docker build -t ${IMG} -f docker/Dockerfile.devel .
+
 devel-image:
-	$(DOCKER) build -t $(IMG) -f docker/Dockerfile.devel .
+	docker build -t $(IMG) -f docker/Dockerfile.devel .
 
 # Push the docker image
 docker-push:
-	$(DOCKER) push ${IMG}
+	docker push ${IMG}
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
@@ -217,7 +144,104 @@ bundle: manifests kustomize
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	$(DOCKER) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+# Define local and dockerized golang targets
+
+MODULE := github.com/NVIDIA/gpu-operator
+
+CUDA_IMAGE ?= nvidia/cuda
+CUDA_VERSION ?= 11.2.1
+GOLANG_VERSION ?= 1.15
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+ifeq ($(IMAGE),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE := $(REGISTRY)/gpu-operator
+endif
+IMAGE_TAG ?= $(GOLANG_VERSION)
+BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
+
+CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
+MAKE_TARGETS := check coverage $(CHECK_TARGETS)
+DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
+.PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
+
+# Generate an image for containerized builds
+# Note: This image is local only
+.PHONY: .build-image .pull-build-image .push-build-image
+.build-image: docker/Dockerfile.devel
+	if [ x"$(SKIP_IMAGE_BUILD)" = x"" ]; then \
+		$(DOCKER) build \
+			--progress=plain \
+			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+			--tag $(BUILDIMAGE) \
+			-f $(^) \
+			docker; \
+	fi
+
+.pull-build-image:
+	$(DOCKER) pull $(BUILDIMAGE)
+
+.push-build-image:
+	$(DOCKER) push $(BUILDIMAGE)
+
+$(DOCKER_TARGETS): docker-%: .build-image
+	@echo "Running 'make $(*)' in docker container $(BUILDIMAGE)"
+	$(DOCKER) run \
+		--rm \
+		-e GOCACHE=/tmp/.cache \
+		-v $(PWD):$(PWD) \
+		-w $(PWD) \
+		--user $$(id -u):$$(id -g) \
+		$(BUILDIMAGE) \
+			make $(*)
+
+check: $(CHECK_TARGETS)
+
+# Apply go fmt to the codebase
+fmt:
+	go list -f '{{.Dir}}' $(MODULE)/... \
+		| xargs gofmt -s -l -w
+
+assert-fmt:
+	go list -f '{{.Dir}}' $(MODULE)/... \
+		| xargs gofmt -s -l | ( grep -v /vendor/ || true ) > fmt.out
+	@if [ -s fmt.out ]; then \
+		echo "\nERROR: The following files are not formatted:\n"; \
+		cat fmt.out; \
+		rm fmt.out; \
+		exit 1; \
+	else \
+		rm fmt.out; \
+	fi
+
+ineffassign:
+	ineffassign $(MODULE)/...
+
+lint:
+# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' $(MODULE)/... | xargs golint -set_exit_status
+
+lint-internal:
+# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' $(MODULE)/internal/... | xargs golint -set_exit_status
+
+misspell:
+	misspell $(MODULE)/...
+
+vet:
+	go vet $(MODULE)/...
+
+build:
+	@
+
+COVERAGE_FILE := coverage.out
+unit-test: build
+	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
+
+coverage: unit-test
+	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
+	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 
 ##### Public rules #####
