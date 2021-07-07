@@ -1,12 +1,12 @@
 # Contribute to the NVIDIA GPU Operator
 
 ## Introduction
-Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin [framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/). 
+Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin [framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/).
 However, managing special hardware resources in Kubernetes is difficult and prone to errors. GPUs and NICs require special drivers, plugins, runtimes, libraries to ensure fully high-performance functionality.
 
 ![nvidia-gpu-operator](https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/egx/nvidia-egx-platform-gold-image-full-2c50-d@2x.jpg)
 
-Moreover, NVIDIA software components such as drivers have been traditionally deployed as part of the base operating system image. This meant that there was a different image for CPU vs. GPU nodes that infrastructure teams would have to manage as part of the software lifecycle. This in turn requires sophisticated automation as part of the provisioning phase for GPU nodes in Kubernetes. 
+Moreover, NVIDIA software components such as drivers have been traditionally deployed as part of the base operating system image. This meant that there was a different image for CPU vs. GPU nodes that infrastructure teams would have to manage as part of the software lifecycle. This in turn requires sophisticated automation as part of the provisioning phase for GPU nodes in Kubernetes.
 
 The NVIDIA GPU Operator was primarily built to address these challenges. It leverages the standard [Operator Framework](https://coreos.com/blog/introducing-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPUs within Kubernetes.
 
@@ -28,8 +28,8 @@ gitlab.com/
 │   ├── gpu-operator		(CRD and controller logic that implements the reconciliation)
 │   ├── k8s-device-plugin	(NVIDIA Device Plugin for Kubernetes)
 │   ├── driver              (NVIDIA Driver qualified for data center GPUs)
-│   ├── container-toolkit   (NVIDIA Container Toolkit, runtime for Docker) 
-│   ├── dcgm-exporter    	(NVIDIA DCGM for monitoring and telemetry)	
+│   ├── container-toolkit   (NVIDIA Container Toolkit, runtime for Docker)
+│   ├── dcgm-exporter    	(NVIDIA DCGM for monitoring and telemetry)
 │   ├── samples		        (CUDA VectorAdd sample used for validation steps)
 ```
 
@@ -58,7 +58,7 @@ GitLab is where the GPU Operator is actively developed - we leverage GitLab’s 
 
 Releases of the GPU Operator include container images that are currently available on NVIDIA’s Docker Hub [repository](https://hub.docker.com/u/nvidia). In the future, the operator will be available on [NVIDIA NGC Catalog](https://ngc.nvidia.com/).
 
-The following are the container images (and tag format) that are released: 
+The following are the container images (and tag format) that are released:
 ```
 ├── nvidia/
 │   ├── gpu-operator		(<version-number>)
@@ -70,7 +70,7 @@ The following are the container images (and tag format) that are released:
 ```
 
 ### <a name="helm-charts"></a> Helm Charts
-To simplify the deployment, the Operator can be installed using a Helm chart (note only Helm v3 is supported). A Helm chart repository is maintained at the following URL: https://nvidia.github.io/gpu-operator (which in turn is maintained at the corresponding ‘gh-pages’ directory under https://github.com/NVIDIA/gpu-operator/tree/gh-pages) 
+To simplify the deployment, the Operator can be installed using a Helm chart (note only Helm v3 is supported). A Helm chart repository is maintained at the following URL: https://nvidia.github.io/gpu-operator (which in turn is maintained at the corresponding ‘gh-pages’ directory under https://github.com/NVIDIA/gpu-operator/tree/gh-pages)
 
 Continuous (‘nightly’) releases of the operator are available. Release milestones are available under ‘stable’.
 ```
@@ -85,13 +85,13 @@ To get started with building the GPU Operator, follow these steps:
 ```shell
 $ git clone https://gitlab.com/nvidia/kubernetes/gpu-operator.git
 $ cd gpu-operator
-$ make devel-image
+$ make .build-image
 ```
 We also use a CI infrastructure on AWS for nightly and per-change testing on the GPU Operator. This infrastructure is available here: https://gitlab.com/nvidia/container-infrastructure/aws-kube-ci
 
-To ensure that the GPU Operator releases can be effectively validated on new platforms, it would be ideal for contributions to make available CI infrastructure (e.g. runners) and associated changes to the CI scripts. 
+To ensure that the GPU Operator releases can be effectively validated on new platforms, it would be ideal for contributions to make available CI infrastructure (e.g. runners) and associated changes to the CI scripts.
 
-## <a name="signing"></a>Signing your work 
+## <a name="signing"></a>Signing your work
 
 Want to hack on the NVIDIA GPU Operator? Awesome!
 We only require you to sign your work, the below section describes this!
