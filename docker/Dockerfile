@@ -13,7 +13,8 @@
 # limitations under the License.
 
 ARG CUDA_IMAGE=nvidia/cuda
-ARG CUDA_VERSION=1.11.2
+ARG CUDA_VERSION=undefined
+
 ARG BASE_DIST=ubi8
 
 ARG GOLANG_VERSION=1.15
