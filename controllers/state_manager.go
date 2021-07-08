@@ -32,6 +32,7 @@ var gpuStateLabels = map[string]string{
 	"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
 	"nvidia.com/gpu.deploy.container-toolkit":     "true",
 	"nvidia.com/gpu.deploy.device-plugin":         "true",
+	"nvidia.com/gpu.deploy.dcgm":                  "true",
 	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
 	"nvidia.com/gpu.deploy.operator-validator":    "true",
 }
@@ -272,7 +273,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
-		addState(n, "/opt/gpu-operator/state-monitoring")
+		addState(n, "/opt/gpu-operator/state-dcgm")
+		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
 			addState(n, "/opt/gpu-operator/state-mig-manager")

@@ -35,13 +35,10 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
         env:
-        - name: "DCGM_EXPORTER_LISTEN"
-          value: ":9400"
-        - name: "DCGM_EXPORTER_KUBERNETES"
-          value: "true"
-        args:
-        - "-f"
-        - "/etc/dcgm-exporter/dcp-metrics-included.csv"
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - name: "metrics"
           containerPort: 9400

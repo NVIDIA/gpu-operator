@@ -16,10 +16,34 @@ metadata:
               "image": "dcgm-exporter",
               "imagePullSecrets": [],
               "repository": "nvcr.io/nvidia/k8s",
+              "env": [
+                {
+                  "name": "DCGM_EXPORTER_LISTEN",
+                  "value": ":9400"
+                },
+                {
+                  "name": "DCGM_EXPORTER_KUBERNETES",
+                  "value": "true"
+                },
+                {
+                  "name": "DCGM_EXPORTER_COLLECTORS",
+                  "value": "/etc/dcgm-exporter/dcp-metrics-included.csv"
+                }
+              ],
               "resources": {},
               "securityContext": {},
               "tolerations": [],
               "version": "sha256:8af02463a8b60b21202d0bf69bc1ee0bb12f684fa367f903d138df6cacc2d0ac"
+            },
+            "dcgm": {
+              "image": "dcgm",
+              "imagePullSecrets": [],
+              "repository": "docker.io/nvidia",
+              "hostPort": 5555,
+              "resources": {},
+              "securityContext": {},
+              "tolerations": [],
+              "version": "sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c"
             },
             "daemonsets": {
               "tolerations": [

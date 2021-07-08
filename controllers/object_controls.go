@@ -67,6 +67,10 @@ const (
 	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIMECLASS"
 	// MigStrategyEnvName indicates env name for passing MIG strategy
 	MigStrategyEnvName = "MIG_STRATEGY"
+	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
+	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
+	// DCGMDefaultHostPort indicates default host port bound to DCGM host engine
+	DCGMDefaultHostPort = 5555
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -290,6 +294,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-driver-daemonset":            TransformDriver,
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
+		"nvidia-dcgm":                        TransformDCGM,
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
 		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
 		"nvidia-mig-manager":                 TransformMIGManager,
@@ -884,6 +889,13 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// set DCGM host engine env. NODE_IP will be substituted during pod runtime
+	dcgmHostPort := int32(DCGMDefaultHostPort)
+	if config.DCGM.HostPort != 0 {
+		dcgmHostPort = config.DCGM.HostPort
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("$(NODE_IP):%d", dcgmHostPort))
+
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
@@ -930,6 +942,66 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
 	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
+
+	return nil
+}
+
+// TransformDCGM transforms dcgm daemonset with required config as per ClusterPolicy
+func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
+	// update image
+	image, err := gpuv1.ImagePath(&config.DCGM)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DCGM.ImagePullPolicy)
+	// set image pull secrets
+	if len(config.DCGM.ImagePullSecrets) > 0 {
+		for _, secret := range config.DCGM.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+	// set resource limits
+	if config.DCGM.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.DCGM.Resources
+		}
+	}
+	// set arguments if specified for exporter container
+	if len(config.DCGM.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.DCGM.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.DCGM.Env) > 0 {
+		for _, env := range config.DCGM.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set host port to bind for DCGM engine
+	for i, port := range obj.Spec.Template.Spec.Containers[0].Ports {
+		if port.Name == "dcgm" {
+			obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = DCGMDefaultHostPort
+			if config.DCGM.HostPort != 0 {
+				obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = config.DCGM.HostPort
+			}
+		}
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
 
 	return nil
 }
