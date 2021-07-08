@@ -106,6 +106,9 @@ driver:
   # vGPU licensing configuration
   licensingConfig:
     configMapName: ""
+  # vGPU topology daemon configuration
+  virtualTopology:
+    config: ""
 
 toolkit:
   enabled: true

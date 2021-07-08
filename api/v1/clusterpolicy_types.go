@@ -335,8 +335,13 @@ type DriverSpec struct {
 
 	// Optional: Licensing configuration for vGPU drivers
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For Driver Container"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Licensing Configuration For vGPU Driver Container"
 	LicensingConfig *DriverLicensingConfigSpec `json:"licensingConfig,omitempty"`
+
+	// Optional: Virtual Topology Daemon configuration for vGPU drivers
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Virtual Topology Daemon Configuration For vGPU Driver Container"
+	VirtualTopology *VirtualTopologyConfigSpec `json:"virtualTopology,omitempty"`
 }
 
 // ToolkitSpec defines the properties for container-toolkit deployment
@@ -517,6 +522,16 @@ type DriverLicensingConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	ConfigMapName string `json:"configMapName,omitempty"`
+}
+
+// VirtualTopologyConfigSpec defines virtual topology daemon configuration with vGPU
+type VirtualTopologyConfigSpec struct {
+	// Optional: Config name representing virtual topology daemon configuration file nvidia-topologyd.conf
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Config string `json:"config,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin

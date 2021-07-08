@@ -108,6 +108,9 @@ metadata:
               "licensingConfig": {
                 "configMapName": ""
               },
+              "virtualTopology": {
+                "config": ""
+              },
               "version": "sha256:09ba3eca64a80fab010a9fcd647a2675260272a8c3eb515dfed6dc38a2d31ead"
             },
             "gfd": {
