@@ -47,6 +47,10 @@ const (
 	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
 	// VGPULicensingFileName is the vGPU licensing configuration filename
 	VGPULicensingFileName = "gridd.conf"
+	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
+	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
+	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename
+	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
 	// NvidiaDriverRootEnvName represents env name for indicating root directory of driver installation
@@ -506,6 +510,28 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
+	}
+
+	// set virtual topology daemon configuration if specified for vGPU driver
+	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
+		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, topologyConfigVolMount)
+
+		topologyConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.VirtualTopology.Config,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  VGPUTopologyConfigFileName,
+						Path: VGPUTopologyConfigFileName,
+					},
+				},
+			},
+		}
+		topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
 	}
 
 	// Inject EUS kernel RPM's as an override to the entrypoint

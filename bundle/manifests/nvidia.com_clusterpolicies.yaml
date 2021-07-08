@@ -1480,6 +1480,15 @@ spec:
                   version:
                     description: Driver image tag
                     type: string
+                  virtualTopology:
+                    description: 'Optional: Virtual Topology Daemon configuration
+                      for vGPU drivers'
+                    properties:
+                      config:
+                        description: 'Optional: Config name representing virtual topology
+                          daemon configuration file nvidia-topologyd.conf'
+                        type: string
+                    type: object
                 required:
                 - image
                 type: object

@@ -52,6 +52,8 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
+          - name: run-nvidia-topologyd
+            mountPath: /run/nvidia-topologyd
           - name: var-log
             mountPath: /var/log
           - name: dev-log
@@ -72,3 +74,7 @@ spec:
         - name: host-os-release
           hostPath:
             path: "/etc/os-release"
+        - name: run-nvidia-topologyd
+          hostPath:
+            path: /run/nvidia-topologyd
+          
