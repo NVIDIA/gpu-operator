@@ -108,16 +108,30 @@ spec:
     securityContext: {}
     resources: {}
 
+  dcgm:
+    repository: docker.io/nvidia
+    image: dcgm
+    version: 2.2.3-ubi8
+    imagePullPolicy: IfNotPresent
+    hostPort: 5555
+    args: []
+    env: []
+    securityContext: {}
+    resources: {}
+
   dcgmExporter:
     repository: nvcr.io/nvidia/k8s
     image: dcgm-exporter
     version: 2.1.8-2.4.0-rc.2-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
-    args:
-      - "-f"
-      - "/etc/dcgm-exporter/dcp-metrics-included.csv"
-    env: []
+    env:
+      - name: DCGM_EXPORTER_LISTEN
+        value: ":9400"
+      - name: DCGM_EXPORTER_KUBERNETES
+        value: "true"
+      - name: DCGM_EXPORTER_COLLECTORS
+        value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
     securityContext: {}
     resources: {}
 

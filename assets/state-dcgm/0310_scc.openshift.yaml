@@ -6,7 +6,7 @@ allowHostDirVolumePlugin: true
 allowHostIPC: false
 allowHostNetwork: false
 allowHostPID: false
-allowHostPorts: false
+allowHostPorts: true
 allowPrivilegeEscalation: true
 allowPrivilegedContainer: true
 allowedCapabilities:
@@ -29,7 +29,7 @@ metadata:
       any SELinux context.  WARNING: this is the most relaxed SCC and should be used
       only for cluster administration. Grant with caution.'
 
-  name: nvidia-dcgm-exporter
+  name: nvidia-dcgm
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
@@ -42,6 +42,6 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:gpu-operator-resources:nvidia-dcgm-exporter
+- system:serviceaccount:gpu-operator-resources:nvidia-dcgm
 volumes:
 - '*'

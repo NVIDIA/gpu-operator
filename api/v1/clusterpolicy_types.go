@@ -45,6 +45,8 @@ type ClusterPolicySpec struct {
 	DevicePlugin DevicePluginSpec `json:"devicePlugin"`
 	// DCGMExporter spec
 	DCGMExporter DCGMExporterSpec `json:"dcgmExporter"`
+	// DCGM component spec
+	DCGM DCGMSpec `json:"dcgm"`
 	// GPUFeatureDiscovery spec
 	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
 	// MIG spec
@@ -495,6 +497,61 @@ type DCGMExporterSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// DCGMSpec defines the properties for DCGM deployment
+type DCGMSpec struct {
+	// DCGM image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository"`
+
+	// DCGM image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image"`
+
+	// DCGM image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Security Context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// HostPort represents host port that needs to be bound for DCGM engine (Default: 5555)
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Host port to bind for DCGM engine"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:number"
+	HostPort int32 `json:"hostPort,omitempty"`
+}
+
 // DriverRepoConfigSpec defines custom repo configuration for driver container
 type DriverRepoConfigSpec struct {
 	// +kubebuilder:validation:Optional
@@ -716,6 +773,9 @@ func ImagePath(spec interface{}) (string, error) {
 		return imagePath(config.Repository, config.Image, config.Version)
 	case *DCGMExporterSpec:
 		config := spec.(*DCGMExporterSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
+	case *DCGMSpec:
+		config := spec.(*DCGMSpec)
 		return imagePath(config.Repository, config.Image, config.Version)
 	case *GPUFeatureDiscoverySpec:
 		config := spec.(*GPUFeatureDiscoverySpec)
