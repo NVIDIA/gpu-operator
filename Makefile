@@ -1,3 +1,19 @@
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+DOCKER ?= docker
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -104,11 +120,11 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 devel-image:
-	docker build -t $(IMG) -f docker/Dockerfile.devel .
+	$(DOCKER) build -t $(IMG) -f docker/Dockerfile.devel .
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	$(DOCKER) push ${IMG}
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
@@ -145,14 +161,13 @@ bundle: manifests kustomize
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(DOCKER) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 
 CUDA_IMAGE ?= nvidia/cuda
 CUDA_VERSION ?= 11.2.1
 GOLANG_VERSION ?= 1.15
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-DOCKER   ?= docker
 ifeq ($(IMAGE),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
 IMAGE := $(REGISTRY)/gpu-operator
@@ -208,4 +223,4 @@ endif
 # This includes https://github.com/openshift-psap/ci-artifacts
 .PHONY: docker-image
 docker-image: $(DEFAULT_PUSH_TARGET)
-	docker tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
+	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
