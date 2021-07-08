@@ -222,5 +222,6 @@ endif
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
 .PHONY: docker-image
+docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
 docker-image: $(DEFAULT_PUSH_TARGET)
 	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
