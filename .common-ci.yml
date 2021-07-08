@@ -13,7 +13,6 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 stages:
-  - versioning
   - image
   - lint
   - go-checks
@@ -27,23 +26,6 @@ stages:
   - e2e_tests
   - aws_kube_clean
   - release
-
-versioning:
-  stage: versioning
-  image:
-    name: alpine/git
-    entrypoint: ['/usr/bin/env']
-  script:
-    # generate version information, an artifact sourced as a script in other jobs
-    - VERSION="$(git describe --tags --dirty --always)"
-    - echo export VERSION=${VERSION} | tee .VERSION_INFO
-    - echo export LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1)) | tee -a .VERSION_INFO
-    - if [ -z "${CI_COMMIT_TAG}" ]; then echo SUBCHART_DIR="nightly" ; else echo SUBCHART_DIR="stable"; fi | tee -a .VERSION_INFO
-    # check that index is not dirty - to avoid some annoying to debug CI failures
-    - "git diff-index --quiet HEAD -- || ( echo ERROR: Unstaged files or dirty index ; exit 1 )"
-  artifacts:
-    paths:
-      - .VERSION_INFO
 
 helm-lint:
   stage: lint
