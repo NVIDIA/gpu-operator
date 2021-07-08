@@ -181,7 +181,7 @@ PUSH_TARGETS := $(patsubst %,push-%, $(TARGETS))
 BUILD_TARGETS := $(patsubst %,build-%, $(TARGETS))
 TEST_TARGETS := $(patsubst %,test-%, $(TARGETS))
 
-ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS)
+ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 .PHONY: $(ALL_TARGETS)
 
 ifeq ($(SUBCOMPONENT),)
@@ -213,15 +213,15 @@ $(BUILD_TARGETS): build-%:
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--file $(DOCKERFILE) .
 
+
+# Provide a utility target to build the images to allow for use in external tools.
+# This includes https://github.com/openshift-psap/ci-artifacts
+docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
+docker-image: $(DEFAULT_PUSH_TARGET)
+	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
+
 else
 # SUBCOMPONENT is set; assume this is the target folder
 $(ALL_TARGETS): %:
 	make -C $(SUBCOMPONENT) $(*)
 endif
-
-# Provide a utility target to build the images to allow for use in external tools.
-# This includes https://github.com/openshift-psap/ci-artifacts
-.PHONY: docker-image
-docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
-docker-image: $(DEFAULT_PUSH_TARGET)
-	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
