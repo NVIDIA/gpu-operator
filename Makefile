@@ -65,9 +65,6 @@ test: generate fmt vet manifests
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
-unit-test:
-	go test ./... -coverprofile cover.out
-
 # Build gpu-operator binary
 gpu-operator: generate fmt vet
 	go build -o bin/gpu-operator main.go
@@ -97,34 +94,9 @@ undeploy:
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=gpu-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-lint:
-# We use `go list -f '{{.Dir}}' ./...` to skip the `vendor` folder.
-	go list -f '{{.Dir}}' ./... | xargs golint -set_exit_status
-
-# Run go fmt against code
-fmt:
-	go fmt ./...
-
-# Run go vet against code
-vet:
-	go vet ./...
-
-assign:
-	ineffassign ./...
-
-misspell:
-	misspell .
-
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-devel-image:
-	$(DOCKER) build -t $(IMG) -f docker/Dockerfile.devel .
-
-# Push the docker image
-docker-push:
-	$(DOCKER) push ${IMG}
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
@@ -161,8 +133,11 @@ bundle: manifests kustomize
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	$(DOCKER) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
 
+# Define local and dockerized golang targets
+
+MODULE := github.com/NVIDIA/gpu-operator
 
 CUDA_IMAGE ?= nvidia/cuda
 CUDA_VERSION ?= 11.2.1
@@ -172,6 +147,91 @@ ifeq ($(IMAGE),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
 IMAGE := $(REGISTRY)/gpu-operator
 endif
+IMAGE_TAG ?= $(GOLANG_VERSION)
+BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
+
+CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
+MAKE_TARGETS := build check coverage $(CHECK_TARGETS)
+DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
+.PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
+
+# Generate an image for containerized builds
+# Note: This image is local only
+.PHONY: .build-image .pull-build-image .push-build-image
+.build-image: docker/Dockerfile.devel
+	if [ x"$(SKIP_IMAGE_BUILD)" = x"" ]; then \
+		$(DOCKER) build \
+			--progress=plain \
+			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+			--tag $(BUILDIMAGE) \
+			-f $(^) \
+			docker; \
+	fi
+
+.pull-build-image:
+	$(DOCKER) pull $(BUILDIMAGE)
+
+.push-build-image:
+	$(DOCKER) push $(BUILDIMAGE)
+
+$(DOCKER_TARGETS): docker-%: .build-image
+	@echo "Running 'make $(*)' in docker container $(BUILDIMAGE)"
+	$(DOCKER) run \
+		--rm \
+		-e GOCACHE=/tmp/.cache \
+		-v $(PWD):$(PWD) \
+		-w $(PWD) \
+		--user $$(id -u):$$(id -g) \
+		$(BUILDIMAGE) \
+			make $(*)
+
+check: $(CHECK_TARGETS)
+
+# Apply go fmt to the codebase
+fmt:
+	go list -f '{{.Dir}}' $(MODULE)/... \
+		| xargs gofmt -s -l -w
+
+assert-fmt:
+	go list -f '{{.Dir}}' $(MODULE)/... \
+		| xargs gofmt -s -l | ( grep -v /vendor/ || true ) > fmt.out
+	@if [ -s fmt.out ]; then \
+		echo "\nERROR: The following files are not formatted:\n"; \
+		cat fmt.out; \
+		rm fmt.out; \
+		exit 1; \
+	else \
+		rm fmt.out; \
+	fi
+
+ineffassign:
+	ineffassign $(MODULE)/...
+
+lint:
+# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' $(MODULE)/... | xargs golint -set_exit_status
+
+lint-internal:
+# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' $(MODULE)/internal/... | xargs golint -set_exit_status
+
+misspell:
+	misspell $(MODULE)/...
+
+vet:
+	go vet $(MODULE)/...
+
+build:
+	go build $(MODULE)/...
+
+COVERAGE_FILE := coverage.out
+unit-test: build
+	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
+
+coverage: unit-test
+	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
+	go tool cover -func=$(COVERAGE_FILE).no-mocks
+
 
 ##### Public rules #####
 DEFAULT_PUSH_TARGET := ubi8

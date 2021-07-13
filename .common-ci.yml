@@ -1,7 +1,8 @@
 default:
   image: docker:stable
   services:
-    - docker:stable-dind
+    - name: docker:stable-dind
+      command: ["--experimental"]
 
 variables:
   # DH_PROD_IMAGE: nvidia/gpu-operator
@@ -12,8 +13,11 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 stages:
-  - versioning
+  - image
   - lint
+  - go-checks
+  - go-build
+  - unit-tests
   - build
   - tests
   - scan
@@ -22,23 +26,6 @@ stages:
   - e2e_tests
   - aws_kube_clean
   - release
-
-versioning:
-  stage: versioning
-  image:
-    name: alpine/git
-    entrypoint: ['/usr/bin/env']
-  script:
-    # generate version information, an artifact sourced as a script in other jobs
-    - VERSION="$(git describe --tags --dirty --always)"
-    - echo export VERSION=${VERSION} | tee .VERSION_INFO
-    - echo export LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1)) | tee -a .VERSION_INFO
-    - if [ -z "${CI_COMMIT_TAG}" ]; then echo SUBCHART_DIR="nightly" ; else echo SUBCHART_DIR="stable"; fi | tee -a .VERSION_INFO
-    # check that index is not dirty - to avoid some annoying to debug CI failures
-    - "git diff-index --quiet HEAD -- || ( echo ERROR: Unstaged files or dirty index ; exit 1 )"
-  artifacts:
-    paths:
-      - .VERSION_INFO
 
 helm-lint:
   stage: lint
@@ -52,56 +39,73 @@ helm-lint:
   script:
     - helm lint deployments/gpu-operator/
 
-go-lint:
-  stage: lint
-  allow_failure: true
-  image: golang:1.15
-  services:
-    - docker:stable-dind
-  script:
-    - GO111MODULE=off go get -u golang.org/x/lint/golint
-    - make lint
+.dev-image:
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_REF_SLUG}"
 
-go-fmt:
-  stage: lint
-  allow_failure: true
-  image: golang:1.15
-  services:
-    - docker:stable-dind
+build-dev-image:
+  extends:
+    - .dev-image
+  stage: image
   script:
-    - make fmt
+    - apk --no-cache add make bash
+    - make .build-image
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - make .push-build-image
+
+.requires-build-image:
+  image: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-build
+
+.go-check:
+  extends:
+    - .requires-build-image
+  stage: go-checks
+
+fmt:
+  extends:
+    - .go-check
+  script:
+    - make assert-fmt
+
+vet:
+  extends:
+    - .go-check
+  script:
+    - make vet
+
+go-lint:
+  extends:
+    - .go-check
+  script:
+    - make lint
+  allow_failure: true
 
 ineffassign:
-  stage: lint
-  allow_failure: true
-  image: golang:1.15
+  extends:
+    - .go-check
   script:
-    - GO111MODULE=off go get -u github.com/gordonklaus/ineffassign
-    - make assign
+    - make ineffassign
 
 misspell:
-  stage: lint
-  allow_failure: true
-  image: golang:1.15
+  extends:
+    - .go-check
   script:
-    - GO111MODULE=off go get -u github.com/client9/misspell/cmd/misspell
     - make misspell
 
-unit-tests:
-  stage: tests
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  except:
-    variables:
-      - $SKIP_TESTS =~ /^y/
-
+go-build:
+  extends:
+    - .requires-build-image
+  stage: go-build
   script:
-    - apk add --update make
-    - make devel-image IMG=nvidia/gpu-operator:devel
-    - docker run -t nvidia/gpu-operator:devel make unit-test
-  dependencies:
-    - build:gpu-operator
+    - make build
+
+unit-tests:
+  extends:
+    - .requires-build-image
+  stage: unit-tests
+  script:
+    - make coverage
 
 # Define targets for the gpu-operator and gpu-operator-validator images
 .target-gpu-operator:
