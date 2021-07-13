@@ -1,11 +1,27 @@
-# VERSION defines the project version for the bundle. 
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+DOCKER ?= docker
+
+# VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
-# CHANNELS define the bundle channels used in the bundle. 
+# CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=preview,fast,stable)
@@ -14,7 +30,7 @@ ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
 
-# DEFAULT_CHANNEL defines the default channel used in the bundle. 
+# DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
@@ -24,7 +40,7 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# BUNDLE_IMG defines the image:tag used for the bundle. 
+# BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= gpu-operator-bundle:$(VERSION)
 
@@ -82,7 +98,8 @@ manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=gpu-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 lint:
-	golint -set_exit_status ./...
+# We use `go list -f '{{.Dir}}' ./...` to skip the `vendor` folder.
+	go list -f '{{.Dir}}' ./... | xargs golint -set_exit_status
 
 # Run go fmt against code
 fmt:
@@ -102,16 +119,12 @@ misspell:
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-# Build the docker image
-docker-build:
-	docker build -t ${IMG} .
-
 devel-image:
-	docker build -t $(IMG) -f Dockerfile.devel .
+	$(DOCKER) build -t $(IMG) -f docker/Dockerfile.devel .
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	$(DOCKER) push ${IMG}
 
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
@@ -148,4 +161,67 @@ bundle: manifests kustomize
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(DOCKER) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+
+CUDA_IMAGE ?= nvidia/cuda
+CUDA_VERSION ?= 11.2.1
+GOLANG_VERSION ?= 1.15
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+ifeq ($(IMAGE),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE := $(REGISTRY)/gpu-operator
+endif
+
+##### Public rules #####
+DEFAULT_PUSH_TARGET := ubi8
+TARGETS := ubi8
+
+PUSH_TARGETS := $(patsubst %,push-%, $(TARGETS))
+BUILD_TARGETS := $(patsubst %,build-%, $(TARGETS))
+TEST_TARGETS := $(patsubst %,test-%, $(TARGETS))
+
+ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+.PHONY: $(ALL_TARGETS)
+
+ifeq ($(SUBCOMPONENT),)
+$(PUSH_TARGETS): push-%:
+	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
+
+# For the default push target we also push a short tag equal to the version.
+# We skip this for the development release
+RELEASE_DEVEL_TAG ?= devel
+ifneq ($(strip $(VERSION)),$(RELEASE_DEVEL_TAG))
+push-$(DEFAULT_PUSH_TARGET): push-short
+endif
+push-short:
+	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
+	$(DOCKER) push "$(IMAGE):$(VERSION)"
+
+build-ubi8: DOCKERFILE := docker/Dockerfile
+build-ubi8: BASE_DIST := ubi8
+
+$(TARGETS): %: build-%
+$(BUILD_TARGETS): build-%:
+	$(DOCKER) build --pull \
+		--tag $(IMAGE):$(VERSION)-$(*) \
+		--build-arg BASE_DIST="$(BASE_DIST)" \
+		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
+		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
+		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+		--file $(DOCKERFILE) .
+
+
+# Provide a utility target to build the images to allow for use in external tools.
+# This includes https://github.com/openshift-psap/ci-artifacts
+docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
+docker-image: $(DEFAULT_PUSH_TARGET)
+	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
+
+else
+# SUBCOMPONENT is set; assume this is the target folder
+$(ALL_TARGETS): %:
+	make -C $(SUBCOMPONENT) $(*)
+endif

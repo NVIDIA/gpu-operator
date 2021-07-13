@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE=undefined
-ARG GOLANG_VERSION=undefined
+ARG CUDA_IMAGE=nvidia/cuda
+ARG CUDA_VERSION=undefined
 ARG CUDA_SAMPLE_IMAGE=undefined
 
-FROM golang:${GOLANG_VERSION} AS build
+ARG BASE_DIST=ubi8
+
+ARG GOLANG_VERSION=1.15
+ARG BUILDER_IMAGE=golang:${GOLANG_VERSION}
+
+FROM ${BUILDER_IMAGE} AS build
 
 WORKDIR /build
 COPY . .
@@ -29,7 +34,7 @@ FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 RUN mkdir /artifacts
 RUN cp /tmp/vectorAdd /artifacts/vectorAdd
 
-FROM ${BASE_IMAGE}
+FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 
 COPY ./LICENSE ./licenses/LICENSE
 COPY --from=build /artifacts/nvidia-validator  /usr/bin/nvidia-validator

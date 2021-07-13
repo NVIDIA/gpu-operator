@@ -9,123 +9,96 @@ default:
 include:
   - local: '.common-ci.yml'
 
-contamer:
-  extends: .scan
-  script:
-    - apk add --no-cache bash findutils libmagic curl make git
-    - apk add --no-cache python3 python3-dev py3-pip py3-wheel
+variables:
+  # Release "devel"-tagged images off the master branch
+  RELEASE_DEVEL_BRANCH: "master"
+  RELEASE_DEVEL_TAG: "devel"
+
+# The .scan step forms the base of the image scan operation performed before releasing
+# images.
+.scan:
+  stage: scan
+  variables:
+    REGISTRY: "${CI_REGISTRY_IMAGE}"
+    VERSION: "${CI_COMMIT_SHA}"
+    # Define both OUT_IMAGE and OUT_IMAGE_TAG to allow for these to be used when scanning the
+    # "local" (tagged) image
+    OUT_IMAGE_TAG: "${CI_COMMIT_SHA}-${TARGET}"
+    OUT_IMAGE: "${IMAGE_NAME}"
+  except:
+    variables:
+    - $CI_COMMIT_MESSAGE =~ /\[skip[ _-]scans?\]/i
+    - $SKIP_SCANS
+  before_script:
+    - apk add --no-cache git
+    - apk add --no-cache python3 python3-dev py3-pip py3-wheel libmagic
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}/${IMAGE_NAME}:${CI_COMMIT_SHA}-${TARGET}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${IMAGE_NAME}:${CI_COMMIT_SHA}-${TARGET}" "${OUT_IMAGE}:${OUT_IMAGE_TAG}"
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/sectooling/scanning/contamer.git
+    - pip3 install -r contamer/requirements.txt
+  script:
     - cd contamer
-    - pip3 install -r requirements.txt
-    - docker tag ${CI_REGISTRY_IMAGE}:${VERSION} ${CI_PROJECT_NAME}:${VERSION}
-    - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- ${CI_PROJECT_NAME}:${VERSION}
+    - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- "${OUT_IMAGE}:${OUT_IMAGE_TAG}"
 
-contamer:validator:
-  extends: .scan
-  script:
-    - apk add --no-cache bash findutils libmagic curl make git
-    - apk add --no-cache python3 python3-dev py3-pip py3-wheel
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/sectooling/scanning/contamer.git
-    - cd contamer
-    - pip3 install -r requirements.txt
-    - docker tag ${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION} ${VALIDATOR_IMAGE_NAME}:${VERSION}
-    - python3 contamer.py -ls --fail-on-non-os ${CONTAMER_SUPPRESS_VULNS:+--suppress-vulns ${CONTAMER_SUPPRESS_VULNS}} -- ${VALIDATOR_IMAGE_NAME}:${VERSION}
+scan:gpu-operator:
+  extends:
+    - .scan
+    - .target-gpu-operator
 
-release:ngc:
-  stage: release
-  dependencies:
-    - build-image
-    - versioning
-  image: docker:stable
-  services:
-    - docker:stable-dind
+scan:gpu-operator-validator:
+  extends:
+    - .scan
+    - .target-gpu-operator-validator
+
+# Define the external release steps for NGC and Dockerhub
+.release:ngc:
+  extends: .release:external
   variables:
-    GIT_STRATEGY: clone
-  only:
-    refs:
-      - master
-      - /^v\d+\.\d+\.\d+$/
-  script:
-    - source .VERSION_INFO
-    # Push Operator Container to NGC
-    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
-    - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${NGC_PROD_IMAGE}:latest"
-    - docker push ${NGC_PROD_IMAGE}:${VERSION}
-    - docker push ${NGC_PROD_IMAGE}:latest
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
+    OUT_IMAGE: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
 
-release:ngc:validator:
-  stage: release
-  dependencies:
-    - build-image
-    - versioning
-  image: docker:stable
-  services:
-    - docker:stable-dind
+.release:dockerhub:
+  extends: .release:external
   variables:
-    GIT_STRATEGY: clone
-  only:
-    refs:
-      - master
-      - /^v\d+\.\d+\.\d+$/
-  script:
-    - source .VERSION_INFO
-    # Push Operator Validator Container to NGC
-    - docker login -u "${NGC_REGISTRY_USER}" -p "${NGC_REGISTRY_TOKEN}" "${NGC_REGISTRY}"
-    - docker pull "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${NGC_PROD_VALIDATOR_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${NGC_PROD_VALIDATOR_IMAGE}:latest"
-    - docker push ${NGC_PROD_VALIDATOR_IMAGE}:${VERSION}
-    - docker push ${NGC_PROD_VALIDATOR_IMAGE}:latest
+    OUT_REGISTRY_USER: "${REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${DOCKERHUB_REGISTRY}"
+    OUT_IMAGE: "${REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
 
-release:dockerhub:
-  stage: release
+release:ngc-gpu-operator:
+  extends:
+    - .release:ngc
+    - .target-gpu-operator
   dependencies:
-    - build-image
-    - versioning
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  variables:
-    GIT_STRATEGY: clone
-  only:
-    refs:
-      - master
-      - /^v\d+\.\d+\.\d+$/
-  script:
-    # Push Operator Container to Dockerhub
-    - source .VERSION_INFO
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${DOCKERHUB_REGISTRY}"
-    - docker pull "${CI_REGISTRY_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DH_PROD_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}:${VERSION}" "${DH_PROD_IMAGE}:latest"
-    - docker push "${DH_PROD_IMAGE}:${VERSION}"
-    - docker push "${DH_PROD_IMAGE}:latest"
+    - deploy:sha-ci-gpu-operator
+    - scan:gpu-operator
 
-release:dockerhub:validator:
-  stage: release
+release:ngc-gpu-operator-validator:
+  extends:
+    - .release:ngc
+    - .target-gpu-operator-validator
   dependencies:
-    - build-image
-    - versioning
-  image: docker:stable
-  services:
-    - docker:stable-dind
-  variables:
-    GIT_STRATEGY: clone
-  only:
-    refs:
-      - master
-      - /^v\d+\.\d+\.\d+$/
-  script:
-    # Push Operator Validator Container to Dockerhub
-    - source .VERSION_INFO
-    - docker login -u "${REGISTRY_USER}" -p "${REGISTRY_TOKEN}" "${DOCKERHUB_REGISTRY}"
-    - docker pull "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${DH_PROD_VALIDATOR_IMAGE}:${VERSION}"
-    - docker tag "${CI_REGISTRY_IMAGE}/${VALIDATOR_IMAGE_NAME}:${VERSION}" "${DH_PROD_VALIDATOR_IMAGE}:latest"
-    - docker push "${DH_PROD_VALIDATOR_IMAGE}:${VERSION}"
-    - docker push "${DH_PROD_VALIDATOR_IMAGE}:latest"
+    - deploy:sha-ci-gpu-operator-validator
+    - scan:gpu-operator-validator
+
+release:dockerhub-gpu-operator:
+  extends:
+    - .release:dockerhub
+    - .target-gpu-operator
+  dependencies:
+    - deploy:sha-ci-gpu-operator
+    - scan:gpu-operator
+
+release:dockerhub-gpu-operator-validator:
+  extends:
+    - .release:dockerhub
+    - .target-gpu-operator-validator
+  dependencies:
+    - deploy:sha-ci-gpu-operator-validator
+    - scan:gpu-operator-validator
 
 release:helm:
   stage: release
