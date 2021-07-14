@@ -32,6 +32,9 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
           securityContext:
             privileged: true
           volumeMounts:
