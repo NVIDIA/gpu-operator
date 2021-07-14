@@ -93,9 +93,6 @@ driver:
         value: "0s"
       - name: DRAIN_DELETE_EMPTYDIR_DATA
         value: "false"
-      # always use runc for driver containers
-      - name: NVIDIA_VISIBLE_DEVICES
-        value: void
   env: []
   securityContext:
     privileged: true

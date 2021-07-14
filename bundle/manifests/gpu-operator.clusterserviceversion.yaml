@@ -115,10 +115,6 @@ metadata:
                   {
                     "name": "DRAIN_DELETE_EMPTYDIR_DATA",
                     "value": "false"
-                  },
-                  {
-                    "name": "NVIDIA_VISIBLE_DEVICES",
-                    "value": "void"
                   }
                 ]
               },
