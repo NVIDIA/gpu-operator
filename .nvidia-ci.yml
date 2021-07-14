@@ -80,6 +80,8 @@ release:ngc-gpu-operator-validator:
   extends:
     - .release:ngc
     - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE: "${NGC_PROD_VALIDATOR_IMAGE}"
   dependencies:
     - deploy:sha-ci-gpu-operator-validator
     - scan:gpu-operator-validator
@@ -96,6 +98,8 @@ release:dockerhub-gpu-operator-validator:
   extends:
     - .release:dockerhub
     - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE: "${REGISTRY_IMAGE}-validator"
   dependencies:
     - deploy:sha-ci-gpu-operator-validator
     - scan:gpu-operator-validator
