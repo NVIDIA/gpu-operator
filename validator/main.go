@@ -64,6 +64,11 @@ type Plugin struct {
 // Toolkit component
 type Toolkit struct{}
 
+// Metrics represents spec to run metrics exporter
+type Metrics struct {
+	kubeClient kubernetes.Interface
+}
+
 var (
 	kubeconfigFlag           string
 	nodeNameFlag             string
@@ -74,6 +79,7 @@ var (
 	outputDirFlag            string
 	sleepIntervalSecondsFlag int
 	migStrategyFlag          string
+	metricsPort              int
 )
 
 const (
@@ -81,6 +87,8 @@ const (
 	defaultStatusPath = "/run/nvidia/validations"
 	// defaultSleepIntervalSeconds indicates sleep interval in seconds between validation command retries
 	defaultSleepIntervalSeconds = 5
+	// defaultMetricsPort indicates the port on which the metrics will be exposed.
+	defaultMetricsPort = 0
 	// driverStatusFile indicates status file for driver readiness
 	driverStatusFile = "driver-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
@@ -206,6 +214,14 @@ func main() {
 			Destination: &migStrategyFlag,
 			EnvVars:     []string{"MIG_STRATEGY"},
 		},
+		&cli.IntFlag{
+			Name:        "metrics-port",
+			Aliases:     []string{"p"},
+			Value:       defaultMetricsPort,
+			Usage:       "port on which the metrics will be exposed. 0 means disabled.",
+			Destination: &metricsPort,
+			EnvVars:     []string{"METRICS_PORT"},
+		},
 	}
 
 	// Handle signals
@@ -240,6 +256,15 @@ func validateFlags(c *cli.Context) error {
 	if componentFlag == "plugin" && nodeNameFlag == "" {
 		return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for plugin validation")
 	}
+	if componentFlag == "metrics" {
+		if metricsPort == defaultMetricsPort {
+			return fmt.Errorf("invalid -p <port> flag: must not be empty or 0 for the metrics component")
+		}
+		if nodeNameFlag == "" {
+			return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for metrics exporter")
+		}
+	}
+
 	return nil
 }
 
@@ -250,6 +275,8 @@ func isValidComponent() bool {
 	case "toolkit":
 		fallthrough
 	case "cuda":
+		fallthrough
+	case "metrics":
 		fallthrough
 	case "plugin":
 		return true
@@ -305,23 +332,34 @@ func start(c *cli.Context) error {
 			return fmt.Errorf("error validating plugin installation: %s", err)
 		}
 		return nil
+	case "metrics":
+		metrics := &Metrics{}
+		err := metrics.run()
+		if err != nil {
+			return fmt.Errorf("error running validation-metrics exporter: %s", err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("invalid component specified for validation: %s", componentFlag)
 	}
 }
 
-func runCommand(command string, args []string) error {
+func runCommand(command string, args []string, silent bool) error {
 	cmd := exec.Command(command, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if !silent {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	return cmd.Run()
 }
 
-func runCommandWithWait(command string, args []string, sleepSeconds int) error {
+func runCommandWithWait(command string, args []string, sleepSeconds int, silent bool) error {
 	for {
 		cmd := exec.Command(command, args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		if !silent {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
 		fmt.Printf("running command %s with args %v\n", command, args)
 		err := cmd.Run()
 		if err != nil {
@@ -336,11 +374,23 @@ func runCommandWithWait(command string, args []string, sleepSeconds int) error {
 func cleanupStatusFiles() error {
 	command := "rm"
 	args := []string{"-f", fmt.Sprintf("%s/*-ready", outputDirFlag)}
-	err := runCommand(command, args)
+	err := runCommand(command, args, false)
 	if err != nil {
 		return fmt.Errorf("unable to cleanup status files: %s", err)
 	}
 	return nil
+}
+
+func (d *Driver) runValidation(silent bool) error {
+	// invoke validation command
+	command := "chroot"
+	args := []string{"/run/nvidia/driver", "nvidia-smi"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+
+	return runCommand(command, args, silent)
 }
 
 func (d *Driver) validate() error {
@@ -350,14 +400,7 @@ func (d *Driver) validate() error {
 		return err
 	}
 
-	// invoke validation command
-	command := "chroot"
-	args := []string{"/run/nvidia/driver", "nvidia-smi"}
-	if withWaitFlag {
-		err = runCommandWithWait(command, args, sleepIntervalSecondsFlag)
-	} else {
-		err = runCommand(command, args)
-	}
+	err = d.runValidation(false)
 	if err != nil {
 		fmt.Println("driver is not ready")
 		return err
@@ -401,9 +444,9 @@ func (t *Toolkit) validate() error {
 	command := "nvidia-smi"
 	args := []string{}
 	if withWaitFlag {
-		err = runCommandWithWait(command, args, sleepIntervalSecondsFlag)
+		err = runCommandWithWait(command, args, sleepIntervalSecondsFlag, false)
 	} else {
-		err = runCommand(command, args)
+		err = runCommand(command, args, false)
 	}
 	if err != nil {
 		fmt.Println("toolkit is not ready")
@@ -589,6 +632,25 @@ func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
 	return &pod, nil
 }
 
+func (p *Plugin) countGPUResources() (int64, error) {
+	// get node info to check discovered GPU resources
+	node, err := p.getNode()
+	if err != nil {
+		return -1, fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
+	}
+
+	count := int64(0)
+
+	for resourceName, quantity := range node.Status.Capacity {
+		if !strings.HasPrefix(string(resourceName), migGPUResourcePrefix) && !strings.HasPrefix(string(resourceName), genericGPUResourceType) {
+			continue
+		}
+
+		count += quantity.Value()
+	}
+	return count, nil
+}
+
 func (p *Plugin) validateGPUResource() error {
 	for retry := 1; retry <= gpuResourceDiscoveryWaitRetries; retry++ {
 		// get node info to check discovered GPU resources
@@ -764,4 +826,10 @@ func (c *CUDA) runWorkload() error {
 		return err
 	}
 	return nil
+}
+
+func (c *Metrics) run() error {
+	m := NewNodeMetrics(metricsPort)
+
+	return m.Run()
 }
