@@ -149,7 +149,7 @@ devicePlugin:
   resources: {}
 
 dcgm:
-  repository: docker.io/nvidia
+  repository: nvcr.io/nvidia/cloud-native
   image: dcgm
   version: 2.2.3-ubuntu20.04
   imagePullPolicy: IfNotPresent
