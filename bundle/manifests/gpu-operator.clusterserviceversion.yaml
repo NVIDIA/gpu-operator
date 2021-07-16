@@ -96,7 +96,7 @@ metadata:
               "imagePullSecrets": [],
               "manager": {
                 "image": "k8s-driver-manager",
-                "repository": "quay.io/shivamerla",
+                "repository": "nvcr.io/nvidia/cloud-native",
                 "version": "v0.1.0",
                 "imagePullSecrets": [],
                 "env": [
@@ -241,8 +241,10 @@ spec:
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:495ed3b42e0541590c537ab1b33bda772aad530d3ef6a4f9384d3741a59e2bf8
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce
-    - name: gpu-operator-validator
+    - name: gpu-operator-validator-image
       image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:aa1f7bd526ae132c46f3ebe6ecfabe675889e240776ccc2155e31e0c48cc659e
+    - name: k8s-driver-manager-image
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:b3736e00c01dccd433dee18ee8807d23741a9085e87743ef25a35a989d9b0784
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
