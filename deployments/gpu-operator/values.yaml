@@ -81,7 +81,7 @@ driver:
   imagePullSecrets: []
   manager:
     image: k8s-driver-manager
-    repository: quay.io/shivamerla
+    repository: nvcr.io/nvidia/cloud-native
     version: v0.1.0
     imagePullPolicy: IfNotPresent
     env:
