@@ -112,7 +112,7 @@ spec:
     resources: {}
 
   dcgm:
-    repository: docker.io/nvidia
+    repository: nvcr.io/nvidia/cloud-native
     image: dcgm
     version: 2.2.3-ubi8
     imagePullPolicy: IfNotPresent
