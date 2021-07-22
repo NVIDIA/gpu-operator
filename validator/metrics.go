@@ -102,7 +102,7 @@ func NewNodeMetrics(port int) NodeMetrics {
 		),
 		driverValidationLastSuccess: promauto.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_node_driver_validation_last_valid",
+				Name: "gpu_operator_node_driver_validation_last_success_ts_seconds",
 				Help: "timestamp (in seconds) of the last successful driver test validation",
 			},
 		),
@@ -115,7 +115,7 @@ func NewNodeMetrics(port int) NodeMetrics {
 		),
 		pluginValidationLastSuccess: promauto.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_node_device_plugin_validation_last_success",
+				Name: "gpu_operator_node_device_plugin_validation_last_success_ts_seconds",
 				Help: "timestamp (in seconds) of the last time GPU devices were found on the local node spec",
 			},
 		),
