@@ -11,11 +11,13 @@ spec:
     matchLabels:
       {{ $.Release.matchLabels }}
       app.kubernetes.io/component: "gpu-operator"
+      app: "gpu-operator"
   template:
     metadata:
       labels:
         {{ $.Release.matchLabels }}
         app.kubernetes.io/component: "gpu-operator"
+        app: "gpu-operator"
       annotations:
         {{- toYaml .Values.operator.annotations | nindent 8 }}
     spec:
@@ -39,6 +41,10 @@ spec:
         env:
         - name: WATCH_NAMESPACE
           value: ""
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         volumeMounts:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
@@ -62,6 +68,9 @@ spec:
           requests:
             cpu: 200m
             memory: 100Mi
+          ports:
+          - name: metrics
+            containerPort: 8080
       volumes:
         - name: host-os-release
           hostPath:

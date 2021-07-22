@@ -1,0 +1,9 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: gpu-operator
+  name: nvidia-gpu-operator-metrics
+  namespace: "FILLED_BY_THE_OPERATOR"
+spec:
+  groups:

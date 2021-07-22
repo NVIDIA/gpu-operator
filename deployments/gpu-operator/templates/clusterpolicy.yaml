@@ -321,3 +321,32 @@ spec:
     {{- if .Values.migManager.args }}
     args: {{ toYaml .Values.migManager.args | nindent 6 }}
     {{- end }}
+  nodeStatusExporter:
+    enabled: {{ .Values.nodeStatusExporter.enabled }}
+    {{- if .Values.nodeStatusExporter.repository }}
+    repository: {{ .Values.nodeStatusExporter.repository }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.image }}
+    image: {{ .Values.nodeStatusExporter.image }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.version }}
+    version: {{ .Values.nodeStatusExporter.version }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.nodeStatusExporter.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.nodeStatusExporter.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.securityContext }}
+    securityContext: {{ toYaml .Values.nodeStatusExporter.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.resources }}
+    resources: {{ toYaml .Values.nodeStatusExporter.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.env }}
+    env: {{ toYaml .Values.nodeStatusExporter.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeStatusExporter.args }}
+    args: {{ toYaml .Values.nodeStatusExporter.args | nindent 6 }}
+    {{- end }}

@@ -106,6 +106,11 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Namespace = n.operatorNamespace
+	}
+
 	logger := n.rec.Log.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -134,6 +139,11 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].RoleBinding.DeepCopy()
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Namespace = n.operatorNamespace
+	}
+
 	logger := n.rec.Log.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -300,6 +310,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm":                        TransformDCGM,
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
+		"nvidia-node-status-exporter":        TransformNodeStatusExporter,
 		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
 		"nvidia-mig-manager":                 TransformMIGManager,
 		"nvidia-operator-validator":          TransformValidator,
@@ -942,7 +953,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	initContainer := v1.Container{}
 	initContainer.Image = initImage
-	initContainer.Name = "init-pod-nvidia-metrics-exporter"
+	initContainer.Name = "init-pod-nvidia-node-status-exporter"
 	initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.InitContainer.ImagePullPolicy)
 	initContainer.Command = []string{"/bin/entrypoint.sh"}
 
@@ -1226,6 +1237,63 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			return fmt.Errorf("invalid component provided to apply validator changes")
 		}
 	}
+	return nil
+}
+
+// TransformNodeStatusExporter transforms the node-status-exporter daemonset with required config as per ClusterPolicy
+func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	updateValidationInitContainer(obj, config)
+
+	// update image
+	image, err := gpuv1.ImagePath(&config.NodeStatusExporter)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.NodeStatusExporter.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.NodeStatusExporter.ImagePullSecrets) > 0 {
+		for _, secret := range config.NodeStatusExporter.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set resource limits
+	if config.NodeStatusExporter.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.NodeStatusExporter.Resources
+		}
+	}
+
+	// set arguments if specified for driver container
+	if len(config.NodeStatusExporter.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.NodeStatusExporter.Args
+	}
+
+	// set/append environment variables for exporter container
+	if len(config.NodeStatusExporter.Env) > 0 {
+		for _, env := range config.NodeStatusExporter.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+
 	return nil
 }
 
@@ -1548,6 +1616,11 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Service.DeepCopy()
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Namespace = n.operatorNamespace
+	}
+
 	logger := n.rec.Log.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -1584,6 +1657,12 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Namespace = n.operatorNamespace
+		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
+	}
+
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -1650,6 +1729,45 @@ func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &nodev1.RuntimeClass{}
 	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
+	} else if err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
+	return gpuv1.Ready, nil
+}
+
+// PrometheusRule creates PrometheusRule object
+func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
+	state := n.idx
+	obj := n.resources[state].PrometheusRule.DeepCopy()
+	logger := n.rec.Log.WithValues("PrometheusRule", obj.Name)
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Namespace = n.operatorNamespace
+	}
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	found := &promv1.PrometheusRule{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(context.TODO(), obj)

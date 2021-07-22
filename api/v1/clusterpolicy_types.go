@@ -47,6 +47,8 @@ type ClusterPolicySpec struct {
 	DCGMExporter DCGMExporterSpec `json:"dcgmExporter"`
 	// DCGM component spec
 	DCGM DCGMSpec `json:"dcgm"`
+	// NodeStatusExporter spec
+	NodeStatusExporter NodeStatusExporterSpec `json:"nodeStatusExporter"`
 	// GPUFeatureDiscovery spec
 	GPUFeatureDiscovery GPUFeatureDiscoverySpec `json:"gfd"`
 	// MIG spec
@@ -557,6 +559,62 @@ type DCGMSpec struct {
 	HostPort int32 `json:"hostPort,omitempty"`
 }
 
+// NodeStatusExporterSpec defines the properties for node-status-exporter state
+type NodeStatusExporterSpec struct {
+	// Enabled indicates if deployment of node-status-exporter is enabled.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable node-status-exporter deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// node-status-exporter image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository"`
+
+	// node-status-exporter image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image"`
+
+	// node-status-exporter image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Security Context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
 // DriverRepoConfigSpec defines custom repo configuration for driver container
 type DriverRepoConfigSpec struct {
 	// +kubebuilder:validation:Optional
@@ -792,6 +850,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *DCGMSpec:
 		config := spec.(*DCGMSpec)
 		return imagePath(config.Repository, config.Image, config.Version)
+	case *NodeStatusExporterSpec:
+		config := spec.(*NodeStatusExporterSpec)
+		return imagePath(config.Repository, config.Image, config.Version)
 	case *GPUFeatureDiscoverySpec:
 		config := spec.(*GPUFeatureDiscoverySpec)
 		return imagePath(config.Repository, config.Image, config.Version)
@@ -868,6 +929,16 @@ func (m *MIGManagerSpec) IsMIGManagerEnabled() bool {
 	if m.Enabled == nil {
 		// default is true if not specified by user
 		return true
+	}
+	return *m.Enabled
+}
+
+// IsNodeStatusExporterEnabled returns true if node-status-exporter is
+// enabled through gpu-operator
+func (m *NodeStatusExporterSpec) IsNodeStatusExporterEnabled() bool {
+	if m.Enabled == nil {
+		// default is false if not specified by user
+		return false
 	}
 	return *m.Enabled
 }

@@ -1,0 +1,9 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: nvidia-node-status-exporter
+  name: nvidia-node-status-exporter-alerts
+  namespace: gpu-operator-resources
+spec:
+  groups:

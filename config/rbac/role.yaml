@@ -78,6 +78,7 @@ rules:
   - monitoring.coreos.com
   resources:
   - servicemonitors
+  - prometheusrule
   verbs:
   - create
   - get

@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-node-status-exporter
+  namespace: gpu-operator-resources
+  labels:
+    app: nvidia-node-status-exporter
+spec:
+  endpoints:
+  - port: node-status
+    path: "/metrics"
+  jobLabel: node-status
+  namespaceSelector:
+    matchNames:
+    - gpu-operator-resources
+  selector:
+    matchLabels:
+     app: nvidia-node-status-exporter
