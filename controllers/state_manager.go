@@ -3,6 +3,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
@@ -34,6 +36,7 @@ var gpuStateLabels = map[string]string{
 	"nvidia.com/gpu.deploy.device-plugin":         "true",
 	"nvidia.com/gpu.deploy.dcgm":                  "true",
 	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+	"nvidia.com/gpu.deploy.node-status-exporter":  "true",
 	"nvidia.com/gpu.deploy.operator-validator":    "true",
 }
 
@@ -52,13 +55,16 @@ type state interface {
 
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
-	singleton *gpuv1.ClusterPolicy
+	singleton         *gpuv1.ClusterPolicy
+	operatorNamespace string
 
-	resources []Resources
-	controls  []controlFunc
-	rec       *ClusterPolicyReconciler
-	idx       int
-	openshift string
+	resources       []Resources
+	controls        []controlFunc
+	stateNames      []string
+	operatorMetrics OperatorMetrics
+	rec             *ClusterPolicyReconciler
+	idx             int
+	openshift       string
 }
 
 func addState(n *ClusterPolicyController, path string) error {
@@ -67,6 +73,7 @@ func addState(n *ClusterPolicyController, path string) error {
 
 	n.controls = append(n.controls, ctrl)
 	n.resources = append(n.resources, res)
+	n.stateNames = append(n.stateNames, filepath.Base(path))
 
 	return nil
 }
@@ -194,7 +201,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 	if err != nil {
 		return fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
 	}
-
+	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		// get node labels
 		labels := node.GetLabels()
@@ -243,8 +250,12 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 						node.ObjectMeta.Name, err.Error())
 				}
 			}
+			gpuNodesTotal++
 		}
 	}
+	log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
+	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
+
 	return nil
 }
 
@@ -264,6 +275,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		promv1.AddToScheme(reconciler.Scheme)
 		secv1.AddToScheme(reconciler.Scheme)
 
+		n.operatorMetrics = initOperatorMetrics(n)
+
 		addState(n, "/opt/gpu-operator/pre-requisites")
 		if clusterPolicy.Spec.Driver.IsDriverEnabled() {
 			addState(n, "/opt/gpu-operator/state-driver")
@@ -275,6 +288,18 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		addState(n, "/opt/gpu-operator/state-device-plugin")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
+
+		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
+		if clusterPolicyCtrl.operatorNamespace != "" {
+			addState(n, "/opt/gpu-operator/state-operator-metrics")
+		} else {
+			log.Error(err, "OPERATOR_NAMESPACE environment variable not set, cannot activate state-operator-metrics")
+		}
+
+		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
+			addState(n, "/opt/gpu-operator/state-node-status-exporter")
+		}
+
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
 			addState(n, "/opt/gpu-operator/state-mig-manager")

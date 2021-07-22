@@ -5,13 +5,13 @@ metadata:
   name: gpu-operator
   labels:
     app.kubernetes.io/component: gpu-operator
-    name: gpu-operator
+    app: gpu-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/component: gpu-operator
-      name: gpu-operator
+      app: gpu-operator
   strategy: {}
   template:
     metadata:
@@ -53,6 +53,14 @@ spec:
           - mountPath: /host-etc/os-release
             name: host-os-release
             readOnly: true
+        env:
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+          - name: metrics
+            containerPort: 8080
       terminationGracePeriodSeconds: 10
       volumes:
         - hostPath:

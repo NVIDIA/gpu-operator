@@ -170,6 +170,15 @@ metadata:
               "securityContext": {},
               "version": "sha256:495ed3b42e0541590c537ab1b33bda772aad530d3ef6a4f9384d3741a59e2bf8"
             },
+            "nodeStatusExporter": {
+              "enabled": true,
+              "image": "gpu-operator-validator",
+              "imagePullSecrets": [],
+              "repository": "nvcr.io/nvidia/cloud-native",
+              "resources": {},
+              "securityContext": {},
+              "version": "latest"
+            },
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
@@ -496,13 +505,13 @@ spec:
           selector:
             matchLabels:
               app.kubernetes.io/component: gpu-operator
-              name: gpu-operator
+              app: gpu-operator
           strategy: {}
           template:
             metadata:
               labels:
                 app.kubernetes.io/component: gpu-operator
-                name: gpu-operator
+                app: gpu-operator
             spec:
               priorityClassName: system-node-critical
               containers:
@@ -518,6 +527,9 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: gpu-operator
+                ports:
+                - name: metrics
+                  containerPort: 8080
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -537,6 +549,11 @@ spec:
                 - mountPath: /host-etc/os-release
                   name: host-os-release
                   readOnly: true
+                env:
+                - name: OPERATOR_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:

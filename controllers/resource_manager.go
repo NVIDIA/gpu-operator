@@ -45,6 +45,7 @@ type Resources struct {
 	PodSecurityPolicy          policyv1beta1.PodSecurityPolicy
 	Namespace                  corev1.Namespace
 	RuntimeClass               nodev1.RuntimeClass
+	PrometheusRule             promv1.PrometheusRule
 }
 
 func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) {
@@ -158,6 +159,10 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			_, _, err := s.Decode(m, nil, &res.PodSecurityPolicy)
 			panicIfError(err)
 			ctrl = append(ctrl, PodSecurityPolicy)
+		case "PrometheusRule":
+			_, _, err := s.Decode(m, nil, &res.PrometheusRule)
+			panicIfError(err)
+			ctrl = append(ctrl, PrometheusRule)
 		default:
 			n.rec.Log.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}

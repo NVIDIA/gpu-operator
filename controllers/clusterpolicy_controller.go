@@ -18,14 +18,13 @@ package controllers
 
 import (
 	"context"
-	"time"
-
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -35,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
@@ -79,6 +79,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	instance := &gpuv1.ClusterPolicy{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -93,19 +94,25 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// We already have a main Clusterpolicy
 	if clusterPolicyCtrl.singleton != nil && clusterPolicyCtrl.singleton.ObjectMeta.Name != instance.ObjectMeta.Name {
 		instance.SetState(gpuv1.Ignored)
+		// do not change `clusterPolicyCtrl.operatorMetrics.reconciliationStatus` here,
+		// spurious reconciliation
 		return ctrl.Result{}, err
 	}
 
 	err = clusterPolicyCtrl.init(r, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to initialize ClusterPolicy controller")
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		return ctrl.Result{}, err
 	}
 
+	clusterPolicyCtrl.operatorMetrics.reconciliationTotal.Inc()
 	overallStatus := gpuv1.Ready
 	for {
 		status, statusError := clusterPolicyCtrl.step()
 		if statusError != nil {
+			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 			return ctrl.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
@@ -126,11 +133,15 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// if any state is not ready, requeue for reconfile after 5 seconds
 	if overallStatus != gpuv1.Ready {
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	// Update CR state as ready as all states are complete
 	updateCRState(r, req.NamespacedName, gpuv1.Ready)
+	clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
+	clusterPolicyCtrl.operatorMetrics.reconciliationLastSuccess.Set(float64(time.Now().Unix()))
 
 	return ctrl.Result{}, nil
 }
