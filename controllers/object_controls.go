@@ -1297,7 +1297,7 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	return nil
 }
