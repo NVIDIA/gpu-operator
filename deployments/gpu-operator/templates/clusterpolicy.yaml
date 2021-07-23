@@ -11,6 +11,9 @@ spec:
     {{- if .Values.operator.defaultRuntime }}
     defaultRuntime: {{ .Values.operator.defaultRuntime }}
     {{- end }}
+    {{- if .Values.operator.runtimeClass }}
+    runtimeClass: {{ .Values.operator.runtimeClass }}
+    {{- end }}
     {{- if .Values.operator.defaultGPUMode }}
     defaultGPUMode: {{ .Values.operator.defaultGPUMode }}
     {{- end }}
