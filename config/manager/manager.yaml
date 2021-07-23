@@ -10,14 +10,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: gpu-operator
       app: gpu-operator
   strategy: {}
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: gpu-operator
-        name: gpu-operator
+        app: gpu-operator
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: gpu-operator
