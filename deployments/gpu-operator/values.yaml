@@ -45,6 +45,7 @@ operator:
   imagePullSecrets: []
   priorityClassName: system-node-critical
   defaultRuntime: docker
+  runtimeClass: nvidia
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia

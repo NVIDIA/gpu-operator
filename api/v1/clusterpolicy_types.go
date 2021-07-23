@@ -64,6 +64,9 @@ type ClusterPolicySpec struct {
 // Runtime defines container runtime type
 type Runtime string
 
+// RuntimeClass defines the runtime class to use for GPU-enabled pods
+type RuntimeClass string
+
 const (
 	// Docker runtime
 	Docker Runtime = "docker"
@@ -91,8 +94,11 @@ func (r Runtime) String() string {
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
 	// +kubebuilder:validation:Enum=docker;crio;containerd
-	DefaultRuntime Runtime           `json:"defaultRuntime"`
-	InitContainer  InitContainerSpec `json:"initContainer,omitempty"`
+	// +kubebuilder:default=docker
+	DefaultRuntime Runtime `json:"defaultRuntime"`
+	// +kubebuilder:default=nvidia
+	RuntimeClass  string            `json:"runtimeClass,omitempty"`
+	InitContainer InitContainerSpec `json:"initContainer,omitempty"`
 }
 
 // PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
