@@ -383,7 +383,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, true)
@@ -773,6 +773,11 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	runtime := string(config.Operator.DefaultRuntime)
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
 
+	if runtime == gpuv1.Containerd.String() {
+		// Set the runtime class name that is to be configured for containerd
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
+	}
+
 	// setup mounts for runtime config file and socket file
 	if runtime == gpuv1.Docker.String() || runtime == gpuv1.Containerd.String() {
 		runtimeConfigFile := getRuntimeConfigFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
@@ -877,7 +882,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	nvidiaDriverRoot := config.Driver.Root()
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
 	return nil
@@ -934,7 +939,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("$(NODE_IP):%d", dcgmHostPort))
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	kvers, osTag, _ := kernelFullVersion(n)
 	if kvers == "" {
@@ -1038,7 +1043,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	return nil
 }
@@ -1095,7 +1100,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	return nil
 }
@@ -1143,7 +1148,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime)
+	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
 	// configure volume driver-install-path to use host root path if installed outside of operator
 	for _, volume := range obj.Spec.Template.Spec.Volumes {
@@ -1350,10 +1355,19 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
-func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime) {
+func getRuntimeClass(config *gpuv1.ClusterPolicySpec) string {
+	if config.Operator.RuntimeClass != "" {
+		return config.Operator.RuntimeClass
+	}
+	return DefaultRuntimeClass
+}
+
+func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClass string) {
 	if runtime == gpuv1.Containerd {
-		nvidiaRuntimeClass := DefaultRuntimeClass
-		podSpec.RuntimeClassName = &nvidiaRuntimeClass
+		if runtimeClass == "" {
+			runtimeClass = DefaultRuntimeClass
+		}
+		podSpec.RuntimeClassName = &runtimeClass
 	}
 }
 
@@ -1721,6 +1735,11 @@ func Namespace(n ClusterPolicyController) (gpuv1.State, error) {
 func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].RuntimeClass.DeepCopy()
+
+	// apply runtime class name as per ClusterPolicy
+	obj.Name = getRuntimeClass(&n.singleton.Spec)
+	obj.Handler = getRuntimeClass(&n.singleton.Spec)
+
 	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {

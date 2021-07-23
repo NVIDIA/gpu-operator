@@ -2444,6 +2444,7 @@ spec:
                 description: Operator component spec
                 properties:
                   defaultRuntime:
+                    default: docker
                     description: Runtime defines container runtime type
                     enum:
                     - docker
@@ -2473,6 +2474,9 @@ spec:
                         description: Version represents image tag(version)
                         type: string
                     type: object
+                  runtimeClass:
+                    default: nvidia
+                    type: string
                 required:
                 - defaultRuntime
                 type: object
