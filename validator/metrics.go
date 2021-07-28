@@ -51,6 +51,7 @@ const (
 type NodeMetrics struct {
 	port int
 
+	metricsReady promcli.Gauge
 	driverReady  promcli.Gauge
 	toolkitReady promcli.Gauge
 	pluginReady  promcli.Gauge
@@ -69,63 +70,85 @@ type NodeMetrics struct {
 func NewNodeMetrics(port int) NodeMetrics {
 	return NodeMetrics{
 		port: port,
-		driverReady: promcli.NewGauge(
+		metricsReady: promauto.NewGaugeVec(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_node_metrics_ready_ts_seconds",
+				Help: "timestamp (in seconds) of the launch time of the GPU Operator node metrics Pod",
+			},
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		driverReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_driver_ready",
 				Help: "1 if the driver synchronization barrier of the the local node is open, 0 otherwise",
 			},
-		),
-		toolkitReady: promauto.NewGauge(
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		toolkitReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_toolkit_ready",
 				Help: "1 if the container-toolkit synchronization barrier on the local node is open, 0 otherwise",
 			},
-		),
-		pluginReady: promauto.NewGauge(
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		pluginReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_plugin_ready",
 				Help: "1 if the device plugin synchronization barrier on the local is open, 0 otherwise",
 			},
-		),
-		cudaReady: promauto.NewGauge(
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		cudaReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_cuda_ready",
 				Help: "1 if cuda synchronization barrier on the local node is open, 0 otherwise",
 			},
-		),
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
 
-		driverValidation: promauto.NewGauge(
+		driverValidation: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_driver_validation",
 				Help: "1 if the driver validation test passed on the local node, 0 otherwise",
 			},
-		),
-		driverValidationLastSuccess: promauto.NewGauge(
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		driverValidationLastSuccess: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_driver_validation_last_success_ts_seconds",
 				Help: "timestamp (in seconds) of the last successful driver test validation",
 			},
-		),
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
 
-		deviceCount: promauto.NewGauge(
+		deviceCount: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_device_plugin_devices_total",
 				Help: "number of GPU devices exposed by the DevicePlugin on the local node. -1 if failing to inspect the node spec.",
 			},
-		),
-		pluginValidationLastSuccess: promauto.NewGauge(
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
+
+		pluginValidationLastSuccess: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_device_plugin_validation_last_success_ts_seconds",
 				Help: "timestamp (in seconds) of the last time GPU devices were found on the local node spec",
 			},
-		),
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
 
-		nvidiaPciDevices: promauto.NewGauge(
+		nvidiaPciDevices: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_nvidia_pci_devices_total",
 				Help: "number of NVIDIA devices found in the node. -1 if failing to count",
 			},
-		),
+			[]string{"node"},
+		).WithLabelValues(nodeNameFlag),
 	}
 }
 
@@ -267,6 +290,8 @@ func (nm *NodeMetrics) watchNVIDIAPCI() {
 
 // Run launches a Prometheus server and watches for metrics value udates
 func (nm *NodeMetrics) Run() error {
+	nm.metricsReady.Set(float64(time.Now().Unix()))
+
 	go nm.watchStatusFile(&nm.driverReady, driverStatusFile)
 	go nm.watchStatusFile(&nm.toolkitReady, toolkitStatusFile)
 	go nm.watchStatusFile(&nm.pluginReady, pluginStatusFile)
