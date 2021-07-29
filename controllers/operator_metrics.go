@@ -13,10 +13,11 @@ import (
 type OperatorMetrics struct {
 	gpuNodesTotal promcli.Gauge
 
-	reconciliationLastSuccess promcli.Gauge
-	reconciliationStatus      promcli.Gauge
-	reconciliationTotal       promcli.Counter
-	reconciliationFailed      promcli.Counter
+	reconciliationLastSuccess  promcli.Gauge
+	reconciliationStatus       promcli.Gauge
+	reconciliationTotal        promcli.Counter
+	reconciliationFailed       promcli.Counter
+	reconciliationHasNFDLabels promcli.Gauge
 }
 
 const (
@@ -62,6 +63,12 @@ func initOperatorMetrics(n *ClusterPolicyController) OperatorMetrics {
 				Help: "Number of failed reconciliation",
 			},
 		),
+		reconciliationHasNFDLabels: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_reconciliation_has_nfd_labels",
+				Help: "1 if NFD mandatory kernel labels have been found, 0 otherwise",
+			},
+		),
 	}
 
 	metrics.Registry.MustRegister(
@@ -71,6 +78,7 @@ func initOperatorMetrics(n *ClusterPolicyController) OperatorMetrics {
 		m.reconciliationStatus,
 		m.reconciliationTotal,
 		m.reconciliationFailed,
+		m.reconciliationHasNFDLabels,
 	)
 
 	return m

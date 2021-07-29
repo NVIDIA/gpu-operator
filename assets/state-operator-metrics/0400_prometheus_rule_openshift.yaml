@@ -7,3 +7,37 @@ metadata:
   namespace: "FILLED_BY_THE_OPERATOR"
 spec:
   groups:
+  - name: Alert on GPU Operator operator reconciliation failure
+    rules:
+    - alert: GPUOperatorReconciliationFailed
+      expr: |
+        gpu_operator_reconciliation_status != 1
+        AND
+        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 3600)
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not reconcile resources for 1h
+        description: |
+          GPU Operator reconciliation loop failed for more than 1h;
+          some of its DaemonSet operands might be unable to deploy on
+          some of the GPU-enabled nodes.
+
+    - alert: GPUOperatorReconciliationFailedNfdLabelsMissing
+      # GPU Operator reconciliation loop is failing
+      # For more than 30min
+      # And NFD labels cannot be found
+      expr: |
+        gpu_operator_reconciliation_status != 1
+        AND
+        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 1800)
+        AND
+        gpu_operator_reconciliation_has_nfd_labels == 0
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator reconciliation loop failed for more than 30min and NFD labels missing
+        description: |
+          GPU Operator reconciliation loop failed for more than 30min
+          and NFD labels cannot be found. Check that the NFD Operator
+          is installed and running properly.

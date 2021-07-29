@@ -106,6 +106,16 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	if !clusterPolicyCtrl.hasNFDLabels {
+		r.Log.Info("WARNING: NFD labels missing in the cluster, GPU nodes cannot be discovered.")
+		clusterPolicyCtrl.operatorMetrics.reconciliationHasNFDLabels.Set(0)
+	} else {
+		clusterPolicyCtrl.operatorMetrics.reconciliationHasNFDLabels.Set(1)
+	}
+	if !clusterPolicyCtrl.hasGPUNodes {
+		r.Log.Info("No GPU node can be found in the cluster.")
+	}
+
 	clusterPolicyCtrl.operatorMetrics.reconciliationTotal.Inc()
 	overallStatus := gpuv1.Ready
 	for {
@@ -138,10 +148,28 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
+	if !clusterPolicyCtrl.hasNFDLabels {
+		// no NFD-labelled node in the cluster (required dependency),
+		// watch periodically for the labels to appear
+		var requeueAfter = time.Second * 45
+		r.Log.Info("No NFD label found, polling for new nodes.",
+			"requeueAfter", requeueAfter)
+
+		// Update CR state as ready as all states are complete
+		updateCRState(r, req.NamespacedName, gpuv1.NotReady)
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+
 	// Update CR state as ready as all states are complete
 	updateCRState(r, req.NamespacedName, gpuv1.Ready)
 	clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
 	clusterPolicyCtrl.operatorMetrics.reconciliationLastSuccess.Set(float64(time.Now().Unix()))
+
+	if !clusterPolicyCtrl.hasGPUNodes {
+		r.Log.Info("No GPU node found, watching for new nodes to join the cluster.", "hasNFDLabels", clusterPolicyCtrl.hasNFDLabels)
+	}
 
 	return ctrl.Result{}, nil
 }
