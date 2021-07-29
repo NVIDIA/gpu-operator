@@ -27,6 +27,7 @@ const (
 	migManagerLabelKey   = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue = "true"
 	gpuProductLabelKey   = "nvidia.com/gpu.product"
+	nfdLabelPrefix       = "feature.node.kubernetes.io/"
 )
 
 var gpuStateLabels = map[string]string{
@@ -65,6 +66,9 @@ type ClusterPolicyController struct {
 	rec             *ClusterPolicyReconciler
 	idx             int
 	openshift       string
+
+	hasGPUNodes  bool
+	hasNFDLabels bool
 }
 
 func addState(n *ClusterPolicyController, path string) error {
@@ -166,6 +170,16 @@ func hasGPULabels(labels map[string]string) bool {
 	return false
 }
 
+// hasNFDLabels return true if node labels contain NFD labels
+func hasNFDLabels(labels map[string]string) bool {
+	for key := range labels {
+		if strings.HasPrefix(key, nfdLabelPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasMIGCapableGPU returns true if this node has GPU capable of MIG partitioning.
 func hasMIGCapableGPU(labels map[string]string) bool {
 	for key, value := range labels {
@@ -193,18 +207,24 @@ func hasMIGManagerLabel(labels map[string]string) bool {
 }
 
 // labelGPUNodes labels nodes with GPU's with Nvidia common label
-func (n *ClusterPolicyController) labelGPUNodes() error {
+// it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
+func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	// fetch all nodes
 	opts := []client.ListOption{}
 	list := &corev1.NodeList{}
 	err := n.rec.Client.List(context.TODO(), list, opts...)
 	if err != nil {
-		return fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
+		return false, 0, fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
 	}
+
+	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		// get node labels
 		labels := node.GetLabels()
+		if !clusterHasNFDLabels {
+			clusterHasNFDLabels = hasNFDLabels(labels)
+		}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			// label the node with common Nvidia GPU label
 			labels[commonGPULabelKey] = commonGPULabelValue
@@ -220,7 +240,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
 			if err != nil {
-				return fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
+				return false, 0, fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
 					node.ObjectMeta.Name, err.Error())
 			}
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
@@ -236,7 +256,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
 			if err != nil {
-				return fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
+				return false, 0, fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
 					node.ObjectMeta.Name, err.Error())
 			}
 		}
@@ -246,7 +266,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 				log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
 				err = n.rec.Client.Update(context.TODO(), &node)
 				if err != nil {
-					return fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
+					return false, 0, fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
 						node.ObjectMeta.Name, err.Error())
 				}
 			}
@@ -256,7 +276,7 @@ func (n *ClusterPolicyController) labelGPUNodes() error {
 	log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
 
-	return nil
+	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 
 func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
@@ -276,8 +296,19 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		secv1.AddToScheme(reconciler.Scheme)
 
 		n.operatorMetrics = initOperatorMetrics(n)
+		log.Info("Operator metrics initialized.")
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
+		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
+		if clusterPolicyCtrl.operatorNamespace != "" {
+			addState(n, "/opt/gpu-operator/state-operator-metrics")
+		} else {
+			log.Error(err, "OPERATOR_NAMESPACE environment variable not set, cannot activate state-operator-metrics")
+		}
+		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
+			addState(n, "/opt/gpu-operator/state-node-status-exporter")
+		}
+
 		if clusterPolicy.Spec.Driver.IsDriverEnabled() {
 			addState(n, "/opt/gpu-operator/state-driver")
 		}
@@ -289,17 +320,6 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
 
-		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-		if clusterPolicyCtrl.operatorNamespace != "" {
-			addState(n, "/opt/gpu-operator/state-operator-metrics")
-		} else {
-			log.Error(err, "OPERATOR_NAMESPACE environment variable not set, cannot activate state-operator-metrics")
-		}
-
-		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
-			addState(n, "/opt/gpu-operator/state-node-status-exporter")
-		}
-
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
 			addState(n, "/opt/gpu-operator/state-mig-manager")
@@ -307,10 +327,12 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 	}
 
 	// fetch all nodes and label gpu nodes
-	err = n.labelGPUNodes()
+	hasNFDLabels, gpuNodeCount, err := n.labelGPUNodes()
 	if err != nil {
 		return err
 	}
+	n.hasGPUNodes = gpuNodeCount != 0
+	n.hasNFDLabels = hasNFDLabels
 
 	return nil
 }

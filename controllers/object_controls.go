@@ -1495,6 +1495,16 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	logger := n.rec.Log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
+	if !n.hasGPUNodes {
+		// multiple DaemonSets (eg, driver, dgcm-exporter) cannot be
+		// deployed without knowing the OS name, so skip their
+		// deployment for now. The operator will be notified
+		// (addWatchNewGPUNode) when new nodes will join the cluster.
+		logger.Info("No GPU node in the cluster, do not create DaemonSets")
+
+		return gpuv1.Ready, nil
+	}
+
 	err := preProcessDaemonSet(obj, n)
 	if err != nil {
 		logger.Info("Could not pre-process", "Error", err)
