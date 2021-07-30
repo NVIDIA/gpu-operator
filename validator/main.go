@@ -64,6 +64,11 @@ type Plugin struct {
 // Toolkit component
 type Toolkit struct{}
 
+// MOFED represents spec to validate MOFED driver installation
+type MOFED struct {
+	kubeClient kubernetes.Interface
+}
+
 // Metrics represents spec to run metrics exporter
 type Metrics struct {
 	kubeClient kubernetes.Interface
@@ -97,6 +102,8 @@ const (
 	pluginStatusFile = "plugin-ready"
 	// cudaStatusFile indicates status file for cuda readiness
 	cudaStatusFile = "cuda-ready"
+	// mofedStatusFile indicates status file for mofed driver readiness
+	mofedStatusFile = "mofed-ready"
 	// podCreationWaitRetries indicates total retries to wait for plugin validation pod creation
 	podCreationWaitRetries = 60
 	// podCreationSleepIntervalSeconds indicates sleep interval in seconds between checking for plugin validation pod readiness
@@ -135,6 +142,10 @@ const (
 	cudaValidatorLabelValue = "nvidia-cuda-validator"
 	// pluginValidatorLabelValue represents label for device-plugin workload validation pod
 	pluginValidatorLabelValue = "nvidia-device-plugin-validator"
+	// MellanoxDeviceLabelKey represents NFD label name for Mellanox devices
+	MellanoxDeviceLabelKey = "feature.node.kubernetes.io/pci-15b3.present"
+	// GPUDirectRDMAEnabledEnvName represents env name to indicate if GPUDirect RDMA is enabled through GPU Operator
+	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 )
 
 func main() {
@@ -280,6 +291,8 @@ func isValidComponent() bool {
 		fallthrough
 	case "plugin":
 		return true
+	case "mofed":
+		return true
 	default:
 		return false
 	}
@@ -330,6 +343,13 @@ func start(c *cli.Context) error {
 		err := plugin.validate()
 		if err != nil {
 			return fmt.Errorf("error validating plugin installation: %s", err)
+		}
+		return nil
+	case "mofed":
+		mofed := &MOFED{}
+		err := mofed.validate()
+		if err != nil {
+			return fmt.Errorf("error validating MOFED driver installation: %s", err)
 		}
 		return nil
 	case "metrics":
@@ -505,6 +525,86 @@ func (p *Plugin) validate() error {
 	return nil
 }
 
+func (m *MOFED) validate() error {
+	// If GPUDirectRDMA is disabled, skip validation
+	if os.Getenv(GPUDirectRDMAEnabledEnvName) != "true" {
+		log.Info("GPUDirect RDMA is disabled, skipping MOFED driver validation...")
+		return nil
+	}
+
+	// Check node labels for Mellanox devices and MOFED driver status file
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		log.Errorf("Error getting config cluster - %s\n", err.Error())
+		return err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		log.Errorf("Error getting k8s client - %s\n", err.Error())
+		return err
+	}
+
+	// update k8s client for the mofed driver validation
+	m.setKubeClient(kubeClient)
+
+	present, err := m.isMellanoxDevicePresent()
+	if err != nil {
+		log.Errorf(err.Error())
+		return err
+	}
+	if !present {
+		log.Info("No Mellanox device label found, skipping MOFED driver validation...")
+		return nil
+	}
+
+	// delete status file is already present
+	err = deleteStatusFile(outputDirFlag + "/" + mofedStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = m.runValidation(false)
+	if err != nil {
+		return err
+	}
+
+	// delete status file is already present
+	err = createStatusFile(outputDirFlag + "/" + mofedStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MOFED) runValidation(silent bool) error {
+	// invoke validation command
+	command := "stat"
+	args := []string{"/run/mellanox/drivers/.driver-ready"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+	return runCommand(command, args, silent)
+}
+
+func (m *MOFED) setKubeClient(kubeClient kubernetes.Interface) {
+	m.kubeClient = kubeClient
+}
+
+func (m *MOFED) isMellanoxDevicePresent() (bool, error) {
+	node, err := getNode(m.kubeClient)
+	if err != nil {
+		return false, fmt.Errorf("unable to fetch node by name %s to check for Mellanox device label: %s", nodeNameFlag, err)
+	}
+	for key, value := range node.GetLabels() {
+		if key == MellanoxDeviceLabelKey && value == "true" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (p *Plugin) runWorkload() error {
 	// load podSpec
 	pod, err := loadPodSpec(pluginWorkloadPodSpecPath)
@@ -634,7 +734,7 @@ func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
 
 func (p *Plugin) countGPUResources() (int64, error) {
 	// get node info to check discovered GPU resources
-	node, err := p.getNode()
+	node, err := getNode(p.kubeClient)
 	if err != nil {
 		return -1, fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 	}
@@ -654,7 +754,7 @@ func (p *Plugin) countGPUResources() (int64, error) {
 func (p *Plugin) validateGPUResource() error {
 	for retry := 1; retry <= gpuResourceDiscoveryWaitRetries; retry++ {
 		// get node info to check discovered GPU resources
-		node, err := p.getNode()
+		node, err := getNode(p.kubeClient)
 		if err != nil {
 			return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 		}
@@ -695,7 +795,7 @@ func (p *Plugin) isFullGPUResourcePresent(resources v1.ResourceList) bool {
 
 func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
 	// get node info to check allocatable GPU resources
-	node, err := p.getNode()
+	node, err := getNode(p.kubeClient)
 	if err != nil {
 		return "", fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 	}
@@ -716,8 +816,8 @@ func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
 	p.kubeClient = kubeClient
 }
 
-func (p *Plugin) getNode() (*v1.Node, error) {
-	node, err := p.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeNameFlag, meta_v1.GetOptions{})
+func getNode(kubeClient kubernetes.Interface) (*v1.Node, error) {
+	node, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeNameFlag, meta_v1.GetOptions{})
 	if err != nil {
 		log.Errorf("unable to get node with name %s, err %s", nodeNameFlag, err.Error())
 		return nil, err
