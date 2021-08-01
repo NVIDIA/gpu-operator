@@ -61,13 +61,10 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
+      {{- with .Values.operator.resources }}
         resources:
-          limits:
-            cpu: 500m
-            memory: 250Mi
-          requests:
-            cpu: 200m
-            memory: 100Mi
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
         ports:
           - name: metrics
             containerPort: 8080
