@@ -93,6 +93,8 @@ driver:
     version: v0.1.0
     imagePullPolicy: IfNotPresent
     env:
+      - name: ENABLE_AUTO_DRAIN
+        value: "true"
       - name: DRAIN_USE_FORCE
         value: "false"
       - name: DRAIN_POD_SELECTOR_LABEL
