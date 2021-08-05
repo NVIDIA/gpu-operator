@@ -135,7 +135,7 @@ metadata:
               "virtualTopology": {
                 "config": ""
               },
-              "version": "sha256:09ba3eca64a80fab010a9fcd647a2675260272a8c3eb515dfed6dc38a2d31ead"
+              "version": "sha256:5b162daf3ea5fafc64a9bbfc7cb9d3a52233e46a6f595fd205b7b674ab7001cf"
             },
             "gfd": {
               "image": "gpu-feature-discovery",
@@ -243,7 +243,7 @@ spec:
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:ffa284f1f359d70f0e1d6d8e7752d7c92ef7445b0d74965a8682775de37febf8
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:09ba3eca64a80fab010a9fcd647a2675260272a8c3eb515dfed6dc38a2d31ead
+      image: nvcr.io/nvidia/driver@sha256:5b162daf3ea5fafc64a9bbfc7cb9d3a52233e46a6f595fd205b7b674ab7001cf
     - name: device-plugin-image
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05
     - name: gpu-feature-discovery-image
