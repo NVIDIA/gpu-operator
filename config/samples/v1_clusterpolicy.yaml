@@ -81,7 +81,7 @@ spec:
     enabled: true
     repository: nvcr.io/nvidia/k8s
     image: container-toolkit
-    version: 1.5.0-ubi8
+    version: 1.6.0-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
@@ -114,7 +114,7 @@ spec:
   dcgm:
     repository: nvcr.io/nvidia/cloud-native
     image: dcgm
-    version: 2.2.3-ubi8
+    version: 2.2.9-ubi8
     imagePullPolicy: IfNotPresent
     hostPort: 5555
     args: []
@@ -125,7 +125,7 @@ spec:
   dcgmExporter:
     repository: nvcr.io/nvidia/k8s
     image: dcgm-exporter
-    version: 2.1.8-2.4.0-rc.2-ubi8
+    version: 2.2.9-2.4.0-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env:
