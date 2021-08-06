@@ -1440,6 +1440,17 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if !strings.Contains(initContainer.Name, "validation") {
 			continue
 		}
+		if strings.Contains(initContainer.Name, "mofed-validation") {
+			if config.Driver.GPUDirectRDMA == nil || !config.Driver.GPUDirectRDMA.IsEnabled() {
+				// remove mofed-validation init container from driver Daemonset if RDMA is not enabled
+				obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
+				continue
+			} else {
+				// pass env for mofed-validation
+				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), GPUDirectRDMAEnabledEnvName, "true")
+			}
+		}
+
 		// update validation image
 		image, err := gpuv1.ImagePath(&config.Validator)
 		if err != nil {
@@ -1449,11 +1460,6 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		// update validation image pull policy
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
-		}
-		// set env for mofed validation if nv_peer_mem(GPUDirect RDMA) is enabled
-		if strings.Contains(initContainer.Name, "mofed-validation") && config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
-			// pass env for mofed-validation
-			setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), GPUDirectRDMAEnabledEnvName, "true")
 		}
 	}
 	return nil
