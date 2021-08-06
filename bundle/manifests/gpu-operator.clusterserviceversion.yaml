@@ -94,6 +94,9 @@ metadata:
               "enabled": true,
               "image": "driver",
               "imagePullSecrets": [],
+              "rdma": {
+                "enabled": false
+              },
               "manager": {
                 "image": "k8s-driver-manager",
                 "repository": "nvcr.io/nvidia/cloud-native",

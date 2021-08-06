@@ -288,6 +288,8 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
 
+	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
+
 	// Driver image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository"`
@@ -761,6 +763,15 @@ type MIGManagerSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// GPUDirectRDMASpec defines the properties for nv_peer_mem deployment
+type GPUDirectRDMASpec struct {
+	// Enabled indicates if GPUDirect RDMA is enabled through GPU operator
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable container-toolkit deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -947,4 +958,13 @@ func (m *NodeStatusExporterSpec) IsNodeStatusExporterEnabled() bool {
 		return false
 	}
 	return *m.Enabled
+}
+
+// IsEnabled returns true if GPUDirect RDMA are enabled through gpu-perator
+func (g *GPUDirectRDMASpec) IsEnabled() bool {
+	if g.Enabled == nil {
+		// GPUDirectRDMA is disabled by default
+		return false
+	}
+	return *g.Enabled
 }

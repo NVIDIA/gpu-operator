@@ -22,6 +22,33 @@ spec:
       serviceAccountName: nvidia-driver
       hostPID: true
       initContainers:
+        - name: mofed-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: mofed
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # always use runc for driver containers
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: void
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: run-mellanox-drivers
+              mountPath: /run/mellanox/drivers
+              mountPropagation: HostToContainer
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
         - name: k8s-driver-manager
           image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
@@ -64,6 +91,46 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-peermem-ctr
+        command: ["sh", "-c"]
+        args: ["until [ -f /run/mellanox/drivers/.driver-ready ] && [ -f /sys/module/nvidia/refcnt ]; do echo waiting for mellanox ofed and nvidia drivers to be installed; sleep 10; done; chroot /run/nvidia/driver modprobe nvidia-peermem; if [ -f /sys/module/nvidia_peermem/refcnt ]; then echo successfully loaded nvidia-peermem module;  sleep inf; else echo failed to load nvidia-peermem; exit 1; fi"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_peermem']
+          initialDelaySeconds: 10
+          failureThreshold: 60
+          successThreshold: 1
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_peermem']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
       volumes:
         - name: run-nvidia
           hostPath:
@@ -80,4 +147,12 @@ spec:
         - name: run-nvidia-topologyd
           hostPath:
             path: /run/nvidia-topologyd
+        - name: run-mellanox-drivers
+          hostPath:
+            path: /run/mellanox/drivers
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
           

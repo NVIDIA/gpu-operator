@@ -36,6 +36,8 @@ RUN cp /tmp/vectorAdd /artifacts/vectorAdd
 
 FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 
+RUN dnf install -y kmod
+
 COPY ./LICENSE ./licenses/LICENSE
 COPY --from=build /artifacts/nvidia-validator  /usr/bin/nvidia-validator
 COPY --from=sample-builder /artifacts/vectorAdd /usr/bin/vectorAdd

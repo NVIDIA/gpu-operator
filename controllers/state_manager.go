@@ -198,8 +198,8 @@ func hasMIGCapableGPU(labels map[string]string) bool {
 }
 
 func hasMIGManagerLabel(labels map[string]string) bool {
-	for key, value := range labels {
-		if key == migManagerLabelKey && value == migManagerLabelValue {
+	for key := range labels {
+		if key == migManagerLabelKey {
 			return true
 		}
 	}

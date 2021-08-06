@@ -21,7 +21,7 @@ daemonsets:
 validator:
   repository: nvcr.io/nvidia/cloud-native
   image: gpu-operator-validator
-  version: v1.7.1
+  version: devel-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -87,6 +87,8 @@ driver:
   version: "470.57.02"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  rdma:
+    enabled: false
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
