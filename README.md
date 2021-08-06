@@ -12,9 +12,6 @@ The GPU Operator allows administrators of Kubernetes clusters to manage GPU node
 
 Note that the GPU Operator is specifically useful for scenarios where the Kubernetes cluster needs to scale quickly - for example provisioning additional GPU nodes on the cloud or on-prem and managing the lifecycle of the underlying software components. Since the GPU Operator runs everything as containers including NVIDIA drivers, the administrators can easily swap various components - simply by starting or stopping containers.
 
-The GPU Operator is not a good fit for scenarios when special OS images are already being provisioned in a GPU cluster (for example using [NVIDIA DGX systems](https://www.nvidia.com/en-us/data-center/dgx-systems/)) or when using hybrid environments that use a combination of Kubernetes and Slurm for workload management.
-
-
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html). 
 
