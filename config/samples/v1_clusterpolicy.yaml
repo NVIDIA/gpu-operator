@@ -28,7 +28,7 @@ spec:
   validator:
     repository: nvcr.io/nvidia/cloud-native
     image: gpu-operator-validator
-    version: v1.7.1
+    version: devel-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env: []
@@ -159,7 +159,7 @@ spec:
     enabled: true
     repository: nvcr.io/nvidia/cloud-native
     image: k8s-mig-manager
-    version: v0.1.1-ubi8
+    version: v0.1.2-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     env:
@@ -173,7 +173,7 @@ spec:
     enabled: false
     repository: nvcr.io/nvidia/cloud-native
     image: gpu-operator-validator
-    version: latest
+    version: devel-ubi8
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     securityContext: {}
