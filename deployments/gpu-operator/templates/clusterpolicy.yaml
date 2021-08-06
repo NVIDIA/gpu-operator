@@ -114,6 +114,8 @@ spec:
     {{- if .Values.driver.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.driver.imagePullSecrets | nindent 6 }}
     {{- end }}
+    rdma:
+      enabled: {{ .Values.driver.rdma.enabled }}
     manager:
       {{- if .Values.driver.manager.repository }}
       repository: {{ .Values.driver.manager.repository }}

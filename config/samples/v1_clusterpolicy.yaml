@@ -5,6 +5,7 @@ metadata:
 spec:
   operator:
     defaultRuntime: crio
+    runtimeClass: nvidia
     initContainer:
       image: cuda
       repository: nvcr.io/nvidia
@@ -49,6 +50,8 @@ spec:
     version: "470.57.02"
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
+    rdma:
+      enabled: false
     manager:
       image: k8s-driver-manager
       repository: nvcr.io/nvidia/cloud-native

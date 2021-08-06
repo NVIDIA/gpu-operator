@@ -75,6 +75,8 @@ const (
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
 	// DCGMDefaultHostPort indicates default host port bound to DCGM host engine
 	DCGMDefaultHostPort = 5555
+	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
+	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -334,7 +336,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
 func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 
 	// update image
 	img, err := gpuv1.ImagePath(&config.GPUFeatureDiscovery)
@@ -416,50 +418,18 @@ func parseOSRelease() (map[string]string, error) {
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
-	kvers, osTag, _ := kernelFullVersion(n)
-	if kvers == "" {
-		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
-	}
+	// update validation container
+	transformValidationInitContainer(obj, config)
 
-	img, err := gpuv1.ImagePath(&config.Driver)
-	if err != nil {
-		return err
-	}
-	// if image digest is specified, use it directly
-	if !strings.HasPrefix(config.Driver.Version, "sha256:") {
-		// append os-tag to the provided driver version
-		img = fmt.Sprintf("%s-%s", img, osTag)
-	}
-	obj.Spec.Template.Spec.Containers[0].Image = img
+	// update driver-manager initContainer
+	transformDriverManagerInitContainer(obj, config)
 
-	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+	// update nvidia-driver container
+	transformDriverContainer(obj, config, n)
 
-	// update driver-manager(initContainer) image and pull policy
-	managerImage, err := gpuv1.ImagePath(&config.Driver.Manager)
-	if err != nil {
-		return err
-	}
+	// update nvidia-peermem sidecar container
+	transformPeerMemoryContainer(obj, config, n)
 
-	obj.Spec.Template.Spec.InitContainers[0].Image = managerImage
-	if config.Driver.ImagePullPolicy != "" {
-		obj.Spec.Template.Spec.InitContainers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
-	}
-
-	// set/append environment variables for driver-manager initContainer
-	if len(config.Driver.Manager.Env) > 0 {
-		for _, env := range config.Driver.Manager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[0]), env.Name, env.Value)
-		}
-	}
-
-	// set image pull secrets
-	if len(config.Driver.ImagePullSecrets) > 0 {
-		for _, secret := range config.Driver.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
-	}
 	// update PriorityClass
 	if config.Daemonsets.PriorityClassName != "" {
 		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
@@ -467,118 +437,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// set tolerations if specified
 	if len(config.Daemonsets.Tolerations) > 0 {
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
-	// set resource limits
-	if config.Driver.Resources != nil {
-		// apply resource limits to all containers
-		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
-		}
-	}
-	// set arguments if specified for driver container
-	if len(config.Driver.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.Driver.Args
-	}
-	// set/append environment variables for exporter container
-	if len(config.Driver.Env) > 0 {
-		for _, env := range config.Driver.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-	// set any custom repo configuration provided
-	if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && config.Driver.RepoConfig.DestinationDir != "" {
-		repoConfigVolMount := corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: config.Driver.RepoConfig.DestinationDir}
-		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, repoConfigVolMount)
-
-		repoConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.RepoConfig.ConfigMapName,
-				},
-			},
-		}
-		repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: repoConfigVolumeSource}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
-	}
-
-	// set any licensing configuration required
-	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
-		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
-		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, licensingConfigVolMount)
-
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.LicensingConfig.ConfigMapName,
-				},
-				Items: []corev1.KeyToPath{
-					{
-						Key:  VGPULicensingFileName,
-						Path: VGPULicensingFileName,
-					},
-				},
-			},
-		}
-		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
-	}
-
-	// set virtual topology daemon configuration if specified for vGPU driver
-	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
-		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
-		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, topologyConfigVolMount)
-
-		topologyConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.VirtualTopology.Config,
-				},
-				Items: []corev1.KeyToPath{
-					{
-						Key:  VGPUTopologyConfigFileName,
-						Path: VGPUTopologyConfigFileName,
-					},
-				},
-			},
-		}
-		topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
-	}
-
-	// Inject EUS kernel RPM's as an override to the entrypoint
-	// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
-	if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
-		return nil
-	}
-
-	release, err := parseOSRelease()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
-	}
-
-	ocpV, err := OpenshiftVersion()
-	if err != nil {
-		// might be RHEL node using upstream k8s, don't error out.
-		logger.Info(fmt.Sprintf("ERROR: failed to get OpenShift version: %s", err))
-	}
-
-	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-	ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
-
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhelVersion)
-	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocpVersion)
-
-	if ocpV != "" {
-		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
-		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
-		err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
-		if err != nil {
-			return err
-		}
-
-		// indicate driver container to automatically resolve OCP/RHEL versions to better handle node/cluster upgrades
-		autoResolveVersion := corev1.EnvVar{Name: "RESOLVE_OCP_VERSION", Value: "true"}
-		obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, autoResolveVersion)
 	}
 	return nil
 }
@@ -713,7 +571,8 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-
+	// update validation container
+	transformValidationInitContainer(obj, config)
 	// update image
 	image, err := gpuv1.ImagePath(&config.Toolkit)
 	if err != nil {
@@ -806,39 +665,13 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
-
-	// update init container spec for waiting on driver-initialization
-	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
-		// skip if not toolkit-init container
-		if initContainer.Name != "driver-validation" {
-			continue
-		}
-
-		// update initContainer image
-		image, err := gpuv1.ImagePath(&config.Validator)
-		if err != nil {
-			return err
-		}
-
-		obj.Spec.Template.Spec.InitContainers[i].Image = image
-		// update initContainer image pull policy
-		obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
-
-		// set/append environment variables for validation init container
-		if len(config.Validator.Toolkit.Env) > 0 {
-			for _, env := range config.Validator.Toolkit.Env {
-				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
-			}
-		}
-	}
-
 	return nil
 }
 
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 	// update image
 	image, err := gpuv1.ImagePath(&config.DevicePlugin)
 	if err != nil {
@@ -891,7 +724,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 	// update image
 	image, err := gpuv1.ImagePath(&config.DCGMExporter)
 	if err != nil {
@@ -991,7 +824,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 // TransformDCGM transforms dcgm daemonset with required config as per ClusterPolicy
 func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 	// update image
 	image, err := gpuv1.ImagePath(&config.DCGM)
 	if err != nil {
@@ -1051,7 +884,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 // TransformMIGManager transforms MIG Manager daemonset with required config as per ClusterPolicy
 func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 
 	// update image
 	image, err := gpuv1.ImagePath(&config.MIGManager)
@@ -1248,7 +1081,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 // TransformNodeStatusExporter transforms the node-status-exporter daemonset with required config as per ClusterPolicy
 func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	updateValidationInitContainer(obj, config)
+	transformValidationInitContainer(obj, config)
 
 	// update image
 	image, err := gpuv1.ImagePath(&config.NodeStatusExporter)
@@ -1389,10 +1222,222 @@ func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy, isGF
 	}
 }
 
-func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
 	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
 		// skip if not validation initContainer
-		if initContainer.Name != "toolkit-validation" {
+		if !strings.Contains(initContainer.Name, "k8s-driver-manager") {
+			continue
+		}
+		// update driver-manager(initContainer) image and pull policy
+		managerImage, err := gpuv1.ImagePath(&config.Driver.Manager)
+		if err != nil {
+			return err
+		}
+
+		obj.Spec.Template.Spec.InitContainers[i].Image = managerImage
+		if config.Driver.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
+		}
+
+		// set/append environment variables for driver-manager initContainer
+		if len(config.Driver.Manager.Env) > 0 {
+			for _, env := range config.Driver.Manager.Env {
+				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+			}
+		}
+	}
+	return nil
+}
+
+func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		// skip if not nvidia-peermem
+		if !strings.Contains(container.Name, "nvidia-peermem") {
+			continue
+		}
+		if config.Driver.GPUDirectRDMA == nil || !config.Driver.GPUDirectRDMA.IsEnabled() {
+			// remove nvidia-peermem sidecar container from driver Daemonset if RDMA is not enabled
+			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
+			return nil
+		}
+		// update nvidia-peermem driver image and pull policy to be same as gpu-driver image
+		// as its installed as part of gpu-driver image
+		driverImage, err := resolveDriverTag(n, &config.Driver)
+		if err != nil {
+			return err
+		}
+		obj.Spec.Template.Spec.Containers[i].Image = driverImage
+		if config.Driver.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+		}
+	}
+	return nil
+}
+
+// resolveDriverTag resolves driver image tag based on the OS of the worker node
+func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (string, error) {
+	kvers, osTag, _ := kernelFullVersion(n)
+	if kvers == "" {
+		return "", fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
+	}
+
+	image, err := gpuv1.ImagePath(driverSpec)
+	if err != nil {
+		return "", err
+	}
+	// if image digest is specified, use it directly
+	if !strings.HasPrefix(driverSpec.Version, "sha256:") {
+		// append os-tag to the provided driver version
+		image = fmt.Sprintf("%s-%s", image, osTag)
+	}
+	return image, nil
+}
+
+func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		// skip if not nvidia-peermem
+		if !strings.Contains(container.Name, "nvidia-driver") {
+			continue
+		}
+		image, err := resolveDriverTag(n, &config.Driver)
+		if err != nil {
+			return err
+		}
+		obj.Spec.Template.Spec.Containers[i].Image = image
+
+		// update image pull policy
+		obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+
+		// set image pull secrets
+		if len(config.Driver.ImagePullSecrets) > 0 {
+			for _, secret := range config.Driver.ImagePullSecrets {
+				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			}
+		}
+		// set resource limits
+		if config.Driver.Resources != nil {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
+		}
+		// set arguments if specified for driver container
+		if len(config.Driver.Args) > 0 {
+			obj.Spec.Template.Spec.Containers[i].Args = config.Driver.Args
+		}
+		// set/append environment variables for exporter container
+		if len(config.Driver.Env) > 0 {
+			for _, env := range config.Driver.Env {
+				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
+			}
+		}
+		if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
+			// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), GPUDirectRDMAEnabledEnvName, "true")
+		}
+
+		// set any custom repo configuration provided
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && config.Driver.RepoConfig.DestinationDir != "" {
+			repoConfigVolMount := corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: config.Driver.RepoConfig.DestinationDir}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, repoConfigVolMount)
+
+			repoConfigVolumeSource := corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: config.Driver.RepoConfig.ConfigMapName,
+					},
+				},
+			}
+			repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: repoConfigVolumeSource}
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
+		}
+
+		// set any licensing configuration required
+		if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
+			licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, licensingConfigVolMount)
+
+			licensingConfigVolumeSource := corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: config.Driver.LicensingConfig.ConfigMapName,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  VGPULicensingFileName,
+							Path: VGPULicensingFileName,
+						},
+					},
+				},
+			}
+			licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
+		}
+
+		// set virtual topology daemon configuration if specified for vGPU driver
+		if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
+			topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, topologyConfigVolMount)
+
+			topologyConfigVolumeSource := corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: config.Driver.VirtualTopology.Config,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  VGPUTopologyConfigFileName,
+							Path: VGPUTopologyConfigFileName,
+						},
+					},
+				},
+			}
+			topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
+		}
+
+		// Inject EUS kernel RPM's as an override to the entrypoint
+		// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
+		kvers, osTag, _ := kernelFullVersion(n)
+		if kvers == "" {
+			return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
+		}
+
+		if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
+			return nil
+		}
+
+		release, err := parseOSRelease()
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+		}
+
+		ocpV, err := OpenshiftVersion()
+		if err != nil {
+			// might be RHEL node using upstream k8s, don't error out.
+			logger.Info(fmt.Sprintf("ERROR: failed to get OpenShift version: %s", err))
+		}
+
+		rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
+		ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
+
+		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, rhelVersion)
+		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, ocpVersion)
+
+		if ocpV != "" {
+			// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+			// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
+			err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+		// skip if not validation initContainer
+		if !strings.Contains(initContainer.Name, "validation") {
 			continue
 		}
 		// update validation image
@@ -1404,6 +1449,11 @@ func updateValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		// update validation image pull policy
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+		}
+		// set env for mofed validation if nv_peer_mem(GPUDirect RDMA) is enabled
+		if strings.Contains(initContainer.Name, "mofed-validation") && config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
+			// pass env for mofed-validation
+			setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), GPUDirectRDMAEnabledEnvName, "true")
 		}
 	}
 	return nil

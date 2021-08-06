@@ -1293,6 +1293,15 @@ spec:
                         description: Version represents Driver-Manager image tag(version)
                         type: string
                     type: object
+                  rdma:
+                    description: GPUDirectRDMASpec defines the properties for nv_peer_mem
+                      deployment
+                    properties:
+                      enabled:
+                        description: Enabled indicates if GPUDirect RDMA is enabled
+                          through GPU operator
+                        type: boolean
+                    type: object
                   repoConfig:
                     description: 'Optional: Custom repo configuration for driver container'
                     properties:
