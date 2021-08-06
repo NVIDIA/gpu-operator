@@ -1,9 +1,9 @@
 apiVersion: v2
 name: gpu-operator
-version: v1.7.1
+version: v1.0.0-devel
 kubeVersion: ">= 1.16.0-0"
 description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
-appVersion: "v1.7.1"
+appVersion: "devel-ubi8"
 icon: https://assets.nvidiagrid.net/ngc/logos/GPUoperator.png
 sources:
 - https://github.com/NVIDIA/gpu-operator

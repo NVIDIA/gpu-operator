@@ -52,9 +52,7 @@ spec:
     {{- if .Values.validator.image }}
     image: {{ .Values.validator.image }}
     {{- end }}
-    {{- if .Values.validator.version }}
-    version: {{ .Values.validator.version }}
-    {{- end }}
+    version: {{ .Values.validator.version | default .Chart.AppVersion }}
     {{- if .Values.validator.imagePullPolicy }}
     imagePullPolicy: {{ .Values.validator.imagePullPolicy }}
     {{- end }}
@@ -334,9 +332,7 @@ spec:
     {{- if .Values.nodeStatusExporter.image }}
     image: {{ .Values.nodeStatusExporter.image }}
     {{- end }}
-    {{- if .Values.nodeStatusExporter.version }}
-    version: {{ .Values.nodeStatusExporter.version }}
-    {{- end }}
+    version: {{ .Values.nodeStatusExporter.version | default .Chart.AppVersion }}
     {{- if .Values.nodeStatusExporter.imagePullPolicy }}
     imagePullPolicy: {{ .Values.nodeStatusExporter.imagePullPolicy }}
     {{- end }}
