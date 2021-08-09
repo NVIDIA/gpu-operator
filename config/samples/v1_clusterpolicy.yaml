@@ -115,6 +115,7 @@ spec:
     resources: {}
 
   dcgm:
+    enabled: true
     repository: nvcr.io/nvidia/cloud-native
     image: dcgm
     version: 2.2.9-ubi8

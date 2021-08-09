@@ -529,6 +529,12 @@ type DCGMExporterMetricsConfig struct {
 
 // DCGMSpec defines the properties for DCGM deployment
 type DCGMSpec struct {
+	// Enabled indicates if deployment of DCGM hostengine as a separate pod is enabled.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable DCGM hostengine as a separate Pod"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// DCGM image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository"`
@@ -982,4 +988,13 @@ func (g *GPUDirectRDMASpec) IsEnabled() bool {
 		return false
 	}
 	return *g.Enabled
+}
+
+// IsEnabled returns true if DCGM hostengine as a separate Pod is enabled through gpu-perator
+func (dcgm *DCGMSpec) IsEnabled() bool {
+	if dcgm.Enabled == nil {
+		// DCGM is enabled by default
+		return true
+	}
+	return *dcgm.Enabled
 }

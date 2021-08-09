@@ -767,13 +767,15 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-	// set DCGM host engine env. NODE_IP will be substituted during pod runtime
-	dcgmHostPort := int32(DCGMDefaultHostPort)
-	if config.DCGM.HostPort != 0 {
-		dcgmHostPort = config.DCGM.HostPort
+	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
+	if config.DCGM.IsEnabled() {
+		// set DCGM host engine env. NODE_IP will be substituted during pod runtime
+		dcgmHostPort := int32(DCGMDefaultHostPort)
+		if config.DCGM.HostPort != 0 {
+			dcgmHostPort = config.DCGM.HostPort
+		}
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("$(NODE_IP):%d", dcgmHostPort))
 	}
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("$(NODE_IP):%d", dcgmHostPort))
-
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 

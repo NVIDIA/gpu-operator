@@ -90,6 +90,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  enabled:
+                    description: Enabled indicates if deployment of DCGM hostengine
+                      as a separate pod is enabled.
+                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:
