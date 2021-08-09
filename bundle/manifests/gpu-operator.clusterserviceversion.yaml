@@ -39,6 +39,7 @@ metadata:
               "version": "sha256:e37404194fa2bc2275827411049422b93d1493991fb925957f170b4b842846ff"
             },
             "dcgm": {
+              "enabled": true,
               "image": "dcgm",
               "imagePullSecrets": [],
               "repository": "nvcr.io/nvidia/cloud-native",

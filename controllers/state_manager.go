@@ -317,7 +317,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
-		addState(n, "/opt/gpu-operator/state-dcgm")
+		if clusterPolicy.Spec.DCGM.IsEnabled() {
+			addState(n, "/opt/gpu-operator/state-dcgm")
+		}
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
 
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
