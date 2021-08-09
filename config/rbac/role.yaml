@@ -77,12 +77,14 @@ rules:
 - apiGroups:
   - monitoring.coreos.com
   resources:
-  - servicemonitors
   - prometheusrule
+  - servicemonitors
   verbs:
   - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - nvidia.com

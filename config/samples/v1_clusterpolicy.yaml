@@ -140,6 +140,9 @@ spec:
         value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
     securityContext: {}
     resources: {}
+    # configmap name for custom dcgm metrics
+    config:
+      name: ""
 
   gfd:
     repository: nvcr.io/nvidia
