@@ -117,7 +117,7 @@ spec:
   dcgm:
     repository: nvcr.io/nvidia/cloud-native
     image: dcgm
-    version: 2.2.9-ubi8
+    version: 2.2.3-ubi8
     imagePullPolicy: IfNotPresent
     hostPort: 5555
     args: []
