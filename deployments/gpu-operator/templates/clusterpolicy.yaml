@@ -267,6 +267,9 @@ spec:
     {{- if .Values.dcgmExporter.args }}
     args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.config }}
+    config: {{ toYaml .Values.dcgmExporter.config | nindent 6 }}
+    {{- end }}
   gfd:
     {{- if .Values.gfd.repository }}
     repository: {{ .Values.gfd.repository }}

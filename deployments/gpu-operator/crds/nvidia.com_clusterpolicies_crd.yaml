@@ -405,6 +405,15 @@ spec:
                     items:
                       type: string
                     type: array
+                  config:
+                    description: 'Optional: Custom metrics configuration for DCGM
+                      exporter'
+                    properties:
+                      name:
+                        description: ConfigMap name with file dcgm-metrics.csv for
+                          metrics to be collected by DCGM exporter
+                        type: string
+                    type: object
                   env:
                     description: 'Optional: List of environment variables'
                     items:

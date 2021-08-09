@@ -16,6 +16,9 @@ metadata:
               "image": "dcgm-exporter",
               "imagePullSecrets": [],
               "repository": "nvcr.io/nvidia/k8s",
+              "config": {
+                "name": ""
+              },
               "env": [
                 {
                   "name": "DCGM_EXPORTER_LISTEN",

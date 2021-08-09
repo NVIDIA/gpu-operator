@@ -77,6 +77,10 @@ const (
 	DCGMDefaultHostPort = 5555
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
+	// MetricsConfigMountPath indicates mount path for custom dcgm metrics file
+	MetricsConfigMountPath = "/etc/dcgm-exporter/" + MetricsConfigFileName
+	// MetricsConfigFileName indicates custom dcgm metrics file name
+	MetricsConfigFileName = "dcgm-metrics.csv"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -412,7 +416,6 @@ func parseOSRelease() (map[string]string, error) {
 			release[m[1]] = strings.Trim(m[2], `"`)
 		}
 	}
-
 	return release, nil
 }
 
@@ -774,16 +777,39 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
-	kvers, osTag, _ := kernelFullVersion(n)
-	if kvers == "" {
-		return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
+	// mount configmap for custom metrics if provided by user
+	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
+		metricsConfigVolMount := corev1.VolumeMount{Name: "metrics-config", ReadOnly: true, MountPath: MetricsConfigMountPath, SubPath: MetricsConfigFileName}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, metricsConfigVolMount)
+
+		metricsConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.DCGMExporter.MetricsConfig.Name,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  MetricsConfigFileName,
+						Path: MetricsConfigFileName,
+					},
+				},
+			},
+		}
+		metricsConfigVol := corev1.Volume{Name: "metrics-config", VolumeSource: metricsConfigVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, metricsConfigVol)
 	}
 
-	if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
+	release, err := parseOSRelease()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	}
+
+	// skip SELinux changes if not an OCP cluster
+	if _, ok := release["OPENSHIFT_VERSION"]; !ok {
 		return nil
 	}
 
-	// update init container config for per pod specific resources
+	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
 	initImage, err := gpuv1.ImagePath(&config.Operator.InitContainer)
 	if err != nil {
 		return err
@@ -801,7 +827,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		Privileged: &privileged,
 	}
 
-	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
 	initContainer.SecurityContext = securityContext
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
@@ -1294,9 +1319,8 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (
 }
 
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
 	for i, container := range obj.Spec.Template.Spec.Containers {
-		// skip if not nvidia-peermem
+		// skip if not nvidia-driver container
 		if !strings.Contains(container.Name, "nvidia-driver") {
 			continue
 		}
@@ -1394,41 +1418,28 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
 		}
 
-		// Inject EUS kernel RPM's as an override to the entrypoint
-		// Add Env Vars needed by nvidia-driver to enable the right releasever and rpm repo
-		kvers, osTag, _ := kernelFullVersion(n)
-		if kvers == "" {
-			return fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
-		}
-
-		if !strings.Contains(osTag, "rhel") && !strings.Contains(osTag, "rhcos") {
-			return nil
-		}
-
 		release, err := parseOSRelease()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get os-release: %s", err)
 		}
 
-		ocpV, err := OpenshiftVersion()
-		if err != nil {
-			// might be RHEL node using upstream k8s, don't error out.
-			logger.Info(fmt.Sprintf("ERROR: failed to get OpenShift version: %s", err))
+		// skip proxy and env settings if not ocp cluster
+		if _, ok := release["OPENSHIFT_VERSION"]; !ok {
+			return nil
 		}
 
+		// Add env vars needed by nvidia-driver to enable the right releasever and EUS rpm repos
 		rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-		ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: ocpV}
+		ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]}
 
 		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, rhelVersion)
 		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, ocpVersion)
 
-		if ocpV != "" {
-			// Automatically apply proxy settings for OCP and inject custom CA if configured by user
-			// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
-			err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
-			if err != nil {
-				return err
-			}
+		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
+		err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
