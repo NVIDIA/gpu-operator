@@ -164,7 +164,7 @@ devicePlugin:
 dcgm:
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 2.2.9-ubuntu20.04
+  version: 2.2.3-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []

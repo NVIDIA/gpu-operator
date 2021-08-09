@@ -46,7 +46,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "tolerations": [],
-              "version": "sha256:a819c7dae3674d9da6fcefa79a97e80549cab0d026740e7398c6c31e20776f8d"
+              "version": "sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c"
             },
             "daemonsets": {
               "tolerations": [
@@ -245,7 +245,7 @@ spec:
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:e37404194fa2bc2275827411049422b93d1493991fb925957f170b4b842846ff
     - name: dcgm-image
-      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:a819c7dae3674d9da6fcefa79a97e80549cab0d026740e7398c6c31e20776f8d
+      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:8f9517b4c83b8730c40134df385088be41519b585176c66727ff6f181ae5e703
     - name: driver-image
