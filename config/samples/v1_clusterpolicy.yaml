@@ -76,6 +76,7 @@ spec:
     # vGPU licensing configuration
     licensingConfig:
       configMapName: ""
+      nlsEnabled: false
     # vGPU topology daemon configuration
     virtualTopology:
       config: ""
