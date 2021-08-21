@@ -666,6 +666,12 @@ type DriverLicensingConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	ConfigMapName string `json:"configMapName,omitempty"`
+
+	// NLSEnabled indicates if NLS is used for licensing.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NLS licensing"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	NLSEnabled *bool `json:"nlsEnabled,omitempty"`
 }
 
 // VirtualTopologyConfigSpec defines virtual topology daemon configuration with vGPU
@@ -997,4 +1003,13 @@ func (dcgm *DCGMSpec) IsEnabled() bool {
 		return true
 	}
 	return *dcgm.Enabled
+}
+
+// IsNLSEnabled returns true if NLS should be used for licensing the driver
+func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
+	if l.NLSEnabled == nil {
+		// NLS is not enabled by default
+		return false
+	}
+	return *l.NLSEnabled
 }

@@ -1168,6 +1168,9 @@ spec:
                     properties:
                       configMapName:
                         type: string
+                      nlsEnabled:
+                        description: NLSEnabled indicates if NLS is used for licensing.
+                        type: boolean
                     type: object
                   manager:
                     description: Manager represents configuration for driver manager
