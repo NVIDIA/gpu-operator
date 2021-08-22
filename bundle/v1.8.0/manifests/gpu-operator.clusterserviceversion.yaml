@@ -184,7 +184,7 @@ metadata:
               "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
-              "version": "devel-ubi8"
+              "version": "sha256:1cce434a1722288bacab5eaa5c194ca2bdbad55679ba871a2814556853339585"
             },
             "operator": {
               "defaultRuntime": "crio",
@@ -214,7 +214,7 @@ metadata:
               "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
-              "version": "devel-ubi8",
+              "version": "sha256:1cce434a1722288bacab5eaa5c194ca2bdbad55679ba871a2814556853339585",
               "env": [
                 {
                   "name": "WITH_WORKLOAD",
@@ -230,13 +230,13 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: nvcr.io/nvidia/gpu-operator:devel-ubi8
-    createdAt: "Tue Aug 10 06:58:46 PDT 2021"
+    containerImage: nvcr.io/nvidia/gpu-operator:v1.8.0
+    createdAt: "Wed Jun 16 06:51:51 PDT 2021"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.0.0-devel
+  name: gpu-operator-certified.v1.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -526,7 +526,7 @@ spec:
                 - --leader-elect
                 command:
                 - gpu-operator
-                image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:3a0ff79c4edc24de708f82e5f9dc2946897aa4a50e8827203221ee2281008974
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -591,4 +591,4 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.0.0-devel
+  version: 1.8.0
