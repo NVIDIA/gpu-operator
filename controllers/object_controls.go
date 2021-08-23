@@ -285,7 +285,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	} else {
 		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
 			"feature.node.kubernetes.io/kernel-version.full")
-		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", err)
+		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", "Error", err)
 		return "", "", ""
 	}
 
