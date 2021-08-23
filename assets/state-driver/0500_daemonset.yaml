@@ -135,6 +135,7 @@ spec:
         - name: run-nvidia
           hostPath:
             path: /run/nvidia
+            type: DirectoryOrCreate
         - name: var-log
           hostPath:
             path: /var/log
@@ -147,6 +148,7 @@ spec:
         - name: run-nvidia-topologyd
           hostPath:
             path: /run/nvidia-topologyd
+            type: DirectoryOrCreate
         - name: run-mellanox-drivers
           hostPath:
             path: /run/mellanox/drivers
