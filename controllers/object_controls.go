@@ -71,8 +71,8 @@ const (
 	ValidatorImagePullPolicyEnvName = "VALIDATOR_IMAGE_PULL_POLICY"
 	// ValidatorImagePullSecretsEnvName indicates env name for validator image pull secrets passed
 	ValidatorImagePullSecretsEnvName = "VALIDATOR_IMAGE_PULL_SECRETS"
-	// ValidatorRuntimeClassEnvName indicates env name for validator image pull secrets passed
-	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIMECLASS"
+	// ValidatorRuntimeClassEnvName indicates env name of runtime class to be applied to validator pods
+	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIME_CLASS"
 	// MigStrategyEnvName indicates env name for passing MIG strategy
 	MigStrategyEnvName = "MIG_STRATEGY"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
