@@ -43,13 +43,12 @@ const (
 	TrustedCABundleMountDir = "/etc/pki/ca-trust/extracted/pem"
 	// TrustedCACertificate indicates injected CA certificate name
 	TrustedCACertificate = "tls-ca-bundle.pem"
-	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration files
-	VGPULicensingConfigMountPath = "/drivers/"
+	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration file
+	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
 	// VGPULicensingFileName is the vGPU licensing configuration filename
 	VGPULicensingFileName = "gridd.conf"
-	// NLSClientTokenMountPath inidicates the target mount path relative to VGPULicenseConfigMountPath
-	// for NLS client config token file (.tok)
-	NLSClientTokenMountPath = "ClientConfigToken/"
+	// NLSClientTokenMountPath inidicates the target mount path for NLS client config token file (.tok)
+	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
 	// NLSClientTokenFileName is the NLS client config token filename
 	NLSClientTokenFileName = "client_configuration_token.tok"
 	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
@@ -1383,7 +1382,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 		// set any licensing configuration required
 		if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
-			licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath}
+			licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, licensingConfigVolMount)
 
 			// gridd.conf always mounted
@@ -1397,8 +1396,10 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			if config.Driver.LicensingConfig.IsNLSEnabled() {
 				licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
 					Key:  NLSClientTokenFileName,
-					Path: NLSClientTokenMountPath + NLSClientTokenFileName,
+					Path: NLSClientTokenFileName,
 				})
+				nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
+				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, nlsTokenVolMount)
 			}
 
 			licensingConfigVolumeSource := corev1.VolumeSource{
