@@ -4,6 +4,8 @@ go 1.15
 
 require (
 	github.com/go-logr/logr v0.3.0
+	github.com/mitchellh/hashstructure v1.1.0
+	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/onsi/ginkgo v1.14.1 // indirect
 	github.com/onsi/gomega v1.10.2 // indirect
 	github.com/openshift/api v0.0.0-20210216211028-bb81baaf35cd
