@@ -7,9 +7,12 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -85,6 +88,8 @@ const (
 	MetricsConfigMountPath = "/etc/dcgm-exporter/" + MetricsConfigFileName
 	// MetricsConfigFileName indicates custom dcgm metrics file name
 	MetricsConfigFileName = "dcgm-metrics.csv"
+	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
+	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 )
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -461,46 +466,53 @@ func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error
 		return nil
 	}
 
-	proxyEnv := getProxyEnv(proxy)
-	if len(proxyEnv) != 0 {
-		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, proxyEnv...)
-	}
+	for i, container := range podSpec.Containers {
+		// skip if not nvidia-driver container
+		if !strings.Contains(container.Name, "nvidia-driver") {
+			continue
+		}
 
-	// if user-ca-bundle is setup in proxy,  create a trusted-ca configmap and add volume mount
-	if proxy.Spec.TrustedCA.Name == "" {
-		return nil
-	}
+		proxyEnv := getProxyEnv(proxy)
+		if len(proxyEnv) != 0 {
+			podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, proxyEnv...)
+		}
 
-	// create trusted-ca configmap to inject custom user ca bundle into it
-	_, err = getOrCreateTrustedCAConfigMap(n, TrustedCAConfigMapName)
-	if err != nil {
-		return err
-	}
+		// if user-ca-bundle is setup in proxy,  create a trusted-ca configmap and add volume mount
+		if proxy.Spec.TrustedCA.Name == "" {
+			return nil
+		}
 
-	// mount trusted-ca configmap
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      TrustedCAConfigMapName,
-			ReadOnly:  true,
-			MountPath: TrustedCABundleMountDir,
-		})
-	podSpec.Volumes = append(podSpec.Volumes,
-		v1.Volume{
-			Name: TrustedCAConfigMapName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: TrustedCAConfigMapName,
-					},
-					Items: []v1.KeyToPath{
-						{
-							Key:  TrustedCABundleFileName,
-							Path: TrustedCACertificate,
+		// create trusted-ca configmap to inject custom user ca bundle into it
+		_, err = getOrCreateTrustedCAConfigMap(n, TrustedCAConfigMapName)
+		if err != nil {
+			return err
+		}
+
+		// mount trusted-ca configmap
+		podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      TrustedCAConfigMapName,
+				ReadOnly:  true,
+				MountPath: TrustedCABundleMountDir,
+			})
+		podSpec.Volumes = append(podSpec.Volumes,
+			v1.Volume{
+				Name: TrustedCAConfigMapName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: TrustedCAConfigMapName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  TrustedCABundleFileName,
+								Path: TrustedCACertificate,
+							},
 						},
 					},
 				},
-			},
-		})
+			})
+	}
 	return nil
 }
 
@@ -558,7 +570,15 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
 		"HTTP_PROXY":  proxyConfig.Spec.HTTPProxy,
 		"NO_PROXY":    proxyConfig.Spec.NoProxy,
 	}
-	for e, v := range proxies {
+	var envs []string
+	for k := range proxies {
+		envs = append(envs, k)
+	}
+	// ensure ordering is preserved when we add these env to pod spec
+	sort.Strings(envs)
+
+	for _, e := range envs {
+		v := proxies[e]
 		if len(v) == 0 {
 			continue
 		}
@@ -1600,22 +1620,80 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return isDaemonSetReady(obj.Name, n), nil
+	found := &appsv1.DaemonSet{}
+	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating")
+		// generate hash for the spec to create
+		hashStr := getDaemonsetHash(obj)
+		// add annotation to the Daemonset with hash value during creation
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
 		}
-
-		logger.Info("Couldn't create", "Error", err)
+		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create")
+			return gpuv1.NotReady, err
+		}
+		return isDaemonSetReady(obj.Name, n), nil
+	} else if err != nil {
+		logger.Info("Failed to get DaemonSet from client", "Error", err.Error())
 		return gpuv1.NotReady, err
 	}
 
+	changed := isDaemonsetSpecChanged(found, obj)
+	if changed {
+		logger.Info("Found, updating")
+		err = n.rec.Client.Update(context.TODO(), obj)
+		if err != nil {
+			return gpuv1.NotReady, err
+		}
+	} else {
+		logger.Info("Found, skipping update")
+	}
 	return isDaemonSetReady(obj.Name, n), nil
+}
+
+func getDaemonsetHash(daemonset *appsv1.DaemonSet) string {
+	hash, err := hashstructure.Hash(daemonset, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+	return strconv.FormatUint(hash, 16)
+}
+
+// isDaemonsetSpecChanged returns true if the spec has changed between existing one
+// and new Daemonset spec compared by hash.
+func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bool {
+	if current == nil && new != nil {
+		return true
+	}
+
+	hashStr := getDaemonsetHash(new)
+	foundHashAnnotation := false
+
+	for annotation, value := range current.Annotations {
+		if annotation == NvidiaAnnotationHashKey {
+			if value != hashStr {
+				// update annotation to be added to Daemonset as per new spec and indicate spec update is required
+				new.Annotations[NvidiaAnnotationHashKey] = hashStr
+				return true
+			}
+			foundHashAnnotation = true
+			break
+		}
+	}
+
+	if !foundHashAnnotation {
+		// update annotation to be added to Daemonset as per new spec and indicate spec update is required
+		if new.Annotations == nil {
+			new.Annotations = make(map[string]string)
+		}
+		new.Annotations[NvidiaAnnotationHashKey] = hashStr
+		return true
+	}
+	return false
 }
 
 // The operator starts two pods in different stages to validate

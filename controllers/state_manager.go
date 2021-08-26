@@ -146,14 +146,14 @@ func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
 			nodeLabels[key] = value
 			modified = true
 		}
-		log.Info(" - ", "Label", key, "value", nodeLabels[key])
+		log.Info(" - ", "Label=", key, " value=", nodeLabels[key])
 	}
 
 	// add mig-manager label if missing
 	if hasMIGCapableGPU(nodeLabels) && !hasMIGManagerLabel(nodeLabels) {
 		nodeLabels[migManagerLabelKey] = migManagerLabelValue
 		modified = true
-		log.Info(" - ", "Label", migManagerLabelKey, "value", migManagerLabelValue)
+		log.Info(" - ", "Label=", migManagerLabelKey, " value=", migManagerLabelValue)
 	}
 	return modified
 }
