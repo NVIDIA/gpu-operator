@@ -1645,6 +1645,11 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
+	// Daemonsets will always have at least one annotation applied, so allocate if necessary
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+
 	found := &appsv1.DaemonSet{}
 	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -1652,9 +1657,6 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		// generate hash for the spec to create
 		hashStr := getDaemonsetHash(obj)
 		// add annotation to the Daemonset with hash value during creation
-		if obj.Annotations == nil {
-			obj.Annotations = make(map[string]string)
-		}
 		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
 		err = n.rec.Client.Create(context.TODO(), obj)
 		if err != nil {
@@ -1694,6 +1696,9 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 	if current == nil && new != nil {
 		return true
 	}
+	if current.Annotations == nil || new.Annotations == nil {
+		panic("appsv1.DaemonSet.Annotations must be allocated prior to calling isDaemonsetSpecChanged()")
+	}
 
 	hashStr := getDaemonsetHash(new)
 	foundHashAnnotation := false
@@ -1702,9 +1707,6 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 		if annotation == NvidiaAnnotationHashKey {
 			if value != hashStr {
 				// update annotation to be added to Daemonset as per new spec and indicate spec update is required
-				if new.Annotations == nil {
-					new.Annotations = make(map[string]string)
-				}
 				new.Annotations[NvidiaAnnotationHashKey] = hashStr
 				return true
 			}
@@ -1715,9 +1717,6 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 
 	if !foundHashAnnotation {
 		// update annotation to be added to Daemonset as per new spec and indicate spec update is required
-		if new.Annotations == nil {
-			new.Annotations = make(map[string]string)
-		}
 		new.Annotations[NvidiaAnnotationHashKey] = hashStr
 		return true
 	}
