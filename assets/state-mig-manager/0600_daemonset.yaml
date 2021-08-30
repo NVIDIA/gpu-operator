@@ -59,7 +59,7 @@ spec:
           type: Directory
       - name: mig-parted-config
         configMap:
-          name: mig-parted-config
+          name: "FILLED_BY_OPERATOR"
       - name: run-nvidia
         hostPath:
           path: "/run/nvidia"

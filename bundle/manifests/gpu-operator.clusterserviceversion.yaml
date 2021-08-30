@@ -137,7 +137,8 @@ metadata:
                 "destinationDir": ""
               },
               "licensingConfig": {
-                "configMapName": ""
+                "configMapName": "",
+                "nlsEnabled": false
               },
               "virtualTopology": {
                 "config": ""
@@ -175,6 +176,9 @@ metadata:
               "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
+              "config": {
+                "name": ""
+              },
               "version": "sha256:77b8e58a54c222bee3cc56b2305d4cebfa60722c122858f94301e611f87d7fec"
             },
             "nodeStatusExporter": {

@@ -173,6 +173,8 @@ spec:
     securityContext:
       privileged: true
     resources: {}
+    config:
+      name: ""
 
   nodeStatusExporter:
     enabled: false

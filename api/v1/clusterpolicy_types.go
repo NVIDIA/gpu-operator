@@ -788,6 +788,11 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Optional: Custom mig-parted configuration for MIG Manager container
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom mig-parted configuration for MIG Manager container"
+	Config *MIGPartedConfigSpec `json:"config,omitempty"`
 }
 
 // GPUDirectRDMASpec defines the properties for nv_peer_mem deployment
@@ -797,6 +802,16 @@ type GPUDirectRDMASpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable container-toolkit deployment through GPU Operator"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// MIGPartedConfigSpec defines custom mig-parted config for MIG Manager container
+type MIGPartedConfigSpec struct {
+	// ConfigMap name
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
 }
 
 // MIGStrategy indicates MIG mode
