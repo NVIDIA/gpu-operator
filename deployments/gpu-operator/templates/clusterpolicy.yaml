@@ -328,6 +328,9 @@ spec:
     {{- if .Values.migManager.args }}
     args: {{ toYaml .Values.migManager.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.migManager.config }}
+    config: {{ toYaml .Values.migManager.config | nindent 6 }}
+    {{- end }}
   nodeStatusExporter:
     enabled: {{ .Values.nodeStatusExporter.enabled }}
     {{- if .Values.nodeStatusExporter.repository }}

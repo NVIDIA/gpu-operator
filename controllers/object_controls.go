@@ -78,6 +78,8 @@ const (
 	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIME_CLASS"
 	// MigStrategyEnvName indicates env name for passing MIG strategy
 	MigStrategyEnvName = "MIG_STRATEGY"
+	// MigPartedDefaultConfigMapName indicates name of ConfigMap containing default mig-parted config
+	MigPartedDefaultConfigMapName = "default-mig-parted-config"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
 	// DCGMDefaultHostPort indicates default host port bound to DCGM host engine
@@ -244,6 +246,15 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ConfigMap.DeepCopy()
 	logger := n.rec.Log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
+
+	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
+	if obj.Name == MigPartedDefaultConfigMapName {
+		config := n.singleton.Spec
+		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" {
+			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.Config.Name))
+			return gpuv1.Ready, nil
+		}
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -986,6 +997,20 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
 
+	// set ConfigMap name for "mig-parted-config" Volume
+	for i, vol := range obj.Spec.Template.Spec.Volumes {
+		if !strings.Contains(vol.Name, "mig-parted-config") {
+			continue
+		}
+
+		name := MigPartedDefaultConfigMapName
+		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" {
+			name = config.MIGManager.Config.Name
+		}
+		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
+		break
+	}
+
 	return nil
 }
 
@@ -1677,6 +1702,9 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 		if annotation == NvidiaAnnotationHashKey {
 			if value != hashStr {
 				// update annotation to be added to Daemonset as per new spec and indicate spec update is required
+				if new.Annotations == nil {
+					new.Annotations = make(map[string]string)
+				}
 				new.Annotations[NvidiaAnnotationHashKey] = hashStr
 				return true
 			}

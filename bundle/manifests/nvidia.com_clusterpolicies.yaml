@@ -1,3 +1,4 @@
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -1168,6 +1169,9 @@ spec:
                     properties:
                       configMapName:
                         type: string
+                      nlsEnabled:
+                        description: NLSEnabled indicates if NLS is used for licensing.
+                        type: boolean
                     type: object
                   manager:
                     description: Manager represents configuration for driver manager
@@ -1842,6 +1846,14 @@ spec:
                     items:
                       type: string
                     type: array
+                  config:
+                    description: 'Optional: Custom mig-parted configuration for MIG
+                      Manager container'
+                    properties:
+                      name:
+                        description: ConfigMap name
+                        type: string
+                    type: object
                   enabled:
                     description: Enabled indicates if deployment of mig-manager is
                       enabled

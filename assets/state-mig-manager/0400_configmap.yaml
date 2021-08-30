@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mig-parted-config
+  name: default-mig-parted-config
   namespace: gpu-operator-resources
 data:
   config.yaml: |
