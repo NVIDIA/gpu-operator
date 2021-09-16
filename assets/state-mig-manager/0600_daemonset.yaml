@@ -52,6 +52,7 @@ spec:
           name: mig-parted-config
         - mountPath: /host
           name: host-root
+          mountPropagation: HostToContainer
       volumes:
       - name: host-sys
         hostPath:

@@ -38,7 +38,7 @@ spec:
         volumeMounts:
           - name: driver-install-path
             mountPath: /run/nvidia/driver
-            mountPropagation: Bidirectional
+            mountPropagation: HostToContainer
           - name: run-nvidia-validations
             mountPath: /run/nvidia/validations
             mountPropagation: Bidirectional
