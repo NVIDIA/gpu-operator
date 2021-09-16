@@ -196,7 +196,7 @@ metadata:
               "initContainer": {
                 "image": "cuda",
                 "repository": "nvcr.io/nvidia",
-                "version": "sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce",
+                "version": "sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70",
                 "imagePullSecrets": []
               }
             },
@@ -262,7 +262,7 @@ spec:
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:77b8e58a54c222bee3cc56b2305d4cebfa60722c122858f94301e611f87d7fec
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce
+      image: nvcr.io/nvidia/cuda@sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70
     - name: gpu-operator-validator-image
       image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:1cce434a1722288bacab5eaa5c194ca2bdbad55679ba871a2814556853339585
     - name: k8s-driver-manager-image

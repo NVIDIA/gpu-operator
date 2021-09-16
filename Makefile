@@ -140,7 +140,7 @@ bundle-build:
 MODULE := github.com/NVIDIA/gpu-operator
 
 CUDA_IMAGE ?= nvidia/cuda
-CUDA_VERSION ?= 11.4.1
+CUDA_VERSION ?= 11.4.2
 GOLANG_VERSION ?= 1.15
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 ifeq ($(IMAGE),)
