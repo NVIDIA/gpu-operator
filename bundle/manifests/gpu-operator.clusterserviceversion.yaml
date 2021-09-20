@@ -179,7 +179,7 @@ metadata:
               "config": {
                 "name": ""
               },
-              "version": "sha256:77b8e58a54c222bee3cc56b2305d4cebfa60722c122858f94301e611f87d7fec"
+              "version": "sha256:8cdb793f8a22b076bf0f19818f9d79fe87b121608f1aa28b12a560b6fe13f47e"
             },
             "nodeStatusExporter": {
               "enabled": true,
@@ -260,7 +260,7 @@ spec:
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
     - name: mig-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:77b8e58a54c222bee3cc56b2305d4cebfa60722c122858f94301e611f87d7fec
+      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8cdb793f8a22b076bf0f19818f9d79fe87b121608f1aa28b12a560b6fe13f47e
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce
     - name: gpu-operator-validator-image
