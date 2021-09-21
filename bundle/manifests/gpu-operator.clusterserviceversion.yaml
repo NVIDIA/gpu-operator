@@ -210,7 +210,7 @@ metadata:
               "repository": "nvcr.io/nvidia/k8s",
               "resources": {},
               "securityContext": {},
-              "version": "sha256:8f9517b4c83b8730c40134df385088be41519b585176c66727ff6f181ae5e703"
+              "version": "sha256:b0c84b47d5f95000a842b823ad33dc9aa28f0edfa6d9565c289b61cb1d4a9934"
             },
             "validator": {
               "image": "gpu-operator-validator",
@@ -252,7 +252,7 @@ spec:
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:8f9517b4c83b8730c40134df385088be41519b585176c66727ff6f181ae5e703
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:b0c84b47d5f95000a842b823ad33dc9aa28f0edfa6d9565c289b61cb1d4a9934
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:a62de5e843a41c65cf837e7db5f5b675d03fa2de05e981a859b114336cf183e3
     - name: device-plugin-image
