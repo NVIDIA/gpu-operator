@@ -9,7 +9,7 @@ spec:
     initContainer:
       image: cuda
       repository: nvcr.io/nvidia
-      version: 11.2.1-base-ubi8
+      version: 11.4.2-base-ubi8
       imagePullPolicy: IfNotPresent
 
   psp:
