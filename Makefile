@@ -19,7 +19,7 @@ DOCKER ?= docker
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
+VERSION ?= latest
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
@@ -133,7 +133,7 @@ bundle: manifests kustomize
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	docker build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build --build-arg VERSION=$(VERSION) --build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 # Define local and dockerized golang targets
 
