@@ -108,6 +108,10 @@ metadata:
                 "imagePullSecrets": [],
                 "env": [
                   {
+                    "name": "ENABLE_AUTO_DRAIN",
+                    "value": "true"
+                  },
+                  {
                     "name": "DRAIN_USE_FORCE",
                     "value": "false"
                   },
@@ -188,7 +192,7 @@ metadata:
               "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
-              "version": "devel-ubi8"
+              "version": "sha256:a07fd1c74e3e469ac316d17cf79635173764fdab3b681dbc282027a23dbbe227"
             },
             "operator": {
               "defaultRuntime": "crio",
@@ -196,7 +200,7 @@ metadata:
               "initContainer": {
                 "image": "cuda",
                 "repository": "nvcr.io/nvidia",
-                "version": "sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70",
+                "version": "sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce",
                 "imagePullSecrets": []
               }
             },
@@ -218,7 +222,7 @@ metadata:
               "repository": "nvcr.io/nvidia/cloud-native",
               "resources": {},
               "securityContext": {},
-              "version": "devel-ubi8",
+              "version": "sha256:a07fd1c74e3e469ac316d17cf79635173764fdab3b681dbc282027a23dbbe227",
               "env": [
                 {
                   "name": "WITH_WORKLOAD",
@@ -234,19 +238,19 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: nvcr.io/nvidia/gpu-operator:devel-ubi8
-    createdAt: "Tue Aug 10 06:58:46 PDT 2021"
+    containerImage: nvcr.io/nvidia/gpu-operator:v1.8.2
+    createdAt: "Tue Sep 21 10:20:06 PDT 2021"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.0.0-devel
+  name: gpu-operator-certified.v1.8.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:2097beb34a61d906dd86d6784a4435de778c5a771865d06b60b6989f602741fd
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:e37404194fa2bc2275827411049422b93d1493991fb925957f170b4b842846ff
     - name: dcgm-image
@@ -262,9 +266,9 @@ spec:
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8cdb793f8a22b076bf0f19818f9d79fe87b121608f1aa28b12a560b6fe13f47e
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70
+      image: nvcr.io/nvidia/cuda@sha256:15674e5c45c97994bc92387bad03a0d52d7c1e983709c471c4fecc8e806dbdce
     - name: gpu-operator-validator-image
-      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:a07fd1c74e3e469ac316d17cf79635173764fdab3b681dbc282027a23dbbe227
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:907ab0fc008bb90149ed059ac3a8ed3d19ae010d52c58c0ddbafce45df468d5b
   customresourcedefinitions:
@@ -530,7 +534,7 @@ spec:
                 - --leader-elect
                 command:
                 - gpu-operator
-                image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:2097beb34a61d906dd86d6784a4435de778c5a771865d06b60b6989f602741fd
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -550,7 +554,7 @@ spec:
                 resources:
                   limits:
                     cpu: 500m
-                    memory: 500Mi
+                    memory: 1Gi
                   requests:
                     cpu: 200m
                     memory: 200Mi
@@ -595,4 +599,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.0.0-devel
+  version: 1.8.2
+  replaces: gpu-operator-certified.v1.8.0
