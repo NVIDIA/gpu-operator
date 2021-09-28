@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-node-status-exporter
   name: nvidia-node-status-exporter
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   annotations:
     openshift.io/scc: nvidia-node-status-exporter
 spec:

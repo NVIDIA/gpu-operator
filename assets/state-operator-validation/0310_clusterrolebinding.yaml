@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: nvidia-operator-validator
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"

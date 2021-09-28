@@ -100,6 +100,8 @@ type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -123,10 +125,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
-
-	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Namespace = n.operatorNamespace
-	}
+	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
 
@@ -156,12 +155,19 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].RoleBinding.DeepCopy()
-
-	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Namespace = n.operatorNamespace
-	}
+	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
+
+	for idx := range obj.Subjects {
+		// we don't want to update ALL the Subjects[].Namespace, eg we need to keep 'openshift-monitoring'
+		// for allowing PrometheusOperator to scrape our metrics resources:
+		// see in assets/state-dcgm-exporter, 0500_prom_rolebinding_openshift.yaml vs 0300_rolebinding.yaml
+		if obj.Subjects[idx].Namespace != "FILLED BY THE OPERATOR" {
+			continue
+		}
+		obj.Subjects[idx].Namespace = n.operatorNamespace
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -189,6 +195,8 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ClusterRole.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -217,7 +225,13 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
+
+	for idx := range obj.Subjects {
+		obj.Subjects[idx].Namespace = n.operatorNamespace
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -245,6 +259,8 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ConfigMap.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
@@ -536,7 +552,7 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "gpu-operator-resources",
+			Namespace: n.operatorNamespace,
 		},
 		Data: map[string]string{
 			TrustedCABundleFileName: "",
@@ -1593,6 +1609,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Deployment.DeepCopy()
+	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
@@ -1622,6 +1639,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].DaemonSet.DeepCopy()
+	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
@@ -1755,7 +1773,16 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
+
+	for idx := range obj.Users {
+		if obj.Users[idx] != "FILLED BY THE OPERATOR" {
+			continue
+		}
+		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -1795,6 +1822,8 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 
 	state := n.idx
 	obj := n.resources[state].PodSecurityPolicy.DeepCopy()
+	obj.Namespace = n.operatorNamespace
+
 	logger := n.rec.Log.WithValues("PodSecurityPolicies", obj.Name)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
@@ -1831,9 +1860,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Service.DeepCopy()
 
-	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Namespace = n.operatorNamespace
-	}
+	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
 
@@ -1871,13 +1898,20 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
+	obj.Namespace = n.operatorNamespace
 
 	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Namespace = n.operatorNamespace
 		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
 	}
 
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
+
+	for idx := range obj.Spec.NamespaceSelector.MatchNames {
+		if obj.Spec.NamespaceSelector.MatchNames[idx] != "FILLED BY THE OPERATOR" {
+			continue
+		}
+		obj.Spec.NamespaceSelector.MatchNames[idx] = obj.Namespace
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -1905,29 +1939,6 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
-	return gpuv1.Ready, nil
-}
-
-// Namespace creates Namespace object
-func Namespace(n ClusterPolicyController) (gpuv1.State, error) {
-	state := n.idx
-	obj := n.resources[state].Namespace.DeepCopy()
-	logger := n.rec.Log.WithValues("Namespace", obj.Name)
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, skipping update...")
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
 	return gpuv1.Ready, nil
 }
 
@@ -1975,11 +1986,9 @@ func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].PrometheusRule.DeepCopy()
-	logger := n.rec.Log.WithValues("PrometheusRule", obj.Name)
+	obj.Namespace = n.operatorNamespace
 
-	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Namespace = n.operatorNamespace
-	}
+	logger := n.rec.Log.WithValues("PrometheusRule", obj.Name)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err

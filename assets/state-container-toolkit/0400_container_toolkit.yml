@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-container-toolkit-daemonset
   name: nvidia-container-toolkit-daemonset
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   annotations:
     openshift.io/scc: hostmount-anyuid
 spec:

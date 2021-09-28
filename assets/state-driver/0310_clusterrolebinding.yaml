@@ -9,6 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: nvidia-driver
-  namespace: gpu-operator-resources
-userNames:
-- system:serviceaccount:gpu-operator-resources:nvidia-driver
+  namespace: "FILLED BY THE OPERATOR"

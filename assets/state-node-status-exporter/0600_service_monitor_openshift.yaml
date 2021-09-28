@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: nvidia-node-status-exporter
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   labels:
     app: nvidia-node-status-exporter
 spec:
@@ -12,7 +12,7 @@ spec:
   jobLabel: node-status
   namespaceSelector:
     matchNames:
-    - gpu-operator-resources
+    - "FILLED BY THE OPERATOR"
   selector:
     matchLabels:
      app: nvidia-node-status-exporter

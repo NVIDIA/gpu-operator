@@ -42,6 +42,6 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:gpu-operator-resources:nvidia-gpu-feature-discovery
+- "FILLED BY THE OPERATOR"
 volumes:
 - '*'

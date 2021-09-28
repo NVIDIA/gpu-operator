@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-dcgm
   name: nvidia-dcgm
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   annotations:
     openshift.io/scc: hostmount-anyuid
 spec:

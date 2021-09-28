@@ -9,6 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: nvidia-mig-manager
-  namespace: gpu-operator-resources
-userNames:
-- system:serviceaccount:gpu-operator-resources:nvidia-mig-manager
+  namespace: "FILLED BY THE OPERATOR"

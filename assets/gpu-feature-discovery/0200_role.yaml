@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: nvidia-gpu-feature-discovery
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
 rules:
 - apiGroups:
   - security.openshift.io

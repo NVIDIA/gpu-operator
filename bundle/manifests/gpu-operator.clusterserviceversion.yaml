@@ -231,6 +231,8 @@ metadata:
       ]
     operators.operatorframework.io/builder: operator-sdk-v1.4.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operatorframework.io/cluster-monitoring: "true"
+    operatorframework.io/suggested-namespace: nvidia-gpu-operator
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
@@ -509,6 +511,211 @@ spec:
     mediatype: image/png
   install:
     spec:
+      clusterPermissions:
+      - serviceAccountName: gpu-operator
+        rules:
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          - proxies
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - '*'
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
+          resourceNames:
+          - hostmount-anyuid
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - clusterrolebindings
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - nodes
+          - namespaces
+          - serviceaccounts
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - node.k8s.io
+          resources:
+          - runtimeclasses
+          verbs:
+          - get
+          - list
+          - create
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - '*'
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
+      permissions:
+      - serviceAccountName: gpu-operator
+        rules:
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - create
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resourceNames:
+          - gpu-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - '*'
       deployments:
       - name: gpu-operator
         spec:
@@ -573,13 +780,13 @@ spec:
               serviceAccountName: gpu-operator
     strategy: deployment
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
-  - supported: true
+  - supported: false
     type: MultiNamespace
-  - supported: true
+  - supported: false
     type: AllNamespaces
   keywords:
   - gpu

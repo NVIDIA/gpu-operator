@@ -43,7 +43,6 @@ type Resources struct {
 	Taint                      corev1.Taint
 	SecurityContextConstraints secv1.SecurityContextConstraints
 	PodSecurityPolicy          policyv1beta1.PodSecurityPolicy
-	Namespace                  corev1.Namespace
 	RuntimeClass               nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
 }
@@ -147,10 +146,6 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			_, _, err := s.Decode(m, nil, &res.SecurityContextConstraints)
 			panicIfError(err)
 			ctrl = append(ctrl, SecurityContextConstraints)
-		case "Namespace":
-			_, _, err := s.Decode(m, nil, &res.Namespace)
-			panicIfError(err)
-			ctrl = append(ctrl, Namespace)
 		case "RuntimeClass":
 			_, _, err := s.Decode(m, nil, &res.RuntimeClass)
 			panicIfError(err)

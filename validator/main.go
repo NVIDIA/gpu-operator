@@ -77,6 +77,7 @@ type Metrics struct {
 var (
 	kubeconfigFlag           string
 	nodeNameFlag             string
+	namespaceFlag            string
 	withWaitFlag             bool
 	withWorkloadFlag         bool
 	componentFlag            string
@@ -128,8 +129,6 @@ const (
 	cudaWorkloadPodSpecPath = "/var/nvidia/manifests/cuda-workload-validation.yaml"
 	// NodeSelectorKey indicates node label key to use as node selector for plugin validation pod
 	nodeSelectorKey = "kubernetes.io/hostname"
-	// validationPodNamespace indicates namespace to deploy plugin validation pod
-	validationPodNamespace = "gpu-operator-resources"
 	// validatorImageEnvName indicates env name for validator image passed
 	validatorImageEnvName = "VALIDATOR_IMAGE"
 	// validatorImagePullPolicyEnvName indicates env name for validator image pull policy passed
@@ -168,6 +167,14 @@ func main() {
 			Usage:       "the name of the node to deploy plugin validation pod",
 			Destination: &nodeNameFlag,
 			EnvVars:     []string{"NODE_NAME"},
+		},
+		&cli.StringFlag{
+			Name:        "namespace",
+			Aliases:     []string{"ns"},
+			Value:       "",
+			Usage:       "the namespace in which the operator resources are deployed",
+			Destination: &namespaceFlag,
+			EnvVars:     []string{"OPERATOR_NAMESPACE"},
 		},
 		&cli.BoolFlag{
 			Name:        "with-wait",
@@ -264,8 +271,16 @@ func validateFlags(c *cli.Context) error {
 	if !isValidComponent() {
 		return fmt.Errorf("invalid -c <component-name> flag value: %s", componentFlag)
 	}
-	if componentFlag == "plugin" && nodeNameFlag == "" {
-		return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for plugin validation")
+	if componentFlag == "plugin" {
+		if nodeNameFlag == "" {
+			return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for plugin validation")
+		}
+		if namespaceFlag == "" {
+			return fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for plugin validation")
+		}
+	}
+	if componentFlag == "cuda" && namespaceFlag == "" {
+		return fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for cuda validation")
 	}
 	if componentFlag == "metrics" {
 		if metricsPort == defaultMetricsPort {
@@ -612,6 +627,7 @@ func (p *Plugin) runWorkload() error {
 		return err
 	}
 
+	pod.ObjectMeta.Namespace = namespaceFlag
 	pod.Spec.Containers[0].Image = os.Getenv(validatorImageEnvName)
 	pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
 	pod.Spec.InitContainers[0].Image = os.Getenv(validatorImageEnvName)
@@ -649,7 +665,7 @@ func (p *Plugin) runWorkload() error {
 		FieldSelector: fields.Set{"spec.nodeName": nodeNameFlag}.AsSelector().String()}
 
 	// check if plugin validation pod is already running and cleanup.
-	podList, err := p.kubeClient.CoreV1().Pods(validationPodNamespace).List(context.TODO(), opts)
+	podList, err := p.kubeClient.CoreV1().Pods(namespaceFlag).List(context.TODO(), opts)
 	if err != nil {
 		return fmt.Errorf("cannot list existing validation pods: %s", err)
 	}
@@ -658,20 +674,20 @@ func (p *Plugin) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = p.kubeClient.CoreV1().Pods(validationPodNamespace).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
+		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %s", err)
 		}
 	}
 
 	// wait for plugin validation pod to be ready.
-	newPod, err := p.kubeClient.CoreV1().Pods(validationPodNamespace).Create(context.TODO(), pod, meta_v1.CreateOptions{})
+	newPod, err := p.kubeClient.CoreV1().Pods(namespaceFlag).Create(context.TODO(), pod, meta_v1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create plugin validation pod %s, err %+v", pod.ObjectMeta.Name, err)
 	}
 
 	// make sure its available
-	err = waitForPod(p.kubeClient, newPod.ObjectMeta.Name, validationPodNamespace)
+	err = waitForPod(p.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
@@ -680,7 +696,7 @@ func (p *Plugin) runWorkload() error {
 
 func setOwnerReference(kubeClient kubernetes.Interface, pod *v1.Pod) error {
 	// get owner of validator daemonset (which is ClusterPolicy)
-	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(validationPodNamespace).Get(context.TODO(), "nvidia-operator-validator", meta_v1.GetOptions{})
+	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(context.TODO(), "nvidia-operator-validator", meta_v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -873,6 +889,7 @@ func (c *CUDA) runWorkload() error {
 		return err
 	}
 
+	pod.ObjectMeta.Namespace = namespaceFlag
 	pod.Spec.Containers[0].Image = os.Getenv(validatorImageEnvName)
 	pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
 	pod.Spec.InitContainers[0].Image = os.Getenv(validatorImageEnvName)
@@ -899,7 +916,7 @@ func (c *CUDA) runWorkload() error {
 		FieldSelector: fields.Set{"spec.nodeName": nodeNameFlag}.AsSelector().String()}
 
 	// check if cuda workload pod is already running and cleanup.
-	podList, err := c.kubeClient.CoreV1().Pods(validationPodNamespace).List(context.TODO(), opts)
+	podList, err := c.kubeClient.CoreV1().Pods(namespaceFlag).List(context.TODO(), opts)
 	if err != nil {
 		return fmt.Errorf("cannot list existing validation pods: %s", err)
 	}
@@ -908,20 +925,20 @@ func (c *CUDA) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = c.kubeClient.CoreV1().Pods(validationPodNamespace).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
+		err = c.kubeClient.CoreV1().Pods(namespaceFlag).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %s", err)
 		}
 	}
 
 	// wait for cuda workload pod to be ready.
-	newPod, err := c.kubeClient.CoreV1().Pods(validationPodNamespace).Create(context.TODO(), pod, meta_v1.CreateOptions{})
+	newPod, err := c.kubeClient.CoreV1().Pods(namespaceFlag).Create(context.TODO(), pod, meta_v1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create cuda validation pod %s, err %+v", pod.ObjectMeta.Name, err)
 	}
 
 	// make sure its available
-	err = waitForPod(c.kubeClient, newPod.ObjectMeta.Name, validationPodNamespace)
+	err = waitForPod(c.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
