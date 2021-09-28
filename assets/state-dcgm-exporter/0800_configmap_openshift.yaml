@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nvidia-dcgm-exporter
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   labels:
     app: nvidia-dcgm-exporter
 data:

@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-cuda-validator
   generateName: nvidia-cuda-validator-
-  namespace: gpu-operator-resources
+  namespace: "FILLED_BY_VALIDATOR"
 spec:
   tolerations:
     - key: nvidia.com/gpu

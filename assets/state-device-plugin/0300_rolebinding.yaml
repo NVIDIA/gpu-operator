@@ -2,15 +2,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: nvidia-device-plugin
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: nvidia-device-plugin
-  namespace: gpu-operator-resources
 subjects:
 - kind: ServiceAccount
   name: nvidia-device-plugin
-  namespace: gpu-operator-resources
-userNames:
-- system:serviceaccount:gpu-operator-resources:nvidia-device-plugin
+  namespace: "FILLED BY THE OPERATOR"

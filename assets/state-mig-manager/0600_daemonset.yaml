@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nvidia-mig-manager
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   labels:
     app: nvidia-mig-manager
 spec:

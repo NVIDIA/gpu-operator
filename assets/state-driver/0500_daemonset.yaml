@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-driver-daemonset
   name: nvidia-driver-daemonset
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   annotations:
     openshift.io/scc: nvidia-driver
 spec:

@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-device-plugin-validator
   generateName: nvidia-device-plugin-validator-
-  namespace: gpu-operator-resources
+  namespace: "FILLED_BY_VALIDATOR"
 spec:
   tolerations:
     - key: nvidia.com/gpu

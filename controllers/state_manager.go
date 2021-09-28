@@ -300,11 +300,12 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
 		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-		if clusterPolicyCtrl.operatorNamespace != "" {
-			addState(n, "/opt/gpu-operator/state-operator-metrics")
-		} else {
-			log.Error(err, "OPERATOR_NAMESPACE environment variable not set, cannot activate state-operator-metrics")
+		if clusterPolicyCtrl.operatorNamespace == "" {
+			return fmt.Errorf("OPERATOR_NAMESPACE environment variable not set, cannot proceed")
 		}
+
+		addState(n, "/opt/gpu-operator/state-operator-metrics")
+
 		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
 			addState(n, "/opt/gpu-operator/state-node-status-exporter")
 		}

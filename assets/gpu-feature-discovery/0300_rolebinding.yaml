@@ -2,15 +2,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: nvidia-gpu-feature-discovery
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: nvidia-gpu-feature-discovery
-  namespace: gpu-operator-resources
 subjects:
 - kind: ServiceAccount
   name: nvidia-gpu-feature-discovery
-  namespace: gpu-operator-resources
-userNames:
-- system:serviceaccount:gpu-operator-resources:nvidia-gpu-feature-discovery
+  namespace: "FILLED BY THE OPERATOR"

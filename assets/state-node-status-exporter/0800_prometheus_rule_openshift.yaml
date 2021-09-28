@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-node-status-exporter
   name: nvidia-node-status-exporter-alerts
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
 spec:
   groups:
   - name: Alert on node deployment failure

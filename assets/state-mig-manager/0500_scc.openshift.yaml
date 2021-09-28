@@ -42,6 +42,6 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:gpu-operator-resources:nvidia-driver
+- "FILLED BY THE OPERATOR"
 volumes:
 - '*'

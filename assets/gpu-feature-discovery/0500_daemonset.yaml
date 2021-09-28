@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: gpu-feature-discovery
-  namespace: gpu-operator-resources
+  namespace: "FILLED BY THE OPERATOR"
   labels:
     app: gpu-feature-discovery
     app.kubernetes.io/part-of: nvidia-gpu
