@@ -5,10 +5,10 @@ check_pod_ready() {
 	local current_time=0
 	while :; do
 		echo "Checking $pod_label pod"
-		kubectl get pods -lapp=$pod_label -n gpu-operator-resources
+		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
 
 		echo "Checking $pod_label pod readiness"
-		is_pod_ready=$(kubectl get pods -lapp=$pod_label -n gpu-operator-resources -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
+		is_pod_ready=$(kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
 		if [ "${is_pod_ready}" = "True" ]; then
 			echo "Pod $pod_label is ready"
@@ -21,7 +21,7 @@ check_pod_ready() {
 		fi
 
 		# Echo useful information on stdout
-		kubectl get pods -n gpu-operator-resources
+		kubectl get pods -n ${TEST_NAMESPACE}
 
 		echo "Sleeping 5 seconds"
 		current_time=$((${current_time} + 5))
