@@ -133,8 +133,7 @@ metadata:
               "resources": {},
               "securityContext": {},
               "repoConfig": {
-                "configMapName": "",
-                "destinationDir": ""
+                "configMapName": ""
               },
               "licensingConfig": {
                 "configMapName": "",
