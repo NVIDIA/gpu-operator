@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -93,6 +94,14 @@ const (
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 )
+
+// RepoConfigPathMap indicates standard OS specific paths for repository configuration files
+var RepoConfigPathMap = map[string]string{
+	"centos": "/etc/yum.repos.d",
+	"ubuntu": "/etc/apt/sources.list.d",
+	"rhcos":  "/etc/yum.repos.d",
+	"rhel":   "/etc/yum.repos.d",
+}
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
@@ -1385,6 +1394,20 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (
 	return image, nil
 }
 
+// getRepoConfigPath returns the standard OS specific path for repository configuration files
+func getRepoConfigPath() (string, error) {
+	release, err := parseOSRelease()
+	if err != nil {
+		return "", err
+	}
+
+	os := release["ID"]
+	if path, ok := RepoConfigPathMap[os]; ok {
+		return path, nil
+	}
+	return "", fmt.Errorf("distribution not supported")
+}
+
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	for i, container := range obj.Spec.Template.Spec.Containers {
 		// skip if not nvidia-driver container
@@ -1426,15 +1449,43 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 
 		// set any custom repo configuration provided
-		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && config.Driver.RepoConfig.DestinationDir != "" {
-			repoConfigVolMount := corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: config.Driver.RepoConfig.DestinationDir}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, repoConfigVolMount)
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
+			destinationDir, err := getRepoConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
+			}
+
+			// get the custom repo ConfigMap
+			cm := &corev1.ConfigMap{}
+			opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: config.Driver.RepoConfig.ConfigMapName}
+			err = n.rec.Client.Get(context.TODO(), opts, cm)
+			if err != nil {
+				return fmt.Errorf("ERROR: could not get custom repo ConfigMap from client: %v", err)
+			}
+
+			// create one volume mount per file in the ConfigMap and use subPath
+			var filenames []string
+			for filename := range cm.Data {
+				filenames = append(filenames, filename)
+			}
+			// sort so volumes are added to spec in deterministic order
+			sort.Strings(filenames)
+			var itemsToInclude []corev1.KeyToPath
+			for _, filename := range filenames {
+				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts,
+					corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
+				itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
+					Key:  filename,
+					Path: filename,
+				})
+			}
 
 			repoConfigVolumeSource := corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: config.Driver.RepoConfig.ConfigMapName,
 					},
+					Items: itemsToInclude,
 				},
 			}
 			repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: repoConfigVolumeSource}

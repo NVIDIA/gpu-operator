@@ -72,7 +72,6 @@ spec:
     # private mirror repository configuration
     repoConfig:
       configMapName: ""
-      destinationDir: ""
     # vGPU licensing configuration
     licensingConfig:
       configMapName: ""

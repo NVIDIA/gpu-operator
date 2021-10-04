@@ -1323,8 +1323,6 @@ spec:
                     properties:
                       configMapName:
                         type: string
-                      destinationDir:
-                        type: string
                     type: object
                   repository:
                     description: Driver image repository
