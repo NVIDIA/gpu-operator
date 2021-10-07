@@ -30,7 +30,7 @@ metadata:
                 "configMapName": ""
               },
               "licensingConfig": {
-                "nlsEnabled": "false",
+                "nlsEnabled": false,
                 "configMapName": ""
               },
               "virtualTopology": {
