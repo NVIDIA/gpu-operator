@@ -398,8 +398,6 @@ spec:
                   version:
                     description: DCGM image tag
                     type: string
-                required:
-                - image
                 type: object
               dcgmExporter:
                 description: DCGMExporter spec
@@ -717,8 +715,6 @@ spec:
                   version:
                     description: DCGM image tag
                     type: string
-                required:
-                - image
                 type: object
               devicePlugin:
                 description: DevicePlugin component spec
@@ -1027,8 +1023,6 @@ spec:
                   version:
                     description: DevicePlugin image tag
                     type: string
-                required:
-                - image
                 type: object
               driver:
                 description: Driver component spec
@@ -1511,8 +1505,6 @@ spec:
                           daemon configuration file nvidia-topologyd.conf'
                         type: string
                     type: object
-                required:
-                - image
                 type: object
               gfd:
                 description: GPUFeatureDiscovery spec
@@ -1821,8 +1813,6 @@ spec:
                   version:
                     description: GFD image tag
                     type: string
-                required:
-                - image
                 type: object
               mig:
                 description: MIG spec
@@ -2154,8 +2144,6 @@ spec:
                   version:
                     description: mig-manager image tag
                     type: string
-                required:
-                - image
                 type: object
               nodeStatusExporter:
                 description: NodeStatusExporter spec
@@ -2468,8 +2456,6 @@ spec:
                   version:
                     description: node-status-exporter image tag
                     type: string
-                required:
-                - image
                 type: object
               operator:
                 description: Operator component spec
@@ -2830,8 +2816,6 @@ spec:
                   version:
                     description: Toolkit image tag
                     type: string
-                required:
-                - image
                 type: object
               validator:
                 description: Validator defines the spec for operator-validator daemonset
@@ -3608,8 +3592,6 @@ spec:
                   version:
                     description: Validator image tag
                     type: string
-                required:
-                - image
                 type: object
             required:
             - daemonsets

@@ -16,6 +16,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.mig-manager: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-mig-manager
       initContainers:
         - name: toolkit-validation
@@ -30,7 +35,7 @@ spec:
               mountPropagation: HostToContainer
       containers:
       - name: nvidia-mig-manager
-        image: "FILLED_BY_OPERATOR"
+        image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         env:
         - name: NODE_NAME
@@ -40,7 +45,7 @@ spec:
         - name: CONFIG_FILE
           value: "/mig-parted-config/config.yaml"
         - name: WITH_REBOOT
-          value: "FILLED_BY_OPERATOR"
+          value: "false"
         - name: HOST_ROOT_MOUNT
           value: "/host"
         securityContext:

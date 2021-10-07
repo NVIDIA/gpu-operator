@@ -13,217 +13,59 @@ metadata:
           },
           "spec": {
             "dcgmExporter": {
-              "image": "dcgm-exporter",
-              "imagePullSecrets": [],
-              "repository": "nvcr.io/nvidia/k8s",
               "config": {
                 "name": ""
-              },
-              "env": [
-                {
-                  "name": "DCGM_EXPORTER_LISTEN",
-                  "value": ":9400"
-                },
-                {
-                  "name": "DCGM_EXPORTER_KUBERNETES",
-                  "value": "true"
-                },
-                {
-                  "name": "DCGM_EXPORTER_COLLECTORS",
-                  "value": "/etc/dcgm-exporter/dcp-metrics-included.csv"
-                }
-              ],
-              "resources": {},
-              "securityContext": {},
-              "tolerations": [],
-              "version": "sha256:e37404194fa2bc2275827411049422b93d1493991fb925957f170b4b842846ff"
+              }
             },
             "dcgm": {
-              "enabled": true,
-              "image": "dcgm",
-              "imagePullSecrets": [],
-              "repository": "nvcr.io/nvidia/cloud-native",
-              "hostPort": 5555,
-              "resources": {},
-              "securityContext": {},
-              "tolerations": [],
-              "version": "sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c"
+              "enabled": true
             },
             "daemonsets": {
-              "tolerations": [
-                {
-                  "key": "nvidia.com/gpu",
-                  "operator": "Exists",
-                  "effect": "NoSchedule"
-                }
-              ],
-              "priorityClassName": "system-node-critical"
             },
             "devicePlugin": {
-              "image": "k8s-device-plugin",
-              "imagePullSecrets": [],
-              "args": [],
-              "env": [
-                {
-                  "name": "PASS_DEVICE_SPECS",
-                  "value": "true"
-                },
-                {
-                  "name": "FAIL_ON_INIT_ERROR",
-                  "value": "true"
-                },
-                {
-                  "name": "DEVICE_LIST_STRATEGY",
-                  "value": "envvar"
-                },
-                {
-                  "name": "DEVICE_ID_STRATEGY",
-                  "value": "uuid"
-                },
-                {
-                  "name": "NVIDIA_VISIBLE_DEVICES",
-                  "value": "all"
-                },
-                {
-                  "name": "NVIDIA_DRIVER_CAPABILITIES",
-                  "value": "all"
-                }
-              ],
-              "repository": "nvcr.io/nvidia",
-              "resources": {},
-              "securityContext": {},
-              "version": "sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05"
             },
             "driver": {
               "enabled": true,
-              "image": "driver",
-              "imagePullSecrets": [],
-              "rdma": {
-                "enabled": false
-              },
-              "manager": {
-                "image": "k8s-driver-manager",
-                "repository": "nvcr.io/nvidia/cloud-native",
-                "version": "sha256:907ab0fc008bb90149ed059ac3a8ed3d19ae010d52c58c0ddbafce45df468d5b",
-                "imagePullSecrets": [],
-                "env": [
-                  {
-                    "name": "DRAIN_USE_FORCE",
-                    "value": "false"
-                  },
-                  {
-                    "name": "DRAIN_POD_SELECTOR_LABEL",
-                    "value": ""
-                  },
-                  {
-                    "name": "DRAIN_TIMEOUT_SECONDS",
-                    "value": "0s"
-                  },
-                  {
-                    "name": "DRAIN_DELETE_EMPTYDIR_DATA",
-                    "value": "false"
-                  }
-                ]
-              },
-              "nodeSelector": {
-                "nvidia.com/gpu.deploy.driver": "true"
-              },
-              "podSecurityContext": {},
-              "repository": "nvcr.io/nvidia",
-              "resources": {},
-              "securityContext": {},
               "repoConfig": {
                 "configMapName": ""
               },
               "licensingConfig": {
-                "configMapName": "",
-                "nlsEnabled": false
+                "nlsEnabled": "false",
+                "configMapName": ""
               },
               "virtualTopology": {
                 "config": ""
-              },
-              "version": "sha256:a62de5e843a41c65cf837e7db5f5b675d03fa2de05e981a859b114336cf183e3"
+              }
             },
             "gfd": {
-              "image": "gpu-feature-discovery",
-              "imagePullSecrets": [],
-              "env": [
-                {
-                  "name": "GFD_SLEEP_INTERVAL",
-                  "value": "60s"
-                },
-                {
-                  "name": "FAIL_ON_INIT_ERROR",
-                  "value": "true"
-                }
-              ],
-              "repository": "nvcr.io/nvidia",
-              "resources": {},
-              "securityContext": {},
-              "version": "sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
             },
             "migManager": {
-              "enabled": true,
-              "image": "k8s-mig-manager",
-              "imagePullSecrets": [],
-              "env": [
-                {
-                  "name": "WITH_REBOOT",
-                  "value": "false"
-                }
-              ],
-              "repository": "nvcr.io/nvidia/cloud-native",
-              "resources": {},
-              "securityContext": {},
-              "config": {
-                "name": ""
-              },
-              "version": "sha256:8cdb793f8a22b076bf0f19818f9d79fe87b121608f1aa28b12a560b6fe13f47e"
+              "enabled": true
             },
             "nodeStatusExporter": {
-              "enabled": true,
-              "image": "gpu-operator-validator",
-              "imagePullSecrets": [],
-              "repository": "nvcr.io/nvidia/cloud-native",
-              "resources": {},
-              "securityContext": {},
-              "version": "devel-ubi8"
+              "enabled": true
             },
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
               "initContainer": {
-                "image": "cuda",
-                "repository": "nvcr.io/nvidia",
-                "version": "sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70",
-                "imagePullSecrets": []
               }
             },
             "mig": {
               "strategy": "single"
             },
             "toolkit": {
-              "enabled": true,
-              "image": "container-toolkit",
-              "imagePullSecrets": [],
-              "repository": "nvcr.io/nvidia/k8s",
-              "resources": {},
-              "securityContext": {},
-              "version": "sha256:b0c84b47d5f95000a842b823ad33dc9aa28f0edfa6d9565c289b61cb1d4a9934"
+              "enabled": true
             },
             "validator": {
-              "image": "gpu-operator-validator",
-              "imagePullSecrets": [],
-              "repository": "nvcr.io/nvidia/cloud-native",
-              "resources": {},
-              "securityContext": {},
-              "version": "devel-ubi8",
-              "env": [
-                {
-                  "name": "WITH_WORKLOAD",
-                  "value": "true"
-                }
-              ]
+              "plugin": {
+                "env": [
+                  {
+                    "name": "WITH_WORKLOAD",
+                    "value": "true"
+                  }
+                ]
+              }
             }
           }
         }
@@ -733,10 +575,10 @@ spec:
               priorityClassName: system-node-critical
               containers:
               - args:
-                - --leader-elect
-                command:
-                - gpu-operator
+                  - --leader-elect
                 image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+                command:
+                  - gpu-operator
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -767,10 +609,30 @@ spec:
                   name: host-os-release
                   readOnly: true
                 env:
-                - name: OPERATOR_NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.namespace
+                  - name: OPERATOR_NAMESPACE
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.namespace
+                  - name: "VALIDATOR_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8"
+                  - name: "GFD_IMAGE"
+                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
+                  - name: "CONTAINER_TOOLKIT_IMAGE"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:b0c84b47d5f95000a842b823ad33dc9aa28f0edfa6d9565c289b61cb1d4a9934"
+                  - name: "DCGM_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:28f334d6d5ca6e5cad2cf05a255989834128c952e3c181e6861bd033476d4b2c"
+                  - name: "DCGM_EXPORTER_IMAGE"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:e37404194fa2bc2275827411049422b93d1493991fb925957f170b4b842846ff"
+                  - name: "DEVICE_PLUGIN_IMAGE"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:85def0197f388e5e336b1ab0dbec350816c40108a58af946baa1315f4c96ee05"
+                  - name: "DRIVER_IMAGE"
+                    value: "nvcr.io/nvidia/driver@sha256:a62de5e843a41c65cf837e7db5f5b675d03fa2de05e981a859b114336cf183e3"
+                  - name: "DRIVER_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:907ab0fc008bb90149ed059ac3a8ed3d19ae010d52c58c0ddbafce45df468d5b"
+                  - name: "MIG_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8cdb793f8a22b076bf0f19818f9d79fe87b121608f1aa28b12a560b6fe13f47e"
+                  - name: "CUDA_BASE_IMAGE"
+                    value: "nvcr.io/nvidia/cuda@sha256:2fc35c2743cd826f84dd8ea3d2d177f7fa22b08f19fe246ea0fce1dce1c18a70"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:

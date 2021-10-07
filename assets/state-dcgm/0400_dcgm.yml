@@ -18,6 +18,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-dcgm
       initContainers:
       - name: toolkit-validation

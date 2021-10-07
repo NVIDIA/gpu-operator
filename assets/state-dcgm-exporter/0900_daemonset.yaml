@@ -18,6 +18,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm-exporter: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
       initContainers:
@@ -39,6 +44,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DCGM_EXPORTER_LISTEN
+          value: ":9400"
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        - name: DCGM_EXPORTER_COLLECTORS
+          value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
         ports:
         - name: "metrics"
           containerPort: 9400

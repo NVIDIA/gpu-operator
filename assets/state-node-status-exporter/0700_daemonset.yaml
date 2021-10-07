@@ -18,6 +18,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.node-status-exporter: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-node-status-exporter
       containers:
       - image: "FILLED BY THE OPERATOR"

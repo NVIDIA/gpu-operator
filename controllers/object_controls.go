@@ -741,6 +741,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = image
+
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 	// set image pull secrets
@@ -794,6 +795,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = image
+
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DCGMExporter.ImagePullPolicy)
 	// set image pull secrets
@@ -878,7 +880,9 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	initContainer := v1.Container{}
-	initContainer.Image = initImage
+	if initImage != "" {
+		initContainer.Image = initImage
+	}
 	initContainer.Name = "init-pod-nvidia-node-status-exporter"
 	initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.InitContainer.ImagePullPolicy)
 	initContainer.Command = []string{"/bin/entrypoint.sh"}
@@ -1334,8 +1338,8 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 		if err != nil {
 			return err
 		}
-
 		obj.Spec.Template.Spec.InitContainers[i].Image = managerImage
+
 		if config.Driver.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
 		}
@@ -1367,7 +1371,9 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		if err != nil {
 			return err
 		}
-		obj.Spec.Template.Spec.Containers[i].Image = driverImage
+		if driverImage != "" {
+			obj.Spec.Template.Spec.Containers[i].Image = driverImage
+		}
 		if config.Driver.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 		}
@@ -1387,7 +1393,7 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (
 		return "", err
 	}
 	// if image digest is specified, use it directly
-	if !strings.HasPrefix(driverSpec.Version, "sha256:") {
+	if !strings.Contains(image, "sha256:") {
 		// append os-tag to the provided driver version
 		image = fmt.Sprintf("%s-%s", image, osTag)
 	}
@@ -1418,7 +1424,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return err
 		}
-		obj.Spec.Template.Spec.Containers[i].Image = image
+		if image != "" {
+			obj.Spec.Template.Spec.Containers[i].Image = image
+		}
 
 		// update image pull policy
 		obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
