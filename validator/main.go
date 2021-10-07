@@ -628,10 +628,15 @@ func (p *Plugin) runWorkload() error {
 	}
 
 	pod.ObjectMeta.Namespace = namespaceFlag
-	pod.Spec.Containers[0].Image = os.Getenv(validatorImageEnvName)
-	pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
-	pod.Spec.InitContainers[0].Image = os.Getenv(validatorImageEnvName)
-	pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
+	image := os.Getenv(validatorImageEnvName)
+	pod.Spec.Containers[0].Image = image
+	pod.Spec.InitContainers[0].Image = image
+
+	imagePullPolicy := os.Getenv(validatorImagePullPolicyEnvName)
+	if imagePullPolicy != "" {
+		pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+		pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
 		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")
@@ -888,12 +893,16 @@ func (c *CUDA) runWorkload() error {
 	if err != nil {
 		return err
 	}
-
 	pod.ObjectMeta.Namespace = namespaceFlag
-	pod.Spec.Containers[0].Image = os.Getenv(validatorImageEnvName)
-	pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
-	pod.Spec.InitContainers[0].Image = os.Getenv(validatorImageEnvName)
-	pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(os.Getenv(validatorImagePullPolicyEnvName))
+	image := os.Getenv(validatorImageEnvName)
+	pod.Spec.Containers[0].Image = image
+	pod.Spec.InitContainers[0].Image = image
+
+	imagePullPolicy := os.Getenv(validatorImagePullPolicyEnvName)
+	if imagePullPolicy != "" {
+		pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+		pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
 		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")

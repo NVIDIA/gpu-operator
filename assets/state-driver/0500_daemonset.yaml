@@ -18,6 +18,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-driver
       serviceAccountName: nvidia-driver
       hostPID: true
@@ -62,6 +67,16 @@ spec:
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
+          - name: ENABLE_AUTO_DRAIN
+            value: "true"
+          - name: DRAIN_USE_FORCE
+            value: "false"
+          - name: DRAIN_POD_SELECTOR_LABEL
+            value: ""
+          - name: DRAIN_TIMEOUT_SECONDS
+            value: "0s"
+          - name: DRAIN_DELETE_EMPTYDIR_DATA
+            value: "false"
           securityContext:
             privileged: true
           volumeMounts:

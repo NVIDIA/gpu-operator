@@ -19,6 +19,11 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
       serviceAccount: nvidia-gpu-feature-discovery
       initContainers:
         - name: toolkit-validation
@@ -34,6 +39,11 @@ spec:
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
+          env:
+            - name: GFD_SLEEP_INTERVAL
+              value: 60s
+            - name: GFD_FAIL_ON_INIT_ERROR
+              value: "true"
           volumeMounts:
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"

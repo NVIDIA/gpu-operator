@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -161,15 +162,15 @@ type ValidatorSpec struct {
 
 	// Validator image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// Validator image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// Validator image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -292,15 +293,15 @@ type DriverSpec struct {
 
 	// Driver image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// Driver image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// Driver image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -366,15 +367,15 @@ type ToolkitSpec struct {
 
 	// Toolkit image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// Toolkit image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// Toolkit image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -416,15 +417,15 @@ type ToolkitSpec struct {
 type DevicePluginSpec struct {
 	// DevicePlugin image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// DevicePlugin image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// DevicePlugin image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -466,15 +467,15 @@ type DevicePluginSpec struct {
 type DCGMExporterSpec struct {
 	// DCGM image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// DCGM image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// DCGM image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -537,15 +538,15 @@ type DCGMSpec struct {
 
 	// DCGM image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// DCGM image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// DCGM image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -598,15 +599,15 @@ type NodeStatusExporterSpec struct {
 
 	// node-status-exporter image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// node-status-exporter image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// node-status-exporter image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -682,15 +683,15 @@ type VirtualTopologyConfigSpec struct {
 type GPUFeatureDiscoverySpec struct {
 	// GFD image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// GFD image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// GFD image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -738,15 +739,15 @@ type MIGManagerSpec struct {
 
 	// mig-manager image repository
 	// +kubebuilder:validation:Optional
-	Repository string `json:"repository"`
+	Repository string `json:"repository,omitempty"`
 
 	// mig-manager image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 
 	// mig-manager image tag
 	// +kubebuilder:validation:Optional
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -870,19 +871,35 @@ func (p *ClusterPolicy) SetState(s State) {
 	p.Status.State = s
 }
 
-func imagePath(repository string, image string, version string) (string, error) {
+func imagePath(repository string, image string, version string, imagePathEnvName string) (string, error) {
+	// ImagePath is obtained using following priority
+	// 1. ClusterPolicy (i.e through repository/image/path variables in CRD)
+	var crdImagePath string
 	if repository == "" && version == "" {
 		if image != "" {
 			// this is useful for tools like kbld(carvel) which transform templates into image as path@digest
-			return image, nil
+			crdImagePath = image
 		}
-		return "", fmt.Errorf("Invalid values for building container image path provided, please update the ClusterPolicy instance")
+	} else {
+		// use @ if image digest is specified instead of tag
+		if strings.HasPrefix(version, "sha256:") {
+			crdImagePath = repository + "/" + image + "@" + version
+		} else {
+			crdImagePath = repository + "/" + image + ":" + version
+		}
 	}
-	// use @ if image digest is specified instead of tag
-	if strings.HasPrefix(version, "sha256:") {
-		return repository + "/" + image + "@" + version, nil
+	if crdImagePath != "" {
+		return crdImagePath, nil
 	}
-	return repository + "/" + image + ":" + version, nil
+
+	// 2. Env passed to GPU Operator Pod (eg OLM)
+	envImagePath := os.Getenv(imagePathEnvName)
+	if envImagePath != "" {
+		return envImagePath, nil
+	}
+
+	// 3. If both are not set, error out
+	return "", fmt.Errorf("Empty image path provided through both ClusterPolicy CR and ENV %s", imagePathEnvName)
 }
 
 // ImagePath sets image path for given component type
@@ -890,37 +907,37 @@ func ImagePath(spec interface{}) (string, error) {
 	switch v := spec.(type) {
 	case *DriverSpec:
 		config := spec.(*DriverSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "DRIVER_IMAGE")
 	case *ToolkitSpec:
 		config := spec.(*ToolkitSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "CONTAINER_TOOLKIT_IMAGE")
 	case *DevicePluginSpec:
 		config := spec.(*DevicePluginSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "DEVICE_PLUGIN_IMAGE")
 	case *DCGMExporterSpec:
 		config := spec.(*DCGMExporterSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "DCGM_EXPORTER_IMAGE")
 	case *DCGMSpec:
 		config := spec.(*DCGMSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "DCGM_IMAGE")
 	case *NodeStatusExporterSpec:
 		config := spec.(*NodeStatusExporterSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "VALIDATOR_IMAGE")
 	case *GPUFeatureDiscoverySpec:
 		config := spec.(*GPUFeatureDiscoverySpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "GFD_IMAGE")
 	case *ValidatorSpec:
 		config := spec.(*ValidatorSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "VALIDATOR_IMAGE")
 	case *InitContainerSpec:
 		config := spec.(*InitContainerSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "CUDA_BASE_IMAGE")
 	case *MIGManagerSpec:
 		config := spec.(*MIGManagerSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "MIG_MANAGER_IMAGE")
 	case *DriverManagerSpec:
 		config := spec.(*DriverManagerSpec)
-		return imagePath(config.Repository, config.Image, config.Version)
+		return imagePath(config.Repository, config.Image, config.Version, "DRIVER_MANAGER_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
