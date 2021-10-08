@@ -103,6 +103,17 @@ var RepoConfigPathMap = map[string]string{
 	"rhel":   "/etc/yum.repos.d",
 }
 
+// CertConfigPathMap indicates standard OS specific paths for ssl keys/certificates.
+// Where Go looks for certs: https://golang.org/src/crypto/x509/root_linux.go
+// Where OCP mounts proxy certs on RHCOS nodes:
+// https://access.redhat.com/documentation/en-us/openshift_container_platform/4.3/html/authentication/ocp-certificates#proxy-certificates_ocp-certificates
+var CertConfigPathMap = map[string]string{
+	"centos": "/etc/pki/ca-trust/extracted/pem",
+	"ubuntu": "/etc/ssl/certs",
+	"rhcos":  "/etc/pki/ca-trust/extracted/pem",
+	"rhel":   "/etc/pki/ca-trust/extracted/pem",
+}
+
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
 // ServiceAccount creates ServiceAccount resource
@@ -1414,6 +1425,64 @@ func getRepoConfigPath() (string, error) {
 	return "", fmt.Errorf("distribution not supported")
 }
 
+// getCertConfigPath returns the standard OS specific path for ssl keys/certificates
+func getCertConfigPath() (string, error) {
+	release, err := parseOSRelease()
+	if err != nil {
+		return "", err
+	}
+
+	os := release["ID"]
+	if path, ok := CertConfigPathMap[os]; ok {
+		return path, nil
+	}
+	return "", fmt.Errorf("distribution not supported")
+}
+
+// createConfigMapVolumeMounts creates a VolumeMount for each key
+// in the ConfigMap. Use subPath to ensure original contents
+// at destinationDir are not overwritten.
+func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string, destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+	// get the ConfigMap
+	cm := &corev1.ConfigMap{}
+	opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: configMapName}
+	err := n.rec.Client.Get(context.TODO(), opts, cm)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ERROR: could not get ConfigMap %s from client: %v", configMapName, err)
+	}
+
+	// create one volume mount per file in the ConfigMap and use subPath
+	var filenames []string
+	for filename := range cm.Data {
+		filenames = append(filenames, filename)
+	}
+	// sort so volume mounts are added to spec in deterministic order
+	sort.Strings(filenames)
+	var itemsToInclude []corev1.KeyToPath
+	var volumeMounts []corev1.VolumeMount
+	for _, filename := range filenames {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{Name: configMapName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
+		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
+			Key:  filename,
+			Path: filename,
+		})
+	}
+	return volumeMounts, itemsToInclude, nil
+}
+
+func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: configMapName,
+			},
+			Items: itemsToInclude,
+		},
+	}
+	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+}
+
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	for i, container := range obj.Spec.Template.Spec.Containers {
 		// skip if not nvidia-driver container
@@ -1462,42 +1531,27 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 			}
-
-			// get the custom repo ConfigMap
-			cm := &corev1.ConfigMap{}
-			opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: config.Driver.RepoConfig.ConfigMapName}
-			err = n.rec.Client.Get(context.TODO(), opts, cm)
+			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
 			if err != nil {
-				return fmt.Errorf("ERROR: could not get custom repo ConfigMap from client: %v", err)
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
 			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 
-			// create one volume mount per file in the ConfigMap and use subPath
-			var filenames []string
-			for filename := range cm.Data {
-				filenames = append(filenames, filename)
-			}
-			// sort so volumes are added to spec in deterministic order
-			sort.Strings(filenames)
-			var itemsToInclude []corev1.KeyToPath
-			for _, filename := range filenames {
-				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts,
-					corev1.VolumeMount{Name: "repo-config", ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
-				itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
-					Key:  filename,
-					Path: filename,
-				})
-			}
+		}
 
-			repoConfigVolumeSource := corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.Driver.RepoConfig.ConfigMapName,
-					},
-					Items: itemsToInclude,
-				},
+		// set any custom ssl key/certificate configuration provided
+		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
+			destinationDir, err := getCertConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 			}
-			repoConfigVol := corev1.Volume{Name: "repo-config", VolumeSource: repoConfigVolumeSource}
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, repoConfigVol)
+			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
 		}
 
 		// set any licensing configuration required

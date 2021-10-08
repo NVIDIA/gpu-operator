@@ -29,6 +29,9 @@ metadata:
               "repoConfig": {
                 "configMapName": ""
               },
+              "certConfig": {
+                "name": ""
+              },
               "licensingConfig": {
                 "nlsEnabled": "false",
                 "configMapName": ""
