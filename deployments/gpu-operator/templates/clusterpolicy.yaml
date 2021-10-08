@@ -133,6 +133,9 @@ spec:
     {{- if .Values.driver.repoConfig }}
     repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.certConfig }}
+    certConfig: {{ toYaml .Values.driver.certConfig | nindent 6 }}
+    {{- end }}
     {{- if .Values.driver.licensingConfig }}
     licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
     {{- end }}

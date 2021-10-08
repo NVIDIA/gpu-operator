@@ -346,6 +346,11 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For Driver Container"
 	RepoConfig *DriverRepoConfigSpec `json:"repoConfig,omitempty"`
 
+	// Optional: Custom certificates configuration for driver container
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Certificates Configuration For Driver Container"
+	CertConfig *DriverCertConfigSpec `json:"certConfig,omitempty"`
+
 	// Optional: Licensing configuration for vGPU drivers
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Licensing Configuration For vGPU Driver Container"
@@ -652,6 +657,15 @@ type DriverRepoConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	ConfigMapName string `json:"configMapName,omitempty"`
+}
+
+// DriverCertConfigSpec defines custom certificates configuration for driver container
+type DriverCertConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
 }
 
 // DriverLicensingConfigSpec defines licensing server configuration for driver container

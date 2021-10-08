@@ -115,6 +115,9 @@ driver:
   # private mirror repository configuration
   repoConfig:
     configMapName: ""
+  # custom ssl key/certificate configuration
+  certConfig:
+    name: ""
   # vGPU licensing configuration
   licensingConfig:
     configMapName: ""
