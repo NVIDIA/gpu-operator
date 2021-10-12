@@ -320,7 +320,7 @@ func (n *ClusterPolicyController) getRuntime() error {
 	for _, node := range list.Items {
 		rt, err := getRuntimeString(node)
 		if err != nil {
-			log.Warnf("Unable to get runtime info for node %s: %v", node.Name, err)
+			n.rec.Log.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
 			continue
 		}
 		runtime = rt
@@ -331,7 +331,7 @@ func (n *ClusterPolicyController) getRuntime() error {
 	}
 
 	if runtime.String() == "" {
-		log.Warn("Unable to get runtime info from the cluster, defaulting to containerd")
+		n.rec.Log.Info("Unable to get runtime info from the cluster, defaulting to containerd")
 		runtime = gpuv1.Containerd
 	}
 	n.runtime = runtime
@@ -407,7 +407,7 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 	if err != nil {
 		return err
 	}
-	log.Info("Using container runtime: ", n.runtime.String())
+	n.rec.Log.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
 	return nil
 }
 
