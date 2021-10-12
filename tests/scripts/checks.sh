@@ -29,6 +29,18 @@ check_pod_ready() {
 	done
 }
 
+check_no_restarts() {
+	local pod_label=$1
+	restartCount=$(kubectl get pod -lapp=$pod_label -n ${TEST_NAMESPACE} -o jsonpath='{.items[*].status.containerStatuses[0].restartCount}')
+	if [ $restartCount -gt 1 ]; then
+		echo "$pod_label restarted multiple times: $restartCount"
+		kubectl logs -p -lapp=$pod_label --all-containers -n ${TEST_NAMESPACE}
+		exit 1
+	fi
+	echo "Repeated restarts not observed for pod $pod_label"
+	return 0
+}
+
 # This function kills the operator and waits for the operator to be back in a running state
 # Timeout is 100 seconds
 test_restart_operator() {

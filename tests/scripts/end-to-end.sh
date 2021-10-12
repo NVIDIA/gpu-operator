@@ -11,6 +11,9 @@ ${SCRIPT_DIR}/verify-operator.sh
 ${SCRIPT_DIR}/install-workload.sh
 ${SCRIPT_DIR}/verify-workload.sh
 
+# Test updates through ClusterPolicy
+${SCRIPT_DIR}/update-clusterpolicy.sh
+
 # TODO: This should be reusable
 source ${SCRIPT_DIR}/checks.sh
 test_restart_operator ${TEST_NAMESPACE} ${CONTAINER_RUNTIME}
