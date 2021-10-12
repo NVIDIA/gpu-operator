@@ -444,7 +444,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, true)
@@ -702,7 +702,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	}
 
 	// configure runtime
-	runtime := string(config.Operator.DefaultRuntime)
+	runtime := n.runtime.String()
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
 
 	if runtime == gpuv1.Containerd.String() {
@@ -789,7 +789,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	nvidiaDriverRoot := config.Driver.Root()
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
 	return nil
@@ -849,7 +849,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("$(NODE_IP):%d", dcgmHostPort))
 	}
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
@@ -977,7 +977,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	return nil
 }
@@ -1034,7 +1034,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -1096,7 +1096,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// configure volume driver-install-path to use host root path if installed outside of operator
 	for _, volume := range obj.Spec.Template.Spec.Volumes {
@@ -1245,7 +1245,7 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, config.Operator.DefaultRuntime, config.Operator.RuntimeClass)
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	return nil
 }

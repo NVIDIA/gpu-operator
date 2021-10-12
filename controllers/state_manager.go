@@ -65,6 +65,7 @@ type ClusterPolicyController struct {
 	rec             *ClusterPolicyReconciler
 	idx             int
 	openshift       string
+	runtime         gpuv1.Runtime
 
 	hasGPUNodes  bool
 	hasNFDLabels bool
@@ -278,6 +279,65 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 
+func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
+	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
+	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
+	var runtime gpuv1.Runtime
+	if strings.HasPrefix(runtimeVer, gpuv1.Docker.String()) {
+		runtime = gpuv1.Docker
+	} else if strings.HasPrefix(runtimeVer, gpuv1.Containerd.String()) {
+		runtime = gpuv1.Containerd
+	} else if strings.HasPrefix(runtimeVer, gpuv1.CRIO.String()) {
+		runtime = gpuv1.CRIO
+	} else {
+		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
+	}
+	return runtime, nil
+}
+
+// getRuntime will detect the container runtime used by nodes in the
+// cluster and correctly set the value for clusterPolicyController.runtime
+// For openshift, set runtime to crio. Otherwise, the default runtime is
+// containerd -- if >=1 node is configured with containerd, set
+// clusterPolicyController.runtime = containerd
+func (n *ClusterPolicyController) getRuntime() error {
+	// assume crio for openshift clusters
+	if n.openshift != "" {
+		n.runtime = gpuv1.CRIO
+		return nil
+	}
+
+	opts := []client.ListOption{
+		client.MatchingLabels{commonGPULabelKey: "true"},
+	}
+	list := &corev1.NodeList{}
+	err := n.rec.Client.List(context.TODO(), list, opts...)
+	if err != nil {
+		return fmt.Errorf("Unable to list nodes prior to checking container runtime: %v", err)
+	}
+
+	var runtime gpuv1.Runtime
+	for _, node := range list.Items {
+		rt, err := getRuntimeString(node)
+		if err != nil {
+			log.Warnf("Unable to get runtime info for node %s: %v", node.Name, err)
+			continue
+		}
+		runtime = rt
+		if runtime == gpuv1.Containerd {
+			// default to containerd if >=1 node running containerd
+			break
+		}
+	}
+
+	if runtime.String() == "" {
+		log.Warn("Unable to get runtime info from the cluster, defaulting to containerd")
+		runtime = gpuv1.Containerd
+	}
+	n.runtime = runtime
+	return nil
+}
+
 func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
 
@@ -342,6 +402,12 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
 
+	// detect the container runtime on worker nodes
+	err = n.getRuntime()
+	if err != nil {
+		return err
+	}
+	log.Info("Using container runtime: ", n.runtime.String())
 	return nil
 }
 
