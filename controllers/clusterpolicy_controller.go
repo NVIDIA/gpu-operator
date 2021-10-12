@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	"github.com/prometheus/common/log"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -121,6 +121,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	clusterPolicyCtrl.operatorMetrics.reconciliationTotal.Inc()
 	overallStatus := gpuv1.Ready
+	statesNotReady := []string{}
 	for {
 		status, statusError := clusterPolicyCtrl.step()
 		if statusError != nil {
@@ -134,10 +135,12 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if instance.Status.State == gpuv1.Ready {
 				updateCRState(r, req.NamespacedName, gpuv1.NotReady)
 			}
-			// If the resource is not ready, log status and proceed with other components
-			r.Log.Info("ClusterPolicy step wasn't ready", "State:", status)
 			overallStatus = gpuv1.NotReady
+			statesNotReady = append(statesNotReady, clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1])
 		}
+		r.Log.Info("INFO: ClusterPolicy step completed",
+			"state:", clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1],
+			"status", status)
 
 		if clusterPolicyCtrl.last() {
 			break
@@ -148,6 +151,9 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
+
+		r.Log.Info("ClusterPolicy isn't ready", "states not ready", statesNotReady)
+
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -172,6 +178,8 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if !clusterPolicyCtrl.hasGPUNodes {
 		r.Log.Info("No GPU node found, watching for new nodes to join the cluster.", "hasNFDLabels", clusterPolicyCtrl.hasNFDLabels)
+	} else {
+		r.Log.Info("ClusterPolicy is ready.")
 	}
 
 	return ctrl.Result{}, nil
@@ -228,8 +236,9 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 
 			gpuCommonLabelMissing := hasGPULabels(labels) && !hasCommonGPULabel(labels)
 			if gpuCommonLabelMissing {
-				log.Info("New node needs an update, GPU common label missing.",
+				r.Log.Info("New node needs an update, GPU common label missing.",
 					"name", e.Object.GetName())
+
 			}
 			return gpuCommonLabelMissing
 		},
@@ -241,7 +250,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
 			needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated || migManagerLabelMissing
 			if needsUpdate {
-				log.Info("Node needs an update",
+				r.Log.Info("Node needs an update",
 					"name", e.ObjectNew.GetName(),
 					"gpuCommonLabelMissing", gpuCommonLabelMissing,
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,

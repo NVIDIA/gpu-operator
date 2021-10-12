@@ -10,7 +10,6 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/prometheus/common/log"
 
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -139,21 +138,21 @@ func hasCommonGPULabel(labels map[string]string) bool {
 // addMissingGPUStateLabels checks if the nodeLabels contain the GPUState labels,
 // and it adds them when missing (the label value is *not* checked, only the key)
 // addMissingGPUStateLabels returns true if the nodeLabels map has been updated
-func addMissingGPUStateLabels(nodeLabels map[string]string) bool {
+func (n *ClusterPolicyController) addMissingGPUStateLabels(nodeLabels map[string]string) bool {
 	modified := false
 	for key, value := range gpuStateLabels {
 		if _, ok := nodeLabels[key]; !ok {
 			nodeLabels[key] = value
 			modified = true
 		}
-		log.Info(" - ", "Label=", key, " value=", nodeLabels[key])
+		n.rec.Log.Info(" - ", "Label=", key, " value=", nodeLabels[key])
 	}
 
 	// add mig-manager label if missing
 	if hasMIGCapableGPU(nodeLabels) && !hasMIGManagerLabel(nodeLabels) {
 		nodeLabels[migManagerLabelKey] = migManagerLabelValue
 		modified = true
-		log.Info(" - ", "Label=", migManagerLabelKey, " value=", migManagerLabelValue)
+		n.rec.Log.Info(" - ", "Label=", migManagerLabelKey, " value=", migManagerLabelValue)
 	}
 	return modified
 }
@@ -261,9 +260,9 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			}
 		}
 		if hasCommonGPULabel(labels) {
-			log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
-			if addMissingGPUStateLabels(labels) {
-				log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+			n.rec.Log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
+			if n.addMissingGPUStateLabels(labels) {
+				n.rec.Log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
 				err = n.rec.Client.Update(context.TODO(), &node)
 				if err != nil {
 					return false, 0, fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
@@ -273,36 +272,42 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			gpuNodesTotal++
 		}
 	}
-	log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
+	n.rec.Log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
 
 	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 
 func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
-	version, err := OpenshiftVersion()
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	n.openshift = version
 	n.singleton = clusterPolicy
 
 	n.rec = reconciler
 	n.idx = 0
 
 	if len(n.controls) == 0 {
+		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
+
+		if clusterPolicyCtrl.operatorNamespace == "" {
+			n.rec.Log.Error(nil, "OPERATOR_NAMESPACE environment variable not set, cannot proceed")
+			// we cannot do anything without the operator namespace,
+			// let the operator Pod run into `CrashloopBackOff`
+
+			os.Exit(1)
+		}
+
+		version, err := OpenshiftVersion()
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		n.openshift = version
+
 		promv1.AddToScheme(reconciler.Scheme)
 		secv1.AddToScheme(reconciler.Scheme)
 
 		n.operatorMetrics = initOperatorMetrics(n)
-		log.Info("Operator metrics initialized.")
+		n.rec.Log.Info("Operator metrics initialized.")
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
-		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-		if clusterPolicyCtrl.operatorNamespace == "" {
-			return fmt.Errorf("OPERATOR_NAMESPACE environment variable not set, cannot proceed")
-		}
 
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
 

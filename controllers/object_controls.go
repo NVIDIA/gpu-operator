@@ -297,18 +297,17 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Ready, nil
+		if !errors.IsAlreadyExists(err) {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
 
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
+		logger.Info("Found Resource, updating...")
+		err = n.rec.Client.Update(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't update", "Error", err)
+			return gpuv1.NotReady, err
+		}
 	}
 
 	return gpuv1.Ready, nil
@@ -1773,6 +1772,8 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		logger.Info("SetControllerReference failed", "Error", err)
+
 		return gpuv1.NotReady, err
 	}
 
@@ -1784,31 +1785,38 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	found := &appsv1.DaemonSet{}
 	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
-		logger.Info("Not found, creating")
+		logger.Info("DaemonSet not found, creating",
+			"Name", obj.Name,
+		)
 		// generate hash for the spec to create
 		hashStr := getDaemonsetHash(obj)
 		// add annotation to the Daemonset with hash value during creation
 		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
 		err = n.rec.Client.Create(context.TODO(), obj)
 		if err != nil {
-			logger.Info("Couldn't create")
+			logger.Info("Couldn't create DaemonSet",
+				"Name", obj.Name,
+				"Error", err,
+			)
 			return gpuv1.NotReady, err
 		}
 		return isDaemonSetReady(obj.Name, n), nil
 	} else if err != nil {
-		logger.Info("Failed to get DaemonSet from client", "Error", err.Error())
+		logger.Info("Failed to get DaemonSet from client",
+			"Name", obj.Name,
+			"Error", err.Error())
 		return gpuv1.NotReady, err
 	}
 
 	changed := isDaemonsetSpecChanged(found, obj)
 	if changed {
-		logger.Info("Found, updating")
+		logger.Info("DaemonSet is different, updating", "name", obj.ObjectMeta.Name)
 		err = n.rec.Client.Update(context.TODO(), obj)
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
 	} else {
-		logger.Info("Found, skipping update")
+		logger.Info("DaemonSet identical, skipping update", "name", obj.ObjectMeta.Name)
 	}
 	return isDaemonSetReady(obj.Name, n), nil
 }
