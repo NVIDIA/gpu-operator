@@ -11,8 +11,14 @@ check_pod_ready() {
 		is_pod_ready=$(kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')
 
 		if [ "${is_pod_ready}" = "True" ]; then
-			echo "Pod $pod_label is ready"
-			break;
+			# Check if the pod is not in terminating state
+			is_pod_terminating=$(kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} -o jsonpath='{.items[0].metadata.deletionGracePeriodSeconds}')
+			if [ "${is_pod_terminating}" = "30" ]; then
+				echo "pod $pod_label is in terminating state..."
+			else
+				echo "Pod $pod_label is ready"
+				break;
+			fi
 		fi
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
