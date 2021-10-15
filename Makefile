@@ -235,7 +235,7 @@ coverage: unit-test
 
 ##### Public rules #####
 DEFAULT_PUSH_TARGET := ubi8
-TARGETS := ubi8
+TARGETS := ubi8 ubuntu20.04
 
 PUSH_TARGETS := $(patsubst %,push-%, $(TARGETS))
 BUILD_TARGETS := $(patsubst %,build-%, $(TARGETS))
@@ -260,6 +260,9 @@ push-short:
 
 build-ubi8: DOCKERFILE := docker/Dockerfile
 build-ubi8: BASE_DIST := ubi8
+
+build-ubuntu20.04: DOCKERFILE := docker/Dockerfile
+build-ubuntu20.04: BASE_DIST := ubuntu20.04
 
 $(TARGETS): %: build-%
 $(BUILD_TARGETS): build-%:

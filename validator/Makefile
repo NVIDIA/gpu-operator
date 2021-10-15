@@ -28,7 +28,7 @@ endif
 
 ##### Public rules #####
 DEFAULT_PUSH_TARGET := ubi8
-TARGETS := ubi8
+TARGETS := ubi8 ubuntu20.04
 
 PUSH_TARGETS := $(patsubst %, push-%, $(TARGETS))
 BUILD_TARGETS := $(patsubst %, build-%, $(TARGETS))
