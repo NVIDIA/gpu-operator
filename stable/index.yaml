@@ -3,14 +3,14 @@ entries:
   gpu-operator:
   - apiVersion: v2
     appVersion: v1.7.0
-    created: "2021-10-14T10:27:10.2489812+05:30"
+    created: "2021-10-18T12:48:24.7699553+05:30"
     dependencies:
     - condition: nfd.enabled
       name: node-feature-discovery
       repository: https://kubernetes-sigs.github.io/node-feature-discovery/charts
       version: 0.8.2
     description: NVIDIA GPU Operator creates/configures/manages GPUs atop Kubernetes
-    digest: 12ee7a54dd4f7a558fc566d655e6598c6b213b3ff4c1557418ea1842f26e2132
+    digest: 1798c8f24e87c31a2e9c369b54bc426e35ba5b59d72fa50f561ef2ade6a2534e
     home: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html
     icon: https://assets.nvidiagrid.net/ngc/logos/GPUoperator.png
     keywords:
@@ -28,4 +28,4 @@ entries:
     urls:
     - https://rocketsoftware.github.io/gpu-operator/stable/gpu-operator-v1.7.0.tgz
     version: v1.7.0
-generated: "2021-10-14T10:27:10.2303787+05:30"
+generated: "2021-10-18T12:48:24.7549589+05:30"
