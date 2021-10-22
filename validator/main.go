@@ -594,8 +594,8 @@ func (m *MOFED) validate() error {
 
 func (m *MOFED) runValidation(silent bool) error {
 	// invoke validation command
-	command := "stat"
-	args := []string{"/run/mellanox/drivers/.driver-ready"}
+	command := "grep"
+	args := []string{"ib_register_peer_memory_client", "/proc/kallsyms"}
 
 	if withWaitFlag {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)

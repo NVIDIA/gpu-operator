@@ -90,6 +90,7 @@ driver:
   imagePullSecrets: []
   rdma:
     enabled: false
+    useHostMofed: false
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
