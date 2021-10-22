@@ -1318,6 +1318,10 @@ spec:
                         description: Enabled indicates if GPUDirect RDMA is enabled
                           through GPU operator
                         type: boolean
+                      useHostMofed:
+                        description: UseHostMOFED indicates to use MOFED drivers directly
+                          installed on the host to enable GPUDirect RDMA
+                        type: boolean
                     type: object
                   repoConfig:
                     description: 'Optional: Custom repo configuration for driver container'

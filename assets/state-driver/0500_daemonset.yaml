@@ -48,9 +48,6 @@ spec:
             seLinuxOptions:
               level: "s0"
           volumeMounts:
-            - name: run-mellanox-drivers
-              mountPath: /run/mellanox/drivers
-              mountPropagation: HostToContainer
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
@@ -106,14 +103,15 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
-          - name: run-mellanox-drivers
-            mountPath: /run/mellanox/drivers
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
             mountPropagation: HostToContainer
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-peermem-ctr
-        command: ["sh", "-c"]
-        args: ["until [ -f /run/mellanox/drivers/.driver-ready ] && [ -f /sys/module/nvidia/refcnt ]; do echo waiting for mellanox ofed and nvidia drivers to be installed; sleep 10; done; chroot /run/nvidia/driver modprobe nvidia-peermem; if [ -f /sys/module/nvidia_peermem/refcnt ]; then echo successfully loaded nvidia-peermem module;  sleep inf; else echo failed to load nvidia-peermem; exit 1; fi"]
+        command: ["nvidia-driver"]
+        # takes care of loading nvidia_peermem whenever it gets dynamically unloaded during MOFED driver re-install/update
+        args: ["reload_nvidia_peermem"]
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -127,13 +125,13 @@ spec:
           - name: dev-log
             mountPath: /dev/log
             readOnly: true
-          - name: run-mellanox-drivers
-            mountPath: /run/mellanox/drivers
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
             mountPropagation: HostToContainer
         startupProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia_peermem']
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
           initialDelaySeconds: 10
           failureThreshold: 60
           successThreshold: 1
@@ -141,7 +139,7 @@ spec:
         livenessProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia_peermem']
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
           periodSeconds: 30
           initialDelaySeconds: 30
           failureThreshold: 1
@@ -164,9 +162,9 @@ spec:
           hostPath:
             path: /run/nvidia-topologyd
             type: DirectoryOrCreate
-        - name: run-mellanox-drivers
+        - name: mlnx-ofed-usr-src
           hostPath:
-            path: /run/mellanox/drivers
+            path: /run/mellanox/drivers/usr/src
             type: DirectoryOrCreate
         - name: run-nvidia-validations
           hostPath:

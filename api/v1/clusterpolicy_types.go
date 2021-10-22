@@ -808,9 +808,14 @@ type MIGManagerSpec struct {
 type GPUDirectRDMASpec struct {
 	// Enabled indicates if GPUDirect RDMA is enabled through GPU operator
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable container-toolkit deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPUDirect RDMA through GPU operator"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
+	// UseHostMOFED indicates to use MOFED drivers directly installed on the host to enable GPUDirect RDMA
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Use MOFED drivers directly installed on the host to enable GPUDirect RDMA"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseHostMOFED *bool `json:"useHostMofed,omitempty"`
 }
 
 // MIGPartedConfigSpec defines custom mig-parted config for MIG Manager container

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"path/filepath"
+
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
@@ -25,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -1522,6 +1523,16 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
 			// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), GPUDirectRDMAEnabledEnvName, "true")
+			// check if MOFED drives are directly installed on host and update source path accordingly
+			// to build nvidia-peermem module
+			if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
+				// mount /usr/src/ofa_kernel path directly from host to build using MOFED drivers installed on host
+				for index, volume := range obj.Spec.Template.Spec.Volumes {
+					if volume.Name == "mlnx-ofed-usr-src" {
+						obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
+					}
+				}
+			}
 		}
 
 		// set any custom repo configuration provided
