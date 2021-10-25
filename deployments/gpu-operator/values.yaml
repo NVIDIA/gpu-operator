@@ -223,6 +223,8 @@ migManager:
   resources: {}
   config:
     name: ""
+  gpuClientsConfig:
+    name: ""
 
 nodeStatusExporter:
   enabled: false

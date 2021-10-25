@@ -82,6 +82,8 @@ const (
 	MigStrategyEnvName = "MIG_STRATEGY"
 	// MigPartedDefaultConfigMapName indicates name of ConfigMap containing default mig-parted config
 	MigPartedDefaultConfigMapName = "default-mig-parted-config"
+	// MigDefaultGPUClientsConfigMapName indicates name of ConfigMap containing default gpu-clients
+	MigDefaultGPUClientsConfigMapName = "default-gpu-clients"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
 	// DCGMDefaultHostPort indicates default host port bound to DCGM host engine
@@ -276,10 +278,10 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// ConfigMap creates ConfigMap resource
-func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
+// createConfigMap creates a ConfigMap resource
+func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, error) {
 	state := n.idx
-	obj := n.resources[state].ConfigMap.DeepCopy()
+	obj := n.resources[state].ConfigMaps[configMapIdx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
@@ -289,6 +291,20 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 		config := n.singleton.Spec
 		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" {
 			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.Config.Name))
+			return gpuv1.Ready, nil
+		}
+	}
+
+	// only create default 'gpu-clients' ConfigMap if drivers are preinstalled and
+	// the user has not provided a custom ConfigMap
+	if obj.Name == MigDefaultGPUClientsConfigMapName {
+		config := n.singleton.Spec
+		if config.Driver.IsDriverEnabled() {
+			logger.Info("Not creating resource, driver is enabled")
+			return gpuv1.Ready, nil
+		}
+		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
+			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.GPUClientsConfig.Name))
 			return gpuv1.Ready, nil
 		}
 	}
@@ -312,6 +328,22 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
+}
+
+// ConfigMaps creates ConfigMap resource(s)
+func ConfigMaps(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].ConfigMaps {
+		stat, err := createConfigMap(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat != gpuv1.Ready {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
@@ -1022,12 +1054,13 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		}
 	}
 
-	// set arguments if specified for driver container
+	// set arguments if specified for mig-manager container
 	if len(config.MIGManager.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	// set/append environment variables for exporter container
+	// set/append environment variables for mig-manager container
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "OPERATOR_NAMESPACE", n.operatorNamespace)
 	if len(config.MIGManager.Env) > 0 {
 		for _, env := range config.MIGManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
@@ -1049,6 +1082,30 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		}
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
+	}
+
+	// If the nvidia driver is pre-installed, shutdown and restart gpu clients on the host
+	// when applying mig mode/config changes. The following changes to the spec are required:
+	//   - Set WITH_SHUTDOWN_HOST_GPU_CLIENTS and GPU_CLIENTS_FILE env vars
+	//   - Use the host's pid and ipc namespaces
+	//   - Create ConfigMap Volume + VolumeMount for gpu-clients config file
+	if !config.Driver.IsDriverEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "WITH_SHUTDOWN_HOST_GPU_CLIENTS", "true")
+		obj.Spec.Template.Spec.HostPID = true
+		obj.Spec.Template.Spec.HostIPC = true
+
+		configMapName := MigDefaultGPUClientsConfigMapName
+		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
+			configMapName = config.MIGManager.GPUClientsConfig.Name
+		}
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, configMapName, "/gpu-clients")
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMount for gpu-clients config: %v", err)
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(configMapName, itemsToInclude))
+		// ConfigMap should only consist of one key, which is the filename for the gpu-clients config file
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GPU_CLIENTS_FILE", filepath.Join("/gpu-clients", itemsToInclude[0].Key))
 	}
 
 	return nil

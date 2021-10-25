@@ -1965,6 +1965,14 @@ spec:
                       - name
                       type: object
                     type: array
+                  gpuClientsConfig:
+                    description: 'Optional: Custom gpu-clients configuration for MIG
+                      Manager container'
+                    properties:
+                      name:
+                        description: ConfigMap name
+                        type: string
+                    type: object
                   image:
                     description: mig-manager image name
                     pattern: '[a-zA-Z0-9\-]+'

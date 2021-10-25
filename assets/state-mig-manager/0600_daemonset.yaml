@@ -44,10 +44,6 @@ spec:
               fieldPath: spec.nodeName
         - name: CONFIG_FILE
           value: "/mig-parted-config/config.yaml"
-        - name: WITH_REBOOT
-          value: "false"
-        - name: HOST_ROOT_MOUNT
-          value: "/host"
         securityContext:
           privileged: true
         volumeMounts:
