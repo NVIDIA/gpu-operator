@@ -41,6 +41,8 @@ spec:
     enabled: true
     config:
       name: ""
+    gpuClientsConfig:
+      name: ""
 
   nodeStatusExporter:
     enabled: false
