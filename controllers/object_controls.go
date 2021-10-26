@@ -295,14 +295,9 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		}
 	}
 
-	// only create default 'gpu-clients' ConfigMap if drivers are preinstalled and
-	// the user has not provided a custom ConfigMap
+	// avoid creating default 'gpu-clients' ConfigMap if custom one is provided
 	if obj.Name == MigDefaultGPUClientsConfigMapName {
 		config := n.singleton.Spec
-		if config.Driver.IsDriverEnabled() {
-			logger.Info("Not creating resource, driver is enabled")
-			return gpuv1.Ready, nil
-		}
 		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
 			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.GPUClientsConfig.Name))
 			return gpuv1.Ready, nil
@@ -1084,28 +1079,26 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		break
 	}
 
+	// set ConfigMap name for "gpu-clients" Volume
+	for i, vol := range obj.Spec.Template.Spec.Volumes {
+		if !strings.Contains(vol.Name, "gpu-clients") {
+			continue
+		}
+
+		name := MigDefaultGPUClientsConfigMapName
+		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
+			name = config.MIGManager.GPUClientsConfig.Name
+		}
+		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
+		break
+	}
+
 	// If the nvidia driver is pre-installed, shutdown and restart gpu clients on the host
-	// when applying mig mode/config changes. The following changes to the spec are required:
-	//   - Set WITH_SHUTDOWN_HOST_GPU_CLIENTS and GPU_CLIENTS_FILE env vars
-	//   - Use the host's pid and ipc namespaces
-	//   - Create ConfigMap Volume + VolumeMount for gpu-clients config file
+	// when applying mig mode/config changes. This requires the host pid and ipc namespaces.
 	if !config.Driver.IsDriverEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "WITH_SHUTDOWN_HOST_GPU_CLIENTS", "true")
 		obj.Spec.Template.Spec.HostPID = true
 		obj.Spec.Template.Spec.HostIPC = true
-
-		configMapName := MigDefaultGPUClientsConfigMapName
-		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
-			configMapName = config.MIGManager.GPUClientsConfig.Name
-		}
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, configMapName, "/gpu-clients")
-		if err != nil {
-			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMount for gpu-clients config: %v", err)
-		}
-		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(configMapName, itemsToInclude))
-		// ConfigMap should only consist of one key, which is the filename for the gpu-clients config file
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "GPU_CLIENTS_FILE", filepath.Join("/gpu-clients", itemsToInclude[0].Key))
 	}
 
 	return nil
@@ -1971,6 +1964,10 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 			continue
 		}
 		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
+	}
+
+	if obj.Name == "nvidia-mig-manager" && !n.singleton.Spec.Driver.IsDriverEnabled() {
+		obj.AllowHostIPC = true
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
