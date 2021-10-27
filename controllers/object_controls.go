@@ -1546,7 +1546,8 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
 		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
-		n.rec.Log.Info("WARNING: DriverToolkit imagetag missing, using entitlement-based fallback", "rhcosVersion", rhcosVersion)
+		n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[n.ocpDriverToolkit.currentRhcosVersion] = false
 	}
 
 	/* prepare the shared volumes */
@@ -1960,13 +1961,24 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 		return false, err
 	}
 	n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
-
+	isBroken := false
 	for _, tag := range found.Spec.Tags {
+		if tag.Name == "" {
+			isBroken = true
+			continue
+		}
 		if tag.Name == "latest" || tag.From == nil {
 			continue
 		}
 		n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
 		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[tag.Name] = true
+	}
+	if isBroken {
+		n.rec.Log.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
+
+		n.operatorMetrics.openshiftDriverToolkitIsBroken.Set(1)
+	} else {
+		n.operatorMetrics.openshiftDriverToolkitIsBroken.Set(0)
 	}
 
 	return true, nil
@@ -2052,7 +2064,24 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 			errs = fmt.Errorf("failed to handle OpenShift Driver Toolkit Daemonset for version %s: %v", rhcosVersion, errs)
 		}
 	}
+
 	n.ocpDriverToolkit.currentRhcosVersion = ""
+
+	tagsMissing := false
+	if n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream == "" {
+		for rhcosVersion, tagExists := range n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist {
+			if tagExists {
+				continue
+			}
+			n.rec.Log.Info("WARNINGs: RHCOS image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+			tagsMissing = true
+		}
+	}
+	if tagsMissing {
+		n.operatorMetrics.openshiftDriverToolkitRhcosTagsMissing.Set(1)
+	} else {
+		n.operatorMetrics.openshiftDriverToolkitRhcosTagsMissing.Set(0)
+	}
 
 	return overallState, errs
 }

@@ -41,3 +41,62 @@ spec:
           GPU Operator reconciliation loop failed for more than 30min
           and NFD labels cannot be found. Check that the NFD Operator
           is installed and running properly.
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledNfdTooOld
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == -1
+        AND
+        gpu_operator_openshift_driver_toolkit_nfd_too_old == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but NFD too old to support it
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but the NFD version deployed in the cluster
+          is too old to support it.
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamMissing
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == -1
+        AND
+        gpu_operator_openshift_driver_toolkit_imagestream_missing == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but the driver-toolkit imagestream is missing
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but this version of OpenShift does not
+          support it (driver-toolkit imagestream is not available).
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamBroken
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == 1
+        AND
+        gpu_operator_openshift_driver_toolkit_imagestream_broken == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but the driver-toolkit imagestream is broken
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but the OpenShift driver-toolkit imagestream
+          is broken after the last cluster upgrade. See rhbz 2015024.
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageTagsMissing
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == 1
+        AND
+        gpu_operator_openshift_driver_toolkit_rhcos_tags_missing == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but some RHCOS driver-toolkit imagestream tags are missing
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but some RHCOS tags are missing in the
+          driver-toolkit imagestream.
