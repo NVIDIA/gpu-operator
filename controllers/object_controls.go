@@ -16,6 +16,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
+	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -373,12 +374,11 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	labels := node.GetLabels()
 
 	var ok bool
-	kFVersion, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
+	kFVersion, ok := labels[nfdKernelLabelKey]
 	if ok {
 		logger.Info(kFVersion)
 	} else {
-		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
-			"feature.node.kubernetes.io/kernel-version.full")
+		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
 		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", "Error", err)
 		return "", "", ""
 	}
@@ -529,6 +529,13 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	if len(config.Daemonsets.Tolerations) > 0 {
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
+
+	// update OpenShift Driver Toolkit sidecar container
+	err := transformOpenShiftDriverToolkitContainer(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
+	}
+
 	return nil
 }
 
@@ -1449,6 +1456,125 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	return nil
 }
 
+func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	var err error
+
+	getContainer := func(name string, remove bool) (*v1.Container, error) {
+		for i, container := range obj.Spec.Template.Spec.Containers {
+			if container.Name != name {
+				continue
+			}
+			if !remove {
+				return &obj.Spec.Template.Spec.Containers[i], nil
+			}
+
+			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i],
+				obj.Spec.Template.Spec.Containers[i+1:]...)
+			return nil, nil
+		}
+		return nil, fmt.Errorf(fmt.Sprintf("could not find the '%s' container", name))
+	}
+
+	if !n.ocpDriverToolkit.enabled {
+		if n.ocpDriverToolkit.requested {
+			n.rec.Log.Info("WARNING: OpenShift DriverToolkit was requested but could not be enabled (depencies missing)")
+		}
+
+		/* remove OpenShift Driver Toolkit side-car container from the Driver DaemonSet */
+
+		_, err = getContainer("openshift-driver-toolkit-ctr", true)
+
+		return err
+	}
+
+	/* find the main container and driver-toolkit sidecar container */
+	var mainContainer, driverToolkitContainer *v1.Container
+
+	if mainContainer, err = getContainer("nvidia-driver-ctr", false); err != nil {
+		return err
+	}
+
+	if driverToolkitContainer, err = getContainer("openshift-driver-toolkit-ctr", false); err != nil {
+		return err
+	}
+
+	/* prepare the DaemonSet to be RHCOS-version specific */
+
+	rhcosVersion := n.ocpDriverToolkit.currentRhcosVersion
+
+	obj.ObjectMeta.Name += "-" + rhcosVersion
+	obj.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
+	obj.Spec.Selector.MatchLabels["app"] = obj.ObjectMeta.Name
+	obj.Spec.Template.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
+
+	obj.ObjectMeta.Labels[ocpDriverToolkitVersionLabel] = rhcosVersion
+
+	obj.Spec.Template.Spec.NodeSelector[nfdOSTreeVersionLabelKey] = rhcosVersion
+
+	/* prepare the DaemonSet to be searchable */
+
+	obj.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
+	obj.Spec.Template.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
+
+	/* prepare the DriverToolkit container */
+
+	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
+
+	// ensure that there is no tag specified in the DriverToolkit image
+	image := driverToolkitContainer.Image
+	if config.Driver.OpenShiftDriverToolkitImageStream != "" {
+		image = config.Driver.OpenShiftDriverToolkitImageStream
+	}
+	if strings.Contains(image[strings.LastIndex(image, "/")+1:], ":") {
+		return fmt.Errorf("driver-toolkit sidecar container image should not contain a tag: %s", image)
+	}
+
+	/* setup fallback if RHCOS tag missing in the Driver-Toolkit imagestream */
+
+	_, rhcosTagExists := n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[n.ocpDriverToolkit.currentRhcosVersion]
+
+	if rhcosTagExists || config.Driver.OpenShiftDriverToolkitImageStream != "" {
+		driverToolkitContainer.Image += ":" + rhcosVersion
+		n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
+
+	} else {
+		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+
+		driverToolkitContainer.Image = mainContainer.Image
+		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
+		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
+		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
+
+		n.rec.Log.Info("WARNING: DriverToolkit imagetag missing, using entitlement-based fallback", "rhcosVersion", rhcosVersion)
+	}
+
+	/* prepare the shared volumes */
+
+	// shared directory
+
+	volSharedDirName, volSharedDirPath := "shared-nvidia-driver-toolkit", "/mnt/shared-nvidia-driver-toolkit"
+
+	volMountSharedDir := corev1.VolumeMount{Name: volSharedDirName, MountPath: volSharedDirPath}
+	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountSharedDir)
+
+	volSharedDir := corev1.Volume{
+		Name: volSharedDirName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
+
+	/* prepare the main container to start from the DriverToolkit entrypoint */
+
+	mainContainer.Command = []string{"ocp_dtk_entrypoint"}
+	mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
+
+	return nil
+}
+
 // resolveDriverTag resolves driver image tag based on the OS of the worker node
 func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (string, error) {
 	kvers, osTag, _ := kernelFullVersion(n)
@@ -1815,6 +1941,273 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	return isDeploymentReady(obj.Name, n), nil
 }
 
+func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
+	found := &apiimagev1.ImageStream{}
+	name := "driver-toolkit"
+	namespace := "openshift"
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			n.rec.Log.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
+				"Name", name,
+				"Namespace", namespace)
+
+			return false, nil
+		}
+
+		n.rec.Log.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
+
+		return false, err
+	}
+	n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
+
+	for _, tag := range found.Spec.Tags {
+		if tag.Name == "latest" || tag.From == nil {
+			continue
+		}
+		n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
+		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[tag.Name] = true
+	}
+
+	return true, nil
+}
+
+// serviceAccountHasDockerCfg returns True if obj ServiceAccount
+// exists and has its builder-dockercfg secret reference populated.
+//
+// With OpenShift DriverToolkit, we need to ensure that this secret is
+// populated, otherwise, the Pod won't have the credentials to access
+// the DriverToolkit image in the cluster registry.
+func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyController) (bool, error) {
+	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name)
+
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("ServiceAccount not found",
+				"Namespace", n.operatorNamespace, "err", err)
+			return false, nil
+		}
+
+		logger.Info("Couldn't get the ServiceAccount",
+			"Name", obj.Name,
+			"Error", err)
+
+		return false, err
+	}
+
+	for _, secret := range obj.Secrets {
+		if strings.HasPrefix(secret.Name, obj.Name+"-dockercfg-") {
+			return true, nil
+		}
+	}
+
+	logger.Info("ServiceAccount doesn't have dockercfg secret", "Name", obj.Name)
+
+	return false, nil
+}
+
+// ocpDriverToolkitDaemonSets goes through all the RHCOS versions
+// found in the cluster, sets `currentRhcosVersion` and calls the
+// original DaemonSet() function to create/update the RHCOS-specific
+// DaemonSet.
+func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) {
+	ocpCleanupUnusedDriverToolkitDaemonSets(n)
+
+	state := n.idx
+	saObj := n.resources[state].ServiceAccount.DeepCopy()
+	saReady, err := serviceAccountHasDockerCfg(saObj, n)
+	if err != nil {
+		return gpuv1.NotReady, err
+	}
+	if !saReady {
+		n.rec.Log.Info("Driver ServiceAccount not ready, cannot create DriverToolkit DaemonSet")
+		return gpuv1.NotReady, nil
+	}
+
+	n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+		"rhcos", n.ocpDriverToolkit.rhcosVersions)
+
+	overallState := gpuv1.Ready
+	var errs error
+
+	for rhcosVersion := range n.ocpDriverToolkit.rhcosVersions {
+		n.ocpDriverToolkit.currentRhcosVersion = rhcosVersion
+
+		n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion)
+
+		state, err := DaemonSet(n)
+
+		n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion, "state", state)
+		if state != gpuv1.Ready {
+			overallState = state
+		}
+
+		if err != nil {
+			if errs == nil {
+				errs = err
+			}
+			errs = fmt.Errorf("failed to handle OpenShift Driver Toolkit Daemonset for version %s: %v", rhcosVersion, errs)
+		}
+	}
+	n.ocpDriverToolkit.currentRhcosVersion = ""
+
+	return overallState, errs
+}
+
+// ocpCleanupUnusedDriverToolkitDaemonSets scans the DriverToolkit
+// RHCOS-version specific DaemonSets, and deletes the unused one:
+// - RHCOS version wasn't found in the node labels (upgrade finished)
+// - RHCOS version marked for deletion ealier in the Reconciliation loop (currently unexpected)
+// - no RHCOS version label (unexpected)
+// The DaemonSet set is kept if:
+// - RHCOS version was found in the node labels (most likely case)
+func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
+	opts := []client.ListOption{
+		client.MatchingLabels{
+			ocpDriverToolkitIdentificationLabel: ocpDriverToolkitIdentificationValue,
+		},
+	}
+
+	list := &appsv1.DaemonSetList{}
+	err := n.rec.Client.List(context.TODO(), list, opts...)
+	if err != nil {
+		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
+		return
+	}
+
+	for idx := range list.Items {
+		name := list.Items[idx].ObjectMeta.Name
+		dsRhcosVersion, versionOk := list.Items[idx].ObjectMeta.Labels[ocpDriverToolkitVersionLabel]
+		clusterHasRhcosVersion, clusterOk := n.ocpDriverToolkit.rhcosVersions[dsRhcosVersion]
+		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
+
+		n.rec.Log.Info("DEBUG: Driver DaemonSet found",
+			"Name", name,
+			"dsRhcosVersion", dsRhcosVersion,
+			"clusterHasRhcosVersion", clusterHasRhcosVersion,
+			"desiredNumberScheduled", desiredNumberScheduled)
+
+		if desiredNumberScheduled != 0 {
+			n.rec.Log.Info("INFO: Driver DaemonSet active, keep it.",
+				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
+			continue
+		}
+
+		if !versionOk {
+			n.rec.Log.Info("WARNING: Driver DaemonSet doesn't have DriverToolkit version label",
+				"Name", name, "Label", ocpDriverToolkitVersionLabel,
+			)
+		} else {
+			if !clusterOk {
+				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version NOT part of the cluster",
+					"Name", name, "RHCOS version", dsRhcosVersion,
+				)
+			} else if clusterHasRhcosVersion {
+				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version is part of the cluster, keep it.",
+					"Name", name, "RHCOS version", dsRhcosVersion,
+				)
+
+				// the version of RHCOS targetted by this DS is part of the cluster
+				// keep it alive
+
+				continue
+			} else /* clusterHasRhcosVersion == false */ {
+				// currently unexpected
+				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version marked for deletion",
+					"Name", name, "RHCOS version", dsRhcosVersion,
+				)
+			}
+		}
+
+		n.rec.Log.Info("INFO: Delete Driver DaemonSet", "Name", name)
+
+		err = n.rec.Client.Delete(context.TODO(), &list.Items[idx])
+		if err != nil {
+			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
+				"Name", name, "Error", err)
+
+		}
+	}
+}
+
+// cleanupUnusedDriverDaemonSets cleans up the driver DaemonSet(s)
+// according to the UseOpenShiftDriverToolkit flag. This allows
+// switching toggling the flag after the initial deployment.  If no
+// error happens, returns the number of Pods belonging to these
+// DaemonSets.
+func cleanupUnusedDriverDaemonSets(n ClusterPolicyController) (int, error) {
+	// in the future, these flags can be extended to also check the
+	// value of n.singleton.Spec.Driver.IsDriverEnabled()
+
+	cleanupNvidiaDriver := n.ocpDriverToolkit.enabled
+	cleanupOcpDriverToolkitDriver := !cleanupNvidiaDriver
+
+	var podCount = 0
+
+	if cleanupNvidiaDriver {
+		count, err := cleanupDaemonSets(n, "app", "nvidia-driver-daemonset")
+		if err != nil {
+			return 0, err
+		}
+		podCount += count
+	}
+
+	if cleanupOcpDriverToolkitDriver {
+		count, err := cleanupDaemonSets(n,
+			ocpDriverToolkitIdentificationLabel,
+			ocpDriverToolkitIdentificationValue)
+		if err != nil {
+			return 0, err
+		}
+		podCount += count
+	}
+
+	return podCount, nil
+}
+
+// cleanupDaemonSets deletes the DaemonSets matching a given key/value
+// pairs If no error happens, returns the number of Pods belonging to
+// the DaemonSet.
+func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string) (int, error) {
+	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}}
+
+	dsList := &appsv1.DaemonSetList{}
+	if err := n.rec.Client.List(context.TODO(), dsList, opts...); err != nil {
+		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
+		return 0, err
+	}
+
+	var lastErr error
+	for idx := range dsList.Items {
+		n.rec.Log.Info("INFO: Delete DaemonSet",
+			"Name", dsList.Items[idx].ObjectMeta.Name,
+		)
+
+		if err := n.rec.Client.Delete(context.TODO(), &dsList.Items[idx]); err != nil {
+			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
+				"Name", dsList.Items[idx].ObjectMeta.Name,
+				"Error", err)
+			lastErr = err
+		}
+	}
+
+	// return the last error that occured, if any
+	if lastErr != nil {
+		return 0, lastErr
+	}
+
+	podList := &corev1.PodList{}
+	if err := n.rec.Client.List(context.TODO(), podList, opts...); err != nil {
+		n.rec.Log.Info("ERROR: Could not get PodList", "Error", err)
+		return 0, err
+	}
+
+	return len(podList.Items), nil
+}
+
 // DaemonSet creates Daemonset resource
 func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
@@ -1831,6 +2224,33 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("No GPU node in the cluster, do not create DaemonSets")
 
 		return gpuv1.Ready, nil
+	}
+
+	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" {
+		podCount, err := cleanupUnusedDriverDaemonSets(n)
+		if err != nil {
+			return gpuv1.NotReady, err
+		}
+		if podCount != 0 {
+			logger.Info("Driver DaemonSet cleanup in progress", "podCount", podCount)
+
+			return gpuv1.NotReady, nil
+		}
+
+		if n.ocpDriverToolkit.enabled &&
+			n.ocpDriverToolkit.currentRhcosVersion == "" {
+			// OpenShift Driver Toolkit requires the creation of
+			// one Driver DaemonSet per RHCOS version (stored in
+			// n.ocpDriverToolkit.rhcosVersions).
+			//
+			// Here, we are at the top-most call of DaemonSet(),
+			// as currentRhcosVersion is unset.
+			//
+			// Initiate the multi-DaemonSet OCP DriverToolkit
+			// deployment.
+
+			return ocpDriverToolkitDaemonSets(n)
+		}
 	}
 
 	err := preProcessDaemonSet(obj, n)

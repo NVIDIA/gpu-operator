@@ -144,6 +144,30 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
+
+        # Only kept when OpenShift DriverToolkit side-car is enabled.
+        # Base image maybe be overriden by the operator (from
+        # ClusterPolicy.Driver.OpenShiftDriverToolkitImageStream).
+        # Tag always set by the operator with RHCOS OSTree value
+      - image: image-registry.openshift-image-registry.svc:5000/openshift/driver-toolkit
+        imagePullPolicy: IfNotPresent
+        name: openshift-driver-toolkit-ctr
+        command: [bash, -xc]
+        args: ["until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting for nvidia-driver-ctr container to prepare the shared directory ...; sleep 10; done; exec /mnt/shared-nvidia-driver-toolkit/ocp_dtk_entrypoint dtk-build-driver"]
+        securityContext:
+          # currently mandatory as 'nvidia-installer' loads (and
+          # unloads) the kernel module as part of the build process
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        env:
+          - name: RHCOS_VERSION
+            value: "FILLED BY THE OPERATOR"
+        volumeMounts:
+          # corresponding volumes are dynamically inject by the
+          # operator when OCP DriverToolkit side-car is enabled
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
       volumes:
         - name: run-nvidia
           hostPath:
@@ -170,4 +194,3 @@ spec:
           hostPath:
             path: /run/nvidia/validations
             type: DirectoryOrCreate
-          

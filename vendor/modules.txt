@@ -90,6 +90,9 @@ github.com/modern-go/reflect2
 # github.com/openshift/api v0.0.0-20210216211028-bb81baaf35cd
 ## explicit
 github.com/openshift/api/config/v1
+github.com/openshift/api/image/docker10
+github.com/openshift/api/image/dockerpre012
+github.com/openshift/api/image/v1
 github.com/openshift/api/security/v1
 # github.com/openshift/client-go v0.0.0-20210112165513-ebc401615f47
 ## explicit

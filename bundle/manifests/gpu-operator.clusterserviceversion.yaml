@@ -26,6 +26,7 @@ metadata:
             },
             "driver": {
               "enabled": true,
+              "use_ocp_driver_toolkit": true,
               "repoConfig": {
                 "configMapName": ""
               },
@@ -466,6 +467,14 @@ spec:
           - create
           - watch
           - update
+        - apiGroups:
+          - image.openshift.io
+          resources:
+          - imagestreams
+          verbs:
+          - get
+          - list
+          - watch
       permissions:
       - serviceAccountName: gpu-operator
         rules:
