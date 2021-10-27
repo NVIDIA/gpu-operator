@@ -12,6 +12,7 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	apiconfigv1 "github.com/openshift/api/config/v1"
+	apiimagev1 "github.com/openshift/api/image/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,12 +22,17 @@ import (
 )
 
 const (
-	commonGPULabelKey    = "nvidia.com/gpu.present"
-	commonGPULabelValue  = "true"
-	migManagerLabelKey   = "nvidia.com/gpu.deploy.mig-manager"
-	migManagerLabelValue = "true"
-	gpuProductLabelKey   = "nvidia.com/gpu.product"
-	nfdLabelPrefix       = "feature.node.kubernetes.io/"
+	commonGPULabelKey                   = "nvidia.com/gpu.present"
+	commonGPULabelValue                 = "true"
+	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
+	migManagerLabelValue                = "true"
+	gpuProductLabelKey                  = "nvidia.com/gpu.product"
+	nfdLabelPrefix                      = "feature.node.kubernetes.io/"
+	nfdKernelLabelKey                   = "feature.node.kubernetes.io/kernel-version.full"
+	nfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+	ocpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
+	ocpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
+	ocpDriverToolkitIdentificationValue = "true"
 )
 
 var gpuStateLabels = map[string]string{
@@ -53,6 +59,23 @@ type state interface {
 	last()
 }
 
+// OpenShiftDriverToolkit contains the values required to deploy
+// OpenShift DriverToolkit DaemonSet.
+type OpenShiftDriverToolkit struct {
+	// true if the cluster runs OpenShift and
+	// Driver.UseOpenShiftDriverToolkit is turned on in the
+	// ClusterPolicy
+	requested bool
+	// true of the DriverToolkit is requested and the cluster has all
+	// the required components (NFD RHCOS OSTree label + OCP
+	// DriverToolkit imagestream)
+	enabled bool
+
+	currentRhcosVersion              string
+	rhcosVersions                    map[string]bool
+	rhcosDriverToolkitImageTagsExist map[string]bool
+}
+
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
 	singleton         *gpuv1.ClusterPolicy
@@ -64,9 +87,11 @@ type ClusterPolicyController struct {
 	operatorMetrics OperatorMetrics
 	rec             *ClusterPolicyReconciler
 	idx             int
-	openshift       string
-	runtime         gpuv1.Runtime
 
+	openshift        string
+	ocpDriverToolkit OpenShiftDriverToolkit
+
+	runtime      gpuv1.Runtime
 	hasGPUNodes  bool
 	hasNFDLabels bool
 }
@@ -271,6 +296,23 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 				}
 			}
 			gpuNodesTotal++
+
+			if n.ocpDriverToolkit.requested {
+				rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
+				if ok {
+					n.ocpDriverToolkit.rhcosVersions[rhcosVersion] = true
+					n.rec.Log.Info("DEBUG: GPU node running RHCOS",
+						"nodeName", node.ObjectMeta.Name,
+						"RHCOS version", rhcosVersion,
+					)
+				} else {
+					n.rec.Log.Info("WARNING: node doesn't have the proper NFD RHCOS version label.",
+						"nodeName", node.ObjectMeta.Name,
+						"nfdLabel", nfdOSTreeVersionLabelKey,
+					)
+				}
+
+			}
 		}
 	}
 	n.rec.Log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
@@ -363,6 +405,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		promv1.AddToScheme(reconciler.Scheme)
 		secv1.AddToScheme(reconciler.Scheme)
+		apiconfigv1.AddToScheme(reconciler.Scheme)
+		apiimagev1.AddToScheme(reconciler.Scheme)
 
 		n.operatorMetrics = initOperatorMetrics(n)
 		n.rec.Log.Info("Operator metrics initialized.")
@@ -394,6 +438,22 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 	}
 
+	if n.singleton.Spec.Driver.UseOpenShiftDriverToolkit != nil &&
+		*n.singleton.Spec.Driver.UseOpenShiftDriverToolkit {
+		if n.openshift == "" {
+			return fmt.Errorf("ERROR: Driver Toolkit requested but not running on OpenShift")
+		}
+		n.ocpDriverToolkit.requested = true
+
+		// mind that this is executed at every reconciliation loop,
+		// do not assume "permanent" data storage.
+		n.ocpDriverToolkit.rhcosVersions = make(map[string]bool)
+		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist = make(map[string]bool)
+	} else {
+		n.ocpDriverToolkit.requested = false
+		n.ocpDriverToolkit.enabled = false
+	}
+
 	// fetch all nodes and label gpu nodes
 	hasNFDLabels, gpuNodeCount, err := n.labelGPUNodes()
 	if err != nil {
@@ -408,6 +468,34 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		return err
 	}
 	n.rec.Log.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
+
+	if n.ocpDriverToolkit.requested {
+		hasImageStream := true
+		if n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream == "" {
+			hasImageStream, err = ocpHasDriverToolkitImageStream(n)
+			if err != nil {
+				n.rec.Log.Info("ocpHasDriverToolkitImageStream", "err", err)
+				return err
+			}
+		} else {
+			n.rec.Log.Info("ocpHasDriverToolkitImageStream skipped",
+				"Driver.OpenShiftDriverToolkitImageStream", n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream)
+		}
+
+		hasCompatibleNFD := len(n.ocpDriverToolkit.rhcosVersions) != 0
+		n.ocpDriverToolkit.enabled = hasImageStream && hasCompatibleNFD
+
+		level := "INFO"
+		if !n.ocpDriverToolkit.enabled {
+			level = "WARNING" // Driver Toolkit requested but could not be enabled
+		}
+		n.rec.Log.Info(level+" OpenShift Driver Toolkit requested",
+			"hasCompatibleNFD", hasCompatibleNFD,
+			"hasDriverToolkitImageStream", hasImageStream)
+
+		n.rec.Log.Info(level+" OpenShift Driver Toolkit",
+			"enabled", n.ocpDriverToolkit.enabled)
+	}
 	return nil
 }
 

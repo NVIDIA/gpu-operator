@@ -64,6 +64,7 @@ type ClusterPolicyReconciler struct {
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=image.openshift.io,resources=imagestreams,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -234,29 +235,51 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		CreateFunc: func(e event.CreateEvent) bool {
 			labels := e.Object.GetLabels()
 
-			gpuCommonLabelMissing := hasGPULabels(labels) && !hasCommonGPULabel(labels)
-			if gpuCommonLabelMissing {
-				r.Log.Info("New node needs an update, GPU common label missing.",
-					"name", e.Object.GetName())
-
-			}
-			return gpuCommonLabelMissing
+			return hasGPULabels(labels)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			newLabels := e.ObjectNew.GetLabels()
+			oldLabels := e.ObjectOld.GetLabels()
 
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
-			needsUpdate := gpuCommonLabelMissing || gpuCommonLabelOutdated || migManagerLabelMissing
+
+			oldOSTreeLabel, _ := oldLabels[nfdOSTreeVersionLabelKey]
+			newOSTreeLabel, _ := newLabels[nfdOSTreeVersionLabelKey]
+			osTreeLabelChanged := oldOSTreeLabel != newOSTreeLabel
+
+			needsUpdate := gpuCommonLabelMissing ||
+				gpuCommonLabelOutdated ||
+				migManagerLabelMissing ||
+				osTreeLabelChanged
+
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
 					"name", e.ObjectNew.GetName(),
 					"gpuCommonLabelMissing", gpuCommonLabelMissing,
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
-					"migManagerLabelMissing", migManagerLabelMissing)
+					"migManagerLabelMissing", migManagerLabelMissing,
+					"migManagerLabelMissing", migManagerLabelMissing,
+					"osTreeLabelChanged", osTreeLabelChanged,
+				)
 			}
+
 			return needsUpdate
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// if an RHCOS GPU node is deleted, trigger a
+			// reconciliation to ensure that there is no dangling
+			// OpenShift Driver-Toolkit (RHCOS version-specific)
+			// DaemonSet.
+			// NB: we cannot know here if the DriverToolkit is
+			// enabled.
+
+			labels := e.Object.GetLabels()
+
+			_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
+
+			return hasGPULabels(labels) && hasOSTreeLabel
 		},
 	}
 

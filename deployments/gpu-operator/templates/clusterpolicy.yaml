@@ -97,6 +97,9 @@ spec:
     enabled: {{ .Values.psp.enabled }}
   driver:
     enabled: {{ .Values.driver.enabled }}
+    {{- if .Values.driver.use_ocp_driver_toolkit }}
+    use_ocp_driver_toolkit: {{ .Values.driver.use_ocp_driver_toolkit }}
+    {{- end }}
     {{- if .Values.driver.repository }}
     repository: {{ .Values.driver.repository }}
     {{- end }}

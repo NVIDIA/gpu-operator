@@ -133,3 +133,11 @@ rules:
   - create
   - update
   - watch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+  - watch
