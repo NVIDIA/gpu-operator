@@ -44,6 +44,8 @@ spec:
               fieldPath: spec.nodeName
         - name: CONFIG_FILE
           value: "/mig-parted-config/config.yaml"
+        - name: GPU_CLIENTS_FILE
+          value: "/gpu-clients/clients.yaml"
         securityContext:
           privileged: true
         volumeMounts:
@@ -54,6 +56,8 @@ spec:
         - mountPath: /host
           name: host-root
           mountPropagation: HostToContainer
+        - mountPath: /gpu-clients
+          name: gpu-clients
       volumes:
       - name: host-sys
         hostPath:
@@ -69,3 +73,6 @@ spec:
       - name: host-root
         hostPath:
           path: "/"
+      - name: gpu-clients
+        configMap:
+          name: "FILLED_BY_OPERATOR"

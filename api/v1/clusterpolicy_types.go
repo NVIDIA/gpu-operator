@@ -818,7 +818,7 @@ type MIGManagerSpec struct {
 	// Optional: Custom gpu-clients configuration for MIG Manager container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom gpu-clients configuration for MIG Manager container"
-	GPUClientsConfig *MIGPartedConfigSpec `json:"gpuClientsConfig,omitempty"`
+	GPUClientsConfig *MIGGPUClientsConfigSpec `json:"gpuClientsConfig,omitempty"`
 }
 
 // GPUDirectRDMASpec defines the properties for nv_peer_mem deployment
@@ -837,6 +837,16 @@ type GPUDirectRDMASpec struct {
 
 // MIGPartedConfigSpec defines custom mig-parted config for MIG Manager container
 type MIGPartedConfigSpec struct {
+	// ConfigMap name
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+}
+
+// MIGGPUClientsConfigSpec defines custom gpu-clients config for MIG Manager container
+type MIGGPUClientsConfigSpec struct {
 	// ConfigMap name
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true

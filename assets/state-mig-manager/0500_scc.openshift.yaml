@@ -29,7 +29,7 @@ metadata:
       any SELinux context.  WARNING: this is the most relaxed SCC and should be used
       only for cluster administration. Grant with caution.'
 
-  name: nvidia-driver
+  name: nvidia-mig-manager
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
