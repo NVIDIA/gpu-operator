@@ -452,6 +452,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 	} else {
 		n.ocpDriverToolkit.requested = false
 		n.ocpDriverToolkit.enabled = false
+
+		n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitDisabled)
 	}
 
 	// fetch all nodes and label gpu nodes
@@ -486,8 +488,12 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		n.ocpDriverToolkit.enabled = hasImageStream && hasCompatibleNFD
 
 		level := "INFO"
-		if !n.ocpDriverToolkit.enabled {
+		if n.ocpDriverToolkit.enabled {
+			n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitEnabled)
+		} else {
 			level = "WARNING" // Driver Toolkit requested but could not be enabled
+
+			n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitNotPossible)
 		}
 		n.rec.Log.Info(level+" OpenShift Driver Toolkit requested",
 			"hasCompatibleNFD", hasCompatibleNFD,
@@ -495,6 +501,17 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		n.rec.Log.Info(level+" OpenShift Driver Toolkit",
 			"enabled", n.ocpDriverToolkit.enabled)
+
+		if hasImageStream {
+			n.operatorMetrics.openshiftDriverToolkitIsMissing.Set(0)
+		} else {
+			n.operatorMetrics.openshiftDriverToolkitIsMissing.Set(1)
+		}
+		if hasCompatibleNFD {
+			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(0)
+		} else {
+			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(1)
+		}
 	}
 	return nil
 }
