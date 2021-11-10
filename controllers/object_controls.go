@@ -1513,34 +1513,32 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
 
-	// ensure that there is no tag specified in the DriverToolkit image
-	image := driverToolkitContainer.Image
 	if config.Driver.OpenShiftDriverToolkitImageStream != "" {
-		image = config.Driver.OpenShiftDriverToolkitImageStream
-	}
-	if strings.Contains(image[strings.LastIndex(image, "/")+1:], ":") {
-		return fmt.Errorf("driver-toolkit sidecar container image should not contain a tag: %s", image)
-	}
+		image := config.Driver.OpenShiftDriverToolkitImageStream
 
-	/* setup fallback if RHCOS tag missing in the Driver-Toolkit imagestream */
+		if !strings.Contains(image[strings.LastIndex(image, "/")+1:], ":") {
+			image += ":" + rhcosVersion
+		}
 
-	_, rhcosTagExists := n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[n.ocpDriverToolkit.currentRhcosVersion]
-
-	if rhcosTagExists || config.Driver.OpenShiftDriverToolkitImageStream != "" {
-		driverToolkitContainer.Image += ":" + rhcosVersion
-		n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
-
+		driverToolkitContainer.Image = image
+		n.rec.Log.Info("INFO: DriverToolkit", "custom image", driverToolkitContainer.Image)
 	} else {
-		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
-		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		image, _ := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
+		if image != "" {
+			driverToolkitContainer.Image = image
+			n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
+		} else {
+			/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
+			obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+			obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
-		driverToolkitContainer.Image = mainContainer.Image
-		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
-		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
-		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
+			driverToolkitContainer.Image = mainContainer.Image
+			setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
+			setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
+			setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
-		n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
-		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[n.ocpDriverToolkit.currentRhcosVersion] = false
+			n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+		}
 	}
 
 	/* prepare the shared volumes */
@@ -1964,7 +1962,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 			continue
 		}
 		n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
-		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist[tag.Name] = true
+		n.ocpDriverToolkit.rhcosDriverToolkitImages[tag.Name] = tag.From.Name
 	}
 	if isBroken {
 		n.rec.Log.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
@@ -2062,11 +2060,11 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 
 	tagsMissing := false
 	if n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream == "" {
-		for rhcosVersion, tagExists := range n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist {
-			if tagExists {
+		for rhcosVersion, image := range n.ocpDriverToolkit.rhcosDriverToolkitImages {
+			if image != "" {
 				continue
 			}
-			n.rec.Log.Info("WARNINGs: RHCOS image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+			n.rec.Log.Info("WARNINGs: RHCOS driver-toolkit image missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 			tagsMissing = true
 		}
 	}

@@ -150,10 +150,10 @@ spec:
           successThreshold: 1
 
         # Only kept when OpenShift DriverToolkit side-car is enabled.
-        # Base image maybe be overriden by the operator (from
+        # Base image may be overriden by the operator (from
         # ClusterPolicy.Driver.OpenShiftDriverToolkitImageStream).
         # Tag always set by the operator with RHCOS OSTree value
-      - image: image-registry.openshift-image-registry.svc:5000/openshift/driver-toolkit
+      - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: openshift-driver-toolkit-ctr
         command: [bash, -xc]
@@ -167,6 +167,9 @@ spec:
         env:
           - name: RHCOS_VERSION
             value: "FILLED BY THE OPERATOR"
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
         volumeMounts:
           # corresponding volumes are dynamically inject by the
           # operator when OCP DriverToolkit side-car is enabled
