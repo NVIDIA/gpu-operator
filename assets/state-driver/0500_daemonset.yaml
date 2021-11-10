@@ -150,9 +150,6 @@ spec:
           successThreshold: 1
 
         # Only kept when OpenShift DriverToolkit side-car is enabled.
-        # Base image may be overriden by the operator (from
-        # ClusterPolicy.Driver.OpenShiftDriverToolkitImageStream).
-        # Tag always set by the operator with RHCOS OSTree value
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: openshift-driver-toolkit-ctr

@@ -1310,10 +1310,6 @@ spec:
                         description: Version represents Driver-Manager image tag(version)
                         type: string
                     type: object
-                  ocp_driver_toolkit_imagestream:
-                    description: OpenShiftDriverToolkitImage indicates the address
-                      of imagestream where the OpenShift Driver Toolkit image is stored
-                    type: string
                   rdma:
                     description: GPUDirectRDMASpec defines the properties for nv_peer_mem
                       deployment

@@ -295,12 +295,6 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UseOpenShiftDriverToolkit *bool `json:"use_ocp_driver_toolkit,omitempty"`
 
-	// OpenShiftDriverToolkitImage indicates the address of imagestream where the OpenShift Driver Toolkit image is stored
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Indicates the address of imagestream where the OpenShift Driver Toolkit image is stored"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
-	OpenShiftDriverToolkitImageStream string `json:"ocp_driver_toolkit_imagestream,omitempty"`
-
 	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
 
 	// Driver image repository
