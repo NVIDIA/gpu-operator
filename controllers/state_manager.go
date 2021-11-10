@@ -71,9 +71,9 @@ type OpenShiftDriverToolkit struct {
 	// DriverToolkit imagestream)
 	enabled bool
 
-	currentRhcosVersion              string
-	rhcosVersions                    map[string]bool
-	rhcosDriverToolkitImageTagsExist map[string]bool
+	currentRhcosVersion      string
+	rhcosVersions            map[string]bool
+	rhcosDriverToolkitImages map[string]string
 }
 
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
@@ -448,7 +448,7 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		// mind that this is executed at every reconciliation loop,
 		// do not assume "permanent" data storage.
 		n.ocpDriverToolkit.rhcosVersions = make(map[string]bool)
-		n.ocpDriverToolkit.rhcosDriverToolkitImageTagsExist = make(map[string]bool)
+		n.ocpDriverToolkit.rhcosDriverToolkitImages = make(map[string]string)
 	} else {
 		n.ocpDriverToolkit.requested = false
 		n.ocpDriverToolkit.enabled = false
