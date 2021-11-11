@@ -1513,32 +1513,21 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
 
-	if config.Driver.OpenShiftDriverToolkitImageStream != "" {
-		image := config.Driver.OpenShiftDriverToolkitImageStream
-
-		if !strings.Contains(image[strings.LastIndex(image, "/")+1:], ":") {
-			image += ":" + rhcosVersion
-		}
-
+	image, _ := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
+	if image != "" {
 		driverToolkitContainer.Image = image
-		n.rec.Log.Info("INFO: DriverToolkit", "custom image", driverToolkitContainer.Image)
+		n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
-		image, _ := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
-		if image != "" {
-			driverToolkitContainer.Image = image
-			n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
-		} else {
-			/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
-			obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
-			obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
+		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
-			driverToolkitContainer.Image = mainContainer.Image
-			setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
-			setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
-			setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
+		driverToolkitContainer.Image = mainContainer.Image
+		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
+		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
+		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
-			n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
-		}
+		n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
 
 	/* prepare the shared volumes */
@@ -2059,14 +2048,12 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 	n.ocpDriverToolkit.currentRhcosVersion = ""
 
 	tagsMissing := false
-	if n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream == "" {
-		for rhcosVersion, image := range n.ocpDriverToolkit.rhcosDriverToolkitImages {
-			if image != "" {
-				continue
-			}
-			n.rec.Log.Info("WARNINGs: RHCOS driver-toolkit image missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
-			tagsMissing = true
+	for rhcosVersion, image := range n.ocpDriverToolkit.rhcosDriverToolkitImages {
+		if image != "" {
+			continue
 		}
+		n.rec.Log.Info("WARNINGs: RHCOS driver-toolkit image missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+		tagsMissing = true
 	}
 	if tagsMissing {
 		n.operatorMetrics.openshiftDriverToolkitRhcosTagsMissing.Set(1)

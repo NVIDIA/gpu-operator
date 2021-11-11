@@ -472,16 +472,10 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 	n.rec.Log.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
 
 	if n.ocpDriverToolkit.requested {
-		hasImageStream := true
-		if n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream == "" {
-			hasImageStream, err = ocpHasDriverToolkitImageStream(n)
-			if err != nil {
-				n.rec.Log.Info("ocpHasDriverToolkitImageStream", "err", err)
-				return err
-			}
-		} else {
-			n.rec.Log.Info("ocpHasDriverToolkitImageStream skipped",
-				"Driver.OpenShiftDriverToolkitImageStream", n.singleton.Spec.Driver.OpenShiftDriverToolkitImageStream)
+		hasImageStream, err := ocpHasDriverToolkitImageStream(n)
+		if err != nil {
+			n.rec.Log.Info("ocpHasDriverToolkitImageStream", "err", err)
+			return err
 		}
 
 		hasCompatibleNFD := len(n.ocpDriverToolkit.rhcosVersions) != 0

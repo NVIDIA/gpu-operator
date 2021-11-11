@@ -50,7 +50,6 @@ spec:
   driver:
     enabled: true
     use_ocp_driver_toolkit: false
-    ocp_driver_toolkit_imagestream: ""
 
     rdma:
       enabled: false
