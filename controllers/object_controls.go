@@ -1470,7 +1470,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	if !n.ocpDriverToolkit.enabled {
 		if n.ocpDriverToolkit.requested {
-			n.rec.Log.Info("WARNING: OpenShift DriverToolkit was requested but could not be enabled (depencies missing)")
+			n.rec.Log.Info("WARNING: OpenShift DriverToolkit was requested but could not be enabled (dependencies missing)")
 		}
 
 		/* remove OpenShift Driver Toolkit side-car container from the Driver DaemonSet */
