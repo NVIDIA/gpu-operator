@@ -1062,7 +1062,6 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// set/append environment variables for mig-manager container
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "OPERATOR_NAMESPACE", n.operatorNamespace)
 	if len(config.MIGManager.Env) > 0 {
 		for _, env := range config.MIGManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)

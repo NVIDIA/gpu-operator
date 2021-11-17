@@ -46,6 +46,10 @@ spec:
           value: "/mig-parted-config/config.yaml"
         - name: GPU_CLIENTS_FILE
           value: "/gpu-clients/clients.yaml"
+        - name: DEFAULT_GPU_CLIENTS_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         securityContext:
           privileged: true
         volumeMounts:
