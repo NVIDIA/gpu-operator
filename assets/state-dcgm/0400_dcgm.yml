@@ -35,6 +35,7 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: HostToContainer
+      hostNetwork: true
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-ctr
