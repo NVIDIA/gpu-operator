@@ -86,7 +86,7 @@ driver:
   use_ocp_driver_toolkit: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "470.57.02"
+  version: "470.82.01"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   rdma:
@@ -95,7 +95,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.1.0
+    version: v0.2.0
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
@@ -145,7 +145,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.9.0-ubi8
+  version: v0.10.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -170,7 +170,7 @@ dcgm:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 2.2.3-ubuntu20.04
+  version: 2.3.1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -181,7 +181,7 @@ dcgm:
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.2.9-2.4.0-ubuntu20.04
+  version: 2.3.1-2.6.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
@@ -213,7 +213,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.1.3-ubuntu20.04
+  version: v0.2.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
