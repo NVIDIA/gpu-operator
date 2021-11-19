@@ -57,6 +57,14 @@ COPY --from=builder /workspace/gpu-operator /usr/bin/
 RUN mkdir -p /opt/gpu-operator
 COPY assets /opt/gpu-operator/
 COPY ./LICENSE /licenses/LICENSE
+COPY hack/must-gather.sh /usr/bin/gather
+
+ENV VERSION=${VERSION}
+
+# Install must-gather dependency: `kubectl`
+RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+RUN chmod +x ./kubectl
+RUN mv ./kubectl /usr/local/bin
 
 RUN useradd gpu-operator
 USER gpu-operator
