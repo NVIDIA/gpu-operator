@@ -3631,6 +3631,10 @@ spec:
           status:
             description: ClusterPolicyStatus defines the observed state of ClusterPolicy
             properties:
+              namespace:
+                description: Namespace indicates a namespace in which the operator
+                  is installed
+                type: string
               state:
                 description: State indicates status of ClusterPolicy
                 enum:
@@ -3639,6 +3643,7 @@ spec:
                 - notReady
                 type: string
             required:
+            - namespace
             - state
             type: object
         type: object
