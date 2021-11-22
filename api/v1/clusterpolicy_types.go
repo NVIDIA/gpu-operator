@@ -879,6 +879,8 @@ type ClusterPolicyStatus struct {
 	// +kubebuilder:validation:Enum=ignored;ready;notReady
 	// State indicates status of ClusterPolicy
 	State State `json:"state"`
+	// Namespace indicates a namespace in which the operator is installed
+	Namespace string `json:"namespace"`
 }
 
 // +kubebuilder:object:root=true
@@ -906,9 +908,10 @@ func init() {
 	SchemeBuilder.Register(&ClusterPolicy{}, &ClusterPolicyList{})
 }
 
-// SetState sets state of ClusterPolicy instance
-func (p *ClusterPolicy) SetState(s State) {
+// SetStatus sets state and namespace of ClusterPolicy instance
+func (p *ClusterPolicy) SetStatus(s State, ns string) {
 	p.Status.State = s
+	p.Status.Namespace = ns
 }
 
 func imagePath(repository string, image string, version string, imagePathEnvName string) (string, error) {

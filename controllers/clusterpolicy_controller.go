@@ -97,7 +97,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// TODO: Handle deletion of the main ClusterPolicy and cycle to the next one.
 	// We already have a main Clusterpolicy
 	if clusterPolicyCtrl.singleton != nil && clusterPolicyCtrl.singleton.ObjectMeta.Name != instance.ObjectMeta.Name {
-		instance.SetState(gpuv1.Ignored)
+		instance.SetStatus(gpuv1.Ignored, clusterPolicyCtrl.operatorNamespace)
 		// do not change `clusterPolicyCtrl.operatorMetrics.reconciliationStatus` here,
 		// spurious reconciliation
 		return ctrl.Result{}, err
@@ -195,7 +195,7 @@ func updateCRState(r *ClusterPolicyReconciler, namespacedName types.NamespacedNa
 		return err
 	}
 	// Update the CR state
-	instance.SetState(state)
+	instance.SetStatus(state, clusterPolicyCtrl.operatorNamespace)
 	err = r.Client.Status().Update(context.TODO(), instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to update ClusterPolicy status")
