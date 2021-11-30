@@ -42,7 +42,10 @@ rules:
   - namespaces
   verbs:
   - get
+  - list
   - create
+  - watch
+  - update
 - apiGroups:
   - apps
   resources:
