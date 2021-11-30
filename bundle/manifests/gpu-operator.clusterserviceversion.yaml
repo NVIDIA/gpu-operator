@@ -76,7 +76,6 @@ metadata:
       ]
     operators.operatorframework.io/builder: operator-sdk-v1.4.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    operatorframework.io/cluster-monitoring: "true"
     operatorframework.io/suggested-namespace: nvidia-gpu-operator
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
