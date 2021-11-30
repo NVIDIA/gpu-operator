@@ -35,14 +35,12 @@ if [[ "$0" == "/usr/bin/gather" ]]; then
     echo "${VERSION:-N/A}" >> $ARTIFACT_DIR/version
 fi
 
-if [[ "$K" == "oc" ]]; then
-    ocp_cluster=$($K get clusterversion/version --ignore-not-found -oname)
+ocp_cluster=$($K get clusterversion/version --ignore-not-found -oname || true)
 
-    if [ "$ocp_cluster" ]; then
-        echo "Running in OpenShift."
-        echo "Get the cluster version"
-        $K get clusterversion/version -oyaml > $ARTIFACT_DIR/openshift_version.yaml
-    fi
+if [[ "$ocp_cluster" ]]; then
+    echo "Running in OpenShift."
+    echo "Get the cluster version"
+    $K get clusterversion/version -oyaml > $ARTIFACT_DIR/openshift_version.yaml
 fi
 
 echo "Get the operator namespaces"
@@ -64,6 +62,22 @@ echo "Using '$OPERATOR_NAMESPACE' as operator namespace"
 echo "Using '$OPERAND_NAMESPACE' as operand namespace"
 echo ""
 
+echo "#"
+echo "# ClusterPolicy"
+echo "#"
+echo
+
+CLUSTER_POLICY_NAME=$($K get clusterpolicy -oname)
+
+if [[ "$CLUSTER_POLICY_NAME" ]]; then
+    echo "Get $CLUSTER_POLICY_NAME"
+    $K get -oyaml $CLUSTER_POLICY_NAME > $ARTIFACT_DIR/cluster_policy.yaml
+else
+    echo "Mark the ClusterPolicy as missing"
+    touch $ARTIFACT_DIR/cluster_policy.missing
+fi
+
+echo
 echo "#"
 echo "# Nodes and machines"
 echo "#"
@@ -101,10 +115,10 @@ for node in $(echo "$gpu_pci_nodes"); do
     echo "" >> $ARTIFACT_DIR/gpu_nodes.labels
 done
 
-echo "Get the GPU nodes"
+echo "Get the GPU nodes (status)"
 $K get nodes -l nvidia.com/gpu.present=true > $ARTIFACT_DIR/gpu_nodes.status
 
-echo "Get the GPU nodes"
+echo "Get the GPU nodes (description)"
 $K describe nodes -l nvidia.com/gpu.present=true > $ARTIFACT_DIR/gpu_nodes.descr
 
 echo ""
