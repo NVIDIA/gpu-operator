@@ -172,6 +172,8 @@ spec:
           # operator when OCP DriverToolkit side-car is enabled
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
+          - name: var-log
+            mountPath: /var/log
       volumes:
         - name: run-nvidia
           hostPath:
