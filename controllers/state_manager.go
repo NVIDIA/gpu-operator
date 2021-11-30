@@ -33,6 +33,11 @@ const (
 	ocpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	ocpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	ocpDriverToolkitIdentificationValue = "true"
+	ocpNamespaceMonitoringLabelKey      = "openshift.io/cluster-monitoring"
+	ocpNamespaceMonitoringLabelValue    = "true"
+	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
+	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
+	ocpSuggestedNamespace = "nvidia-gpu-operator"
 )
 
 var gpuStateLabels = map[string]string{
@@ -337,6 +342,64 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 	return runtime, nil
 }
 
+func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
+	namespaceName := clusterPolicyCtrl.operatorNamespace
+
+	if namespaceName != ocpSuggestedNamespace {
+		// The GPU Operator is not installed in the suggested
+		// namespace, so the namespace may be shared with other
+		// untrusted operators.  Do not enable namespace monitoring in
+		// this case, as per OpenShift/Prometheus best practices.
+		n.rec.Log.Info("GPU Operator not installed in the suggested namespace, skipping namespace monitoring verification",
+			"namespace", namespaceName,
+			"suggested namespace", ocpSuggestedNamespace)
+		return nil
+	}
+
+	ns := &corev1.Namespace{}
+	opts := client.ObjectKey{Name: namespaceName}
+	err := n.rec.Client.Get(context.TODO(), opts, ns)
+	if err != nil {
+		return fmt.Errorf("ERROR: could not get Namespace %s from client: %v", namespaceName, err)
+	}
+
+	val, ok := ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey]
+	if ok {
+		// label already defined, do not change it
+		var msg string
+		if val == ocpNamespaceMonitoringLabelValue {
+			msg = "OpenShift monitoring is enabled on the GPU Operator namespace"
+		} else {
+			msg = "WARNING: OpenShift monitoring currently disabled on user request"
+		}
+		n.rec.Log.Info(msg,
+			"namespace", namespaceName,
+			"label", ocpNamespaceMonitoringLabelKey,
+			"value", val,
+			"excepted value", ocpNamespaceMonitoringLabelValue)
+
+		return nil
+	}
+
+	// label not defined, enable monitoring
+	n.rec.Log.Info("Enabling OpenShift monitoring")
+	n.rec.Log.Info("DEBUG: Adding monitoring label to the operator namespace",
+		"namespace", namespaceName,
+		"label", ocpNamespaceMonitoringLabelKey,
+		"value", ocpNamespaceMonitoringLabelValue)
+	n.rec.Log.Info("Monitoring can be disabled by setting the namespace label " +
+		ocpNamespaceMonitoringLabelKey + "=false")
+	patch := client.MergeFrom(ns.DeepCopy())
+	ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
+	err = n.rec.Client.Patch(context.TODO(), ns, patch)
+	if err != nil {
+		return fmt.Errorf("Unable to label namespace %s for the GPU Operator monitoring, err %s",
+			namespaceName, err.Error())
+	}
+
+	return nil
+}
+
 // getRuntime will detect the container runtime used by nodes in the
 // cluster and correctly set the value for clusterPolicyController.runtime
 // For openshift, set runtime to crio. Otherwise, the default runtime is
@@ -507,6 +570,13 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(1)
 		}
 	}
+
+	if n.openshift != "" {
+		if err := n.ocpEnsureNamespaceMonitoring(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
