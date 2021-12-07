@@ -4,8 +4,16 @@ import (
 	"context"
 	"fmt"
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	schedv1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -19,14 +27,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"strings"
 	"testing"
 )
 
 const (
-	clusterPolicyPath   = "config/samples/v1_clusterpolicy.yaml"
-	clusterPolicyName   = "gpu-cluster-policy"
-	driverAssetsPath    = "assets/state-driver/"
-	driverDaemonsetName = "nvidia-driver-daemonset"
+	clusterPolicyPath    = "config/samples/v1_clusterpolicy.yaml"
+	clusterPolicyName    = "gpu-cluster-policy"
+	driverAssetsPath     = "assets/state-driver/"
+	driverDaemonsetName  = "nvidia-driver-daemonset"
+	nfdNvidiaPCILabelKey = "feature.node.kubernetes.io/pci-10de.present"
+	nfdKernelLabelKey    = "feature.node.kubernetes.io/kernel-version.full"
+	nfdOsNameLabelKey    = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOsVersionLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
 )
 
 type testConfig struct {
@@ -39,13 +52,48 @@ var (
 	clusterPolicyController ClusterPolicyController
 	clusterPolicyReconciler ClusterPolicyReconciler
 	clusterPolicy           gpuv1.ClusterPolicy
+	boolTrue                *bool
+	boolFalse               *bool
 )
 
 var nfdLabels = map[string]string{
-	"feature.node.kubernetes.io/pci-10de.present":             "true",
-	"feature.node.kubernetes.io/kernel-version.full":          "5.4.0",
-	"feature.node.kubernetes.io/system-os_release.ID":         "ubuntu",
-	"feature.node.kubernetes.io/system-os_release.VERSION_ID": "18.04",
+	nfdNvidiaPCILabelKey: "true",
+	nfdKernelLabelKey:    "5.4.0",
+	nfdOsNameLabelKey:    "ubuntu",
+	nfdOsVersionLabelKey: "18.04",
+}
+
+var kubernetesResources = []client.Object{
+	&corev1.ServiceAccount{},
+	&rbacv1.Role{},
+	&rbacv1.RoleBinding{},
+	&rbacv1.ClusterRole{},
+	&rbacv1.ClusterRoleBinding{},
+	&corev1.ConfigMap{},
+	&appsv1.DaemonSet{},
+	&appsv1.Deployment{},
+	&corev1.Pod{},
+	&corev1.Service{},
+	&promv1.ServiceMonitor{},
+	&schedv1.PriorityClass{},
+	//&corev1.Taint{},
+	&secv1.SecurityContextConstraints{},
+	&policyv1beta1.PodSecurityPolicy{},
+	&corev1.Namespace{},
+	&nodev1.RuntimeClass{},
+	&promv1.PrometheusRule{},
+}
+
+type commonDaemonsetSpec struct {
+	repository       string
+	image            string
+	version          string
+	imagePullPolicy  string
+	imagePullSecrets []corev1.LocalObjectReference
+	args             []string
+	env              []corev1.EnvVar
+	securityContext  *corev1.SecurityContext
+	resources        *corev1.ResourceRequirements
 }
 
 func TestMain(m *testing.M) {
@@ -85,9 +133,20 @@ func getModuleRoot(dir string) (string, error) {
 // object is initialized with the mock kubernetes client as well as other steps
 // mimicking init() in state_manager.go
 func setup() error {
+	// Used when updating ClusterPolicy spec
+	boolFalse = new(bool)
+	boolTrue = new(bool)
+	*boolTrue = true
+
 	s := scheme.Scheme
 	if err := gpuv1.AddToScheme(s); err != nil {
 		return fmt.Errorf("unable to add ClusterPolicy v1 schema: %v", err)
+	}
+	if err := promv1.AddToScheme(s); err != nil {
+		return fmt.Errorf("unable to add promv1 schema: %v", err)
+	}
+	if err := secv1.AddToScheme(s); err != nil {
+		return fmt.Errorf("unable to add secv1 schema: %v", err)
 	}
 
 	client, err := newCluster(cfg.nodes, s)
@@ -176,32 +235,230 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 	return cl, nil
 }
 
-// TestDriverAssets tests that valid spec is generated for all driver assets
-func TestDriverAssets(t *testing.T) {
-	err := addState(&clusterPolicyController, filepath.Join(cfg.root, driverAssetsPath))
+// updateClusterPolicy updates an existing ClusterPolicy instance
+func updateClusterPolicy(n *ClusterPolicyController, cp *gpuv1.ClusterPolicy) error {
+	n.singleton = cp
+	err := n.rec.Client.Update(context.TODO(), cp)
+	if err != nil && !errors.IsConflict(err) {
+		return fmt.Errorf("failed to update ClusterPolicy: %v", err)
+	}
+	return nil
+}
+
+// removeState deletes all resources, controls, and stateNames tracked
+// by ClusterPolicyController at a specific index. It also deletes
+// all objects from the mock k8s client
+func removeState(n *ClusterPolicyController, idx int) error {
+	var err error
+	for _, res := range kubernetesResources {
+		// TODO: use n.operatorNamespace once MR is merged
+		err = n.rec.Client.DeleteAllOf(context.TODO(), res)
+		if err != nil {
+			return fmt.Errorf("error deleting objects from k8s client: %v", err)
+		}
+	}
+	n.resources = append(n.resources[:idx], n.resources[idx+1:]...)
+	n.controls = append(n.controls[:idx], n.controls[idx+1:]...)
+	n.stateNames = append(n.stateNames[:idx], n.stateNames[idx+1:]...)
+	return nil
+}
+
+// getImagePullSecrets converts a slice of strings (pull secrets)
+// to the corev1 type used by k8s
+func getImagePullSecrets(secrets []string) []corev1.LocalObjectReference {
+	var ret []corev1.LocalObjectReference
+	for _, secret := range secrets {
+		ret = append(ret, corev1.LocalObjectReference{Name: secret})
+	}
+	return ret
+}
+
+// testDaemonsetCommon executes one test case for a particular Daemonset,
+// and checks the values for common fields used throughout all Daemonsets
+// managed by the GPU Operator.
+func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string, numDaemonsets int) (*appsv1.DaemonSet, error) {
+	var spec commonDaemonsetSpec
+	var dsLabel, mainCtrName, manifestFile, mainCtrImage string
+	var err error
+
+	// TODO: add cases for all components
+	switch component {
+	case "Driver":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.Driver.Repository,
+			image:            cp.Spec.Driver.Image,
+			version:          cp.Spec.Driver.Version,
+			imagePullPolicy:  cp.Spec.Driver.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.Driver.ImagePullSecrets),
+			args:             cp.Spec.Driver.Args,
+			env:              cp.Spec.Driver.Env,
+			securityContext:  cp.Spec.Driver.SecurityContext,
+			resources:        cp.Spec.Driver.Resources,
+		}
+		dsLabel = "nvidia-driver-daemonset"
+		mainCtrName = "nvidia-driver"
+		manifestFile = filepath.Join(cfg.root, driverAssetsPath+"0500_daemonset.yaml")
+		mainCtrImage, err = resolveDriverTag(clusterPolicyController, &cp.Spec.Driver)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for driver: %v", err)
+		}
+	default:
+		return nil, fmt.Errorf("invalid component for testDaemonsetCommon(): %s", component)
+	}
+
+	// update cluster policy
+	err = updateClusterPolicy(&clusterPolicyController, cp)
+	if err != nil {
+		t.Fatalf("error in test setup: %v", err)
+	}
+	// add manifests
+	err = addState(&clusterPolicyController, manifestFile)
 	if err != nil {
 		t.Fatalf("unable to add state: %v", err)
 	}
-
+	// create resources
 	_, err = clusterPolicyController.step()
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
 	}
-
-	// Verify that driver DaemonSet is deployed properly
+	// get daemonset
 	opts := []client.ListOption{
-		client.MatchingLabels{"app": "nvidia-driver-daemonset"},
+		client.MatchingLabels{"app": dsLabel},
 	}
 	list := &appsv1.DaemonSetList{}
 	err = clusterPolicyController.rec.Client.List(context.TODO(), list, opts...)
 	if err != nil {
 		t.Fatalf("could not get DaemonSetList from client: %v", err)
 	}
-	if len(list.Items) == 0 {
-		t.Fatalf("no daemonsets returned from client")
+
+	// compare daemonset with expected output
+	require.Equal(t, numDaemonsets, len(list.Items), "unexpected # of daemonsets")
+	if numDaemonsets == 0 || len(list.Items) == 0 {
+		return nil, nil
+	}
+	ds := list.Items[0]
+	// find main container
+	mainCtrIdx := -1
+	for i, container := range ds.Spec.Template.Spec.Containers {
+		if strings.Contains(container.Name, mainCtrName) {
+			mainCtrIdx = i
+			break
+		}
+	}
+	if mainCtrIdx == -1 {
+		return nil, fmt.Errorf("could not find main container index")
+	}
+	mainCtr := ds.Spec.Template.Spec.Containers[mainCtrIdx]
+
+	require.Equal(t, mainCtrImage, mainCtr.Image, "unexpected Image")
+	require.Equal(t, gpuv1.ImagePullPolicy(spec.imagePullPolicy), mainCtr.ImagePullPolicy, "unexpected ImagePullPolicy")
+	require.Equal(t, spec.imagePullSecrets, ds.Spec.Template.Spec.ImagePullSecrets, "unexpected ImagePullSecrets")
+	if spec.args != nil {
+		require.Equal(t, spec.args, mainCtr.Args, "unexpected Args")
+	}
+	for _, env := range spec.env {
+		require.Contains(t, mainCtr.Env, env, "env var not present")
+	}
+	// TODO: implement checks for other common fields (i.e. Resources, securityContext, Tolerations, etc.)
+
+	return &ds, nil
+}
+
+// getDriverTestInput return a ClusterPolicy instance for a particular
+// driver test case. This function will grow as new test cases are added
+func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Until we create sample ClusterPolicies that have all fields
+	// set, hardcode some default values:
+	cp.Spec.Driver.Repository = "nvcr.io/nvidia"
+	cp.Spec.Driver.Image = "driver"
+	cp.Spec.Driver.Version = "470.57.02"
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
 	}
 
-	ds := list.Items[0]
-	t.Logf("%v created with valid spec", ds.Name)
-	t.Logf("driver image: %v", ds.Spec.Template.Spec.Containers[0].Image)
+	return cp
+}
+
+// getDriverTestOutput returns a map containing expected output for
+// driver test case. This function will grow as new test cases are added
+func getDriverTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets":          1,
+		"mofedValidationPresent": false,
+		"nvPeerMemPresent":       false,
+		"driverImage":            "nvcr.io/nvidia/driver:470.57.02-ubuntu18.04",
+	}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestDriver tests that the GPU Operator correctly deploys the driver daemonset
+// under various scenarios/config options
+func TestDriver(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getDriverTestInput("default"),
+			getDriverTestOutput("default"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "Driver", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			mofedValidationPresent := false
+			nvPeerMemPresent := false
+			driverImage := ""
+			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
+				if strings.Contains(initContainer.Name, "mofed-validation") {
+					mofedValidationPresent = true
+				}
+			}
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				if strings.Contains(container.Name, "nvidia-driver") {
+					driverImage = container.Image
+					continue
+				}
+				if strings.Contains(container.Name, "nvidia-peermem") {
+					nvPeerMemPresent = true
+				}
+			}
+
+			require.Equal(t, tc.output["mofedValidationPresent"], mofedValidationPresent, "Unexpected configuration for mofed-validation init container")
+			require.Equal(t, tc.output["nvPeerMemPresent"], nvPeerMemPresent, "Unexpected configuration for nv-peermem container")
+			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-driver-ctr image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
+		})
+	}
 }
