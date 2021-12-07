@@ -89,7 +89,7 @@ type ClusterPolicyController struct {
 	resources       []Resources
 	controls        []controlFunc
 	stateNames      []string
-	operatorMetrics OperatorMetrics
+	operatorMetrics *OperatorMetrics
 	rec             *ClusterPolicyReconciler
 	idx             int
 

@@ -37,8 +37,8 @@ const (
 	openshiftDriverToolkitNotPossible = -1
 )
 
-func initOperatorMetrics(n *ClusterPolicyController) OperatorMetrics {
-	m := OperatorMetrics{
+func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
+	m := &OperatorMetrics{
 		gpuNodesTotal: promcli.NewGauge(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_gpu_nodes_total",
