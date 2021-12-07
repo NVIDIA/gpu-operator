@@ -15,6 +15,7 @@ require (
 	github.com/prometheus/common v0.10.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
