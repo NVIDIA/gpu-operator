@@ -244,9 +244,9 @@ echo "# nvidia-bug-report.sh"
 echo "#"
 echo ""
 
-for pod in $($K get pods -lopenshift.driver-toolkit -oname; $K get pods -lapp=nvidia-driver-daemonset -oname);
+for pod in $($K get pods -lopenshift.driver-toolkit -oname -n $OPERAND_NAMESPACE; $K get pods -lapp=nvidia-driver-daemonset -oname -n $OPERAND_NAMESPACE);
 do
-    pod_nodename=$($K get $pod -ojsonpath={.spec.nodeName})
+    pod_nodename=$($K get $pod -ojsonpath={.spec.nodeName} -n $OPERAND_NAMESPACE)
     echo "Saving nvidia-bug-report from ${pod_nodename} ..."
 
     $K exec -c nvidia-driver-ctr -n $OPERAND_NAMESPACE $pod -- bash -c 'cd /tmp && nvidia-bug-report.sh' >&2 || continue
