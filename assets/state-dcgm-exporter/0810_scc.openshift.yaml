@@ -4,7 +4,7 @@
 #
 allowHostDirVolumePlugin: true
 allowHostIPC: false
-allowHostNetwork: true
+allowHostNetwork: false
 allowHostPID: false
 allowHostPorts: true
 allowPrivilegeEscalation: true

@@ -25,7 +25,6 @@ spec:
       priorityClassName: system-node-critical
       serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
-      hostNetwork: true
       initContainers:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
