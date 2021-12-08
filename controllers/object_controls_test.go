@@ -37,7 +37,6 @@ const (
 	driverAssetsPath     = "assets/state-driver/"
 	driverDaemonsetName  = "nvidia-driver-daemonset"
 	nfdNvidiaPCILabelKey = "feature.node.kubernetes.io/pci-10de.present"
-	nfdKernelLabelKey    = "feature.node.kubernetes.io/kernel-version.full"
 	nfdOsNameLabelKey    = "feature.node.kubernetes.io/system-os_release.ID"
 	nfdOsVersionLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
 )
