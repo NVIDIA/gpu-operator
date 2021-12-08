@@ -24,7 +24,7 @@ func TestGetRuntimeString(t *testing.T) {
 		},
 		{
 			"crio",
-			"crio://1.0.0",
+			"cri-o://1.0.0",
 			gpuv1.CRIO,
 		},
 		{
