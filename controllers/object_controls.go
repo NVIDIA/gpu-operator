@@ -876,6 +876,8 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
+		// enable hostNetwork for communication with external DCGM using NODE_IP
+		obj.Spec.Template.Spec.HostNetwork = true
 		// set DCGM host engine env. NODE_IP will be substituted during pod runtime
 		dcgmHostPort := int32(DCGMDefaultHostPort)
 		if config.DCGM.HostPort != 0 {
@@ -2401,6 +2403,11 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	if obj.Name == "nvidia-mig-manager" && !n.singleton.Spec.Driver.IsDriverEnabled() {
 		obj.AllowHostIPC = true
+	}
+
+	// Allow hostNetwork only when a separate standalone DCGM engine is deployed for communication
+	if obj.Name == "nvidia-dcgm-exporter" && n.singleton.Spec.DCGM.IsEnabled() {
+		obj.AllowHostNetwork = true
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
