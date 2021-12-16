@@ -105,6 +105,18 @@ test_mig_strategy_updates() {
     return 0
 }
 
+test_enable_dcgm() {
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgm/enabled", "value": 'true'}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot enable standalone DCGM engine with ClusterPolicy update"
+        exit 1
+    fi
+    # Verify that standalone nvidia-dcgm and exporter pods are running successfully after update
+    check_pod_ready "nvidia-dcgm"
+    check_pod_ready "nvidia-dcgm-exporter"
+}
+
 test_image_updates
 test_env_updates
 test_mig_strategy_updates
+test_enable_dcgm
