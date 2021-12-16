@@ -15,7 +15,6 @@ source ${SCRIPT_DIR}/checks.sh
 check_pod_ready "nvidia-driver-daemonset"
 check_pod_ready "nvidia-container-toolkit-daemonset"
 check_pod_ready "nvidia-device-plugin-daemonset"
-check_pod_ready "nvidia-dcgm"
 check_pod_ready "nvidia-dcgm-exporter"
 check_pod_ready "gpu-feature-discovery"
 check_pod_ready "nvidia-operator-validator"
