@@ -499,6 +499,22 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
 			addState(n, "/opt/gpu-operator/state-mig-manager")
 		}
+	} else {
+		// Only adding dcgm as special case to dynamically enable the component
+		// if disabled during install
+		if clusterPolicy.Spec.DCGM.IsEnabled() {
+			stateAdded := false
+			for _, state := range n.stateNames {
+				if state == "state-dcgm" {
+					// already added ignore
+					stateAdded = true
+					break
+				}
+			}
+			if !stateAdded {
+				addState(n, "/opt/gpu-operator/state-dcgm")
+			}
+		}
 	}
 
 	if n.singleton.Spec.Driver.UseOpenShiftDriverToolkit != nil &&

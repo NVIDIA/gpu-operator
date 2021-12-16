@@ -40,10 +40,6 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-exporter
         env:
-        - name: NODE_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         - name: DCGM_EXPORTER_LISTEN
           value: ":9400"
         - name: DCGM_EXPORTER_KUBERNETES
