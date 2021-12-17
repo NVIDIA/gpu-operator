@@ -141,7 +141,7 @@ MODULE := github.com/NVIDIA/gpu-operator
 
 CUDA_IMAGE ?= nvidia/cuda
 CUDA_VERSION ?= 11.4.2
-GOLANG_VERSION ?= 1.15
+GOLANG_VERSION ?= 1.17
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 ifeq ($(IMAGE),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
