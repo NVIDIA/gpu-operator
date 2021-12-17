@@ -1,4 +1,5 @@
 variables:
+  GO111MODULE: 'auto'
   GOPATH: '$(system.defaultWorkingDirectory)/work'
   sdkPath: '$(GOPATH)/src/github.com/$(build.repository.name)'
 
@@ -8,12 +9,16 @@ jobs:
 
     strategy:
       matrix:
-        Linux_Go113:
+        Linux_Go115:
           vm.image: 'ubuntu-18.04'
-          go.version: '1.13'
-        Linux_Go114:
+          go.version: '1.15'
+        Linux_Go116:
           vm.image: 'ubuntu-18.04'
-          go.version: '1.14'
+          go.version: '1.16'
+        Linux_Go117:
+          vm.image: 'ubuntu-18.04'
+          go.version: '1.17'
+          current_go: 'true'
 
     pool:
       vmImage: '$(vm.image)'
@@ -35,36 +40,42 @@ jobs:
 
       - script: |
           set -e
-          curl -sSL https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-          dep ensure -v
-          go install ./vendor/golang.org/x/lint/golint
-          go get github.com/jstemmer/go-junit-report
-          go get github.com/axw/gocov/gocov
-          go get github.com/AlekSi/gocov-xml
-          go get -u github.com/matm/gocov-html
+          export GO111MODULE=on
+          go get golang.org/x/lint/golint@latest
+          go get github.com/jstemmer/go-junit-report@latest
+          go get github.com/axw/gocov/gocov@latest
+          go get github.com/AlekSi/gocov-xml@latest
+          go get github.com/matm/gocov-html@latest
         workingDirectory: '$(sdkPath)'
         displayName: 'Install Dependencies'
 
       - script: |
-          go vet ./autorest/...
-          go vet ./logger/...
-          go vet ./tracing/...
+          modules=$(find . -name go.mod)
+          for module in $modules; do
+            pushd "$(dirname $module)" && go vet ./... && popd;
+          done
         workingDirectory: '$(sdkPath)'
         displayName: 'Vet'
 
       - script: |
-          go build -v ./autorest/...
-          go build -v ./logger/...
-          go build -v ./tracing/...
+          modules=$(find . -name go.mod)
+          for module in $modules; do
+            pushd "$(dirname $module)" && go build -v ./... && popd;
+          done
         workingDirectory: '$(sdkPath)'
         displayName: 'Build'
 
       - script: |
           set -e
-          go test -race -v -coverprofile=coverage.txt -covermode atomic ./autorest/... ./logger/... ./tracing/... 2>&1 | go-junit-report > report.xml
-          gocov convert coverage.txt > coverage.json
-          gocov-xml < coverage.json > coverage.xml
-          gocov-html < coverage.json > coverage.html
+          modules=$(find . -name go.mod)
+          for module in $modules; do
+            pushd "$(dirname $module)";
+              go test -race -v -coverprofile=coverage.txt -covermode atomic ./... 2>&1 | go-junit-report > report.xml;
+              gocov convert coverage.txt > coverage.json;
+              gocov-xml < coverage.json > coverage.xml;
+              gocov-html < coverage.json > coverage.html;
+            popd;
+          done
         workingDirectory: '$(sdkPath)'
         displayName: 'Run Tests'
 
@@ -81,12 +92,13 @@ jobs:
         workingDirectory: '$(sdkPath)'
         displayName: 'Format Check'
         failOnStderr: true
-        condition: succeededOrFailed()
+        condition: and(succeededOrFailed(), eq(variables['current_go'], 'true'))
 
       - script: |
-          golint ./autorest/... >&2
-          golint ./logger/... >&2
-          golint ./tracing/... >&2
+          modules=$(find . -name go.mod)
+          for module in $modules; do
+            pushd "$(dirname $module)" && golint ./... >&2 && popd;
+          done
         workingDirectory: '$(sdkPath)'
         displayName: 'Linter Check'
         failOnStderr: true
@@ -95,11 +107,11 @@ jobs:
       - task: PublishTestResults@2
         inputs:
           testRunner: JUnit
-          testResultsFiles: $(sdkPath)/report.xml
+          testResultsFiles: $(sdkPath)/**/report.xml
           failTaskOnFailedTests: true
 
       - task: PublishCodeCoverageResults@1
         inputs:
           codeCoverageTool: Cobertura 
-          summaryFileLocation: $(sdkPath)/coverage.xml
-          additionalCodeCoverageFiles: $(sdkPath)/coverage.html
+          summaryFileLocation: $(sdkPath)/autorest/**/coverage.xml
+          additionalCodeCoverageFiles: $(sdkPath)/autorest/**/coverage.html
