@@ -11,7 +11,7 @@ metadata:
 spec:
   privileged: true
   hostIPC: false
-  hostNetwork: false
+  hostNetwork: true
   hostPID: true
   allowPrivilegeEscalation: true
   readOnlyRootFilesystem: false

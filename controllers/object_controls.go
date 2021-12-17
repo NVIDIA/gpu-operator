@@ -884,6 +884,13 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			dcgmHostPort = config.DCGM.HostPort
 		}
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("localhost:%d", dcgmHostPort))
+	} else {
+		// case for DCGM running on the host itself(DGX BaseOS)
+		remoteEngine := getContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName)
+		if remoteEngine != "" && strings.HasPrefix(remoteEngine, "localhost") {
+			// enable hostNetwork for communication with external DCGM using localhost
+			obj.Spec.Template.Spec.HostNetwork = true
+		}
 	}
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
