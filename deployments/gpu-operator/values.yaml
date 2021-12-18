@@ -183,7 +183,7 @@ dcgm:
 dcgmExporter:
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.3.1-2.6.0-ubuntu20.04
+  version: 2.3.1-2.6.1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
