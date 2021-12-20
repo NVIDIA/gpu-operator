@@ -593,9 +593,9 @@ func (m *MOFED) validate() error {
 }
 
 func (m *MOFED) runValidation(silent bool) error {
-	// invoke validation command
-	command := "grep"
-	args := []string{"ib_register_peer_memory_client", "/proc/kallsyms"}
+	//check for mlx5_core module to be loaded
+	command := "bash"
+	args := []string{"-c", "lsmod | grep mlx5_core"}
 
 	if withWaitFlag {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
