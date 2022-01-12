@@ -91,6 +91,8 @@ const (
 	DCGMDefaultHostPort = 5555
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
+	// UseHostMOFEDEnvName indicates if MOFED driver is pre-installed on the host
+	UseHostMOFEDEnvName = "USE_HOST_MOFED"
 	// MetricsConfigMountPath indicates mount path for custom dcgm metrics file
 	MetricsConfigMountPath = "/etc/dcgm-exporter/" + MetricsConfigFileName
 	// MetricsConfigFileName indicates custom dcgm metrics file name
@@ -1704,6 +1706,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 						obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
 					}
 				}
+				// set env indicating host-mofed is enabled
+				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), UseHostMOFEDEnvName, "true")
 			}
 		}
 
@@ -1833,6 +1837,10 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 			} else {
 				// pass env for mofed-validation
 				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), GPUDirectRDMAEnabledEnvName, "true")
+				if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
+					// set env indicating host-mofed is enabled
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), UseHostMOFEDEnvName, "true")
+				}
 			}
 		}
 
