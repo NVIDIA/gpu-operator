@@ -145,6 +145,8 @@ const (
 	MellanoxDeviceLabelKey = "feature.node.kubernetes.io/pci-15b3.present"
 	// GPUDirectRDMAEnabledEnvName represents env name to indicate if GPUDirect RDMA is enabled through GPU Operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
+	// UseHostMOFEDEnvname represents env name to indicate if MOFED is pre-installed on host
+	UseHostMOFEDEnvname = "USE_HOST_MOFED"
 )
 
 func main() {
@@ -597,6 +599,10 @@ func (m *MOFED) runValidation(silent bool) error {
 	command := "grep"
 	args := []string{"ib_register_peer_memory_client", "/proc/kallsyms"}
 
+	// If MOFED container is running then use readiness flag set by the driver container instead
+	if os.Getenv(UseHostMOFEDEnvname) != "true" {
+		args = []string{"-c", "stat /run/mellanox/drivers/.driver-ready"}
+	}
 	if withWaitFlag {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
 	}
