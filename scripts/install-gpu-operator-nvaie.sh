@@ -61,9 +61,9 @@ helm repo add nvaie https://helm.ngc.nvidia.com/nvaie \
 # step5: Install the NVIDIA GPU Operator
 
 if [ DEPLOYMENT_TYPE = virtual ]; then
-    helm install --wait gpu-operator nvaie/gpu-operator -n gpu-operator
+    helm install --wait gpu-operator nvaie/gpu-operator-1-1 -n gpu-operator
 else
-    helm install --wait gpu-operator nvaie/gpu-operator -n gpu-operator \
+    helm install --wait gpu-operator nvaie/gpu-operator-1-1 -n gpu-operator \
         --set driver.repository=nvcr.io/nvidia \
         --set driver.image=driver \
         --set driver.version="${DATACENTER_DRIVER_VERSION}" \
