@@ -18,6 +18,14 @@ ${SCRIPT_DIR}/update-clusterpolicy.sh
 source ${SCRIPT_DIR}/checks.sh
 test_restart_operator ${TEST_NAMESPACE} ${CONTAINER_RUNTIME}
 
+# Disable operands and verify that this works as expected
+${SCRIPT_DIR}/disable-operands.sh
+${SCRIPT_DIR}/verify-disable-operands.sh
+
+# Enable operands and verify that this works as expected
+${SCRIPT_DIR}/enable-operands.sh
+${SCRIPT_DIR}/verify-operator.sh
+
 # Uninstall the workload and operator
 ${SCRIPT_DIR}/uninstall-workload.sh
 ${SCRIPT_DIR}/uninstall-operator.sh
