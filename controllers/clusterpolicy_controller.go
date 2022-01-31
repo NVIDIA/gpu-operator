@@ -247,6 +247,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
+			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
 
 			oldOSTreeLabel, _ := oldLabels[nfdOSTreeVersionLabelKey]
 			newOSTreeLabel, _ := newLabels[nfdOSTreeVersionLabelKey]
@@ -255,6 +256,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			needsUpdate := gpuCommonLabelMissing ||
 				gpuCommonLabelOutdated ||
 				migManagerLabelMissing ||
+				commonOperandsLabelChanged ||
 				osTreeLabelChanged
 
 			if needsUpdate {
@@ -263,7 +265,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"gpuCommonLabelMissing", gpuCommonLabelMissing,
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
 					"migManagerLabelMissing", migManagerLabelMissing,
-					"migManagerLabelMissing", migManagerLabelMissing,
+					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
 				)
 			}

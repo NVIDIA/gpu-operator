@@ -24,6 +24,8 @@ import (
 const (
 	commonGPULabelKey                   = "nvidia.com/gpu.present"
 	commonGPULabelValue                 = "true"
+	commonOperandsLabelKey              = "nvidia.com/gpu.deploy.operands"
+	commonOperandsLabelValue            = "true"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
 	gpuProductLabelKey                  = "nvidia.com/gpu.product"
@@ -171,6 +173,22 @@ func hasCommonGPULabel(labels map[string]string) bool {
 // addMissingGPUStateLabels returns true if the nodeLabels map has been updated
 func (n *ClusterPolicyController) addMissingGPUStateLabels(nodeLabels map[string]string) bool {
 	modified := false
+	if hasOperandsDisabled(nodeLabels) {
+		// Operands are disabled, delete all GPU state labels
+		n.rec.Log.Info("Operands are disabled", "Label", commonOperandsLabelKey, "Value", "false")
+		for key := range gpuStateLabels {
+			if _, ok := nodeLabels[key]; ok {
+				delete(nodeLabels, key)
+				modified = true
+			}
+		}
+		if _, ok := nodeLabels[migManagerLabelKey]; ok {
+			delete(nodeLabels, migManagerLabelKey)
+			modified = true
+		}
+		return modified
+	}
+
 	for key, value := range gpuStateLabels {
 		if _, ok := nodeLabels[key]; !ok {
 			nodeLabels[key] = value
@@ -236,6 +254,15 @@ func hasMIGManagerLabel(labels map[string]string) bool {
 	return false
 }
 
+func hasOperandsDisabled(labels map[string]string) bool {
+	if value, ok := labels[commonOperandsLabelKey]; ok {
+		if value == "false" {
+			return true
+		}
+	}
+	return false
+}
+
 // labelGPUNodes labels nodes with GPU's with Nvidia common label
 // it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
 func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
@@ -259,12 +286,22 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			// label the node with common Nvidia GPU label
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// label the node with the state GPU labels
-			for key, value := range gpuStateLabels {
-				labels[key] = value
-			}
-			// add mig-manager label
-			if hasMIGCapableGPU(labels) {
-				labels[migManagerLabelKey] = migManagerLabelValue
+			if hasOperandsDisabled(labels) {
+				// Operands are disabled, delete all GPU state labels
+				n.rec.Log.Info("Operands are disabled", "Label", commonOperandsLabelKey, "Value", "false")
+				n.rec.Log.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
+				for key := range gpuStateLabels {
+					delete(labels, key)
+				}
+				delete(labels, migManagerLabelKey)
+			} else {
+				for key, value := range gpuStateLabels {
+					labels[key] = value
+				}
+				// add mig-manager label
+				if hasMIGCapableGPU(labels) {
+					labels[migManagerLabelKey] = migManagerLabelValue
+				}
 			}
 			// update node labels
 			node.SetLabels(labels)

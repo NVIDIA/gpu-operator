@@ -35,6 +35,38 @@ check_pod_ready() {
 	done
 }
 
+check_pod_deleted() {
+	local pod_label=$1
+	local current_time=0
+	while :; do
+		echo "Checking $pod_label pod"
+		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
+
+		echo "Checking if $pod_label pod has been deleted"
+		# note: $(kubectl get pods <options> -o jsonpath='.items' | jq length) does not work for older kubectl clients
+		num_pods=$(kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} -o json | jq '.items' | jq length)
+
+		if [ "${num_pods}" = 0 ]; then
+			echo "Pod $pod_label has been deleted"
+			break;
+		else
+			echo "Pod $pod_label has not been deleted"
+		fi
+
+		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+			echo "timeout reached"
+			exit 1;
+		fi
+
+		# Echo useful information on stdout
+		kubectl get pods -n ${TEST_NAMESPACE}
+
+		echo "Sleeping 5 seconds"
+		current_time=$((${current_time} + 5))
+		sleep 5
+	done
+}
+
 check_no_restarts() {
 	local pod_label=$1
 	restartCount=$(kubectl get pod -lapp=$pod_label -n ${TEST_NAMESPACE} -o jsonpath='{.items[*].status.containerStatuses[0].restartCount}')
