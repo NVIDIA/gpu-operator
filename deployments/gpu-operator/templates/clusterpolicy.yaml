@@ -29,7 +29,7 @@ spec:
       image: {{ .Values.operator.initContainer.image }}
       {{- end }}
       {{- if .Values.operator.initContainer.version }}
-      version: {{ .Values.operator.initContainer.version }}
+      version: {{ .Values.operator.initContainer.version | quote }}
       {{- end }}
       {{- if .Values.operator.initContainer.imagePullPolicy }}
       imagePullPolicy: {{ .Values.operator.initContainer.imagePullPolicy }}
@@ -52,7 +52,7 @@ spec:
     {{- if .Values.validator.image }}
     image: {{ .Values.validator.image }}
     {{- end }}
-    version: {{ .Values.validator.version | default .Chart.AppVersion }}
+    version: {{ .Values.validator.version | default .Chart.AppVersion | quote }}
     {{- if .Values.validator.imagePullPolicy }}
     imagePullPolicy: {{ .Values.validator.imagePullPolicy }}
     {{- end }}
@@ -107,7 +107,7 @@ spec:
     image: {{ .Values.driver.image }}
     {{- end }}
     {{- if .Values.driver.version }}
-    version: {{ .Values.driver.version }}
+    version: {{ .Values.driver.version | quote }}
     {{- end }}
     {{- if .Values.driver.imagePullPolicy }}
     imagePullPolicy: {{ .Values.driver.imagePullPolicy }}
@@ -126,7 +126,7 @@ spec:
       image: {{ .Values.driver.manager.image }}
       {{- end }}
       {{- if .Values.driver.manager.version }}
-      version: {{ .Values.driver.manager.version }}
+      version: {{ .Values.driver.manager.version | quote }}
       {{- end }}
       {{- if .Values.driver.manager.imagePullPolicy }}
       imagePullPolicy: {{ .Values.driver.manager.imagePullPolicy }}
@@ -170,7 +170,7 @@ spec:
     image: {{ .Values.toolkit.image }}
     {{- end }}
     {{- if .Values.toolkit.version }}
-    version: {{ .Values.toolkit.version }}
+    version: {{ .Values.toolkit.version | quote }}
     {{- end }}
     {{- if .Values.toolkit.imagePullPolicy }}
     imagePullPolicy: {{ .Values.toolkit.imagePullPolicy }}
@@ -198,7 +198,7 @@ spec:
     image: {{ .Values.devicePlugin.image }}
     {{- end }}
     {{- if .Values.devicePlugin.version }}
-    version: {{ .Values.devicePlugin.version }}
+    version: {{ .Values.devicePlugin.version | quote }}
     {{- end }}
     {{- if .Values.devicePlugin.imagePullPolicy }}
     imagePullPolicy: {{ .Values.devicePlugin.imagePullPolicy }}
@@ -227,7 +227,7 @@ spec:
     image: {{ .Values.dcgm.image }}
     {{- end }}
     {{- if .Values.dcgm.version }}
-    version: {{ .Values.dcgm.version }}
+    version: {{ .Values.dcgm.version | quote }}
     {{- end }}
     {{- if .Values.dcgm.imagePullPolicy }}
     imagePullPolicy: {{ .Values.dcgm.imagePullPolicy }}
@@ -258,7 +258,7 @@ spec:
     image: {{ .Values.dcgmExporter.image }}
     {{- end }}
     {{- if .Values.dcgmExporter.version }}
-    version: {{ .Values.dcgmExporter.version }}
+    version: {{ .Values.dcgmExporter.version | quote }}
     {{- end }}
     {{- if .Values.dcgmExporter.imagePullPolicy }}
     imagePullPolicy: {{ .Values.dcgmExporter.imagePullPolicy }}
@@ -289,7 +289,7 @@ spec:
     image: {{ .Values.gfd.image }}
     {{- end }}
     {{- if .Values.gfd.version }}
-    version: {{ .Values.gfd.version }}
+    version: {{ .Values.gfd.version | quote }}
     {{- end }}
     {{- if .Values.gfd.imagePullPolicy }}
     imagePullPolicy: {{ .Values.gfd.imagePullPolicy }}
@@ -318,7 +318,7 @@ spec:
     image: {{ .Values.migManager.image }}
     {{- end }}
     {{- if .Values.migManager.version }}
-    version: {{ .Values.migManager.version }}
+    version: {{ .Values.migManager.version | quote }}
     {{- end }}
     {{- if .Values.migManager.imagePullPolicy }}
     imagePullPolicy: {{ .Values.migManager.imagePullPolicy }}
@@ -352,7 +352,7 @@ spec:
     {{- if .Values.nodeStatusExporter.image }}
     image: {{ .Values.nodeStatusExporter.image }}
     {{- end }}
-    version: {{ .Values.nodeStatusExporter.version | default .Chart.AppVersion }}
+    version: {{ .Values.nodeStatusExporter.version | default .Chart.AppVersion | quote }}
     {{- if .Values.nodeStatusExporter.imagePullPolicy }}
     imagePullPolicy: {{ .Values.nodeStatusExporter.imagePullPolicy }}
     {{- end }}
