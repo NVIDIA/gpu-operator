@@ -1728,6 +1728,17 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 		}
 
+		// mount any custom kernel module configuration parameters at /drivers
+		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
+			destinationDir := "/drivers"
+			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
+		}
+
 		// set any custom ssl key/certificate configuration provided
 		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
 			destinationDir, err := getCertConfigPath()

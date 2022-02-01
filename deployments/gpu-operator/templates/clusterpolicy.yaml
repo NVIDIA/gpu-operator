@@ -146,6 +146,9 @@ spec:
     {{- if .Values.driver.virtualTopology }}
     virtualTopology: {{ toYaml .Values.driver.virtualTopology | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.kernelModuleConfig }}
+    kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
+    {{- end }}
     {{- if .Values.driver.securityContext }}
     securityContext: {{ toYaml .Values.driver.securityContext | nindent 6 }}
     {{- end }}

@@ -366,6 +366,11 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Virtual Topology Daemon Configuration For vGPU Driver Container"
 	VirtualTopology *VirtualTopologyConfigSpec `json:"virtualTopology,omitempty"`
+
+	// Optional: Kernel module configuration parameters for the NVIDIA driver
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
+	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
 }
 
 // ToolkitSpec defines the properties for container-toolkit deployment
@@ -697,6 +702,15 @@ type VirtualTopologyConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Config string `json:"config,omitempty"`
+}
+
+// KernelModuleConfigSpec defines custom configuration parameters for the NVIDIA driver
+type KernelModuleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin

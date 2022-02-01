@@ -127,6 +127,9 @@ driver:
   # vGPU topology daemon configuration
   virtualTopology:
     config: ""
+  # kernel module configuration for NVIDIA driver
+  kernelModuleConfig:
+    name: ""
 
 toolkit:
   enabled: true
