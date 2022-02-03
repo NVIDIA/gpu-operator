@@ -80,19 +80,19 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: nvcr.io/nvidia/gpu-operator:devel-ubi8
-    createdAt: "Tue Aug 10 06:58:46 PDT 2021"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:57e7be259af342ccdf281d23d79e15d474e2e6f506f84c0cdae3db2a199b3395
+    createdAt: "Thu Jan 20 07:14:13 PST 2022"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.0.0-devel
+  name: gpu-operator-certified.v1.9.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:173639a16409d7aeba2f5ca7ccd6260ea621d280a24b8933089d6df0623bb657
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:8546a3e1ca8e642d2dbbfde13ee439e8137513be9886f9fe51f4fa9c4db80198
     - name: dcgm-image
@@ -110,7 +110,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:e137c897256501537e0986963889a91ec90cac029b5263fc4b229b278f5b1a02
     - name: gpu-operator-validator-image
-      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:d7e0397249cd5099046506f32841535ea4f329f7b7583a6ddd9f75ff0f53385e
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:54233ebccbc3d2b388b237031907d58c3719d0e6f3ecb874349c91e8145225d2
   customresourcedefinitions:
@@ -587,7 +587,7 @@ spec:
               containers:
               - args:
                   - --leader-elect
-                image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:173639a16409d7aeba2f5ca7ccd6260ea621d280a24b8933089d6df0623bb657
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -609,7 +609,7 @@ spec:
                 resources:
                   limits:
                     cpu: 500m
-                    memory: 500Mi
+                    memory: 1Gi
                   requests:
                     cpu: 200m
                     memory: 200Mi
@@ -625,7 +625,7 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:d7e0397249cd5099046506f32841535ea4f329f7b7583a6ddd9f75ff0f53385e"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
@@ -674,4 +674,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.0.0-devel
+  version: 1.9.1
+  replaces: gpu-operator-certified.v1.9.0
