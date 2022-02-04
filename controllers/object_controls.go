@@ -1457,6 +1457,18 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		if config.Driver.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 		}
+		// mount any custom kernel module configuration parameters at /drivers
+		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
+			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
+			// Only add a VolumeMount for nvidia-peermem-ctr.
+			destinationDir := "/drivers"
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+		}
+
 	}
 	return nil
 }
@@ -1726,6 +1738,17 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 
+		}
+
+		// mount any custom kernel module configuration parameters at /drivers
+		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
+			destinationDir := "/drivers"
+			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
 		}
 
 		// set any custom ssl key/certificate configuration provided

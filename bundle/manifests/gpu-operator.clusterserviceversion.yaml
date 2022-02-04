@@ -39,6 +39,9 @@ metadata:
               },
               "virtualTopology": {
                 "config": ""
+              },
+              "kernelModuleConfig": {
+                "name": ""
               }
             },
             "gfd": {
