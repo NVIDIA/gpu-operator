@@ -1431,6 +1431,12 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 			}
 		}
 	}
+	// add any pull secrets needed for driver-manager image
+	if len(config.Driver.Manager.ImagePullSecrets) > 0 {
+		for _, secret := range config.Driver.Manager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
 	return nil
 }
 
@@ -1878,6 +1884,12 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		// update validation image pull policy
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+		}
+	}
+	// add any pull secrets needed for validation image
+	if len(config.Validator.ImagePullSecrets) > 0 {
+		for _, secret := range config.Validator.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
 	return nil
