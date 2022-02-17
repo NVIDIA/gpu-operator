@@ -617,10 +617,10 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		} else {
 			n.operatorMetrics.openshiftDriverToolkitIsMissing.Set(1)
 		}
-		if hasCompatibleNFD {
-			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(0)
-		} else {
+		if n.hasGPUNodes && !hasCompatibleNFD {
 			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(1)
+		} else {
+			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(0)
 		}
 	}
 
