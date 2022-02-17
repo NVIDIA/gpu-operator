@@ -86,7 +86,7 @@ driver:
   use_ocp_driver_toolkit: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "470.82.01"
+  version: "510.47.03"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   rdma:
@@ -135,7 +135,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.8.0-ubuntu18.04
+  version: v1.8.1-ubuntu18.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
