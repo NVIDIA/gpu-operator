@@ -242,6 +242,17 @@ nodeStatusExporter:
   imagePullSecrets: []
   resources: {}
 
+# Experimental and only deploys nvidia-fs driver on Ubuntu
+gds:
+  enabled: false
+  repository: nvcr.io/nvidia/cloud-native
+  image: nvidia-fs
+  version: ""
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  args: []
+
 node-feature-discovery:
   worker:
     tolerations:

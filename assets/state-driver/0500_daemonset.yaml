@@ -154,7 +154,40 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
-
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-fs-ctr
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gds-driver install"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia-fs']
+          initialDelaySeconds: 10
+          failureThreshold: 60
+          successThreshold: 1
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia-fs']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
