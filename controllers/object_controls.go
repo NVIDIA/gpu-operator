@@ -518,6 +518,9 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// update nvidia-peermem sidecar container
 	transformPeerMemoryContainer(obj, config, n)
 
+	// update nvidia-fs sidecar container
+	transformGDSContainer(obj, config, n)
+
 	// update PriorityClass
 	if config.Daemonsets.PriorityClassName != "" {
 		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
@@ -1479,6 +1482,38 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	return nil
 }
 
+func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		// skip if not nvidia-fs
+		if !strings.Contains(container.Name, "nvidia-fs") {
+			continue
+		}
+		if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
+			// remove nvidia-fs sidecar container from driver Daemonset if GDS is not enabled
+			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
+			return nil
+		}
+		// update nvidia-fs(sidecar) image and pull policy
+		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
+		if err != nil {
+			return err
+		}
+		if gdsImage != "" {
+			obj.Spec.Template.Spec.Containers[i].Image = gdsImage
+		}
+		if config.GPUDirectStorage.ImagePullPolicy != "" {
+			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUDirectStorage.ImagePullPolicy)
+		}
+		// set image pull secrets
+		if len(config.GPUDirectStorage.ImagePullSecrets) > 0 {
+			for _, secret := range config.GPUDirectStorage.ImagePullSecrets {
+				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			}
+		}
+	}
+	return nil
+}
+
 func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	var err error
 
@@ -1586,17 +1621,34 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	return nil
 }
 
-// resolveDriverTag resolves driver image tag based on the OS of the worker node
-func resolveDriverTag(n ClusterPolicyController, driverSpec *gpuv1.DriverSpec) (string, error) {
+// resolveDriverTag resolves image tag based on the OS of the worker node
+func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string, error) {
+	// obtain os version
 	kvers, osTag, _ := kernelFullVersion(n)
 	if kvers == "" {
 		return "", fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
 	}
 
-	image, err := gpuv1.ImagePath(driverSpec)
-	if err != nil {
-		return "", err
+	// obtain image path
+	var image string
+	var err error
+	switch v := driverSpec.(type) {
+	case *gpuv1.DriverSpec:
+		spec := driverSpec.(*gpuv1.DriverSpec)
+		image, err = gpuv1.ImagePath(spec)
+		if err != nil {
+			return "", err
+		}
+	case *gpuv1.GPUDirectStorageSpec:
+		spec := driverSpec.(*gpuv1.GPUDirectStorageSpec)
+		image, err = gpuv1.ImagePath(spec)
+		if err != nil {
+			return "", err
+		}
+	default:
+		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
+
 	// if image digest is specified, use it directly
 	if !strings.Contains(image, "sha256:") {
 		// append os-tag to the provided driver version

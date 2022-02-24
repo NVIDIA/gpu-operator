@@ -60,6 +60,8 @@ type ClusterPolicySpec struct {
 	PSP PSPSpec `json:"psp,omitempty"`
 	// Validator defines the spec for operator-validator daemonset
 	Validator ValidatorSpec `json:"validator,omitempty"`
+	// GPUDirectStorage defines the spec for GDS components(Experimental)
+	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -843,6 +845,53 @@ type GPUDirectRDMASpec struct {
 	UseHostMOFED *bool `json:"useHostMofed,omitempty"`
 }
 
+// GPUDirectStorageSpec defines the properties for nvidia-fs deployment(Experimental)
+type GPUDirectStorageSpec struct {
+	// Enabled indicates if GPUDirect Storage is enabled through GPU operator
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPUDirect Storage through GPU operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Driver image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// Driver image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// Driver image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
 // MIGPartedConfigSpec defines custom mig-parted config for MIG Manager container
 type MIGPartedConfigSpec struct {
 	// ConfigMap name
@@ -995,6 +1044,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *DriverManagerSpec:
 		config := spec.(*DriverManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DRIVER_MANAGER_IMAGE")
+	case *GPUDirectStorageSpec:
+		config := spec.(*GPUDirectStorageSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "GDS_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
@@ -1077,6 +1129,15 @@ func (g *GPUDirectRDMASpec) IsEnabled() bool {
 		return false
 	}
 	return *g.Enabled
+}
+
+// IsEnabled returns true if GPUDirect Storage are enabled through gpu-perator
+func (gds *GPUDirectStorageSpec) IsEnabled() bool {
+	if gds.Enabled == nil {
+		// GPUDirectStorage is disabled by default
+		return false
+	}
+	return *gds.Enabled
 }
 
 // IsEnabled returns true if DCGM hostengine as a separate Pod is enabled through gpu-perator
