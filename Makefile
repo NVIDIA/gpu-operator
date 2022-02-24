@@ -291,5 +291,5 @@ $(BUILD_TARGETS): build-%:
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-docker-image: ${DEFAULT_PUSH_TARGET} push-${DEFAULT_PUSH_TARGET}
+docker-image: ${DEFAULT_PUSH_TARGET}
 endif
