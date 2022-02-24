@@ -32,6 +32,33 @@ spec:
             {{- toYaml .Values.master.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          livenessProbe:
+            exec:
+              command:
+              - "/usr/bin/grpc_health_probe"
+              - "-addr=:8080"
+              {{- if .Values.tls.enable }}
+              - "-tls"
+              - "-tls-ca-cert=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+              - "-tls-client-key=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+              - "-tls-client-cert=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+              {{- end }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+              - "/usr/bin/grpc_health_probe"
+              - "-addr=:8080"
+              {{- if .Values.tls.enable }}
+              - "-tls"
+              - "-tls-ca-cert=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+              - "-tls-client-key=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+              - "-tls-client-cert=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+              {{- end }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 10
           ports:
           - containerPort: 8080
             name: grpc
@@ -51,30 +78,26 @@ spec:
             {{- if .Values.master.extraLabelNs | empty | not }}
             - "--extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
             {{- end }}
-## Enable TLS authentication
-## The example below assumes having the root certificate named ca.crt stored in
-## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored
-## in a TLS Secret named nfd-master-cert.
-## Additional hardening can be enabled by specifying --verify-node-name in
-## args, in which case node name will be checked against the worker's
-## TLS certificate.
-#            - "--ca-file=/etc/kubernetes/node-feature-discovery/trust/ca.crt"
-#            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-#            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
-#          volumeMounts:
-#            - name: nfd-ca-cert
-#              mountPath: "/etc/kubernetes/node-feature-discovery/trust"
-#              readOnly: true
-#            - name: nfd-master-cert
-#              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
-#              readOnly: true
-#      volumes:
-#        - name: nfd-ca-cert
-#          configMap:
-#            name: nfd-ca-cert
-#        - name: nfd-master-cert
-#          secret:
-#            secretName: nfd-master-cert
+            {{- if .Values.master.featureRulesController | kindIs "invalid" | not }}
+            - "-featurerules-controller={{ .Values.master.featureRulesController }}"
+            {{- else }}
+            ## By default, disable NodeFeatureRules controller for other than the default instances
+            - "-featurerules-controller={{ .Values.master.instance | empty }}"
+            {{- end }}
+    {{- if .Values.tls.enable }}
+            - "--ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+          volumeMounts:
+            - name: nfd-master-cert
+              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+              readOnly: true
+      volumes:
+        - name: nfd-master-cert
+          secret:
+            secretName: nfd-master-cert
+    ## /TLS ##
+    {{- end }}
     {{- with .Values.master.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

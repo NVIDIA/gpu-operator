@@ -1,0 +1,39 @@
+{{- if .Values.tls.certManager }}
+# See https://cert-manager.io/docs/configuration/selfsigned/#bootstrapping-ca-issuers
+# - Create a self signed issuer
+# - Use this to create a CA cert
+# - Use this to now create a CA issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: nfd-ca-bootstrap
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nfd-ca-cert
+spec:
+  isCA: true
+  secretName: nfd-ca-cert
+  subject:
+    organizations:
+    - node-feature-discovery
+  commonName: nfd-ca-cert
+  issuerRef:
+    name: nfd-ca-bootstrap
+    kind: Issuer
+    group: cert-manager.io
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: nfd-ca-issuer
+spec:
+  ca:
+    secretName: nfd-ca-cert
+{{- end }}
