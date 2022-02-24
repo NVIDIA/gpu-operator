@@ -12,68 +12,84 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION ?= v0.1.0
-
+BUILD_MULTI_ARCH_IMAGES ?= no
 DOCKER ?= docker
-CUDA_IMAGE ?= nvidia/cuda
-CUDA_VERSION ?= 11.4.2
-GOLANG_VERSION ?= 1.17
-BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-BUILD_DIR ?= ../
-
-ifeq ($(IMAGE),)
-REGISTRY ?= nvcr.io/nvidia/cloud-native
-IMAGE := $(REGISTRY)/gpu-operator-validator
+BUILDX  =
+ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
+BUILDX = buildx
 endif
 
+##### Global variables #####
+include $(CURDIR)/versions.mk
+
+CUDA_IMAGE ?= nvidia/cuda
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+
+ifeq ($(IMAGE_NAME),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE_NAME := $(REGISTRY)/gpu-operator-validator
+endif
+
+BUILD_DIR ?= ../
+
+IMAGE_VERSION := $(VERSION)
+IMAGE_TAG ?= $(IMAGE_VERSION)-$(DIST)
+IMAGE = $(IMAGE_NAME):$(IMAGE_TAG)
+
+OUT_IMAGE_NAME ?= $(IMAGE_NAME)
+OUT_IMAGE_VERSION ?= $(VERSION)
+OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
+OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
+
 ##### Public rules #####
+DISTRIBUTIONS := ubi8 ubuntu20.04
 DEFAULT_PUSH_TARGET := ubi8
-TARGETS := ubi8 ubuntu20.04
 
-PUSH_TARGETS := $(patsubst %, push-%, $(TARGETS))
-BUILD_TARGETS := $(patsubst %, build-%, $(TARGETS))
-TEST_TARGETS := $(patsubst %, test-%, $(TARGETS))
+PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
+BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
+TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
 
-.PHONY: $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS)
+ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
+include $(CURDIR)/native-only.mk
+else
+include $(CURDIR)/multi-arch.mk
+endif
 
-all: $(TARGETS)
-
-push-all: $(PUSH_TARGETS)
-build-all: $(BUILD_TARGETS)
-
-$(PUSH_TARGETS): push-%:
-	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
+ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+.PHONY: $(ALL_TARGETS)
 
 # For the default push target we also push a short tag equal to the version.
 # We skip this for the development release
-RELEASE_DEVEL_TAG ?= devel
-ifneq ($(strip $(VERSION)),$(RELEASE_DEVEL_TAG))
+DEVEL_RELEASE_IMAGE_VERSION ?= devel
+ifneq ($(strip $(VERSION)),$(DEVEL_RELEASE_IMAGE_VERSION))
 push-$(DEFAULT_PUSH_TARGET): push-short
 endif
-push-short:
-	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
-	$(DOCKER) push "$(IMAGE):$(VERSION)"
 
-%-ubi8: BASE_DIST := ubi8
+push-%: DIST = $(*)
+push-short: DIST = $(DEFAULT_PUSH_TARGET)
 
-# Both ubi8 and build-ubi8 trigger a build of the relevant image
-$(TARGETS): %: build-%
+build-%: DIST = $(*)
+build-%: DOCKERFILE = $(CURDIR)/Dockerfile
+
+$(DISTRIBUTIONS): %: build-%:
 $(BUILD_TARGETS): build-%:
-		$(DOCKER) build --pull \
-			--build-arg BASE_DIST="$(BASE_DIST)" \
-			--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
-			--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
-			--build-arg VERSION="$(VERSION)" \
-			--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-			--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.2.1-$(*) \
-			--tag $(IMAGE):$(VERSION)-$(*) \
-			--file Dockerfile \
-			$(BUILD_DIR)
+	DOCKER_BUILDKIT=1 \
+		$(DOCKER) $(BUILDX) build --pull \
+		$(DOCKER_BUILD_OPTIONS) \
+		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
+		--tag $(IMAGE) \
+		--build-arg BASE_DIST="$(DIST)" \
+		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
+		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.6.0-$(*) \
+		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+		--file $(DOCKERFILE) $(BUILD_DIR)
 
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
-.PHONY: docker-image
-docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
+docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 docker-image: $(DEFAULT_PUSH_TARGET)
-	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
+	$(DOCKER) tag $(IMAGE_NAME):$(IMAGE_TAG) $(OUT_IMAGE)
+

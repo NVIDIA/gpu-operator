@@ -254,7 +254,7 @@ node-feature-discovery:
       value: "present"
       effect: "NoSchedule"
 
-    config: |
+    config:
       sources:
         pci:
           deviceClassWhitelist:

@@ -1,0 +1,64 @@
+{{- if .Values.tls.certManager }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nfd-master-cert
+spec:
+  secretName: nfd-master-cert
+  subject:
+    organizations:
+    - node-feature-discovery
+  commonName: nfd-master
+  dnsNames:
+  # must match the service name
+  - {{ include "node-feature-discovery.fullname" . }}-master
+  # first one is configured for use by the worker; below are for completeness
+  - {{ include "node-feature-discovery.fullname" . }}-master.{{ $.Release.Namespace }}.svc
+  - {{ include "node-feature-discovery.fullname" . }}-master.{{ $.Release.Namespace }}.svc.cluster.local
+  # localhost needed for grpc_health_probe
+  - localhost
+  issuerRef:
+    name: nfd-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nfd-worker-cert
+spec:
+  secretName: nfd-worker-cert
+  subject:
+    organizations:
+    - node-feature-discovery
+  commonName: nfd-worker
+  dnsNames:
+  - {{ include "node-feature-discovery.fullname" . }}-worker.{{ $.Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    name: nfd-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+
+{{- if .Values.topologyUpdater.enable }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nfd-topology-updater-cert
+spec:
+  secretName: nfd-topology-updater-cert
+  subject:
+    organizations:
+    - node-feature-discovery
+  commonName: nfd-topology-updater
+  dnsNames:
+  - {{ include "node-feature-discovery.fullname" . }}-topology-updater.{{ $.Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    name: nfd-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}
+
+{{- end }}
