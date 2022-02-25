@@ -34,7 +34,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on \
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on \
     go build -a -o gpu-operator main.go
 
 FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
@@ -42,6 +42,7 @@ FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 ENV NVIDIA_VISIBLE_DEVICES=void
 
 ARG VERSION
+ARG TARGETARCH
 
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
 LABEL name="NVIDIA GPU Operator"
@@ -62,7 +63,7 @@ COPY hack/must-gather.sh /usr/bin/gather
 ENV VERSION=${VERSION}
 
 # Install must-gather dependency: `kubectl`
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin
 

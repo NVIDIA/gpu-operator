@@ -23,6 +23,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      serviceAccountName: {{ include "node-feature-discovery.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
       containers:
@@ -41,15 +42,12 @@ spec:
         command:
         - "nfd-worker"
         args:
-        - "--sleep-interval=60s"
         - "--server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
-## Enable TLS authentication (1/3)
-## The example below assumes having the root certificate named ca.crt stored in
-## a ConfigMap named nfd-ca-cert, and, the TLS authentication credentials stored
-## in a TLS Secret named nfd-worker-cert
-#          - "--ca-file=/etc/kubernetes/node-feature-discovery/trust/ca.crt"
-#          - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-#          - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+{{- if .Values.tls.enable }}
+        - "--ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+        - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+        - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+{{- end }}
         volumeMounts:
         - name: host-boot
           mountPath: "/host-boot"
@@ -60,6 +58,14 @@ spec:
         - name: host-sys
           mountPath: "/host-sys"
           readOnly: true
+        - name: host-usr-lib
+          mountPath: "/host-usr/lib"
+          readOnly: true
+        {{- if .Values.worker.mountUsrSrc }}
+        - name: host-usr-src
+          mountPath: "/host-usr/src"
+          readOnly: true
+        {{- end }}
         - name: source-d
           mountPath: "/etc/kubernetes/node-feature-discovery/source.d/"
           readOnly: true
@@ -69,13 +75,11 @@ spec:
         - name: nfd-worker-conf
           mountPath: "/etc/kubernetes/node-feature-discovery"
           readOnly: true
-## Enable TLS authentication (2/3)
-#        - name: nfd-ca-cert
-#          mountPath: "/etc/kubernetes/node-feature-discovery/trust"
-#          readOnly: true
-#        - name: nfd-worker-cert
-#          mountPath: "/etc/kubernetes/node-feature-discovery/certs"
-#          readOnly: true
+{{- if .Values.tls.enable }}
+        - name: nfd-worker-cert
+          mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+          readOnly: true
+{{- end }}
       volumes:
         - name: host-boot
           hostPath:
@@ -86,6 +90,14 @@ spec:
         - name: host-sys
           hostPath:
             path: "/sys"
+        - name: host-usr-lib
+          hostPath:
+            path: "/usr/lib"
+        {{- if .Values.worker.mountUsrSrc }}
+        - name: host-usr-src
+          hostPath:
+            path: "/usr/src"
+        {{- end }}
         - name: source-d
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/source.d/"
@@ -94,17 +106,15 @@ spec:
             path: "/etc/kubernetes/node-feature-discovery/features.d/"
         - name: nfd-worker-conf
           configMap:
-            name: {{ .Values.worker.configmapName }}
+            name: {{ include "node-feature-discovery.fullname" . }}-worker-conf
             items:
               - key: nfd-worker.conf
                 path: nfd-worker.conf
-## Enable TLS authentication (3/3)
-#        - name: nfd-ca-cert
-#          configMap:
-#            name: nfd-ca-cert
-#        - name: nfd-worker-cert
-#          secret:
-#            secretName: nfd-worker-cert
+{{- if .Values.tls.enable }}
+        - name: nfd-worker-cert
+          secret:
+            secretName: nfd-worker-cert
+{{- end }}
     {{- with .Values.worker.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

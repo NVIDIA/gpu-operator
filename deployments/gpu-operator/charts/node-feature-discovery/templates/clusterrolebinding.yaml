@@ -1,4 +1,4 @@
-{{- if .Values.rbac.create }}
+{{- if .Values.master.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -12,5 +12,23 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "node-feature-discovery.serviceAccountName" . }}
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
+
+---
+{{- if .Values.topologyUpdater.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "node-feature-discovery.fullname" . }}-topology-updater
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "node-feature-discovery.fullname" . }}-topology-updater
+subjects:
+- kind: ServiceAccount
+  name: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
   namespace: {{ $.Release.Namespace }}
 {{- end }}

@@ -12,14 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+BUILD_MULTI_ARCH_IMAGES ?= no
 DOCKER ?= docker
+BUILDX  =
+ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
+BUILDX = buildx
+endif
 
-# VERSION defines the project version for the bundle.
-# Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= latest
+##### Global variables #####
+include $(CURDIR)/versions.mk
+
+MODULE := github.com/NVIDIA/gpu-operator
+CUDA_IMAGE ?= nvidia/cuda
+BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+
+ifeq ($(IMAGE_NAME),)
+REGISTRY ?= nvcr.io/nvidia/cloud-native
+IMAGE_NAME := $(REGISTRY)/gpu-operator
+endif
+
+IMAGE_VERSION := $(VERSION)
+IMAGE_TAG ?= $(IMAGE_VERSION)-$(DIST)
+IMAGE = $(IMAGE_NAME):$(IMAGE_TAG)
+BUILDIMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)-build
+
+OUT_IMAGE_NAME ?= $(IMAGE_NAME)
+OUT_IMAGE_VERSION ?= $(VERSION)
+OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
+OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
@@ -40,12 +60,10 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# BUNDLE_IMG defines the image:tag used for the bundle.
-# You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= gpu-operator-bundle:$(VERSION)
+# BUNDLE_IMAGE defines the image:tag used for the bundle.
+# You can use it as an arg. (E.g make bundle-build BUNDLE_IMAGE=<some-registry>/<project-name-bundle>:<tag>)
+BUNDLE_IMAGE ?= gpu-operator-bundle:$(VERSION)
 
-# Image URL to use all building/pushing image targets
-IMG ?= gpu-operator:$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -83,7 +101,7 @@ uninstall: manifests kustomize
 
 # Deploy gpu-operator in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image gpu-operator=${IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image gpu-operator=${IMAGE}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # UnDeploy gpu-operator from the configured Kubernetes cluster in ~/.kube/config
@@ -126,29 +144,16 @@ endef
 .PHONY: bundle
 bundle: manifests kustomize
 	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image gpu-opertor=$(IMG)
+	cd config/manager && $(KUSTOMIZE) edit set image gpu-opertor=$(IMAGE)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build:
-	docker build --build-arg VERSION=$(VERSION) --build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build --build-arg VERSION=$(VERSION) --build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) -f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
 
 # Define local and dockerized golang targets
-
-MODULE := github.com/NVIDIA/gpu-operator
-
-CUDA_IMAGE ?= nvidia/cuda
-CUDA_VERSION ?= 11.4.2
-GOLANG_VERSION ?= 1.17
-BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-ifeq ($(IMAGE),)
-REGISTRY ?= nvcr.io/nvidia/cloud-native
-IMAGE := $(REGISTRY)/gpu-operator
-endif
-IMAGE_TAG ?= $(GOLANG_VERSION)
-BUILDIMAGE ?= $(IMAGE):$(IMAGE_TAG)-build
 
 CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
 MAKE_TARGETS := build check coverage $(CHECK_TARGETS)
@@ -232,59 +237,59 @@ coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
-
 ##### Public rules #####
+DISTRIBUTIONS := ubi8 ubuntu20.04
 DEFAULT_PUSH_TARGET := ubi8
-TARGETS := ubi8 ubuntu20.04
 
-PUSH_TARGETS := $(patsubst %,push-%, $(TARGETS))
-BUILD_TARGETS := $(patsubst %,build-%, $(TARGETS))
-TEST_TARGETS := $(patsubst %,test-%, $(TARGETS))
+PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
+BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
+TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
 
-ALL_TARGETS := $(TARGETS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
+include $(CURDIR)/native-only.mk
+else
+include $(CURDIR)/multi-arch.mk
+endif
+
+ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 .PHONY: $(ALL_TARGETS)
 
-ifeq ($(SUBCOMPONENT),)
-$(PUSH_TARGETS): push-%:
-	$(DOCKER) push "$(IMAGE):$(VERSION)-$(*)"
+ifneq ($(SUBCOMPONENT),)
+# SUBCOMPONENT is set; assume this is the target folder
+$(ALL_TARGETS): %:
+	make -C $(SUBCOMPONENT) $(*)
+else
 
 # For the default push target we also push a short tag equal to the version.
 # We skip this for the development release
-RELEASE_DEVEL_TAG ?= devel
-ifneq ($(strip $(VERSION)),$(RELEASE_DEVEL_TAG))
+DEVEL_RELEASE_IMAGE_VERSION ?= devel
+ifneq ($(strip $(VERSION)),$(DEVEL_RELEASE_IMAGE_VERSION))
 push-$(DEFAULT_PUSH_TARGET): push-short
 endif
-push-short:
-	$(DOCKER) tag "$(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE):$(VERSION)"
-	$(DOCKER) push "$(IMAGE):$(VERSION)"
 
-build-ubi8: DOCKERFILE := docker/Dockerfile
-build-ubi8: BASE_DIST := ubi8
+push-%: DIST = $(*)
+push-short: DIST = $(DEFAULT_PUSH_TARGET)
 
-build-ubuntu20.04: DOCKERFILE := docker/Dockerfile
-build-ubuntu20.04: BASE_DIST := ubuntu20.04
+build-%: DIST = $(*)
+build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
-$(TARGETS): %: build-%
+$(DISTRIBUTIONS): %: build-%
 $(BUILD_TARGETS): build-%:
-	$(DOCKER) build --pull \
-		--tag $(IMAGE):$(VERSION)-$(*) \
-		--build-arg BASE_DIST="$(BASE_DIST)" \
+	DOCKER_BUILDKIT=1 \
+		$(DOCKER) $(BUILDX) build --pull \
+		$(DOCKER_BUILD_OPTIONS) \
+		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
+		--tag $(IMAGE) \
+		--build-arg BASE_DIST="$(DIST)" \
 		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
 		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-		--file $(DOCKERFILE) .
-
+		--file $(DOCKERFILE) $(CURDIR)
 
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
-docker-image: OUT_IMAGE ?= $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET)
-docker-image: $(DEFAULT_PUSH_TARGET)
-	$(DOCKER) tag $(IMAGE):$(VERSION)-$(DEFAULT_PUSH_TARGET) $(OUT_IMAGE)
-
-else
-# SUBCOMPONENT is set; assume this is the target folder
-$(ALL_TARGETS): %:
-	make -C $(SUBCOMPONENT) $(*)
+docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
+docker-image: ${DEFAULT_PUSH_TARGET} push-${DEFAULT_PUSH_TARGET}
 endif
