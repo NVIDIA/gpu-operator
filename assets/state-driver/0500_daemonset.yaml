@@ -213,6 +213,9 @@ spec:
             mountPath: /mnt/shared-nvidia-driver-toolkit
           - name: var-log
             mountPath: /var/log
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
+            mountPropagation: HostToContainer
       volumes:
         - name: run-nvidia
           hostPath:
