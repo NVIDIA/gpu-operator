@@ -3871,7 +3871,6 @@ spec:
                 - notReady
                 type: string
             required:
-            - namespace
             - state
             type: object
         type: object
