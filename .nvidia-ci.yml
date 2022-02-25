@@ -1,10 +1,11 @@
 default:
   tags:
-    - type/docker
-    - docker/privileged
     - cnt
     - container-dev
+    - docker/privileged
+    - docker/multi-arch
     - os/linux
+    - type/docker
 
 include:
   - local: '.common-ci.yml'
@@ -12,7 +13,62 @@ include:
 variables:
   # Release "devel"-tagged images off the master branch
   RELEASE_DEVEL_BRANCH: "master"
-  RELEASE_DEVEL_TAG: "devel"
+  DEVEL_RELEASE_IMAGE_VERSION: "devel"
+  # On the multi-arch builder we don't need the qemu setup.
+  SKIP_QEMU_SETUP: "1"
+  # Define the public staging registry
+  STAGING_REGISTRY: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging
+  STAGING_VERSION: ${CI_COMMIT_SHORT_SHA}
+
+.image-pull:
+  stage: image-build
+  variables:
+    IN_REGISTRY: "${STAGING_REGISTRY}"
+    IN_IMAGE_NAME: gpu-operator
+    IN_VERSION: "${STAGING_VERSION}"
+    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
+    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
+  # We delay the job start to allow the public pipeline to generate the required images.
+  when: delayed
+  start_in: 30 minutes
+  timeout: 30 minutes
+  retry:
+    max: 2
+    when:
+      - job_execution_timeout
+      - stuck_or_timeout_failure
+  before_script:
+    - !reference [.regctl-setup, before_script]
+    - apk add --no-cache make bash
+    - >
+      regctl manifest get ${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}-${DIST} --list > /dev/null && echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}-${DIST}" || ( echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}-${DIST} does not exist" && sleep infinity )
+  script:
+    - regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"
+    - make IMAGE=${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}-${DIST} OUT_IMAGE=${OUT_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}-${DIST} push-${DIST}
+
+image:gpu-operator:
+  extends:
+    - .image-pull
+    - .dist-ubi8
+    - .target-gpu-operator
+
+image:gpu-operator-validator:
+  extends:
+    - .image-pull
+    - .dist-ubi8
+    - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
+
+# We skip the integration tests for the internal CI:
+.integration:
+  stage: test
+  before_script:
+    - echo "Skipped in internal CI"
+  script:
+    - echo "Skipped in internal CI"
 
 # The .scan step forms the base of the image scan operation performed before releasing
 # images.
@@ -20,15 +76,15 @@ variables:
   stage: scan
   image: "${PULSE_IMAGE}"
   variables:
-    IMAGE: "${CI_REGISTRY_IMAGE}/${IMAGE_NAME}:${CI_COMMIT_SHA}-${TARGET}"
+    IMAGE: "${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}-${DIST}"
     IMAGE_ARCHIVE: "gpu-operator.tar"
   except:
     variables:
     - $CI_COMMIT_MESSAGE =~ /\[skip[ _-]scans?\]/i
-    - $SKIP_SCANS
+    - $SKIP_SCANS && $SKIP_SCANS == "yes"
   before_script:
     - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
-    - docker pull "${IMAGE}"
+    - docker pull --platform="${PLATFORM}" "${IMAGE}"
     - docker save "${IMAGE}" -o "${IMAGE_ARCHIVE}"
     - AuthHeader=$(echo -n $SSA_CLIENT_ID:$SSA_CLIENT_SECRET | base64 -w0)
     - >
@@ -46,15 +102,45 @@ variables:
       - vulns.json
       - policy_evaluation.json
 
-scan:gpu-operator:
+.scan:gpu-operator:
   extends:
     - .scan
+    - .dist-ubi8
     - .target-gpu-operator
+  needs:
+    - image:gpu-operator
 
-scan:gpu-operator-validator:
+scan:gpu-operator-amd64:
+  extends:
+    - .scan:gpu-operator
+    - .platform-amd64
+
+scan:gpu-operator-arm64:
+  extends:
+    - .scan:gpu-operator
+    - .platform-arm64
+  needs:
+    - scan:gpu-operator-amd64
+
+.scan:gpu-operator-validator:
   extends:
     - .scan
+    - .dist-ubi8
     - .target-gpu-operator-validator
+  needs:
+    - image:gpu-operator-validator
+
+scan:gpu-operator-validator-amd64:
+  extends:
+    - .scan:gpu-operator-validator
+    - .platform-amd64
+
+scan:gpu-operator-validator-arm64:
+  extends:
+    - .scan:gpu-operator-validator
+    - .platform-arm64
+  needs:
+    - scan:gpu-operator-validator-amd64
 
 # Define the external release steps for NGC and Dockerhub
 .release:ngc:
@@ -63,7 +149,10 @@ scan:gpu-operator-validator:
     OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
     OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
     OUT_REGISTRY: "${NGC_REGISTRY}"
-    OUT_IMAGE: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    # Disable external releases for now
+    DOCKER: echo
+    REGCTL: echo
 
 .release:dockerhub:
   extends: .release:external
@@ -71,40 +160,37 @@ scan:gpu-operator-validator:
     OUT_REGISTRY_USER: "${REGISTRY_USER}"
     OUT_REGISTRY_TOKEN: "${REGISTRY_TOKEN}"
     OUT_REGISTRY: "${DOCKERHUB_REGISTRY}"
-    OUT_IMAGE: "${REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    OUT_IMAGE_NAME: "${REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    # Disable external releases for now
+    DOCKER: echo
+    REGCTL: echo
 
 release:ngc-gpu-operator:
   extends:
     - .release:ngc
+    - .dist-ubi8
     - .target-gpu-operator
-  dependencies:
-    - deploy:sha-ci-gpu-operator
-    - scan:gpu-operator
 
 release:ngc-gpu-operator-validator:
   extends:
     - .release:ngc
+    - .dist-ubi8
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE: "${NGC_PROD_VALIDATOR_IMAGE}"
-  dependencies:
-    - deploy:sha-ci-gpu-operator-validator
-    - scan:gpu-operator-validator
+    IN_IMAGE_NAME: "gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
 
 release:dockerhub-gpu-operator:
   extends:
     - .release:dockerhub
+    - .dist-ubi8
     - .target-gpu-operator
-  dependencies:
-    - deploy:sha-ci-gpu-operator
-    - scan:gpu-operator
 
 release:dockerhub-gpu-operator-validator:
   extends:
     - .release:dockerhub
+    - .dist-ubi8
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE: "${REGISTRY_IMAGE}-validator"
-  dependencies:
-    - deploy:sha-ci-gpu-operator-validator
-    - scan:gpu-operator-validator
+    IN_IMAGE_NAME: "gpu-operator-validator"
+    OUT_IMAGE_NAME: "${REGISTRY_IMAGE}-validator"

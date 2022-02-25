@@ -19,6 +19,6 @@ keywords:
 
 dependencies:
   - name: node-feature-discovery
-    version: 0.8.2
+    version: v0.10.1
     repository: https://kubernetes-sigs.github.io/node-feature-discovery/charts
     condition: nfd.enabled

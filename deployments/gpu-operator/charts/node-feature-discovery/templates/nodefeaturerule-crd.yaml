@@ -1,0 +1,3 @@
+{{- if .Values.nodeFeatureRule.createCRD }}
+{{ .Files.Get "manifests/nodefeaturerule-crd.yaml" }}
+{{- end}}
