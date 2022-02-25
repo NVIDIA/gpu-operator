@@ -10,7 +10,8 @@ metadata:
       any SELinux context."
 spec:
   privileged: true
-  hostIPC: false
+  # Required by mig-manager
+  hostIPC: true
   hostNetwork: true
   hostPID: true
   allowPrivilegeEscalation: true
