@@ -894,7 +894,7 @@ type ClusterPolicyStatus struct {
 	// State indicates status of ClusterPolicy
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator is installed
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // +kubebuilder:object:root=true
