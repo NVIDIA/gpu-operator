@@ -590,6 +590,8 @@ spec:
               containers:
               - args:
                   - --leader-elect
+                  - --leader-lease-renew-deadline
+                  - "60s"
                 image: nvcr.io/nvidia/gpu-operator:devel-ubi8
                 command:
                   - gpu-operator
