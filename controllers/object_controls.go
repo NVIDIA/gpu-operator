@@ -99,6 +99,8 @@ const (
 	MetricsConfigFileName = "dcgm-metrics.csv"
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
+	// NvidiaDisableRequireEnvName is the env name to disable default cuda constraints
+	NvidiaDisableRequireEnvName = "NVIDIA_DISABLE_REQUIRE"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -955,6 +957,9 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	initContainer.SecurityContext = securityContext
+
+	// Disable all constraints on the configurations required by NVIDIA container toolkit
+	setContainerEnv(&initContainer, NvidiaDisableRequireEnvName, "true")
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
 	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
