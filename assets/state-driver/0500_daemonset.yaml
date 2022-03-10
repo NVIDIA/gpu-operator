@@ -175,7 +175,7 @@ spec:
         startupProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia-fs']
+              [sh, -c, 'lsmod | grep nvidia_fs']
           initialDelaySeconds: 10
           failureThreshold: 60
           successThreshold: 1
@@ -183,7 +183,7 @@ spec:
         livenessProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia-fs']
+              [sh, -c, 'lsmod | grep nvidia_fs']
           periodSeconds: 30
           initialDelaySeconds: 30
           failureThreshold: 1
