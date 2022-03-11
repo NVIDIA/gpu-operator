@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -52,11 +53,17 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var renewDeadline time.Duration
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.DurationVar(&renewDeadline, "leader-lease-renew-deadline", 0,
+		"Set the leader lease renew deadline duration (e.g. \"10s\") of the controller manager. "+
+			"Only enabled when the --leader-elect flag is set. "+
+			"If undefined, the renew deadline defaults to the controller-runtime manager's default RenewDeadline. "+
+			"By setting this option, the LeaseDuration is also set as RenewDealine + 5s.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -65,14 +72,23 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	options := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "53822513.nvidia.com",
-	})
+	}
+
+	if enableLeaderElection && int(renewDeadline) != 0 {
+		leaseDuration := renewDeadline + time.Duration(5*time.Second)
+
+		options.RenewDeadline = &renewDeadline
+		options.LeaseDuration = &leaseDuration
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
