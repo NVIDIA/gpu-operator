@@ -247,7 +247,7 @@ gds:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: nvidia-fs
-  version: ""
+  version: "510.39.01"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
