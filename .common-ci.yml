@@ -50,6 +50,7 @@ stages:
 .dist-ubi8:
   variables:
     DIST: ubi8
+    CVE_UPDATES: "cyrus-sasl-lib"
 
 .target-gpu-operator:
   variables:
