@@ -58,4 +58,11 @@ LABEL name="NVIDIA Validator for the GPU Operator"
 LABEL summary="NVIDIA Validator for the GPU Operator"
 LABEL description="See summary"
 
+# Install / upgrade packages here that are required to resolve CVEs
+ARG CVE_UPDATES
+RUN if [ -n "${CVE_UPDATES}" ]; then \
+        yum update -y ${CVE_UPDATES} && \
+        rm -rf /var/cache/yum/*; \
+    fi
+
 ENTRYPOINT ["/bin/bash"]

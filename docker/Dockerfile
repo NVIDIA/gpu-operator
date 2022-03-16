@@ -67,6 +67,13 @@ RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && cu
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin
 
+# Install / upgrade packages here that are required to resolve CVEs
+ARG CVE_UPDATES
+RUN if [ -n "${CVE_UPDATES}" ]; then \
+        yum update -y ${CVE_UPDATES} && \
+        rm -rf /var/cache/yum/*; \
+    fi
+
 RUN useradd gpu-operator
 USER gpu-operator
 
