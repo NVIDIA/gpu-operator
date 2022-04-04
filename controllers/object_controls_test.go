@@ -3,6 +3,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	goruntime "runtime"
+	"strings"
+	"testing"
+
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -19,16 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"log"
-	"os"
-	"path/filepath"
-	goruntime "runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"strings"
-	"testing"
 )
 
 const (
@@ -91,7 +92,6 @@ type commonDaemonsetSpec struct {
 	imagePullSecrets []corev1.LocalObjectReference
 	args             []string
 	env              []corev1.EnvVar
-	securityContext  *corev1.SecurityContext
 	resources        *corev1.ResourceRequirements
 }
 
@@ -291,7 +291,6 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 			imagePullSecrets: getImagePullSecrets(cp.Spec.Driver.ImagePullSecrets),
 			args:             cp.Spec.Driver.Args,
 			env:              cp.Spec.Driver.Env,
-			securityContext:  cp.Spec.Driver.SecurityContext,
 			resources:        cp.Spec.Driver.Resources,
 		}
 		dsLabel = "nvidia-driver-daemonset"

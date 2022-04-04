@@ -27,10 +27,6 @@ validator:
   imagePullSecrets: []
   env: []
   args: []
-  securityContext:
-    privileged: true
-    seLinuxOptions:
-      level: "s0"
   resources: {}
   plugin:
     env:
@@ -109,10 +105,6 @@ driver:
       - name: DRAIN_DELETE_EMPTYDIR_DATA
         value: "false"
   env: []
-  securityContext:
-    privileged: true
-    seLinuxOptions:
-      level: "s0"
   resources: {}
   # private mirror repository configuration
   repoConfig:
@@ -139,10 +131,6 @@ toolkit:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
-  securityContext:
-    privileged: true
-    seLinuxOptions:
-      level: "s0"
   resources: {}
 
 devicePlugin:
@@ -165,8 +153,6 @@ devicePlugin:
       value: all
     - name: NVIDIA_DRIVER_CAPABILITIES
       value: all
-  securityContext:
-    privileged: true
   resources: {}
 
 # standalone dcgm hostengine
@@ -180,7 +166,6 @@ dcgm:
   hostPort: 5555
   args: []
   env: []
-  securityContext: {}
   resources: {}
 
 dcgmExporter:
@@ -195,7 +180,6 @@ dcgmExporter:
       value: "true"
     - name: DCGM_EXPORTER_COLLECTORS
       value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
-  securityContext: {}
   resources: {}
 
 gfd:
@@ -209,8 +193,6 @@ gfd:
       value: 60s
     - name: GFD_FAIL_ON_INIT_ERROR
       value: "true"
-  podSecurityContext: {}
-  securityContext: {}
   resources: {}
 
 
@@ -224,8 +206,6 @@ migManager:
   env:
     - name: WITH_REBOOT
       value: "false"
-  securityContext:
-    privileged: true
   resources: {}
   config:
     name: ""
