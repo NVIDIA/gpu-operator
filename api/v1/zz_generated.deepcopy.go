@@ -178,11 +178,6 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
@@ -229,11 +224,6 @@ func (in *DCGMSpec) DeepCopyInto(out *DCGMSpec) {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
@@ -293,11 +283,6 @@ func (in *DevicePluginSpec) DeepCopyInto(out *DevicePluginSpec) {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
@@ -429,11 +414,6 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 		copy(*out, *in)
 	}
 	in.Manager.DeepCopyInto(&out.Manager)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
@@ -580,11 +560,6 @@ func (in *GPUFeatureDiscoverySpec) DeepCopyInto(out *GPUFeatureDiscoverySpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
@@ -677,11 +652,6 @@ func (in *MIGManagerSpec) DeepCopyInto(out *MIGManagerSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
@@ -763,11 +733,6 @@ func (in *NodeStatusExporterSpec) DeepCopyInto(out *NodeStatusExporterSpec) {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
@@ -869,11 +834,6 @@ func (in *ToolkitSpec) DeepCopyInto(out *ToolkitSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(corev1.ResourceRequirements)
@@ -936,11 +896,6 @@ func (in *ValidatorSpec) DeepCopyInto(out *ValidatorSpec) {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources

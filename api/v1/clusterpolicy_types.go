@@ -188,9 +188,6 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -328,9 +325,6 @@ type DriverSpec struct {
 	// Manager represents configuration for driver manager initContainer
 	Manager DriverManagerSpec `json:"manager,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -409,9 +403,6 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -459,9 +450,6 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -508,9 +496,6 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
-
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -580,9 +565,6 @@ type DCGMSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -640,9 +622,6 @@ type NodeStatusExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
-
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -743,9 +722,6 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
@@ -798,9 +774,6 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
-
-	// Optional: Security Context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
