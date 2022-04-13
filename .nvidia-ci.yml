@@ -150,18 +150,9 @@ scan:gpu-operator-validator-arm64:
     OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
     OUT_REGISTRY: "${NGC_REGISTRY}"
     OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
-    SKIP_RELEASE: "${NGC_SKIP_RELEASE}"
-    DRYRUN_RELEASE: "${NGC_DRYRUN_RELEASE}"
-
-.release:dockerhub:
-  extends: .release:external
-  variables:
-    OUT_REGISTRY_USER: "${REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${REGISTRY_TOKEN}"
-    OUT_REGISTRY: "${DOCKERHUB_REGISTRY}"
-    OUT_IMAGE_NAME: "${REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
-    SKIP_RELEASE: "${DOCKERHUB_SKIP_RELEASE}"
-    DRYRUN_RELEASE: "${DOCKERHUB_DRYRUN_RELEASE}"
+    # Disable external releases for now
+    DOCKER: echo
+    REGCTL: echo
 
 release:ngc-gpu-operator:
   extends:
@@ -177,18 +168,3 @@ release:ngc-gpu-operator-validator:
   variables:
     IN_IMAGE_NAME: "gpu-operator-validator"
     OUT_IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
-
-release:dockerhub-gpu-operator:
-  extends:
-    - .release:dockerhub
-    - .dist-ubi8
-    - .target-gpu-operator
-
-release:dockerhub-gpu-operator-validator:
-  extends:
-    - .release:dockerhub
-    - .dist-ubi8
-    - .target-gpu-operator-validator
-  variables:
-    IN_IMAGE_NAME: "gpu-operator-validator"
-    OUT_IMAGE_NAME: "${REGISTRY_IMAGE}-validator"
