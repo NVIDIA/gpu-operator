@@ -1,6 +1,9 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
+  labels:
+    operatorframework.io/arch.arm64: supported
+    operatorframework.io/arch.amd64: supported
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
     olm.skipRange: '>=v1.9.0 <v1.10.1'
@@ -344,7 +347,7 @@ spec:
     errors.
 
     The NVIDIA GPU Operator uses the [operator
-    framework](https://coreos.com/blog/introducing-operator-framework) within
+    framework](https://cloud.redhat.com/blog/introducing-the-operator-framework) within
     Kubernetes to automate the management of all NVIDIA software components
     needed to provision and monitor GPUs.
     These components include the NVIDIA drivers (to enable CUDA), Kubernetes

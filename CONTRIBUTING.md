@@ -8,7 +8,7 @@ However, managing special hardware resources in Kubernetes is difficult and pron
 
 Moreover, NVIDIA software components such as drivers have been traditionally deployed as part of the base operating system image. This meant that there was a different image for CPU vs. GPU nodes that infrastructure teams would have to manage as part of the software lifecycle. This in turn requires sophisticated automation as part of the provisioning phase for GPU nodes in Kubernetes.
 
-The NVIDIA GPU Operator was primarily built to address these challenges. It leverages the standard [Operator Framework](https://coreos.com/blog/introducing-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPUs within Kubernetes.
+The NVIDIA GPU Operator was primarily built to address these challenges. It leverages the standard [Operator Framework](https://cloud.redhat.com/blog/introducing-the-operator-framework) within Kubernetes to automate the management of all NVIDIA software components needed to provision GPUs within Kubernetes.
 
 The NVIDIA GPU Operator is an open-source product built and maintained by NVIDIA. It is currently validated on a set of platforms (including specific NVIDIA GPUs, operating systems and deployment configurations). The purpose of this document is to briefly describe the architecture of the GPU Operator, so that partners can extend the GPU Operator to support other platforms.
 
