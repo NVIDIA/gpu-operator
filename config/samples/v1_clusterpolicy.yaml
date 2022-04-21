@@ -11,6 +11,9 @@ spec:
   psp:
     enabled: false
 
+  sandboxedEnvironments:
+    enabled: false
+
   mig:
     strategy: single
 

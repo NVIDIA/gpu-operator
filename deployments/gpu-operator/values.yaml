@@ -11,6 +11,9 @@ nfd:
 psp:
   enabled: false
 
+sandboxedEnvironments:
+  enabled: false
+
 daemonsets:
   priorityClassName: system-node-critical
   tolerations:

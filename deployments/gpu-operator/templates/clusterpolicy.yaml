@@ -370,3 +370,7 @@ spec:
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
   {{- end }}
+  {{- if .Values.sandboxedEnvironments.enabled }}
+  sandboxedEnvironments:
+    enabled: {{ .Values.sandboxedEnvironments.enabled }}
+  {{- end }}

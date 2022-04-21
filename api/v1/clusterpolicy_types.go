@@ -62,6 +62,8 @@ type ClusterPolicySpec struct {
 	Validator ValidatorSpec `json:"validator,omitempty"`
 	// GPUDirectStorage defines the spec for GDS components(Experimental)
 	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
+	// SandboxedEnvironments defines the spec for handling sandboxed environments
+	SandboxedEnvironments SandboxedEnvironmentsSpec `json:"sandboxedEnvironments,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -100,6 +102,13 @@ type OperatorSpec struct {
 	// +kubebuilder:default=nvidia
 	RuntimeClass  string            `json:"runtimeClass,omitempty"`
 	InitContainer InitContainerSpec `json:"initContainer,omitempty"`
+}
+
+// SandboxedEnvironmentsSpec describes configuration for sandboxed environments
+type SandboxedEnvironmentsSpec struct {
+	// Enabled indicates if the GPU Operator should manage operands required
+	// for sandboxed environments (i.e. vfio-pci driver, vgpu-host-driver, and additional device plugins)
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
@@ -1076,6 +1085,16 @@ func (t *ToolkitSpec) IsToolkitEnabled() bool {
 		return true
 	}
 	return *t.Enabled
+}
+
+// IsEnabled returns true if the cluster intends to run GPU accelerated
+// workloads in sandboxed environments (VMs).
+func (s *SandboxedEnvironmentsSpec) IsEnabled() bool {
+	if s.Enabled == nil {
+		// Sandbox functionality is disabled by default
+		return false
+	}
+	return *s.Enabled
 }
 
 // IsEnabled returns true if PodSecurityPolicies are enabled for all Pods
