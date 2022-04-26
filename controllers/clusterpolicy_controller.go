@@ -249,7 +249,16 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
 			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
-			gpuWorkloadLabelChanged := getWorkloadConfig(oldLabels, nodeName, r.Log) != getWorkloadConfig(newLabels, nodeName, r.Log)
+
+			oldGPUWorkloadConfig, err := getWorkloadConfig(oldLabels)
+			if err != nil {
+				oldGPUWorkloadConfig = defaultGPUWorkloadConfig
+			}
+			newGPUWorkloadConfig, err := getWorkloadConfig(newLabels)
+			if err != nil {
+				newGPUWorkloadConfig = defaultGPUWorkloadConfig
+			}
+			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
 
 			oldOSTreeLabel, _ := oldLabels[nfdOSTreeVersionLabelKey]
 			newOSTreeLabel, _ := newLabels[nfdOSTreeVersionLabelKey]
@@ -259,7 +268,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 				gpuCommonLabelOutdated ||
 				migManagerLabelMissing ||
 				commonOperandsLabelChanged ||
-				gpuWorkloadLabelChanged ||
+				gpuWorkloadConfigLabelChanged ||
 				osTreeLabelChanged
 
 			if needsUpdate {
@@ -269,7 +278,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
 					"migManagerLabelMissing", migManagerLabelMissing,
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
-					"gpuWorkloadLabelChanged", gpuWorkloadLabelChanged,
+					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
 				)
 			}

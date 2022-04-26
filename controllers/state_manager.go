@@ -40,12 +40,16 @@ const (
 	ocpNamespaceMonitoringLabelValue    = "true"
 	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
 	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
-	ocpSuggestedNamespace = "nvidia-gpu-operator"
-	gpuWorkloadLabelKey   = "nvidia.com/gpu.workload.config"
+	ocpSuggestedNamespace          = "nvidia-gpu-operator"
+	gpuWorkloadConfigLabelKey      = "nvidia.com/gpu.workload.config"
+	gpuWorkloadConfigContainer     = "container"
+	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
+	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
+	defaultGPUWorkloadConfig       = gpuWorkloadConfigContainer
 )
 
 var gpuStateLabels = map[string]map[string]string{
-	"container": {
+	gpuWorkloadConfigContainer: {
 		"nvidia.com/gpu.deploy.driver":                "true",
 		"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
 		"nvidia.com/gpu.deploy.container-toolkit":     "true",
@@ -55,11 +59,11 @@ var gpuStateLabels = map[string]map[string]string{
 		"nvidia.com/gpu.deploy.node-status-exporter":  "true",
 		"nvidia.com/gpu.deploy.operator-validator":    "true",
 	},
-	"vm-passthrough": {
+	gpuWorkloadConfigVMPassthrough: {
 		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
 		"nvidia.com/gpu.deploy.vfio-pci-driver":        "true",
 	},
-	"vm-vgpu": {
+	gpuWorkloadConfigVMVgpu: {
 		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
 		"nvidia.com/gpu.deploy.vgpu-manager":           "true",
 	},
@@ -76,6 +80,12 @@ type state interface {
 	step()
 	validate()
 	last()
+}
+
+type gpuWorkloadConfiguration struct {
+	config string
+	node   string
+	log    logr.Logger
 }
 
 // OpenShiftDriverToolkit contains the values required to deploy
@@ -181,42 +191,6 @@ func hasCommonGPULabel(labels map[string]string) bool {
 	return false
 }
 
-// addMissingGPUStateLabels checks if the nodeLabels contain the correct GPUState labels,
-// and it adds them when missing (the label value is *not* checked, only the key).
-// If sandbox functionality is enabled, this function will also delete all state labels
-// not applicable for the current workload config. This is needed when the workload
-// config label has changed on the node.
-// addMissingGPUStateLabels returns true if the nodeLabels map has been updated
-func (n *ClusterPolicyController) addMissingGPUStateLabels(nodeLabels map[string]string, workloadConfig string) bool {
-	modified := false
-	if hasOperandsDisabled(nodeLabels) {
-		// Operands are disabled, delete all GPU state labels
-		return n.removeAllStateLabels(nodeLabels)
-	}
-
-	if n.sandboxEnabled {
-		// if the workloadConfig for the node has changed,
-		// need to ensure the existing gpuStateLabels are removed
-		n.removeAllStateLabelsExcept(nodeLabels, workloadConfig)
-	}
-
-	for key, value := range gpuStateLabels[workloadConfig] {
-		if _, ok := nodeLabels[key]; !ok {
-			nodeLabels[key] = value
-			modified = true
-		}
-		n.rec.Log.Info("Setting node label", "Label", key, "Value", nodeLabels[key])
-	}
-
-	// add mig-manager label if missing
-	if workloadConfig == "container" && hasMIGCapableGPU(nodeLabels) && !hasMIGManagerLabel(nodeLabels) {
-		nodeLabels[migManagerLabelKey] = migManagerLabelValue
-		modified = true
-		n.rec.Log.Info("Setting node label", "Label", migManagerLabelKey, "Value", migManagerLabelValue)
-	}
-	return modified
-}
-
 // hasGPULabels return true if node labels contain Nvidia GPU labels
 func hasGPULabels(labels map[string]string) bool {
 	for key, val := range labels {
@@ -274,69 +248,91 @@ func hasOperandsDisabled(labels map[string]string) bool {
 	return false
 }
 
-// getWorkloadConfig retrieves the workload configured for the node.
-// If the gpuWorkloadLabel is not found on the node, default to
-// the "container" workload configuration.
-func getWorkloadConfig(labels map[string]string, nodeName string, log logr.Logger) string {
-	workloadConfig := "container"
-	if value, ok := labels[gpuWorkloadLabelKey]; ok {
-		if _, ok := gpuStateLabels[value]; ok {
-			workloadConfig = value
-		} else {
-			log.Info("WARNING: Node does not have a valid workload config. Proceeding with default workload config (container)",
-				"nodeName", nodeName,
-				"gpuWorkloadLabel", gpuWorkloadLabelKey,
-				"gpuWorkloadValue", value)
+// getWorkloadConfig returns the GPU workload configured for the node.
+func getWorkloadConfig(labels map[string]string) (string, error) {
+	if workloadConfig, ok := labels[gpuWorkloadConfigLabelKey]; ok {
+		if _, ok = gpuStateLabels[workloadConfig]; ok {
+			return workloadConfig, nil
 		}
-	} else {
-		log.Info("Node does not have a workload config specified. Proceeding with default workload config (container)",
-			"nodeName", nodeName)
+		return "", fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
 	}
-	return workloadConfig
+	return "", fmt.Errorf("No GPU workload config found")
 }
 
-// removeAllStateLabels deletes all gpuStateLabels from the provided map of node labels.
-// removeAllStateLabels returns true if the labels map has been modified.
-func (n *ClusterPolicyController) removeAllStateLabels(labels map[string]string) bool {
+// removeAllGPUStateLabels removes all gpuStateLabels from the provided map of node labels.
+// removeAllGPUStateLabels returns true if the labels map has been modified.
+func removeAllGPUStateLabels(labels map[string]string) bool {
 	modified := false
 	for _, labelsMap := range gpuStateLabels {
 		for key := range labelsMap {
 			if _, ok := labels[key]; ok {
-				n.rec.Log.Info("Deleting node label", "Label", key)
 				delete(labels, key)
 				modified = true
 			}
 		}
 	}
 	if _, ok := labels[migManagerLabelKey]; ok {
-		n.rec.Log.Info("Deleting node label", "Label", migManagerLabelKey)
 		delete(labels, migManagerLabelKey)
 		modified = true
 	}
 	return modified
 }
 
-// removeAllStateLabelsExcept deletes all gpuStateLabels from the provided map of node labels
-// except gpuStateLabels associated with a particular workloadConfig.
-// removeAllStateLabelsExcept returns true if the labels map has been modified.
-func (n *ClusterPolicyController) removeAllStateLabelsExcept(labels map[string]string, workloadConfig string) bool {
+// updateGPUStateLabels applies the correct GPU state labels for the GPU workload configuration.
+// updateGPUStateLabels returns true if the input labels map is modified.
+func (w *gpuWorkloadConfiguration) updateGPUStateLabels(labels map[string]string) bool {
+	if hasOperandsDisabled(labels) {
+		// Operands are disabled, delete all GPU state labels
+		w.log.Info("Operands are disabled for node", "NodeName", w.node, "Label", commonOperandsLabelKey, "Value", "false")
+		w.log.Info("Disabling all operands for node", "NodeName", w.node)
+		return removeAllGPUStateLabels(labels)
+	}
+	removed := w.removeGPUStateLabels(labels)
+	added := w.addGPUStateLabels(labels)
+	return removed || added
+}
+
+// addGPUStateLabels adds GPU state labels needed for the GPU workload configuration.
+// If a required state label already exists on the node, honor the current value.
+func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) bool {
 	modified := false
-	for _, labelsMap := range gpuStateLabels {
+	for key, value := range gpuStateLabels[w.config] {
+		if _, ok := labels[key]; !ok {
+			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
+			labels[key] = value
+			modified = true
+		}
+	}
+	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
+		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
+		labels[migManagerLabelKey] = migManagerLabelValue
+		modified = true
+	}
+	return modified
+}
+
+// removeGPUStateLabels removes GPU state labels not needed for the GPU workload configuration
+func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
+	modified := false
+	for workloadConfig, labelsMap := range gpuStateLabels {
+		if workloadConfig == w.config {
+			continue
+		}
 		for key := range labelsMap {
-			if _, ok := gpuStateLabels[workloadConfig][key]; ok {
+			if _, ok := gpuStateLabels[w.config][key]; ok {
 				// skip label if it is in the set of states for workloadConfig
 				continue
 			}
 			if _, ok := labels[key]; ok {
-				n.rec.Log.Info("Deleting node label", "Label", key)
+				w.log.Info("Deleting node label", "NodeName", w.node, "Label", key)
 				delete(labels, key)
 				modified = true
 			}
 		}
 	}
-	if workloadConfig != "container" {
+	if w.config != gpuWorkloadConfigContainer {
 		if _, ok := labels[migManagerLabelKey]; ok {
-			n.rec.Log.Info("Deleting node label", "Label", migManagerLabelKey)
+			w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
 			delete(labels, migManagerLabelKey)
 			modified = true
 		}
@@ -357,43 +353,34 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
-	workloadConfig := "container"
+	var gpuWorkloadConfig *gpuWorkloadConfiguration
 	for _, node := range list.Items {
 		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
 			clusterHasNFDLabels = hasNFDLabels(labels)
 		}
+		config := defaultGPUWorkloadConfig
 		if n.sandboxEnabled {
-			workloadConfig = getWorkloadConfig(labels, node.ObjectMeta.Name, n.rec.Log)
-			n.rec.Log.Info("Node workload configuration", "NodeName", node.ObjectMeta.Name, "WorkloadConfig", workloadConfig)
+			config, err = getWorkloadConfig(labels)
+			if err != nil {
+				n.rec.Log.Info("WARNING: failed to get GPU workload config for node", "NodeName", node.ObjectMeta.Name)
+				n.rec.Log.Info("WARNING: proceeding with default GPU workload config",
+					"NodeName", node.ObjectMeta.Name,
+					"defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
+				config = defaultGPUWorkloadConfig
+			}
 		}
+		n.rec.Log.Info("GPU workload configuration", "NodeName", node.ObjectMeta.Name, "GpuWorkloadConfig", config)
+		gpuWorkloadConfig = &gpuWorkloadConfiguration{config, node.ObjectMeta.Name, n.rec.Log}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
+			n.rec.Log.Info("Node has GPU(s)", "NodeName", node.ObjectMeta.Name)
 			// label the node with common Nvidia GPU label
+			n.rec.Log.Info("Setting node label", "NodeName", node.ObjectMeta.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// label the node with the state GPU labels
-			if hasOperandsDisabled(labels) {
-				// Operands are disabled, delete all GPU state labels
-				n.rec.Log.Info("Operands are disabled for node", "NodeName", node.ObjectMeta.Name, "Label", commonOperandsLabelKey, "Value", "false")
-				n.rec.Log.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
-				n.removeAllStateLabels(labels)
-			} else {
-				if n.sandboxEnabled {
-					n.rec.Log.Info("Disabling operands not needed for configured workload",
-						"NodeName", node.ObjectMeta.Name,
-						"WorkloadConfig", workloadConfig)
-					n.removeAllStateLabelsExcept(labels, workloadConfig)
-				}
-				for key, value := range gpuStateLabels[workloadConfig] {
-					labels[key] = value
-					n.rec.Log.Info("Setting node label", "Label", key, "Value", value)
-				}
-				// add mig-manager label
-				if workloadConfig == "container" && hasMIGCapableGPU(labels) {
-					labels[migManagerLabelKey] = migManagerLabelValue
-					n.rec.Log.Info("Setting node label", "Label", migManagerLabelKey, "Value", migManagerLabelValue)
-				}
-			}
+			n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+			gpuWorkloadConfig.updateGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
@@ -404,9 +391,11 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
 			// previously labelled node and no longer has GPU's
 			// label node to reset common Nvidia GPU label
+			n.rec.Log.Info("Node no longer has GPUs", "NodeName", node.ObjectMeta.Name)
+			n.rec.Log.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
 			labels[commonGPULabelKey] = "false"
-			n.rec.Log.Info("Deleting node label", "Label", commonGPULabelKey)
-			n.removeAllStateLabels(labels)
+			n.rec.Log.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
+			removeAllGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
@@ -417,8 +406,8 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		}
 		if hasCommonGPULabel(labels) {
 			n.rec.Log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
-			if n.addMissingGPUStateLabels(labels, workloadConfig) {
-				n.rec.Log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
+				n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
 				node.SetLabels(labels)
 				err = n.rec.Client.Update(context.TODO(), &node)
 				if err != nil {
@@ -608,6 +597,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 			n.sandboxEnabled = true
 			n.rec.Log.Info("Sandboxed environments functionality is enabled")
 			// TODO: add state for additional operands managed in sandboxed environments
+		} else {
+			n.rec.Log.Info("Sandboxed environments functionality is disabled")
 		}
 
 		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
