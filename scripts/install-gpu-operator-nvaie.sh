@@ -32,7 +32,7 @@ kubectl create namespace gpu-operator
 # note: the NLS client license token is stored in client_configuration_token.tok
 #
 
-if [ DEPLOYMENT_TYPE = virtual ]; then
+if [ "${DEPLOYMENT_TYPE}" = virtual ]; then
     sudo touch gridd.conf
 
     kubectl create configmap licensing-config \
@@ -60,12 +60,12 @@ helm repo add nvaie https://helm.ngc.nvidia.com/nvaie \
 
 # step5: Install the NVIDIA GPU Operator
 
-if [ DEPLOYMENT_TYPE = virtual ]; then
+if [ "${DEPLOYMENT_TYPE}" = virtual ]; then
     helm install --wait gpu-operator nvaie/gpu-operator-2-0 -n gpu-operator
 else
     helm install --wait gpu-operator nvaie/gpu-operator-2-0 -n gpu-operator \
         --set driver.repository=nvcr.io/nvidia \
         --set driver.image=driver \
         --set driver.version="${DATACENTER_DRIVER_VERSION}" \
-        --set driver.licensingConfig.config.name=""
+        --set driver.licensingConfig.configMapName=""
 fi
