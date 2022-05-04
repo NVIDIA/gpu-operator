@@ -59,9 +59,6 @@ spec:
     {{- if .Values.validator.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.validator.imagePullSecrets | nindent 8 }}
     {{- end }}
-    {{- if .Values.validator.securityContext }}
-    securityContext: {{ toYaml .Values.validator.securityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.validator.resources }}
     resources: {{ toYaml .Values.validator.resources | nindent 6 }}
     {{- end }}
@@ -149,9 +146,6 @@ spec:
     {{- if .Values.driver.kernelModuleConfig }}
     kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
     {{- end }}
-    {{- if .Values.driver.securityContext }}
-    securityContext: {{ toYaml .Values.driver.securityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.driver.resources }}
     resources: {{ toYaml .Values.driver.resources | nindent 6 }}
     {{- end }}
@@ -178,9 +172,6 @@ spec:
     {{- if .Values.toolkit.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.toolkit.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.toolkit.securityContext }}
-    securityContext: {{ toYaml .Values.toolkit.securityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.toolkit.resources }}
     resources: {{ toYaml .Values.toolkit.resources | nindent 6 }}
     {{- end }}
@@ -205,9 +196,6 @@ spec:
     {{- end }}
     {{- if .Values.devicePlugin.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.devicePlugin.imagePullSecrets | nindent 6 }}
-    {{- end }}
-    {{- if .Values.devicePlugin.securityContext }}
-    securityContext: {{ toYaml .Values.devicePlugin.securityContext | nindent 6 }}
     {{- end }}
     {{- if .Values.devicePlugin.resources }}
     resources: {{ toYaml .Values.devicePlugin.resources | nindent 6 }}
@@ -234,9 +222,6 @@ spec:
     {{- end }}
     {{- if .Values.dcgm.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.dcgm.imagePullSecrets | nindent 6 }}
-    {{- end }}
-    {{- if .Values.dcgm.securityContext }}
-    securityContext: {{ toYaml .Values.dcgm.securityContext | nindent 6 }}
     {{- end }}
     {{- if .Values.dcgm.resources }}
     resources: {{ toYaml .Values.dcgm.resources | nindent 6 }}
@@ -266,9 +251,6 @@ spec:
     {{- if .Values.dcgmExporter.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.dcgmExporter.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.dcgmExporter.securityContext }}
-    securityContext: {{ toYaml .Values.dcgmExporter.securityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.dcgmExporter.resources }}
     resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
     {{- end }}
@@ -297,9 +279,6 @@ spec:
     {{- if .Values.gfd.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.gfd.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.gfd.securityContext }}
-    securityContext: {{ toYaml .Values.gfd.securityContext | nindent 6 }}
-    {{- end }}
     {{- if .Values.gfd.resources }}
     resources: {{ toYaml .Values.gfd.resources | nindent 6 }}
     {{- end }}
@@ -325,9 +304,6 @@ spec:
     {{- end }}
     {{- if .Values.migManager.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.migManager.imagePullSecrets | nindent 6 }}
-    {{- end }}
-    {{- if .Values.migManager.securityContext }}
-    securityContext: {{ toYaml .Values.migManager.securityContext | nindent 6 }}
     {{- end }}
     {{- if .Values.migManager.resources }}
     resources: {{ toYaml .Values.migManager.resources | nindent 6 }}
@@ -358,9 +334,6 @@ spec:
     {{- end }}
     {{- if .Values.nodeStatusExporter.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.nodeStatusExporter.imagePullSecrets | nindent 6 }}
-    {{- end }}
-    {{- if .Values.nodeStatusExporter.securityContext }}
-    securityContext: {{ toYaml .Values.nodeStatusExporter.securityContext | nindent 6 }}
     {{- end }}
     {{- if .Values.nodeStatusExporter.resources }}
     resources: {{ toYaml .Values.nodeStatusExporter.resources | nindent 6 }}
