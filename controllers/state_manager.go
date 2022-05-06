@@ -249,14 +249,19 @@ func hasOperandsDisabled(labels map[string]string) bool {
 }
 
 // getWorkloadConfig returns the GPU workload configured for the node.
-func getWorkloadConfig(labels map[string]string) (string, error) {
+// If sandbox functionality is disabled or an error occurs when searching
+// for the workload config, return defaultGPUWorkloadConfig.
+func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, error) {
+	if !sandboxEnabled {
+		return defaultGPUWorkloadConfig, nil
+	}
 	if workloadConfig, ok := labels[gpuWorkloadConfigLabelKey]; ok {
 		if _, ok = gpuStateLabels[workloadConfig]; ok {
 			return workloadConfig, nil
 		}
-		return "", fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
+		return defaultGPUWorkloadConfig, fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
 	}
-	return "", fmt.Errorf("No GPU workload config found")
+	return defaultGPUWorkloadConfig, fmt.Errorf("No GPU workload config found")
 }
 
 // removeAllGPUStateLabels removes all gpuStateLabels from the provided map of node labels.
@@ -340,7 +345,7 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 	return modified
 }
 
-// labelGPUNodes labels nodes with GPU's with Nvidia common label
+// labelGPUNodes labels nodes with GPU's with NVIDIA common label
 // it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
 func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	// fetch all nodes
@@ -353,26 +358,20 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
-	var gpuWorkloadConfig *gpuWorkloadConfiguration
 	for _, node := range list.Items {
 		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
 			clusterHasNFDLabels = hasNFDLabels(labels)
 		}
-		config := defaultGPUWorkloadConfig
-		if n.sandboxEnabled {
-			config, err = getWorkloadConfig(labels)
-			if err != nil {
-				n.rec.Log.Info("WARNING: failed to get GPU workload config for node", "NodeName", node.ObjectMeta.Name)
-				n.rec.Log.Info("WARNING: proceeding with default GPU workload config",
-					"NodeName", node.ObjectMeta.Name,
-					"defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
-				config = defaultGPUWorkloadConfig
-			}
+		config, err := getWorkloadConfig(labels, n.sandboxEnabled)
+		if err != nil {
+			n.rec.Log.Info("WARNING: failed to get GPU workload config for node; using default",
+				"NodeName", node.ObjectMeta.Name, "SandboxEnabled", n.sandboxEnabled,
+				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
 		}
 		n.rec.Log.Info("GPU workload configuration", "NodeName", node.ObjectMeta.Name, "GpuWorkloadConfig", config)
-		gpuWorkloadConfig = &gpuWorkloadConfiguration{config, node.ObjectMeta.Name, n.rec.Log}
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.ObjectMeta.Name, n.rec.Log}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.rec.Log.Info("Node has GPU(s)", "NodeName", node.ObjectMeta.Name)
 			// label the node with common Nvidia GPU label
@@ -595,11 +594,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		if clusterPolicy.Spec.SandboxedEnvironments.IsEnabled() {
 			n.sandboxEnabled = true
-			n.rec.Log.Info("Sandboxed environments functionality is enabled")
 			// TODO: add state for additional operands managed in sandboxed environments
-		} else {
-			n.rec.Log.Info("Sandboxed environments functionality is disabled")
 		}
+		n.rec.Log.Info("Sandboxed environments", "Enabled", n.sandboxEnabled)
 
 		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
 			addState(n, "/opt/gpu-operator/state-node-status-exporter")

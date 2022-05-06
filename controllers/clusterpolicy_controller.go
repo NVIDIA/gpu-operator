@@ -250,14 +250,8 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
 			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
 
-			oldGPUWorkloadConfig, err := getWorkloadConfig(oldLabels)
-			if err != nil {
-				oldGPUWorkloadConfig = defaultGPUWorkloadConfig
-			}
-			newGPUWorkloadConfig, err := getWorkloadConfig(newLabels)
-			if err != nil {
-				newGPUWorkloadConfig = defaultGPUWorkloadConfig
-			}
+			oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
+			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
 			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
 
 			oldOSTreeLabel, _ := oldLabels[nfdOSTreeVersionLabelKey]
