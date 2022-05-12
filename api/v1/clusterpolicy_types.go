@@ -77,8 +77,6 @@ const (
 	CRIO Runtime = "crio"
 	// Containerd runtime
 	Containerd Runtime = "containerd"
-	// DefaultNvidiaDriverRoot indicates default root directory of driver installation with gpu-operator
-	DefaultNvidiaDriverRoot = "/run/nvidia/driver"
 )
 
 func (r Runtime) String() string {
@@ -1039,14 +1037,6 @@ func ImagePullPolicy(pullPolicy string) corev1.PullPolicy {
 		imagePullPolicy = corev1.PullIfNotPresent
 	}
 	return imagePullPolicy
-}
-
-// Root returns root path for driver install
-func (d *DriverSpec) Root() string {
-	if d.Enabled != nil && !*d.Enabled {
-		return "/"
-	}
-	return DefaultNvidiaDriverRoot
 }
 
 // IsDriverEnabled returns true if driver install is enabled(default) through gpu-operator

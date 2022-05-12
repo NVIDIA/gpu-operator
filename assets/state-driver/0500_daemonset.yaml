@@ -87,6 +87,10 @@ spec:
             - name: run-nvidia
               mountPath: /run/nvidia
               mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
@@ -246,3 +250,6 @@ spec:
           hostPath:
             path: /run/nvidia/validations
             type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: "/"

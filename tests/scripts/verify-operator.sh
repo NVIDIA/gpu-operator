@@ -19,8 +19,3 @@ check_pod_ready "nvidia-dcgm-exporter"
 check_pod_ready "gpu-feature-discovery"
 check_pod_ready "nvidia-operator-validator"
 
-# Check that Daemonset pods are not constantly being restarted by operator.
-check_no_restarts "nvidia-driver-daemonset"
-check_no_restarts "nvidia-container-toolkit-daemonset"
-check_no_restarts "nvidia-device-plugin-daemonset"
-check_no_restarts "gpu-feature-discovery"

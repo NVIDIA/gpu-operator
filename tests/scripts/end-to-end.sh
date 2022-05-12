@@ -6,6 +6,7 @@ source ${SCRIPT_DIR}/.definitions.sh
 # Install the operator and ensure that this works as expected
 ${SCRIPT_DIR}/install-operator.sh
 ${SCRIPT_DIR}/verify-operator.sh
+${SCRIPT_DIR}/verify-operand-restarts.sh
 
 # Install a workload and verify that this works as expected
 ${SCRIPT_DIR}/install-workload.sh

@@ -95,8 +95,10 @@ const (
 	defaultSleepIntervalSeconds = 5
 	// defaultMetricsPort indicates the port on which the metrics will be exposed.
 	defaultMetricsPort = 0
-	// driverStatusFile indicates status file for driver readiness
+	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
+	// hostDriverStatusFile indicates status file for host driver readiness
+	hostDriverStatusFile = "host-driver-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
 	toolkitStatusFile = "toolkit-ready"
 	// pluginStatusFile indicates status file for plugin readiness
@@ -418,33 +420,50 @@ func cleanupStatusFiles() error {
 	return nil
 }
 
-func (d *Driver) runValidation(silent bool) error {
+func (d *Driver) runValidation(silent bool) (hostDriver bool, err error) {
 	// invoke validation command
 	command := "chroot"
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
-	if withWaitFlag {
-		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	// check if driver is pre-installed on the host and use host path for validation
+	if _, err := os.Stat("/host/usr/bin/nvidia-smi"); err == nil {
+		args = []string{"/host", "nvidia-smi"}
+		hostDriver = true
 	}
 
-	return runCommand(command, args, silent)
+	if withWaitFlag {
+		return hostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+
+	return hostDriver, runCommand(command, args, silent)
 }
 
 func (d *Driver) validate() error {
-	// delete status file is already present
+	// delete driver status file is already present
 	err := deleteStatusFile(outputDirFlag + "/" + driverStatusFile)
 	if err != nil {
 		return err
 	}
 
-	err = d.runValidation(false)
+	// delete host driver status file is already present
+	err = deleteStatusFile(outputDirFlag + "/" + hostDriverStatusFile)
+	if err != nil {
+		return err
+	}
+
+	hostDriver, err := d.runValidation(false)
 	if err != nil {
 		fmt.Println("driver is not ready")
 		return err
 	}
 
+	statusFile := driverStatusFile
+	if hostDriver {
+		statusFile = hostDriverStatusFile
+	}
+
 	// create driver status file
-	err = createStatusFile(outputDirFlag + "/" + driverStatusFile)
+	err = createStatusFile(outputDirFlag + "/" + statusFile)
 	if err != nil {
 		return err
 	}

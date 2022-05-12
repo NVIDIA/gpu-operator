@@ -63,8 +63,6 @@ const (
 	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
-	// NvidiaDriverRootEnvName represents env name for indicating root directory of driver installation
-	NvidiaDriverRootEnvName = "NVIDIA_DRIVER_ROOT"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
 	DriverInstallPathVolName = "driver-install-path"
 	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted
@@ -730,19 +728,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
-	// configure root directory of driver installation for toolkit if not already provided by user
-	nvidiaDriverRoot := config.Driver.Root()
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
-
-	// configure volume driver-install-path to use host root path if installed outside of operator
-	for _, volume := range obj.Spec.Template.Spec.Volumes {
-		if volume.Name == DriverInstallPathVolName && !config.Driver.IsDriverEnabled() {
-			// set host root path as driver-install-path
-			volume.HostPath.Path = "/"
-			break
-		}
-	}
-
 	// configure runtime
 	runtime := n.runtime.String()
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
@@ -827,9 +812,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-	// configure root directory of driver installation for device-plugin if not already provided by user
-	nvidiaDriverRoot := config.Driver.Root()
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaDriverRootEnvName, nvidiaDriverRoot)
+
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 	// update env required for MIG support
@@ -1120,14 +1103,6 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		break
 	}
 
-	// If the nvidia driver is pre-installed, shutdown and restart gpu clients on the host
-	// when applying mig mode/config changes. This requires the host pid and ipc namespaces.
-	if !config.Driver.IsDriverEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "WITH_SHUTDOWN_HOST_GPU_CLIENTS", "true")
-		obj.Spec.Template.Spec.HostPID = true
-		obj.Spec.Template.Spec.HostIPC = true
-	}
-
 	return nil
 }
 
@@ -1175,15 +1150,6 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
-
-	// configure volume driver-install-path to use host root path if installed outside of operator
-	for _, volume := range obj.Spec.Template.Spec.Volumes {
-		if volume.Name == DriverInstallPathVolName && !config.Driver.IsDriverEnabled() {
-			// set host root path as driver-install-path
-			volume.HostPath.Path = "/"
-			break
-		}
-	}
 
 	// apply changes for individual component validators(initContainers)
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
@@ -2508,10 +2474,6 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 			continue
 		}
 		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
-	}
-
-	if obj.Name == "nvidia-mig-manager" && !n.singleton.Spec.Driver.IsDriverEnabled() {
-		obj.AllowHostIPC = true
 	}
 
 	// Allow hostNetwork only when a separate standalone DCGM engine is deployed for communication
