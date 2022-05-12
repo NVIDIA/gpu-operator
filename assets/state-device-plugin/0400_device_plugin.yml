@@ -38,6 +38,8 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin-ctr
+        command: [bash, -c]
+        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; NVIDIA_DRIVER_ROOT=$driver_root nvidia-device-plugin;"]
         securityContext:
           privileged: true
         env:
@@ -56,6 +58,9 @@ spec:
         volumeMounts:
           - name: device-plugin
             mountPath: /var/lib/kubelet/device-plugins
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
       volumes:
         - name: device-plugin
           hostPath:

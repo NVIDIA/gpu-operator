@@ -18,3 +18,4 @@ check_pod_deleted "nvidia-device-plugin-daemonset"
 check_pod_deleted "nvidia-dcgm-exporter"
 check_pod_deleted "gpu-feature-discovery"
 check_pod_deleted "nvidia-operator-validator"
+

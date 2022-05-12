@@ -47,9 +47,14 @@ spec:
           - name: run-nvidia-validations
             mountPath: /run/nvidia/validations
             mountPropagation: Bidirectional
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
       containers:
       - image: "FILLED BY THE OPERATOR"
-        args: ["/usr/local/nvidia"]
+        command: [bash, -c]
+        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; NVIDIA_DRIVER_ROOT=$driver_root nvidia-toolkit /usr/local/nvidia"]
         env:
         - name: RUNTIME_ARGS
           value: ""
@@ -67,6 +72,10 @@ spec:
             mountPath: /usr/local/nvidia
           - name: crio-hooks
             mountPath: /usr/share/containers/oci/hooks.d
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
       volumes:
         - name: nvidia-run-path
           hostPath:
@@ -79,6 +88,9 @@ spec:
         - name: driver-install-path
           hostPath:
             path: /run/nvidia/driver
+        - name: host-root
+          hostPath:
+            path: /
         - name: nvidia-local
           hostPath:
             path: /usr/local/nvidia

@@ -3,7 +3,7 @@
 # reopened with the relevant failures.
 #
 allowHostDirVolumePlugin: true
-allowHostIPC: false
+allowHostIPC: true
 allowHostNetwork: false
 allowHostPID: true
 allowHostPorts: false

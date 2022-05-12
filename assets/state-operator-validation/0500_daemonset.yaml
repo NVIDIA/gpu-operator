@@ -40,6 +40,10 @@ spec:
             seLinuxOptions:
               level: "s0"
           volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
             - name: driver-install-path
               mountPath: /run/nvidia/driver
               mountPropagation: HostToContainer
@@ -134,3 +138,6 @@ spec:
         - name: driver-install-path
           hostPath:
             path: /run/nvidia/driver
+        - name: host-root
+          hostPath:
+            path: /
