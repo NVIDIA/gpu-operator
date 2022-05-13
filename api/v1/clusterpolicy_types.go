@@ -177,6 +177,15 @@ type ValidatorSpec struct {
 	// CUDA validator spec
 	CUDA CUDAValidatorSpec `json:"cuda,omitempty"`
 
+	// VfioPCI validator spec
+	VfioPCI VfioPCIValidatorSpec `json:"vfioPCI,omitempty"`
+
+	// VGPUManager validator spec
+	VGPUManager VGPUManagerValidatorSpec `json:"vGPUManager,omitempty"`
+
+	// VGPUDevices validator spec
+	VGPUDevices VGPUDevicesValidatorSpec `json:"vGPUDevices,omitempty"`
+
 	// Validator image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -251,6 +260,33 @@ type DriverValidatorSpec struct {
 
 // CUDAValidatorSpec defines validator spec for cuda validation workload pod
 type CUDAValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// VfioPCIValidatorSpec defines validator spec for vfio-pci component
+type VfioPCIValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// VGPUManagerValidatorSpec defines validator spec for vgpu-manager component
+type VGPUManagerValidatorSpec struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// VGPUDevicesValidatorSpec defines validator spec for vgpu-devices component
+type VGPUDevicesValidatorSpec struct {
 	// Optional: List of environment variables
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"

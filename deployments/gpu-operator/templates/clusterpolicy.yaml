@@ -89,6 +89,25 @@ spec:
       env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
       {{- end }}
     {{- end }}
+    {{- if .Values.validator.vfioPCI }}
+    vfioPCI:
+      {{- if .Values.validator.vfioPCI.env }}
+      env: {{ toYaml .Values.validator.vfioPCI.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.vGPUManager }}
+    vGPUManager:
+      {{- if .Values.validator.vGPUManager.env }}
+      env: {{ toYaml .Values.validator.vGPUManager.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.vGPUDevices }}
+    vGPUDevices:
+      {{- if .Values.validator.vGPUDevices.env }}
+      env: {{ toYaml .Values.validator.vGPUDevices.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+
   mig:
     {{- if .Values.mig.strategy }}
     strategy: {{ .Values.mig.strategy }}

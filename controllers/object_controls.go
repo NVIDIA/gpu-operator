@@ -406,6 +406,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
 		"nvidia-mig-manager":                 TransformMIGManager,
 		"nvidia-operator-validator":          TransformValidator,
+		"nvidia-sandbox-validator":           TransformSandboxValidator,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -1149,6 +1150,40 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	err := TransformValidatorShared(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+
+	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
+
+	return nil
+}
+
+// TransformSandboxValidator transforms nvidia-sandbox-validator daemonset with required config as per ClusterPolicy
+func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	err := TransformValidatorShared(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vfio-pci")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-manager")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-devices")
+
+	return nil
+}
+
+// TransformValidatorShared applies general transformations to the validator daemonset with required config as per ClusterPolicy
+func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
 	image, err := gpuv1.ImagePath(&config.Validator)
 	if err != nil {
@@ -1178,25 +1213,16 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Validator.Resources
 		}
 	}
-	// set arguments if specified for device-plugin container
+	// set arguments if specified for validator container
 	if len(config.Validator.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.Validator.Args
 	}
-	// set/append environment variables for device-plugin container
+	// set/append environment variables for validator container
 	if len(config.Validator.Env) > 0 {
 		for _, env := range config.Validator.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
-
-	// apply changes for individual component validators(initContainers)
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
 
 	return nil
 }
@@ -1268,6 +1294,27 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vfio-pci":
+			// set/append environment variables for vfio-pci-validation container
+			if len(config.Validator.VfioPCI.Env) > 0 {
+				for _, env := range config.Validator.VfioPCI.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vgpu-manager":
+			// set/append environment variables for vgpu-manager-validation container
+			if len(config.Validator.VGPUManager.Env) > 0 {
+				for _, env := range config.Validator.VGPUManager.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vgpu-devices":
+			// set/append environment variables for vgpu-devices-validation container
+			if len(config.Validator.VGPUDevices.Env) > 0 {
+				for _, env := range config.Validator.VGPUDevices.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}
