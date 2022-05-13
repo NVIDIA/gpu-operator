@@ -38,6 +38,9 @@ spec:
       imagePullSecrets: {{ toYaml .Values.operator.initContainer.imagePullSecrets | nindent 8 }}
       {{- end }}
     {{- end }}
+    {{- if .Values.operator.use_ocp_driver_toolkit }}
+    use_ocp_driver_toolkit: {{ .Values.operator.use_ocp_driver_toolkit }}
+    {{- end }}
   daemonsets:
     {{- if .Values.daemonsets.tolerations }}
     tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
@@ -94,9 +97,6 @@ spec:
     enabled: {{ .Values.psp.enabled }}
   driver:
     enabled: {{ .Values.driver.enabled }}
-    {{- if .Values.driver.use_ocp_driver_toolkit }}
-    use_ocp_driver_toolkit: {{ .Values.driver.use_ocp_driver_toolkit }}
-    {{- end }}
     {{- if .Values.driver.repository }}
     repository: {{ .Values.driver.repository }}
     {{- end }}
@@ -155,6 +155,34 @@ spec:
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
     {{- end }}
+  {{- if .Values.sandboxedEnvironments.enabled }}
+  vGPUManager:
+    enabled: {{ .Values.vGPUManager.enabled }}
+    {{- if .Values.vGPUManager.repository }}
+    repository: {{ .Values.vGPUManager.repository }}
+    {{- end }}
+    {{- if .Values.vGPUManager.image }}
+    image: {{ .Values.vGPUManager.image }}
+    {{- end }}
+    {{- if .Values.vGPUManager.version }}
+    version: {{ .Values.vGPUManager.version | quote }}
+    {{- end }}
+    {{- if .Values.vGPUManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.vGPUManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.vGPUManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.vGPUManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vGPUManager.resources }}
+    resources: {{ toYaml .Values.vGPUManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vGPUManager.env }}
+    env: {{ toYaml .Values.vGPUManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vGPUManager.args }}
+    args: {{ toYaml .Values.vGPUManager.args | nindent 6 }}
+    {{- end }}
+  {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
     {{- if .Values.toolkit.repository }}

@@ -7,6 +7,7 @@ spec:
     defaultRuntime: crio
     runtimeClass: nvidia
     initContainer: {}
+    use_ocp_driver_toolkit: false
 
   psp:
     enabled: false
@@ -55,7 +56,6 @@ spec:
 
   driver:
     enabled: true
-    use_ocp_driver_toolkit: false
 
     rdma:
       enabled: false
@@ -75,3 +75,6 @@ spec:
     # kernel module configuration for NVIDIA driver
     kernelModuleConfig:
       name: ""
+
+  vGPUManager:
+    enabled: true

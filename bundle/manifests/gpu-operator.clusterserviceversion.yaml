@@ -34,7 +34,6 @@ metadata:
             },
             "driver": {
               "enabled": true,
-              "use_ocp_driver_toolkit": true,
               "repoConfig": {
                 "configMapName": ""
               },
@@ -52,6 +51,9 @@ metadata:
                 "name": ""
               }
             },
+            "vGPUManager": {
+              "enabled": true
+            },
             "gfd": {
             },
             "migManager": {
@@ -63,6 +65,7 @@ metadata:
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
+              "use_ocp_driver_toolkit": true,
               "initContainer": {
               }
             },

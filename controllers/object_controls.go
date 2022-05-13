@@ -397,6 +397,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":            TransformDriver,
+		"nvidia-vgpu-manager-daemonset":      TransformVGPUManager,
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm":                        TransformDCGM,
@@ -534,9 +535,35 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// update OpenShift Driver Toolkit sidecar container
-	err := transformOpenShiftDriverToolkitContainer(obj, config, n)
+	err := transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
+	}
+
+	return nil
+}
+
+// TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
+func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update nvidia-vgpu-manager container
+	err := transformVGPUManagerContainer(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("failed to transform vGPU Manager container: %v", err)
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// update OpenShift Driver Toolkit sidecar container
+	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-vgpu-host-driver-ctr")
+	if err != nil {
+		return fmt.Errorf("failed to transform the Driver Toolkit container: %s", err)
 	}
 
 	return nil
@@ -1616,7 +1643,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	return nil
 }
 
-func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, mainContainerName string) error {
 	var err error
 
 	getContainer := func(name string, remove bool) (*v1.Container, error) {
@@ -1650,7 +1677,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	/* find the main container and driver-toolkit sidecar container */
 	var mainContainer, driverToolkitContainer *v1.Container
 
-	if mainContainer, err = getContainer("nvidia-driver-ctr", false); err != nil {
+	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
 		return err
 	}
 
@@ -1743,6 +1770,12 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 		}
 	case *gpuv1.GPUDirectStorageSpec:
 		spec := driverSpec.(*gpuv1.GPUDirectStorageSpec)
+		image, err = gpuv1.ImagePath(spec)
+		if err != nil {
+			return "", err
+		}
+	case *gpuv1.VGPUManagerSpec:
+		spec := driverSpec.(*gpuv1.VGPUManagerSpec)
 		image, err = gpuv1.ImagePath(spec)
 		if err != nil {
 			return "", err
@@ -2013,6 +2046,54 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			return err
 		}
 	}
+	return nil
+}
+
+func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	var container *corev1.Container
+	for i, ctr := range obj.Spec.Template.Spec.Containers {
+		if ctr.Name == "nvidia-vgpu-manager-ctr" {
+			container = &obj.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+
+	if container == nil {
+		return fmt.Errorf("failed to find nvidia-vgpu-manager-ctr in spec")
+	}
+
+	image, err := resolveDriverTag(n, &config.VGPUManager)
+	if err != nil {
+		return err
+	}
+	if image != "" {
+		container.Image = image
+	}
+
+	// update image pull policy
+	container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.VGPUManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VGPUManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VGPUManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// set resource limits
+	if config.VGPUManager.Resources != nil {
+		container.Resources = *config.VGPUManager.Resources
+	}
+	// set arguments if specified for driver container
+	if len(config.VGPUManager.Args) > 0 {
+		container.Args = config.VGPUManager.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.VGPUManager.Env) > 0 {
+		for _, env := range config.VGPUManager.Env {
+			setContainerEnv(container, env.Name, env.Value)
+		}
+	}
+
 	return nil
 }
 
@@ -2448,7 +2529,8 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" {
+	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" ||
+		n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-vgpu-host-driver-daemonset" {
 		podCount, err := cleanupUnusedDriverDaemonSets(n)
 		if err != nil {
 			return gpuv1.NotReady, err

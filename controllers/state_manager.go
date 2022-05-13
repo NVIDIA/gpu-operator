@@ -92,7 +92,7 @@ type gpuWorkloadConfiguration struct {
 // OpenShift DriverToolkit DaemonSet.
 type OpenShiftDriverToolkit struct {
 	// true if the cluster runs OpenShift and
-	// Driver.UseOpenShiftDriverToolkit is turned on in the
+	// Operator.UseOpenShiftDriverToolkit is turned on in the
 	// ClusterPolicy
 	requested bool
 	// true of the DriverToolkit is requested and the cluster has all
@@ -595,6 +595,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		if clusterPolicy.Spec.SandboxedEnvironments.IsEnabled() {
 			n.sandboxEnabled = true
 			// TODO: add state for additional operands managed in sandboxed environments
+			if clusterPolicy.Spec.VGPUManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vgpu-manager")
+			}
 		}
 		n.rec.Log.Info("Sandboxed environments", "Enabled", n.sandboxEnabled)
 
@@ -637,8 +640,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 	}
 
-	if n.singleton.Spec.Driver.UseOpenShiftDriverToolkit != nil &&
-		*n.singleton.Spec.Driver.UseOpenShiftDriverToolkit {
+	if n.singleton.Spec.Operator.UseOpenShiftDriverToolkit != nil &&
+		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit {
 		if n.openshift == "" {
 			return fmt.Errorf("ERROR: Driver Toolkit requested but not running on OpenShift")
 		}
