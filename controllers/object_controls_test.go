@@ -636,6 +636,9 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.VGPUManager.Repository = "nvcr.io/nvidia"
 	cp.Spec.VGPUManager.Image = "vgpu-manager"
 	cp.Spec.VGPUManager.Version = "470.57.02"
+	cp.Spec.VGPUManager.DriverManager.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.VGPUManager.DriverManager.Image = "k8s-driver-manager"
+	cp.Spec.VGPUManager.DriverManager.Version = "v0.3.0"
 
 	switch testCase {
 	case "default":

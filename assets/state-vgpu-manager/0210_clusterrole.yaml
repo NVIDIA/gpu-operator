@@ -15,6 +15,7 @@ rules:
   resources:
   - nodes
   - pods
-  - pods/eviction
   verbs:
-  - "get"
+  - get
+  - list
+  - patch

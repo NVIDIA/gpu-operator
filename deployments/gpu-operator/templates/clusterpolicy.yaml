@@ -182,6 +182,22 @@ spec:
     {{- if .Values.vGPUManager.args }}
     args: {{ toYaml .Values.vGPUManager.args | nindent 6 }}
     {{- end }}
+    driverManager:
+      {{- if .Values.vGPUManager.driverManager.repository }}
+      repository: {{ .Values.vGPUManager.driverManager.repository }}
+      {{- end }}
+      {{- if .Values.vGPUManager.driverManager.image }}
+      image: {{ .Values.vGPUManager.driverManager.image }}
+      {{- end }}
+      {{- if .Values.vGPUManager.driverManager.version }}
+      version: {{ .Values.vGPUManager.driverManager.version | quote }}
+      {{- end }}
+      {{- if .Values.vGPUManager.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.vGPUManager.driverManager.imagePullPolicy }}
+      {{- end }}
+      {{- if .Values.vGPUManager.driverManager.env }}
+      env: {{ toYaml .Values.vGPUManager.driverManager.env | nindent 8 }}
+      {{- end }}
   {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}

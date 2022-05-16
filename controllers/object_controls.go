@@ -514,7 +514,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	transformValidationInitContainer(obj, config)
 
 	// update driver-manager initContainer
-	transformDriverManagerInitContainer(obj, config)
+	transformDriverManagerInitContainer(obj, &config.Driver.Manager)
 
 	// update nvidia-driver container
 	transformDriverContainer(obj, config, n)
@@ -545,8 +545,14 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 // TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update k8s-driver-manager initContainer
+	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager)
+	if err != nil {
+		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for vGPU Manager: %v", err)
+	}
+
 	// update nvidia-vgpu-manager container
-	err := transformVGPUManagerContainer(obj, config, n)
+	err = transformVGPUManagerContainer(obj, config, n)
 	if err != nil {
 		return fmt.Errorf("failed to transform vGPU Manager container: %v", err)
 	}
@@ -1539,36 +1545,43 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	return nil
 }
 
-func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
-		// skip if not validation initContainer
-		if !strings.Contains(initContainer.Name, "k8s-driver-manager") {
-			continue
-		}
-		// update driver-manager(initContainer) image and pull policy
-		managerImage, err := gpuv1.ImagePath(&config.Driver.Manager)
-		if err != nil {
-			return err
-		}
-		obj.Spec.Template.Spec.InitContainers[i].Image = managerImage
-
-		if config.Driver.ImagePullPolicy != "" {
-			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
-		}
-
-		// set/append environment variables for driver-manager initContainer
-		if len(config.Driver.Manager.Env) > 0 {
-			for _, env := range config.Driver.Manager.Env {
-				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
-			}
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec) error {
+	var container *corev1.Container
+	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
+		if initCtr.Name == "k8s-driver-manager" {
+			container = &obj.Spec.Template.Spec.InitContainers[i]
+			break
 		}
 	}
+
+	if container == nil {
+		return fmt.Errorf("failed to find k8s-driver-manager initContainer in spec")
+	}
+
+	managerImage, err := gpuv1.ImagePath(driverManagerSpec)
+	if err != nil {
+		return err
+	}
+	container.Image = managerImage
+
+	if driverManagerSpec.ImagePullPolicy != "" {
+		container.ImagePullPolicy = gpuv1.ImagePullPolicy(driverManagerSpec.ImagePullPolicy)
+	}
+
+	// set/append environment variables for driver-manager initContainer
+	if len(driverManagerSpec.Env) > 0 {
+		for _, env := range driverManagerSpec.Env {
+			setContainerEnv(container, env.Name, env.Value)
+		}
+	}
+
 	// add any pull secrets needed for driver-manager image
-	if len(config.Driver.Manager.ImagePullSecrets) > 0 {
-		for _, secret := range config.Driver.Manager.ImagePullSecrets {
+	if len(driverManagerSpec.ImagePullSecrets) > 0 {
+		for _, secret := range driverManagerSpec.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
+
 	return nil
 }
 
