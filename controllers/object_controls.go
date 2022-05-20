@@ -1299,8 +1299,8 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vfio-pci":
 			// set/append environment variables for vfio-pci-validation container
-			if len(config.Validator.VfioPCI.Env) > 0 {
-				for _, env := range config.Validator.VfioPCI.Env {
+			if len(config.Validator.VFIOPCI.Env) > 0 {
+				for _, env := range config.Validator.VFIOPCI.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}

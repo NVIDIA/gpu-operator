@@ -178,13 +178,13 @@ type ValidatorSpec struct {
 	CUDA CUDAValidatorSpec `json:"cuda,omitempty"`
 
 	// VfioPCI validator spec
-	VfioPCI VfioPCIValidatorSpec `json:"vfioPCI,omitempty"`
+	VFIOPCI VFIOPCIValidatorSpec `json:"vfioPCI,omitempty"`
 
 	// VGPUManager validator spec
-	VGPUManager VGPUManagerValidatorSpec `json:"vGPUManager,omitempty"`
+	VGPUManager VGPUManagerValidatorSpec `json:"vgpuManager,omitempty"`
 
 	// VGPUDevices validator spec
-	VGPUDevices VGPUDevicesValidatorSpec `json:"vGPUDevices,omitempty"`
+	VGPUDevices VGPUDevicesValidatorSpec `json:"vgpuDevices,omitempty"`
 
 	// Validator image repository
 	// +kubebuilder:validation:Optional
@@ -267,8 +267,8 @@ type CUDAValidatorSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-// VfioPCIValidatorSpec defines validator spec for vfio-pci component
-type VfioPCIValidatorSpec struct {
+// VFIOPCIValidatorSpec defines validator spec for vfio-pci component
+type VFIOPCIValidatorSpec struct {
 	// Optional: List of environment variables
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"

@@ -95,16 +95,16 @@ spec:
       env: {{ toYaml .Values.validator.vfioPCI.env | nindent 8 }}
       {{- end }}
     {{- end }}
-    {{- if .Values.validator.vGPUManager }}
-    vGPUManager:
-      {{- if .Values.validator.vGPUManager.env }}
-      env: {{ toYaml .Values.validator.vGPUManager.env | nindent 8 }}
+    {{- if .Values.validator.vgpuManager }}
+    vgpuManager:
+      {{- if .Values.validator.vgpuManager.env }}
+      env: {{ toYaml .Values.validator.vgpuManager.env | nindent 8 }}
       {{- end }}
     {{- end }}
-    {{- if .Values.validator.vGPUDevices }}
-    vGPUDevices:
-      {{- if .Values.validator.vGPUDevices.env }}
-      env: {{ toYaml .Values.validator.vGPUDevices.env | nindent 8 }}
+    {{- if .Values.validator.vgpuDevices }}
+    vgpuDevices:
+      {{- if .Values.validator.vgpuDevices.env }}
+      env: {{ toYaml .Values.validator.vgpuDevices.env | nindent 8 }}
       {{- end }}
     {{- end }}
 
