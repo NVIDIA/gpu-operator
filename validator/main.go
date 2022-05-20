@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -30,6 +31,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
+	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1099,6 +1101,7 @@ func (v *VfioPCI) validate() error {
 	if err != nil {
 		return err
 	}
+	log.Info("Validation completed successfully - all devices are bound to vfio-pci")
 
 	// delete status file is already present
 	err = createStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
@@ -1109,7 +1112,34 @@ func (v *VfioPCI) validate() error {
 }
 
 func (v *VfioPCI) runValidation(silent bool) error {
-	// TODO: validate vfio-pci driver is loaded and bound to GPU(s)
+	nvpci := nvpci.New()
+	nvdevices, err := nvpci.GetAllDevices()
+	if err != nil {
+		return fmt.Errorf("error getting NVIDIA PCI devices: %v", err)
+	}
+
+	for _, dev := range nvdevices {
+		path := filepath.Join(dev.Path, "driver")
+		fileInfo, err := os.Lstat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("device %s is not bound to any driver", dev.Address)
+			}
+			return fmt.Errorf("failed to get file info for %s: %v", path, err)
+		}
+
+		driverName := ""
+		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			link, _ := filepath.EvalSymlinks(path)
+			driverName = filepath.Base(link)
+		} else {
+			return fmt.Errorf("%s is malinformed: %v", path, err)
+		}
+
+		if driverName != "vfio-pci" {
+			return fmt.Errorf("device %s is bound to driver '%s'", dev.Address, driverName)
+		}
+	}
 	return nil
 }
 
