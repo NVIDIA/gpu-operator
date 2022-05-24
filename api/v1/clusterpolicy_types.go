@@ -41,7 +41,7 @@ type ClusterPolicySpec struct {
 	// Driver component spec
 	Driver DriverSpec `json:"driver"`
 	// VGPUManager component spec
-	VGPUManager VGPUManagerSpec `json:"vGPUManager,omitempty"`
+	VGPUManager VGPUManagerSpec `json:"vgpuManager,omitempty"`
 	// Toolkit component spec
 	Toolkit ToolkitSpec `json:"toolkit"`
 	// DevicePlugin component spec
@@ -66,6 +66,8 @@ type ClusterPolicySpec struct {
 	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
 	// SandboxedEnvironments defines the spec for handling sandboxed environments
 	SandboxedEnvironments SandboxedEnvironmentsSpec `json:"sandboxedEnvironments,omitempty"`
+	// VFIOManager for configuration to deploy VFIO-PCI Manager
+	VFIOManager VFIOManagerSpec `json:"vfioManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1007,6 +1009,59 @@ type MIGGPUClientsConfigSpec struct {
 	Name string `json:"name,omitempty"`
 }
 
+// VFIOManagerSpec defines the properties for deploying VFIO-PCI manager
+type VFIOManagerSpec struct {
+	// Enabled indicates if deployment of vfio-manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable vfio-manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// vfio-manager image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// vfio-manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// vfio-manager image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -1145,6 +1200,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *GPUDirectStorageSpec:
 		config := spec.(*GPUDirectStorageSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "GDS_IMAGE")
+	case *VFIOManagerSpec:
+		config := spec.(*VFIOManagerSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "VFIO_MANAGER_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
@@ -1173,6 +1231,15 @@ func (d *DriverSpec) IsDriverEnabled() bool {
 		return true
 	}
 	return *d.Enabled
+}
+
+// IsEnabled returns true if VFIO-PCI Manager install is enabled through gpu-operator
+func (v *VFIOManagerSpec) IsEnabled() bool {
+	if v.Enabled == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *v.Enabled
 }
 
 // IsEnabled returns true if vGPU Manager install is enabled through gpu-operator

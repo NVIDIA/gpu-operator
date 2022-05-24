@@ -398,6 +398,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":            TransformDriver,
 		"nvidia-vgpu-manager-daemonset":      TransformVGPUManager,
+		"nvidia-vfio-manager":                TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm":                        TransformDCGM,
@@ -1143,6 +1144,57 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		}
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
+	}
+
+	return nil
+}
+
+// TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
+func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
+	image, err := gpuv1.ImagePath(&config.VFIOManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.VFIOManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VFIOManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VFIOManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set resource limits
+	if config.VFIOManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.VFIOManager.Resources
+		}
+	}
+
+	// set arguments if specified for mig-manager container
+	if len(config.VFIOManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.VFIOManager.Args
+	}
+
+	// set/append environment variables for mig-manager container
+	if len(config.VFIOManager.Env) > 0 {
+		for _, env := range config.VFIOManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
 	}
 
 	return nil

@@ -175,48 +175,74 @@ spec:
     args: {{ toYaml .Values.driver.args | nindent 6 }}
     {{- end }}
   {{- if .Values.sandboxedEnvironments.enabled }}
-  vGPUManager:
-    enabled: {{ .Values.vGPUManager.enabled }}
-    {{- if .Values.vGPUManager.repository }}
-    repository: {{ .Values.vGPUManager.repository }}
+  vgpuManager:
+    enabled: {{ .Values.vgpuManager.enabled }}
+    {{- if .Values.vgpuManager.repository }}
+    repository: {{ .Values.vgpuManager.repository }}
     {{- end }}
-    {{- if .Values.vGPUManager.image }}
-    image: {{ .Values.vGPUManager.image }}
+    {{- if .Values.vgpuManager.image }}
+    image: {{ .Values.vgpuManager.image }}
     {{- end }}
-    {{- if .Values.vGPUManager.version }}
-    version: {{ .Values.vGPUManager.version | quote }}
+    {{- if .Values.vgpuManager.version }}
+    version: {{ .Values.vgpuManager.version | quote }}
     {{- end }}
-    {{- if .Values.vGPUManager.imagePullPolicy }}
-    imagePullPolicy: {{ .Values.vGPUManager.imagePullPolicy }}
+    {{- if .Values.vgpuManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.vgpuManager.imagePullPolicy }}
     {{- end }}
-    {{- if .Values.vGPUManager.imagePullSecrets }}
-    imagePullSecrets: {{ toYaml .Values.vGPUManager.imagePullSecrets | nindent 6 }}
+    {{- if .Values.vgpuManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.vgpuManager.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.vGPUManager.resources }}
-    resources: {{ toYaml .Values.vGPUManager.resources | nindent 6 }}
+    {{- if .Values.vgpuManager.resources }}
+    resources: {{ toYaml .Values.vgpuManager.resources | nindent 6 }}
     {{- end }}
-    {{- if .Values.vGPUManager.env }}
-    env: {{ toYaml .Values.vGPUManager.env | nindent 6 }}
+    {{- if .Values.vgpuManager.env }}
+    env: {{ toYaml .Values.vgpuManager.env | nindent 6 }}
     {{- end }}
-    {{- if .Values.vGPUManager.args }}
-    args: {{ toYaml .Values.vGPUManager.args | nindent 6 }}
+    {{- if .Values.vgpuManager.args }}
+    args: {{ toYaml .Values.vgpuManager.args | nindent 6 }}
     {{- end }}
     driverManager:
-      {{- if .Values.vGPUManager.driverManager.repository }}
-      repository: {{ .Values.vGPUManager.driverManager.repository }}
+      {{- if .Values.vgpuManager.driverManager.repository }}
+      repository: {{ .Values.vgpuManager.driverManager.repository }}
       {{- end }}
-      {{- if .Values.vGPUManager.driverManager.image }}
-      image: {{ .Values.vGPUManager.driverManager.image }}
+      {{- if .Values.vgpuManager.driverManager.image }}
+      image: {{ .Values.vgpuManager.driverManager.image }}
       {{- end }}
-      {{- if .Values.vGPUManager.driverManager.version }}
-      version: {{ .Values.vGPUManager.driverManager.version | quote }}
+      {{- if .Values.vgpuManager.driverManager.version }}
+      version: {{ .Values.vgpuManager.driverManager.version | quote }}
       {{- end }}
-      {{- if .Values.vGPUManager.driverManager.imagePullPolicy }}
-      imagePullPolicy: {{ .Values.vGPUManager.driverManager.imagePullPolicy }}
+      {{- if .Values.vgpuManager.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.vgpuManager.driverManager.imagePullPolicy }}
       {{- end }}
-      {{- if .Values.vGPUManager.driverManager.env }}
-      env: {{ toYaml .Values.vGPUManager.driverManager.env | nindent 8 }}
+      {{- if .Values.vgpuManager.driverManager.env }}
+      env: {{ toYaml .Values.vgpuManager.driverManager.env | nindent 8 }}
       {{- end }}
+  vfioManager:
+    enabled: {{ .Values.vfioManager.enabled }}
+    {{- if .Values.vfioManager.repository }}
+    repository: {{ .Values.vfioManager.repository }}
+    {{- end }}
+    {{- if .Values.vfioManager.image }}
+    image: {{ .Values.vfioManager.image }}
+    {{- end }}
+    {{- if .Values.vfioManager.version }}
+    version: {{ .Values.vfioManager.version | quote }}
+    {{- end }}
+    {{- if .Values.vfioManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.vfioManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.vfioManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.vfioManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vfioManager.resources }}
+    resources: {{ toYaml .Values.vfioManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vfioManager.env }}
+    env: {{ toYaml .Values.vfioManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vfioManager.args }}
+    args: {{ toYaml .Values.vfioManager.args | nindent 6 }}
+    {{- end }}
   {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}

@@ -50,7 +50,7 @@ operator:
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 11.4.2-base-ubi8
+    version: 11.6.0-base-ubi8
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -126,7 +126,7 @@ driver:
   kernelModuleConfig:
     name: ""
 
-vGPUManager:
+vgpuManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: vgpu-manager
@@ -143,6 +143,16 @@ vGPUManager:
     env:
       - name: ENABLE_AUTO_DRAIN
         value: "false"
+
+vfioManager:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: cuda
+  version: 11.6.0-base-ubi8
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  resources: {}
 
 toolkit:
   enabled: true

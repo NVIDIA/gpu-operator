@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-vfio-manager
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    k8s-app: nvidia-vfio-manager
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-vfio-manager
+  template:
+    metadata:
+      labels:
+        name: nvidia-vfio-manager
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.vfio-manager: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-vfio-manager
+      containers:
+      - name: nvidia-vfio-manager
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        args:
+          - /bin/vfio-manage.sh bind --all && sleep inf
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: nvidia-vfio-manager
+          readOnly: true
+          mountPath: /bin/vfio-manage.sh
+          subPath: vfio-manage.sh
+        securityContext:
+          privileged: true
+            seLinuxOptions:
+              level: "s0"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/bin/vfio-manage.sh unbind --all"]
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: nvidia-vfio-manager
+        configMap:
+          name: nvidia-vfio-manager
+          defaultMode: 448

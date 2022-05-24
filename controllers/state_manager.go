@@ -61,8 +61,8 @@ var gpuStateLabels = map[string]map[string]string{
 	},
 	gpuWorkloadConfigVMPassthrough: {
 		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
-		"nvidia.com/gpu.deploy.vfio-pci-driver":        "true",
 		"nvidia.com/gpu.deploy.sandbox-validator":      "true",
+		"nvidia.com/gpu.deploy.vfio-manager":           "true",
 	},
 	gpuWorkloadConfigVMVgpu: {
 		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
