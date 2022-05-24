@@ -601,6 +601,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 				addState(n, "/opt/gpu-operator/state-vgpu-manager")
 			}
 			addState(n, "/opt/gpu-operator/state-sandbox-validation")
+			if clusterPolicy.Spec.VFIOManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vfio-manager")
+			}
 		}
 		n.rec.Log.Info("Sandboxed environments", "Enabled", n.sandboxEnabled)
 
