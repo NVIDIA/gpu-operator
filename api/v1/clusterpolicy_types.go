@@ -68,6 +68,8 @@ type ClusterPolicySpec struct {
 	SandboxedEnvironments SandboxedEnvironmentsSpec `json:"sandboxedEnvironments,omitempty"`
 	// VFIOManager for configuration to deploy VFIO-PCI Manager
 	VFIOManager VFIOManagerSpec `json:"vfioManager,omitempty"`
+	// SandboxDevicePlugin component spec
+	SandboxDevicePlugin SandboxDevicePluginSpec `json:"sandboxDevicePlugin,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -591,6 +593,59 @@ type DevicePluginConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Default config name within the ConfigMap for the device-plugin config"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Default string `json:"default,omitempty"`
+}
+
+// SandboxDevicePluginSpec defines the properties for the sandbox-device-plugin deployment
+type SandboxDevicePluginSpec struct {
+	// Enabled indicates if deployment of sandbox-device-plugin through operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable sandbox-device-plugin deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// DevicePlugin image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// DevicePlugin image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// DevicePlugin image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // DCGMExporterSpec defines the properties for DCGM exporter deployment
@@ -1173,6 +1228,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *DevicePluginSpec:
 		config := spec.(*DevicePluginSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DEVICE_PLUGIN_IMAGE")
+	case *SandboxDevicePluginSpec:
+		config := spec.(*SandboxDevicePluginSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "SANDBOX_DEVICE_PLUGIN_IMAGE")
 	case *DCGMExporterSpec:
 		config := spec.(*DCGMExporterSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DCGM_EXPORTER_IMAGE")
@@ -1265,6 +1323,15 @@ func (t *ToolkitSpec) IsToolkitEnabled() bool {
 func (s *SandboxedEnvironmentsSpec) IsEnabled() bool {
 	if s.Enabled == nil {
 		// Sandbox functionality is disabled by default
+		return false
+	}
+	return *s.Enabled
+}
+
+// IsEnabled returns true if the sandbox device plugin is enabled through gpu-operator
+func (s *SandboxDevicePluginSpec) IsEnabled() bool {
+	if s.Enabled == nil {
+		// default is false if not specified by user
 		return false
 	}
 	return *s.Enabled

@@ -24,11 +24,16 @@ import (
 )
 
 const (
-	pciCfgSpaceStandardSize  = 256
-	pciCfgSpaceExtendedSize  = 4096
-	pciCapabilityListPointer = 0x34
-	pciStatusCapabilityList  = 0x10
-	pciStatusBytePosition    = 0x06
+	// PCICfgSpaceStandardSize represents the size in bytes of the standard config space
+	PCICfgSpaceStandardSize = 256
+	// PCICfgSpaceExtendedSize represents the size in bytes of the extended config space
+	PCICfgSpaceExtendedSize = 4096
+	// PCICapabilityListPointer represents offset for the capability list pointer
+	PCICapabilityListPointer = 0x34
+	// PCIStatusCapabilityList represents the status register bit which indicates capability list support
+	PCIStatusCapabilityList = 0x10
+	// PCIStatusBytePosition represents the position of the status register
+	PCIStatusBytePosition = 0x06
 )
 
 // ConfigSpace PCI configuration space (standard extended) file path
@@ -87,12 +92,12 @@ func (cs *configSpaceIO) GetPCICapabilities() (*PCICapabilities, error) {
 		make(map[uint16]*PCIExtendedCapability),
 	}
 
-	support := cs.Read8(pciStatusBytePosition) & pciStatusCapabilityList
+	support := cs.Read8(PCIStatusBytePosition) & PCIStatusCapabilityList
 	if support == 0 {
 		return nil, fmt.Errorf("pci device does not support capability list")
 	}
 
-	soffset := cs.Read8(pciCapabilityListPointer)
+	soffset := cs.Read8(PCICapabilityListPointer)
 	if int(soffset) >= cs.Len() {
 		return nil, fmt.Errorf("capability list pointer out of bounds")
 	}
@@ -101,7 +106,7 @@ func (cs *configSpaceIO) GetPCICapabilities() (*PCICapabilities, error) {
 		if soffset == 0xff {
 			return nil, fmt.Errorf("config space broken")
 		}
-		if int(soffset) >= pciCfgSpaceStandardSize {
+		if int(soffset) >= PCICfgSpaceStandardSize {
 			return nil, fmt.Errorf("standard capability list pointer out of bounds")
 		}
 		data := cs.Read32(int(soffset))
@@ -112,16 +117,16 @@ func (cs *configSpaceIO) GetPCICapabilities() (*PCICapabilities, error) {
 		soffset = uint8((data >> 8) & 0xff)
 	}
 
-	if cs.Len() <= pciCfgSpaceStandardSize {
+	if cs.Len() <= PCICfgSpaceStandardSize {
 		return caps, nil
 	}
 
-	eoffset := uint16(pciCfgSpaceStandardSize)
+	eoffset := uint16(PCICfgSpaceStandardSize)
 	for eoffset != 0 {
 		if eoffset == 0xffff {
 			return nil, fmt.Errorf("config space broken")
 		}
-		if int(eoffset) >= pciCfgSpaceExtendedSize {
+		if int(eoffset) >= PCICfgSpaceExtendedSize {
 			return nil, fmt.Errorf("extended capability list pointer out of bounds")
 		}
 		data := cs.Read32(int(eoffset))

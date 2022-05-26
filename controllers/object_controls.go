@@ -396,18 +396,19 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-daemonset":            TransformDriver,
-		"nvidia-vgpu-manager-daemonset":      TransformVGPUManager,
-		"nvidia-vfio-manager":                TransformVFIOManager,
-		"nvidia-container-toolkit-daemonset": TransformToolkit,
-		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
-		"nvidia-dcgm":                        TransformDCGM,
-		"nvidia-dcgm-exporter":               TransformDCGMExporter,
-		"nvidia-node-status-exporter":        TransformNodeStatusExporter,
-		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
-		"nvidia-mig-manager":                 TransformMIGManager,
-		"nvidia-operator-validator":          TransformValidator,
-		"nvidia-sandbox-validator":           TransformSandboxValidator,
+		"nvidia-driver-daemonset":                TransformDriver,
+		"nvidia-vgpu-manager-daemonset":          TransformVGPUManager,
+		"nvidia-vfio-manager":                    TransformVFIOManager,
+		"nvidia-container-toolkit-daemonset":     TransformToolkit,
+		"nvidia-device-plugin-daemonset":         TransformDevicePlugin,
+		"nvidia-sandbox-device-plugin-daemonset": TransformSandboxDevicePlugin,
+		"nvidia-dcgm":                            TransformDCGM,
+		"nvidia-dcgm-exporter":                   TransformDCGMExporter,
+		"nvidia-node-status-exporter":            TransformNodeStatusExporter,
+		"gpu-feature-discovery":                  TransformGPUDiscoveryPlugin,
+		"nvidia-mig-manager":                     TransformMIGManager,
+		"nvidia-operator-validator":              TransformValidator,
+		"nvidia-sandbox-validator":               TransformSandboxValidator,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -860,6 +861,53 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
 
+	return nil
+}
+
+// TransformSandboxDevicePlugin transforms sandbox-device-plugin daemonset with required config as per ClusterPolicy
+func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	transformValidationInitContainer(obj, config)
+	// update image
+	image, err := gpuv1.ImagePath(&config.SandboxDevicePlugin)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.SandboxDevicePlugin.ImagePullPolicy)
+	// set image pull secrets
+	if len(config.SandboxDevicePlugin.ImagePullSecrets) > 0 {
+		for _, secret := range config.SandboxDevicePlugin.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+	// set resource limits
+	if config.SandboxDevicePlugin.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.SandboxDevicePlugin.Resources
+		}
+	}
+	// set arguments if specified for device-plugin container
+	if len(config.SandboxDevicePlugin.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.SandboxDevicePlugin.Args
+	}
+	// set/append environment variables for device-plugin container
+	if len(config.SandboxDevicePlugin.Env) > 0 {
+		for _, env := range config.SandboxDevicePlugin.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
 	return nil
 }
 

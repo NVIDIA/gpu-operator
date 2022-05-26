@@ -192,6 +192,17 @@ devicePlugin:
     # Default config name within the ConfigMap
     default: ""
 
+sandboxDevicePlugin:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: kubevirt-gpu-device-plugin
+  version: v1.1.1
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  args: []
+  env: []
+  resources: {}
+
 # standalone dcgm hostengine
 dcgm:
   # disabled by default to use embedded nv-hostengine by exporter

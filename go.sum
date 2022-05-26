@@ -464,6 +464,8 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220216100624-cc0dadbb966e h1:DYpRP5Rj8TulujF5ZrP/tuwj8nfVWmkmaS35H01X/oc=
 gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220216100624-cc0dadbb966e/go.mod h1:TBB3sR7/jg4RCThC/cgT4fB8mAbbMO307TycfgeR59w=
+gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220525163429-038b3f8b475d h1:WLnoEFzgCutNeWSdVTOU6U/55FA/FS0EbXNifmOAPHA=
+gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220525163429-038b3f8b475d/go.mod h1:TBB3sR7/jg4RCThC/cgT4fB8mAbbMO307TycfgeR59w=
 go.etcd.io/bbolt v1.3.6/go.mod h1:qXsaaIqmgQH0T+OPdb99Bf+PKfBBQVAdyD6TY9G8XM4=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
 go.etcd.io/etcd/client/pkg/v3 v3.5.0/go.mod h1:IJHfcCEKxYu1Os13ZdwCwIUTUVGYTSAM3YSwc9/Ac1g=

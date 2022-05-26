@@ -60,14 +60,14 @@ var gpuStateLabels = map[string]map[string]string{
 		"nvidia.com/gpu.deploy.operator-validator":    "true",
 	},
 	gpuWorkloadConfigVMPassthrough: {
-		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
-		"nvidia.com/gpu.deploy.sandbox-validator":      "true",
-		"nvidia.com/gpu.deploy.vfio-manager":           "true",
+		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+		"nvidia.com/gpu.deploy.vfio-manager":          "true",
 	},
 	gpuWorkloadConfigVMVgpu: {
-		"nvidia.com/gpu.deploy.kubevirt-device-plugin": "true",
-		"nvidia.com/gpu.deploy.vgpu-manager":           "true",
-		"nvidia.com/gpu.deploy.sandbox-validator":      "true",
+		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+		"nvidia.com/gpu.deploy.vgpu-manager":          "true",
+		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
 	},
 }
 
@@ -603,6 +603,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 			addState(n, "/opt/gpu-operator/state-sandbox-validation")
 			if clusterPolicy.Spec.VFIOManager.IsEnabled() {
 				addState(n, "/opt/gpu-operator/state-vfio-manager")
+			}
+			if clusterPolicy.Spec.SandboxDevicePlugin.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
 			}
 		}
 		n.rec.Log.Info("Sandboxed environments", "Enabled", n.sandboxEnabled)

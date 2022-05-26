@@ -31,6 +31,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
+	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -128,6 +129,8 @@ const (
 	hostVGPUManagerStatusFile = "host-vgpu-manager-ready"
 	// vGPUDevicesStatusFile is name of the file which indicates vGPU Manager is installed and vGPU devices have been created
 	vGPUDevicesStatusFile = "vgpu-devices-ready"
+	// workloadTypeStatusFile is the name of the file which specifies the workload type configured for the node
+	workloadTypeStatusFile = "workload-type"
 	// podCreationWaitRetries indicates total retries to wait for plugin validation pod creation
 	podCreationWaitRetries = 60
 	// podCreationSleepIntervalSeconds indicates sleep interval in seconds between checking for plugin validation pod readiness
@@ -567,6 +570,20 @@ func createStatusFile(statusFile string) error {
 	if err != nil {
 		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
 	}
+	return nil
+}
+
+func createStatusFileWithContent(statusFile string, content string) error {
+	f, err := os.Create(statusFile)
+	if err != nil {
+		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
+	}
+
+	_, err = f.WriteString(content)
+	if err != nil {
+		return fmt.Errorf("unable to write contents of status file %s: %s", statusFile, err)
+	}
+
 	return nil
 }
 
@@ -1084,6 +1101,11 @@ func (v *VfioPCI) validate() error {
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
+
 	if gpuWorkloadConfig != gpuWorkloadConfigVMPassthrough {
 		log.WithFields(log.Fields{
 			"gpuWorkloadConfig": gpuWorkloadConfig,
@@ -1091,7 +1113,7 @@ func (v *VfioPCI) validate() error {
 		return nil
 	}
 
-	// delete status file is already present
+	// delete status file if already present
 	err = deleteStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
 	if err != nil {
 		return err
@@ -1149,6 +1171,11 @@ func (v *VGPUManager) validate() error {
 		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
+
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
 
 	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
 		log.WithFields(log.Fields{
@@ -1213,6 +1240,11 @@ func (v *VGPUDevices) validate() error {
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
+
 	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
 		log.WithFields(log.Fields{
 			"gpuWorkloadConfig": gpuWorkloadConfig,
@@ -1220,21 +1252,56 @@ func (v *VGPUDevices) validate() error {
 		return nil
 	}
 
+	// delete status file if already present
+	err = deleteStatusFile(outputDirFlag + "/" + vGPUDevicesStatusFile)
+	if err != nil {
+		return err
+	}
+
 	err = v.runValidation(false)
 	if err != nil {
 		return err
 	}
+	log.Info("Validation completed successfully - vGPU devices present on the host")
+
+	// create status file
+	err = createStatusFile(outputDirFlag + "/" + vGPUDevicesStatusFile)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (v *VGPUDevices) runValidation(silent bool) error {
-	// Once all vGPU devices have been created, the vGPUDevicesStatusFile will be created.
-	command := "bash"
-	statusFile := defaultStatusPath + "/" + vGPUDevicesStatusFile
-	args := []string{"-c", fmt.Sprintf("stat %s", statusFile)}
-
-	if withWaitFlag {
-		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	nvmdev := nvmdev.New()
+	vGPUDevices, err := nvmdev.GetAllDevices()
+	if err != nil {
+		return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
 	}
-	return runCommand(command, args, silent)
+
+	if !withWaitFlag {
+		numDevices := len(vGPUDevices)
+		if numDevices == 0 {
+			return fmt.Errorf("No vGPU devices found")
+		}
+
+		log.Infof("Found %d vGPU devices", numDevices)
+		return nil
+	}
+
+	for {
+		numDevices := len(vGPUDevices)
+		if numDevices > 0 {
+			log.Infof("Found %d vGPU devices", numDevices)
+			return nil
+		}
+		log.Infof("No vGPU devices found, retrying after %d seconds", sleepIntervalSecondsFlag)
+		time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
+
+		vGPUDevices, err = nvmdev.GetAllDevices()
+		if err != nil {
+			return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
+		}
+	}
 }

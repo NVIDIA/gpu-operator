@@ -462,4 +462,32 @@ spec:
   {{- if .Values.sandboxedEnvironments.enabled }}
   sandboxedEnvironments:
     enabled: {{ .Values.sandboxedEnvironments.enabled }}
+  sandboxDevicePlugin:
+    {{- if .Values.sandboxDevicePlugin.enabled }}
+    enabled: {{ .Values.sandboxDevicePlugin.enabled }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.repository }}
+    repository: {{ .Values.sandboxDevicePlugin.repository }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.image }}
+    image: {{ .Values.sandboxDevicePlugin.image }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.version }}
+    version: {{ .Values.sandboxDevicePlugin.version | quote }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.sandboxDevicePlugin.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.sandboxDevicePlugin.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.resources }}
+    resources: {{ toYaml .Values.sandboxDevicePlugin.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.env }}
+    env: {{ toYaml .Values.sandboxDevicePlugin.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.sandboxDevicePlugin.args }}
+    args: {{ toYaml .Values.sandboxDevicePlugin.args | nindent 6 }}
+    {{- end }}
   {{- end }}

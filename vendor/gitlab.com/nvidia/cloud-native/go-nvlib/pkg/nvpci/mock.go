@@ -45,7 +45,7 @@ func NewMockNvpci() (mock *MockNvpci, rerr error) {
 	}()
 
 	mock = &MockNvpci{
-		&nvpci{rootDir},
+		NewFrom(rootDir).(*nvpci),
 	}
 
 	return mock, nil
@@ -68,7 +68,7 @@ func (m *MockNvpci) AddMockA100(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = vendor.WriteString(fmt.Sprintf("0x%x", pciNvidiaVendorID))
+	_, err = vendor.WriteString(fmt.Sprintf("0x%x", PCINvidiaVendorID))
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (m *MockNvpci) AddMockA100(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = class.WriteString(fmt.Sprintf("0x%x", pci3dControllerClass))
+	_, err = class.WriteString(fmt.Sprintf("0x%x", PCI3dControllerClass))
 	if err != nil {
 		return err
 	}
@@ -104,11 +104,11 @@ func (m *MockNvpci) AddMockA100(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_data := make([]byte, pciCfgSpaceStandardSize)
+	_data := make([]byte, PCICfgSpaceStandardSize)
 	data := bytes.New(&_data)
-	data.Write16(0, pciNvidiaVendorID)
+	data.Write16(0, PCINvidiaVendorID)
 	data.Write16(2, uint16(0x20bf))
-	data.Write8(pciStatusBytePosition, pciStatusCapabilityList)
+	data.Write8(PCIStatusBytePosition, PCIStatusCapabilityList)
 	_, err = config.Write(*data.Raw())
 	if err != nil {
 		return err
