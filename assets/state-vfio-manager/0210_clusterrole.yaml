@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-vgpu-manager
+  name: nvidia-vfio-manager
 rules:
 - apiGroups:
   - config.openshift.io

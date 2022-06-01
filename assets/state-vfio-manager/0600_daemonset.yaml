@@ -22,6 +22,36 @@ spec:
         nvidia.com/gpu.deploy.vfio-manager: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-vfio-manager
+      initContainers:
+        - name: k8s-driver-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["driver-manager"]
+          args: ["uninstall_driver"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: ENABLE_AUTO_DRAIN
+            value: "false"
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
       containers:
         - name: nvidia-vfio-manager
           image: "FILLED BY THE OPERATOR"
@@ -60,3 +90,10 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: "/"

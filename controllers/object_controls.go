@@ -1199,6 +1199,12 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update k8s-driver-manager initContainer
+	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager)
+	if err != nil {
+		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+	}
+
 	// update image
 	image, err := gpuv1.ImagePath(&config.VFIOManager)
 	if err != nil {

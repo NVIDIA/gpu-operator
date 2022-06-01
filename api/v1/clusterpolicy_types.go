@@ -1115,6 +1115,9 @@ type VFIOManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// DriverManager represents configuration for driver manager initContainer
+	DriverManager DriverManagerSpec `json:"driverManager,omitempty"`
 }
 
 // MIGStrategy indicates MIG mode

@@ -243,6 +243,22 @@ spec:
     {{- if .Values.vfioManager.args }}
     args: {{ toYaml .Values.vfioManager.args | nindent 6 }}
     {{- end }}
+    driverManager:
+      {{- if .Values.vfioManager.driverManager.repository }}
+      repository: {{ .Values.vfioManager.driverManager.repository }}
+      {{- end }}
+      {{- if .Values.vfioManager.driverManager.image }}
+      image: {{ .Values.vfioManager.driverManager.image }}
+      {{- end }}
+      {{- if .Values.vfioManager.driverManager.version }}
+      version: {{ .Values.vfioManager.driverManager.version | quote }}
+      {{- end }}
+      {{- if .Values.vfioManager.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.vfioManager.driverManager.imagePullPolicy }}
+      {{- end }}
+      {{- if .Values.vfioManager.driverManager.env }}
+      env: {{ toYaml .Values.vfioManager.driverManager.env | nindent 8 }}
+      {{- end }}
   {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
