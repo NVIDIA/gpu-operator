@@ -571,7 +571,7 @@ func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	}
 
 	// update OpenShift Driver Toolkit sidecar container
-	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-vgpu-host-driver-ctr")
+	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-vgpu-manager-ctr")
 	if err != nil {
 		return fmt.Errorf("failed to transform the Driver Toolkit container: %s", err)
 	}
@@ -2765,7 +2765,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" ||
-		n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-vgpu-host-driver-daemonset" {
+		n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-vgpu-manager-daemonset" {
 		podCount, err := cleanupUnusedDriverDaemonSets(n)
 		if err != nil {
 			return gpuv1.NotReady, err

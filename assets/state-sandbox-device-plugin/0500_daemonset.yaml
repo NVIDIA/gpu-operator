@@ -36,6 +36,8 @@ spec:
           env:
             - name: NVIDIA_VISIBLE_DEVICES
               value: void
+          securityContext:
+            privileged: true
           volumeMounts:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
@@ -50,6 +52,8 @@ spec:
           env:
             - name: NVIDIA_VISIBLE_DEVICES
               value: void
+          securityContext:
+            privileged: true
           volumeMounts:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
@@ -60,9 +64,7 @@ spec:
           name: nvidia-sandbox-device-plugin-ctr
           command: ["nvidia-kubevirt-gpu-device-plugin"]
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
+            privileged: true
           volumeMounts:
             - name: device-plugin
               mountPath: /var/lib/kubelet/device-plugins

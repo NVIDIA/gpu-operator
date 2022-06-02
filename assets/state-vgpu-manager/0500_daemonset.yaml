@@ -97,6 +97,12 @@ spec:
             # operator when OCP DriverToolkit side-car is enabled
             - name: shared-nvidia-driver-toolkit
               mountPath: /mnt/shared-nvidia-driver-toolkit
+            # Currently, the OCP DriverToolkit side-car loads the
+            # driver and mounts the driver rootfs, so the /run/nvidia
+            # volume is needed
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
       volumes:
         - name: run-nvidia
           hostPath:
