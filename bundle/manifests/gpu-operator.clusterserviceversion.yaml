@@ -54,6 +54,13 @@ metadata:
             "vgpuManager": {
               "enabled": true
             },
+            "vgpuDeviceManager": {
+              "enabled": true,
+              "config": {
+                "name": "vgpu-devices-config",
+                "default": "default"
+                }
+            },
             "vfioManager": {
               "enabled": true
             },

@@ -259,6 +259,35 @@ spec:
       {{- if .Values.vfioManager.driverManager.env }}
       env: {{ toYaml .Values.vfioManager.driverManager.env | nindent 8 }}
       {{- end }}
+  vgpuDeviceManager:
+    enabled: {{ .Values.vgpuDeviceManager.enabled }}
+    {{- if .Values.vgpuDeviceManager.repository }}
+    repository: {{ .Values.vgpuDeviceManager.repository }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.image }}
+    image: {{ .Values.vgpuDeviceManager.image }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.version }}
+    version: {{ .Values.vgpuDeviceManager.version | quote }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.vgpuDeviceManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.vgpuDeviceManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.resources }}
+    resources: {{ toYaml .Values.vgpuDeviceManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.env }}
+    env: {{ toYaml .Values.vgpuDeviceManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.args }}
+    args: {{ toYaml .Values.vgpuDeviceManager.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.vgpuDeviceManager.config }}
+    config: {{ toYaml .Values.vgpuDeviceManager.config | nindent 6 }}
+    {{- end  }}
   {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}

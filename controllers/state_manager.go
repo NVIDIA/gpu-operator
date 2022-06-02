@@ -67,6 +67,7 @@ var gpuStateLabels = map[string]map[string]string{
 	gpuWorkloadConfigVMVgpu: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
 		"nvidia.com/gpu.deploy.vgpu-manager":          "true",
+		"nvidia.com/gpu.deploy.vgpu-device-manager":   "true",
 		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
 	},
 }
@@ -596,9 +597,11 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		if clusterPolicy.Spec.SandboxedEnvironments.IsEnabled() {
 			n.sandboxEnabled = true
-			// TODO: add state for additional operands managed in sandboxed environments
 			if clusterPolicy.Spec.VGPUManager.IsEnabled() {
 				addState(n, "/opt/gpu-operator/state-vgpu-manager")
+			}
+			if clusterPolicy.Spec.VGPUDeviceManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
 			}
 			addState(n, "/opt/gpu-operator/state-sandbox-validation")
 			if clusterPolicy.Spec.VFIOManager.IsEnabled() {

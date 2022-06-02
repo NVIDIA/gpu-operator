@@ -398,6 +398,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":                TransformDriver,
 		"nvidia-vgpu-manager-daemonset":          TransformVGPUManager,
+		"nvidia-vgpu-device-manager":             TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                    TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset":     TransformToolkit,
 		"nvidia-device-plugin-daemonset":         TransformDevicePlugin,
@@ -1250,6 +1251,74 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
+	return nil
+}
+
+// TransformVGPUDeviceManager transforms VGPU Device Manager daemonset with required config as per ClusterPolicy
+func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	transformValidationInitContainer(obj, config)
+
+	// update image
+	image, err := gpuv1.ImagePath(&config.VGPUDeviceManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.VGPUDeviceManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VGPUDeviceManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VGPUDeviceManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set resource limits
+	if config.VGPUDeviceManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.VGPUDeviceManager.Resources
+		}
+	}
+
+	// set arguments if specified for mig-manager container
+	if len(config.VGPUDeviceManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.VGPUDeviceManager.Args
+	}
+
+	// set/append environment variables for mig-manager container
+	if len(config.VGPUDeviceManager.Env) > 0 {
+		for _, env := range config.VGPUDeviceManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set ConfigMap name for "vgpu-config" Volume
+	for i, vol := range obj.Spec.Template.Spec.Volumes {
+		if !strings.Contains(vol.Name, "vgpu-config") {
+			continue
+		}
+
+		// vgpuDeviceManager.config.name has a default value in the CRD, so it will always be set
+		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = config.VGPUDeviceManager.Config.Name
+		break
+	}
+
+	// vgpuDeviceManager.config.default has a default value in the CRD, so it will always be set
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", config.VGPUDeviceManager.Config.Default)
 
 	return nil
 }

@@ -70,6 +70,8 @@ type ClusterPolicySpec struct {
 	VFIOManager VFIOManagerSpec `json:"vfioManager,omitempty"`
 	// SandboxDevicePlugin component spec
 	SandboxDevicePlugin SandboxDevicePluginSpec `json:"sandboxDevicePlugin,omitempty"`
+	// VGPUDeviceManager spec
+	VGPUDeviceManager VGPUDeviceManagerSpec `json:"vgpuDeviceManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1120,6 +1122,82 @@ type VFIOManagerSpec struct {
 	DriverManager DriverManagerSpec `json:"driverManager,omitempty"`
 }
 
+// VGPUDeviceManagerSpec defines the properties for deploying vGPU Device Manager
+type VGPUDeviceManagerSpec struct {
+	// Enabled indicates if deployment of vgpu-device-manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable vgpu-device-manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// vgpu-device-manager image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// vgpu-device-manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// vgpu-devicemanager image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// vGPU devices configuration for vGPU Device Manager container
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="vGPU devices configuration for vGPU Device Manager container"
+	Config *VGPUDevicesConfigSpec `json:"config,omitempty"`
+}
+
+// VGPUDevicesConfigSpec defines vGPU devices configuration for vGPU Device Manager container
+type VGPUDevicesConfigSpec struct {
+	// ConfigMap name
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=vgpu-devices-config
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+	// Default config name within the ConfigMap
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=default
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Default config name within the ConfigMap for the vGPU devices config"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Default string `json:"default,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -1264,6 +1342,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *VFIOManagerSpec:
 		config := spec.(*VFIOManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "VFIO_MANAGER_IMAGE")
+	case *VGPUDeviceManagerSpec:
+		config := spec.(*VGPUDeviceManagerSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "VGPU_DEVICE_MANAGER_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
@@ -1310,6 +1391,15 @@ func (d *VGPUManagerSpec) IsEnabled() bool {
 		return false
 	}
 	return *d.Enabled
+}
+
+// IsEnabled returns true if vGPU Device Manager is enabled through gpu-operator
+func (v *VGPUDeviceManagerSpec) IsEnabled() bool {
+	if v.Enabled == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *v.Enabled
 }
 
 // IsToolkitEnabled returns true if container-toolkit install is enabled(default) through gpu-operator

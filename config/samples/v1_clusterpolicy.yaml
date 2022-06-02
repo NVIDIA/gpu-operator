@@ -80,6 +80,17 @@ spec:
 
   vgpuManager:
     enabled: true
-  
+
+  vgpuDeviceManager:
+    enabled: true
+# NOTE: When sandboxedEnvironments is enabled, creating
+# a custom ConfigMap with vGPU device configuration is required
+# for a successful vGPU Device Manager deployent. Replace
+# the below with the correct ConfigMap and default config
+# in ConfigMap.
+    config:
+      name: "name-of-configmap"
+      default: "name-of-default-config"
+
   vfioManager:
     enabled: true
