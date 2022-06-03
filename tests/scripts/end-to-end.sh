@@ -32,7 +32,7 @@ ${SCRIPT_DIR}/uninstall-workload.sh
 ${SCRIPT_DIR}/uninstall-operator.sh
 
 # Install the operator with sandboxed functionality enabled and confirm container workloads operate as expected
-OPERATOR_OPTIONS="--set sandboxedEnvironments.enabled=true" ${SCRIPT_DIR}/install-operator.sh
+OPERATOR_OPTIONS="--set sandboxWorkloads.enabled=true --set sandboxWorkloads.defaultWorkload=container" ${SCRIPT_DIR}/install-operator.sh
 ${SCRIPT_DIR}/verify-operator.sh
 
 # Install a workload and verify that this works as expected
