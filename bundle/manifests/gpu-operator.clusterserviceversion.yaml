@@ -115,7 +115,7 @@ spec:
     - name: device-plugin-image
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:0e1f3d259c5a8d3754ee109f7ecfac5b57a6cb0fa4e4039a62bde621f55e7a2f
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:c2e3d0fe41a0d227dbb70caec03c780cc76317515e5ab3875f31d50c63f41c66
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:1281abfb478b0856b4fb25dbe060c1fd130e82af3b21992e861063888fc04ca8
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e8f06ce53415e8572f633b2169289d973993cb1e49d4dcc686ac134194d88f33
     - name: init-container-image
@@ -640,7 +640,7 @@ spec:
                   - name: "VALIDATOR_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:c2e3d0fe41a0d227dbb70caec03c780cc76317515e5ab3875f31d50c63f41c66"
+                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:1281abfb478b0856b4fb25dbe060c1fd130e82af3b21992e861063888fc04ca8"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:9abb063e6b74085728fead5ed5bbe3bd7b3f57de60e87f6b964bba2d46f1bc67"
                   - name: "DCGM_IMAGE"

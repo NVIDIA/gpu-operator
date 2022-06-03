@@ -119,6 +119,7 @@ test_gpu_sharing() {
 
     # Wait for device-plugin pod to be ready
     check_pod_ready "nvidia-device-plugin-daemonset"
+    check_pod_ready "gpu-feature-discovery"
 
     echo "validating workloads on timesliced GPU"
     # Deploy test-pod to validate GPU sharing
@@ -129,6 +130,17 @@ test_gpu_sharing() {
         echo "cannot run parallel pods with GPU sharing enabled"
         kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
         exit 1
+    fi
+
+    # Verify GFD labels
+    replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]')
+    if [ "$replica_count" != "10" ]; then
+        echo "Required label nvidia.com/gpu.replicas is incorrect when GPU sharing is enabled - $replica_count"
+    fi
+
+    product_name=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.product"]')
+    if [ "$product_name" != "Tesla-T4-SHARED" ]; then
+        echo "Label nvidia.com/gpu.product is incorrect when GPU sharing is enabled - $product_name"
     fi
 
     # Cleanup plugin test pod.

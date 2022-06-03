@@ -31,3 +31,5 @@ spec:
           resources:
             limits:
               nvidia.com/gpu: 1
+      nodeSelector: # Schedule on the node with GPU sharing enabled
+          nvidia.com/gpu.product: Tesla-T4-SHARED

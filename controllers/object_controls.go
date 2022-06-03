@@ -473,6 +473,9 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		}
 	}
 
+	// apply plugin configuration through ConfigMap if one is provided
+	handleDevicePluginConfig(obj, config)
+
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 

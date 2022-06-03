@@ -36,6 +36,32 @@ spec:
             - name: run-nvidia
               mountPath: /run/nvidia
               mountPropagation: Bidirectional
+        - name: config-manager-init
+          image: "FILLED BY THE OPERATOR"
+          command: ["config-manager"]
+          env:
+          - name: ONESHOT
+            value: "true"
+          - name: KUBECONFIG
+            value: ""
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: "spec.nodeName"
+          - name: NODE_LABEL
+            value: "nvidia.com/device-plugin.config"
+          - name: CONFIG_FILE_SRCDIR
+            value: "/available-configs"
+          - name: CONFIG_FILE_DST
+            value: "/config/config.yaml"
+          - name: DEFAULT_CONFIG
+            value: ""
+          - name: SEND_SIGNAL
+            value: "false"
+          - name: SIGNAL
+            value: ""
+          - name: PROCESS_TO_SIGNAL
+            value: ""
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
@@ -51,6 +77,34 @@ spec:
               mountPath: "/sys/class/dmi/id/product_name"
           securityContext:
             privileged: true
+        - image: "FILLED BY THE OPERATOR"
+          name: config-manager
+          command: ["config-manager"]
+          securityContext:
+            privileged: true
+          env:
+          - name: ONESHOT
+            value: "false"
+          - name: KUBECONFIG
+            value: ""
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: "spec.nodeName"
+          - name: NODE_LABEL
+            value: "nvidia.com/device-plugin.config"
+          - name: CONFIG_FILE_SRCDIR
+            value: "/available-configs"
+          - name: CONFIG_FILE_DST
+            value: "/config/config.yaml"
+          - name: DEFAULT_CONFIG
+            value: ""
+          - name: SEND_SIGNAL
+            value: "true"
+          - name: SIGNAL
+            value: "1" # SIGHUP
+          - name: PROCESS_TO_SIGNAL
+            value: "/usr/bin/gpu-feature-discovery"
       volumes:
         - name: output-dir
           hostPath:
