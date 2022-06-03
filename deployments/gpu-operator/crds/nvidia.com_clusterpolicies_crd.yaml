@@ -436,6 +436,19 @@ spec:
                     items:
                       type: string
                     type: array
+                  config:
+                    description: 'Optional: Configuration for the device-plugin via
+                      the ConfigMap'
+                    properties:
+                      default:
+                        description: Default config name within the ConfigMap for
+                          the device-plugin config
+                        type: string
+                      name:
+                        description: ConfigMap name for device-plugin config including
+                          shared config between plugin and GFD
+                        type: string
+                    type: object
                   env:
                     description: 'Optional: List of environment variables'
                     items:

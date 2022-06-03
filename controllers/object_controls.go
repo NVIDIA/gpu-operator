@@ -813,10 +813,15 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
+	// apply plugin configuration through ConfigMap if one is provided
+	handleDevicePluginConfig(obj, config)
+
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
+
 	return nil
 }
 
@@ -1381,6 +1386,129 @@ func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy, isGF
 	}
 }
 
+// checks if custom plugin config is provided through a ConfigMap
+func isCustomPluginConfigSet(pluginConfig *gpuv1.DevicePluginConfig) bool {
+	if pluginConfig != nil && pluginConfig.Name != "" {
+		return true
+	}
+	return false
+}
+
+// adds shared volume mounts required for custom plugin config provided via a ConfigMap
+func addSharedMountsForPluginConfig(container *corev1.Container, config *gpuv1.DevicePluginConfig) {
+	emptyDirMount := corev1.VolumeMount{Name: "config", MountPath: "/config"}
+	configVolMount := corev1.VolumeMount{Name: config.Name, MountPath: "/available-configs"}
+
+	container.VolumeMounts = append(container.VolumeMounts, emptyDirMount)
+	container.VolumeMounts = append(container.VolumeMounts, configVolMount)
+}
+
+// apply spec changes to make custom configurations provided via a ConfigMap available to all containers
+func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	if !isCustomPluginConfigSet(config.DevicePlugin.Config) {
+		// remove config-manager-init container
+		for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+			if initContainer.Name != "config-manager-init" {
+				continue
+			}
+			obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
+		}
+		// remove config-manager sidecar container
+		for i, container := range obj.Spec.Template.Spec.Containers {
+			if container.Name != "config-manager" {
+				continue
+			}
+			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
+		}
+		return nil
+	}
+
+	// Apply custom configuration provided through ConfigMap
+	// setup env for main container
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		if container.Name != "nvidia-device-plugin" && container.Name != "gpu-feature-discovery" {
+			continue
+		}
+		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], "CONFIG_FILE", "/config/config.yaml")
+		// setup sharedvolume(emptydir) for main container
+		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i], config.DevicePlugin.Config)
+	}
+	// Enable process ns sharing for PID access
+	shareProcessNamespace := true
+	obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
+	// setup volumes from configmap and shared emptyDir
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.DevicePlugin.Config.Name, nil))
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createEmptyDirVolume("config"))
+
+	// apply env/volume changes to initContainer
+	err := transformConfigManagerInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+	// apply env/volume changes to sidecarContainer
+	err = transformConfigManagerSidecarContainer(obj, config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	var initContainer *corev1.Container
+	for i := range obj.Spec.Template.Spec.InitContainers {
+		if obj.Spec.Template.Spec.InitContainers[i].Name != "config-manager-init" {
+			continue
+		}
+		initContainer = &obj.Spec.Template.Spec.InitContainers[i]
+	}
+	if initContainer == nil {
+		// config-manager-init container is not added to the spec, this is a no-op
+		return nil
+	}
+	configManagerImage, err := gpuv1.ImagePath(&config.DevicePlugin)
+	if err != nil {
+		return err
+	}
+	initContainer.Image = configManagerImage
+	if config.DevicePlugin.ImagePullPolicy != "" {
+		initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+	}
+	// setup env
+	setContainerEnv(initContainer, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
+
+	// setup volume mounts
+	addSharedMountsForPluginConfig(initContainer, config.DevicePlugin.Config)
+	return nil
+}
+
+func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	var container *corev1.Container
+	for i := range obj.Spec.Template.Spec.Containers {
+		if obj.Spec.Template.Spec.Containers[i].Name != "config-manager" {
+			continue
+		}
+		container = &obj.Spec.Template.Spec.Containers[i]
+	}
+	if container == nil {
+		// config-manager-init container is not added to the spec, this is a no-op
+		return nil
+	}
+	configManagerImage, err := gpuv1.ImagePath(&config.DevicePlugin)
+	if err != nil {
+		return err
+	}
+	container.Image = configManagerImage
+	if config.DevicePlugin.ImagePullPolicy != "" {
+		container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+	}
+	// setup env
+	setContainerEnv(container, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
+
+	// setup volume mounts
+	addSharedMountsForPluginConfig(container, config.DevicePlugin.Config)
+	return nil
+}
+
 func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
 	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
 		// skip if not validation initContainer
@@ -1700,6 +1828,15 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
 }
 
+func createEmptyDirVolume(volumeName string) corev1.Volume {
+	return corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	for i, container := range obj.Spec.Template.Spec.Containers {
 		// skip if not nvidia-driver container
@@ -1766,7 +1903,6 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
-
 		}
 
 		// mount any custom kernel module configuration parameters at /drivers

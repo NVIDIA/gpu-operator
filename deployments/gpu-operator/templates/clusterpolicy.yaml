@@ -206,6 +206,9 @@ spec:
     {{- if .Values.devicePlugin.args }}
     args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.devicePlugin.config }}
+    config: {{ toYaml .Values.devicePlugin.config | nindent 6 }}
+    {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
     {{- if .Values.dcgm.repository }}

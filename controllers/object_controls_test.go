@@ -33,13 +33,14 @@ import (
 )
 
 const (
-	clusterPolicyPath    = "config/samples/v1_clusterpolicy.yaml"
-	clusterPolicyName    = "gpu-cluster-policy"
-	driverAssetsPath     = "assets/state-driver/"
-	driverDaemonsetName  = "nvidia-driver-daemonset"
-	nfdNvidiaPCILabelKey = "feature.node.kubernetes.io/pci-10de.present"
-	nfdOsNameLabelKey    = "feature.node.kubernetes.io/system-os_release.ID"
-	nfdOsVersionLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	clusterPolicyPath      = "config/samples/v1_clusterpolicy.yaml"
+	clusterPolicyName      = "gpu-cluster-policy"
+	driverAssetsPath       = "assets/state-driver/"
+	driverDaemonsetName    = "nvidia-driver-daemonset"
+	devicePluginAssetsPath = "assets/state-device-plugin/"
+	nfdNvidiaPCILabelKey   = "feature.node.kubernetes.io/pci-10de.present"
+	nfdOsNameLabelKey      = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOsVersionLabelKey   = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
 )
 
 type testConfig struct {
@@ -300,6 +301,24 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for driver: %v", err)
 		}
+	case "DevicePlugin":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.DevicePlugin.Repository,
+			image:            cp.Spec.DevicePlugin.Image,
+			version:          cp.Spec.DevicePlugin.Version,
+			imagePullPolicy:  cp.Spec.DevicePlugin.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.DevicePlugin.ImagePullSecrets),
+			args:             cp.Spec.DevicePlugin.Args,
+			env:              cp.Spec.DevicePlugin.Env,
+			resources:        cp.Spec.DevicePlugin.Resources,
+		}
+		dsLabel = "nvidia-device-plugin-daemonset"
+		mainCtrName = "nvidia-device-plugin"
+		manifestFile = filepath.Join(cfg.root, devicePluginAssetsPath+"0400_daemonset.yaml")
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DevicePlugin)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for device-plugin: %v", err)
+		}
 	default:
 		return nil, fmt.Errorf("invalid component for testDaemonsetCommon(): %s", component)
 	}
@@ -450,6 +469,133 @@ func TestDriver(t *testing.T) {
 			require.Equal(t, tc.output["mofedValidationPresent"], mofedValidationPresent, "Unexpected configuration for mofed-validation init container")
 			require.Equal(t, tc.output["nvPeerMemPresent"], nvPeerMemPresent, "Unexpected configuration for nv-peermem container")
 			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-driver-ctr image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
+		})
+	}
+}
+
+// getDevicePluginTestInput return a ClusterPolicy instance for a particular
+// device-plugin test case. This function will grow as new test cases are added
+func getDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Until we create sample ClusterPolicies that have all fields
+	// set, hardcode some default values:
+	cp.Spec.DevicePlugin.Repository = "nvcr.io/nvidia"
+	cp.Spec.DevicePlugin.Image = "k8s-device-plugin"
+	cp.Spec.DevicePlugin.Version = "v0.12.0-ubi8"
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	case "custom-config":
+		cp.Spec.DevicePlugin.Config = &gpuv1.DevicePluginConfig{Name: "plugin-config", Default: "default"}
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getDevicePluginTestOutput returns a map containing expected output for
+// device-plugin test case. This function will grow as new test cases are added
+func getDevicePluginTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets":               1,
+		"configManagerInitPresent":    false,
+		"configManagerSidecarPresent": false,
+		"devicePluginImage":           "nvcr.io/nvidia/k8s-device-plugin:v0.12.0-ubi8",
+	}
+
+	switch testCase {
+	case "default":
+		output["env"] = map[string]string{}
+	case "custom-config":
+		// Ensure config-manager containers are added
+		output["configManagerInitPresent"] = true
+		output["configManagerSidecarPresent"] = true
+		output["env"] = map[string]string{
+			"CONFIG_FILE": "/config/config.yaml",
+		}
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestDevicePlugin tests that the GPU Operator correctly deploys the device-plugin daemonset
+// under various scenarios/config options
+func TestDevicePlugin(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getDevicePluginTestInput("default"),
+			getDevicePluginTestOutput("default"),
+		},
+		{
+			"CustomConfig",
+			getDevicePluginTestInput("custom-config"),
+			getDevicePluginTestOutput("custom-config"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "DevicePlugin", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			configManagerInitPresent := false
+			configManagerSidecarPresent := false
+			devicePluginImage := ""
+			mainCtrIdx := 0
+			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
+				if initContainer.Name == "config-manager-init" {
+					configManagerInitPresent = true
+				}
+			}
+			for i, container := range ds.Spec.Template.Spec.Containers {
+				if container.Name == "nvidia-device-plugin" {
+					devicePluginImage = container.Image
+					mainCtrIdx = i
+					continue
+				}
+				if container.Name == "config-manager" {
+					configManagerSidecarPresent = true
+				}
+			}
+
+			require.Equal(t, tc.output["configManagerInitPresent"], configManagerInitPresent, "Unexpected configuration for config-manager init container")
+			require.Equal(t, tc.output["configManagerSidecarPresent"], configManagerSidecarPresent, "Unexpected configuration for config-manager sidecar container")
+			require.Equal(t, tc.output["devicePluginImage"], devicePluginImage, "Unexpected configuration for nvidia-device-plugin image")
+
+			for key, value := range tc.output["env"].(map[string]string) {
+				envFound := false
+				for _, envVar := range ds.Spec.Template.Spec.Containers[mainCtrIdx].Env {
+					if envVar.Name == key && envVar.Value == value {
+						envFound = true
+					}
+				}
+				if !envFound {
+					t.Fatalf("Expected env is not set for daemonset nvidia-device-plugin %s->%s", key, value)
+				}
+			}
 
 			// cleanup by deleting all kubernetes objects
 			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)

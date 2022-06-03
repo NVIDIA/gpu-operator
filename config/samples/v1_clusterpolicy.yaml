@@ -22,7 +22,10 @@ spec:
       - name: WITH_WORKLOAD
         value: "true"
 
-  devicePlugin: {}
+  devicePlugin:
+    config:
+      name: ""
+      default: ""
 
   gfd: {}
 

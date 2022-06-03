@@ -25,8 +25,8 @@ spec:
       priorityClassName: system-node-critical
       serviceAccount: nvidia-device-plugin
       initContainers:
-      - name: toolkit-validation
-        image: "FILLED BY THE OPERATOR"
+      - image: "FILLED BY THE OPERATOR"
+        name: toolkit-validation
         command: ['sh', '-c']
         args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
         securityContext:
@@ -35,9 +35,35 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: HostToContainer
+      - image: "FILLED BY THE OPERATOR"
+        name: config-manager-init
+        command: ["config-manager"]
+        env:
+        - name: ONESHOT
+          value: "true"
+        - name: KUBECONFIG
+          value: ""
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: "spec.nodeName"
+        - name: NODE_LABEL
+          value: "nvidia.com/device-plugin.config"
+        - name: CONFIG_FILE_SRCDIR
+          value: "/available-configs"
+        - name: CONFIG_FILE_DST
+          value: "/config/config.yaml"
+        - name: DEFAULT_CONFIG
+          value: ""
+        - name: SEND_SIGNAL
+          value: "false"
+        - name: SIGNAL
+          value: ""
+        - name: PROCESS_TO_SIGNAL
+          value: ""
       containers:
       - image: "FILLED BY THE OPERATOR"
-        name: nvidia-device-plugin-ctr
+        name: nvidia-device-plugin
         command: [bash, -c]
         args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; NVIDIA_DRIVER_ROOT=$driver_root nvidia-device-plugin;"]
         securityContext:
@@ -61,6 +87,34 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: HostToContainer
+      - image: "FILLED BY THE OPERATOR"
+        name: config-manager
+        command: ["config-manager"]
+        securityContext:
+          privileged: true
+        env:
+        - name: ONESHOT
+          value: "false"
+        - name: KUBECONFIG
+          value: ""
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: "spec.nodeName"
+        - name: NODE_LABEL
+          value: "nvidia.com/device-plugin.config"
+        - name: CONFIG_FILE_SRCDIR
+          value: "/available-configs"
+        - name: CONFIG_FILE_DST
+          value: "/config/config.yaml"
+        - name: DEFAULT_CONFIG
+          value: ""
+        - name: SEND_SIGNAL
+          value: "true"
+        - name: SIGNAL
+          value: "1" # SIGHUP
+        - name: PROCESS_TO_SIGNAL
+          value: "nvidia-device-plugin"
       volumes:
         - name: device-plugin
           hostPath:
