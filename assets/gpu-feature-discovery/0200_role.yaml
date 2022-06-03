@@ -20,3 +20,11 @@ rules:
   - use
   resourceNames:
   - gpu-operator-privileged
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
