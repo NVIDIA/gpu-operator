@@ -45,7 +45,10 @@ const (
 	gpuWorkloadConfigContainer     = "container"
 	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
-	defaultGPUWorkloadConfig       = gpuWorkloadConfigContainer
+)
+
+var (
+	defaultGPUWorkloadConfig = gpuWorkloadConfigVMPassthrough
 )
 
 var gpuStateLabels = map[string]map[string]string{
@@ -251,15 +254,20 @@ func hasOperandsDisabled(labels map[string]string) bool {
 	return false
 }
 
+func isValidWorkloadConfig(workloadConfig string) bool {
+	_, ok := gpuStateLabels[workloadConfig]
+	return ok
+}
+
 // getWorkloadConfig returns the GPU workload configured for the node.
-// If sandbox functionality is disabled or an error occurs when searching
-// for the workload config, return defaultGPUWorkloadConfig.
+// If an error occurs when searching for the workload config,
+// return defaultGPUWorkloadConfig.
 func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, error) {
 	if !sandboxEnabled {
-		return defaultGPUWorkloadConfig, nil
+		return gpuWorkloadConfigContainer, nil
 	}
 	if workloadConfig, ok := labels[gpuWorkloadConfigLabelKey]; ok {
-		if _, ok = gpuStateLabels[workloadConfig]; ok {
+		if isValidWorkloadConfig(workloadConfig) {
 			return workloadConfig, nil
 		}
 		return defaultGPUWorkloadConfig, fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
@@ -595,8 +603,16 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
 
-		if clusterPolicy.Spec.SandboxedEnvironments.IsEnabled() {
+		if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
 			n.sandboxEnabled = true
+			// defaultGPUWorkloadConfig is vm-passthrough, unless
+			// user overrides in ClusterPolicy with a valid GPU
+			// workload configuration
+			defaultWorkload := clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload
+			if isValidWorkloadConfig(defaultWorkload) {
+				n.rec.Log.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", defaultWorkload)
+				defaultGPUWorkloadConfig = defaultWorkload
+			}
 			if clusterPolicy.Spec.VGPUManager.IsEnabled() {
 				addState(n, "/opt/gpu-operator/state-vgpu-manager")
 			}
@@ -611,7 +627,7 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 				addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
 			}
 		}
-		n.rec.Log.Info("Sandboxed environments", "Enabled", n.sandboxEnabled)
+		n.rec.Log.Info("Sandbox workloads", "Enabled", n.sandboxEnabled, "DefaultWorkload", defaultGPUWorkloadConfig)
 
 		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
 			addState(n, "/opt/gpu-operator/state-node-status-exporter")

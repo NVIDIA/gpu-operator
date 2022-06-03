@@ -40,8 +40,6 @@ type ClusterPolicySpec struct {
 	Daemonsets DaemonsetsSpec `json:"daemonsets"`
 	// Driver component spec
 	Driver DriverSpec `json:"driver"`
-	// VGPUManager component spec
-	VGPUManager VGPUManagerSpec `json:"vgpuManager,omitempty"`
 	// Toolkit component spec
 	Toolkit ToolkitSpec `json:"toolkit"`
 	// DevicePlugin component spec
@@ -64,12 +62,14 @@ type ClusterPolicySpec struct {
 	Validator ValidatorSpec `json:"validator,omitempty"`
 	// GPUDirectStorage defines the spec for GDS components(Experimental)
 	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
-	// SandboxedEnvironments defines the spec for handling sandboxed environments
-	SandboxedEnvironments SandboxedEnvironmentsSpec `json:"sandboxedEnvironments,omitempty"`
+	// SandboxWorkloads defines the spec for handling sandbox workloads (i.e. Virtual Machines)
+	SandboxWorkloads SandboxWorkloadsSpec `json:"sandboxWorkloads,omitempty"`
 	// VFIOManager for configuration to deploy VFIO-PCI Manager
 	VFIOManager VFIOManagerSpec `json:"vfioManager,omitempty"`
 	// SandboxDevicePlugin component spec
 	SandboxDevicePlugin SandboxDevicePluginSpec `json:"sandboxDevicePlugin,omitempty"`
+	// VGPUManager component spec
+	VGPUManager VGPUManagerSpec `json:"vgpuManager,omitempty"`
 	// VGPUDeviceManager spec
 	VGPUDeviceManager VGPUDeviceManagerSpec `json:"vgpuDeviceManager,omitempty"`
 }
@@ -118,11 +118,15 @@ type OperatorSpec struct {
 	UseOpenShiftDriverToolkit *bool `json:"use_ocp_driver_toolkit,omitempty"`
 }
 
-// SandboxedEnvironmentsSpec describes configuration for sandboxed environments
-type SandboxedEnvironmentsSpec struct {
-	// Enabled indicates if the GPU Operator should manage operands required
-	// for sandboxed environments (i.e. vfio-pci driver, vgpu-host-driver, and additional device plugins)
+// SandboxWorkloadsSpec describes configuration for handling sandbox workloads (i.e. Virtual Machines)
+type SandboxWorkloadsSpec struct {
+	// Enabled indicates if the GPU Operator should manage additional operands required
+	// for sandbox workloads (i.e. VFIO Manager, vGPU Manager, and additional device plugins)
 	Enabled *bool `json:"enabled,omitempty"`
+	// DefaultWorkload indicates the default GPU workload type to configure
+	// worker nodes in the cluster for
+	// +kubebuilder:default=vm-passthrough
+	DefaultWorkload string `json:"defaultWorkload,omitempty"`
 }
 
 // PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
@@ -1413,9 +1417,9 @@ func (t *ToolkitSpec) IsToolkitEnabled() bool {
 
 // IsEnabled returns true if the cluster intends to run GPU accelerated
 // workloads in sandboxed environments (VMs).
-func (s *SandboxedEnvironmentsSpec) IsEnabled() bool {
+func (s *SandboxWorkloadsSpec) IsEnabled() bool {
 	if s.Enabled == nil {
-		// Sandbox functionality is disabled by default
+		// Sandbox workloads are disabled by default
 		return false
 	}
 	return *s.Enabled

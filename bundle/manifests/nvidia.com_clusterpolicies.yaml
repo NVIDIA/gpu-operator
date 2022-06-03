@@ -1851,14 +1851,19 @@ spec:
                     description: DevicePlugin image tag
                     type: string
                 type: object
-              sandboxedEnvironments:
-                description: SandboxedEnvironments defines the spec for handling sandboxed
-                  environments
+              sandboxWorkloads:
+                description: SandboxWorkloads defines the spec for handling sandbox
+                  workloads (i.e. Virtual Machines)
                 properties:
+                  defaultWorkload:
+                    default: vm-passthrough
+                    description: DefaultWorkload indicates the default GPU workload
+                      type to configure worker nodes in the cluster for
+                    type: string
                   enabled:
                     description: Enabled indicates if the GPU Operator should manage
-                      operands required for sandboxed environments (i.e. vfio-pci
-                      driver, vgpu-host-driver, and additional device plugins)
+                      additional operands required for sandbox workloads (i.e. VFIO
+                      Manager, vGPU Manager, and additional device plugins)
                     type: boolean
                 type: object
               toolkit:

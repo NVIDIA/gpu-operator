@@ -4,7 +4,7 @@ metadata:
   name: nvidia-vfio-manager
   namespace: "FILLED BY THE OPERATOR"
   labels:
-    k8s-app: nvidia-vfio-manager
+    app: nvidia-vfio-manager
 spec:
   selector:
     matchLabels:

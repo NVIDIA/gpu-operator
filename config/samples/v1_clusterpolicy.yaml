@@ -12,8 +12,9 @@ spec:
   psp:
     enabled: false
 
-  sandboxedEnvironments:
+  sandboxWorkloads:
     enabled: false
+    defaultWorkload: "vm-passthrough"
 
   mig:
     strategy: single

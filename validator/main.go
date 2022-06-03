@@ -87,20 +87,23 @@ type VGPUManager struct{}
 type VGPUDevices struct{}
 
 var (
-	kubeconfigFlag           string
-	nodeNameFlag             string
-	namespaceFlag            string
-	withWaitFlag             bool
-	withWorkloadFlag         bool
-	componentFlag            string
-	cleanupAllFlag           bool
-	outputDirFlag            string
-	sleepIntervalSecondsFlag int
-	migStrategyFlag          string
-	metricsPort              int
-	sandboxEnabledFlag       bool
-	gpuWorkloadConfig        string
+	kubeconfigFlag               string
+	nodeNameFlag                 string
+	namespaceFlag                string
+	withWaitFlag                 bool
+	withWorkloadFlag             bool
+	componentFlag                string
+	cleanupAllFlag               bool
+	outputDirFlag                string
+	sleepIntervalSecondsFlag     int
+	migStrategyFlag              string
+	metricsPort                  int
+	defaultGPUWorkloadConfigFlag string
 )
+
+// defaultGPUWorkloadConfig is "vm-passthrough" unless
+// overridden by defaultGPUWorkloadConfigFlag
+var defaultGPUWorkloadConfig = gpuWorkloadConfigVMPassthrough
 
 const (
 	// defaultStatusPath indicates directory to create all validation status files
@@ -178,7 +181,6 @@ const (
 	gpuWorkloadConfigContainer     = "container"
 	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
-	defaultGPUWorkloadConfig       = gpuWorkloadConfigContainer
 )
 
 func main() {
@@ -274,6 +276,14 @@ func main() {
 			Destination: &metricsPort,
 			EnvVars:     []string{"METRICS_PORT"},
 		},
+		&cli.StringFlag{
+			Name:        "default-gpu-workload-config",
+			Aliases:     []string{"g"},
+			Value:       "",
+			Usage:       "default GPU workload config. determines what components to validate by default when sandbox workloads are enabled in the cluster.",
+			Destination: &defaultGPUWorkloadConfigFlag,
+			EnvVars:     []string{"DEFAULT_GPU_WORKLOAD_CONFIG"},
+		},
 	}
 
 	// Handle signals
@@ -356,13 +366,18 @@ func isValidComponent() bool {
 	}
 }
 
-func isWorkloadConfigValid(config string) bool {
+func isValidWorkloadConfig(config string) bool {
 	return config == gpuWorkloadConfigContainer ||
 		config == gpuWorkloadConfigVMPassthrough ||
 		config == gpuWorkloadConfigVMVgpu
 }
 
 func getWorkloadConfig() (string, error) {
+	// check if default workload is overridden by flag
+	if isValidWorkloadConfig(defaultGPUWorkloadConfigFlag) {
+		defaultGPUWorkloadConfig = defaultGPUWorkloadConfigFlag
+	}
+
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return "", fmt.Errorf("Error getting cluster config - %s", err.Error())
@@ -384,7 +399,7 @@ func getWorkloadConfig() (string, error) {
 		log.Infof("No %s label found; using default workload config: %s", gpuWorkloadConfigLabelKey, defaultGPUWorkloadConfig)
 		return defaultGPUWorkloadConfig, nil
 	}
-	if !isWorkloadConfigValid(value) {
+	if !isValidWorkloadConfig(value) {
 		log.Warnf("%s is an invalid workload config; using default workload config: %s", value, defaultGPUWorkloadConfig)
 		return defaultGPUWorkloadConfig, nil
 	}

@@ -174,7 +174,7 @@ spec:
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
     {{- end }}
-  {{- if .Values.sandboxedEnvironments.enabled }}
+  {{- if .Values.sandboxWorkloads.enabled }}
   vgpuManager:
     enabled: {{ .Values.vgpuManager.enabled }}
     {{- if .Values.vgpuManager.repository }}
@@ -504,9 +504,12 @@ spec:
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
   {{- end }}
-  {{- if .Values.sandboxedEnvironments.enabled }}
-  sandboxedEnvironments:
-    enabled: {{ .Values.sandboxedEnvironments.enabled }}
+  {{- if .Values.sandboxWorkloads.enabled }}
+  sandboxWorkloads:
+    enabled: {{ .Values.sandboxWorkloads.enabled }}
+    {{- if .Values.sandboxWorkloads.defaultWorkload }}
+    defaultWorkload: {{ .Values.sandboxWorkloads.defaultWorkload }}
+    {{- end }}
   sandboxDevicePlugin:
     {{- if .Values.sandboxDevicePlugin.enabled }}
     enabled: {{ .Values.sandboxDevicePlugin.enabled }}

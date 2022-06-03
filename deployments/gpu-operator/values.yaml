@@ -11,8 +11,9 @@ nfd:
 psp:
   enabled: false
 
-sandboxedEnvironments:
+sandboxWorkloads:
   enabled: false
+  defaultWorkload: "vm-passthrough"
 
 daemonsets:
   priorityClassName: system-node-critical
