@@ -39,19 +39,11 @@ test_image_updates() {
 
 # Test updates to ENV passed to Daemonsets in ClusterPolicy
 test_env_updates() {
-    # Update any ENV on Device Plugin
+    # Add any ENV on Device Plugin
     ENV_NAME="MY_TEST_ENV_NAME"
     ENV_VALUE="test"
-    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/devicePlugin/env/0/name", "value": '$ENV_NAME'}]'
-    if [ "$?" -ne 0 ]; then
-        echo "cannot update env_name $ENV_NAME for device-plugin"
-        exit 1
-    fi
-    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/devicePlugin/env/0/value", "value": '$ENV_VALUE'}]'
-    if [ "$?" -ne 0 ]; then
-        echo "cannot update env value for $ENV_NAME to $ENV_VALUE for device-plugin"
-        exit 1
-    fi
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/env", "value": '[]'}]'
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/env/0", "value": {"name": '$ENV_NAME', "value": '$ENV_VALUE'}}]'
 
     # Wait for env updates to be applied by operator
     sleep 10
@@ -116,7 +108,35 @@ test_enable_dcgm() {
     check_pod_ready "nvidia-dcgm-exporter"
 }
 
+test_gpu_sharing() {
+    echo "updating device-plugin with custom config for enabling gpu sharing"
+    # Apply device-plugin config for GPU sharing
+    kubectl create configmap plugin-config --from-file=${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "plugin-config.yaml"}}]'
+
+    # sleep for 10 seconds for operator to apply changes to plugin pods
+    sleep 10
+
+    # Wait for device-plugin pod to be ready
+    check_pod_ready "nvidia-device-plugin-daemonset"
+
+    echo "validating workloads on timesliced GPU"
+    # Deploy test-pod to validate GPU sharing
+    kubectl apply -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
+
+    kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-test -n $TEST_NAMESPACE
+    if [ $? -ne 0 ]; then
+        echo "cannot run parallel pods with GPU sharing enabled"
+        kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
+        exit 1
+    fi
+
+    # Cleanup plugin test pod.
+    kubectl delete -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
+}
+
 test_image_updates
 test_env_updates
 test_mig_strategy_updates
 test_enable_dcgm
+test_gpu_sharing

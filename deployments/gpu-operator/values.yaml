@@ -136,7 +136,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.11.0-ubi8
+  version: v0.12.0-rc.5-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -154,6 +154,12 @@ devicePlugin:
     - name: NVIDIA_DRIVER_CAPABILITIES
       value: all
   resources: {}
+  # Plugin configuration
+  config:
+    # ConfigMap name
+    name: ""
+    # Default config name within the ConfigMap
+    default: ""
 
 # standalone dcgm hostengine
 dcgm:
@@ -194,7 +200,6 @@ gfd:
     - name: GFD_FAIL_ON_INIT_ERROR
       value: "true"
   resources: {}
-
 
 migManager:
   enabled: true

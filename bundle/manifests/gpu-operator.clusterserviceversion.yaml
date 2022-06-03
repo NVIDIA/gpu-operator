@@ -27,6 +27,10 @@ metadata:
             "daemonsets": {
             },
             "devicePlugin": {
+              "config": {
+                "name": "",
+                "default": ""
+              }
             },
             "driver": {
               "enabled": true,
@@ -109,7 +113,7 @@ spec:
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:f99b66855e92451a59a722355dd52bf97eb985cc8a647172273de8178aeaa93c
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:aa95c16106280e36a5e32d2fe4c66e8b70f5a114860c6f4ed5b1a4085c63601b
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:0e1f3d259c5a8d3754ee109f7ecfac5b57a6cb0fa4e4039a62bde621f55e7a2f
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:c2e3d0fe41a0d227dbb70caec03c780cc76317515e5ab3875f31d50c63f41c66
     - name: mig-manager-image
@@ -644,7 +648,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:67c48a8370c34f68b46eb57339e87d01c04198368a0423553fab7565c862c4df"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:aa95c16106280e36a5e32d2fe4c66e8b70f5a114860c6f4ed5b1a4085c63601b"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:0e1f3d259c5a8d3754ee109f7ecfac5b57a6cb0fa4e4039a62bde621f55e7a2f"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:f99b66855e92451a59a722355dd52bf97eb985cc8a647172273de8178aeaa93c"
                   - name: "DRIVER_MANAGER_IMAGE"
