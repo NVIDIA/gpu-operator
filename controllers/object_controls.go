@@ -1568,6 +1568,10 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		if config.Driver.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 		}
+		if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
+			// set env indicating host-mofed is enabled
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), UseHostMOFEDEnvName, "true")
+		}
 		// mount any custom kernel module configuration parameters at /drivers
 		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
@@ -1579,7 +1583,6 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
-
 	}
 	return nil
 }
