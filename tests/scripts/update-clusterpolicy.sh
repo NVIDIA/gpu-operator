@@ -133,14 +133,16 @@ test_gpu_sharing() {
     fi
 
     # Verify GFD labels
-    replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]')
+    replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]' | tr -d '"')
     if [ "$replica_count" != "10" ]; then
         echo "Required label nvidia.com/gpu.replicas is incorrect when GPU sharing is enabled - $replica_count"
+        exit 1
     fi
 
-    product_name=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.product"]')
+    product_name=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.product"]' | tr -d '"')
     if [ "$product_name" != "Tesla-T4-SHARED" ]; then
         echo "Label nvidia.com/gpu.product is incorrect when GPU sharing is enabled - $product_name"
+        exit 1
     fi
 
     # Cleanup plugin test pod.
