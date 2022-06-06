@@ -34,7 +34,6 @@ metadata:
             },
             "driver": {
               "enabled": true,
-              "use_ocp_driver_toolkit": true,
               "repoConfig": {
                 "configMapName": ""
               },
@@ -52,6 +51,19 @@ metadata:
                 "name": ""
               }
             },
+            "vgpuManager": {
+              "enabled": true
+            },
+            "vgpuDeviceManager": {
+              "enabled": true,
+              "config": {
+                "name": "vgpu-devices-config",
+                "default": "default"
+                }
+            },
+            "vfioManager": {
+              "enabled": true
+            },
             "gfd": {
             },
             "migManager": {
@@ -63,6 +75,7 @@ metadata:
             "operator": {
               "defaultRuntime": "crio",
               "deployGFD": true,
+              "use_ocp_driver_toolkit": true,
               "initContainer": {
               }
             },
@@ -119,11 +132,13 @@ spec:
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e8f06ce53415e8572f633b2169289d973993cb1e49d4dcc686ac134194d88f33
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:7f0f7dc8c993a86865d4d9f9b0e36d113ea15603d5d5279d2879fa2bc21c8236
+      image: nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c
     - name: gpu-operator-validator-image
       image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:5b16056257acc51b517d9cdb1da3218693cefc214af93789e6e214fd2b4cacf1
+    - name: vfio-manager-image
+      image: nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
@@ -656,7 +671,9 @@ spec:
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e8f06ce53415e8572f633b2169289d973993cb1e49d4dcc686ac134194d88f33"
                   - name: "CUDA_BASE_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:7f0f7dc8c993a86865d4d9f9b0e36d113ea15603d5d5279d2879fa2bc21c8236"
+                    value: "nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c"
+                  - name: "VFIO_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:

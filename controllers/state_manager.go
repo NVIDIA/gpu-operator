@@ -11,6 +11,7 @@ import (
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
+	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -39,18 +40,39 @@ const (
 	ocpNamespaceMonitoringLabelValue    = "true"
 	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
 	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
-	ocpSuggestedNamespace = "nvidia-gpu-operator"
+	ocpSuggestedNamespace          = "nvidia-gpu-operator"
+	gpuWorkloadConfigLabelKey      = "nvidia.com/gpu.workload.config"
+	gpuWorkloadConfigContainer     = "container"
+	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
+	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 )
 
-var gpuStateLabels = map[string]string{
-	"nvidia.com/gpu.deploy.driver":                "true",
-	"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
-	"nvidia.com/gpu.deploy.container-toolkit":     "true",
-	"nvidia.com/gpu.deploy.device-plugin":         "true",
-	"nvidia.com/gpu.deploy.dcgm":                  "true",
-	"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
-	"nvidia.com/gpu.deploy.node-status-exporter":  "true",
-	"nvidia.com/gpu.deploy.operator-validator":    "true",
+var (
+	defaultGPUWorkloadConfig = gpuWorkloadConfigVMPassthrough
+)
+
+var gpuStateLabels = map[string]map[string]string{
+	gpuWorkloadConfigContainer: {
+		"nvidia.com/gpu.deploy.driver":                "true",
+		"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
+		"nvidia.com/gpu.deploy.container-toolkit":     "true",
+		"nvidia.com/gpu.deploy.device-plugin":         "true",
+		"nvidia.com/gpu.deploy.dcgm":                  "true",
+		"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+		"nvidia.com/gpu.deploy.node-status-exporter":  "true",
+		"nvidia.com/gpu.deploy.operator-validator":    "true",
+	},
+	gpuWorkloadConfigVMPassthrough: {
+		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+		"nvidia.com/gpu.deploy.vfio-manager":          "true",
+	},
+	gpuWorkloadConfigVMVgpu: {
+		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+		"nvidia.com/gpu.deploy.vgpu-manager":          "true",
+		"nvidia.com/gpu.deploy.vgpu-device-manager":   "true",
+		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+	},
 }
 
 var gpuNodeLabels = map[string]string{
@@ -66,11 +88,17 @@ type state interface {
 	last()
 }
 
+type gpuWorkloadConfiguration struct {
+	config string
+	node   string
+	log    logr.Logger
+}
+
 // OpenShiftDriverToolkit contains the values required to deploy
 // OpenShift DriverToolkit DaemonSet.
 type OpenShiftDriverToolkit struct {
 	// true if the cluster runs OpenShift and
-	// Driver.UseOpenShiftDriverToolkit is turned on in the
+	// Operator.UseOpenShiftDriverToolkit is turned on in the
 	// ClusterPolicy
 	requested bool
 	// true of the DriverToolkit is requested and the cluster has all
@@ -98,9 +126,10 @@ type ClusterPolicyController struct {
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
-	runtime      gpuv1.Runtime
-	hasGPUNodes  bool
-	hasNFDLabels bool
+	runtime        gpuv1.Runtime
+	hasGPUNodes    bool
+	hasNFDLabels   bool
+	sandboxEnabled bool
 }
 
 func addState(n *ClusterPolicyController, path string) error {
@@ -168,44 +197,6 @@ func hasCommonGPULabel(labels map[string]string) bool {
 	return false
 }
 
-// addMissingGPUStateLabels checks if the nodeLabels contain the GPUState labels,
-// and it adds them when missing (the label value is *not* checked, only the key)
-// addMissingGPUStateLabels returns true if the nodeLabels map has been updated
-func (n *ClusterPolicyController) addMissingGPUStateLabels(nodeLabels map[string]string) bool {
-	modified := false
-	if hasOperandsDisabled(nodeLabels) {
-		// Operands are disabled, delete all GPU state labels
-		n.rec.Log.Info("Operands are disabled", "Label", commonOperandsLabelKey, "Value", "false")
-		for key := range gpuStateLabels {
-			if _, ok := nodeLabels[key]; ok {
-				delete(nodeLabels, key)
-				modified = true
-			}
-		}
-		if _, ok := nodeLabels[migManagerLabelKey]; ok {
-			delete(nodeLabels, migManagerLabelKey)
-			modified = true
-		}
-		return modified
-	}
-
-	for key, value := range gpuStateLabels {
-		if _, ok := nodeLabels[key]; !ok {
-			nodeLabels[key] = value
-			modified = true
-		}
-		n.rec.Log.Info(" - ", "Label=", key, " value=", nodeLabels[key])
-	}
-
-	// add mig-manager label if missing
-	if hasMIGCapableGPU(nodeLabels) && !hasMIGManagerLabel(nodeLabels) {
-		nodeLabels[migManagerLabelKey] = migManagerLabelValue
-		modified = true
-		n.rec.Log.Info(" - ", "Label=", migManagerLabelKey, " value=", migManagerLabelValue)
-	}
-	return modified
-}
-
 // hasGPULabels return true if node labels contain Nvidia GPU labels
 func hasGPULabels(labels map[string]string) bool {
 	for key, val := range labels {
@@ -263,7 +254,109 @@ func hasOperandsDisabled(labels map[string]string) bool {
 	return false
 }
 
-// labelGPUNodes labels nodes with GPU's with Nvidia common label
+func isValidWorkloadConfig(workloadConfig string) bool {
+	_, ok := gpuStateLabels[workloadConfig]
+	return ok
+}
+
+// getWorkloadConfig returns the GPU workload configured for the node.
+// If an error occurs when searching for the workload config,
+// return defaultGPUWorkloadConfig.
+func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, error) {
+	if !sandboxEnabled {
+		return gpuWorkloadConfigContainer, nil
+	}
+	if workloadConfig, ok := labels[gpuWorkloadConfigLabelKey]; ok {
+		if isValidWorkloadConfig(workloadConfig) {
+			return workloadConfig, nil
+		}
+		return defaultGPUWorkloadConfig, fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
+	}
+	return defaultGPUWorkloadConfig, fmt.Errorf("No GPU workload config found")
+}
+
+// removeAllGPUStateLabels removes all gpuStateLabels from the provided map of node labels.
+// removeAllGPUStateLabels returns true if the labels map has been modified.
+func removeAllGPUStateLabels(labels map[string]string) bool {
+	modified := false
+	for _, labelsMap := range gpuStateLabels {
+		for key := range labelsMap {
+			if _, ok := labels[key]; ok {
+				delete(labels, key)
+				modified = true
+			}
+		}
+	}
+	if _, ok := labels[migManagerLabelKey]; ok {
+		delete(labels, migManagerLabelKey)
+		modified = true
+	}
+	return modified
+}
+
+// updateGPUStateLabels applies the correct GPU state labels for the GPU workload configuration.
+// updateGPUStateLabels returns true if the input labels map is modified.
+func (w *gpuWorkloadConfiguration) updateGPUStateLabels(labels map[string]string) bool {
+	if hasOperandsDisabled(labels) {
+		// Operands are disabled, delete all GPU state labels
+		w.log.Info("Operands are disabled for node", "NodeName", w.node, "Label", commonOperandsLabelKey, "Value", "false")
+		w.log.Info("Disabling all operands for node", "NodeName", w.node)
+		return removeAllGPUStateLabels(labels)
+	}
+	removed := w.removeGPUStateLabels(labels)
+	added := w.addGPUStateLabels(labels)
+	return removed || added
+}
+
+// addGPUStateLabels adds GPU state labels needed for the GPU workload configuration.
+// If a required state label already exists on the node, honor the current value.
+func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) bool {
+	modified := false
+	for key, value := range gpuStateLabels[w.config] {
+		if _, ok := labels[key]; !ok {
+			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
+			labels[key] = value
+			modified = true
+		}
+	}
+	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
+		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
+		labels[migManagerLabelKey] = migManagerLabelValue
+		modified = true
+	}
+	return modified
+}
+
+// removeGPUStateLabels removes GPU state labels not needed for the GPU workload configuration
+func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
+	modified := false
+	for workloadConfig, labelsMap := range gpuStateLabels {
+		if workloadConfig == w.config {
+			continue
+		}
+		for key := range labelsMap {
+			if _, ok := gpuStateLabels[w.config][key]; ok {
+				// skip label if it is in the set of states for workloadConfig
+				continue
+			}
+			if _, ok := labels[key]; ok {
+				w.log.Info("Deleting node label", "NodeName", w.node, "Label", key)
+				delete(labels, key)
+				modified = true
+			}
+		}
+	}
+	if w.config != gpuWorkloadConfigContainer {
+		if _, ok := labels[migManagerLabelKey]; ok {
+			w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
+			delete(labels, migManagerLabelKey)
+			modified = true
+		}
+	}
+	return modified
+}
+
+// labelGPUNodes labels nodes with GPU's with NVIDIA common label
 // it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
 func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	// fetch all nodes
@@ -282,27 +375,22 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		if !clusterHasNFDLabels {
 			clusterHasNFDLabels = hasNFDLabels(labels)
 		}
+		config, err := getWorkloadConfig(labels, n.sandboxEnabled)
+		if err != nil {
+			n.rec.Log.Info("WARNING: failed to get GPU workload config for node; using default",
+				"NodeName", node.ObjectMeta.Name, "SandboxEnabled", n.sandboxEnabled,
+				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
+		}
+		n.rec.Log.Info("GPU workload configuration", "NodeName", node.ObjectMeta.Name, "GpuWorkloadConfig", config)
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.ObjectMeta.Name, n.rec.Log}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
+			n.rec.Log.Info("Node has GPU(s)", "NodeName", node.ObjectMeta.Name)
 			// label the node with common Nvidia GPU label
+			n.rec.Log.Info("Setting node label", "NodeName", node.ObjectMeta.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// label the node with the state GPU labels
-			if hasOperandsDisabled(labels) {
-				// Operands are disabled, delete all GPU state labels
-				n.rec.Log.Info("Operands are disabled", "Label", commonOperandsLabelKey, "Value", "false")
-				n.rec.Log.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
-				for key := range gpuStateLabels {
-					delete(labels, key)
-				}
-				delete(labels, migManagerLabelKey)
-			} else {
-				for key, value := range gpuStateLabels {
-					labels[key] = value
-				}
-				// add mig-manager label
-				if hasMIGCapableGPU(labels) {
-					labels[migManagerLabelKey] = migManagerLabelValue
-				}
-			}
+			n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+			gpuWorkloadConfig.updateGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
@@ -313,12 +401,11 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
 			// previously labelled node and no longer has GPU's
 			// label node to reset common Nvidia GPU label
+			n.rec.Log.Info("Node no longer has GPUs", "NodeName", node.ObjectMeta.Name)
+			n.rec.Log.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
 			labels[commonGPULabelKey] = "false"
-			for key := range gpuStateLabels {
-				delete(labels, key)
-			}
-			// delete mig-manager label
-			delete(labels, migManagerLabelKey)
+			n.rec.Log.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
+			removeAllGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
 			err = n.rec.Client.Update(context.TODO(), &node)
@@ -329,8 +416,9 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		}
 		if hasCommonGPULabel(labels) {
 			n.rec.Log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
-			if n.addMissingGPUStateLabels(labels) {
-				n.rec.Log.Info("Applying GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
+				n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+				node.SetLabels(labels)
 				err = n.rec.Client.Update(context.TODO(), &node)
 				if err != nil {
 					return false, 0, fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
@@ -515,6 +603,32 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
 
+		if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
+			n.sandboxEnabled = true
+			// defaultGPUWorkloadConfig is vm-passthrough, unless
+			// user overrides in ClusterPolicy with a valid GPU
+			// workload configuration
+			defaultWorkload := clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload
+			if isValidWorkloadConfig(defaultWorkload) {
+				n.rec.Log.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", defaultWorkload)
+				defaultGPUWorkloadConfig = defaultWorkload
+			}
+			if clusterPolicy.Spec.VGPUManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vgpu-manager")
+			}
+			if clusterPolicy.Spec.VGPUDeviceManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
+			}
+			addState(n, "/opt/gpu-operator/state-sandbox-validation")
+			if clusterPolicy.Spec.VFIOManager.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-vfio-manager")
+			}
+			if clusterPolicy.Spec.SandboxDevicePlugin.IsEnabled() {
+				addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
+			}
+		}
+		n.rec.Log.Info("Sandbox workloads", "Enabled", n.sandboxEnabled, "DefaultWorkload", defaultGPUWorkloadConfig)
+
 		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
 			addState(n, "/opt/gpu-operator/state-node-status-exporter")
 		}
@@ -554,8 +668,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 	}
 
-	if n.singleton.Spec.Driver.UseOpenShiftDriverToolkit != nil &&
-		*n.singleton.Spec.Driver.UseOpenShiftDriverToolkit {
+	if n.singleton.Spec.Operator.UseOpenShiftDriverToolkit != nil &&
+		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit {
 		if n.openshift == "" {
 			return fmt.Errorf("ERROR: Driver Toolkit requested but not running on OpenShift")
 		}

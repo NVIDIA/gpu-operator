@@ -11,6 +11,10 @@ nfd:
 psp:
   enabled: false
 
+sandboxWorkloads:
+  enabled: false
+  defaultWorkload: "vm-passthrough"
+
 daemonsets:
   priorityClassName: system-node-critical
   tolerations:
@@ -43,10 +47,11 @@ operator:
   priorityClassName: system-node-critical
   defaultRuntime: docker
   runtimeClass: nvidia
+  use_ocp_driver_toolkit: false
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 11.4.2-base-ubi8
+    version: 11.6.0-base-ubi8
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -79,7 +84,6 @@ mig:
 
 driver:
   enabled: true
-  use_ocp_driver_toolkit: false
   repository: nvcr.io/nvidia
   image: driver
   version: "510.47.03"
@@ -106,7 +110,7 @@ driver:
         value: "false"
   env: []
   resources: {}
-  # private mirror repository configuration
+  # Private mirror repository configuration
   repoConfig:
     configMapName: ""
   # custom ssl key/certificate configuration
@@ -122,6 +126,59 @@ driver:
   # kernel module configuration for NVIDIA driver
   kernelModuleConfig:
     name: ""
+
+vgpuManager:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: vgpu-manager
+  version: "470.82.01"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  resources: {}
+  driverManager:
+    image: k8s-driver-manager
+    repository: nvcr.io/nvidia/cloud-native
+    version: v0.3.0
+    imagePullPolicy: IfNotPresent
+    env:
+      - name: ENABLE_AUTO_DRAIN
+        value: "false"
+
+vgpuDeviceManager:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: vgpu-device-manager
+  version: "v0.1.0"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+# NOTE: When sandboxedEnvironments is enabled, creating
+# a custom ConfigMap with vGPU device configuration is required
+# for a successful vGPU Device Manager deployent. Replace
+# the below with the correct ConfigMap and default config
+# in ConfigMap.
+  config:
+    name: "vgpu-devices-config"
+    default: "default"
+
+vfioManager:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: cuda
+  version: 11.6.0-base-ubi8
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  resources: {}
+  driverManager:
+    image: k8s-driver-manager
+    repository: nvcr.io/nvidia/cloud-native
+    version: v0.3.0
+    imagePullPolicy: IfNotPresent
+    env:
+      - name: ENABLE_AUTO_DRAIN
+        value: "false"
 
 toolkit:
   enabled: true
@@ -160,6 +217,17 @@ devicePlugin:
     name: ""
     # Default config name within the ConfigMap
     default: ""
+
+sandboxDevicePlugin:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: kubevirt-gpu-device-plugin
+  version: v1.1.1
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  args: []
+  env: []
+  resources: {}
 
 # standalone dcgm hostengine
 dcgm:

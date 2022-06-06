@@ -396,15 +396,20 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-daemonset":            TransformDriver,
-		"nvidia-container-toolkit-daemonset": TransformToolkit,
-		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
-		"nvidia-dcgm":                        TransformDCGM,
-		"nvidia-dcgm-exporter":               TransformDCGMExporter,
-		"nvidia-node-status-exporter":        TransformNodeStatusExporter,
-		"gpu-feature-discovery":              TransformGPUDiscoveryPlugin,
-		"nvidia-mig-manager":                 TransformMIGManager,
-		"nvidia-operator-validator":          TransformValidator,
+		"nvidia-driver-daemonset":                TransformDriver,
+		"nvidia-vgpu-manager-daemonset":          TransformVGPUManager,
+		"nvidia-vgpu-device-manager":             TransformVGPUDeviceManager,
+		"nvidia-vfio-manager":                    TransformVFIOManager,
+		"nvidia-container-toolkit-daemonset":     TransformToolkit,
+		"nvidia-device-plugin-daemonset":         TransformDevicePlugin,
+		"nvidia-sandbox-device-plugin-daemonset": TransformSandboxDevicePlugin,
+		"nvidia-dcgm":                            TransformDCGM,
+		"nvidia-dcgm-exporter":                   TransformDCGMExporter,
+		"nvidia-node-status-exporter":            TransformNodeStatusExporter,
+		"gpu-feature-discovery":                  TransformGPUDiscoveryPlugin,
+		"nvidia-mig-manager":                     TransformMIGManager,
+		"nvidia-operator-validator":              TransformValidator,
+		"nvidia-sandbox-validator":               TransformSandboxValidator,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -513,7 +518,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	transformValidationInitContainer(obj, config)
 
 	// update driver-manager initContainer
-	transformDriverManagerInitContainer(obj, config)
+	transformDriverManagerInitContainer(obj, &config.Driver.Manager)
 
 	// update nvidia-driver container
 	transformDriverContainer(obj, config, n)
@@ -534,9 +539,41 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// update OpenShift Driver Toolkit sidecar container
-	err := transformOpenShiftDriverToolkitContainer(obj, config, n)
+	err := transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
+	}
+
+	return nil
+}
+
+// TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
+func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update k8s-driver-manager initContainer
+	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager)
+	if err != nil {
+		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for vGPU Manager: %v", err)
+	}
+
+	// update nvidia-vgpu-manager container
+	err = transformVGPUManagerContainer(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("failed to transform vGPU Manager container: %v", err)
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// update OpenShift Driver Toolkit sidecar container
+	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-vgpu-manager-ctr")
+	if err != nil {
+		return fmt.Errorf("failed to transform the Driver Toolkit container: %s", err)
 	}
 
 	return nil
@@ -828,6 +865,53 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	return nil
 }
 
+// TransformSandboxDevicePlugin transforms sandbox-device-plugin daemonset with required config as per ClusterPolicy
+func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	transformValidationInitContainer(obj, config)
+	// update image
+	image, err := gpuv1.ImagePath(&config.SandboxDevicePlugin)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.SandboxDevicePlugin.ImagePullPolicy)
+	// set image pull secrets
+	if len(config.SandboxDevicePlugin.ImagePullSecrets) > 0 {
+		for _, secret := range config.SandboxDevicePlugin.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+	// set resource limits
+	if config.SandboxDevicePlugin.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.SandboxDevicePlugin.Resources
+		}
+	}
+	// set arguments if specified for device-plugin container
+	if len(config.SandboxDevicePlugin.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.SandboxDevicePlugin.Args
+	}
+	// set/append environment variables for device-plugin container
+	if len(config.SandboxDevicePlugin.Env) > 0 {
+		for _, env := range config.SandboxDevicePlugin.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+	return nil
+}
+
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
@@ -1114,8 +1198,167 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	return nil
 }
 
+// TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
+func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update k8s-driver-manager initContainer
+	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager)
+	if err != nil {
+		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+	}
+
+	// update image
+	image, err := gpuv1.ImagePath(&config.VFIOManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.VFIOManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VFIOManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VFIOManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set resource limits
+	if config.VFIOManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.VFIOManager.Resources
+		}
+	}
+
+	// set arguments if specified for mig-manager container
+	if len(config.VFIOManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.VFIOManager.Args
+	}
+
+	// set/append environment variables for mig-manager container
+	if len(config.VFIOManager.Env) > 0 {
+		for _, env := range config.VFIOManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	return nil
+}
+
+// TransformVGPUDeviceManager transforms VGPU Device Manager daemonset with required config as per ClusterPolicy
+func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	transformValidationInitContainer(obj, config)
+
+	// update image
+	image, err := gpuv1.ImagePath(&config.VGPUDeviceManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.VGPUDeviceManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VGPUDeviceManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VGPUDeviceManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set resource limits
+	if config.VGPUDeviceManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources = *config.VGPUDeviceManager.Resources
+		}
+	}
+
+	// set arguments if specified for mig-manager container
+	if len(config.VGPUDeviceManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.VGPUDeviceManager.Args
+	}
+
+	// set/append environment variables for mig-manager container
+	if len(config.VGPUDeviceManager.Env) > 0 {
+		for _, env := range config.VGPUDeviceManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set ConfigMap name for "vgpu-config" Volume
+	for i, vol := range obj.Spec.Template.Spec.Volumes {
+		if !strings.Contains(vol.Name, "vgpu-config") {
+			continue
+		}
+
+		// vgpuDeviceManager.config.name has a default value in the CRD, so it will always be set
+		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = config.VGPUDeviceManager.Config.Name
+		break
+	}
+
+	// vgpuDeviceManager.config.default has a default value in the CRD, so it will always be set
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", config.VGPUDeviceManager.Config.Default)
+
+	return nil
+}
+
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	err := TransformValidatorShared(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	// set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+
+	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
+
+	return nil
+}
+
+// TransformSandboxValidator transforms nvidia-sandbox-validator daemonset with required config as per ClusterPolicy
+func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	err := TransformValidatorShared(obj, config, n)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vfio-pci")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-manager")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-devices")
+
+	return nil
+}
+
+// TransformValidatorShared applies general transformations to the validator daemonset with required config as per ClusterPolicy
+func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
 	image, err := gpuv1.ImagePath(&config.Validator)
 	if err != nil {
@@ -1145,25 +1388,16 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Validator.Resources
 		}
 	}
-	// set arguments if specified for device-plugin container
+	// set arguments if specified for validator container
 	if len(config.Validator.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.Validator.Args
 	}
-	// set/append environment variables for device-plugin container
+	// set/append environment variables for validator container
 	if len(config.Validator.Env) > 0 {
 		for _, env := range config.Validator.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
-
-	// apply changes for individual component validators(initContainers)
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
 
 	return nil
 }
@@ -1235,6 +1469,30 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vfio-pci":
+			// set/append environment variables for vfio-pci-validation container
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			if len(config.Validator.VFIOPCI.Env) > 0 {
+				for _, env := range config.Validator.VFIOPCI.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vgpu-manager":
+			// set/append environment variables for vgpu-manager-validation container
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			if len(config.Validator.VGPUManager.Env) > 0 {
+				for _, env := range config.Validator.VGPUManager.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		case "vgpu-devices":
+			// set/append environment variables for vgpu-devices-validation container
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			if len(config.Validator.VGPUDevices.Env) > 0 {
+				for _, env := range config.Validator.VGPUDevices.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}
@@ -1512,36 +1770,43 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	return nil
 }
 
-func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
-		// skip if not validation initContainer
-		if !strings.Contains(initContainer.Name, "k8s-driver-manager") {
-			continue
-		}
-		// update driver-manager(initContainer) image and pull policy
-		managerImage, err := gpuv1.ImagePath(&config.Driver.Manager)
-		if err != nil {
-			return err
-		}
-		obj.Spec.Template.Spec.InitContainers[i].Image = managerImage
-
-		if config.Driver.ImagePullPolicy != "" {
-			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.Manager.ImagePullPolicy)
-		}
-
-		// set/append environment variables for driver-manager initContainer
-		if len(config.Driver.Manager.Env) > 0 {
-			for _, env := range config.Driver.Manager.Env {
-				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
-			}
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec) error {
+	var container *corev1.Container
+	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
+		if initCtr.Name == "k8s-driver-manager" {
+			container = &obj.Spec.Template.Spec.InitContainers[i]
+			break
 		}
 	}
+
+	if container == nil {
+		return fmt.Errorf("failed to find k8s-driver-manager initContainer in spec")
+	}
+
+	managerImage, err := gpuv1.ImagePath(driverManagerSpec)
+	if err != nil {
+		return err
+	}
+	container.Image = managerImage
+
+	if driverManagerSpec.ImagePullPolicy != "" {
+		container.ImagePullPolicy = gpuv1.ImagePullPolicy(driverManagerSpec.ImagePullPolicy)
+	}
+
+	// set/append environment variables for driver-manager initContainer
+	if len(driverManagerSpec.Env) > 0 {
+		for _, env := range driverManagerSpec.Env {
+			setContainerEnv(container, env.Name, env.Value)
+		}
+	}
+
 	// add any pull secrets needed for driver-manager image
-	if len(config.Driver.Manager.ImagePullSecrets) > 0 {
-		for _, secret := range config.Driver.Manager.ImagePullSecrets {
+	if len(driverManagerSpec.ImagePullSecrets) > 0 {
+		for _, secret := range driverManagerSpec.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
+
 	return nil
 }
 
@@ -1619,7 +1884,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	return nil
 }
 
-func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, mainContainerName string) error {
 	var err error
 
 	getContainer := func(name string, remove bool) (*v1.Container, error) {
@@ -1653,7 +1918,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	/* find the main container and driver-toolkit sidecar container */
 	var mainContainer, driverToolkitContainer *v1.Container
 
-	if mainContainer, err = getContainer("nvidia-driver-ctr", false); err != nil {
+	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
 		return err
 	}
 
@@ -1746,6 +2011,12 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 		}
 	case *gpuv1.GPUDirectStorageSpec:
 		spec := driverSpec.(*gpuv1.GPUDirectStorageSpec)
+		image, err = gpuv1.ImagePath(spec)
+		if err != nil {
+			return "", err
+		}
+	case *gpuv1.VGPUManagerSpec:
+		spec := driverSpec.(*gpuv1.VGPUManagerSpec)
 		image, err = gpuv1.ImagePath(spec)
 		if err != nil {
 			return "", err
@@ -2016,6 +2287,54 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			return err
 		}
 	}
+	return nil
+}
+
+func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	var container *corev1.Container
+	for i, ctr := range obj.Spec.Template.Spec.Containers {
+		if ctr.Name == "nvidia-vgpu-manager-ctr" {
+			container = &obj.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+
+	if container == nil {
+		return fmt.Errorf("failed to find nvidia-vgpu-manager-ctr in spec")
+	}
+
+	image, err := resolveDriverTag(n, &config.VGPUManager)
+	if err != nil {
+		return err
+	}
+	if image != "" {
+		container.Image = image
+	}
+
+	// update image pull policy
+	container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.VGPUManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.VGPUManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.VGPUManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+	// set resource limits
+	if config.VGPUManager.Resources != nil {
+		container.Resources = *config.VGPUManager.Resources
+	}
+	// set arguments if specified for driver container
+	if len(config.VGPUManager.Args) > 0 {
+		container.Args = config.VGPUManager.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.VGPUManager.Env) > 0 {
+		for _, env := range config.VGPUManager.Env {
+			setContainerEnv(container, env.Name, env.Value)
+		}
+	}
+
 	return nil
 }
 
@@ -2451,7 +2770,8 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" {
+	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" ||
+		n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-vgpu-manager-daemonset" {
 		podCount, err := cleanupUnusedDriverDaemonSets(n)
 		if err != nil {
 			return gpuv1.NotReady, err

@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -30,6 +31,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
+	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev"
+	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,19 +77,33 @@ type Metrics struct {
 	kubeClient kubernetes.Interface
 }
 
+// VfioPCI represents spec to validate vfio-pci driver
+type VfioPCI struct{}
+
+// VGPUManager represents spec to validate vGPU Manager installation
+type VGPUManager struct{}
+
+// VGPUDevices represents spec to validate vGPU device creation
+type VGPUDevices struct{}
+
 var (
-	kubeconfigFlag           string
-	nodeNameFlag             string
-	namespaceFlag            string
-	withWaitFlag             bool
-	withWorkloadFlag         bool
-	componentFlag            string
-	cleanupAllFlag           bool
-	outputDirFlag            string
-	sleepIntervalSecondsFlag int
-	migStrategyFlag          string
-	metricsPort              int
+	kubeconfigFlag               string
+	nodeNameFlag                 string
+	namespaceFlag                string
+	withWaitFlag                 bool
+	withWorkloadFlag             bool
+	componentFlag                string
+	cleanupAllFlag               bool
+	outputDirFlag                string
+	sleepIntervalSecondsFlag     int
+	migStrategyFlag              string
+	metricsPort                  int
+	defaultGPUWorkloadConfigFlag string
 )
+
+// defaultGPUWorkloadConfig is "vm-passthrough" unless
+// overridden by defaultGPUWorkloadConfigFlag
+var defaultGPUWorkloadConfig = gpuWorkloadConfigVMPassthrough
 
 const (
 	// defaultStatusPath indicates directory to create all validation status files
@@ -107,6 +124,16 @@ const (
 	cudaStatusFile = "cuda-ready"
 	// mofedStatusFile indicates status file for mofed driver readiness
 	mofedStatusFile = "mofed-ready"
+	// vfioPCIStatusFile indicates status file for vfio-pci driver readiness
+	vfioPCIStatusFile = "vfio-pci-ready"
+	// vGPUManagerStatusFile indicates status file for vGPU Manager driver readiness
+	vGPUManagerStatusFile = "vgpu-manager-ready"
+	// hostVGPUManagerStatusFile indicates status file for host vGPU Manager driver readiness
+	hostVGPUManagerStatusFile = "host-vgpu-manager-ready"
+	// vGPUDevicesStatusFile is name of the file which indicates vGPU Manager is installed and vGPU devices have been created
+	vGPUDevicesStatusFile = "vgpu-devices-ready"
+	// workloadTypeStatusFile is the name of the file which specifies the workload type configured for the node
+	workloadTypeStatusFile = "workload-type"
 	// podCreationWaitRetries indicates total retries to wait for plugin validation pod creation
 	podCreationWaitRetries = 60
 	// podCreationSleepIntervalSeconds indicates sleep interval in seconds between checking for plugin validation pod readiness
@@ -149,6 +176,11 @@ const (
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 	// UseHostMOFEDEnvname represents env name to indicate if MOFED is pre-installed on host
 	UseHostMOFEDEnvname = "USE_HOST_MOFED"
+	// TODO: create a common package to share these variables between operator and validator
+	gpuWorkloadConfigLabelKey      = "nvidia.com/gpu.workload.config"
+	gpuWorkloadConfigContainer     = "container"
+	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
+	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 )
 
 func main() {
@@ -244,6 +276,14 @@ func main() {
 			Destination: &metricsPort,
 			EnvVars:     []string{"METRICS_PORT"},
 		},
+		&cli.StringFlag{
+			Name:        "default-gpu-workload-config",
+			Aliases:     []string{"g"},
+			Value:       "",
+			Usage:       "default GPU workload config. determines what components to validate by default when sandbox workloads are enabled in the cluster.",
+			Destination: &defaultGPUWorkloadConfigFlag,
+			EnvVars:     []string{"DEFAULT_GPU_WORKLOAD_CONFIG"},
+		},
 	}
 
 	// Handle signals
@@ -294,6 +334,9 @@ func validateFlags(c *cli.Context) error {
 			return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for metrics exporter")
 		}
 	}
+	if nodeNameFlag == "" && (componentFlag == "vfio-pci" || componentFlag == "vgpu-manager" || componentFlag == "vgpu-devices") {
+		return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for %s validation", componentFlag)
+	}
 
 	return nil
 }
@@ -309,12 +352,58 @@ func isValidComponent() bool {
 	case "metrics":
 		fallthrough
 	case "plugin":
-		return true
+		fallthrough
 	case "mofed":
+		fallthrough
+	case "vfio-pci":
+		fallthrough
+	case "vgpu-manager":
+		fallthrough
+	case "vgpu-devices":
 		return true
 	default:
 		return false
 	}
+}
+
+func isValidWorkloadConfig(config string) bool {
+	return config == gpuWorkloadConfigContainer ||
+		config == gpuWorkloadConfigVMPassthrough ||
+		config == gpuWorkloadConfigVMVgpu
+}
+
+func getWorkloadConfig() (string, error) {
+	// check if default workload is overridden by flag
+	if isValidWorkloadConfig(defaultGPUWorkloadConfigFlag) {
+		defaultGPUWorkloadConfig = defaultGPUWorkloadConfigFlag
+	}
+
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return "", fmt.Errorf("Error getting cluster config - %s", err.Error())
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return "", fmt.Errorf("Error getting k8s client - %s", err.Error())
+	}
+
+	node, err := getNode(kubeClient)
+	if err != nil {
+		return "", fmt.Errorf("Error getting node labels - %s", err.Error())
+	}
+
+	labels := node.GetLabels()
+	value, ok := labels[gpuWorkloadConfigLabelKey]
+	if !ok {
+		log.Infof("No %s label found; using default workload config: %s", gpuWorkloadConfigLabelKey, defaultGPUWorkloadConfig)
+		return defaultGPUWorkloadConfig, nil
+	}
+	if !isValidWorkloadConfig(value) {
+		log.Warnf("%s is an invalid workload config; using default workload config: %s", value, defaultGPUWorkloadConfig)
+		return defaultGPUWorkloadConfig, nil
+	}
+	return value, nil
 }
 
 func start(c *cli.Context) error {
@@ -376,6 +465,27 @@ func start(c *cli.Context) error {
 		err := metrics.run()
 		if err != nil {
 			return fmt.Errorf("error running validation-metrics exporter: %s", err)
+		}
+		return nil
+	case "vfio-pci":
+		vfioPCI := &VfioPCI{}
+		err := vfioPCI.validate()
+		if err != nil {
+			return fmt.Errorf("error validating vfio-pci driver installation: %s", err)
+		}
+		return nil
+	case "vgpu-manager":
+		vGPUManager := &VGPUManager{}
+		err := vGPUManager.validate()
+		if err != nil {
+			return fmt.Errorf("error validating vGPU Manager installation: %s", err)
+		}
+		return nil
+	case "vgpu-devices":
+		vGPUDevices := &VGPUDevices{}
+		err := vGPUDevices.validate()
+		if err != nil {
+			return fmt.Errorf("error validating vGPU devices: %s", err)
 		}
 		return nil
 	default:
@@ -475,6 +585,20 @@ func createStatusFile(statusFile string) error {
 	if err != nil {
 		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
 	}
+	return nil
+}
+
+func createStatusFileWithContent(statusFile string, content string) error {
+	f, err := os.Create(statusFile)
+	if err != nil {
+		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
+	}
+
+	_, err = f.WriteString(content)
+	if err != nil {
+		return fmt.Errorf("unable to write contents of status file %s: %s", statusFile, err)
+	}
+
 	return nil
 }
 
@@ -983,4 +1107,216 @@ func (c *Metrics) run() error {
 	m := NewNodeMetrics(metricsPort)
 
 	return m.Run()
+}
+
+func (v *VfioPCI) validate() error {
+	gpuWorkloadConfig, err := getWorkloadConfig()
+	if err != nil {
+		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+	}
+	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
+
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
+
+	if gpuWorkloadConfig != gpuWorkloadConfigVMPassthrough {
+		log.WithFields(log.Fields{
+			"gpuWorkloadConfig": gpuWorkloadConfig,
+		}).Info("vfio-pci not required on the node. Skipping validation.")
+		return nil
+	}
+
+	// delete status file if already present
+	err = deleteStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = v.runValidation(false)
+	if err != nil {
+		return err
+	}
+	log.Info("Validation completed successfully - all devices are bound to vfio-pci")
+
+	// delete status file is already present
+	err = createStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (v *VfioPCI) runValidation(silent bool) error {
+	nvpci := nvpci.New()
+	nvdevices, err := nvpci.GetAllDevices()
+	if err != nil {
+		return fmt.Errorf("error getting NVIDIA PCI devices: %v", err)
+	}
+
+	for _, dev := range nvdevices {
+		path := filepath.Join(dev.Path, "driver")
+		fileInfo, err := os.Lstat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("device %s is not bound to any driver", dev.Address)
+			}
+			return fmt.Errorf("failed to get file info for %s: %v", path, err)
+		}
+
+		driverName := ""
+		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			link, _ := filepath.EvalSymlinks(path)
+			driverName = filepath.Base(link)
+		} else {
+			return fmt.Errorf("%s is malinformed: %v", path, err)
+		}
+
+		if driverName != "vfio-pci" {
+			return fmt.Errorf("device %s is bound to driver '%s'", dev.Address, driverName)
+		}
+	}
+	return nil
+}
+
+func (v *VGPUManager) validate() error {
+	gpuWorkloadConfig, err := getWorkloadConfig()
+	if err != nil {
+		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+	}
+	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
+
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
+
+	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
+		log.WithFields(log.Fields{
+			"gpuWorkloadConfig": gpuWorkloadConfig,
+		}).Info("vGPU Manager not required on the node. Skipping validation.")
+		return nil
+	}
+
+	// delete status file if already present
+	err = deleteStatusFile(outputDirFlag + "/" + vGPUManagerStatusFile)
+	if err != nil {
+		return err
+	}
+
+	// delete status file if already present
+	err = deleteStatusFile(outputDirFlag + "/" + hostVGPUManagerStatusFile)
+	if err != nil {
+		return err
+	}
+
+	hostDriver, err := v.runValidation(false)
+	if err != nil {
+		fmt.Println("vGPU Manager is not ready")
+		return err
+	}
+
+	statusFile := vGPUManagerStatusFile
+	if hostDriver {
+		statusFile = hostVGPUManagerStatusFile
+	}
+
+	// create driver status file
+	err = createStatusFile(outputDirFlag + "/" + statusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
+	// invoke validation command
+	command := "chroot"
+	args := []string{"/run/nvidia/driver", "nvidia-smi"}
+
+	// check if driver is pre-installed on the host and use host path for validation
+	if _, err := os.Stat("/host/usr/bin/nvidia-smi"); err == nil {
+		args = []string{"/host", "nvidia-smi"}
+		hostDriver = true
+	}
+
+	if withWaitFlag {
+		return hostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+
+	return hostDriver, runCommand(command, args, silent)
+}
+
+func (v *VGPUDevices) validate() error {
+	gpuWorkloadConfig, err := getWorkloadConfig()
+	if err != nil {
+		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+	}
+	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
+
+	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	if err != nil {
+		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+	}
+
+	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
+		log.WithFields(log.Fields{
+			"gpuWorkloadConfig": gpuWorkloadConfig,
+		}).Info("vgpu devices not required on the node. Skipping validation.")
+		return nil
+	}
+
+	// delete status file if already present
+	err = deleteStatusFile(outputDirFlag + "/" + vGPUDevicesStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = v.runValidation(false)
+	if err != nil {
+		return err
+	}
+	log.Info("Validation completed successfully - vGPU devices present on the host")
+
+	// create status file
+	err = createStatusFile(outputDirFlag + "/" + vGPUDevicesStatusFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *VGPUDevices) runValidation(silent bool) error {
+	nvmdev := nvmdev.New()
+	vGPUDevices, err := nvmdev.GetAllDevices()
+	if err != nil {
+		return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
+	}
+
+	if !withWaitFlag {
+		numDevices := len(vGPUDevices)
+		if numDevices == 0 {
+			return fmt.Errorf("No vGPU devices found")
+		}
+
+		log.Infof("Found %d vGPU devices", numDevices)
+		return nil
+	}
+
+	for {
+		numDevices := len(vGPUDevices)
+		if numDevices > 0 {
+			log.Infof("Found %d vGPU devices", numDevices)
+			return nil
+		}
+		log.Infof("No vGPU devices found, retrying after %d seconds", sleepIntervalSecondsFlag)
+		time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
+
+		vGPUDevices, err = nvmdev.GetAllDevices()
+		if err != nil {
+			return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
+		}
+	}
 }

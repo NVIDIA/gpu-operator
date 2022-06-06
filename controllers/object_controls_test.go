@@ -33,14 +33,16 @@ import (
 )
 
 const (
-	clusterPolicyPath      = "config/samples/v1_clusterpolicy.yaml"
-	clusterPolicyName      = "gpu-cluster-policy"
-	driverAssetsPath       = "assets/state-driver/"
-	driverDaemonsetName    = "nvidia-driver-daemonset"
-	devicePluginAssetsPath = "assets/state-device-plugin/"
-	nfdNvidiaPCILabelKey   = "feature.node.kubernetes.io/pci-10de.present"
-	nfdOsNameLabelKey      = "feature.node.kubernetes.io/system-os_release.ID"
-	nfdOsVersionLabelKey   = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	clusterPolicyPath             = "config/samples/v1_clusterpolicy.yaml"
+	clusterPolicyName             = "gpu-cluster-policy"
+	driverAssetsPath              = "assets/state-driver/"
+	vGPUManagerAssetsPath         = "assets/state-vgpu-manager/"
+	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
+	driverDaemonsetName           = "nvidia-driver-daemonset"
+	devicePluginAssetsPath        = "assets/state-device-plugin/"
+	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
+	nfdOsNameLabelKey             = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOsVersionLabelKey          = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
 )
 
 type testConfig struct {
@@ -318,6 +320,42 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DevicePlugin)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for device-plugin: %v", err)
+		}
+	case "VGPUManager":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.VGPUManager.Repository,
+			image:            cp.Spec.VGPUManager.Image,
+			version:          cp.Spec.VGPUManager.Version,
+			imagePullPolicy:  cp.Spec.VGPUManager.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.VGPUManager.ImagePullSecrets),
+			args:             cp.Spec.VGPUManager.Args,
+			env:              cp.Spec.VGPUManager.Env,
+			resources:        cp.Spec.VGPUManager.Resources,
+		}
+		dsLabel = "nvidia-vgpu-manager-daemonset"
+		mainCtrName = "nvidia-vgpu-manager-ctr"
+		manifestFile = filepath.Join(cfg.root, vGPUManagerAssetsPath+"0500_daemonset.yaml")
+		mainCtrImage, err = resolveDriverTag(clusterPolicyController, &cp.Spec.VGPUManager)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for driver: %v", err)
+		}
+	case "SandboxDevicePlugin":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.SandboxDevicePlugin.Repository,
+			image:            cp.Spec.SandboxDevicePlugin.Image,
+			version:          cp.Spec.SandboxDevicePlugin.Version,
+			imagePullPolicy:  cp.Spec.SandboxDevicePlugin.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.SandboxDevicePlugin.ImagePullSecrets),
+			args:             cp.Spec.SandboxDevicePlugin.Args,
+			env:              cp.Spec.SandboxDevicePlugin.Env,
+			resources:        cp.Spec.SandboxDevicePlugin.Resources,
+		}
+		dsLabel = "nvidia-sandbox-device-plugin-daemonset"
+		mainCtrName = "nvidia-sandbox-device-plugin-ctr"
+		manifestFile = filepath.Join(cfg.root, sandboxDevicePluginAssetsPath, "0500_daemonset.yaml")
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.SandboxDevicePlugin)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for sandbox-device-plugin: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid component for testDaemonsetCommon(): %s", component)
@@ -604,5 +642,205 @@ func TestDevicePlugin(t *testing.T) {
 			}
 			clusterPolicyController.idx--
 		})
+	}
+}
+
+// getVGPUManagerTestInput return a ClusterPolicy instance for a particular
+// driver test case. This function will grow as new test cases are added
+func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Until we create sample ClusterPolicies that have all fields
+	// set, hardcode some default values:
+	cp.Spec.VGPUManager.Repository = "nvcr.io/nvidia"
+	cp.Spec.VGPUManager.Image = "vgpu-manager"
+	cp.Spec.VGPUManager.Version = "470.57.02"
+	cp.Spec.VGPUManager.DriverManager.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.VGPUManager.DriverManager.Image = "k8s-driver-manager"
+	cp.Spec.VGPUManager.DriverManager.Version = "v0.3.0"
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getVGPUManagerTestOutput returns a map containing expected output for
+// driver test case. This function will grow as new test cases are added
+func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets": 1,
+		"driverImage":   "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu18.04",
+	}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestVGPUManager tests that the GPU Operator correctly deploys the driver daemonset
+// under various scenarios/config options
+func TestVGPUManager(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getVGPUManagerTestInput("default"),
+			getVGPUManagerTestOutput("default"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "VGPUManager", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+			driverImage := ""
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				if strings.Contains(container.Name, "nvidia-vgpu-manager-ctr") {
+					driverImage = container.Image
+					continue
+				}
+			}
+
+			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-vgpu-manager-ctr image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
+		})
+	}
+}
+
+func TestVGPUManagerAssets(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, vGPUManagerAssetsPath)
+	// add manifests
+	err := addState(&clusterPolicyController, manifestPath)
+	if err != nil {
+		t.Fatalf("unable to add state: %v", err)
+	}
+	// create resources
+	_, err = clusterPolicyController.step()
+	if err != nil {
+		t.Errorf("error creating resources: %v", err)
+	}
+}
+
+// getSandboxDevicePluginTestInput return a ClusterPolicy instance for a particular
+// device plugin test case. This function will grow as new test cases are added
+func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Until we create sample ClusterPolicies that have all fields
+	// set, hardcode some default values:
+	cp.Spec.SandboxDevicePlugin.Repository = "nvcr.io/nvidia"
+	cp.Spec.SandboxDevicePlugin.Image = "kubevirt-device-plugin"
+	cp.Spec.SandboxDevicePlugin.Version = "v1.1.0"
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getSandboxDevicePluginTestOutput returns a map containing expected output for
+// driver test case. This function will grow as new test cases are added
+func getSandboxDevicePluginTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets": 1,
+		"image":         "nvcr.io/nvidia/kubevirt-device-plugin:v1.1.0",
+	}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestSandboxDevicePlugin tests that the GPU Operator correctly deploys the sandbox-device-plugin
+// daemonset under various scenarios/config options
+func TestSandboxDevicePlugin(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getSandboxDevicePluginTestInput("default"),
+			getSandboxDevicePluginTestOutput("default"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "SandboxDevicePlugin", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			image := ""
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				if strings.Contains(container.Name, "nvidia-sandbox-device-plugin-ctr") {
+					image = container.Image
+					continue
+				}
+			}
+
+			require.Equal(t, tc.output["image"], image, "Unexpected configuration for nvidia-sandbox-device-plugin-ctr image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
+		})
+	}
+}
+
+func TestSandboxDevicePluginAssets(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, sandboxDevicePluginAssetsPath)
+	// add manifests
+	err := addState(&clusterPolicyController, manifestPath)
+	if err != nil {
+		t.Fatalf("unable to add state: %v", err)
+	}
+	// create resources
+	_, err = clusterPolicyController.step()
+	if err != nil {
+		t.Errorf("error creating resources: %v", err)
 	}
 }
