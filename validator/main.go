@@ -929,11 +929,11 @@ func (p *Plugin) validateGPUResource() error {
 			return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 		}
 
-		if _, present := p.isMIGResourcePresent(node.Status.Capacity); present {
+		if p.availableMIGResourceName(node.Status.Capacity) != "" {
 			return nil
 		}
 
-		if p.isFullGPUResourcePresent(node.Status.Capacity) {
+		if p.availableGenericResourceName(node.Status.Capacity) != "" {
 			return nil
 		}
 
@@ -943,24 +943,24 @@ func (p *Plugin) validateGPUResource() error {
 	return fmt.Errorf("GPU resources are not discovered by the node")
 }
 
-func (p *Plugin) isMIGResourcePresent(resources v1.ResourceList) (v1.ResourceName, bool) {
+func (p *Plugin) availableMIGResourceName(resources v1.ResourceList) v1.ResourceName {
 	for resourceName, quantity := range resources {
 		if strings.HasPrefix(string(resourceName), migGPUResourcePrefix) && quantity.Value() >= 1 {
 			log.Debugf("Found MIG GPU resource name %s quantity %d", resourceName, quantity.Value())
-			return resourceName, true
+			return resourceName
 		}
 	}
-	return "", false
+	return ""
 }
 
-func (p *Plugin) isFullGPUResourcePresent(resources v1.ResourceList) bool {
+func (p *Plugin) availableGenericResourceName(resources v1.ResourceList) v1.ResourceName {
 	for resourceName, quantity := range resources {
 		if strings.HasPrefix(string(resourceName), genericGPUResourceType) && quantity.Value() >= 1 {
 			log.Debugf("Found GPU resource name %s quantity %d", resourceName, quantity.Value())
-			return true
+			return resourceName
 		}
 	}
-	return false
+	return ""
 }
 
 func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
@@ -971,12 +971,12 @@ func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
 	}
 
 	// use mig resource if one is available to run workload
-	if resourceName, present := p.isMIGResourcePresent(node.Status.Allocatable); present {
+	if resourceName := p.availableMIGResourceName(node.Status.Allocatable); resourceName != "" {
 		return resourceName, nil
 	}
 
-	if p.isFullGPUResourcePresent(node.Status.Allocatable) {
-		return genericGPUResourceType, nil
+	if resourceName := p.availableGenericResourceName(node.Status.Allocatable); resourceName != "" {
+		return resourceName, nil
 	}
 
 	return "", fmt.Errorf("Unable to find any allocatable GPU resource")
