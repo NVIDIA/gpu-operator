@@ -110,6 +110,7 @@ data:
     }
 
     handle_bind() {
+        chroot /host modprobe vfio-pci
         if [ "$DEVICE_ID" != "" ]; then
             bind_device $DEVICE_ID
         elif [ "$ALL_DEVICES" = "true" ]; then

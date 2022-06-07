@@ -72,6 +72,8 @@ spec:
             subPath: vfio-manage.sh
           - name: host-sys
             mountPath: /sys
+          - name: host-root
+            mountPath: /host
           securityContext:
             privileged: true
             seLinuxOptions:
