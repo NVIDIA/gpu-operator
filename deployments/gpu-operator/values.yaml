@@ -193,7 +193,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.12.0-rc.5-ubi8
+  version: v0.12.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -259,7 +259,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.6.0-rc.1-ubi8
+  version: v0.6.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
