@@ -65,7 +65,7 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin
         command: [bash, -c]
-        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; NVIDIA_DRIVER_ROOT=$driver_root nvidia-device-plugin;"]
+        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; exec nvidia-device-plugin;"]
         securityContext:
           privileged: true
         env:

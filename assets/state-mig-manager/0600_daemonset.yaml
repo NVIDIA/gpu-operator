@@ -40,7 +40,7 @@ spec:
         image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         command: [bash, -c]
-        args: [" [[ -f /run/nvidia/validations/host-driver-ready ]] && host_driver=true || host_driver=false; WITH_SHUTDOWN_HOST_GPU_CLIENTS=$host_driver nvidia-mig-manager"]
+        args: [" [[ -f /run/nvidia/validations/host-driver-ready ]] && host_driver=true || host_driver=false; export WITH_SHUTDOWN_HOST_GPU_CLIENTS=$host_driver; exec nvidia-mig-manager"]
         env:
         - name: NODE_NAME
           valueFrom:
