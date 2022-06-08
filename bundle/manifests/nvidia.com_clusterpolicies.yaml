@@ -1856,7 +1856,7 @@ spec:
                   workloads (i.e. Virtual Machines)
                 properties:
                   defaultWorkload:
-                    default: vm-passthrough
+                    default: container
                     description: DefaultWorkload indicates the default GPU workload
                       type to configure worker nodes in the cluster for
                     type: string
