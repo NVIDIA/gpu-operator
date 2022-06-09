@@ -48,7 +48,7 @@ const (
 )
 
 var (
-	defaultGPUWorkloadConfig = gpuWorkloadConfigVMPassthrough
+	defaultGPUWorkloadConfig = gpuWorkloadConfigContainer
 )
 
 var gpuStateLabels = map[string]map[string]string{
