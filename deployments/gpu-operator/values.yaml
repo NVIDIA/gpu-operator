@@ -333,6 +333,5 @@ node-feature-discovery:
   master:
     extraLabelNs:
       - nvidia.com
-
-  serviceAccount:
-    name: node-feature-discovery
+    serviceAccount:
+      name: node-feature-discovery
