@@ -57,7 +57,7 @@ COPY --from=builder /workspace/gpu-operator /usr/bin/
 
 RUN mkdir -p /opt/gpu-operator
 COPY assets /opt/gpu-operator/
-COPY ./LICENSE /licenses/LICENSE
+RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
 
 ENV VERSION=${VERSION}
