@@ -1736,6 +1736,7 @@ func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 	}
 	// setup env
 	setContainerEnv(initContainer, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
+	setContainerEnv(initContainer, "FALLBACK_STRATEGIES", "empty")
 
 	// setup volume mounts
 	addSharedMountsForPluginConfig(initContainer, config.DevicePlugin.Config)
@@ -1764,6 +1765,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	}
 	// setup env
 	setContainerEnv(container, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
+	setContainerEnv(container, "FALLBACK_STRATEGIES", "empty")
 
 	// setup volume mounts
 	addSharedMountsForPluginConfig(container, config.DevicePlugin.Config)
