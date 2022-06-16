@@ -193,7 +193,7 @@ toolkit:
 devicePlugin:
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.12.0-ubi8
+  version: v0.12.2-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -259,7 +259,7 @@ dcgmExporter:
 gfd:
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.6.0-ubi8
+  version: v0.6.1-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -273,7 +273,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.3.0-ubuntu20.04
+  version: v0.4.2-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
