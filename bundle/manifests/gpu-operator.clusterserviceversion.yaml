@@ -139,6 +139,8 @@ spec:
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:5b16056257acc51b517d9cdb1da3218693cefc214af93789e6e214fd2b4cacf1
     - name: vfio-manager-image
       image: nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c
+    - name: sandbox-device-plugin-image
+      image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:f48e8b430248a9cadf716a9211bb0050d4a663d1f1386ea107e72917f82e5b5f
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
@@ -674,6 +676,8 @@ spec:
                     value: "nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c"
                   - name: "VFIO_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c"
+                  - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
+                    value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:f48e8b430248a9cadf716a9211bb0050d4a663d1f1386ea107e72917f82e5b5f"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
