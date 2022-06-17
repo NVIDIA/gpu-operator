@@ -91,7 +91,7 @@ spec:
                       type: string
                     type: array
                   enabled:
-                    description: Enabled indicates if deployment of DCGM hostengine
+                    description: Enabled indicates if deployment of NVIDIA DCGM Hostengine
                       as a separate pod is enabled.
                     type: boolean
                   env:
@@ -210,7 +210,7 @@ spec:
                     format: int32
                     type: integer
                   image:
-                    description: DCGM image name
+                    description: NVIDIA DCGM image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -222,7 +222,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: DCGM image repository
+                    description: NVIDIA DCGM image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -252,7 +252,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: DCGM image tag
+                    description: NVIDIA DCGM image tag
                     type: string
                 type: object
               dcgmExporter:
@@ -264,12 +264,12 @@ spec:
                       type: string
                     type: array
                   config:
-                    description: 'Optional: Custom metrics configuration for DCGM
-                      exporter'
+                    description: 'Optional: Custom metrics configuration for NVIDIA
+                      DCGM Exporter'
                     properties:
                       name:
                         description: ConfigMap name with file dcgm-metrics.csv for
-                          metrics to be collected by DCGM exporter
+                          metrics to be collected by NVIDIA DCGM Exporter
                         type: string
                     type: object
                   env:
@@ -383,7 +383,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: DCGM image name
+                    description: NVIDIA DCGM Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -395,7 +395,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: DCGM image repository
+                    description: NVIDIA DCGM Exporter image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -425,7 +425,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: DCGM image tag
+                    description: NVIDIA DCGM Exporter image tag
                     type: string
                 type: object
               devicePlugin:
@@ -437,16 +437,16 @@ spec:
                       type: string
                     type: array
                   config:
-                    description: 'Optional: Configuration for the device-plugin via
-                      the ConfigMap'
+                    description: 'Optional: Configuration for the NVIDIA Device Plugin
+                      via the ConfigMap'
                     properties:
                       default:
                         description: Default config name within the ConfigMap for
-                          the device-plugin config
+                          the NVIDIA Device Plugin  config
                         type: string
                       name:
-                        description: ConfigMap name for device-plugin config including
-                          shared config between plugin and GFD
+                        description: ConfigMap name for NVIDIA Device Plugin config
+                          including shared config between plugin and GFD
                         type: string
                     type: object
                   env:
@@ -560,7 +560,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: DevicePlugin image name
+                    description: NVIDIA Device Plugin image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -572,7 +572,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: DevicePlugin image repository
+                    description: NVIDIA Device Plugin image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -602,7 +602,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: DevicePlugin image tag
+                    description: NVIDIA Device Plugin image tag
                     type: string
                 type: object
               driver:
@@ -615,14 +615,14 @@ spec:
                     type: array
                   certConfig:
                     description: 'Optional: Custom certificates configuration for
-                      driver container'
+                      NVIDIA Driver container'
                     properties:
                       name:
                         type: string
                     type: object
                   enabled:
-                    description: Enabled indicates if deployment of driver through
-                      operator is enabled
+                    description: Enabled indicates if deployment of NVIDIA Driver
+                      through operator is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -735,7 +735,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: Driver image name
+                    description: NVIDIA Driver image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -748,23 +748,25 @@ spec:
                     type: array
                   kernelModuleConfig:
                     description: 'Optional: Kernel module configuration parameters
-                      for the NVIDIA driver'
+                      for the NVIDIA Driver'
                     properties:
                       name:
                         type: string
                     type: object
                   licensingConfig:
-                    description: 'Optional: Licensing configuration for vGPU drivers'
+                    description: 'Optional: Licensing configuration for NVIDIA vGPU
+                      licensing'
                     properties:
                       configMapName:
                         type: string
                       nlsEnabled:
-                        description: NLSEnabled indicates if NLS is used for licensing.
+                        description: NLSEnabled indicates if NVIDIA Licensing System
+                          is used for licensing.
                         type: boolean
                     type: object
                   manager:
-                    description: Manager represents configuration for driver manager
-                      initContainer
+                    description: Manager represents configuration for NVIDIA Driver
+                      Manager initContainer
                     properties:
                       env:
                         description: 'Optional: List of environment variables'
@@ -881,7 +883,8 @@ spec:
                           type: object
                         type: array
                       image:
-                        description: Image represents Driver-Manager image name
+                        description: Image represents NVIDIA Driver Manager image
+                          name
                         pattern: '[a-zA-Z0-9\-]+'
                         type: string
                       imagePullPolicy:
@@ -893,15 +896,16 @@ spec:
                           type: string
                         type: array
                       repository:
-                        description: Repository represents Driver-Manager repository
+                        description: Repository represents Driver Managerrepository
                           path
                         type: string
                       version:
-                        description: Version represents Driver-Manager image tag(version)
+                        description: Version represents NVIDIA Driver Manager image
+                          tag(version)
                         type: string
                     type: object
                   rdma:
-                    description: GPUDirectRDMASpec defines the properties for nv_peer_mem
+                    description: GPUDirectRDMASpec defines the properties for nvidia-peermem
                       deployment
                     properties:
                       enabled:
@@ -914,13 +918,14 @@ spec:
                         type: boolean
                     type: object
                   repoConfig:
-                    description: 'Optional: Custom repo configuration for driver container'
+                    description: 'Optional: Custom repo configuration for NVIDIA Driver
+                      container'
                     properties:
                       configMapName:
                         type: string
                     type: object
                   repository:
-                    description: Driver image repository
+                    description: NVIDIA Driver image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -950,11 +955,11 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: Driver image tag
+                    description: NVIDIA Driver image tag
                     type: string
                   virtualTopology:
                     description: 'Optional: Virtual Topology Daemon configuration
-                      for vGPU drivers'
+                      for NVIDIA vGPU drivers'
                     properties:
                       config:
                         description: 'Optional: Config name representing virtual topology
@@ -1085,7 +1090,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: Driver image name
+                    description: NVIDIA GPUDirect Storage Driver image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -1097,10 +1102,10 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: Driver image repository
+                    description: NVIDIA GPUDirect Storage Driver image repository
                     type: string
                   version:
-                    description: Driver image tag
+                    description: NVIDIA GPUDirect Storage Driver image tag
                     type: string
                 type: object
               gfd:
@@ -1271,7 +1276,8 @@ spec:
                 description: MIG spec
                 properties:
                   strategy:
-                    description: 'Optional: MIGStrategy to apply for GFD and Device-Plugin'
+                    description: 'Optional: MIGStrategy to apply for GFD and NVIDIA
+                      Device Plugin'
                     enum:
                     - none
                     - single
@@ -1287,16 +1293,16 @@ spec:
                       type: string
                     type: array
                   config:
-                    description: 'Optional: Custom mig-parted configuration for MIG
-                      Manager container'
+                    description: 'Optional: Custom mig-parted configuration for NVIDIA
+                      MIG Manager container'
                     properties:
                       name:
                         description: ConfigMap name
                         type: string
                     type: object
                   enabled:
-                    description: Enabled indicates if deployment of mig-manager is
-                      enabled
+                    description: Enabled indicates if deployment of NVIDIA MIG Manager
+                      is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -1409,15 +1415,15 @@ spec:
                       type: object
                     type: array
                   gpuClientsConfig:
-                    description: 'Optional: Custom gpu-clients configuration for MIG
-                      Manager container'
+                    description: 'Optional: Custom gpu-clients configuration for NVIDIA
+                      MIG Manager container'
                     properties:
                       name:
                         description: ConfigMap name
                         type: string
                     type: object
                   image:
-                    description: mig-manager image name
+                    description: NVIDIA MIG Manager image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -1429,7 +1435,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: mig-manager image repository
+                    description: NVIDIA MIG Manager image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -1459,7 +1465,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: mig-manager image tag
+                    description: NVIDIA MIG Manager image tag
                     type: string
                 type: object
               nodeStatusExporter:
@@ -1471,7 +1477,7 @@ spec:
                       type: string
                     type: array
                   enabled:
-                    description: Enabled indicates if deployment of node-status-exporter
+                    description: Enabled indicates if deployment of Node Status Exporter
                       is enabled.
                     type: boolean
                   env:
@@ -1585,7 +1591,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: node-status-exporter image name
+                    description: Node Status Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -1597,7 +1603,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: node-status-exporter image repository
+                    description: Node Status Exporterimage repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -1627,7 +1633,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: node-status-exporter image tag
+                    description: Node Status Exporterimage tag
                     type: string
                 type: object
               operator:
@@ -1692,8 +1698,8 @@ spec:
                       type: string
                     type: array
                   enabled:
-                    description: Enabled indicates if deployment of sandbox-device-plugin
-                      through operator is enabled
+                    description: Enabled indicates if deployment of NVIDIA Sandbox
+                      Device Plugin through operator is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -1806,7 +1812,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: DevicePlugin image name
+                    description: NVIDIA Sandbox Device Plugin image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -1818,7 +1824,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: DevicePlugin image repository
+                    description: NVIDIA Sandbox Device Plugin image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -1848,7 +1854,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: DevicePlugin image tag
+                    description: NVIDIA Sandbox Device Plugin image tag
                     type: string
                 type: object
               sandboxWorkloads:
@@ -1859,6 +1865,10 @@ spec:
                     default: container
                     description: DefaultWorkload indicates the default GPU workload
                       type to configure worker nodes in the cluster for
+                    enum:
+                    - container
+                    - vm-passthrough
+                    - vm-vgpu
                     type: string
                   enabled:
                     description: Enabled indicates if the GPU Operator should manage
@@ -1875,8 +1885,8 @@ spec:
                       type: string
                     type: array
                   enabled:
-                    description: Enabled indicates if deployment of container-toolkit
-                      through operator is enabled
+                    description: Enabled indicates if deployment of NVIDIA Container
+                      Toolkit through operator is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -1989,7 +1999,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: Toolkit image name
+                    description: NVIDIA Container Toolkit image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -2001,7 +2011,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: Toolkit image repository
+                    description: NVIDIA Container Toolkit image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -2031,7 +2041,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: Toolkit image tag
+                    description: NVIDIA Container Toolkit image tag
                     type: string
                 type: object
               validator:
@@ -3033,8 +3043,8 @@ spec:
                       type: string
                     type: array
                   driverManager:
-                    description: DriverManager represents configuration for driver
-                      manager initContainer
+                    description: DriverManager represents configuration for NVIDIA
+                      Driver Manager
                     properties:
                       env:
                         description: 'Optional: List of environment variables'
@@ -3151,7 +3161,8 @@ spec:
                           type: object
                         type: array
                       image:
-                        description: Image represents Driver-Manager image name
+                        description: Image represents NVIDIA Driver Manager image
+                          name
                         pattern: '[a-zA-Z0-9\-]+'
                         type: string
                       imagePullPolicy:
@@ -3163,15 +3174,16 @@ spec:
                           type: string
                         type: array
                       repository:
-                        description: Repository represents Driver-Manager repository
+                        description: Repository represents Driver Managerrepository
                           path
                         type: string
                       version:
-                        description: Version represents Driver-Manager image tag(version)
+                        description: Version represents NVIDIA Driver Manager image
+                          tag(version)
                         type: string
                     type: object
                   enabled:
-                    description: Enabled indicates if deployment of vfio-manager is
+                    description: Enabled indicates if deployment of VFIO Manager is
                       enabled
                     type: boolean
                   env:
@@ -3285,7 +3297,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: vfio-manager image name
+                    description: VFIO Manager image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -3297,7 +3309,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: vfio-manager image repository
+                    description: VFIO Manager image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -3327,7 +3339,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: vfio-manager image tag
+                    description: VFIO Manager image tag
                     type: string
                 type: object
               vgpuDeviceManager:
@@ -3339,8 +3351,8 @@ spec:
                       type: string
                     type: array
                   config:
-                    description: vGPU devices configuration for vGPU Device Manager
-                      container
+                    description: NVIDIA vGPU devices configuration for NVIDIA vGPU
+                      Device Manager container
                     properties:
                       default:
                         default: default
@@ -3352,8 +3364,8 @@ spec:
                         type: string
                     type: object
                   enabled:
-                    description: Enabled indicates if deployment of vgpu-device-manager
-                      is enabled
+                    description: Enabled indicates if deployment of NVIDIA vGPU Device
+                      Manager is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -3466,7 +3478,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: vgpu-device-manager image name
+                    description: NVIDIA vGPU Device Manager image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -3478,7 +3490,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: vgpu-device-manager image repository
+                    description: NVIDIA vGPU Device Manager image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -3508,7 +3520,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: vgpu-devicemanager image tag
+                    description: NVIDIA vGPU Device Manager image tag
                     type: string
                 type: object
               vgpuManager:
@@ -3520,8 +3532,8 @@ spec:
                       type: string
                     type: array
                   driverManager:
-                    description: DriverManager represents configuration for driver
-                      manager initContainer
+                    description: DriverManager represents configuration for NVIDIA
+                      Driver Manager initContainer
                     properties:
                       env:
                         description: 'Optional: List of environment variables'
@@ -3638,7 +3650,8 @@ spec:
                           type: object
                         type: array
                       image:
-                        description: Image represents Driver-Manager image name
+                        description: Image represents NVIDIA Driver Manager image
+                          name
                         pattern: '[a-zA-Z0-9\-]+'
                         type: string
                       imagePullPolicy:
@@ -3650,16 +3663,17 @@ spec:
                           type: string
                         type: array
                       repository:
-                        description: Repository represents Driver-Manager repository
+                        description: Repository represents Driver Managerrepository
                           path
                         type: string
                       version:
-                        description: Version represents Driver-Manager image tag(version)
+                        description: Version represents NVIDIA Driver Manager image
+                          tag(version)
                         type: string
                     type: object
                   enabled:
-                    description: Enabled indicates if deployment of vGPU Manager through
-                      operator is enabled
+                    description: Enabled indicates if deployment of NVIDIA vGPU Manager
+                      through operator is enabled
                     type: boolean
                   env:
                     description: 'Optional: List of environment variables'
@@ -3772,7 +3786,7 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: vGPU Manager  image name
+                    description: NVIDIA vGPU Manager  image name
                     pattern: '[a-zA-Z0-9\-]+'
                     type: string
                   imagePullPolicy:
@@ -3784,7 +3798,7 @@ spec:
                       type: string
                     type: array
                   repository:
-                    description: vGPU Manager image repository
+                    description: NVIDIA vGPU Manager image repository
                     type: string
                   resources:
                     description: 'Optional: Define resources requests and limits for
@@ -3814,7 +3828,7 @@ spec:
                         type: object
                     type: object
                   version:
-                    description: vGPU Manager image tag
+                    description: NVIDIA vGPU Manager image tag
                     type: string
                 type: object
             required:
