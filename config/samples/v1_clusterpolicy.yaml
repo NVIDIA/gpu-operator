@@ -32,8 +32,6 @@ spec:
       name: ""
       default: ""
 
-  sandboxDevicePlugin: {}
-
   gfd: {}
 
   toolkit:
@@ -95,3 +93,5 @@ spec:
 
   vfioManager:
     enabled: true
+
+  sandboxDevicePlugin: {}
