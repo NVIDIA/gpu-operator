@@ -668,11 +668,9 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		}
 	}
 
-	if n.singleton.Spec.Operator.UseOpenShiftDriverToolkit != nil &&
-		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit {
-		if n.openshift == "" {
-			return fmt.Errorf("ERROR: Driver Toolkit requested but not running on OpenShift")
-		}
+	if n.openshift != "" && (n.singleton.Spec.Operator.UseOpenShiftDriverToolkit == nil ||
+		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit) {
+		// DTK is enabled by default on OpenShift
 		n.ocpDriverToolkit.requested = true
 
 		// mind that this is executed at every reconciliation loop,
@@ -680,6 +678,8 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		n.ocpDriverToolkit.rhcosVersions = make(map[string]bool)
 		n.ocpDriverToolkit.rhcosDriverToolkitImages = make(map[string]string)
 	} else {
+		// DTK is disabled on non-OpenShift deployments or when operator.use_ocp_driver_toolkit
+		// is explicitly set to 'false' in ClusterPolicy
 		n.ocpDriverToolkit.requested = false
 		n.ocpDriverToolkit.enabled = false
 
