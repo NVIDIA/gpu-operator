@@ -246,7 +246,7 @@ vgpuManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: vgpu-manager
-  version: "470.82.01"
+  version: "510.73.06"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
