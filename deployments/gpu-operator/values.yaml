@@ -86,7 +86,7 @@ driver:
   enabled: true
   repository: nvcr.io/nvidia
   image: driver
-  version: "510.47.03"
+  version: "515.48.07"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   rdma:
