@@ -150,6 +150,8 @@ spec:
       image: nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:f48e8b430248a9cadf716a9211bb0050d4a663d1f1386ea107e72917f82e5b5f
+    - name: vgpu-device-manager-image
+      image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:16ee5b1a8d9217f761c40a06c7ae598cbc893fbc35d99ff9b84fa886ea6b9b37
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
@@ -726,6 +728,8 @@ spec:
                     value: "nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:f48e8b430248a9cadf716a9211bb0050d4a663d1f1386ea107e72917f82e5b5f"
+                  - name: "VGPU_DEVICE_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:16ee5b1a8d9217f761c40a06c7ae598cbc893fbc35d99ff9b84fa886ea6b9b37"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
