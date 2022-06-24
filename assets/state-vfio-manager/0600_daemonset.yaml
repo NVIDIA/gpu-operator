@@ -52,6 +52,8 @@ spec:
               mountPath: /host
               readOnly: true
               mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
       containers:
         - name: nvidia-vfio-manager
           image: "FILLED BY THE OPERATOR"

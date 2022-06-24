@@ -57,6 +57,8 @@ spec:
               mountPath: /host
               readOnly: true
               mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
       containers:
         - image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
@@ -122,3 +124,7 @@ spec:
         - name: host-root
           hostPath:
             path: "/"
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
