@@ -25,6 +25,7 @@ include $(CURDIR)/versions.mk
 MODULE := github.com/NVIDIA/gpu-operator
 CUDA_IMAGE ?= nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+DIST ?= ubi8
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native

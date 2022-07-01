@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=v1.9.0 <v1.10.1'
+    olm.skipRange: '>=v1.9.0 <v1.11.0'
     alm-examples: |-
       [
         {
@@ -113,19 +113,19 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: nvcr.io/nvidia/gpu-operator:devel-ubi8
-    createdAt: "Mon Apr 18 10:06:40 PDT 2022"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:7e3699c82bf02ba640d49775ce1b1fc96a5eca02d5ea453ea0ed1571d73779a5
+    createdAt: "Sun Jun 26 14:26:40 PDT 2022"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v1.0.0-devel
+  name: gpu-operator-certified.v1.11.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:7e3699c82bf02ba640d49775ce1b1fc96a5eca02d5ea453ea0ed1571d73779a5
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:b90a519e9f30fbc013e1806bc081268724e9e80b4035c67c167ab3b43a37704a
     - name: dcgm-image
@@ -134,6 +134,12 @@ spec:
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:2d6e86db0e2b0db64c00566938e1851e25d4bb1019b1e7b696e2b199cba33397
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:8c9fabc1cd773e9526eb7e8526084f065f6cca9d0fd8dc2a672a0bb717f1cc60
+    - name: driver-image-510
+      image: nvcr.io/nvidia/driver@sha256:6e2902d73c54cf57bec94edf166d206cfeb0b948b5aab70800ccbe025064b3a1
+    - name: driver-image-470
+      image: nvcr.io/nvidia/driver@sha256:cf8ce04907d0e8decf90a8dccfa6134af9c39509d2f8a21c355ed71223acacdb
+    - name: driver-image-450
+      image: nvcr.io/nvidia/driver@sha256:b8799e7397fae5a27446737443091eed05b918816f53c400a48be71125ee22e8
     - name: device-plugin-image
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:7a0ccbcbe8d379bfc441e06504eb45d0d433a37e2a9e6dde83d13347296ebe81
     - name: gpu-feature-discovery-image
@@ -143,7 +149,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:4400b56f81095b24fc9dde93ad7ad7d0ca6a7e9736c4c7f1d4e2bcbf0afbe45c
     - name: gpu-operator-validator-image
-      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:d83aee1c7a9c3aa39e3947f0bd206e7955390943b8e3f2e56bdb96bc4ef99d69
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:2cb6f2b43e153e67780b1b350ae171c800e15b3f1ae5ad6375b66de530d701fd
     - name: vfio-manager-image
@@ -266,8 +272,8 @@ spec:
           path: dcgmExporter.imagePullPolicy
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
-        - description:  NVIDIA Device Plugin config
-          displayName:  NVIDIA Device Plugin config
+        - description: NVIDIA Device Plugin config
+          displayName: NVIDIA Device Plugin config
           path: devicePlugin
         - description: 'Optional: Set Node affinity'
           displayName: Node affinity
@@ -667,7 +673,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: nvcr.io/nvidia/gpu-operator:devel-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:7e3699c82bf02ba640d49775ce1b1fc96a5eca02d5ea453ea0ed1571d73779a5
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -705,7 +711,7 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:d83aee1c7a9c3aa39e3947f0bd206e7955390943b8e3f2e56bdb96bc4ef99d69"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:39127d04c9faff3f22068dcf463ed48d02be684cd18e3f14db843bddbdd783a7"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
@@ -718,6 +724,12 @@ spec:
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:7a0ccbcbe8d379bfc441e06504eb45d0d433a37e2a9e6dde83d13347296ebe81"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:8c9fabc1cd773e9526eb7e8526084f065f6cca9d0fd8dc2a672a0bb717f1cc60"
+                  - name: "DRIVER_IMAGE-510"
+                    value: "nvcr.io/nvidia/driver@sha256:6e2902d73c54cf57bec94edf166d206cfeb0b948b5aab70800ccbe025064b3a1"
+                  - name: "DRIVER_IMAGE-470"
+                    value: "nvcr.io/nvidia/driver@sha256:cf8ce04907d0e8decf90a8dccfa6134af9c39509d2f8a21c355ed71223acacdb"
+                  - name: "DRIVER_IMAGE-450"
+                    value: "nvcr.io/nvidia/driver@sha256:b8799e7397fae5a27446737443091eed05b918816f53c400a48be71125ee22e8"
                   - name: "DRIVER_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:2cb6f2b43e153e67780b1b350ae171c800e15b3f1ae5ad6375b66de530d701fd"
                   - name: "MIG_MANAGER_IMAGE"
@@ -760,4 +772,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 1.0.0-devel
+  version: 1.11.0
+  replaces: gpu-operator-certified.v1.10.1
