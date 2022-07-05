@@ -150,9 +150,6 @@ scan:gpu-operator-validator-arm64:
     OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
     OUT_REGISTRY: "${NGC_REGISTRY}"
     OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
-    # Disable external releases for now
-    DOCKER: echo
-    REGCTL: echo
 
 release:ngc-gpu-operator:
   extends:
