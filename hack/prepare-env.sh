@@ -1,6 +1,6 @@
 #! /bin/bash
 
-env=$(cat bundle/manifests/gpu-operator.clusterserviceversion.yaml \
+env=$(cat bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml \
 | yq \
 | jq '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | .name, "=", .value, ";"' -r )
 env=${env//$'\n'/}
