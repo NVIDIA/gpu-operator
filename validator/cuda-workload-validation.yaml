@@ -4,7 +4,7 @@ metadata:
   labels:
     app: nvidia-cuda-validator
   generateName: nvidia-cuda-validator-
-  namespace: "FILLED_BY_VALIDATOR"
+  namespace: "FILLED_BY_THE_VALIDATOR"
 spec:
   tolerations:
     - key: nvidia.com/gpu
@@ -15,18 +15,18 @@ spec:
   serviceAccount: nvidia-operator-validator
   initContainers:
   - name: cuda-validation
-    image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
+    image: "FILLED_BY_THE_VALIDATOR"
     imagePullPolicy: IfNotPresent
     command: ['sh', '-c']
     args: ["vectorAdd"]
     securityContext:
-      allowPrivilegeEscalation: false
+      privileged: true
   containers:
     - name: nvidia-cuda-validator
-      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel-ubi8
+      image: "FILLED_BY_THE_VALIDATOR"
       imagePullPolicy: IfNotPresent
       # override command and args as validation is already done by initContainer
       command: ['sh', '-c']
       args: ["echo cuda workload validation is successful"]
       securityContext:
-        allowPrivilegeEscalation: false
+        privileged: true
