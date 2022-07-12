@@ -860,6 +860,18 @@ func setOwnerReference(kubeClient kubernetes.Interface, pod *v1.Pod) error {
 	return nil
 }
 
+func setTolerations(kubeClient kubernetes.Interface, pod *v1.Pod) error {
+	// get tolerations of validator daemonset
+	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(context.TODO(), "nvidia-operator-validator", meta_v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// set same tolerations for individual validator pods
+	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
+	return nil
+}
+
 // waits for the pod to be created
 func waitForPod(kubeClient kubernetes.Interface, name string, namespace string) error {
 	for i := 0; i < podCreationWaitRetries; i++ {
@@ -1065,7 +1077,16 @@ func (c *CUDA) runWorkload() error {
 	}
 
 	// update owner reference
-	setOwnerReference(c.kubeClient, pod)
+	err = setOwnerReference(c.kubeClient, pod)
+	if err != nil {
+		return fmt.Errorf("unable to set owner reference for validator pod: %s", err)
+	}
+
+	// set pod tolerations
+	err = setTolerations(c.kubeClient, pod)
+	if err != nil {
+		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
+	}
 
 	// update podSpec with node name so it will just run on current node
 	pod.Spec.NodeName = nodeNameFlag
