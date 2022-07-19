@@ -272,6 +272,10 @@ spec:
                           metrics to be collected by NVIDIA DCGM Exporter
                         type: string
                     type: object
+                  enabled:
+                    description: Enabled indicates if deployment of NVIDIA DCGM Exporter
+                      through operator is enabled
+                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:
@@ -449,6 +453,10 @@ spec:
                           including shared config between plugin and GFD
                         type: string
                     type: object
+                  enabled:
+                    description: Enabled indicates if deployment of NVIDIA Device
+                      Plugin through operator is enabled
+                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:
@@ -1116,6 +1124,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  enabled:
+                    description: Enabled indicates if deployment of GPU Feature Discovery
+                      Plugin is enabled.
+                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 
 	"time"
 
@@ -40,6 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+)
+
+const (
+	minDelayCR = 100 * time.Millisecond
+	maxDelayCR = 3 * time.Second
 )
 
 // blank assignment to verify that ReconcileClusterPolicy implements reconcile.Reconciler
@@ -306,7 +312,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Create a new controller
-	c, err := controller.New("clusterpolicy-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("clusterpolicy-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1, RateLimiter: workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR)})
 	if err != nil {
 		return err
 	}

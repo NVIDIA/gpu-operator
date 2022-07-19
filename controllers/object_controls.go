@@ -130,6 +130,16 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 
 	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -143,7 +153,6 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("Couldn't create", "Error", err)
 		return gpuv1.NotReady, err
 	}
-
 	return gpuv1.Ready, nil
 }
 
@@ -154,6 +163,16 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -184,6 +203,16 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	for idx := range obj.Subjects {
 		// we don't want to update ALL the Subjects[].Namespace, eg we need to keep 'openshift-monitoring'
@@ -225,6 +254,16 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 	logger := n.rec.Log.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
 
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -254,6 +293,16 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	for idx := range obj.Subjects {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
@@ -288,6 +337,16 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
 	if obj.Name == MigPartedDefaultConfigMapName {
@@ -2439,6 +2498,16 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 
 	logger := n.rec.Log.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -2686,7 +2755,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 // DaemonSets.
 func cleanupUnusedDriverDaemonSets(n ClusterPolicyController) (int, error) {
 	// in the future, these flags can be extended to also check the
-	// value of n.singleton.Spec.Driver.IsDriverEnabled()
+	// value of n.singleton.Spec.Driver.IsEnabled()
 
 	cleanupNvidiaDriver := n.ocpDriverToolkit.enabled
 	cleanupOcpDriverToolkitDriver := !cleanupNvidiaDriver
@@ -2761,6 +2830,16 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	if !n.hasGPUNodes {
 		// multiple DaemonSets (eg, driver, dgcm-exporter) cannot be
@@ -2933,6 +3012,16 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	logger := n.rec.Log.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
 
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
 	for idx := range obj.Users {
 		if obj.Users[idx] != "FILLED BY THE OPERATOR" {
 			continue
@@ -2976,16 +3065,21 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 // PodSecurityPolicy creates PSP resources
 func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
-	// check if PSP's are disabled and ignore PSP creation
-	if !n.singleton.Spec.PSP.IsEnabled() {
-		return gpuv1.Ready, nil
-	}
-
 	state := n.idx
 	obj := n.resources[state].PodSecurityPolicy.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("PodSecurityPolicies", obj.Name)
+
+	// Check if PSP is disabled and cleanup resource if exists
+	if !n.singleton.Spec.PSP.IsEnabled() {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -3024,6 +3118,16 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.rec.Log.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -3066,6 +3170,16 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.rec.Client.Delete(context.TODO(), obj)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
 
 	for idx := range obj.Spec.NamespaceSelector.MatchNames {
 		if obj.Spec.NamespaceSelector.MatchNames[idx] != "FILLED BY THE OPERATOR" {

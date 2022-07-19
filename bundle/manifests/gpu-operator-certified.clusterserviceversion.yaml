@@ -49,6 +49,7 @@ metadata:
               }
             },
             "dcgmExporter": {
+              "enabled": true,
               "config": {
                 "name": ""
               }
@@ -59,12 +60,14 @@ metadata:
             "daemonsets": {
             },
             "devicePlugin": {
+              "enabled": true,
               "config": {
                 "name": "",
                 "default": ""
               }
             },
             "gfd": {
+              "enabled": true
             },
             "migManager": {
               "enabled": true
@@ -89,7 +92,7 @@ metadata:
               }
             },
             "vgpuManager": {
-              "enabled": true
+              "enabled": false
             },
             "vgpuDeviceManager": {
               "enabled": true,
@@ -550,6 +553,7 @@ spec:
           - create
           - watch
           - update
+          - delete
         - apiGroups:
           - image.openshift.io
           resources:
@@ -558,6 +562,16 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - policy
+          resources:
+          - podsecuritypolicies
+          verbs:
+          - create
+          - get
+          - update
+          - list
+          - delete
       permissions:
       - serviceAccountName: gpu-operator
         rules:
@@ -613,6 +627,7 @@ spec:
           - list
           - update
           - watch
+          - delete
         - apiGroups:
           - apps
           resourceNames:
@@ -652,6 +667,16 @@ spec:
           - leases
           verbs:
           - '*'
+        - apiGroups:
+          - policy
+          resources:
+          - podsecuritypolicies
+          verbs:
+          - create
+          - get
+          - update
+          - list
+          - delete
       deployments:
       - name: gpu-operator
         spec:

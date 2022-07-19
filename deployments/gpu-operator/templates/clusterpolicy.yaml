@@ -316,6 +316,7 @@ spec:
     args: {{ toYaml .Values.toolkit.args | nindent 6 }}
     {{- end }}
   devicePlugin:
+    enabled: {{ .Values.devicePlugin.enabled }}
     {{- if .Values.devicePlugin.repository }}
     repository: {{ .Values.devicePlugin.repository }}
     {{- end }}
@@ -373,6 +374,7 @@ spec:
     hostPort: {{ .Values.dcgm.hostPort }}
     {{- end }}
   dcgmExporter:
+    enabled: {{ .Values.dcgmExporter.enabled }}
     {{- if .Values.dcgmExporter.repository }}
     repository: {{ .Values.dcgmExporter.repository }}
     {{- end }}
@@ -401,6 +403,7 @@ spec:
     config: {{ toYaml .Values.dcgmExporter.config | nindent 6 }}
     {{- end }}
   gfd:
+    enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}
     repository: {{ .Values.gfd.repository }}
     {{- end }}

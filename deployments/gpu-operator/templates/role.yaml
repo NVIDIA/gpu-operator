@@ -66,6 +66,7 @@ rules:
   - create
   - watch
   - update
+  - delete
 - apiGroups:
   - nvidia.com
   resources:
@@ -104,6 +105,7 @@ rules:
   - get
   - update
   - list
+  - delete
 - apiGroups:
   - config.openshift.io
   resources:
