@@ -149,8 +149,46 @@ test_gpu_sharing() {
     kubectl delete -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
 }
 
+test_disable_enable_dcgm_exporter() {
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgmExporter/enabled", "value": 'false'}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot disable DCGM Exporter with ClusterPolicy update"
+        exit 1
+    fi
+    # Verify that dcgm-exporter pod is deleted after disabling
+    check_pod_deleted "nvidia-dcgm-exporter"
+
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgmExporter/enabled", "value": 'true'}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot enable DCGM Exporter with ClusterPolicy update"
+        exit 1
+    fi
+    # Verify that dcgm-exporter pod is running after re-enabling
+    check_pod_ready "nvidia-dcgm-exporter"
+}
+
+test_disable_enable_gfd() {
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/gfd/enabled", "value": 'false'}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot disable GFD with ClusterPolicy update"
+        exit 1
+    fi
+     # Verify that gpu-feature-discovery pod is deleted after disabling
+    check_pod_deleted "gpu-feature-discovery"
+
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/gfd/enabled", "value": 'true'}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot enable GFD with ClusterPolicy update"
+        exit 1
+    fi
+     # Verify that gpu-feature-discovery pod is running after re-enabling
+    check_pod_ready "gpu-feature-discovery"
+}
+
 test_image_updates
 test_env_updates
 test_mig_strategy_updates
 test_enable_dcgm
 test_gpu_sharing
+test_disable_enable_gfd
+test_disable_enable_dcgm_exporter

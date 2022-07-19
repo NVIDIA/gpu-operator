@@ -138,6 +138,7 @@ toolkit:
   resources: {}
 
 devicePlugin:
+  enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
   version: v0.12.2-ubi8
@@ -179,6 +180,7 @@ dcgm:
   resources: {}
 
 dcgmExporter:
+  enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
   version: 2.4.5-2.6.7-ubuntu20.04
@@ -193,6 +195,7 @@ dcgmExporter:
   resources: {}
 
 gfd:
+  enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
   version: v0.6.1-ubi8
@@ -243,10 +246,10 @@ gds:
   args: []
 
 vgpuManager:
-  enabled: true
-  repository: nvcr.io/nvidia
+  enabled: false
+  repository: ""
   image: vgpu-manager
-  version: "510.73.06"
+  version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []

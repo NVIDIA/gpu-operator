@@ -536,6 +536,12 @@ type ToolkitSpec struct {
 
 // DevicePluginSpec defines the properties for NVIDIA Device Plugin deployment
 type DevicePluginSpec struct {
+	// Enabled indicates if deployment of NVIDIA Device Plugin through operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Device Plugin deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// NVIDIA Device Plugin image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -657,6 +663,12 @@ type SandboxDevicePluginSpec struct {
 
 // DCGMExporterSpec defines the properties for NVIDIA DCGM Exporter deployment
 type DCGMExporterSpec struct {
+	// Enabled indicates if deployment of NVIDIA DCGM Exporter through operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA DCGM Exporter deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// NVIDIA DCGM Exporter image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -882,6 +894,12 @@ type KernelModuleConfigSpec struct {
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin
 type GPUFeatureDiscoverySpec struct {
+	// Enabled indicates if deployment of GPU Feature Discovery Plugin is enabled.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPU Feature Discovery Plugin deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// GFD image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -1226,6 +1244,8 @@ const (
 	Ready State = "ready"
 	// NotReady indicates some/all components of ClusterPolicy are not ready
 	NotReady State = "notReady"
+	// Disabled indicates if the state is disabled
+	Disabled State = "disabled"
 )
 
 // ClusterPolicyStatus defines the observed state of ClusterPolicy
@@ -1371,13 +1391,40 @@ func ImagePullPolicy(pullPolicy string) corev1.PullPolicy {
 	return imagePullPolicy
 }
 
-// IsDriverEnabled returns true if driver install is enabled(default) through gpu-operator
-func (d *DriverSpec) IsDriverEnabled() bool {
+// IsEnabled returns true if driver install is enabled(default) through gpu-operator
+func (d *DriverSpec) IsEnabled() bool {
 	if d.Enabled == nil {
 		// default is true if not specified by user
 		return true
 	}
 	return *d.Enabled
+}
+
+// IsEnabled returns true if device-plugin is enabled(default) through gpu-operator
+func (p *DevicePluginSpec) IsEnabled() bool {
+	if p.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *p.Enabled
+}
+
+// IsEnabled returns true if dcgm-exporter is enabled(default) through gpu-operator
+func (e *DCGMExporterSpec) IsEnabled() bool {
+	if e.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *e.Enabled
+}
+
+// IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
+func (g *GPUFeatureDiscoverySpec) IsEnabled() bool {
+	if g.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *g.Enabled
 }
 
 // IsEnabled returns true if VFIO-PCI Manager install is enabled through gpu-operator
@@ -1407,8 +1454,8 @@ func (v *VGPUDeviceManagerSpec) IsEnabled() bool {
 	return *v.Enabled
 }
 
-// IsToolkitEnabled returns true if container-toolkit install is enabled(default) through gpu-operator
-func (t *ToolkitSpec) IsToolkitEnabled() bool {
+// IsEnabled returns true if container-toolkit install is enabled(default) through gpu-operator
+func (t *ToolkitSpec) IsEnabled() bool {
 	if t.Enabled == nil {
 		// default is true if not specified by user
 		return true
@@ -1444,8 +1491,8 @@ func (p *PSPSpec) IsEnabled() bool {
 	return *p.Enabled
 }
 
-// IsMIGManagerEnabled returns true if mig-manager is enabled(default) through gpu-operator
-func (m *MIGManagerSpec) IsMIGManagerEnabled() bool {
+// IsEnabled returns true if mig-manager is enabled(default) through gpu-operator
+func (m *MIGManagerSpec) IsEnabled() bool {
 	if m.Enabled == nil {
 		// default is true if not specified by user
 		return true
@@ -1453,9 +1500,9 @@ func (m *MIGManagerSpec) IsMIGManagerEnabled() bool {
 	return *m.Enabled
 }
 
-// IsNodeStatusExporterEnabled returns true if node-status-exporter is
+// IsEnabled returns true if node-status-exporter is
 // enabled through gpu-operator
-func (m *NodeStatusExporterSpec) IsNodeStatusExporterEnabled() bool {
+func (m *NodeStatusExporterSpec) IsEnabled() bool {
 	if m.Enabled == nil {
 		// default is false if not specified by user
 		return false

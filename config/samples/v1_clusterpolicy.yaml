@@ -28,11 +28,13 @@ spec:
         value: "true"
 
   devicePlugin:
+    enabled: true
     config:
       name: ""
       default: ""
 
-  gfd: {}
+  gfd:
+    enabled: true
 
   toolkit:
     enabled: true
@@ -41,6 +43,7 @@ spec:
     enabled: true
 
   dcgmExporter:
+    enabled: true
     # configmap name for custom dcgm metrics
     config:
       name: ""
@@ -94,4 +97,5 @@ spec:
   vfioManager:
     enabled: true
 
-  sandboxDevicePlugin: {}
+  sandboxDevicePlugin:
+    enabled: true

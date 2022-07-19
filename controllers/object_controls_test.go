@@ -298,7 +298,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		}
 		dsLabel = "nvidia-driver-daemonset"
 		mainCtrName = "nvidia-driver"
-		manifestFile = filepath.Join(cfg.root, driverAssetsPath+"0500_daemonset.yaml")
+		manifestFile = filepath.Join(cfg.root, driverAssetsPath)
 		mainCtrImage, err = resolveDriverTag(clusterPolicyController, &cp.Spec.Driver)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for driver: %v", err)
@@ -316,7 +316,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		}
 		dsLabel = "nvidia-device-plugin-daemonset"
 		mainCtrName = "nvidia-device-plugin"
-		manifestFile = filepath.Join(cfg.root, devicePluginAssetsPath+"0400_daemonset.yaml")
+		manifestFile = filepath.Join(cfg.root, devicePluginAssetsPath)
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DevicePlugin)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for device-plugin: %v", err)
@@ -334,7 +334,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		}
 		dsLabel = "nvidia-vgpu-manager-daemonset"
 		mainCtrName = "nvidia-vgpu-manager-ctr"
-		manifestFile = filepath.Join(cfg.root, vGPUManagerAssetsPath+"0500_daemonset.yaml")
+		manifestFile = filepath.Join(cfg.root, vGPUManagerAssetsPath)
 		mainCtrImage, err = resolveDriverTag(clusterPolicyController, &cp.Spec.VGPUManager)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for driver: %v", err)
@@ -352,7 +352,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		}
 		dsLabel = "nvidia-sandbox-device-plugin-daemonset"
 		mainCtrName = "nvidia-sandbox-device-plugin-ctr"
-		manifestFile = filepath.Join(cfg.root, sandboxDevicePluginAssetsPath, "0500_daemonset.yaml")
+		manifestFile = filepath.Join(cfg.root, sandboxDevicePluginAssetsPath)
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.SandboxDevicePlugin)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for sandbox-device-plugin: %v", err)
@@ -658,6 +658,7 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.VGPUManager.DriverManager.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.VGPUManager.DriverManager.Image = "k8s-driver-manager"
 	cp.Spec.VGPUManager.DriverManager.Version = "v0.3.0"
+	clusterPolicyController.sandboxEnabled = true
 
 	switch testCase {
 	case "default":
@@ -756,6 +757,7 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.SandboxDevicePlugin.Repository = "nvcr.io/nvidia"
 	cp.Spec.SandboxDevicePlugin.Image = "kubevirt-device-plugin"
 	cp.Spec.SandboxDevicePlugin.Version = "v1.1.0"
+	clusterPolicyController.sandboxEnabled = true
 
 	switch testCase {
 	case "default":

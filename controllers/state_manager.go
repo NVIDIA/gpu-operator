@@ -600,73 +600,38 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		n.rec.Log.Info("Operator metrics initialized.")
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
-
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
-
-		if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
-			n.sandboxEnabled = true
-			// defaultGPUWorkloadConfig is vm-passthrough, unless
-			// user overrides in ClusterPolicy with a valid GPU
-			// workload configuration
-			defaultWorkload := clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload
-			if isValidWorkloadConfig(defaultWorkload) {
-				n.rec.Log.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", defaultWorkload)
-				defaultGPUWorkloadConfig = defaultWorkload
-			}
-			if clusterPolicy.Spec.VGPUManager.IsEnabled() {
-				addState(n, "/opt/gpu-operator/state-vgpu-manager")
-			}
-			if clusterPolicy.Spec.VGPUDeviceManager.IsEnabled() {
-				addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
-			}
-			addState(n, "/opt/gpu-operator/state-sandbox-validation")
-			if clusterPolicy.Spec.VFIOManager.IsEnabled() {
-				addState(n, "/opt/gpu-operator/state-vfio-manager")
-			}
-			if clusterPolicy.Spec.SandboxDevicePlugin.IsEnabled() {
-				addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
-			}
-		}
-		n.rec.Log.Info("Sandbox workloads", "Enabled", n.sandboxEnabled, "DefaultWorkload", defaultGPUWorkloadConfig)
-
-		if clusterPolicy.Spec.NodeStatusExporter.IsNodeStatusExporterEnabled() {
-			addState(n, "/opt/gpu-operator/state-node-status-exporter")
-		}
-
-		if clusterPolicy.Spec.Driver.IsDriverEnabled() {
-			addState(n, "/opt/gpu-operator/state-driver")
-		}
-		if clusterPolicy.Spec.Toolkit.IsToolkitEnabled() {
-			addState(n, "/opt/gpu-operator/state-container-toolkit")
-		}
+		addState(n, "/opt/gpu-operator/state-driver")
+		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
-		if clusterPolicy.Spec.DCGM.IsEnabled() {
-			addState(n, "/opt/gpu-operator/state-dcgm")
-		}
+		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
-
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
-		if clusterPolicy.Spec.MIGManager.IsMIGManagerEnabled() {
-			addState(n, "/opt/gpu-operator/state-mig-manager")
+		addState(n, "/opt/gpu-operator/state-mig-manager")
+		addState(n, "/opt/gpu-operator/state-node-status-exporter")
+		// add sandbox workload states
+		addState(n, "/opt/gpu-operator/state-vgpu-manager")
+		addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
+		addState(n, "/opt/gpu-operator/state-sandbox-validation")
+		addState(n, "/opt/gpu-operator/state-vfio-manager")
+		addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
+	}
+
+	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
+		n.sandboxEnabled = true
+		// defaultGPUWorkloadConfig is container, unless
+		// user overrides in ClusterPolicy with a valid GPU
+		// workload configuration
+		defaultWorkload := clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload
+		if isValidWorkloadConfig(defaultWorkload) {
+			n.rec.Log.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", defaultWorkload)
+			defaultGPUWorkloadConfig = defaultWorkload
 		}
 	} else {
-		// Only adding dcgm as special case to dynamically enable the component
-		// if disabled during install
-		if clusterPolicy.Spec.DCGM.IsEnabled() {
-			stateAdded := false
-			for _, state := range n.stateNames {
-				if state == "state-dcgm" {
-					// already added ignore
-					stateAdded = true
-					break
-				}
-			}
-			if !stateAdded {
-				addState(n, "/opt/gpu-operator/state-dcgm")
-			}
-		}
+		n.sandboxEnabled = false
 	}
+	n.rec.Log.Info("Sandbox workloads", "Enabled", n.sandboxEnabled, "DefaultWorkload", defaultGPUWorkloadConfig)
 
 	if n.openshift != "" && (n.singleton.Spec.Operator.UseOpenShiftDriverToolkit == nil ||
 		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit) {
@@ -757,7 +722,7 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		// successfully deployed resource, now check if its ready
 		if stat != gpuv1.Ready {
 			// mark overall status of this component as not-ready and continue with other resources, while this becomes ready
-			result = gpuv1.NotReady
+			result = stat
 		}
 	}
 
@@ -776,4 +741,44 @@ func (n ClusterPolicyController) last() bool {
 		return true
 	}
 	return false
+}
+
+func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
+	clusterPolicySpec := &n.singleton.Spec
+
+	switch stateName {
+	case "state-driver":
+		return clusterPolicySpec.Driver.IsEnabled()
+	case "state-container-toolkit":
+		return clusterPolicySpec.Toolkit.IsEnabled()
+	case "state-device-plugin":
+		return clusterPolicySpec.DevicePlugin.IsEnabled()
+	case "state-dcgm":
+		return clusterPolicySpec.DCGM.IsEnabled()
+	case "state-dcgm-exporter":
+		return clusterPolicySpec.DCGMExporter.IsEnabled()
+	case "state-mig-manager":
+		return clusterPolicySpec.MIGManager.IsEnabled()
+	case "gpu-feature-discovery":
+		return clusterPolicySpec.GPUFeatureDiscovery.IsEnabled()
+	case "state-node-status-exporter":
+		return clusterPolicySpec.NodeStatusExporter.IsEnabled()
+	case "state-sandbox-device-plugin":
+		return n.sandboxEnabled && clusterPolicySpec.SandboxDevicePlugin.IsEnabled()
+	case "state-vfio-manager":
+		return n.sandboxEnabled && clusterPolicySpec.VFIOManager.IsEnabled()
+	case "state-vgpu-device-manager":
+		return n.sandboxEnabled && clusterPolicySpec.VGPUDeviceManager.IsEnabled()
+	case "state-vgpu-manager":
+		return n.sandboxEnabled && clusterPolicySpec.VGPUManager.IsEnabled()
+	case "state-sandbox-validation":
+		return n.sandboxEnabled
+	case "state-operator-validation":
+		return true
+	case "state-operator-metrics":
+		return true
+	default:
+		n.rec.Log.Error(nil, "invalid state passed", "stateName", stateName)
+		return false
+	}
 }
