@@ -536,7 +536,7 @@ func (d *Driver) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Stat("/host/usr/bin/nvidia-smi"); err == nil {
+	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
 		args = []string{"/host", "nvidia-smi"}
 		hostDriver = true
 	}
@@ -1257,7 +1257,7 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Stat("/host/usr/bin/nvidia-smi"); err == nil {
+	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
 		args = []string{"/host", "nvidia-smi"}
 		hostDriver = true
 	}
