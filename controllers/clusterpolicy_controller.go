@@ -137,6 +137,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if statusError != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
+			updateCRState(r, req.NamespacedName, gpuv1.NotReady)
 			return ctrl.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
