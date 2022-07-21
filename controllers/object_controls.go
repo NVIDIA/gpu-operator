@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -489,7 +490,10 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
 func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// update image
 	img, err := gpuv1.ImagePath(&config.GPUFeatureDiscovery)
@@ -538,7 +542,10 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
-	handleDevicePluginConfig(obj, config)
+	err = handleDevicePluginConfig(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
@@ -552,6 +559,11 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 // Read and parse os-release file
 func parseOSRelease() (map[string]string, error) {
 	release := map[string]string{}
+
+	// TODO: mock this call instead
+	if os.Getenv("UNIT_TEST") == "true" {
+		return release, nil
+	}
 
 	f, err := os.Open("/host-etc/os-release")
 	if err != nil {
@@ -573,20 +585,41 @@ func parseOSRelease() (map[string]string, error) {
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// apply rolling update config
+	err := applyRollingUpdateConfig(obj, config)
+	if err != nil {
+		return err
+	}
+
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err = transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// update driver-manager initContainer
-	transformDriverManagerInitContainer(obj, &config.Driver.Manager)
+	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager)
+	if err != nil {
+		return err
+	}
 
 	// update nvidia-driver container
-	transformDriverContainer(obj, config, n)
+	err = transformDriverContainer(obj, config, n)
+	if err != nil {
+		return err
+	}
 
 	// update nvidia-peermem sidecar container
-	transformPeerMemoryContainer(obj, config, n)
+	err = transformPeerMemoryContainer(obj, config, n)
+	if err != nil {
+		return err
+	}
 
 	// update nvidia-fs sidecar container
-	transformGDSContainer(obj, config, n)
+	err = transformGDSContainer(obj, config, n)
+	if err != nil {
+		return err
+	}
 
 	// update PriorityClass
 	if config.Daemonsets.PriorityClassName != "" {
@@ -598,7 +631,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// update OpenShift Driver Toolkit sidecar container
-	err := transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
+	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 	}
@@ -784,7 +817,10 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 	// update image
 	image, err := gpuv1.ImagePath(&config.Toolkit)
 	if err != nil {
@@ -870,7 +906,11 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+
 	// update image
 	image, err := gpuv1.ImagePath(&config.DevicePlugin)
 	if err != nil {
@@ -913,7 +953,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
-	handleDevicePluginConfig(obj, config)
+	err = handleDevicePluginConfig(obj, config)
+	if err != nil {
+		return nil
+	}
 
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
@@ -927,7 +970,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 // TransformSandboxDevicePlugin transforms sandbox-device-plugin daemonset with required config as per ClusterPolicy
 func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 	// update image
 	image, err := gpuv1.ImagePath(&config.SandboxDevicePlugin)
 	if err != nil {
@@ -974,7 +1020,11 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
 func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+
 	// update image
 	image, err := gpuv1.ImagePath(&config.DCGMExporter)
 	if err != nil {
@@ -1115,7 +1165,10 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 // TransformDCGM transforms dcgm daemonset with required config as per ClusterPolicy
 func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 	// update image
 	image, err := gpuv1.ImagePath(&config.DCGM)
 	if err != nil {
@@ -1175,7 +1228,10 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 // TransformMIGManager transforms MIG Manager daemonset with required config as per ClusterPolicy
 func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// update image
 	image, err := gpuv1.ImagePath(&config.MIGManager)
@@ -1317,7 +1373,10 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 // TransformVGPUDeviceManager transforms VGPU Device Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// update image
 	image, err := gpuv1.ImagePath(&config.VGPUDeviceManager)
@@ -1565,7 +1624,10 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 // TransformNodeStatusExporter transforms the node-status-exporter daemonset with required config as per ClusterPolicy
 func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
 
 	// update image
 	image, err := gpuv1.ImagePath(&config.NodeStatusExporter)
@@ -2396,6 +2458,26 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		}
 	}
 
+	return nil
+}
+
+func applyRollingUpdateConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	// update config for RollingUpdate strategy
+	if config.Driver.RollingUpdate == nil || config.Driver.RollingUpdate.MaxUnavailable == "" {
+		return nil
+	}
+	var intOrString intstr.IntOrString
+	if strings.HasSuffix(config.Driver.RollingUpdate.MaxUnavailable, "%") {
+		intOrString = intstr.IntOrString{Type: intstr.String, StrVal: config.Driver.RollingUpdate.MaxUnavailable}
+	} else {
+		int64Val, err := strconv.ParseInt(config.Driver.RollingUpdate.MaxUnavailable, 10, 64)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to apply rolling update config: %s", err)
+		}
+		intOrString = intstr.IntOrString{Type: intstr.Int, IntVal: int32(int64Val)}
+	}
+	rollingUpdateSpec := appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intOrString}
+	obj.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType, RollingUpdate: &rollingUpdateSpec}
 	return nil
 }
 

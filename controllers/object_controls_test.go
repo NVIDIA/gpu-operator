@@ -140,6 +140,9 @@ func setup() error {
 	boolTrue = new(bool)
 	*boolTrue = true
 
+	// add env for calls that we cannot mock
+	os.Setenv("UNIT_TEST", "true")
+
 	s := scheme.Scheme
 	if err := gpuv1.AddToScheme(s); err != nil {
 		return fmt.Errorf("unable to add ClusterPolicy v1 schema: %v", err)
@@ -430,6 +433,10 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.Driver.Image = "driver"
 	cp.Spec.Driver.Version = "470.57.02"
 
+	cp.Spec.Driver.Manager.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Driver.Manager.Image = "k8s-driver-manager"
+	cp.Spec.Driver.Manager.Version = "test"
+
 	switch testCase {
 	case "default":
 		// Do nothing
@@ -449,6 +456,7 @@ func getDriverTestOutput(testCase string) map[string]interface{} {
 		"mofedValidationPresent": false,
 		"nvPeerMemPresent":       false,
 		"driverImage":            "nvcr.io/nvidia/driver:470.57.02-ubuntu18.04",
+		"driverManagerImage":     "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
 	}
 
 	switch testCase {
@@ -489,9 +497,13 @@ func TestDriver(t *testing.T) {
 			mofedValidationPresent := false
 			nvPeerMemPresent := false
 			driverImage := ""
+			driverManagerImage := ""
 			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
 				if strings.Contains(initContainer.Name, "mofed-validation") {
 					mofedValidationPresent = true
+				}
+				if strings.Contains(initContainer.Name, "k8s-driver-manager") {
+					driverManagerImage = initContainer.Image
 				}
 			}
 			for _, container := range ds.Spec.Template.Spec.Containers {
@@ -507,6 +519,7 @@ func TestDriver(t *testing.T) {
 			require.Equal(t, tc.output["mofedValidationPresent"], mofedValidationPresent, "Unexpected configuration for mofed-validation init container")
 			require.Equal(t, tc.output["nvPeerMemPresent"], nvPeerMemPresent, "Unexpected configuration for nv-peermem container")
 			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-driver-ctr image")
+			require.Equal(t, tc.output["driverManagerImage"], driverManagerImage, "Unexpected configuration for k8s-driver-manager image")
 
 			// cleanup by deleting all kubernetes objects
 			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
@@ -528,6 +541,10 @@ func getDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.DevicePlugin.Repository = "nvcr.io/nvidia"
 	cp.Spec.DevicePlugin.Image = "k8s-device-plugin"
 	cp.Spec.DevicePlugin.Version = "v0.12.0-ubi8"
+
+	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Validator.Image = "gpu-operator-validator"
+	cp.Spec.Validator.Version = "v1.11.0"
 
 	switch testCase {
 	case "default":
@@ -675,8 +692,9 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
 	// default output
 	output := map[string]interface{}{
-		"numDaemonsets": 1,
-		"driverImage":   "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu18.04",
+		"numDaemonsets":      1,
+		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu18.04",
+		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.3.0",
 	}
 
 	switch testCase {
@@ -714,6 +732,13 @@ func TestVGPUManager(t *testing.T) {
 				return
 			}
 			driverImage := ""
+			driverManagerImage := ""
+			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
+				if strings.Contains(initContainer.Name, "k8s-driver-manager") {
+					driverManagerImage = initContainer.Image
+					break
+				}
+			}
 			for _, container := range ds.Spec.Template.Spec.Containers {
 				if strings.Contains(container.Name, "nvidia-vgpu-manager-ctr") {
 					driverImage = container.Image
@@ -722,6 +747,7 @@ func TestVGPUManager(t *testing.T) {
 			}
 
 			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-vgpu-manager-ctr image")
+			require.Equal(t, tc.output["driverManagerImage"], driverManagerImage, "Unexpected configuration for k8s-driver-manager image")
 
 			// cleanup by deleting all kubernetes objects
 			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
@@ -758,6 +784,10 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.SandboxDevicePlugin.Image = "kubevirt-device-plugin"
 	cp.Spec.SandboxDevicePlugin.Version = "v1.1.0"
 	clusterPolicyController.sandboxEnabled = true
+
+	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Validator.Image = "gpu-operator-validator"
+	cp.Spec.Validator.Version = "v1.11.0"
 
 	switch testCase {
 	case "default":
