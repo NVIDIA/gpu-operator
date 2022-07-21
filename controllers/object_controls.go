@@ -2220,8 +2220,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
 				// mount /usr/src/ofa_kernel path directly from host to build using MOFED drivers installed on host
 				for index, volume := range obj.Spec.Template.Spec.Volumes {
-					if volume.Name == "run-mellanox-drivers" {
-						obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/"
+					if volume.Name == "mlnx-ofed-usr-src" {
+						obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
 					}
 				}
 				// set env indicating host-mofed is enabled
