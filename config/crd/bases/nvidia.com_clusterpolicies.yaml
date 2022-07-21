@@ -962,6 +962,13 @@ spec:
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  rollingUpdate:
+                    description: 'Optional: Configuration for rolling update of NVIDIA
+                      Driver DaemonSet pods'
+                    properties:
+                      maxUnavailable:
+                        type: string
+                    type: object
                   version:
                     description: NVIDIA Driver image tag
                     type: string
