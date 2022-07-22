@@ -52,6 +52,9 @@ metadata:
               "enabled": true,
               "config": {
                 "name": ""
+              },
+              "serviceMonitor": {
+                "enabled": true
               }
             },
             "dcgm": {
@@ -572,6 +575,14 @@ spec:
           - update
           - list
           - delete
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - watch
       permissions:
       - serviceAccountName: gpu-operator
         rules:
@@ -677,6 +688,14 @@ spec:
           - update
           - list
           - delete
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - watch
       deployments:
       - name: gpu-operator
         spec:

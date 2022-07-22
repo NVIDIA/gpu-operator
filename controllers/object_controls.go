@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -99,6 +100,8 @@ const (
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 	// NvidiaDisableRequireEnvName is the env name to disable default cuda constraints
 	NvidiaDisableRequireEnvName = "NVIDIA_DISABLE_REQUIRE"
+	// ServiceMonitorCRDName is the name of the CRD defining the ServiceMonitor kind
+	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -3159,26 +3162,82 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+func crdExists(c client.Client, name string) (bool, error) {
+	crd := &apiextensionsv1.CustomResourceDefinition{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: name}, crd)
+	if err != nil && errors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	if n.stateNames[state] == "state-operator-metrics" {
-		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
-	}
-
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
+	// Check if ServiceMonitor is a valid kind
+	serviceMonitorCRDExists, err := crdExists(n.rec.Client, ServiceMonitorCRDName)
+	if err != nil {
+		return gpuv1.NotReady, err
+	}
+
 	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
+	if !n.isStateEnabled(n.stateNames[state]) {
+		if !serviceMonitorCRDExists {
+			return gpuv1.Ready, nil
+		}
 		err := n.rec.Client.Delete(context.TODO(), obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
+	}
+
+	if n.stateNames[state] == "state-dcgm-exporter" {
+		serviceMonitor := n.singleton.Spec.DCGMExporter.ServiceMonitor
+		// Check if ServiceMonitor is disabled and cleanup resource if exists
+		if serviceMonitor == nil || !serviceMonitor.IsEnabled() {
+			if !serviceMonitorCRDExists {
+				return gpuv1.Ready, nil
+			}
+			err := n.rec.Client.Delete(context.TODO(), obj)
+			if err != nil && !errors.IsNotFound(err) {
+				logger.Info("Couldn't delete", "Error", err)
+				return gpuv1.NotReady, err
+			}
+			return gpuv1.Disabled, nil
+		}
+
+		if !serviceMonitorCRDExists {
+			return gpuv1.NotReady, fmt.Errorf("ServiceMonitor deployment is enabled but ServiceMonitor CRD not found in cluster")
+		}
+
+		// Apply custom edits for DCGM Exporter
+		if serviceMonitor.Interval != "" {
+			obj.Spec.Endpoints[0].Interval = serviceMonitor.Interval
+		}
+
+		if serviceMonitor.HonorLabels != nil {
+			obj.Spec.Endpoints[0].HonorLabels = *serviceMonitor.HonorLabels
+		}
+
+		if serviceMonitor.AdditionalLabels != nil {
+			for key, value := range serviceMonitor.AdditionalLabels {
+				obj.ObjectMeta.Labels[key] = value
+			}
+		}
+	}
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
 	}
 
 	for idx := range obj.Spec.NamespaceSelector.MatchNames {
@@ -3193,7 +3252,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &promv1.ServiceMonitor{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(context.TODO(), obj)

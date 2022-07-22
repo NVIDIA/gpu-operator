@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -717,6 +718,11 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Metrics Configuration For DCGM Exporter"
 	MetricsConfig *DCGMExporterMetricsConfig `json:"config,omitempty"`
+
+	// Optional: ServiceMonitor configuration for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ServiceMonitor configuration for NVIDIA DCGM Exporter"
+	ServiceMonitor *DCGMExporterServiceMonitorConfig `json:"serviceMonitor,omitempty"`
 }
 
 // DCGMExporterMetricsConfig defines metrics to be collected by NVIDIA DCGM Exporter
@@ -727,6 +733,35 @@ type DCGMExporterMetricsConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap name with file dcgm-metrics.csv"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
+}
+
+// DCGMExporterServiceMonitorConfig defines configuration options for the ServiceMonitor
+// deployed for DCGM Exporter
+type DCGMExporterServiceMonitorConfig struct {
+	// Enabled indicates if ServiceMonitor is deployed for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable deployment of NVIDIA DCGM Exporter ServiceMonitor"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Interval which metrics should be scraped from NVIDIA DCGM Exporter. If not specified Prometheus’ global scrape interval is used.
+	// Supported units: y, w, d, h, m, s, ms
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Interval which metrics should be scraped from NVDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Interval promv1.Duration `json:"interval,omitempty"`
+
+	// HonorLabels chooses the metric’s labels on collisions with target labels.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Choose the metric's label on collisions with target labels"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	HonorLabels *bool `json:"honorLabels,omitempty"`
+
+	// AdditionalLabels to add to ServiceMonitor instance for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Additional labels to add to ServiceMonitor instance for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment
@@ -1535,6 +1570,15 @@ func (dcgm *DCGMSpec) IsEnabled() bool {
 		return true
 	}
 	return *dcgm.Enabled
+}
+
+// IsEnabled returns true if ServiceMonitor for DCGM Exporter is enabled through gpu-operator
+func (sm *DCGMExporterServiceMonitorConfig) IsEnabled() bool {
+	if sm.Enabled == nil {
+		// ServiceMonitor for DCGM Exporter is disabled by default
+		return false
+	}
+	return *sm.Enabled
 }
 
 // IsNLSEnabled returns true if NLS should be used for licensing the driver

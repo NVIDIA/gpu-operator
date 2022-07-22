@@ -193,6 +193,11 @@ dcgmExporter:
     - name: DCGM_EXPORTER_COLLECTORS
       value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
   resources: {}
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    honorLabels: false
+    additionalLabels: {}
 
 gfd:
   enabled: true
