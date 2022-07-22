@@ -423,6 +423,11 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
 	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
+
+	// Optional: Configuration for rolling update of NVIDIA Driver DaemonSet pods
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Rolling update configuration for NVIDIA Driver DaemonSet pods"
+	RollingUpdate *RollingUpdateSpec `json:"rollingUpdate,omitempty"`
 }
 
 // VGPUManagerSpec defines the properties for the NVIDIA vGPU Manager deployment
@@ -878,6 +883,15 @@ type KernelModuleConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
+}
+
+// RollingUpdateSpec defines configuration for the rolling update of NVIDIA Driver DaemonSet pods
+type RollingUpdateSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Maximum number of nodes to simultaneously apply pod updates on. Default 1"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin

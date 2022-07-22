@@ -76,6 +76,11 @@ spec:
     # kernel module configuration for NVIDIA driver
     kernelModuleConfig:
       name: ""
+    # configuration for controlling rolling update of NVIDIA driver DaemonSet pods
+    rollingUpdate:
+      # maximum number of nodes to simultaneously apply pod updates on.
+      # can be specified either as number or percentage of nodes. Default 1.
+      maxUnavailable: "1"
 
   vgpuManager:
     enabled: true
