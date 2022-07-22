@@ -11,6 +11,49 @@ data:
         - devices: all
           mig-enabled: false
 
+      # H100-80GB, A100-80GB
+      all-1g.10gb:
+        # H100-80GB
+        - device-filter: ["0x233110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 8
+        # A100-80GB
+        - device-filter: ["0x20B210DE", "0x20B510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 7
+
+      # H100-80GB, A100-80GB
+      all-2g.20gb:
+        # H100-80GB
+        - device-filter: ["0x233110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.20gb": 4
+        # A100-80GB
+        - device-filter: ["0x20B210DE", "0x20B510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.20gb": 3
+
+      # H100-80GB
+      all-4g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.40gb": 2
+
+      all-8g.80gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "8g.80gb": 1
+
       # A100-40GB
       all-1g.5gb:
         - devices: all
@@ -37,18 +80,6 @@ data:
             "7g.40gb": 1
 
       # A100-80GB
-      all-1g.10gb:
-        - devices: all
-          mig-enabled: true
-          mig-devices:
-            "1g.10gb": 7
-
-      all-2g.20gb:
-        - devices: all
-          mig-enabled: true
-          mig-devices:
-            "2g.20gb": 3
-
       all-3g.40gb:
         - devices: all
           mig-enabled: true
@@ -105,8 +136,16 @@ data:
           mig-devices:
             "7g.96gb": 1
 
-      # A100-40GB, A100-80GB, A30-24GB, PG506-96GB
+      # H100-80GB, A100-40GB, A100-80GB, A30-24GB, PG506-96GB
       all-balanced:
+        # H100-80GB
+        - device-filter: ["0x233110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 2
+            "2g.20gb": 1
+            "4g.40gb": 1
         # A100-40GB
         - device-filter: ["0x20B010DE", "0x20B110DE", "0x20F110DE"]
           devices: all
