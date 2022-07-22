@@ -428,6 +428,32 @@ spec:
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  serviceMonitor:
+                    description: 'Optional: ServiceMonitor configuration for NVIDIA
+                      DCGM Exporter'
+                    properties:
+                      additionalLabels:
+                        additionalProperties:
+                          type: string
+                        description: AdditionalLabels to add to ServiceMonitor instance
+                          for NVIDIA DCGM Exporter
+                        type: object
+                      enabled:
+                        description: Enabled indicates if ServiceMonitor is deployed
+                          for NVIDIA DCGM Exporter
+                        type: boolean
+                      honorLabels:
+                        description: HonorLabels chooses the metric’s labels on collisions
+                          with target labels.
+                        type: boolean
+                      interval:
+                        description: 'Interval which metrics should be scraped from
+                          NVIDIA DCGM Exporter. If not specified Prometheus’ global
+                          scrape interval is used. Supported units: y, w, d, h, m,
+                          s, ms'
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                    type: object
                   version:
                     description: NVIDIA DCGM Exporter image tag
                     type: string

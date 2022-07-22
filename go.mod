@@ -7,13 +7,14 @@ require (
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/openshift/api v0.0.0-20210924154557-a4f696157341
 	github.com/openshift/client-go v0.0.0-20210916133943-9acee1a0fb83
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.56.3
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220525163429-038b3f8b475d
 	k8s.io/api v0.23.0
+	k8s.io/apiextensions-apiserver v0.23.0
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v0.23.0
 	sigs.k8s.io/controller-runtime v0.11.0
@@ -71,7 +72,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	k8s.io/apiextensions-apiserver v0.23.0 // indirect
 	k8s.io/component-base v0.23.0 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
