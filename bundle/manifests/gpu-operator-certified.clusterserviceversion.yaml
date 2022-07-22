@@ -46,6 +46,9 @@ metadata:
               },
               "kernelModuleConfig": {
                 "name": ""
+              },
+              "rollingUpdate": {
+                "maxUnavailable": "1"
               }
             },
             "dcgmExporter": {
