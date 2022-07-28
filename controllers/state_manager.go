@@ -29,6 +29,9 @@ const (
 	commonOperandsLabelValue            = "true"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
+	migCapableLabelKey                  = "nvidia.com/mig.capable"
+	migCapableLabelValue                = "true"
+	vgpuHostDriverLabelKey              = "nvidia.com/vgpu.host-driver-version"
 	gpuProductLabelKey                  = "nvidia.com/gpu.product"
 	nfdLabelPrefix                      = "feature.node.kubernetes.io/"
 	nfdKernelLabelKey                   = "feature.node.kubernetes.io/kernel-version.full"
@@ -221,18 +224,27 @@ func hasNFDLabels(labels map[string]string) bool {
 
 // hasMIGCapableGPU returns true if this node has GPU capable of MIG partitioning.
 func hasMIGCapableGPU(labels map[string]string) bool {
-	for key, value := range labels {
-		if strings.Contains(key, "vgpu.host-driver-version") && value != "" {
-			// vGPU node
-			return false
+	if value, exists := labels[vgpuHostDriverLabelKey]; exists && value != "" {
+		// vGPU node
+		return false
+	}
+
+	if value, exists := labels[migCapableLabelKey]; exists {
+		if value == migCapableLabelValue {
+			return true
 		}
-		// update this once GFD supports mig.capable label
-		if key == gpuProductLabelKey {
-			if strings.Contains(strings.ToLower(value), "a100") || strings.Contains(strings.ToLower(value), "a30") {
-				return true
-			}
+		return false
+	}
+
+	// check product label if mig.capable label does not exist
+	if value, exists := labels[gpuProductLabelKey]; exists {
+		if strings.Contains(strings.ToLower(value), "h100") ||
+			strings.Contains(strings.ToLower(value), "a100") ||
+			strings.Contains(strings.ToLower(value), "a30") {
+			return true
 		}
 	}
+
 	return false
 }
 
