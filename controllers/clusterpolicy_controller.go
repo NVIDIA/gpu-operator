@@ -204,6 +204,10 @@ func updateCRState(r *ClusterPolicyReconciler, namespacedName types.NamespacedNa
 		r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
 		return err
 	}
+	if instance.Status.State == state {
+		// state is unchanged
+		return nil
+	}
 	// Update the CR state
 	instance.SetStatus(state, clusterPolicyCtrl.operatorNamespace)
 	err = r.Client.Status().Update(context.TODO(), instance)
