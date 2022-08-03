@@ -95,7 +95,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.0
+    version: v0.4.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
@@ -267,7 +267,7 @@ vgpuManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.0
+    version: v0.4.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
@@ -302,7 +302,7 @@ vfioManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.0
+    version: v0.4.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
