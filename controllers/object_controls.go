@@ -101,6 +101,10 @@ const (
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 	// NvidiaDisableRequireEnvName is the env name to disable default cuda constraints
 	NvidiaDisableRequireEnvName = "NVIDIA_DISABLE_REQUIRE"
+	// GDSEnabledEnvName is the env name to enable GDS support with device-plugin
+	GDSEnabledEnvName = "GDS_ENABLED"
+	// MOFEDEnabledEnvName is the env name to enable MOFED devices injection with device-plugin
+	MOFEDEnabledEnvName = "MOFED_ENABLED"
 	// ServiceMonitorCRDName is the name of the CRD defining the ServiceMonitor kind
 	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
 )
@@ -954,6 +958,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
+	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MOFEDEnabledEnvName, "true")
+	}
 
 	// apply plugin configuration through ConfigMap if one is provided
 	err = handleDevicePluginConfig(obj, config)
@@ -1456,6 +1465,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	// apply changes for individual component validators(initContainers)
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "nvidia-fs")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
@@ -1530,6 +1540,11 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		if !strings.Contains(initContainer.Name, fmt.Sprintf("%s-validation", component)) {
 			continue
 		}
+		if component == "nvidia-fs" && (config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled()) {
+			// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
+			podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+			return nil
+		}
 		// update validation image
 		image, err := gpuv1.ImagePath(&config.Validator)
 		if err != nil {
@@ -1586,6 +1601,8 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}
+		case "nvidia-fs":
+			// no additional config required for nvidia-fs validation
 		case "toolkit":
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {

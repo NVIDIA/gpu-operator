@@ -54,6 +54,9 @@ type Component interface {
 // Driver component
 type Driver struct{}
 
+// NvidiaFs GDS Driver component
+type NvidiaFs struct{}
+
 // CUDA represents spec to run cuda workload
 type CUDA struct {
 	kubeClient kubernetes.Interface
@@ -116,6 +119,8 @@ const (
 	driverStatusFile = "driver-ready"
 	// hostDriverStatusFile indicates status file for host driver readiness
 	hostDriverStatusFile = "host-driver-ready"
+	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
+	nvidiaFsStatusFile = "nvidia-fs-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
 	toolkitStatusFile = "toolkit-ready"
 	// pluginStatusFile indicates status file for plugin readiness
@@ -360,6 +365,8 @@ func isValidComponent() bool {
 	case "vgpu-manager":
 		fallthrough
 	case "vgpu-devices":
+		fallthrough
+	case "nvidia-fs":
 		return true
 	default:
 		return false
@@ -430,6 +437,13 @@ func start(c *cli.Context) error {
 		err := driver.validate()
 		if err != nil {
 			return fmt.Errorf("error validating driver installation: %s", err)
+		}
+		return nil
+	case "nvidia-fs":
+		nvidiaFs := &NvidiaFs{}
+		err := nvidiaFs.validate()
+		if err != nil {
+			return fmt.Errorf("error validating nvidia-fs driver installation: %s", err)
 		}
 		return nil
 	case "toolkit":
@@ -611,6 +625,38 @@ func deleteStatusFile(statusFile string) error {
 		// status file already removed
 	}
 	return nil
+}
+
+func (n *NvidiaFs) validate() error {
+	// delete driver status file if already present
+	err := deleteStatusFile(outputDirFlag + "/" + nvidiaFsStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = n.runValidation(false)
+	if err != nil {
+		fmt.Println("nvidia-fs driver is not ready")
+		return err
+	}
+
+	// create driver status file
+	err = createStatusFile(outputDirFlag + "/" + nvidiaFsStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *NvidiaFs) runValidation(silent bool) error {
+	//check for nvidia_fs module to be loaded
+	command := "bash"
+	args := []string{"-c", "lsmod | grep nvidia_fs"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+	return runCommand(command, args, silent)
 }
 
 func (t *Toolkit) validate() error {
