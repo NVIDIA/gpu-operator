@@ -178,7 +178,6 @@ spec:
     rollingUpdate:
       maxUnavailable: {{ .Values.driver.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
-  {{- if .Values.sandboxWorkloads.enabled }}
   vgpuManager:
     enabled: {{ .Values.vgpuManager.enabled }}
     {{- if .Values.vgpuManager.repository }}
@@ -292,7 +291,6 @@ spec:
     {{- if .Values.vgpuDeviceManager.config }}
     config: {{ toYaml .Values.vgpuDeviceManager.config | nindent 6 }}
     {{- end  }}
-  {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
     {{- if .Values.toolkit.repository }}
@@ -514,7 +512,6 @@ spec:
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
   {{- end }}
-  {{- if .Values.sandboxWorkloads.enabled }}
   sandboxWorkloads:
     enabled: {{ .Values.sandboxWorkloads.enabled }}
     {{- if .Values.sandboxWorkloads.defaultWorkload }}
@@ -548,4 +545,3 @@ spec:
     {{- if .Values.sandboxDevicePlugin.args }}
     args: {{ toYaml .Values.sandboxDevicePlugin.args | nindent 6 }}
     {{- end }}
-  {{- end }}
