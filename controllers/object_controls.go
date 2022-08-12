@@ -128,6 +128,37 @@ var CertConfigPathMap = map[string]string{
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
 }
 
+// SubscriptionPathMap indicated OS-specific paths for
+// entitlements/subscription information.
+// These are used enable Driver Container's access to packages controlled by
+// the distro through their subscription and support program.
+var SubscriptionPathMap = map[string]([]corev1.KeyToPath){
+	"rhel": {
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		}, {
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		},
+	},
+	"rhcos": {
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		}, {
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		},
+	},
+}
+
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
 // ServiceAccount creates ServiceAccount resource
@@ -2204,6 +2235,37 @@ func getCertConfigPath() (string, error) {
 	return "", fmt.Errorf("distribution not supported")
 }
 
+// wrap array type with interface suitable for sort.Sort
+type keyToPathList []corev1.KeyToPath
+
+func (kp keyToPathList) Len() int {
+	return len(kp)
+}
+
+func (kp keyToPathList) Less(i, j int) bool {
+	return kp[i].Key > kp[i].Key
+}
+
+func (kp keyToPathList) Swap(i, j int) {
+	kp[i], kp[j] = kp[j], kp[i]
+}
+
+// getSubscriptionPaths returns the standard OS specific path for ssl keys/certificates
+func getSubscriptionPaths() ([]corev1.KeyToPath, error) {
+	release, err := parseOSRelease()
+	if err != nil {
+		return nil, err
+	}
+
+	os := release["ID"]
+	if paths, ok := SubscriptionPathMap[os]; ok {
+		// ensure ordering is preserved when we add these to pod spec
+		sort.Sort(keyToPathList(paths))
+		return paths, nil
+	}
+	return nil, fmt.Errorf("distribution not supported")
+}
+
 // createConfigMapVolumeMounts creates a VolumeMount for each key
 // in the ConfigMap. Use subPath to ensure original contents
 // at destinationDir are not overwritten.
@@ -2409,6 +2471,32 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		release, err := parseOSRelease()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+		}
+
+		_, rhel := release["RHEL_VERSION"]
+		_, openshift := release["OPENSHIFT_VERSION"]
+
+		// set up subscription entitlements for RHEL K8s with a non-CRIO runtime
+		if !openshift && rhel && n.runtime != gpuv1.CRIO {
+			subscriptionPaths, err := getSubscriptionPaths()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
+			}
+
+			// Add multiple paths from host to container
+			for num, item := range subscriptionPaths {
+				volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+
+				volMountSubscription := corev1.VolumeMount{
+					Name:      volMountSubscriptionName,
+					MountPath: item.Path,
+					ReadOnly:  true,
+				}
+				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volMountSubscription)
+
+				subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: item.Key}}}
+				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, subscriptionVol)
+			}
 		}
 
 		// skip proxy and env settings if not ocp cluster
