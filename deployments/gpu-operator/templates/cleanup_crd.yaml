@@ -1,0 +1,40 @@
+{{- if .Values.operator.cleanupCRD }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-operator-cleanup-crd
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+spec:
+  template:
+    metadata:
+      name: gpu-operator-cleanup-crd
+      labels:
+        {{ $.Release.matchLabels }}
+        app.kubernetes.io/component: "gpu-operator"
+    spec:
+      serviceAccountName: gpu-operator
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.operator.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: cleanup-crd
+          image: {{ include "gpu-operator.fullimage" . }}
+          imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          command:
+          - /bin/sh
+          - -c
+          - >
+              kubectl delete clusterpolicy cluster-policy;
+              kubectl delete crd clusterpolicies.nvidia.com;
+      restartPolicy: OnFailure
+{{- end }}

@@ -6,6 +6,12 @@ metadata:
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ .Release.labels }}
+  {{- if .Values.operator.cleanupCRD }}
+  # CR cleanup is handled during pre-delete hook
+  # Add below annotation so that helm doesn't attempt to cleanup CR twice
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
 spec:
   operator:
     {{- if .Values.operator.defaultRuntime }}

@@ -1,0 +1,38 @@
+{{- if .Values.operator.upgradeCRD }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-operator-upgrade-crd
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ $.Release.labels }}
+spec:
+  template:
+    metadata:
+      name: gpu-operator-upgrade-crd
+      labels:
+        {{ $.Release.matchLabels }}
+        app.kubernetes.io/component: "gpu-operator"
+    spec:
+      serviceAccountName: gpu-operator
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.operator.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: upgrade-crd
+          image: {{ include "gpu-operator.fullimage" . }}
+          imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          command:
+          - /bin/sh
+          - -c
+          - kubectl apply -f /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml;
+      restartPolicy: OnFailure
+{{- end }}
