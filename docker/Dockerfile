@@ -67,6 +67,9 @@ RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && cu
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin
 
+# Add CRD resource into the image for helm upgrades
+COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies_crd.yaml /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml
+
 # Install / upgrade packages here that are required to resolve CVEs
 ARG CVE_UPDATES
 RUN if [ -n "${CVE_UPDATES}" ]; then \
