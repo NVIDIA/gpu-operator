@@ -2473,11 +2473,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			return fmt.Errorf("ERROR: failed to get os-release: %s", err)
 		}
 
-		_, rhel := release["RHEL_VERSION"]
-		_, openshift := release["OPENSHIFT_VERSION"]
-
 		// set up subscription entitlements for RHEL K8s with a non-CRIO runtime
-		if !openshift && rhel && n.runtime != gpuv1.CRIO {
+		if release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO {
+			n.rec.Log.Info("Detected RHEL with K8s. Mounting subscriptions into driver container.")
 			subscriptionPaths, err := getSubscriptionPaths()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
