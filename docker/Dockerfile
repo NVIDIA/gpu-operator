@@ -39,6 +39,9 @@ RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on \
 
 FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 
+# Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
+RUN dnf remove -y cuda-*
+
 ENV NVIDIA_VISIBLE_DEVICES=void
 
 ARG VERSION
