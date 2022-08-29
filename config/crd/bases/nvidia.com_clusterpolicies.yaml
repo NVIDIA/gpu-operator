@@ -3408,7 +3408,6 @@ spec:
                         description: Default config name within the ConfigMap
                         type: string
                       name:
-                        default: vgpu-devices-config
                         description: ConfigMap name
                         type: string
                     type: object

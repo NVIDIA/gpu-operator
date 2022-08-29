@@ -1264,7 +1264,6 @@ type VGPUDeviceManagerSpec struct {
 type VGPUDevicesConfigSpec struct {
 	// ConfigMap name
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=vgpu-devices-config
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
