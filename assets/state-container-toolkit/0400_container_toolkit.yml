@@ -68,7 +68,7 @@ spec:
           - name: nvidia-run-path
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
-          - name: nvidia-local
+          - name: toolkit-install-dir
             mountPath: /usr/local/nvidia
           - name: crio-hooks
             mountPath: /usr/share/containers/oci/hooks.d
@@ -91,7 +91,7 @@ spec:
         - name: host-root
           hostPath:
             path: /
-        - name: nvidia-local
+        - name: toolkit-install-dir
           hostPath:
             path: /usr/local/nvidia
         - name: crio-hooks

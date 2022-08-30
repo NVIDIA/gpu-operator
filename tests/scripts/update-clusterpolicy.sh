@@ -185,6 +185,23 @@ test_disable_enable_gfd() {
     check_pod_ready "gpu-feature-discovery"
 }
 
+test_custom_toolkit_dir() {
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/toolkit/installDir", "value": "/opt/nvidia"}]'
+    if [ "$?" -ne 0 ]; then
+        echo "cannot update toolkit install directory to /opt/nvidia"
+        exit 1
+    fi
+    # Verify that cuda-validation/plugin-validation is successful by restarting operator-validator 
+    kubectl delete pod -l app=nvidia-operator-validator -n $TEST_NAMESPACE
+    if [ "$?" -ne 0 ]; then
+        echo "cannot delete operator-validator pod for toolkit-validation"
+        exit 1
+    fi
+    check_pod_ready "nvidia-container-toolkit-daemonset"
+    check_pod_ready "nvidia-operator-validator"
+}
+
+
 test_image_updates
 test_env_updates
 test_mig_strategy_updates

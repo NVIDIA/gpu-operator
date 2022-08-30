@@ -316,8 +316,8 @@ spec:
     {{- if .Values.toolkit.env }}
     env: {{ toYaml .Values.toolkit.env | nindent 6 }}
     {{- end }}
-    {{- if .Values.toolkit.args }}
-    args: {{ toYaml .Values.toolkit.args | nindent 6 }}
+    {{- if .Values.toolkit.installDir }}
+    installDir: {{ .Values.toolkit.installDir }}
     {{- end }}
   devicePlugin:
     enabled: {{ .Values.devicePlugin.enabled }}
