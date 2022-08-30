@@ -101,11 +101,7 @@ metadata:
               "enabled": false
             },
             "vgpuDeviceManager": {
-              "enabled": true,
-              "config": {
-                "name": "vgpu-devices-config",
-                "default": "default"
-                }
+              "enabled": true
             },
             "sandboxDevicePlugin": {
               "enabled": true

@@ -109,6 +109,8 @@ const (
 	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
 	// DefaultToolkitInstallDir is the default toolkit installation directory on the host
 	DefaultToolkitInstallDir = "/usr/local/nvidia"
+	// VgpuDMDefaultConfigMapName indicates name of ConfigMap containing default vGPU devices configuration
+	VgpuDMDefaultConfigMapName = "default-vgpu-devices-config"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -403,6 +405,15 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		config := n.singleton.Spec
 		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
 			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.GPUClientsConfig.Name))
+			return gpuv1.Ready, nil
+		}
+	}
+
+	// avoid creating default vGPU device manager ConfigMap if custom one provided
+	if obj.Name == VgpuDMDefaultConfigMapName {
+		config := n.singleton.Spec
+		if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Name != "" {
+			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.VGPUDeviceManager.Config.Name))
 			return gpuv1.Ready, nil
 		}
 	}
@@ -1495,8 +1506,11 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 			continue
 		}
 
-		// vgpuDeviceManager.config.name has a default value in the CRD, so it will always be set
-		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = config.VGPUDeviceManager.Config.Name
+		name := VgpuDMDefaultConfigMapName
+		if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Name != "" {
+			name = config.VGPUDeviceManager.Config.Name
+		}
+		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
 	}
 

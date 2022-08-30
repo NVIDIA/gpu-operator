@@ -287,13 +287,8 @@ vgpuDeviceManager:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
-# NOTE: When sandboxedEnvironments is enabled, creating
-# a custom ConfigMap with vGPU device configuration is required
-# for a successful vGPU Device Manager deployent. Replace
-# the below with the correct ConfigMap and default config
-# in ConfigMap.
   config:
-    name: "vgpu-devices-config"
+    name: ""
     default: "default"
 
 vfioManager:
