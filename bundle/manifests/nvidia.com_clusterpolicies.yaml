@@ -2055,6 +2055,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  installDir:
+                    default: /usr/local/nvidia
+                    description: Toolkit install directory on the host
+                    type: string
                   repository:
                     description: NVIDIA Container Toolkit image repository
                     type: string

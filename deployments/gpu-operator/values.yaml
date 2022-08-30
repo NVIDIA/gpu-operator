@@ -146,6 +146,7 @@ toolkit:
   imagePullSecrets: []
   env: []
   resources: {}
+  installDir: "/usr/local/nvidia"
 
 devicePlugin:
   enabled: true

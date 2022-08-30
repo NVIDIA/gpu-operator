@@ -107,6 +107,8 @@ const (
 	MOFEDEnabledEnvName = "MOFED_ENABLED"
 	// ServiceMonitorCRDName is the name of the CRD defining the ServiceMonitor kind
 	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
+	// DefaultToolkitInstallDir is the default toolkit installation directory on the host
+	DefaultToolkitInstallDir = "/usr/local/nvidia"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -890,14 +892,34 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.Toolkit.Resources
 		}
 	}
-	// set arguments if specified for toolkit container
-	if len(config.Toolkit.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.Toolkit.Args
-	}
 	// set/append environment variables for toolkit container
 	if len(config.Toolkit.Env) > 0 {
 		for _, env := range config.Toolkit.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+
+	// set install directory for the toolkit
+	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
+		// set args for the toolkit
+		toolkitArgStrFmt := "[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; exec nvidia-toolkit %s"
+		toolkitArg := fmt.Sprintf(toolkitArgStrFmt, config.Toolkit.InstallDir)
+		args := []string{toolkitArg}
+		obj.Spec.Template.Spec.Containers[0].Args = args
+
+		// update install directory for the toolkit
+		for i, volume := range obj.Spec.Template.Spec.Volumes {
+			if volume.Name == "toolkit-install-dir" {
+				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.Toolkit.InstallDir
+				break
+			}
+		}
+
+		for i, volumeMount := range obj.Spec.Template.Spec.Containers[0].VolumeMounts {
+			if volumeMount.Name == "toolkit-install-dir" {
+				obj.Spec.Template.Spec.Containers[0].VolumeMounts[i].MountPath = config.Toolkit.InstallDir
+				break
+			}
 		}
 	}
 
