@@ -18,8 +18,13 @@ import (
 
 	secv1 "github.com/openshift/api/security/v1"
 
+	"golang.org/x/mod/semver"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
+)
+
+const (
+	pspRemovalAPIVersion = "v1.25.0"
 )
 
 type assetsFromFile []byte
@@ -156,6 +161,10 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 			panicIfError(err)
 			ctrl = append(ctrl, RuntimeClass)
 		case "PodSecurityPolicy":
+			if semver.Compare(n.k8sVersion, pspRemovalAPIVersion) >= 0 {
+				n.rec.Log.Info("PodSecurityPolicy no longer supported by API. Skipping...")
+				continue
+			}
 			_, _, err := s.Decode(m, nil, &res.PodSecurityPolicy)
 			panicIfError(err)
 			ctrl = append(ctrl, PodSecurityPolicy)
