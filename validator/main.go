@@ -847,6 +847,12 @@ func (p *Plugin) runWorkload() error {
 	// update owner reference
 	setOwnerReference(p.kubeClient, pod)
 
+	// set pod tolerations
+	err = setTolerations(p.kubeClient, pod)
+	if err != nil {
+		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
+	}
+
 	// update podSpec with node name so it will just run on current node
 	pod.Spec.NodeName = nodeNameFlag
 
