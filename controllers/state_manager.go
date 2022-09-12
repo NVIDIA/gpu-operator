@@ -15,9 +15,11 @@ import (
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -126,6 +128,7 @@ type ClusterPolicyController struct {
 	rec             *ClusterPolicyReconciler
 	idx             int
 
+	k8sVersion       string
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
@@ -172,6 +175,22 @@ func OpenshiftVersion() (string, error) {
 	}
 
 	return "", fmt.Errorf("Failed to find Completed Cluster Version")
+}
+
+// KubernetesVersion fetches the Kubernetes API server version
+func KubernetesVersion() (string, error) {
+	cfg := config.GetConfigOrDie()
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return "", fmt.Errorf("error building discovery client: %v", err)
+	}
+
+	info, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch server version information: %v", err)
+	}
+
+	return info.GitVersion, nil
 }
 
 // GetClusterWideProxy returns cluster wide proxy object setup in OCP
@@ -602,6 +621,16 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 			return err
 		}
 		n.openshift = version
+
+		k8sVersion, err := KubernetesVersion()
+		if err != nil {
+			return err
+		}
+		if !semver.IsValid(k8sVersion) {
+			return fmt.Errorf("k8s version detected '%s' is not a valid semantic version", k8sVersion)
+		}
+		n.k8sVersion = k8sVersion
+		n.rec.Log.Info("Kubernetes version detected", "version", k8sVersion)
 
 		promv1.AddToScheme(reconciler.Scheme)
 		secv1.AddToScheme(reconciler.Scheme)
