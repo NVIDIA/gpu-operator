@@ -19,10 +19,12 @@ import (
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"golang.org/x/mod/semver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -3497,14 +3499,58 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// RuntimeClass creates RuntimeClass object
-func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
+func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
-	obj := n.resources[state].RuntimeClass.DeepCopy()
+	obj := &nodev1beta1.RuntimeClass{}
 
 	// apply runtime class name as per ClusterPolicy
-	obj.Name = getRuntimeClass(&n.singleton.Spec)
-	obj.Handler = getRuntimeClass(&n.singleton.Spec)
+	runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+	obj.Name = runtimeClassName
+	obj.Handler = runtimeClassName
+
+	obj.Labels = n.resources[state].RuntimeClass.Labels
+
+	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	found := &nodev1beta1.RuntimeClass{}
+	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.rec.Client.Create(context.TODO(), obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
+	} else if err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.rec.Client.Update(context.TODO(), obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
+	return gpuv1.Ready, nil
+}
+
+func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
+	state := n.idx
+	obj := &nodev1.RuntimeClass{}
+
+	// apply runtime class name as per ClusterPolicy
+	runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+	obj.Name = runtimeClassName
+	obj.Handler = runtimeClassName
+
+	obj.Labels = n.resources[state].RuntimeClass.Labels
 
 	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
 
@@ -3535,6 +3581,14 @@ func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 	return gpuv1.Ready, nil
+}
+
+// RuntimeClass creates RuntimeClass object
+func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
+	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
+		return transformRuntimeClassLegacy(n)
+	}
+	return transformRuntimeClass(n)
 }
 
 // PrometheusRule creates PrometheusRule object
