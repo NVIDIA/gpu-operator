@@ -56,7 +56,7 @@ operator:
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 11.6.0-base-ubi8
+    version: 11.7.1-base-ubi8
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -91,7 +91,7 @@ driver:
   enabled: true
   repository: nvcr.io/nvidia
   image: driver
-  version: "515.48.07"
+  version: "515.65.01"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   rdma:
@@ -100,7 +100,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.1
+    version: v0.4.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
@@ -141,7 +141,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.10.0-ubuntu20.04
+  version: v1.11.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -152,7 +152,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.12.2-ubi8
+  version: v0.12.3-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -214,7 +214,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.6.1-ubi8
+  version: v0.6.2-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -228,7 +228,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.4.2-ubuntu20.04
+  version: v0.5.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -273,7 +273,7 @@ vgpuManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.1
+    version: v0.4.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
@@ -283,7 +283,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: "v0.1.0"
+  version: "v0.2.0"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -295,7 +295,7 @@ vfioManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: cuda
-  version: 11.6.0-base-ubi8
+  version: 11.7.1-base-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -303,7 +303,7 @@ vfioManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.1
+    version: v0.4.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_AUTO_DRAIN
