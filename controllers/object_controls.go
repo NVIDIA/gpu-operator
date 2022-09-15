@@ -2600,6 +2600,17 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		}
 	}
 
+	release, err := parseOSRelease()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	}
+
+	// add env for OCP
+	if _, ok := release["OPENSHIFT_VERSION"]; ok {
+		setContainerEnv(container, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
+		setContainerEnv(container, "RHEL_VERSION", release["RHEL_VERSION"])
+	}
+
 	return nil
 }
 
