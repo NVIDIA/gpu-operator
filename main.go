@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -56,6 +57,7 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var renewDeadline time.Duration
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -73,6 +75,9 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	ctrl.Log.Info(fmt.Sprintf("version: %s", os.Getenv("VERSION")))
+	ctrl.Log.Info(fmt.Sprintf("commit: %s", os.Getenv("GIT_COMMIT")))
 
 	options := ctrl.Options{
 		Scheme:                 scheme,

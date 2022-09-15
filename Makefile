@@ -150,9 +150,16 @@ bundle: manifests kustomize
 	operator-sdk bundle validate ./bundle
 
 # Build the bundle image.
-.PHONY: bundle-build
-bundle-build:
-	docker build --build-arg VERSION=$(VERSION) --build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) -f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
+build-bundle-image:
+	docker build \
+	--build-arg VERSION=$(VERSION) \
+	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
+	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
+
+# Push the bundle image.
+push-bundle-image: build-bundle-image
+	docker push $(BUNDLE_IMAGE)
 
 # Define local and dockerized golang targets
 
@@ -288,6 +295,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
+		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
 # Provide a utility target to build the images to allow for use in external tools.

@@ -94,6 +94,21 @@ stages:
     # Target
     - make push-${DIST}
 
+.release-bundle:
+  stage: release
+  variables:
+    # Define the source image for the release
+    BUNDLE_IMAGE: ""
+    VERSION: ""
+    DEFAULT_CHANNEL: "stable"
+    CHANNELS: "stable"
+  before_script:
+    - apk add --no-cache make bash
+  script:
+    - 'echo "Logging in to CI registry ${CI_REGISTRY}"'
+    - docker login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}"
+    - make push-bundle-image
+
 # Download the regctl binary for use in the release steps
 .regctl-setup:
   before_script:
@@ -118,24 +133,53 @@ stages:
 # Define a staging release step that pushes an image to an internal "staging" repository
 # This is triggered for all pipelines (i.e. not only tags) to test the pipeline steps
 # outside of the release process.
-release:staging-gpu-operator:
+.release:staging:
   extends:
     - .release
-    - .dist-ubi8
-    - .target-gpu-operator
   variables:
     OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
     OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
     OUT_REGISTRY: "${CI_REGISTRY}"
+
+release:staging-gpu-operator:
+  extends:
+    - .release:staging
+    - .dist-ubi8
+    - .target-gpu-operator
+  variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
 
 release:staging-gpu-operator-validator:
   extends:
-    - .release
+    - .release:staging
     - .dist-ubi8
     - .target-gpu-operator-validator
   variables:
-    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
-    OUT_REGISTRY: "${CI_REGISTRY}"
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+
+release:staging-latest-gpu-operator:
+  extends:
+    - .release:staging
+    - .dist-ubi8
+    - .target-gpu-operator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+
+release:staging-latest-gpu-operator-validator:
+  extends:
+    - .release:staging
+    - .dist-ubi8
+    - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+
+release:gpu-operator-bundle-image:
+  extends:
+    - .release-bundle
+  variables:
+    BUNDLE_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-bundle:${CI_COMMIT_BRANCH}-latest"
+    VERSION: ""
+    DEFAULT_CHANNEL: "stable"
+    CHANNELS: "stable"

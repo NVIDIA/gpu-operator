@@ -3,6 +3,7 @@ FROM scratch
 ARG VERSION=""
 ARG DEFAULT_CHANNEL=stable
 ARG CHANNELS=stable
+ARG GIT_COMMIT="unknown"
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
@@ -19,6 +20,7 @@ LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 LABEL com.redhat.openshift.versions="v4.9"
 LABEL com.redhat.delivery.operator.bundle=true
 LABEL com.redhat.delivery.backport=false
+LABEL vsc-ref=${GIT_COMMIT}
 
 COPY bundle/${VERSION}/manifests /manifests/
 COPY bundle/${VERSION}/metadata /metadata/
