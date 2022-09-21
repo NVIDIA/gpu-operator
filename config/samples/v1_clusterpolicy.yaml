@@ -7,7 +7,7 @@ spec:
     defaultRuntime: crio
     runtimeClass: nvidia
     initContainer: {}
-    use_ocp_driver_toolkit: false
+    use_ocp_driver_toolkit: true
 
   psp:
     enabled: false
