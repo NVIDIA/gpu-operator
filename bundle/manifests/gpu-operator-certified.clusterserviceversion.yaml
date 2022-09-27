@@ -118,7 +118,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
     createdAt: "Wed Sep 14 07:33:59 PDT 2022"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
@@ -130,7 +130,7 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:b90a519e9f30fbc013e1806bc081268724e9e80b4035c67c167ab3b43a37704a
     - name: dcgm-image
@@ -154,7 +154,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:7e840c252c730279c0e3f89b68208aac02ded73c945c0c21e2f1d23b1a9b052f
     - name: gpu-operator-validator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8
+      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:release-22.09-latest-ubi8
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:e3f16c26b9340ed46aed248cc4d18353ba3a65886bf7a2f0cea25ff41b2553da
     - name: vfio-manager-image
@@ -716,7 +716,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -754,7 +754,7 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8"
+                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:release-22.09-latest-ubi8"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:37821ea7829def707f819ac21122cea62efdbbd640679b6004e552fb9a1e17a3"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
