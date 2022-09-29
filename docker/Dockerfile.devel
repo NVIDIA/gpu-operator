@@ -14,6 +14,7 @@
 ARG GOLANG_VERSION=x.x.x
 FROM golang:${GOLANG_VERSION}
 
+# pull ineffassign by commit due to issue https://github.com/gordonklaus/ineffassign/issues/75
 RUN go get -u golang.org/x/lint/golint && \
-    go get -u github.com/gordonklaus/ineffassign && \
+    go get -u github.com/gordonklaus/ineffassign@4cc7213b9bc8b868b2990c372f6fa057fa88b91c && \
     go get -u github.com/client9/misspell/cmd/misspell
