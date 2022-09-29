@@ -46,6 +46,7 @@ rules:
   - create
   - watch
   - update
+  - patch
 - apiGroups:
   - apps
   resources:
