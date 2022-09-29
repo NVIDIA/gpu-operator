@@ -50,10 +50,13 @@ const (
 	gpuWorkloadConfigContainer     = "container"
 	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
+	podSecurityLabelPrefix         = "pod-security.kubernetes.io/"
+	podSecurityLevelPrivileged     = "privileged"
 )
 
 var (
 	defaultGPUWorkloadConfig = gpuWorkloadConfigContainer
+	podSecurityModes         = []string{"enforce", "audit", "warn"}
 )
 
 var gpuStateLabels = map[string]map[string]string{
@@ -498,6 +501,48 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 	return runtime, nil
 }
 
+func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
+	namespaceName := clusterPolicyCtrl.operatorNamespace
+
+	if n.openshift != "" && namespaceName != ocpSuggestedNamespace {
+		// The GPU Operator is not installed in the suggested
+		// namespace, so the namespace may be shared with other
+		// untrusted operators.  Do not set Pod Security Admission labels.
+		n.rec.Log.Info("GPU Operator is not installed in the suggested namespace. Not setting Pod Security Admission labels for namespace",
+			"namespace", namespaceName,
+			"suggested namespace", ocpSuggestedNamespace)
+		return nil
+	}
+
+	ns := &corev1.Namespace{}
+	opts := client.ObjectKey{Name: namespaceName}
+	err := n.rec.Client.Get(context.TODO(), opts, ns)
+	if err != nil {
+		return fmt.Errorf("ERROR: could not get Namespace %s from client: %v", namespaceName, err)
+	}
+
+	patch := client.MergeFrom(ns.DeepCopy())
+	modified := false
+	for _, mode := range podSecurityModes {
+		key := podSecurityLabelPrefix + mode
+		if val, ok := ns.ObjectMeta.Labels[key]; !ok || (val != podSecurityLevelPrivileged) {
+			ns.ObjectMeta.Labels[key] = podSecurityLevelPrivileged
+			modified = true
+		}
+	}
+
+	if !modified {
+		return nil
+	}
+
+	err = n.rec.Client.Patch(context.TODO(), ns, patch)
+	if err != nil {
+		return fmt.Errorf("unable to label namespace %s with pod security levels: %v", namespaceName, err)
+	}
+
+	return nil
+}
+
 func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 	namespaceName := clusterPolicyCtrl.operatorNamespace
 
@@ -690,6 +735,16 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		n.ocpDriverToolkit.enabled = false
 
 		n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitDisabled)
+	}
+
+	if clusterPolicy.Spec.PSP.IsEnabled() {
+		// label namespace with Pod Security Admission levels
+		n.rec.Log.Info("Pod Security is enabled. Adding labels to GPU Operator namespace", "namespace", n.operatorNamespace)
+		err := n.setPodSecurityLabelsForNamespace()
+		if err != nil {
+			return err
+		}
+		n.rec.Log.Info("Pod Security Admission labels added to GPU Operator namespace", "namespace", n.operatorNamespace)
 	}
 
 	// fetch all nodes and label gpu nodes
