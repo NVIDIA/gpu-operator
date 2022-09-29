@@ -76,6 +76,8 @@ stages:
     VERSION: "${CI_COMMIT_SHORT_SHA}"
     # OUT_IMAGE_VERSION is overridden for external releases
     OUT_IMAGE_VERSION: "${CI_COMMIT_SHORT_SHA}"
+  retry:
+    max: 2
   before_script:
     - !reference [.regctl-setup, before_script]
     # We ensure that the OUT_IMAGE_VERSION is set
