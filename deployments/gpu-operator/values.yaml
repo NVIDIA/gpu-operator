@@ -183,7 +183,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 2.4.5-1-ubuntu20.04
+  version: 3.0.4-1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -194,7 +194,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 2.4.5-2.6.7-ubuntu20.04
+  version: 3.0.4-3.0.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
