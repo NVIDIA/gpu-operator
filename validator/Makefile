@@ -83,7 +83,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.6.0-$(*) \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_VERSION)-$(*) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--file $(DOCKERFILE) $(BUILD_DIR)

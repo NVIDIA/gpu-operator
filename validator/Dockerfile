@@ -32,7 +32,7 @@ RUN cp /build/validator/cuda-workload-validation.yaml /artifacts/
 
 FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 RUN mkdir /artifacts
-RUN cp /tmp/vectorAdd /artifacts/vectorAdd
+RUN cp /cuda-samples/vectorAdd /artifacts/vectorAdd
 
 FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 
