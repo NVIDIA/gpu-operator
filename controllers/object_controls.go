@@ -2074,7 +2074,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	image, _ := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
 	if image != "" {
 		driverToolkitContainer.Image = image
-		n.rec.Log.Info("INFO: DriverToolkit", "image", driverToolkitContainer.Image)
+		n.rec.Log.Info("DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
 		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
 		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
@@ -2599,19 +2599,19 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
-	n.rec.Log.Info("DEBUG: Deployment", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.rec.Log.V(1).Info("Deployment", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DeploymentList{}
 	err := n.rec.Client.List(context.TODO(), list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get DeploymentList", err)
 	}
-	n.rec.Log.Info("DEBUG: Deployment", "NumberOfDeployment", len(list.Items))
+	n.rec.Log.V(1).Info("Deployment", "NumberOfDeployment", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	n.rec.Log.Info("DEBUG: Deployment", "NumberUnavailable", ds.Status.UnavailableReplicas)
+	n.rec.Log.V(1).Info("Deployment", "NumberUnavailable", ds.Status.UnavailableReplicas)
 
 	if ds.Status.UnavailableReplicas != 0 {
 		return gpuv1.NotReady
@@ -2624,19 +2624,19 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
-	n.rec.Log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.rec.Log.V(1).Info("DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DaemonSetList{}
 	err := n.rec.Client.List(context.TODO(), list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get DaemonSetList", err)
 	}
-	n.rec.Log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
+	n.rec.Log.V(1).Info("DaemonSet", "NumberOfDaemonSets", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	n.rec.Log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
+	n.rec.Log.V(1).Info("DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
 
 	if ds.Status.NumberUnavailable != 0 {
 		return gpuv1.NotReady
@@ -2703,7 +2703,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 
 		return false, err
 	}
-	n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
+	n.rec.Log.V(1).Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
 	isBroken := false
 	for _, tag := range found.Spec.Tags {
 		if tag.Name == "" {
@@ -2713,7 +2713,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 		if tag.Name == "latest" || tag.From == nil {
 			continue
 		}
-		n.rec.Log.Info("DEBUG: ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
+		n.rec.Log.V(1).Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
 		n.ocpDriverToolkit.rhcosDriverToolkitImages[tag.Name] = tag.From.Name
 	}
 	if isBroken {
@@ -2780,7 +2780,7 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 		return gpuv1.NotReady, nil
 	}
 
-	n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+	n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
 		"rhcos", n.ocpDriverToolkit.rhcosVersions)
 
 	overallState := gpuv1.Ready
@@ -2789,12 +2789,12 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 	for rhcosVersion := range n.ocpDriverToolkit.rhcosVersions {
 		n.ocpDriverToolkit.currentRhcosVersion = rhcosVersion
 
-		n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+		n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
 			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion)
 
 		state, err := DaemonSet(n)
 
-		n.rec.Log.Info("DEBUG: preparing DriverToolkit DaemonSet",
+		n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
 			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion, "state", state)
 		if state != gpuv1.Ready {
 			overallState = state
@@ -2854,14 +2854,14 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 		clusterHasRhcosVersion, clusterOk := n.ocpDriverToolkit.rhcosVersions[dsRhcosVersion]
 		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
 
-		n.rec.Log.Info("DEBUG: Driver DaemonSet found",
+		n.rec.Log.V(1).Info("Driver DaemonSet found",
 			"Name", name,
 			"dsRhcosVersion", dsRhcosVersion,
 			"clusterHasRhcosVersion", clusterHasRhcosVersion,
 			"desiredNumberScheduled", desiredNumberScheduled)
 
 		if desiredNumberScheduled != 0 {
-			n.rec.Log.Info("INFO: Driver DaemonSet active, keep it.",
+			n.rec.Log.Info("Driver DaemonSet active, keep it.",
 				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
 			continue
 		}
@@ -2872,11 +2872,11 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 			)
 		} else {
 			if !clusterOk {
-				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version NOT part of the cluster",
+				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version NOT part of the cluster",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 			} else if clusterHasRhcosVersion {
-				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version is part of the cluster, keep it.",
+				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version is part of the cluster, keep it.",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 
@@ -2886,13 +2886,13 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 				continue
 			} else /* clusterHasRhcosVersion == false */ {
 				// currently unexpected
-				n.rec.Log.Info("DEBUG: Driver DaemonSet RHCOS version marked for deletion",
+				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version marked for deletion",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 			}
 		}
 
-		n.rec.Log.Info("INFO: Delete Driver DaemonSet", "Name", name)
+		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
 
 		err = n.rec.Client.Delete(context.TODO(), &list.Items[idx])
 		if err != nil {
@@ -2946,20 +2946,19 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 
 	dsList := &appsv1.DaemonSetList{}
 	if err := n.rec.Client.List(context.TODO(), dsList, opts...); err != nil {
-		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
+		n.rec.Log.Error(err, "Could not get DaemonSetList")
 		return 0, err
 	}
 
 	var lastErr error
 	for idx := range dsList.Items {
-		n.rec.Log.Info("INFO: Delete DaemonSet",
+		n.rec.Log.Info("Delete DaemonSet",
 			"Name", dsList.Items[idx].ObjectMeta.Name,
 		)
 
 		if err := n.rec.Client.Delete(context.TODO(), &dsList.Items[idx]); err != nil {
-			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
-				"Name", dsList.Items[idx].ObjectMeta.Name,
-				"Error", err)
+			n.rec.Log.Error(err, "Could not get delete DaemonSet",
+				"Name", dsList.Items[idx].ObjectMeta.Name)
 			lastErr = err
 		}
 	}
@@ -3138,13 +3137,13 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) gpuv1.State {
 	opts := []client.ListOption{&client.MatchingLabels{"app": name}}
 
-	n.rec.Log.Info("DEBUG: Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.rec.Log.V(1).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
 	err := n.rec.Client.List(context.TODO(), list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get PodList", err)
 	}
-	n.rec.Log.Info("DEBUG: Pod", "NumberOfPods", len(list.Items))
+	n.rec.Log.V(1).Info("Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
@@ -3152,10 +3151,10 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	pd := list.Items[0]
 
 	if pd.Status.Phase != phase {
-		n.rec.Log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "!=", phase)
+		n.rec.Log.V(1).Info("Pod", "Phase", pd.Status.Phase, "!=", phase)
 		return gpuv1.NotReady
 	}
-	n.rec.Log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "==", phase)
+	n.rec.Log.V(1).Info("Pod", "Phase", pd.Status.Phase, "==", phase)
 	return gpuv1.Ready
 }
 

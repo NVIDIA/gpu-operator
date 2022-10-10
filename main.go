@@ -24,6 +24,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -68,8 +69,9 @@ func main() {
 			"Only enabled when the --leader-elect flag is set. "+
 			"If undefined, the renew deadline defaults to the controller-runtime manager's default RenewDeadline. "+
 			"By setting this option, the LeaseDuration is also set as RenewDealine + 5s.")
+
 	opts := zap.Options{
-		Development: true,
+		StacktraceLevel: zapcore.PanicLevel,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
