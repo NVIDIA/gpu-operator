@@ -54,6 +54,13 @@ spec:
     {{- if .Values.daemonsets.priorityClassName }}
     priorityClassName: {{ .Values.daemonsets.priorityClassName }}
     {{- end }}
+    {{- if .Values.daemonsets.updateStrategy }}
+    updateStrategy: {{ .Values.daemonsets.updateStrategy }}
+    {{- end }}
+    {{- if .Values.daemonsets.rollingUpdate }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.daemonsets.maxUnavailable | quote }}
+    {{- end }}
   validator:
     {{- if .Values.validator.repository }}
     repository: {{ .Values.validator.repository }}
@@ -179,10 +186,6 @@ spec:
     {{- end }}
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.rollingUpdate }}
-    rollingUpdate:
-      maxUnavailable: {{ .Values.driver.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
   vgpuManager:
     enabled: {{ .Values.vgpuManager.enabled }}

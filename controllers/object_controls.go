@@ -531,12 +531,40 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return nil
 	}
 
-	err := t(obj, &n.singleton.Spec, n)
+	// apply common Daemonset configuration that is applicable to all
+	err := applyCommonDaemonsetConfig(obj, &n.singleton.Spec)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
+		logger.Error(err, "Failed to apply common Daemonset transformation", "resource", obj.Name)
 		return err
 	}
 
+	// apply per operand Daemonset config
+	err = t(obj, &n.singleton.Spec, n)
+	if err != nil {
+		logger.Error(err, "Failed to apply transformation", "resource", obj.Name)
+		return err
+	}
+
+	return nil
+}
+
+// Apply common config that is applicable for all Daemonsets
+func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	// apply daemonset update strategy
+	err := applyUpdateStrategyConfig(obj, config)
+	if err != nil {
+		return err
+	}
+
+	// update PriorityClass
+	if config.Daemonsets.PriorityClassName != "" {
+		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
+	}
+
+	// set tolerations if specified
+	if len(config.Daemonsets.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
 	return nil
 }
 
@@ -563,15 +591,6 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		for _, secret := range config.GPUFeatureDiscovery.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -638,14 +657,8 @@ func parseOSRelease() (map[string]string, error) {
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// apply rolling update config
-	err := applyRollingUpdateConfig(obj, config)
-	if err != nil {
-		return err
-	}
-
 	// update validation container
-	err = transformValidationInitContainer(obj, config)
+	err := transformValidationInitContainer(obj, config)
 	if err != nil {
 		return err
 	}
@@ -674,15 +687,6 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return err
 	}
 
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
-
 	// update OpenShift Driver Toolkit sidecar container
 	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
@@ -704,15 +708,6 @@ func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	err = transformVGPUManagerContainer(obj, config, n)
 	if err != nil {
 		return fmt.Errorf("failed to transform vGPU Manager container: %v", err)
-	}
-
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// update OpenShift Driver Toolkit sidecar container
@@ -890,14 +885,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
 	// set resource limits
 	if config.Toolkit.Resources != nil {
 		// apply resource limits to all containers
@@ -999,14 +986,6 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
 	// set resource limits
 	if config.DevicePlugin.Resources != nil {
 		// apply resource limits to all containers
@@ -1067,14 +1046,6 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
 	// set resource limits
 	if config.SandboxDevicePlugin.Resources != nil {
 		// apply resource limits to all containers
@@ -1117,14 +1088,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		for _, secret := range config.DCGMExporter.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.DCGMExporter.Resources != nil {
@@ -1261,14 +1224,6 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
 	// set resource limits
 	if config.DCGM.Resources != nil {
 		// apply resource limits to all containers
@@ -1326,15 +1281,6 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		for _, secret := range config.MIGManager.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -1416,15 +1362,6 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		}
 	}
 
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
-	}
-
 	// set resource limits
 	if config.VFIOManager.Resources != nil {
 		// apply resource limits to all containers
@@ -1471,15 +1408,6 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		for _, secret := range config.VGPUDeviceManager.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -1572,14 +1500,6 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		for _, secret := range config.Validator.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	// set resource limits
 	if config.Validator.Resources != nil {
@@ -1733,15 +1653,6 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		for _, secret := range config.NodeStatusExporter.ImagePullSecrets {
 			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-	}
-
-	// update PriorityClass
-	if config.Daemonsets.PriorityClassName != "" {
-		obj.Spec.Template.Spec.PriorityClassName = config.Daemonsets.PriorityClassName
-	}
-	// set tolerations if specified
-	if len(config.Daemonsets.Tolerations) > 0 {
-		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
 	// set resource limits
@@ -2616,23 +2527,30 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	return nil
 }
 
-func applyRollingUpdateConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	// update config for RollingUpdate strategy
-	if config.Driver.RollingUpdate == nil || config.Driver.RollingUpdate.MaxUnavailable == "" {
-		return nil
-	}
-	var intOrString intstr.IntOrString
-	if strings.HasSuffix(config.Driver.RollingUpdate.MaxUnavailable, "%") {
-		intOrString = intstr.IntOrString{Type: intstr.String, StrVal: config.Driver.RollingUpdate.MaxUnavailable}
-	} else {
-		int64Val, err := strconv.ParseInt(config.Driver.RollingUpdate.MaxUnavailable, 10, 64)
-		if err != nil {
-			return fmt.Errorf("ERROR: failed to apply rolling update config: %s", err)
+func applyUpdateStrategyConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
+	switch config.Daemonsets.UpdateStrategy {
+	case "OnDelete":
+		obj.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.OnDeleteDaemonSetStrategyType}
+	case "RollingUpdate":
+		fallthrough
+	default:
+		// update config for RollingUpdate strategy
+		if config.Daemonsets.RollingUpdate == nil || config.Daemonsets.RollingUpdate.MaxUnavailable == "" {
+			return nil
 		}
-		intOrString = intstr.IntOrString{Type: intstr.Int, IntVal: int32(int64Val)}
+		var intOrString intstr.IntOrString
+		if strings.HasSuffix(config.Daemonsets.RollingUpdate.MaxUnavailable, "%") {
+			intOrString = intstr.IntOrString{Type: intstr.String, StrVal: config.Daemonsets.RollingUpdate.MaxUnavailable}
+		} else {
+			int64Val, err := strconv.ParseInt(config.Daemonsets.RollingUpdate.MaxUnavailable, 10, 32)
+			if err != nil {
+				return fmt.Errorf("failed to apply rolling update config: %s", err)
+			}
+			intOrString = intstr.IntOrString{Type: intstr.Int, IntVal: int32(int64Val)}
+		}
+		rollingUpdateSpec := appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intOrString}
+		obj.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType, RollingUpdate: &rollingUpdateSpec}
 	}
-	rollingUpdateSpec := appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intOrString}
-	obj.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType, RollingUpdate: &rollingUpdateSpec}
 	return nil
 }
 
