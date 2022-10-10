@@ -21,6 +21,13 @@ daemonsets:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
+  # configuration for controlling update strategy("OnDelete" or "RollingUpdate") of GPU Operands
+  updateStrategy: "RollingUpdate"
+  # configuration for controlling rolling update of GPU Operands
+  rollingUpdate:
+    # maximum number of nodes to simultaneously apply pod updates on.
+    # can be specified either as number or percentage of nodes. Default 1.
+    maxUnavailable: "1"
 
 validator:
   repository: nvcr.io/nvidia/cloud-native
@@ -131,11 +138,6 @@ driver:
   # kernel module configuration for NVIDIA driver
   kernelModuleConfig:
     name: ""
-  # configuration for controlling rolling update of NVIDIA driver DaemonSet pods
-  rollingUpdate:
-    # maximum number of nodes to simultaneously apply pod updates on.
-    # can be specified either as number or percentage of nodes. Default 1.
-    maxUnavailable: "1"
 
 toolkit:
   enabled: true

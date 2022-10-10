@@ -40,6 +40,13 @@ spec:
                 properties:
                   priorityClassName:
                     type: string
+                  rollingUpdate:
+                    description: 'Optional: Configuration for rolling update of NVIDIA
+                      Driver DaemonSet pods'
+                    properties:
+                      maxUnavailable:
+                        type: string
+                    type: object
                   tolerations:
                     description: 'Optional: Set tolerations'
                     items:
@@ -81,6 +88,12 @@ spec:
                           type: string
                       type: object
                     type: array
+                  updateStrategy:
+                    default: RollingUpdate
+                    enum:
+                    - RollingUpdate
+                    - OnDelete
+                    type: string
                 type: object
               dcgm:
                 description: DCGM component spec
@@ -987,13 +1000,6 @@ spec:
                           it defaults to Limits if that is explicitly specified, otherwise
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
-                    type: object
-                  rollingUpdate:
-                    description: 'Optional: Configuration for rolling update of NVIDIA
-                      Driver DaemonSet pods'
-                    properties:
-                      maxUnavailable:
-                        type: string
                     type: object
                   version:
                     description: NVIDIA Driver image tag

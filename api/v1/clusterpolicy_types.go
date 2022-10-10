@@ -149,6 +149,18 @@ type DaemonsetsSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=RollingUpdate
+	// +kubebuilder:validation:Enum=RollingUpdate;OnDelete
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="UpdateStrategy for all Daemonsets"
+	UpdateStrategy string `json:"updateStrategy,omitempty"`
+
+	// Optional: Configuration for rolling update of all DaemonSet pods
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Rolling update configuration for all DaemonSet pods"
+	RollingUpdate *RollingUpdateSpec `json:"rollingUpdate,omitempty"`
 }
 
 // InitContainerSpec describes configuration for initContainer image used with all components
@@ -424,11 +436,6 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
 	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
-
-	// Optional: Configuration for rolling update of NVIDIA Driver DaemonSet pods
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Rolling update configuration for NVIDIA Driver DaemonSet pods"
-	RollingUpdate *RollingUpdateSpec `json:"rollingUpdate,omitempty"`
 }
 
 // VGPUManagerSpec defines the properties for the NVIDIA vGPU Manager deployment
@@ -940,11 +947,11 @@ type KernelModuleConfigSpec struct {
 	Name string `json:"name,omitempty"`
 }
 
-// RollingUpdateSpec defines configuration for the rolling update of NVIDIA Driver DaemonSet pods
+// RollingUpdateSpec defines configuration for the rolling update of all DaemonSet pods
 type RollingUpdateSpec struct {
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Maximum number of nodes to simultaneously apply pod updates on. Default 1"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Maximum number of nodes to simultaneously apply Daemonset pod updates on. Default 1"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
