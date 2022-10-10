@@ -46,9 +46,6 @@ metadata:
               },
               "kernelModuleConfig": {
                 "name": ""
-              },
-              "rollingUpdate": {
-                "maxUnavailable": "1"
               }
             },
             "dcgmExporter": {
@@ -64,6 +61,10 @@ metadata:
               "enabled": true
             },
             "daemonsets": {
+              "updateStrategy": "RollingUpdate",
+              "rollingUpdate": {
+                "maxUnavailable": "1"
+              }
             },
             "devicePlugin": {
               "enabled": true,
