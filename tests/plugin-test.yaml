@@ -18,7 +18,7 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
-      serviceAccount: nvidia-device-plugin
+      serviceAccountName: nvidia-device-plugin
       containers:
         - name: nvidia-plugin-test-ctr
           image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.10.1

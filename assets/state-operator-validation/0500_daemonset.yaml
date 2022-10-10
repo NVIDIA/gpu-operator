@@ -24,7 +24,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-operator-validator
+      serviceAccountName: nvidia-operator-validator
       initContainers:
         - name: driver-validation
           image: "FILLED BY THE OPERATOR"

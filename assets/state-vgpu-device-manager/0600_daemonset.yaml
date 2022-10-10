@@ -18,7 +18,6 @@ spec:
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.vgpu-device-manager: "true"
-      serviceAccount: nvidia-vgpu-device-manager
       serviceAccountName: nvidia-vgpu-device-manager
       initContainers:
         - name: vgpu-manager-validation
