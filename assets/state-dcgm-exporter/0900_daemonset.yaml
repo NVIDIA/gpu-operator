@@ -23,7 +23,6 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-dcgm-exporter
       serviceAccountName: nvidia-dcgm-exporter
       initContainers:
       - name: toolkit-validation

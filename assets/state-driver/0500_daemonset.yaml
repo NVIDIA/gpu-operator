@@ -23,7 +23,6 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-driver
       serviceAccountName: nvidia-driver
       hostPID: true
       initContainers:

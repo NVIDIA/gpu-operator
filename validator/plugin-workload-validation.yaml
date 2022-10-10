@@ -10,9 +10,8 @@ spec:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-  readOnlyRootFilesystem: true
   restartPolicy: OnFailure
-  serviceAccount: nvidia-operator-validator
+  serviceAccountName: nvidia-operator-validator
   initContainers:
   - name: plugin-validation
     image: "FILLED_BY_VALIDATOR"
@@ -33,3 +32,4 @@ spec:
       args: ["echo device-plugin workload validation is successful"]
       securityContext:
         allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true

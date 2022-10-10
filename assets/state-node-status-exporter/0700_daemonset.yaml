@@ -23,7 +23,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-node-status-exporter
+      serviceAccountName: nvidia-node-status-exporter
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
