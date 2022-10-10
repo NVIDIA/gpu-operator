@@ -24,7 +24,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-sandbox-validator
+      serviceAccountName: nvidia-sandbox-validator
       initContainers:
         - name: vfio-pci-validation
           image: "FILLED BY THE OPERATOR"

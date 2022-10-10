@@ -23,7 +23,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-device-plugin
+      serviceAccountName: nvidia-device-plugin
       initContainers:
       - image: "FILLED BY THE OPERATOR"
         name: toolkit-validation

@@ -10,9 +10,8 @@ spec:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-  readOnlyRootFilesystem: true
   restartPolicy: OnFailure
-  serviceAccount: nvidia-operator-validator
+  serviceAccountName: nvidia-operator-validator
   initContainers:
   - name: cuda-validation
     image: "FILLED_BY_THE_VALIDATOR"
@@ -30,3 +29,4 @@ spec:
       args: ["echo cuda workload validation is successful"]
       securityContext:
         privileged: true
+        readOnlyRootFilesystem: true

@@ -23,7 +23,6 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-sandbox-device-plugin
       serviceAccountName: nvidia-sandbox-device-plugin
       initContainers:
         - name: vfio-pci-validation

@@ -23,7 +23,6 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-vgpu-manager
       serviceAccountName: nvidia-vgpu-manager
       hostPID: true
       hostIPC: true
