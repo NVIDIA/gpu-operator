@@ -57,7 +57,7 @@ func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) 
 	var files []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			n.rec.Log.Info("DEBUG: error in filepath.Walk on %s: %v", root, err)
+			n.rec.Log.V(1).Info("error in filepath.Walk on %s: %v", root, err)
 			return nil
 		}
 		if !info.IsDir() {
@@ -105,7 +105,7 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 		slce := strings.Split(kind, ":")
 		kind = strings.TrimSpace(slce[1])
 
-		n.rec.Log.Info("DEBUG: Looking for ", "Kind", kind, "in path:", path)
+		n.rec.Log.V(1).Info("Looking for ", "Kind", kind, "in path:", path)
 
 		switch kind {
 		case "ServiceAccount":
