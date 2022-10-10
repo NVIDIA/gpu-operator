@@ -149,7 +149,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			overallStatus = gpuv1.NotReady
 			statesNotReady = append(statesNotReady, clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1])
 		}
-		r.Log.Info("INFO: ClusterPolicy step completed",
+		r.Log.Info("ClusterPolicy step completed",
 			"state:", clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1],
 			"status", status)
 

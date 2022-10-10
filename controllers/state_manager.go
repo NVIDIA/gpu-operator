@@ -465,12 +465,12 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 				rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
 				if ok {
 					n.ocpDriverToolkit.rhcosVersions[rhcosVersion] = true
-					n.rec.Log.Info("DEBUG: GPU node running RHCOS",
+					n.rec.Log.V(1).Info("GPU node running RHCOS",
 						"nodeName", node.ObjectMeta.Name,
 						"RHCOS version", rhcosVersion,
 					)
 				} else {
-					n.rec.Log.Info("WARNING: node doesn't have the proper NFD RHCOS version label.",
+					n.rec.Log.Info("node doesn't have the proper NFD RHCOS version label.",
 						"nodeName", node.ObjectMeta.Name,
 						"nfdLabel", nfdOSTreeVersionLabelKey,
 					)
@@ -584,7 +584,7 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 
 	// label not defined, enable monitoring
 	n.rec.Log.Info("Enabling OpenShift monitoring")
-	n.rec.Log.Info("DEBUG: Adding monitoring label to the operator namespace",
+	n.rec.Log.V(1).Info("Adding monitoring label to the operator namespace",
 		"namespace", namespaceName,
 		"label", ocpNamespaceMonitoringLabelKey,
 		"value", ocpNamespaceMonitoringLabelValue)
@@ -772,19 +772,16 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 		hasCompatibleNFD := len(n.ocpDriverToolkit.rhcosVersions) != 0
 		n.ocpDriverToolkit.enabled = hasImageStream && hasCompatibleNFD
 
-		level := "INFO"
 		if n.ocpDriverToolkit.enabled {
 			n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitEnabled)
 		} else {
-			level = "WARNING" // Driver Toolkit requested but could not be enabled
-
 			n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitNotPossible)
 		}
-		n.rec.Log.Info(level+" OpenShift Driver Toolkit requested",
+		n.rec.Log.Info("OpenShift Driver Toolkit requested",
 			"hasCompatibleNFD", hasCompatibleNFD,
 			"hasDriverToolkitImageStream", hasImageStream)
 
-		n.rec.Log.Info(level+" OpenShift Driver Toolkit",
+		n.rec.Log.Info("OpenShift Driver Toolkit",
 			"enabled", n.ocpDriverToolkit.enabled)
 
 		if hasImageStream {
