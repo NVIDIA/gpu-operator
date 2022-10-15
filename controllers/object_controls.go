@@ -2192,7 +2192,7 @@ func (kp keyToPathList) Len() int {
 }
 
 func (kp keyToPathList) Less(i, j int) bool {
-	return kp[i].Key > kp[i].Key
+	return kp[i].Key < kp[j].Key
 }
 
 func (kp keyToPathList) Swap(i, j int) {
