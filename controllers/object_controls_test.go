@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"testing"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -874,5 +876,40 @@ func TestSandboxDevicePluginAssets(t *testing.T) {
 	_, err = clusterPolicyController.step()
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
+	}
+}
+
+func TestSortKeyToPathList(t *testing.T) {
+	ktpList := []corev1.KeyToPath{
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		}, {
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		},
+	}
+	sort.Sort(keyToPathList(ktpList))
+
+	expectedList := []corev1.KeyToPath{
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		},
+		{
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		},
+	}
+
+	for i, ktp := range ktpList {
+		assert.Equal(t, expectedList[i].Key, ktp.Key)
+		assert.Equal(t, expectedList[i].Path, ktp.Path)
 	}
 }
