@@ -82,12 +82,11 @@ type ClusterPolicyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
 	_ = r.Log.WithValues("Reconciling ClusterPolicy", req.NamespacedName)
 
 	// Fetch the ClusterPolicy instance
 	instance := &gpuv1.ClusterPolicy{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if errors.IsNotFound(err) {
@@ -109,7 +108,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	err = clusterPolicyCtrl.init(r, instance)
+	err = clusterPolicyCtrl.init(ctx, r, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to initialize ClusterPolicy controller")
 
@@ -137,14 +136,14 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if statusError != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
-			updateCRState(r, req.NamespacedName, gpuv1.NotReady)
+			updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 			return ctrl.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
 		if status == gpuv1.NotReady {
 			// if CR was previously set to ready(prior reboot etc), reset it to current state
 			if instance.Status.State == gpuv1.Ready {
-				updateCRState(r, req.NamespacedName, gpuv1.NotReady)
+				updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 			}
 			overallStatus = gpuv1.NotReady
 			statesNotReady = append(statesNotReady, clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1])
@@ -176,14 +175,14 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			"requeueAfter", requeueAfter)
 
 		// Update CR state as ready as all states are complete
-		updateCRState(r, req.NamespacedName, gpuv1.NotReady)
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	// Update CR state as ready as all states are complete
-	updateCRState(r, req.NamespacedName, gpuv1.Ready)
+	updateCRState(ctx, r, req.NamespacedName, gpuv1.Ready)
 	clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
 	clusterPolicyCtrl.operatorMetrics.reconciliationLastSuccess.Set(float64(time.Now().Unix()))
 
@@ -196,10 +195,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func updateCRState(r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) error {
+func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) error {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &gpuv1.ClusterPolicy{}
-	err := r.Client.Get(context.TODO(), namespacedName, instance)
+	err := r.Client.Get(ctx, namespacedName, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
 		return err
@@ -210,7 +209,7 @@ func updateCRState(r *ClusterPolicyReconciler, namespacedName types.NamespacedNa
 	}
 	// Update the CR state
 	instance.SetStatus(state, clusterPolicyCtrl.operatorNamespace)
-	err = r.Client.Status().Update(context.TODO(), instance)
+	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to update ClusterPolicy status")
 		return err
