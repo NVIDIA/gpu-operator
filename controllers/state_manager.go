@@ -121,6 +121,7 @@ type OpenShiftDriverToolkit struct {
 
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
+	ctx               context.Context
 	singleton         *gpuv1.ClusterPolicy
 	operatorNamespace string
 
@@ -143,7 +144,7 @@ type ClusterPolicyController struct {
 
 func addState(n *ClusterPolicyController, path string) error {
 	// TODO check for path
-	res, ctrl := addResourcesControls(n, path, n.openshift)
+	res, ctrl := addResourcesControls(n, path)
 
 	n.controls = append(n.controls, ctrl)
 	n.resources = append(n.resources, res)
@@ -153,14 +154,14 @@ func addState(n *ClusterPolicyController, path string) error {
 }
 
 // OpenshiftVersion fetches OCP version
-func OpenshiftVersion() (string, error) {
+func OpenshiftVersion(ctx context.Context) (string, error) {
 	cfg := config.GetConfigOrDie()
 	client, err := configv1.NewForConfig(cfg)
 	if err != nil {
 		return "", err
 	}
 
-	v, err := client.ClusterVersions().Get(context.TODO(), "version", metav1.GetOptions{})
+	v, err := client.ClusterVersions().Get(ctx, "version", metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -197,14 +198,14 @@ func KubernetesVersion() (string, error) {
 }
 
 // GetClusterWideProxy returns cluster wide proxy object setup in OCP
-func GetClusterWideProxy() (*apiconfigv1.Proxy, error) {
+func GetClusterWideProxy(ctx context.Context) (*apiconfigv1.Proxy, error) {
 	cfg := config.GetConfigOrDie()
 	client, err := configv1.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	proxy, err := client.Proxies().Get(context.TODO(), "cluster", metav1.GetOptions{})
+	proxy, err := client.Proxies().Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -393,10 +394,11 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 // labelGPUNodes labels nodes with GPU's with NVIDIA common label
 // it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
 func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
+	ctx := n.ctx
 	// fetch all nodes
 	opts := []client.ListOption{}
 	list := &corev1.NodeList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		return false, 0, fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
 	}
@@ -427,7 +429,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			gpuWorkloadConfig.updateGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
-			err = n.rec.Client.Update(context.TODO(), &node)
+			err = n.rec.Client.Update(ctx, &node)
 			if err != nil {
 				return false, 0, fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
 					node.ObjectMeta.Name, err.Error())
@@ -442,7 +444,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			removeAllGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
-			err = n.rec.Client.Update(context.TODO(), &node)
+			err = n.rec.Client.Update(ctx, &node)
 			if err != nil {
 				return false, 0, fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
 					node.ObjectMeta.Name, err.Error())
@@ -453,7 +455,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
 				n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
 				node.SetLabels(labels)
-				err = n.rec.Client.Update(context.TODO(), &node)
+				err = n.rec.Client.Update(ctx, &node)
 				if err != nil {
 					return false, 0, fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
 						node.ObjectMeta.Name, err.Error())
@@ -502,6 +504,7 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 }
 
 func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
+	ctx := n.ctx
 	namespaceName := clusterPolicyCtrl.operatorNamespace
 
 	if n.openshift != "" && namespaceName != ocpSuggestedNamespace {
@@ -516,7 +519,7 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 
 	ns := &corev1.Namespace{}
 	opts := client.ObjectKey{Name: namespaceName}
-	err := n.rec.Client.Get(context.TODO(), opts, ns)
+	err := n.rec.Client.Get(ctx, opts, ns)
 	if err != nil {
 		return fmt.Errorf("ERROR: could not get Namespace %s from client: %v", namespaceName, err)
 	}
@@ -535,7 +538,7 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 		return nil
 	}
 
-	err = n.rec.Client.Patch(context.TODO(), ns, patch)
+	err = n.rec.Client.Patch(ctx, ns, patch)
 	if err != nil {
 		return fmt.Errorf("unable to label namespace %s with pod security levels: %v", namespaceName, err)
 	}
@@ -544,6 +547,7 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 }
 
 func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
+	ctx := n.ctx
 	namespaceName := clusterPolicyCtrl.operatorNamespace
 
 	if namespaceName != ocpSuggestedNamespace {
@@ -559,7 +563,7 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 
 	ns := &corev1.Namespace{}
 	opts := client.ObjectKey{Name: namespaceName}
-	err := n.rec.Client.Get(context.TODO(), opts, ns)
+	err := n.rec.Client.Get(ctx, opts, ns)
 	if err != nil {
 		return fmt.Errorf("ERROR: could not get Namespace %s from client: %v", namespaceName, err)
 	}
@@ -592,7 +596,7 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 		ocpNamespaceMonitoringLabelKey + "=false")
 	patch := client.MergeFrom(ns.DeepCopy())
 	ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
-	err = n.rec.Client.Patch(context.TODO(), ns, patch)
+	err = n.rec.Client.Patch(ctx, ns, patch)
 	if err != nil {
 		return fmt.Errorf("Unable to label namespace %s for the GPU Operator monitoring, err %s",
 			namespaceName, err.Error())
@@ -607,6 +611,7 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 // containerd -- if >=1 node is configured with containerd, set
 // clusterPolicyController.runtime = containerd
 func (n *ClusterPolicyController) getRuntime() error {
+	ctx := n.ctx
 	// assume crio for openshift clusters
 	if n.openshift != "" {
 		n.runtime = gpuv1.CRIO
@@ -617,7 +622,7 @@ func (n *ClusterPolicyController) getRuntime() error {
 		client.MatchingLabels{commonGPULabelKey: "true"},
 	}
 	list := &corev1.NodeList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		return fmt.Errorf("Unable to list nodes prior to checking container runtime: %v", err)
 	}
@@ -644,9 +649,9 @@ func (n *ClusterPolicyController) getRuntime() error {
 	return nil
 }
 
-func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
+func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
-
+	n.ctx = ctx
 	n.rec = reconciler
 	n.idx = 0
 
@@ -661,7 +666,7 @@ func (n *ClusterPolicyController) init(reconciler *ClusterPolicyReconciler, clus
 			os.Exit(1)
 		}
 
-		version, err := OpenshiftVersion()
+		version, err := OpenshiftVersion(ctx)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

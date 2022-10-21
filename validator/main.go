@@ -59,11 +59,13 @@ type NvidiaFs struct{}
 
 // CUDA represents spec to run cuda workload
 type CUDA struct {
+	ctx        context.Context
 	kubeClient kubernetes.Interface
 }
 
 // Plugin component
 type Plugin struct {
+	ctx        context.Context
 	kubeClient kubernetes.Interface
 }
 
@@ -72,22 +74,30 @@ type Toolkit struct{}
 
 // MOFED represents spec to validate MOFED driver installation
 type MOFED struct {
+	ctx        context.Context
 	kubeClient kubernetes.Interface
 }
 
 // Metrics represents spec to run metrics exporter
 type Metrics struct {
+	ctx        context.Context
 	kubeClient kubernetes.Interface
 }
 
 // VfioPCI represents spec to validate vfio-pci driver
-type VfioPCI struct{}
+type VfioPCI struct {
+	ctx context.Context
+}
 
 // VGPUManager represents spec to validate vGPU Manager installation
-type VGPUManager struct{}
+type VGPUManager struct {
+	ctx context.Context
+}
 
 // VGPUDevices represents spec to validate vGPU device creation
-type VGPUDevices struct{}
+type VGPUDevices struct {
+	ctx context.Context
+}
 
 var (
 	kubeconfigFlag               string
@@ -379,7 +389,7 @@ func isValidWorkloadConfig(config string) bool {
 		config == gpuWorkloadConfigVMVgpu
 }
 
-func getWorkloadConfig() (string, error) {
+func getWorkloadConfig(ctx context.Context) (string, error) {
 	// check if default workload is overridden by flag
 	if isValidWorkloadConfig(defaultGPUWorkloadConfigFlag) {
 		defaultGPUWorkloadConfig = defaultGPUWorkloadConfigFlag
@@ -395,7 +405,7 @@ func getWorkloadConfig() (string, error) {
 		return "", fmt.Errorf("Error getting k8s client - %s", err.Error())
 	}
 
-	node, err := getNode(kubeClient)
+	node, err := getNode(ctx, kubeClient)
 	if err != nil {
 		return "", fmt.Errorf("Error getting node labels - %s", err.Error())
 	}
@@ -454,21 +464,27 @@ func start(c *cli.Context) error {
 		}
 		return nil
 	case "cuda":
-		cuda := &CUDA{}
+		cuda := &CUDA{
+			ctx: c.Context,
+		}
 		err := cuda.validate()
 		if err != nil {
 			return fmt.Errorf("error validating cuda workload: %s", err)
 		}
 		return nil
 	case "plugin":
-		plugin := &Plugin{}
+		plugin := &Plugin{
+			ctx: c.Context,
+		}
 		err := plugin.validate()
 		if err != nil {
 			return fmt.Errorf("error validating plugin installation: %s", err)
 		}
 		return nil
 	case "mofed":
-		mofed := &MOFED{}
+		mofed := &MOFED{
+			ctx: c.Context,
+		}
 		err := mofed.validate()
 		if err != nil {
 			return fmt.Errorf("error validating MOFED driver installation: %s", err)
@@ -482,21 +498,27 @@ func start(c *cli.Context) error {
 		}
 		return nil
 	case "vfio-pci":
-		vfioPCI := &VfioPCI{}
+		vfioPCI := &VfioPCI{
+			ctx: c.Context,
+		}
 		err := vfioPCI.validate()
 		if err != nil {
 			return fmt.Errorf("error validating vfio-pci driver installation: %s", err)
 		}
 		return nil
 	case "vgpu-manager":
-		vGPUManager := &VGPUManager{}
+		vGPUManager := &VGPUManager{
+			ctx: c.Context,
+		}
 		err := vGPUManager.validate()
 		if err != nil {
 			return fmt.Errorf("error validating vGPU Manager installation: %s", err)
 		}
 		return nil
 	case "vgpu-devices":
-		vGPUDevices := &VGPUDevices{}
+		vGPUDevices := &VGPUDevices{
+			ctx: c.Context,
+		}
 		err := vGPUDevices.validate()
 		if err != nil {
 			return fmt.Errorf("error validating vGPU devices: %s", err)
@@ -803,7 +825,7 @@ func (m *MOFED) setKubeClient(kubeClient kubernetes.Interface) {
 }
 
 func (m *MOFED) isMellanoxDevicePresent() (bool, error) {
-	node, err := getNode(m.kubeClient)
+	node, err := getNode(m.ctx, m.kubeClient)
 	if err != nil {
 		return false, fmt.Errorf("unable to fetch node by name %s to check for Mellanox device label: %s", nodeNameFlag, err)
 	}
@@ -816,6 +838,7 @@ func (m *MOFED) isMellanoxDevicePresent() (bool, error) {
 }
 
 func (p *Plugin) runWorkload() error {
+	ctx := p.ctx
 	// load podSpec
 	pod, err := loadPodSpec(pluginWorkloadPodSpecPath)
 	if err != nil {
@@ -845,10 +868,10 @@ func (p *Plugin) runWorkload() error {
 	}
 
 	// update owner reference
-	setOwnerReference(p.kubeClient, pod)
+	setOwnerReference(ctx, p.kubeClient, pod)
 
 	// set pod tolerations
-	err = setTolerations(p.kubeClient, pod)
+	err = setTolerations(ctx, p.kubeClient, pod)
 	if err != nil {
 		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
 	}
@@ -871,7 +894,7 @@ func (p *Plugin) runWorkload() error {
 		FieldSelector: fields.Set{"spec.nodeName": nodeNameFlag}.AsSelector().String()}
 
 	// check if plugin validation pod is already running and cleanup.
-	podList, err := p.kubeClient.CoreV1().Pods(namespaceFlag).List(context.TODO(), opts)
+	podList, err := p.kubeClient.CoreV1().Pods(namespaceFlag).List(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("cannot list existing validation pods: %s", err)
 	}
@@ -880,29 +903,29 @@ func (p *Plugin) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
+		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].ObjectMeta.Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %s", err)
 		}
 	}
 
 	// wait for plugin validation pod to be ready.
-	newPod, err := p.kubeClient.CoreV1().Pods(namespaceFlag).Create(context.TODO(), pod, meta_v1.CreateOptions{})
+	newPod, err := p.kubeClient.CoreV1().Pods(namespaceFlag).Create(ctx, pod, meta_v1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create plugin validation pod %s, err %+v", pod.ObjectMeta.Name, err)
 	}
 
 	// make sure its available
-	err = waitForPod(p.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
+	err = waitForPod(ctx, p.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func setOwnerReference(kubeClient kubernetes.Interface, pod *v1.Pod) error {
+func setOwnerReference(ctx context.Context, kubeClient kubernetes.Interface, pod *v1.Pod) error {
 	// get owner of validator daemonset (which is ClusterPolicy)
-	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(context.TODO(), "nvidia-operator-validator", meta_v1.GetOptions{})
+	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -912,9 +935,9 @@ func setOwnerReference(kubeClient kubernetes.Interface, pod *v1.Pod) error {
 	return nil
 }
 
-func setTolerations(kubeClient kubernetes.Interface, pod *v1.Pod) error {
+func setTolerations(ctx context.Context, kubeClient kubernetes.Interface, pod *v1.Pod) error {
 	// get tolerations of validator daemonset
-	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(context.TODO(), "nvidia-operator-validator", meta_v1.GetOptions{})
+	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -925,10 +948,10 @@ func setTolerations(kubeClient kubernetes.Interface, pod *v1.Pod) error {
 }
 
 // waits for the pod to be created
-func waitForPod(kubeClient kubernetes.Interface, name string, namespace string) error {
+func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name string, namespace string) error {
 	for i := 0; i < podCreationWaitRetries; i++ {
 		// check for the existence of the resource
-		pod, err := kubeClient.CoreV1().Pods(namespace).Get(context.TODO(), name, meta_v1.GetOptions{})
+		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, name, meta_v1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get pod %s, err %+v", name, err)
 		}
@@ -968,7 +991,7 @@ func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
 
 func (p *Plugin) countGPUResources() (int64, error) {
 	// get node info to check discovered GPU resources
-	node, err := getNode(p.kubeClient)
+	node, err := getNode(p.ctx, p.kubeClient)
 	if err != nil {
 		return -1, fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 	}
@@ -988,7 +1011,7 @@ func (p *Plugin) countGPUResources() (int64, error) {
 func (p *Plugin) validateGPUResource() error {
 	for retry := 1; retry <= gpuResourceDiscoveryWaitRetries; retry++ {
 		// get node info to check discovered GPU resources
-		node, err := getNode(p.kubeClient)
+		node, err := getNode(p.ctx, p.kubeClient)
 		if err != nil {
 			return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 		}
@@ -1029,7 +1052,7 @@ func (p *Plugin) availableGenericResourceName(resources v1.ResourceList) v1.Reso
 
 func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
 	// get node info to check allocatable GPU resources
-	node, err := getNode(p.kubeClient)
+	node, err := getNode(p.ctx, p.kubeClient)
 	if err != nil {
 		return "", fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
 	}
@@ -1050,8 +1073,8 @@ func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
 	p.kubeClient = kubeClient
 }
 
-func getNode(kubeClient kubernetes.Interface) (*v1.Node, error) {
-	node, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeNameFlag, meta_v1.GetOptions{})
+func getNode(ctx context.Context, kubeClient kubernetes.Interface) (*v1.Node, error) {
+	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeNameFlag, meta_v1.GetOptions{})
 	if err != nil {
 		log.Errorf("unable to get node with name %s, err %s", nodeNameFlag, err.Error())
 		return nil, err
@@ -1101,6 +1124,8 @@ func (c *CUDA) setKubeClient(kubeClient kubernetes.Interface) {
 }
 
 func (c *CUDA) runWorkload() error {
+	ctx := c.ctx
+
 	// load podSpec
 	pod, err := loadPodSpec(cudaWorkloadPodSpecPath)
 	if err != nil {
@@ -1129,13 +1154,13 @@ func (c *CUDA) runWorkload() error {
 	}
 
 	// update owner reference
-	err = setOwnerReference(c.kubeClient, pod)
+	err = setOwnerReference(ctx, c.kubeClient, pod)
 	if err != nil {
 		return fmt.Errorf("unable to set owner reference for validator pod: %s", err)
 	}
 
 	// set pod tolerations
-	err = setTolerations(c.kubeClient, pod)
+	err = setTolerations(ctx, c.kubeClient, pod)
 	if err != nil {
 		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
 	}
@@ -1147,7 +1172,7 @@ func (c *CUDA) runWorkload() error {
 		FieldSelector: fields.Set{"spec.nodeName": nodeNameFlag}.AsSelector().String()}
 
 	// check if cuda workload pod is already running and cleanup.
-	podList, err := c.kubeClient.CoreV1().Pods(namespaceFlag).List(context.TODO(), opts)
+	podList, err := c.kubeClient.CoreV1().Pods(namespaceFlag).List(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("cannot list existing validation pods: %s", err)
 	}
@@ -1156,20 +1181,20 @@ func (c *CUDA) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = c.kubeClient.CoreV1().Pods(namespaceFlag).Delete(context.TODO(), podList.Items[0].ObjectMeta.Name, options)
+		err = c.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].ObjectMeta.Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %s", err)
 		}
 	}
 
 	// wait for cuda workload pod to be ready.
-	newPod, err := c.kubeClient.CoreV1().Pods(namespaceFlag).Create(context.TODO(), pod, meta_v1.CreateOptions{})
+	newPod, err := c.kubeClient.CoreV1().Pods(namespaceFlag).Create(ctx, pod, meta_v1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create cuda validation pod %s, err %+v", pod.ObjectMeta.Name, err)
 	}
 
 	// make sure its available
-	err = waitForPod(c.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
+	err = waitForPod(ctx, c.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
@@ -1183,7 +1208,9 @@ func (c *Metrics) run() error {
 }
 
 func (v *VfioPCI) validate() error {
-	gpuWorkloadConfig, err := getWorkloadConfig()
+	ctx := v.ctx
+
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
 	}
@@ -1254,7 +1281,9 @@ func (v *VfioPCI) runValidation(silent bool) error {
 }
 
 func (v *VGPUManager) validate() error {
-	gpuWorkloadConfig, err := getWorkloadConfig()
+	ctx := v.ctx
+
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
 	}
@@ -1322,7 +1351,9 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 }
 
 func (v *VGPUDevices) validate() error {
-	gpuWorkloadConfig, err := getWorkloadConfig()
+	ctx := v.ctx
+
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
 	}

@@ -89,12 +89,12 @@ func getAssetsFrom(n *ClusterPolicyController, path string, openshiftVersion str
 	return manifests
 }
 
-func addResourcesControls(n *ClusterPolicyController, path string, openshiftVersion string) (Resources, controlFunc) {
+func addResourcesControls(n *ClusterPolicyController, path string) (Resources, controlFunc) {
 	res := Resources{}
 	ctrl := controlFunc{}
 
 	n.rec.Log.Info("Getting assets from: ", "path:", path)
-	manifests := getAssetsFrom(n, path, openshiftVersion)
+	manifests := getAssetsFrom(n, path, n.openshift)
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)
