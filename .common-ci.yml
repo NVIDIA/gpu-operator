@@ -25,6 +25,17 @@ stages:
   - aws_kube_clean
   - release
 
+# Enable pipelines on merge requests, tags, and branches.
+# Avoid duplicate pipelines when pushing to a branch associated with an open MR.
+# https://docs.gitlab.com/ee/ci/yaml/workflow.html#switch-between-branch-pipelines-and-merge-request-pipelines
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 # Define the platform targets
 .platform-amd64:
   variables:
@@ -167,6 +178,8 @@ release:staging-latest-gpu-operator:
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
 release:staging-latest-gpu-operator-validator:
   extends:
@@ -176,6 +189,8 @@ release:staging-latest-gpu-operator-validator:
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
 release:gpu-operator-bundle-image:
   extends:
@@ -185,3 +200,5 @@ release:gpu-operator-bundle-image:
     VERSION: ""
     DEFAULT_CHANNEL: "stable"
     CHANNELS: "stable"
+  rules:
+    - if: $CI_COMMIT_BRANCH
