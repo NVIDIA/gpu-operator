@@ -178,6 +178,7 @@ type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
 // ServiceAccount creates ServiceAccount resource
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -186,7 +187,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -198,7 +199,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, skipping update")
 			return gpuv1.Ready, nil
@@ -212,6 +213,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 
 // Role creates Role resource
 func Role(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -220,7 +222,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -232,10 +234,10 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
+			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -252,6 +254,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 
 // RoleBinding creates RoleBinding resource
 func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].RoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -260,7 +263,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -282,10 +285,10 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
+			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -302,6 +305,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 // ClusterRole creates ClusterRole resource
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ClusterRole.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -310,7 +314,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -322,10 +326,10 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
+			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -342,6 +346,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 // ClusterRoleBinding creates ClusterRoleBinding resource
 func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -350,7 +355,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -366,10 +371,10 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
+			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -386,6 +391,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 // createConfigMap creates a ConfigMap resource
 func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ConfigMaps[configMapIdx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -394,7 +400,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -433,14 +439,14 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if !errors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
 		}
 
 		logger.Info("Found Resource, updating...")
-		err = n.rec.Client.Update(context.TODO(), obj)
+		err = n.rec.Client.Update(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't update", "Error", err)
 			return gpuv1.NotReady, err
@@ -467,6 +473,7 @@ func ConfigMaps(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
+	ctx := n.ctx
 	logger := n.rec.Log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := []client.ListOption{
@@ -474,7 +481,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	}
 
 	list := &corev1.NodeList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
 		return "", "", ""
@@ -731,7 +738,7 @@ func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 // applyOCPProxySpec applies proxy settings to podSpec
 func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error {
 	// Pass HTTPS_PROXY, HTTP_PROXY and NO_PROXY env if set in clusterwide proxy for OCP
-	proxy, err := GetClusterWideProxy()
+	proxy, err := GetClusterWideProxy(n.ctx)
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to get clusterwide proxy object: %s", err)
 	}
@@ -793,6 +800,7 @@ func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error
 
 // getOrCreateTrustedCAConfigMap creates or returns an existing Trusted CA Bundle ConfigMap.
 func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*corev1.ConfigMap, error) {
+	ctx := n.ctx
 	configMap := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -818,10 +826,10 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 	}
 
 	found := &corev1.ConfigMap{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating")
-		err = n.rec.Client.Create(context.TODO(), configMap)
+		err = n.rec.Client.Create(ctx, configMap)
 		if err != nil {
 			logger.Info("Couldn't create")
 			return nil, fmt.Errorf("failed to create trusted CA bundle config map %q: %s", name, err)
@@ -2224,10 +2232,11 @@ func getSubscriptionPaths() ([]corev1.KeyToPath, error) {
 // in the ConfigMap. Use subPath to ensure original contents
 // at destinationDir are not overwritten.
 func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string, destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+	ctx := n.ctx
 	// get the ConfigMap
 	cm := &corev1.ConfigMap{}
 	opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: configMapName}
-	err := n.rec.Client.Get(context.TODO(), opts, cm)
+	err := n.rec.Client.Get(ctx, opts, cm)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ERROR: could not get ConfigMap %s from client: %v", configMapName, err)
 	}
@@ -2606,7 +2615,7 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	}
 	n.rec.Log.V(1).Info("Deployment", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DeploymentList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(n.ctx, list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get DeploymentList", err)
 	}
@@ -2626,12 +2635,13 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 }
 
 func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
+	ctx := n.ctx
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
 	n.rec.Log.V(1).Info("DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get DaemonSetList", err)
 	}
@@ -2652,6 +2662,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 
 // Deployment creates Deployment resource
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -2660,7 +2671,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -2672,10 +2683,10 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(context.TODO(), obj); err != nil {
+	if err := n.rec.Client.Create(ctx, obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(context.TODO(), obj)
+			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -2691,10 +2702,11 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
+	ctx := n.ctx
 	found := &apiimagev1.ImageStream{}
 	name := "driver-toolkit"
 	namespace := "openshift"
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			n.rec.Log.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
@@ -2739,9 +2751,10 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 // populated, otherwise, the Pod won't have the credentials to access
 // the DriverToolkit image in the cluster registry.
 func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyController) (bool, error) {
+	ctx := n.ctx
 	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name)
 
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Info("ServiceAccount not found",
@@ -2771,7 +2784,7 @@ func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyControlle
 // found in the cluster, sets `currentRhcosVersion` and calls the
 // original DaemonSet() function to create/update the RHCOS-specific
 // DaemonSet.
-func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) {
+func ocpDriverToolkitDaemonSets(ctx context.Context, n ClusterPolicyController) (gpuv1.State, error) {
 	ocpCleanupUnusedDriverToolkitDaemonSets(n)
 
 	state := n.idx
@@ -2840,6 +2853,7 @@ func ocpDriverToolkitDaemonSets(n ClusterPolicyController) (gpuv1.State, error) 
 // The DaemonSet set is kept if:
 // - RHCOS version was found in the node labels (most likely case)
 func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
+	ctx := n.ctx
 	opts := []client.ListOption{
 		client.MatchingLabels{
 			ocpDriverToolkitIdentificationLabel: ocpDriverToolkitIdentificationValue,
@@ -2847,7 +2861,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 	}
 
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
 		return
@@ -2899,7 +2913,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 
 		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
 
-		err = n.rec.Client.Delete(context.TODO(), &list.Items[idx])
+		err = n.rec.Client.Delete(ctx, &list.Items[idx])
 		if err != nil {
 			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
 				"Name", name, "Error", err)
@@ -2947,10 +2961,11 @@ func cleanupUnusedDriverDaemonSets(n ClusterPolicyController) (int, error) {
 // pairs If no error happens, returns the number of Pods belonging to
 // the DaemonSet.
 func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string) (int, error) {
+	ctx := n.ctx
 	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}}
 
 	dsList := &appsv1.DaemonSetList{}
-	if err := n.rec.Client.List(context.TODO(), dsList, opts...); err != nil {
+	if err := n.rec.Client.List(ctx, dsList, opts...); err != nil {
 		n.rec.Log.Error(err, "Could not get DaemonSetList")
 		return 0, err
 	}
@@ -2961,7 +2976,7 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 			"Name", dsList.Items[idx].ObjectMeta.Name,
 		)
 
-		if err := n.rec.Client.Delete(context.TODO(), &dsList.Items[idx]); err != nil {
+		if err := n.rec.Client.Delete(ctx, &dsList.Items[idx]); err != nil {
 			n.rec.Log.Error(err, "Could not get delete DaemonSet",
 				"Name", dsList.Items[idx].ObjectMeta.Name)
 			lastErr = err
@@ -2974,7 +2989,7 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 	}
 
 	podList := &corev1.PodList{}
-	if err := n.rec.Client.List(context.TODO(), podList, opts...); err != nil {
+	if err := n.rec.Client.List(ctx, podList, opts...); err != nil {
 		n.rec.Log.Info("ERROR: Could not get PodList", "Error", err)
 		return 0, err
 	}
@@ -2984,6 +2999,7 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 
 // DaemonSet creates Daemonset resource
 func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].DaemonSet.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -2992,7 +3008,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3034,7 +3050,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 			// Initiate the multi-DaemonSet OCP DriverToolkit
 			// deployment.
 
-			return ocpDriverToolkitDaemonSets(n)
+			return ocpDriverToolkitDaemonSets(ctx, n)
 		}
 	}
 
@@ -3056,7 +3072,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &appsv1.DaemonSet{}
-	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("DaemonSet not found, creating",
 			"Name", obj.Name,
@@ -3065,7 +3081,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		hashStr := getDaemonsetHash(obj)
 		// add annotation to the Daemonset with hash value during creation
 		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create DaemonSet",
 				"Name", obj.Name,
@@ -3084,7 +3100,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	changed := isDaemonsetSpecChanged(found, obj)
 	if changed {
 		logger.Info("DaemonSet is different, updating", "name", obj.ObjectMeta.Name)
-		err = n.rec.Client.Update(context.TODO(), obj)
+		err = n.rec.Client.Update(ctx, obj)
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
@@ -3140,11 +3156,12 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 // the operator waits until the Pod completes and checks the error status
 // to advance to the next state.
 func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) gpuv1.State {
+	ctx := n.ctx
 	opts := []client.ListOption{&client.MatchingLabels{"app": name}}
 
 	n.rec.Log.V(1).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
-	err := n.rec.Client.List(context.TODO(), list, opts...)
+	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		n.rec.Log.Info("Could not get PodList", err)
 	}
@@ -3165,6 +3182,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 
 // SecurityContextConstraints creates SCC resources
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -3173,7 +3191,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3198,10 +3216,10 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	}
 
 	found := &secv1.SecurityContextConstraints{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3214,7 +3232,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3224,6 +3242,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 // PodSecurityPolicy creates PSP resources
 func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].PodSecurityPolicy.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -3232,7 +3251,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if PSP is disabled and cleanup resource if exists
 	if !n.singleton.Spec.PSP.IsEnabled() {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3245,10 +3264,10 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &policyv1beta1.PodSecurityPolicy{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3261,7 +3280,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3271,6 +3290,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 
 // Service creates Service object
 func Service(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Service.DeepCopy()
 
@@ -3280,7 +3300,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3293,10 +3313,10 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &corev1.Service{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3310,7 +3330,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.ResourceVersion = found.ResourceVersion
 	obj.Spec.ClusterIP = found.Spec.ClusterIP
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3318,9 +3338,9 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func crdExists(c client.Client, name string) (bool, error) {
+func crdExists(n ClusterPolicyController, name string) (bool, error) {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
-	err := c.Get(context.TODO(), client.ObjectKey{Name: name}, crd)
+	err := n.rec.Client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
 	if err != nil && errors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -3332,6 +3352,7 @@ func crdExists(c client.Client, name string) (bool, error) {
 
 // ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -3339,7 +3360,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if ServiceMonitor is a valid kind
-	serviceMonitorCRDExists, err := crdExists(n.rec.Client, ServiceMonitorCRDName)
+	serviceMonitorCRDExists, err := crdExists(n, ServiceMonitorCRDName)
 	if err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -3349,7 +3370,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		if !serviceMonitorCRDExists {
 			return gpuv1.Ready, nil
 		}
-		err := n.rec.Client.Delete(context.TODO(), obj)
+		err := n.rec.Client.Delete(ctx, obj)
 		if err != nil && !errors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3364,7 +3385,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			if !serviceMonitorCRDExists {
 				return gpuv1.Ready, nil
 			}
-			err := n.rec.Client.Delete(context.TODO(), obj)
+			err := n.rec.Client.Delete(ctx, obj)
 			if err != nil && !errors.IsNotFound(err) {
 				logger.Info("Couldn't delete", "Error", err)
 				return gpuv1.NotReady, err
@@ -3408,10 +3429,10 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &promv1.ServiceMonitor{}
-	err = n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3424,7 +3445,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3433,6 +3454,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := &nodev1beta1.RuntimeClass{}
 
@@ -3450,10 +3472,10 @@ func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error)
 	}
 
 	found := &nodev1beta1.RuntimeClass{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3466,7 +3488,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error)
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3476,6 +3498,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error)
 
 func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
+	ctx := n.ctx
 	obj := &nodev1.RuntimeClass{}
 
 	// apply runtime class name as per ClusterPolicy
@@ -3492,10 +3515,10 @@ func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &nodev1.RuntimeClass{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3508,7 +3531,7 @@ func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -3526,6 +3549,7 @@ func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 
 // PrometheusRule creates PrometheusRule object
 func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
+	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].PrometheusRule.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -3537,10 +3561,10 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &promv1.PrometheusRule{}
-	err := n.rec.Client.Get(context.TODO(), types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(context.TODO(), obj)
+		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -3553,7 +3577,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(context.TODO(), obj)
+	err = n.rec.Client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
