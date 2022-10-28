@@ -639,7 +639,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// update env required for MIG support
-	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, true)
+	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
 
 	return nil
 }
@@ -1036,7 +1036,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	// update env required for MIG support
-	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy, false)
+	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
 
 	return nil
 }
@@ -1768,18 +1768,14 @@ func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClas
 }
 
 // applies MIG related configuration env to container spec
-func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy, isGFD bool) {
-	// if not set then default to "none" strategy
+func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy) {
+	// if not set then let plugin decide this per node(default: none)
 	if strategy == "" {
-		strategy = gpuv1.MIGStrategyNone
+		setContainerEnv(c, "NVIDIA_MIG_MONITOR_DEVICES", "all")
+		return
 	}
 
-	if isGFD {
-		// this is temporary until we align env name for GFD with device-plugin
-		setContainerEnv(c, "GFD_MIG_STRATEGY", string(strategy))
-	} else {
-		setContainerEnv(c, "MIG_STRATEGY", string(strategy))
-	}
+	setContainerEnv(c, "MIG_STRATEGY", string(strategy))
 	if strategy != gpuv1.MIGStrategyNone {
 		setContainerEnv(c, "NVIDIA_MIG_MONITOR_DEVICES", "all")
 	}
