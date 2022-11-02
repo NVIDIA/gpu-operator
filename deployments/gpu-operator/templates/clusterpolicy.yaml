@@ -56,7 +56,7 @@ spec:
     {{- end }}
     {{- if .Values.daemonsets.rollingUpdate }}
     rollingUpdate:
-      maxUnavailable: {{ .Values.daemonsets.maxUnavailable | quote }}
+      maxUnavailable: {{ .Values.daemonsets.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
   validator:
     {{- if .Values.validator.repository }}
