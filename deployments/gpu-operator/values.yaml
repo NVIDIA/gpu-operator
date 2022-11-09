@@ -358,10 +358,9 @@ node-feature-discovery:
       operator: "Equal"
       value: ""
       effect: "NoSchedule"
-    - key: "nvidia.com/gpu"
-      operator: "Equal"
-      value: "present"
-      effect: "NoSchedule"
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
 
     config:
       sources:
