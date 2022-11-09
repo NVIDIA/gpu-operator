@@ -134,42 +134,72 @@ var CertConfigPathMap = map[string]string{
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
 }
 
-// SubscriptionPathMap indicated OS-specific paths for
-// entitlements/subscription information.
-// These are used enable Driver Container's access to packages controlled by
+func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
+	hostPathType := new(corev1.HostPathType)
+	*hostPathType = pathType
+	return hostPathType
+}
+
+// MountPathToVolumeSource maps a container mount path to a VolumeSource
+type MountPathToVolumeSource map[string]corev1.VolumeSource
+
+// SubscriptionPathMap contains information on OS-specific paths
+// that provide entitlements/subscription details on the host.
+// These are used to enable Driver Container's access to packages controlled by
 // the distro through their subscription and support program.
-var SubscriptionPathMap = map[string]([]corev1.KeyToPath){
+var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 	"rhel": {
-		{
-			Key:  "/etc/pki/entitlement",
-			Path: "/run/secrets/etc-pki-entitlement",
-		}, {
-			Key:  "/etc/yum.repos.d/redhat.repo",
-			Path: "/run/secrets/redhat.repo",
-		}, {
-			Key:  "/etc/rhsm",
-			Path: "/run/secrets/rhsm",
+		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/pki/entitlement",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/run/secrets/redhat.repo": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/yum.repos.d/redhat.repo",
+				Type: newHostPathType(corev1.HostPathFile),
+			},
+		},
+		"/run/secrets/rhsm": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/rhsm",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
 		},
 	},
 	"rhcos": {
-		{
-			Key:  "/etc/pki/entitlement",
-			Path: "/run/secrets/etc-pki-entitlement",
-		}, {
-			Key:  "/etc/yum.repos.d/redhat.repo",
-			Path: "/run/secrets/redhat.repo",
-		}, {
-			Key:  "/etc/rhsm",
-			Path: "/run/secrets/rhsm",
+		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/pki/entitlement",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/run/secrets/redhat.repo": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/yum.repos.d/redhat.repo",
+				Type: newHostPathType(corev1.HostPathFile),
+			},
+		},
+		"/run/secrets/rhsm": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/rhsm",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
 		},
 	},
 	"sles": {
-		{
-			Key:  "/etc/zypp/credentials.d",
-			Path: "/etc/zypp/credentials.d",
-		}, {
-			Key:  "/etc/SUSEConnect",
-			Path: "/etc/SUSEConnect",
+		"/etc/zypp/credentials.d": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/zypp/credentials.d",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/etc/SUSEConnect": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/SUSEConnect",
+				Type: newHostPathType(corev1.HostPathFileOrCreate),
+			},
 		},
 	},
 }
@@ -2197,33 +2227,17 @@ func getCertConfigPath() (string, error) {
 	return "", fmt.Errorf("distribution not supported")
 }
 
-// wrap array type with interface suitable for sort.Sort
-type keyToPathList []corev1.KeyToPath
-
-func (kp keyToPathList) Len() int {
-	return len(kp)
-}
-
-func (kp keyToPathList) Less(i, j int) bool {
-	return kp[i].Key < kp[j].Key
-}
-
-func (kp keyToPathList) Swap(i, j int) {
-	kp[i], kp[j] = kp[j], kp[i]
-}
-
-// getSubscriptionPaths returns the standard OS specific path for ssl keys/certificates
-func getSubscriptionPaths() ([]corev1.KeyToPath, error) {
+// getSubscriptionPathsToVolumeSources returns the MountPathToVolumeSource map containing all
+// OS-specific subscription/entitlement paths that need to be mounted in the container.
+func getSubscriptionPathsToVolumeSources() (MountPathToVolumeSource, error) {
 	release, err := parseOSRelease()
 	if err != nil {
 		return nil, err
 	}
 
 	os := release["ID"]
-	if paths, ok := SubscriptionPathMap[os]; ok {
-		// ensure ordering is preserved when we add these to pod spec
-		sort.Sort(keyToPathList(paths))
-		return paths, nil
+	if pathToVolumeSource, ok := SubscriptionPathMap[os]; ok {
+		return pathToVolumeSource, nil
 	}
 	return nil, fmt.Errorf("distribution not supported")
 }
@@ -2439,23 +2453,29 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 		if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
 			n.rec.Log.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
-			subscriptionPaths, err := getSubscriptionPaths()
+			pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
 			}
 
-			// Add multiple paths from host to container
-			for num, item := range subscriptionPaths {
+			// sort host path volumes to ensure ordering is preserved when adding to pod spec
+			mountPaths := make([]string, 0, len(pathToVolumeSource))
+			for k := range pathToVolumeSource {
+				mountPaths = append(mountPaths, k)
+			}
+			sort.Strings(mountPaths)
+
+			for num, mountPath := range mountPaths {
 				volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
 
 				volMountSubscription := corev1.VolumeMount{
 					Name:      volMountSubscriptionName,
-					MountPath: item.Path,
+					MountPath: mountPath,
 					ReadOnly:  true,
 				}
 				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volMountSubscription)
 
-				subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: item.Key}}}
+				subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
 				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, subscriptionVol)
 			}
 		}
