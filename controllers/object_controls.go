@@ -949,7 +949,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
 		// set args for the toolkit
-		toolkitArgStrFmt := "[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; exec nvidia-toolkit %s"
+		toolkitArgStrFmt := "[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; sleep 5; exec nvidia-toolkit %s"
 		toolkitArg := fmt.Sprintf(toolkitArgStrFmt, config.Toolkit.InstallDir)
 		args := []string{toolkitArg}
 		obj.Spec.Template.Spec.Containers[0].Args = args
