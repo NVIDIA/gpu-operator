@@ -1007,6 +1007,15 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
+
+	// Update CRI-O hooks path to use default path for non OCP cases
+	if n.openshift == "" && n.runtime == gpuv1.CRIO {
+		for index, volume := range obj.Spec.Template.Spec.Volumes {
+			if volume.Name == "crio-hooks" {
+				obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/share/containers/oci/hooks.d"
+			}
+		}
+	}
 	return nil
 }
 
