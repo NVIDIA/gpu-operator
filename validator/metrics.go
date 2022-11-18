@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -49,6 +50,8 @@ const (
 // NodeMetrics contains the port of the metrics server and the
 // Prometheus metrics objects
 type NodeMetrics struct {
+	ctx context.Context
+
 	port int
 
 	metricsReady promcli.Gauge
@@ -67,8 +70,9 @@ type NodeMetrics struct {
 }
 
 // NewNodeMetrics creates a NodeMetrics with its Prometheus metrics objects initialized (and automatically registered by promauto)
-func NewNodeMetrics(port int) NodeMetrics {
+func NewNodeMetrics(ctx context.Context, port int) NodeMetrics {
 	return NodeMetrics{
+		ctx:  ctx,
 		port: port,
 		metricsReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
@@ -186,7 +190,9 @@ func (nm *NodeMetrics) watchStatusFile(statusFile *promcli.Gauge, statusFileFile
 }
 
 func (nm *NodeMetrics) watchDevicePluginValidation() error {
-	p := &Plugin{}
+	p := &Plugin{
+		ctx: nm.ctx,
+	}
 
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
