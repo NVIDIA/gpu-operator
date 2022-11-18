@@ -23,9 +23,6 @@ spec:
     {{- if .Values.operator.defaultGPUMode }}
     defaultGPUMode: {{ .Values.operator.defaultGPUMode }}
     {{- end }}
-    {{- if .Values.operator.migStrategy }}
-    migStrategy: {{ .Values.operator.migStrategy }}
-    {{- end }}
     {{- if .Values.operator.initContainer }}
     initContainer:
       {{- if .Values.operator.initContainer.repository }}
@@ -53,6 +50,13 @@ spec:
     {{- end }}
     {{- if .Values.daemonsets.priorityClassName }}
     priorityClassName: {{ .Values.daemonsets.priorityClassName }}
+    {{- end }}
+    {{- if .Values.daemonsets.updateStrategy }}
+    updateStrategy: {{ .Values.daemonsets.updateStrategy }}
+    {{- end }}
+    {{- if .Values.daemonsets.rollingUpdate }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.daemonsets.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
   validator:
     {{- if .Values.validator.repository }}
@@ -179,10 +183,6 @@ spec:
     {{- end }}
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
-    {{- end }}
-    {{- if .Values.driver.rollingUpdate }}
-    rollingUpdate:
-      maxUnavailable: {{ .Values.driver.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
   vgpuManager:
     enabled: {{ .Values.vgpuManager.enabled }}
@@ -350,7 +350,13 @@ spec:
     args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
     {{- end }}
     {{- if .Values.devicePlugin.config }}
-    config: {{ toYaml .Values.devicePlugin.config | nindent 6 }}
+    config:
+      {{- if .Values.devicePlugin.config.name }}
+      name: {{ .Values.devicePlugin.config.name }}
+      {{- end }}
+      {{- if .Values.devicePlugin.config.default }}
+      default: {{ .Values.devicePlugin.config.default }}
+      {{- end }}
     {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}

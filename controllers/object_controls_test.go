@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"testing"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -135,6 +137,7 @@ func getModuleRoot(dir string) (string, error) {
 // object is initialized with the mock kubernetes client as well as other steps
 // mimicking init() in state_manager.go
 func setup() error {
+	ctx := context.Background()
 	// Used when updating ClusterPolicy spec
 	boolFalse = new(bool)
 	boolTrue = new(bool)
@@ -168,14 +171,14 @@ func setup() error {
 		return fmt.Errorf("failed to decode sample ClusterPolicy manifest: %v", err)
 	}
 
-	err = client.Create(context.TODO(), &clusterPolicy)
+	err = client.Create(ctx, &clusterPolicy)
 	if err != nil {
 		return fmt.Errorf("failed to create ClusterPolicy resource: %v", err)
 	}
 
 	// Confirm ClusterPolicy is deployed in mock cluster
 	cp := &gpuv1.ClusterPolicy{}
-	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "", Name: clusterPolicyName}, cp)
+	err = client.Get(ctx, types.NamespacedName{Namespace: "", Name: clusterPolicyName}, cp)
 	if err != nil {
 		return fmt.Errorf("unable to get ClusterPolicy from client: %v", err)
 	}
@@ -192,6 +195,7 @@ func setup() error {
 	}
 
 	clusterPolicyController = ClusterPolicyController{
+		ctx:       ctx,
 		singleton: cp,
 		rec:       &clusterPolicyReconciler,
 	}
@@ -214,6 +218,7 @@ func setup() error {
 
 // newCluster creates a mock kubernetes cluster and returns the corresponding client object
 func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
+	ctx := context.Background()
 	// Build fake client
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 
@@ -231,7 +236,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 				},
 			},
 		}
-		err := cl.Create(context.TODO(), n)
+		err := cl.Create(ctx, n)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create node in cluster: %v", err)
 		}
@@ -243,7 +248,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 // updateClusterPolicy updates an existing ClusterPolicy instance
 func updateClusterPolicy(n *ClusterPolicyController, cp *gpuv1.ClusterPolicy) error {
 	n.singleton = cp
-	err := n.rec.Client.Update(context.TODO(), cp)
+	err := n.rec.Client.Update(n.ctx, cp)
 	if err != nil && !errors.IsConflict(err) {
 		return fmt.Errorf("failed to update ClusterPolicy: %v", err)
 	}
@@ -257,7 +262,7 @@ func removeState(n *ClusterPolicyController, idx int) error {
 	var err error
 	for _, res := range kubernetesResources {
 		// TODO: use n.operatorNamespace once MR is merged
-		err = n.rec.Client.DeleteAllOf(context.TODO(), res)
+		err = n.rec.Client.DeleteAllOf(n.ctx, res)
 		if err != nil {
 			return fmt.Errorf("error deleting objects from k8s client: %v", err)
 		}
@@ -282,6 +287,8 @@ func getImagePullSecrets(secrets []string) []corev1.LocalObjectReference {
 // and checks the values for common fields used throughout all Daemonsets
 // managed by the GPU Operator.
 func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string, numDaemonsets int) (*appsv1.DaemonSet, error) {
+	ctx := context.Background()
+
 	var spec commonDaemonsetSpec
 	var dsLabel, mainCtrName, manifestFile, mainCtrImage string
 	var err error
@@ -384,7 +391,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		client.MatchingLabels{"app": dsLabel},
 	}
 	list := &appsv1.DaemonSetList{}
-	err = clusterPolicyController.rec.Client.List(context.TODO(), list, opts...)
+	err = clusterPolicyController.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		t.Fatalf("could not get DaemonSetList from client: %v", err)
 	}
@@ -874,5 +881,40 @@ func TestSandboxDevicePluginAssets(t *testing.T) {
 	_, err = clusterPolicyController.step()
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
+	}
+}
+
+func TestSortKeyToPathList(t *testing.T) {
+	ktpList := []corev1.KeyToPath{
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		}, {
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		},
+	}
+	sort.Sort(keyToPathList(ktpList))
+
+	expectedList := []corev1.KeyToPath{
+		{
+			Key:  "/etc/pki/entitlement",
+			Path: "/run/secrets/etc-pki-entitlement",
+		},
+		{
+			Key:  "/etc/rhsm",
+			Path: "/run/secrets/rhsm",
+		}, {
+			Key:  "/etc/yum.repos.d/redhat.repo",
+			Path: "/run/secrets/redhat.repo",
+		},
+	}
+
+	for i, ktp := range ktpList {
+		assert.Equal(t, expectedList[i].Key, ktp.Key)
+		assert.Equal(t, expectedList[i].Path, ktp.Path)
 	}
 }

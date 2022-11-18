@@ -83,7 +83,7 @@ test_mig_strategy_updates() {
     sleep 10
 
     # Validate that MIG strategy value is applied to both GFD and Device-Plugin Daemonsets
-    kubectl get daemonsets -lapp=gpu-feature-discovery -n $TEST_NAMESPACE  -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="GFD_MIG_STRATEGY")]}{"\n"}{end}' | grep GFD_MIG_STRATEGY.*$MIG_STRATEGY
+    kubectl get daemonsets -lapp=gpu-feature-discovery -n $TEST_NAMESPACE  -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="MIG_STRATEGY")]}{"\n"}{end}' | grep MIG_STRATEGY.*$MIG_STRATEGY
     if [ "$?" -ne 0 ]; then
         echo "cannot update MIG strategy to value $MIG_STRATEGY with GFD Daemonset"
         exit 1

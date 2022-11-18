@@ -21,6 +21,13 @@ daemonsets:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
+  # configuration for controlling update strategy("OnDelete" or "RollingUpdate") of GPU Operands
+  updateStrategy: "RollingUpdate"
+  # configuration for controlling rolling update of GPU Operands
+  rollingUpdate:
+    # maximum number of nodes to simultaneously apply pod updates on.
+    # can be specified either as number or percentage of nodes. Default 1.
+    maxUnavailable: "1"
 
 validator:
   repository: nvcr.io/nvidia/cloud-native
@@ -75,7 +82,13 @@ operator:
                 operator: In
                 values: [""]
   logging:
+    # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch
+    # Zap Level to configure the verbosity of logging. Can be one of 'debug', 'info', 'error', or any integer value > 0 which corresponds to custom debug levels of increasing verbosity
+    level: info
+    # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn)
+    # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error)
+    develMode: false
   resources:
     limits:
       cpu: 500m
@@ -100,9 +113,11 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.4.2
+    version: v0.5.0
     imagePullPolicy: IfNotPresent
     env:
+      - name: ENABLE_GPU_POD_EVICTION
+        value: "true"
       - name: ENABLE_AUTO_DRAIN
         value: "true"
       - name: DRAIN_USE_FORCE
@@ -131,11 +146,6 @@ driver:
   # kernel module configuration for NVIDIA driver
   kernelModuleConfig:
     name: ""
-  # configuration for controlling rolling update of NVIDIA driver DaemonSet pods
-  rollingUpdate:
-    # maximum number of nodes to simultaneously apply pod updates on.
-    # can be specified either as number or percentage of nodes. Default 1.
-    maxUnavailable: "1"
 
 toolkit:
   enabled: true
@@ -152,7 +162,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.12.3-ubi8
+  version: v0.13.0-rc.3-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -171,11 +181,34 @@ devicePlugin:
       value: all
   resources: {}
   # Plugin configuration
+  # Use "name" to either point to an existing ConfigMap or to create a new one with a list of configurations(i.e with create=true).
+  # Use "data" to build an integrated ConfigMap from a set of configurations as
+  # part of this helm chart. An example of setting "data" might be:
+  # config:
+  #   name: device-plugin-config
+  #   create: true
+  #   data:
+  #     default: |-
+  #       version: v1
+  #       flags:
+  #         migStrategy: none
+  #     mig-single: |-
+  #       version: v1
+  #       flags:
+  #         migStrategy: single
+  #     mig-mixed: |-
+  #       version: v1
+  #       flags:
+  #         migStrategy: mixed
   config:
-    # ConfigMap name
+    # Create a ConfigMap (default: false)
+    create: false
+    # ConfigMap name (either exiting or to create a new one with create=true above)
     name: ""
     # Default config name within the ConfigMap
     default: ""
+    # Data section for the ConfigMap to create (i.e only applies when create=true)
+    data: {}
 
 # standalone dcgm hostengine
 dcgm:
@@ -214,7 +247,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.6.2-ubi8
+  version: v0.7.0-rc.3-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -327,10 +360,9 @@ node-feature-discovery:
       operator: "Equal"
       value: ""
       effect: "NoSchedule"
-    - key: "nvidia.com/gpu"
-      operator: "Equal"
-      value: "present"
-      effect: "NoSchedule"
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
 
     config:
       sources:

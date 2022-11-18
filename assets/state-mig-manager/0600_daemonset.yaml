@@ -21,7 +21,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-mig-manager
+      serviceAccountName: nvidia-mig-manager
       hostPID: true
       hostIPC: true
       initContainers:

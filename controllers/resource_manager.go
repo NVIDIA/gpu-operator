@@ -57,7 +57,7 @@ func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) 
 	var files []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			n.rec.Log.Info("DEBUG: error in filepath.Walk on %s: %v", root, err)
+			n.rec.Log.V(1).Info("error in filepath.Walk on %s: %v", root, err)
 			return nil
 		}
 		if !info.IsDir() {
@@ -89,12 +89,12 @@ func getAssetsFrom(n *ClusterPolicyController, path string, openshiftVersion str
 	return manifests
 }
 
-func addResourcesControls(n *ClusterPolicyController, path string, openshiftVersion string) (Resources, controlFunc) {
+func addResourcesControls(n *ClusterPolicyController, path string) (Resources, controlFunc) {
 	res := Resources{}
 	ctrl := controlFunc{}
 
 	n.rec.Log.Info("Getting assets from: ", "path:", path)
-	manifests := getAssetsFrom(n, path, openshiftVersion)
+	manifests := getAssetsFrom(n, path, n.openshift)
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)
@@ -105,7 +105,7 @@ func addResourcesControls(n *ClusterPolicyController, path string, openshiftVers
 		slce := strings.Split(kind, ":")
 		kind = strings.TrimSpace(slce[1])
 
-		n.rec.Log.Info("DEBUG: Looking for ", "Kind", kind, "in path:", path)
+		n.rec.Log.V(1).Info("Looking for ", "Kind", kind, "in path:", path)
 
 		switch kind {
 		case "ServiceAccount":

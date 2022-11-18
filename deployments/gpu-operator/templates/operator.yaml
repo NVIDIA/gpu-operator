@@ -38,6 +38,16 @@ spec:
         command: ["gpu-operator"]
         args:
         - --leader-elect
+      {{- if .Values.operator.logging.develMode }}
+        - --zap-devel
+      {{- else }}
+        {{- if .Values.operator.logging.timeEncoding }}
+        - --zap-time-encoding={{- .Values.operator.logging.timeEncoding }}
+        {{- end }}
+        {{- if .Values.operator.logging.level }}
+        - --zap-log-level={{- .Values.operator.logging.level }}
+        {{- end }}
+      {{- end }}
         env:
         - name: WATCH_NAMESPACE
           value: ""

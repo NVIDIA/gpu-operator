@@ -23,7 +23,6 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-driver
       serviceAccountName: nvidia-driver
       hostPID: true
       initContainers:
@@ -67,6 +66,8 @@ spec:
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
+          - name: ENABLE_GPU_POD_EVICTION
+            value: "true"
           - name: ENABLE_AUTO_DRAIN
             value: "true"
           - name: DRAIN_USE_FORCE

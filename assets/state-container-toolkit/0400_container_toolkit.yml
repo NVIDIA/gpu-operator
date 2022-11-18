@@ -23,7 +23,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-container-toolkit
+      serviceAccountName: nvidia-container-toolkit
       hostPID: true
       initContainers:
       - name: driver-validation
@@ -54,7 +54,7 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         command: [bash, -c]
-        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; exec nvidia-toolkit /usr/local/nvidia"]
+        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; sleep 5; exec nvidia-toolkit /usr/local/nvidia"]
         env:
         - name: RUNTIME_ARGS
           value: ""

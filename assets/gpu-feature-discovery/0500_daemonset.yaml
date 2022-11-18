@@ -24,7 +24,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccount: nvidia-gpu-feature-discovery
+      serviceAccountName: nvidia-gpu-feature-discovery
       initContainers:
         - name: toolkit-validation
           image: "FILLED BY THE OPERATOR"
