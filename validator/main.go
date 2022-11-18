@@ -491,7 +491,9 @@ func start(c *cli.Context) error {
 		}
 		return nil
 	case "metrics":
-		metrics := &Metrics{}
+		metrics := &Metrics{
+			ctx: c.Context,
+		}
 		err := metrics.run()
 		if err != nil {
 			return fmt.Errorf("error running validation-metrics exporter: %s", err)
@@ -1202,7 +1204,7 @@ func (c *CUDA) runWorkload() error {
 }
 
 func (c *Metrics) run() error {
-	m := NewNodeMetrics(metricsPort)
+	m := NewNodeMetrics(c.ctx, metricsPort)
 
 	return m.Run()
 }
