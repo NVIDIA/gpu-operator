@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=v1.9.0 <v22.9.0'
+    olm.skipRange: '>=1.9.0 <22.9.0'
     alm-examples: |-
       [
         {
