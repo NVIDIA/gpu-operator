@@ -237,6 +237,16 @@ vet:
 build:
 	go build $(MODULE)/...
 
+validate-modules:
+	@echo "- Verifying that the dependencies have expected content..."
+	go mod verify
+	@echo "- Checking for any unused/missing packages in go.mod..."
+	go mod tidy
+	@git diff --exit-code -- go.sum go.mod
+	@echo "- Checking if the vendor dir is in sync..."
+	go mod vendor
+	@git diff --exit-code -- vendor
+
 COVERAGE_FILE := coverage.out
 unit-test: build
 	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
