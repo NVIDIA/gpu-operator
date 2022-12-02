@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220525163429-038b3f8b475d
+	go.uber.org/zap v1.19.1
 	golang.org/x/mod v0.5.1
 	k8s.io/api v0.23.0
 	k8s.io/apiextensions-apiserver v0.23.0
@@ -59,7 +60,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
