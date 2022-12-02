@@ -51,6 +51,12 @@ vet:
   script:
     - make vet
 
+go-validate-modules:
+  extends:
+    - .go-check
+  script:
+    - make validate-modules
+
 go-lint:
   extends:
     - .go-check
