@@ -22,7 +22,7 @@ endif
 ##### Global variables #####
 include $(CURDIR)/versions.mk
 
-CUDA_IMAGE ?= nvidia/cuda
+CUDA_IMAGE ?= nvcr.io/nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 
 ifeq ($(IMAGE_NAME),)
@@ -83,7 +83,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_VERSION)-$(*) \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-$(*) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--file $(DOCKERFILE) $(BUILD_DIR)
