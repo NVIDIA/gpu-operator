@@ -19,5 +19,6 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= v0.1.0
 
-CUDA_VERSION ?= 11.7.1
+CUDA_VERSION ?= 11.8.0
+CUDA_SAMPLES_VERSION ?= 11.7.1
 GOLANG_VERSION ?= 1.17

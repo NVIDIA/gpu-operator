@@ -23,7 +23,7 @@ endif
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
-CUDA_IMAGE ?= nvidia/cuda
+CUDA_IMAGE ?= nvcr.io/nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 DIST ?= ubi8
 
