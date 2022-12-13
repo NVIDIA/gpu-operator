@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <22.9.0'
+    olm.skipRange: '>=v1.9.0 <v22.9.0'
     alm-examples: |-
       [
         {
@@ -46,6 +46,9 @@ metadata:
               },
               "kernelModuleConfig": {
                 "name": ""
+              },
+              "rollingUpdate": {
+                "maxUnavailable": "1"
               }
             },
             "dcgmExporter": {
@@ -61,10 +64,6 @@ metadata:
               "enabled": true
             },
             "daemonsets": {
-              "updateStrategy": "RollingUpdate",
-              "rollingUpdate": {
-                "maxUnavailable": "1"
-              }
             },
             "devicePlugin": {
               "enabled": true,
@@ -116,11 +115,11 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.4.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     operatorframework.io/suggested-namespace: nvidia-gpu-operator
-    capabilities: Basic Install
+    capabilities: Deep Insights
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
-    createdAt: "Wed Sep 14 07:33:59 PDT 2022"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:6a1f1e79407ee36e86314a3121f6491fdf3ad164ed558610370e9e3c683bd8db
+    createdAt: "Mon Oct  3 08:48:53 PDT 2022"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
@@ -131,37 +130,35 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:6a1f1e79407ee36e86314a3121f6491fdf3ad164ed558610370e9e3c683bd8db
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:9a00cdfdddb73327ef8e8e0fa60e50926a388d380c551bba6a3d3012be40401d
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:4f991f2be8ec9f590ed53d15bcc5d9cf105298b1eca2d69b8449f8972e6a3faf
     - name: dcgm-image
-      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:c3cf59dd5d6160eba5d816ade2e81b35ebb10f4884df67971f6ace36f8e6efc1
+      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:150c446598d4ab03db0fd2301b1922aabdf3e0159571c71abe4489075639b2e7
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:efb88937f73434994d1bbadc87b492a1df047aa9f8d6e9f5ec3b09536e6e7691
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:268c26781c46b36fe691638e807eb5c3a2cd077029ddb095ac75264adac04925
-    - name: driver-image-515
-      image: nvcr.io/nvidia/driver@sha256:f250d1e4989fd4821e81bad9227eeeaa531ca8810f3a40e996f1ca2af7945f96
+      image: nvcr.io/nvidia/driver@sha256:4d1bf34d0ee9a3f5fa3fa124ab89ef13ae38dea12c92a9c8bd79b4180a205b56
     - name: driver-image-510
-      image: nvcr.io/nvidia/driver@sha256:f2ca4612f3418e0e3963be8c3771ffe463cdc1fc1b810437a3aad9d76bb6499d
+      image: nvcr.io/nvidia/driver@sha256:9be9edb8109dc4f7f3023197aea648e67c4d07649fc5ab7e9cc8b26ee3b7d3e2
     - name: driver-image-470
-      image: nvcr.io/nvidia/driver@sha256:c5a62bc2a6cce339798e4b7cf9cec47e289c2d30b40f451ba8c9e958a68e3e55
+      image: nvcr.io/nvidia/driver@sha256:c6d6697bd9281fe5b5666ba44d0855c9e9c2f2226be65a6bababe08db1fc4cd5
     - name: driver-image-450
-      image: nvcr.io/nvidia/driver@sha256:b860ef04cc6cd8c481810fa19bef7221071f5a3862640b2ad6c2704728dc77c8
+      image: nvcr.io/nvidia/driver@sha256:dd8155a49340aaea95fd85639576e76196d0170fc023dc7782b35f7c313275b5
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:9c17d3a907eb77eb8f7b4f3faf52d8352e4252af92003f828083f80d629bd2c3
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:d1c61116647bb9388eb3c4e31848dd6038458b7ba33c0eb3b659d96739eceb73
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bec9f026d9b3d9404c78d6091817a359015c6a7aa411735b34138c1518853b5d
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:37821ea7829def707f819ac21122cea62efdbbd640679b6004e552fb9a1e17a3
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:50c2a2b998e467c82716efa79fe136aa6f7ea95fd23576cf384d251bb9628640
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:5f2a2d8977f2c59abe88394f05cc3c044194554f90994d8554b0e1117ab5900d
+      image: nvcr.io/nvidia/cuda@sha256:7e840c252c730279c0e3f89b68208aac02ded73c945c0c21e2f1d23b1a9b052f
     - name: gpu-operator-validator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:release-22.09-latest-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:6fe4200960b2b49d6dac1c91e596f61dacb6b3dcff878c84eb74c5136fedd5b6
     - name: k8s-driver-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:6240c5912aabed789c672f3179b4a65e45511d10fa8c41a5de0d91644a792b14
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:e3f16c26b9340ed46aed248cc4d18353ba3a65886bf7a2f0cea25ff41b2553da
     - name: vfio-manager-image
-      image: nvcr.io/nvidia/cuda@sha256:5f2a2d8977f2c59abe88394f05cc3c044194554f90994d8554b0e1117ab5900d
+      image: nvcr.io/nvidia/cuda@sha256:7e840c252c730279c0e3f89b68208aac02ded73c945c0c21e2f1d23b1a9b052f
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:0d47dad29d2ef445b301c5c64717758eed43a606345b79f97bce2e64b40a91a8
     - name: vgpu-device-manager-image
@@ -719,7 +716,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:release-22.09-latest-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:6a1f1e79407ee36e86314a3121f6491fdf3ad164ed558610370e9e3c683bd8db
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -757,35 +754,33 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:release-22.09-latest-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:6fe4200960b2b49d6dac1c91e596f61dacb6b3dcff878c84eb74c5136fedd5b6"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:bec9f026d9b3d9404c78d6091817a359015c6a7aa411735b34138c1518853b5d"
+                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:37821ea7829def707f819ac21122cea62efdbbd640679b6004e552fb9a1e17a3"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:efb88937f73434994d1bbadc87b492a1df047aa9f8d6e9f5ec3b09536e6e7691"
                   - name: "DCGM_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:c3cf59dd5d6160eba5d816ade2e81b35ebb10f4884df67971f6ace36f8e6efc1"
+                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:150c446598d4ab03db0fd2301b1922aabdf3e0159571c71abe4489075639b2e7"
                   - name: "DCGM_EXPORTER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:9a00cdfdddb73327ef8e8e0fa60e50926a388d380c551bba6a3d3012be40401d"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:4f991f2be8ec9f590ed53d15bcc5d9cf105298b1eca2d69b8449f8972e6a3faf"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:9c17d3a907eb77eb8f7b4f3faf52d8352e4252af92003f828083f80d629bd2c3"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:d1c61116647bb9388eb3c4e31848dd6038458b7ba33c0eb3b659d96739eceb73"
                   - name: "DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/driver@sha256:268c26781c46b36fe691638e807eb5c3a2cd077029ddb095ac75264adac04925"
-                  - name: "DRIVER_IMAGE-515"
-                    value: "nvcr.io/nvidia/driver@sha256:f250d1e4989fd4821e81bad9227eeeaa531ca8810f3a40e996f1ca2af7945f96"
+                    value: "nvcr.io/nvidia/driver@sha256:4d1bf34d0ee9a3f5fa3fa124ab89ef13ae38dea12c92a9c8bd79b4180a205b56"
                   - name: "DRIVER_IMAGE-510"
-                    value: "nvcr.io/nvidia/driver@sha256:f2ca4612f3418e0e3963be8c3771ffe463cdc1fc1b810437a3aad9d76bb6499d"
+                    value: "nvcr.io/nvidia/driver@sha256:9be9edb8109dc4f7f3023197aea648e67c4d07649fc5ab7e9cc8b26ee3b7d3e2"
                   - name: "DRIVER_IMAGE-470"
-                    value: "nvcr.io/nvidia/driver@sha256:c5a62bc2a6cce339798e4b7cf9cec47e289c2d30b40f451ba8c9e958a68e3e55"
+                    value: "nvcr.io/nvidia/driver@sha256:c6d6697bd9281fe5b5666ba44d0855c9e9c2f2226be65a6bababe08db1fc4cd5"
                   - name: "DRIVER_IMAGE-450"
-                    value: "nvcr.io/nvidia/driver@sha256:b860ef04cc6cd8c481810fa19bef7221071f5a3862640b2ad6c2704728dc77c8"
+                    value: "nvcr.io/nvidia/driver@sha256:dd8155a49340aaea95fd85639576e76196d0170fc023dc7782b35f7c313275b5"
                   - name: "DRIVER_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:6240c5912aabed789c672f3179b4a65e45511d10fa8c41a5de0d91644a792b14"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:e3f16c26b9340ed46aed248cc4d18353ba3a65886bf7a2f0cea25ff41b2553da"
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:50c2a2b998e467c82716efa79fe136aa6f7ea95fd23576cf384d251bb9628640"
                   - name: "CUDA_BASE_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:5f2a2d8977f2c59abe88394f05cc3c044194554f90994d8554b0e1117ab5900d"
+                    value: "nvcr.io/nvidia/cuda@sha256:7e840c252c730279c0e3f89b68208aac02ded73c945c0c21e2f1d23b1a9b052f"
                   - name: "VFIO_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:5f2a2d8977f2c59abe88394f05cc3c044194554f90994d8554b0e1117ab5900d"
+                    value: "nvcr.io/nvidia/cuda@sha256:7e840c252c730279c0e3f89b68208aac02ded73c945c0c21e2f1d23b1a9b052f"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:0d47dad29d2ef445b301c5c64717758eed43a606345b79f97bce2e64b40a91a8"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"

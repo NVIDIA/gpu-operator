@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG CUDA_IMAGE=nvidia/cuda
+ARG CUDA_IMAGE=nvcr.io/nvidia/cuda
 ARG CUDA_VERSION=undefined
 ARG GIT_COMMIT="unknown"
 
