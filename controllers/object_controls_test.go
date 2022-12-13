@@ -129,7 +129,7 @@ func getModuleRoot(dir string) (string, error) {
 	return dir, nil
 }
 
-// setup creates a mock kubernetes cluster and client. Nodes are labeled with the minumum
+// setup creates a mock kubernetes cluster and client. Nodes are labeled with the minimum
 // required NFD labels to be detected as GPU nodes by the GPU Operator. A sample
 // ClusterPolicy resource is applied to the cluster. The ClusterPolicyController
 // object is initialized with the mock kubernetes client as well as other steps

@@ -2877,7 +2877,7 @@ func ocpDriverToolkitDaemonSets(ctx context.Context, n ClusterPolicyController) 
 // ocpCleanupUnusedDriverToolkitDaemonSets scans the DriverToolkit
 // RHCOS-version specific DaemonSets, and deletes the unused one:
 // - RHCOS version wasn't found in the node labels (upgrade finished)
-// - RHCOS version marked for deletion ealier in the Reconciliation loop (currently unexpected)
+// - RHCOS version marked for deletion earlier in the Reconciliation loop (currently unexpected)
 // - no RHCOS version label (unexpected)
 // The DaemonSet set is kept if:
 // - RHCOS version was found in the node labels (most likely case)
@@ -2928,7 +2928,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 
-				// the version of RHCOS targetted by this DS is part of the cluster
+				// the version of RHCOS targeted by this DS is part of the cluster
 				// keep it alive
 
 				continue
@@ -3012,7 +3012,7 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 		}
 	}
 
-	// return the last error that occured, if any
+	// return the last error that occurred, if any
 	if lastErr != nil {
 		return 0, lastErr
 	}
