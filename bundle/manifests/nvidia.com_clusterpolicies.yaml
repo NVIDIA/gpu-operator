@@ -38,11 +38,26 @@ spec:
               daemonsets:
                 description: Daemonset defines common configuration for all Daemonsets
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Annotations is an unstructured key value
+                      map stored with a resource that may be set by external tools
+                      to store and retrieve arbitrary metadata. They are not queryable
+                      and should be preserved when modifying objects.'
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Map of string keys and values that can
+                      be used to organize and categorize (scope and select) objects.
+                      May match selectors of replication controllers and services.'
+                    type: object
                   priorityClassName:
                     type: string
                   rollingUpdate:
-                    description: 'Optional: Configuration for rolling update of NVIDIA
-                      Driver DaemonSet pods'
+                    description: 'Optional: Configuration for rolling update of all
+                      DaemonSet pods'
                     properties:
                       maxUnavailable:
                         type: string
@@ -1690,6 +1705,14 @@ spec:
               operator:
                 description: Operator component spec
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Annotations is an unstructured key value
+                      map stored with a resource that may be set by external tools
+                      to store and retrieve arbitrary metadata. They are not queryable
+                      and should be preserved when modifying objects.'
+                    type: object
                   defaultRuntime:
                     default: docker
                     description: Runtime defines container runtime type
@@ -1720,6 +1743,13 @@ spec:
                       version:
                         description: Version represents image tag(version)
                         type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Map of string keys and values that can
+                      be used to organize and categorize (scope and select) objects.
+                      May match selectors of replication controllers and services.'
                     type: object
                   runtimeClass:
                     default: nvidia

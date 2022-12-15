@@ -1,11 +1,10 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: gpu-operator
   labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
 rules:
 - apiGroups:
   - config.openshift.io
@@ -161,4 +160,3 @@ rules:
   - update
   - patch
 {{- end }}
-
