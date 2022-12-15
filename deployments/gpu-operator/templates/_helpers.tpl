@@ -43,6 +43,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- if .Values.operator.labels }}
+{{ toYaml .Values.operator.labels }}
+{{- end }}
+{{- end -}}
+
+{{- define "gpu-operator.operand-labels" -}}
+helm.sh/chart: {{ include "gpu-operator.chart" . }}
+app.kubernetes.io/managed-by: {{ include "gpu-operator.name" . }}
+{{- if .Values.daemonsets.labels }}
+{{ toYaml .Values.daemonsets.labels }}
+{{- end }}
 {{- end -}}
 
 {{- define "gpu-operator.matchLabels" -}}

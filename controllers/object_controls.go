@@ -591,7 +591,32 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
+	// apply custom Labels and Annotations to the podSpec if any
+	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets)
+
 	return nil
+}
+
+// applyCommonDaemonsetMetadata adds additional labels and annotations to the daemonset podSpec if there are any specified
+// by the user in the podSpec
+func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
+	if len(dsSpec.Labels) > 0 {
+		for labelKey, labelValue := range dsSpec.Labels {
+			// if the user specifies an override of the "app" or the ""app.kubernetes.io/part-of"" key, we skip it.
+			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
+			// with the existing daemon set selectors.
+			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
+				continue
+			}
+			obj.Spec.Template.ObjectMeta.Labels[labelKey] = labelValue
+		}
+	}
+
+	if len(dsSpec.Annotations) > 0 {
+		for annoKey, annoVal := range dsSpec.Annotations {
+			obj.Spec.Template.ObjectMeta.Annotations[annoKey] = annoVal
+		}
+	}
 }
 
 // Apply common config that is applicable for all Daemonsets
@@ -3095,9 +3120,21 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+
+	for labelKey, labelValue := range n.singleton.Spec.Daemonsets.Labels {
+		obj.Labels[labelKey] = labelValue
+	}
+
 	// Daemonsets will always have at least one annotation applied, so allocate if necessary
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
+	}
+
+	for annoKey, annoValue := range n.singleton.Spec.Daemonsets.Annotations {
+		obj.Annotations[annoKey] = annoValue
 	}
 
 	found := &appsv1.DaemonSet{}
