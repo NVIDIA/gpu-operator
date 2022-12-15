@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -971,12 +970,12 @@ func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name strin
 
 func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
 	var pod v1.Pod
-	manifest, err := ioutil.ReadFile(podSpecPath)
+	manifest, err := os.ReadFile(podSpecPath)
 	if err != nil {
 		panic(err)
 	}
-	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
-		scheme.Scheme)
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
+		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
 	reg, _ := regexp.Compile(`\b(\w*kind:\w*)\B.*\b`)
 
 	kind := reg.FindString(string(manifest))

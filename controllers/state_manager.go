@@ -683,9 +683,9 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.rec.Log.Info("Kubernetes version detected", "version", k8sVersion)
 
 		promv1.AddToScheme(reconciler.Scheme)
-		secv1.AddToScheme(reconciler.Scheme)
-		apiconfigv1.AddToScheme(reconciler.Scheme)
-		apiimagev1.AddToScheme(reconciler.Scheme)
+		secv1.Install(reconciler.Scheme)
+		apiconfigv1.Install(reconciler.Scheme)
+		apiimagev1.Install(reconciler.Scheme)
 
 		n.operatorMetrics = initOperatorMetrics(n)
 		n.rec.Log.Info("Operator metrics initialized.")
