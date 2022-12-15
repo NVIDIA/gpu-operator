@@ -16,6 +16,8 @@ sandboxWorkloads:
   defaultWorkload: "container"
 
 daemonsets:
+  labels: {}
+  annotations: {}
   priorityClassName: system-node-critical
   tolerations:
   - key: nvidia.com/gpu

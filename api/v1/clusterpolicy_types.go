@@ -112,6 +112,16 @@ type OperatorSpec struct {
 	RuntimeClass  string            `json:"runtimeClass,omitempty"`
 	InitContainer InitContainerSpec `json:"initContainer,omitempty"`
 
+	// Optional: Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Optional: Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// UseOpenShiftDriverToolkit indicates if DriverToolkit image should be used on OpenShift to build and install driver modules
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="On OpenShift, enable DriverToolkit image to build and install driver modules"
@@ -139,6 +149,16 @@ type PSPSpec struct {
 
 // DaemonsetsSpec indicates common configuration for all Daemonsets managed by GPU Operator
 type DaemonsetsSpec struct {
+	// Optional: Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Optional: Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Optional: Set tolerations
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
@@ -1322,6 +1342,7 @@ type ClusterPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
 // ClusterPolicy is the Schema for the clusterpolicies API
 type ClusterPolicy struct {

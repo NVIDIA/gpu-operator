@@ -3,19 +3,18 @@ kind: Deployment
 metadata:
   name: gpu-operator
   labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{ $.Release.matchLabels }}
       app.kubernetes.io/component: "gpu-operator"
       app: "gpu-operator"
   template:
     metadata:
       labels:
-        {{ $.Release.matchLabels }}
+        {{- include "gpu-operator.labels" . | nindent 8 }}
         app.kubernetes.io/component: "gpu-operator"
         app: "gpu-operator"
       annotations:
