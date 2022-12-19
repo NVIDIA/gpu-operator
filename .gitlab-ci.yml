@@ -57,13 +57,6 @@ go-validate-modules:
   script:
     - make validate-modules
 
-go-lint:
-  extends:
-    - .go-check
-  script:
-    - make lint
-  allow_failure: true
-
 ineffassign:
   extends:
     - .go-check

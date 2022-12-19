@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,4 @@
 ARG GOLANG_VERSION=x.x.x
 FROM golang:${GOLANG_VERSION}
 
-# pull ineffassign by commit due to issue https://github.com/gordonklaus/ineffassign/issues/75
-RUN go get -u golang.org/x/lint/golint && \
-    go get -u github.com/gordonklaus/ineffassign@4cc7213b9bc8b868b2990c372f6fa057fa88b91c && \
-    go get -u github.com/client9/misspell/cmd/misspell
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.50.1
