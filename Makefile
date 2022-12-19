@@ -120,26 +120,12 @@ generate: controller-gen
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen:
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1)
+	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0
 
 # Download kustomize locally if necessary
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize:
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
-
-# go-get-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-get-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
-rm -rf $$TMP_DIR ;\
-}
-endef
+	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install sigs.k8s.io/kustomize/kustomize/v4@v4.5.2
 
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
@@ -218,24 +204,16 @@ assert-fmt:
 	fi
 
 ineffassign:
-	ineffassign $(MODULE)/...
-
-lint:
-# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
-	go list -f '{{.Dir}}' $(MODULE)/... | xargs golint -set_exit_status
-
-lint-internal:
-# We use `go list -f '{{.Dir}}' $(MODULE)/...` to skip the `vendor` folder.
-	go list -f '{{.Dir}}' $(MODULE)/internal/... | xargs golint -set_exit_status
+	golangci-lint run --disable-all --enable ineffassign ./...
 
 misspell:
-	misspell $(MODULE)/...
+	golangci-lint run --disable-all --enable misspell ./...
 
 vet:
-	go vet $(MODULE)/...
+	go vet ./...
 
 build:
-	go build $(MODULE)/...
+	go build ./...
 
 validate-modules:
 	@echo "- Verifying that the dependencies have expected content..."
@@ -256,7 +234,7 @@ coverage: unit-test
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi8 ubuntu20.04
+DISTRIBUTIONS := ubi8
 DEFAULT_PUSH_TARGET := ubi8
 
 PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
