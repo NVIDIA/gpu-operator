@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -80,7 +79,7 @@ func getAssetsFrom(n *ClusterPolicyController, path string, openshiftVersion str
 			continue
 		}
 
-		buffer, err := ioutil.ReadFile(file)
+		buffer, err := os.ReadFile(file)
 		if err != nil {
 			panic(err)
 		}
@@ -96,8 +95,8 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 	n.rec.Log.Info("Getting assets from: ", "path:", path)
 	manifests := getAssetsFrom(n, path, n.openshift)
 
-	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
-		scheme.Scheme)
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
+		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
 	reg, _ := regexp.Compile(`\b(\w*kind:\w*)\B.*\b`)
 
 	for _, m := range manifests {
