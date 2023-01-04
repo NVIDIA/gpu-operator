@@ -568,16 +568,41 @@ func cleanupStatusFiles() error {
 	return nil
 }
 
-func (d *Driver) runValidation(silent bool) (hostDriver bool, err error) {
-	// invoke validation command
-	command := "chroot"
-	args := []string{"/run/nvidia/driver", "nvidia-smi"}
-
+func getDriverRoot() (string, bool) {
 	// check if driver is pre-installed on the host and use host path for validation
 	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
-		args = []string{"/host", "nvidia-smi"}
-		hostDriver = true
+		log.Infof("Detected pre-installed driver on the host")
+		return "/host", true
 	}
+
+	return "/run/nvidia/driver", false
+}
+
+// For driver container installs, check existence of .driver-ctr-ready to confirm running driver
+// container has completed and is in Ready state.
+func assertDriverContainerReady(silent, withWaitFlag bool) error {
+	command := "bash"
+	args := []string{"-c", "stat /run/nvidia/validations/.driver-ctr-ready"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+
+	return runCommand(command, args, silent)
+}
+
+func (d *Driver) runValidation(silent bool) (hostDriver bool, err error) {
+	driverRoot, hostDriver := getDriverRoot()
+	if !hostDriver {
+		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
+		if err := assertDriverContainerReady(silent, withWaitFlag); err != nil {
+			return hostDriver, fmt.Errorf("error checking driver container status: %v", err)
+		}
+	}
+
+	// invoke validation command
+	command := "chroot"
+	args := []string{driverRoot, "nvidia-smi"}
 
 	if withWaitFlag {
 		return hostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
