@@ -126,11 +126,15 @@ spec:
         startupProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia']
+              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
           initialDelaySeconds: 30
           failureThreshold: 60
           successThreshold: 1
           periodSeconds: 10
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-peermem-ctr
