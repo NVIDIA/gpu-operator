@@ -113,6 +113,8 @@ const (
 	DefaultToolkitInstallDir = "/usr/local/nvidia"
 	// VgpuDMDefaultConfigMapName indicates name of ConfigMap containing default vGPU devices configuration
 	VgpuDMDefaultConfigMapName = "default-vgpu-devices-config"
+	// VgpuDMDefaultConfigName indicates name of default configuration in the vGPU devices config file
+	VgpuDMDefaultConfigName = "default"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -1495,8 +1497,13 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		break
 	}
 
-	// vgpuDeviceManager.config.default has a default value in the CRD, so it will always be set
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", config.VGPUDeviceManager.Config.Default)
+	// set name of default vGPU device configuration. The default configuration is applied if the node
+	// is not labelled with a specific configuration
+	defaultConfig := VgpuDMDefaultConfigName
+	if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Default != "" {
+		defaultConfig = config.VGPUDeviceManager.Config.Default
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", defaultConfig)
 
 	return nil
 }
