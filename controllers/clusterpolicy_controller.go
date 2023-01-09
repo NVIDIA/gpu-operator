@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -217,7 +216,7 @@ func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedNa
 	return nil
 }
 
-func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr manager.Manager) error {
+func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
 	mapFn := func(a client.Object) []reconcile.Request {
@@ -225,7 +224,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
 		list := &gpuv1.ClusterPolicyList{}
 
-		err := mgr.GetClient().List(context.TODO(), list, opts...)
+		err := r.List(ctx, list, opts...)
 		if err != nil {
 			r.Log.Error(err, "Unable to list ClusterPolicies")
 			return []reconcile.Request{}
@@ -314,7 +313,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ClusterPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new controller
 	c, err := controller.New("clusterpolicy-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1, RateLimiter: workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR)})
 	if err != nil {
@@ -328,7 +327,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	// Watch for changes to Node labels and requeue the owner ClusterPolicy
-	err = addWatchNewGPUNode(r, c, mgr)
+	err = addWatchNewGPUNode(ctx, r, c)
 	if err != nil {
 		return err
 	}
