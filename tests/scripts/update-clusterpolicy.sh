@@ -29,7 +29,10 @@ test_image_updates() {
         echo "Image update failed for driver daemonset to version $TARGET_DRIVER_VERSION"
         exit 1
     fi
-    echo "driver image updated successfully to version $TARGET_DRIVER_VERSION"
+
+    echo "driver daemonset image updated successfully to version $TARGET_DRIVER_VERSION, deleting pod to trigger update"
+    # Delete driver pod to trigger update due to OnDelete policy
+    kubectl delete pod -l app=nvidia-driver-daemonset -n $TEST_NAMESPACE
 
     # Verify that driver-daemonset is running successfully after update
     check_pod_ready "nvidia-driver-daemonset"

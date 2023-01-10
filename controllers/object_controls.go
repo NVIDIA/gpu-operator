@@ -1763,9 +1763,6 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
-
 	return nil
 }
 
@@ -2611,6 +2608,10 @@ func applyUpdateStrategyConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	default:
 		// update config for RollingUpdate strategy
 		if config.Daemonsets.RollingUpdate == nil || config.Daemonsets.RollingUpdate.MaxUnavailable == "" {
+			return nil
+		}
+		if obj.Name == "nvidia-driver-daemonset" {
+			// disallow setting RollingUpdate strategy with the driver container
 			return nil
 		}
 		var intOrString intstr.IntOrString
@@ -3486,7 +3487,12 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 	}
 
-	if n.stateNames[state] == "state-operator-metrics" {
+	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
+		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
+		if !serviceMonitorCRDExists {
+			logger.V(1).Info("ServiceMonitor CRD is missing, ignoring creation of CR for operator-metrics")
+			return gpuv1.Ready, nil
+		}
 		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
 	}
 

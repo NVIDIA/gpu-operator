@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: clusterpolicies.nvidia.com
 spec:
@@ -1014,6 +1014,93 @@ spec:
                           resources required. If Requests is omitted for a container,
                           it defaults to Limits if that is explicitly specified, otherwise
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                    type: object
+                  upgradePolicy:
+                    description: Driver auto-upgrade settings
+                    properties:
+                      autoUpgrade:
+                        default: false
+                        description: AutoUpgrade is a global switch for automatic
+                          upgrade feature if set to false all other options are ignored
+                        type: boolean
+                      drain:
+                        description: DrainSpec describes configuration for node drain
+                          during automatic upgrade
+                        properties:
+                          deleteEmptyDir:
+                            default: false
+                            description: DeleteEmptyDir indicates if should continue
+                              even if there are pods using emptyDir (local data that
+                              will be deleted when the node is drained)
+                            type: boolean
+                          enable:
+                            default: false
+                            description: Enable indicates if node draining is allowed
+                              during upgrade
+                            type: boolean
+                          force:
+                            default: false
+                            description: Force indicates if force draining is allowed
+                            type: boolean
+                          podSelector:
+                            description: 'PodSelector specifies a label selector to
+                              filter pods on the node that need to be drained For
+                              more details on label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            type: string
+                          timeoutSeconds:
+                            default: 300
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up drain, zero means
+                              infinite
+                            minimum: 0
+                            type: integer
+                        type: object
+                      maxParallelUpgrades:
+                        default: 1
+                        description: MaxParallelUpgrades indicates how many nodes
+                          can be upgraded in parallel 0 means no limit, all nodes
+                          will be upgraded in parallel
+                        minimum: 0
+                        type: integer
+                      podDeletion:
+                        description: PodDeletionSpec describes configuration for deletion
+                          of pods using special resources during automatic upgrade
+                        properties:
+                          deleteEmptyDir:
+                            default: false
+                            description: DeleteEmptyDir indicates if should continue
+                              even if there are pods using emptyDir (local data that
+                              will be deleted when the pod is deleted)
+                            type: boolean
+                          force:
+                            default: false
+                            description: Force indicates if force deletion is allowed
+                            type: boolean
+                          timeoutSeconds:
+                            default: 300
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up on pod termination,
+                              zero means infinite
+                            minimum: 0
+                            type: integer
+                        type: object
+                      waitForCompletion:
+                        description: WaitForCompletionSpec describes the configuration
+                          for waiting on job completions
+                        properties:
+                          podSelector:
+                            description: 'PodSelector specifies a label selector for
+                              the pods to wait for completion For more details on
+                              label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            type: string
+                          timeoutSeconds:
+                            default: 0
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up on pod termination,
+                              zero means infinite
+                            minimum: 0
+                            type: integer
                         type: object
                     type: object
                   version:
