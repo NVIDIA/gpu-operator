@@ -24,6 +24,13 @@ type OperatorMetrics struct {
 	openshiftDriverToolkitIsMissing        promcli.Gauge
 	openshiftDriverToolkitRhcosTagsMissing promcli.Gauge
 	openshiftDriverToolkitIsBroken         promcli.Gauge
+
+	driverAutoUpgradeEnabled promcli.Gauge
+	upgradesInProgress       promcli.Gauge
+	upgradesDone             promcli.Gauge
+	upgradesFailed           promcli.Gauge
+	upgradesAvailable        promcli.Gauge
+	upgradesPending          promcli.Gauge
 }
 
 const (
@@ -35,6 +42,9 @@ const (
 	openshiftDriverToolkitEnabled     = 1
 	openshiftDriverToolkitDisabled    = 0
 	openshiftDriverToolkitNotPossible = -1
+
+	driverAutoUpgradeEnabled  = 1
+	driverAutoUpgradeDisabled = 0
 )
 
 func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
@@ -110,6 +120,42 @@ func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
 				Help: "1 if OCP DriverToolkit is enabled but its imagestream is broken (rhbz#2015024), 0 otherwise",
 			},
 		),
+		driverAutoUpgradeEnabled: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_driver_auto_upgrade_enabled",
+				Help: "1 if driver auto upgrade is enabled 0 if not",
+			},
+		),
+		upgradesInProgress: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_nodes_upgrades_in_progress",
+				Help: "Total number of nodes on which the gpu operator pods are being upgraded",
+			},
+		),
+		upgradesDone: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_nodes_upgrades_done",
+				Help: "Total number of nodes on which the gpu operator pods are successfully upgraded",
+			},
+		),
+		upgradesFailed: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_nodes_upgrades_failed",
+				Help: "Total number of nodes on which the gpu operator pod upgrades have failed",
+			},
+		),
+		upgradesAvailable: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_nodes_upgrades_available",
+				Help: "Total number of nodes on which the gpu operator pod upgrades can be done",
+			},
+		),
+		upgradesPending: promcli.NewGauge(
+			promcli.GaugeOpts{
+				Name: "gpu_operator_nodes_upgrades_pending",
+				Help: "Total number of nodes on which the gpu operator pod upgrades are pending",
+			},
+		),
 	}
 
 	metrics.Registry.MustRegister(
@@ -126,6 +172,13 @@ func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
 		m.openshiftDriverToolkitIsMissing,
 		m.openshiftDriverToolkitRhcosTagsMissing,
 		m.openshiftDriverToolkitIsBroken,
+
+		m.driverAutoUpgradeEnabled,
+		m.upgradesInProgress,
+		m.upgradesDone,
+		m.upgradesAvailable,
+		m.upgradesFailed,
+		m.upgradesPending,
 	)
 
 	return m

@@ -11,6 +11,8 @@ spec:
   selector:
     matchLabels:
       app: nvidia-driver-daemonset
+  updateStrategy:
+    type: OnDelete
   template:
     metadata:
       labels:
@@ -131,6 +133,7 @@ spec:
           failureThreshold: 60
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
         lifecycle:
           preStop:
             exec:
@@ -165,6 +168,7 @@ spec:
           failureThreshold: 60
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -173,6 +177,7 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
+          timeoutSeconds: 10
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-fs-ctr
@@ -199,6 +204,7 @@ spec:
           failureThreshold: 60
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -207,6 +213,7 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
+          timeoutSeconds: 10
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent

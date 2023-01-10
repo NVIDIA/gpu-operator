@@ -498,6 +498,7 @@ spec:
           - ""
           resources:
           - pods
+          - pods/eviction
           - services
           - services/finalizers
           - endpoints
@@ -531,6 +532,13 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - apps
+          resources:
+          - controllerrevisions
+          verbs:
+          - get
+          - list
         - apiGroups:
           - node.k8s.io
           resources:
@@ -599,6 +607,7 @@ spec:
           - ""
           resources:
           - pods
+          - pods/eviction
           - services
           - services/finalizers
           - endpoints
@@ -629,6 +638,13 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - apps
+          resources:
+          - controllerrevisions
+          verbs:
+          - get
+          - list
         - apiGroups:
           - monitoring.coreos.com
           resources:
@@ -712,6 +728,7 @@ spec:
               labels:
                 app.kubernetes.io/component: gpu-operator
                 app: gpu-operator
+                nvidia.com/gpu-driver-upgrade-drain.skip: "true"
             spec:
               priorityClassName: system-node-critical
               containers:

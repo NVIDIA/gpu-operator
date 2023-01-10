@@ -22,6 +22,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -492,6 +493,11 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 	if in.GPUDirectRDMA != nil {
 		in, out := &in.GPUDirectRDMA, &out.GPUDirectRDMA
 		*out = new(GPUDirectRDMASpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.UpgradePolicy != nil {
+		in, out := &in.UpgradePolicy, &out.UpgradePolicy
+		*out = new(v1alpha1.DriverUpgradePolicySpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ImagePullSecrets != nil {
