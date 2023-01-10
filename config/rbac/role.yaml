@@ -27,6 +27,7 @@ rules:
   - endpoints
   - namespaces
   - pods
+  - pods/eviction
   - serviceaccounts
   - services
   - services/finalizers
@@ -38,6 +39,29 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+- apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps
   resources:
@@ -53,6 +77,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
 - apiGroups:
   - batch
   resources:
@@ -80,6 +110,18 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - mellanox.com
+  resources:
+  - '*'
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - monitoring.coreos.com

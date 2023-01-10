@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -384,6 +385,9 @@ type DriverSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
+
+	// Driver auto-upgrade settings
+	UpgradePolicy *upgrade_v1alpha1.DriverUpgradePolicySpec `json:"upgradePolicy,omitempty"`
 
 	// NVIDIA Driver image repository
 	// +kubebuilder:validation:Optional

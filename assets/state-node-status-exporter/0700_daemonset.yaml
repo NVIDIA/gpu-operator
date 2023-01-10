@@ -30,6 +30,8 @@ spec:
         name: nvidia-node-status-exporter
         command: [nvidia-validator]
         env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
         - name: COMPONENT
           value: metrics
         - name: METRICS_PORT
@@ -47,8 +49,15 @@ spec:
           - name: run-nvidia
             mountPath: "/run/nvidia"
             mountPropagation: HostToContainer
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
       volumes:
-      - name: run-nvidia
-        hostPath:
-          path: /run/nvidia
-          type: Directory
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: Directory
+        - name: host-root
+          hostPath:
+            path: /
