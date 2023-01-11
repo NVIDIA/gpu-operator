@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <22.9.0'
+    olm.skipRange: '>=1.9.0 <22.9.1'
     alm-examples: |-
       [
         {
@@ -31,6 +31,24 @@ metadata:
             },
             "driver": {
               "enabled": true,
+              "upgradePolicy": {
+                "autoUpgrade": true,
+                "drain": {
+                  "deleteEmptyDir": false,
+                  "enable": false,
+                  "force": false,
+                  "timeoutSeconds": 300
+                },
+                "maxParallelUpgrades": 1,
+                "podDeletion": {
+                  "deleteEmptyDir": false,
+                  "force": false,
+                  "timeoutSeconds": 300
+                },
+                "waitForCompletion": {
+                  "timeoutSeconds": 0
+                }
+              },
               "repoConfig": {
                 "configMapName": ""
               },
