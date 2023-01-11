@@ -580,6 +580,13 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 
 	patch := client.MergeFrom(ns.DeepCopy())
 	modified := false
+	// On K8s<1.21, namespaces are not automatically labeled with an immutable label. Initialize
+	// a labels map if needed before adding PSA labels.
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#automatic-labelling
+	if ns.ObjectMeta.Labels == nil {
+		ns.ObjectMeta.Labels = make(map[string]string)
+		modified = true
+	}
 	for _, mode := range podSecurityModes {
 		key := podSecurityLabelPrefix + mode
 		if val, ok := ns.ObjectMeta.Labels[key]; !ok || (val != podSecurityLevelPrivileged) {
