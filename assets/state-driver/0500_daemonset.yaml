@@ -11,6 +11,8 @@ spec:
   selector:
     matchLabels:
       app: nvidia-driver-daemonset
+  updateStrategy:
+    type: OnDelete
   template:
     metadata:
       labels:
@@ -126,11 +128,16 @@ spec:
         startupProbe:
           exec:
             command:
-              [sh, -c, 'lsmod | grep nvidia']
+              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
           initialDelaySeconds: 30
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-peermem-ctr
@@ -158,9 +165,10 @@ spec:
             command:
               [sh, -c, 'nvidia-driver probe_nvidia_peermem']
           initialDelaySeconds: 10
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -169,6 +177,7 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
+          timeoutSeconds: 10
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-fs-ctr
@@ -192,9 +201,10 @@ spec:
             command:
               [sh, -c, 'lsmod | grep nvidia_fs']
           initialDelaySeconds: 10
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -203,6 +213,7 @@ spec:
           initialDelaySeconds: 30
           failureThreshold: 1
           successThreshold: 1
+          timeoutSeconds: 10
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent

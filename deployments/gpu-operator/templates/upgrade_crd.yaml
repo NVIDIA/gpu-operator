@@ -9,14 +9,14 @@ metadata:
     "helm.sh/hook-weight": "1"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
   labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
 spec:
   template:
     metadata:
       name: gpu-operator-upgrade-crd
       labels:
-        {{ $.Release.matchLabels }}
+        {{- include "gpu-operator.labels" . | nindent 8 }}
         app.kubernetes.io/component: "gpu-operator"
     spec:
       serviceAccountName: gpu-operator

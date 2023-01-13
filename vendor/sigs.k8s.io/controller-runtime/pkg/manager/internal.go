@@ -18,6 +18,7 @@ package manager
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -135,6 +136,8 @@ type controllerManager struct {
 	// if not set, webhook server would look up the server key and certificate in
 	// {TempDir}/k8s-webhook-server/serving-certs
 	certDir string
+	// tlsOpts is used to allow configuring the TLS config used for the webhook server.
+	tlsOpts []func(*tls.Config)
 
 	webhookServer *webhook.Server
 	// webhookServerOnce will be called in GetWebhookServer() to optionally initialize
@@ -305,6 +308,7 @@ func (cm *controllerManager) GetWebhookServer() *webhook.Server {
 				Port:    cm.port,
 				Host:    cm.host,
 				CertDir: cm.certDir,
+				TLSOpts: cm.tlsOpts,
 			}
 		}
 		if err := cm.Add(cm.webhookServer); err != nil {
@@ -457,21 +461,21 @@ func (cm *controllerManager) Start(ctx context.Context) (err error) {
 	// between conversion webhooks and the cache sync (usually initial list) which causes the webhooks
 	// to never start because no cache can be populated.
 	if err := cm.runnables.Webhooks.Start(cm.internalCtx); err != nil {
-		if err != wait.ErrWaitTimeout {
+		if !errors.Is(err, wait.ErrWaitTimeout) {
 			return err
 		}
 	}
 
 	// Start and wait for caches.
 	if err := cm.runnables.Caches.Start(cm.internalCtx); err != nil {
-		if err != wait.ErrWaitTimeout {
+		if !errors.Is(err, wait.ErrWaitTimeout) {
 			return err
 		}
 	}
 
 	// Start the non-leaderelection Runnables after the cache has synced.
 	if err := cm.runnables.Others.Start(cm.internalCtx); err != nil {
-		if err != wait.ErrWaitTimeout {
+		if !errors.Is(err, wait.ErrWaitTimeout) {
 			return err
 		}
 	}
@@ -587,7 +591,7 @@ func (cm *controllerManager) engageStopProcedure(stopComplete <-chan struct{}) e
 	}()
 
 	<-cm.shutdownCtx.Done()
-	if err := cm.shutdownCtx.Err(); err != nil && err != context.Canceled {
+	if err := cm.shutdownCtx.Err(); err != nil && !errors.Is(err, context.Canceled) {
 		if errors.Is(err, context.DeadlineExceeded) {
 			if cm.gracefulShutdownTimeout > 0 {
 				return fmt.Errorf("failed waiting for all runnables to end within grace period of %s: %w", cm.gracefulShutdownTimeout, err)
@@ -597,6 +601,7 @@ func (cm *controllerManager) engageStopProcedure(stopComplete <-chan struct{}) e
 		// For any other error, return the error.
 		return err
 	}
+
 	return nil
 }
 

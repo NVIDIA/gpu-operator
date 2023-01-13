@@ -113,6 +113,8 @@ const (
 	DefaultToolkitInstallDir = "/usr/local/nvidia"
 	// VgpuDMDefaultConfigMapName indicates name of ConfigMap containing default vGPU devices configuration
 	VgpuDMDefaultConfigMapName = "default-vgpu-devices-config"
+	// VgpuDMDefaultConfigName indicates name of default configuration in the vGPU devices config file
+	VgpuDMDefaultConfigName = "default"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -561,7 +563,32 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
+	// apply custom Labels and Annotations to the podSpec if any
+	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets)
+
 	return nil
+}
+
+// applyCommonDaemonsetMetadata adds additional labels and annotations to the daemonset podSpec if there are any specified
+// by the user in the podSpec
+func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
+	if len(dsSpec.Labels) > 0 {
+		for labelKey, labelValue := range dsSpec.Labels {
+			// if the user specifies an override of the "app" or the ""app.kubernetes.io/part-of"" key, we skip it.
+			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
+			// with the existing daemon set selectors.
+			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
+				continue
+			}
+			obj.Spec.Template.ObjectMeta.Labels[labelKey] = labelValue
+		}
+	}
+
+	if len(dsSpec.Annotations) > 0 {
+		for annoKey, annoVal := range dsSpec.Annotations {
+			obj.Spec.Template.ObjectMeta.Annotations[annoKey] = annoVal
+		}
+	}
 }
 
 // Apply common config that is applicable for all Daemonsets
@@ -1470,8 +1497,13 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		break
 	}
 
-	// vgpuDeviceManager.config.default has a default value in the CRD, so it will always be set
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", config.VGPUDeviceManager.Config.Default)
+	// set name of default vGPU device configuration. The default configuration is applied if the node
+	// is not labelled with a specific configuration
+	defaultConfig := VgpuDMDefaultConfigName
+	if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Default != "" {
+		defaultConfig = config.VGPUDeviceManager.Config.Default
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", defaultConfig)
 
 	return nil
 }
@@ -1700,9 +1732,6 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
-
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
 	return nil
 }
@@ -2561,6 +2590,10 @@ func applyUpdateStrategyConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		if config.Daemonsets.RollingUpdate == nil || config.Daemonsets.RollingUpdate.MaxUnavailable == "" {
 			return nil
 		}
+		if obj.Name == "nvidia-driver-daemonset" {
+			// disallow setting RollingUpdate strategy with the driver container
+			return nil
+		}
 		var intOrString intstr.IntOrString
 		if strings.HasSuffix(config.Daemonsets.RollingUpdate.MaxUnavailable, "%") {
 			intOrString = intstr.IntOrString{Type: intstr.String, StrVal: config.Daemonsets.RollingUpdate.MaxUnavailable}
@@ -2857,7 +2890,7 @@ func ocpDriverToolkitDaemonSets(ctx context.Context, n ClusterPolicyController) 
 // ocpCleanupUnusedDriverToolkitDaemonSets scans the DriverToolkit
 // RHCOS-version specific DaemonSets, and deletes the unused one:
 // - RHCOS version wasn't found in the node labels (upgrade finished)
-// - RHCOS version marked for deletion ealier in the Reconciliation loop (currently unexpected)
+// - RHCOS version marked for deletion earlier in the Reconciliation loop (currently unexpected)
 // - no RHCOS version label (unexpected)
 // The DaemonSet set is kept if:
 // - RHCOS version was found in the node labels (most likely case)
@@ -2908,7 +2941,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 
-				// the version of RHCOS targetted by this DS is part of the cluster
+				// the version of RHCOS targeted by this DS is part of the cluster
 				// keep it alive
 
 				continue
@@ -2992,7 +3025,7 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 		}
 	}
 
-	// return the last error that occured, if any
+	// return the last error that occurred, if any
 	if lastErr != nil {
 		return 0, lastErr
 	}
@@ -3075,9 +3108,21 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+
+	for labelKey, labelValue := range n.singleton.Spec.Daemonsets.Labels {
+		obj.Labels[labelKey] = labelValue
+	}
+
 	// Daemonsets will always have at least one annotation applied, so allocate if necessary
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
+	}
+
+	for annoKey, annoValue := range n.singleton.Spec.Daemonsets.Annotations {
+		obj.Annotations[annoKey] = annoValue
 	}
 
 	found := &appsv1.DaemonSet{}
@@ -3422,7 +3467,12 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 	}
 
-	if n.stateNames[state] == "state-operator-metrics" {
+	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
+		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
+		if !serviceMonitorCRDExists {
+			logger.V(1).Info("ServiceMonitor CRD is missing, ignoring creation of CR for operator-metrics")
+			return gpuv1.Ready, nil
+		}
 		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
 	}
 

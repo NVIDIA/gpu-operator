@@ -4,8 +4,8 @@ metadata:
   name: cluster-policy
   namespace: {{ .Release.Namespace }}
   labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
-    {{ .Release.labels }}
   {{- if .Values.operator.cleanupCRD }}
   # CR cleanup is handled during pre-delete hook
   # Add below annotation so that helm doesn't attempt to cleanup CR twice
@@ -45,6 +45,11 @@ spec:
     use_ocp_driver_toolkit: {{ .Values.operator.use_ocp_driver_toolkit }}
     {{- end }}
   daemonsets:
+    labels:
+      {{- include "gpu-operator.operand-labels" . | nindent 6 }}
+    {{- if .Values.daemonsets.annotations }}
+    annotations: {{ toYaml .Values.daemonsets.annotations | nindent 6 }}
+    {{- end }}
     {{- if .Values.daemonsets.tolerations }}
     tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
     {{- end }}
@@ -183,6 +188,24 @@ spec:
     {{- end }}
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.upgradePolicy }}
+    upgradePolicy:
+      autoUpgrade: {{ .Values.driver.upgradePolicy.autoUpgrade | default false }}
+      maxParallelUpgrades: {{ .Values.driver.upgradePolicy.maxParallelUpgrades | default 0 }}
+      waitForCompletion:
+        timeoutSeconds: {{ .Values.driver.upgradePolicy.waitForCompletion.timeoutSeconds }}
+        podSelector: {{ .Values.driver.upgradePolicy.waitForCompletion.podSelector }}
+      podDeletion:
+        force: {{ .Values.driver.upgradePolicy.gpuPodDeletion.force | default false }}
+        timeoutSeconds: {{ .Values.driver.upgradePolicy.gpuPodDeletion.timeoutSeconds }}
+        deleteEmptyDir: {{ .Values.driver.upgradePolicy.gpuPodDeletion.deleteEmptyDir | default false }}
+      drain:
+        enable: {{ .Values.driver.upgradePolicy.drain.enable | default false }}
+        force: {{ .Values.driver.upgradePolicy.drain.force | default false }}
+        podSelector: {{ .Values.driver.upgradePolicy.drain.podSelector}}
+        timeoutSeconds: {{ .Values.driver.upgradePolicy.drain.timeoutSeconds }}
+        deleteEmptyDir: {{ .Values.driver.upgradePolicy.drain.deleteEmptyDir | default false}}
     {{- end }}
   vgpuManager:
     enabled: {{ .Values.vgpuManager.enabled }}

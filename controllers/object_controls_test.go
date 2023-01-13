@@ -131,7 +131,7 @@ func getModuleRoot(dir string) (string, error) {
 	return dir, nil
 }
 
-// setup creates a mock kubernetes cluster and client. Nodes are labeled with the minumum
+// setup creates a mock kubernetes cluster and client. Nodes are labeled with the minimum
 // required NFD labels to be detected as GPU nodes by the GPU Operator. A sample
 // ClusterPolicy resource is applied to the cluster. The ClusterPolicyController
 // object is initialized with the mock kubernetes client as well as other steps
@@ -153,7 +153,7 @@ func setup() error {
 	if err := promv1.AddToScheme(s); err != nil {
 		return fmt.Errorf("unable to add promv1 schema: %v", err)
 	}
-	if err := secv1.AddToScheme(s); err != nil {
+	if err := secv1.Install(s); err != nil {
 		return fmt.Errorf("unable to add secv1 schema: %v", err)
 	}
 
@@ -165,7 +165,8 @@ func setup() error {
 	// Get a sample ClusterPolicy manifest
 	manifests := getAssetsFrom(&clusterPolicyController, filepath.Join(cfg.root, clusterPolicyPath), "")
 	clusterPolicyManifest := manifests[0]
-	ser := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme)
+	ser := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
 	_, _, err = ser.Decode(clusterPolicyManifest, nil, &clusterPolicy)
 	if err != nil {
 		return fmt.Errorf("failed to decode sample ClusterPolicy manifest: %v", err)

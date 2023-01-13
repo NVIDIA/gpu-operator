@@ -52,6 +52,7 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	podSecurityLabelPrefix         = "pod-security.kubernetes.io/"
 	podSecurityLevelPrivileged     = "privileged"
+	driverAutoUpgradeAnnotationKey = "nvidia.com/gpu-driver-upgrade-enabled"
 )
 
 var (
@@ -391,6 +392,59 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 	return modified
 }
 
+func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
+	// fetch all nodes
+	opts := []client.ListOption{}
+	list := &corev1.NodeList{}
+	err := n.rec.Client.List(n.ctx, list, opts...)
+	if err != nil {
+		return fmt.Errorf("Unable to list nodes to check annotations, err %s", err.Error())
+	}
+	for _, node := range list.Items {
+		labels := node.GetLabels()
+		if !hasCommonGPULabel(labels) {
+			// not a gpu node
+			continue
+		}
+		// set node annotation for driver auto-upgrade
+		updateRequired := false
+		value := "true"
+		annotationValue, annotationExists := node.ObjectMeta.Annotations[driverAutoUpgradeAnnotationKey]
+		if n.singleton.Spec.Driver.UpgradePolicy != nil && n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade {
+			// check if we need to add the annotation
+			if !annotationExists {
+				updateRequired = true
+			} else if annotationValue != "true" {
+				updateRequired = true
+			}
+		} else {
+			// check if we need to remove the annotation
+			if annotationExists {
+				updateRequired = true
+			}
+			value = "null"
+		}
+		if !updateRequired {
+			continue
+		}
+		// update annotation
+		node.ObjectMeta.Annotations[driverAutoUpgradeAnnotationKey] = value
+		if value == "null" {
+			// remove annotation if value is null
+			delete(node.ObjectMeta.Annotations, driverAutoUpgradeAnnotationKey)
+		}
+		err := n.rec.Client.Update(n.ctx, &node)
+		if err != nil {
+			n.rec.Log.Info("Failed to update node state annotation on a node",
+				"node", node.Name,
+				"annotationKey", driverAutoUpgradeAnnotationKey,
+				"annotationValue", value, "error", err)
+			return err
+		}
+	}
+	return nil
+}
+
 // labelGPUNodes labels nodes with GPU's with NVIDIA common label
 // it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
 func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
@@ -526,6 +580,13 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 
 	patch := client.MergeFrom(ns.DeepCopy())
 	modified := false
+	// On K8s<1.21, namespaces are not automatically labeled with an immutable label. Initialize
+	// a labels map if needed before adding PSA labels.
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#automatic-labelling
+	if ns.ObjectMeta.Labels == nil {
+		ns.ObjectMeta.Labels = make(map[string]string)
+		modified = true
+	}
 	for _, mode := range podSecurityModes {
 		key := podSecurityLabelPrefix + mode
 		if val, ok := ns.ObjectMeta.Labels[key]; !ok || (val != podSecurityLevelPrivileged) {
@@ -683,9 +744,9 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.rec.Log.Info("Kubernetes version detected", "version", k8sVersion)
 
 		promv1.AddToScheme(reconciler.Scheme)
-		secv1.AddToScheme(reconciler.Scheme)
-		apiconfigv1.AddToScheme(reconciler.Scheme)
-		apiimagev1.AddToScheme(reconciler.Scheme)
+		secv1.Install(reconciler.Scheme)
+		apiconfigv1.Install(reconciler.Scheme)
+		apiimagev1.Install(reconciler.Scheme)
 
 		n.operatorMetrics = initOperatorMetrics(n)
 		n.rec.Log.Info("Operator metrics initialized.")
@@ -759,6 +820,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
+
+	// fetch all nodes and annotate gpu nodes
+	err = n.applyDriverAutoUpgradeAnnotation()
+	if err != nil {
+		return err
+	}
 
 	// detect the container runtime on worker nodes
 	err = n.getRuntime()

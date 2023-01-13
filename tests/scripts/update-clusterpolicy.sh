@@ -29,7 +29,10 @@ test_image_updates() {
         echo "Image update failed for driver daemonset to version $TARGET_DRIVER_VERSION"
         exit 1
     fi
-    echo "driver image updated successfully to version $TARGET_DRIVER_VERSION"
+
+    echo "driver daemonset image updated successfully to version $TARGET_DRIVER_VERSION, deleting pod to trigger update"
+    # Delete driver pod to trigger update due to OnDelete policy
+    kubectl delete pod -l app=nvidia-driver-daemonset -n $TEST_NAMESPACE
 
     # Verify that driver-daemonset is running successfully after update
     check_pod_ready "nvidia-driver-daemonset"
@@ -201,6 +204,39 @@ test_custom_toolkit_dir() {
     check_pod_ready "nvidia-operator-validator"
 }
 
+test_custom_labels_override() {
+  if ! kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/daemonsets/labels", "value": {"cloudprovider": "aws", "platform": "kubernetes"}}]';
+  then
+    echo "cannot update the labels of the ClusterPolicy resource"
+    exit 1
+  fi
+
+  operands="nvidia-container-toolkit-daemonset nvidia-operator-validator gpu-feature-discovery nvidia-dcgm-exporter nvidia-device-plugin-daemonset"
+
+  for operand in $operands
+  do
+    check_pod_ready "$operand"
+  done
+
+  for operand in $operands
+  do
+    echo "checking $operand labels"
+    for pod in $(kubectl get pods -n "$TEST_NAMESPACE" -l app="$operand" --output=jsonpath={.items..metadata.name})
+    do
+      cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
+      if [ "$cp_label_value" != "aws" ]; then
+          echo "Custom Label cloudprovider is incorrect when clusterpolicy labels are overridden - $pod"
+          exit 1
+      fi
+      platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
+      if [ "$platform_label_value" != "kubernetes" ]; then
+          echo "Custom Label platform is incorrect when clusterpolicy labels are overridden - $pod"
+          exit 1
+      fi
+    done
+  done
+}
+
 
 test_image_updates
 test_env_updates
@@ -209,3 +245,4 @@ test_enable_dcgm
 test_gpu_sharing
 test_disable_enable_gfd
 test_disable_enable_dcgm_exporter
+test_custom_labels_override

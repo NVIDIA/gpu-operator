@@ -1,11 +1,10 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: gpu-operator
   labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
-    {{ $.Release.labels }}
 rules:
 - apiGroups:
   - config.openshift.io
@@ -56,6 +55,13 @@ rules:
   - statefulsets
   verbs:
   - '*'
+- apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  verbs:
+  - 'get'
+  - 'list'
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -148,6 +154,30 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
@@ -161,4 +191,3 @@ rules:
   - update
   - patch
 {{- end }}
-

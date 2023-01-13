@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -27,6 +28,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,6 +36,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 
 	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/NVIDIA/gpu-operator/controllers"
@@ -103,16 +107,41 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
 	if err = (&controllers.ClusterPolicyReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPolicy")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
 
+	// setup upgrade controller
+	upgrade.SetDriverName("gpu")
+	upgradeLogger := ctrl.Log.WithName("controllers").WithName("Upgrade")
+	clusterUpgradeStateManager, err := upgrade.NewClusterUpgradeStateManager(
+		upgradeLogger,
+		mgr.GetConfig(),
+		mgr.GetEventRecorderFor("nvidia-gpu-operator"),
+	)
+	if err != nil {
+		setupLog.Error(err, "unable to create new ClusterUpdateStateManager", "controller", "Upgrade")
+		os.Exit(1)
+	}
+	clusterUpgradeStateManager = clusterUpgradeStateManager.WithPodDeletionEnabled(gpuPodSpecFilter).WithValidationEnabled("app=nvidia-operator-validator")
+
+	if err = (&controllers.UpgradeReconciler{
+		Client:       mgr.GetClient(),
+		Log:          upgradeLogger,
+		Scheme:       mgr.GetScheme(),
+		StateManager: clusterUpgradeStateManager,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
+		os.Exit(1)
+	}
+
+	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
@@ -123,8 +152,27 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func gpuPodSpecFilter(pod corev1.Pod) bool {
+	gpuInResourceList := func(rl corev1.ResourceList) bool {
+		for resourceName := range rl {
+			str := string(resourceName)
+			if strings.HasPrefix(str, "nvidia.com/gpu") || strings.HasPrefix(str, "nvidia.com/mig-") {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, c := range pod.Spec.Containers {
+		if gpuInResourceList(c.Resources.Limits) || gpuInResourceList(c.Resources.Requests) {
+			return true
+		}
+	}
+	return false
 }

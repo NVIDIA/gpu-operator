@@ -16,12 +16,15 @@ sandboxWorkloads:
   defaultWorkload: "container"
 
 daemonsets:
+  labels: {}
+  annotations: {}
   priorityClassName: system-node-critical
   tolerations:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
   # configuration for controlling update strategy("OnDelete" or "RollingUpdate") of GPU Operands
+  # note that driver Daemonset is always set with OnDelete to avoid unintended disruptions
   updateStrategy: "RollingUpdate"
   # configuration for controlling rolling update of GPU Operands
   rollingUpdate:
@@ -110,16 +113,42 @@ driver:
   rdma:
     enabled: false
     useHostMofed: false
+  upgradePolicy:
+    # global switch for automatic upgrade feature
+    # if set to false all other options are ignored
+    autoUpgrade: true
+    # how many nodes can be upgraded in parallel
+    # 0 means no limit, all nodes will be upgraded in parallel
+    maxParallelUpgrades: 1
+    # options for waiting on pod(job) completions
+    waitForCompletion:
+      timeoutSeconds: 0
+      podSelector: ""
+    # options for gpu pod deletion
+    gpuPodDeletion:
+      force: false
+      timeoutSeconds: 300
+      deleteEmptyDir: false
+    # options for node drain (`kubectl drain`) before the driver reload
+    # this is required only if default GPU pod deletions done by the operator
+    # are not sufficient to re-install the driver
+    drain:
+      enable: false
+      force: false
+      podSelector: ""
+      # It's recommended to set a timeout to avoid infinite drain in case non-fatal error keeps happening on retries
+      timeoutSeconds: 300
+      deleteEmptyDir: false
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.5.1
+    version: v0.6.0
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
         value: "true"
       - name: ENABLE_AUTO_DRAIN
-        value: "true"
+        value: "false"
       - name: DRAIN_USE_FORCE
         value: "false"
       - name: DRAIN_POD_SELECTOR_LABEL
@@ -305,9 +334,11 @@ vgpuManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.5.1
+    version: v0.6.0
     imagePullPolicy: IfNotPresent
     env:
+      - name: ENABLE_GPU_POD_EVICTION
+        value: "false"
       - name: ENABLE_AUTO_DRAIN
         value: "false"
 
@@ -335,9 +366,11 @@ vfioManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.5.1
+    version: v0.6.0
     imagePullPolicy: IfNotPresent
     env:
+      - name: ENABLE_GPU_POD_EVICTION
+        value: "false"
       - name: ENABLE_AUTO_DRAIN
         value: "false"
 

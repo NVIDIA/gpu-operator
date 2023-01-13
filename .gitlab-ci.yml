@@ -51,12 +51,11 @@ vet:
   script:
     - make vet
 
-go-lint:
+go-validate-modules:
   extends:
     - .go-check
   script:
-    - make lint
-  allow_failure: true
+    - make validate-modules
 
 ineffassign:
   extends:

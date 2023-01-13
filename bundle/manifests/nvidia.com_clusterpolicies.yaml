@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: clusterpolicies.nvidia.com
 spec:
@@ -38,11 +38,26 @@ spec:
               daemonsets:
                 description: Daemonset defines common configuration for all Daemonsets
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Annotations is an unstructured key value
+                      map stored with a resource that may be set by external tools
+                      to store and retrieve arbitrary metadata. They are not queryable
+                      and should be preserved when modifying objects.'
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Map of string keys and values that can
+                      be used to organize and categorize (scope and select) objects.
+                      May match selectors of replication controllers and services.'
+                    type: object
                   priorityClassName:
                     type: string
                   rollingUpdate:
-                    description: 'Optional: Configuration for rolling update of NVIDIA
-                      Driver DaemonSet pods'
+                    description: 'Optional: Configuration for rolling update of all
+                      DaemonSet pods'
                     properties:
                       maxUnavailable:
                         type: string
@@ -1001,6 +1016,93 @@ spec:
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
+                  upgradePolicy:
+                    description: Driver auto-upgrade settings
+                    properties:
+                      autoUpgrade:
+                        default: false
+                        description: AutoUpgrade is a global switch for automatic
+                          upgrade feature if set to false all other options are ignored
+                        type: boolean
+                      drain:
+                        description: DrainSpec describes configuration for node drain
+                          during automatic upgrade
+                        properties:
+                          deleteEmptyDir:
+                            default: false
+                            description: DeleteEmptyDir indicates if should continue
+                              even if there are pods using emptyDir (local data that
+                              will be deleted when the node is drained)
+                            type: boolean
+                          enable:
+                            default: false
+                            description: Enable indicates if node draining is allowed
+                              during upgrade
+                            type: boolean
+                          force:
+                            default: false
+                            description: Force indicates if force draining is allowed
+                            type: boolean
+                          podSelector:
+                            description: 'PodSelector specifies a label selector to
+                              filter pods on the node that need to be drained For
+                              more details on label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            type: string
+                          timeoutSeconds:
+                            default: 300
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up drain, zero means
+                              infinite
+                            minimum: 0
+                            type: integer
+                        type: object
+                      maxParallelUpgrades:
+                        default: 1
+                        description: MaxParallelUpgrades indicates how many nodes
+                          can be upgraded in parallel 0 means no limit, all nodes
+                          will be upgraded in parallel
+                        minimum: 0
+                        type: integer
+                      podDeletion:
+                        description: PodDeletionSpec describes configuration for deletion
+                          of pods using special resources during automatic upgrade
+                        properties:
+                          deleteEmptyDir:
+                            default: false
+                            description: DeleteEmptyDir indicates if should continue
+                              even if there are pods using emptyDir (local data that
+                              will be deleted when the pod is deleted)
+                            type: boolean
+                          force:
+                            default: false
+                            description: Force indicates if force deletion is allowed
+                            type: boolean
+                          timeoutSeconds:
+                            default: 300
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up on pod termination,
+                              zero means infinite
+                            minimum: 0
+                            type: integer
+                        type: object
+                      waitForCompletion:
+                        description: WaitForCompletionSpec describes the configuration
+                          for waiting on job completions
+                        properties:
+                          podSelector:
+                            description: 'PodSelector specifies a label selector for
+                              the pods to wait for completion For more details on
+                              label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            type: string
+                          timeoutSeconds:
+                            default: 0
+                            description: TimeoutSecond specifies the length of time
+                              in seconds to wait before giving up on pod termination,
+                              zero means infinite
+                            minimum: 0
+                            type: integer
+                        type: object
+                    type: object
                   version:
                     description: NVIDIA Driver image tag
                     type: string
@@ -1690,6 +1792,14 @@ spec:
               operator:
                 description: Operator component spec
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Annotations is an unstructured key value
+                      map stored with a resource that may be set by external tools
+                      to store and retrieve arbitrary metadata. They are not queryable
+                      and should be preserved when modifying objects.'
+                    type: object
                   defaultRuntime:
                     default: docker
                     description: Runtime defines container runtime type
@@ -1720,6 +1830,13 @@ spec:
                       version:
                         description: Version represents image tag(version)
                         type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Map of string keys and values that can
+                      be used to organize and categorize (scope and select) objects.
+                      May match selectors of replication controllers and services.'
                     type: object
                   runtimeClass:
                     default: nvidia
