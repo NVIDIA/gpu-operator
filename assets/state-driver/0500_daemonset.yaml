@@ -130,7 +130,7 @@ spec:
             command:
               [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
           initialDelaySeconds: 30
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
           timeoutSeconds: 10
@@ -165,7 +165,7 @@ spec:
             command:
               [sh, -c, 'nvidia-driver probe_nvidia_peermem']
           initialDelaySeconds: 10
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
           timeoutSeconds: 10
@@ -201,7 +201,7 @@ spec:
             command:
               [sh, -c, 'lsmod | grep nvidia_fs']
           initialDelaySeconds: 10
-          failureThreshold: 60
+          failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
           timeoutSeconds: 10
