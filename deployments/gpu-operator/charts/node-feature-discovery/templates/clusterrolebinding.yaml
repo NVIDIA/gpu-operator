@@ -11,8 +11,8 @@ roleRef:
   name: {{ include "node-feature-discovery.fullname" . }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "node-feature-discovery.serviceAccountName" . }}
-  namespace: {{ $.Release.Namespace }}
+  name: {{ include "node-feature-discovery.master.serviceAccountName" . }}
+  namespace: {{ include "node-feature-discovery.namespace" .  }}
 {{- end }}
 
 ---
@@ -30,5 +30,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
-  namespace: {{ $.Release.Namespace }}
+  namespace: {{ include "node-feature-discovery.namespace" .  }}
 {{- end }}

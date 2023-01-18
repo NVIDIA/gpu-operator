@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "node-feature-discovery.fullname" . }}-topology-updater
+  namespace: {{ include "node-feature-discovery.namespace" . }}
   labels:
     {{- include "node-feature-discovery.labels" . | nindent 4 }}
     role: topology-updater
@@ -39,7 +40,6 @@ spec:
         command:
           - "nfd-topology-updater"
         args:
-          - "--server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
           {{- if .Values.topologyUpdater.updateInterval | empty | not }}
           - "--sleep-interval={{ .Values.topologyUpdater.updateInterval }}"
           {{- else }}
@@ -67,6 +67,9 @@ spec:
           mountPath: "/etc/kubernetes/node-feature-discovery/certs"
           readOnly: true
         {{- end }}
+        - name: nfd-topology-updater-conf
+          mountPath: "/etc/kubernetes/node-feature-discovery"
+          readOnly: true
 
         resources:
       {{- toYaml .Values.topologyUpdater.resources | nindent 12 }}
@@ -90,11 +93,18 @@ spec:
           {{- else }}
           path: /var/lib/kubelet/pod-resources/kubelet.sock
           {{- end }}
+      - name: nfd-topology-updater-conf
+        configMap:
+          name: {{ include "node-feature-discovery.fullname" . }}-topology-updater-conf
+          items:
+            - key: nfd-topology-updater.conf
+              path: nfd-topology-updater.conf
       {{- if .Values.tls.enable }}
       - name: nfd-topology-updater-cert
         secret:
           secretName: nfd-topology-updater-cert
       {{- end }}
+
 
     {{- with .Values.topologyUpdater.nodeSelector }}
       nodeSelector:

@@ -1,5 +1,5 @@
 image:
-  repository: k8s.gcr.io/nfd/node-feature-discovery
+  repository: registry.k8s.io/nfd/node-feature-discovery
   # This should be set to 'IfNotPresent' for released version
   pullPolicy: IfNotPresent
   # tag, if defined will use the given image tag, else Chart.AppVersion will be used
@@ -8,15 +8,18 @@ imagePullSecrets: []
 
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 
-nodeFeatureRule:
-  createCRD: true
+enableNodeFeatureApi: true
 
 master:
   instance:
+  featureApi:
   extraLabelNs: []
+  resourceLabels: []
+  crdController: null
   featureRulesController: null
-
+  deploymentAnnotations: {}
   replicaCount: 1
 
   podSecurityContext: {}
@@ -167,6 +170,8 @@ worker:
     #      - "class"
     #      - "vendor"
     #      - "device"
+    #  local:
+    #    hooksEnabled: true
     #  custom:
     #    # The following feature demonstrates the capabilities of the matchFeatures
     #    - name: "my custom rule"
@@ -315,6 +320,7 @@ worker:
     #
 ### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
 
+  daemonsetAnnotations: {}
   podSecurityContext: {}
     # fsGroup: 2000
 
@@ -325,6 +331,19 @@ worker:
     readOnlyRootFilesystem: true
     runAsNonRoot: true
     # runAsUser: 1000
+
+  serviceAccount:
+    # Specifies whether a service account should be created.
+    # We create this by default to make it easier for downstream users to apply PodSecurityPolicies.
+    create: true
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name:
+
+  rbac:
+    create: true
 
   # Allow users to mount the hostPath /usr/src, useful for RHCOS on s390x
   # Does not work on systems without /usr/src AND a read-only /usr, such as Talos
@@ -350,7 +369,19 @@ worker:
 
   affinity: {}
 
+  priorityClassName: ""
+
 topologyUpdater:
+  config: ### <NFD-TOPOLOGY-UPDATER-CONF-START-DO-NOT-REMOVE>
+    ## key = node name, value = list of resources to be excluded.
+    ## use * to exclude from all nodes.
+    ## an example for how the exclude list should looks like
+    #excludeList:
+    #  node1: [cpu]
+    #  node2: [memory, example/deviceA]
+    #  *: [hugepages-2Mi]
+### <NFD-TOPOLOGY-UPDATER-CONF-END-DO-NOT-REMOVE>
+
   enable: false
   createCRDs: false
 

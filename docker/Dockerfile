@@ -76,6 +76,7 @@ RUN mv ./kubectl /usr/local/bin
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies_crd.yaml /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml
+COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
 # Install / upgrade packages here that are required to resolve CVEs
 ARG CVE_UPDATES
