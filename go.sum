@@ -69,8 +69,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20230109211555-38532a3a7d36 h1:nAmSm7OHxO+Aeh4Rtjja8DLc6wUWeURi8AcHZB4pFSA=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20230109211555-38532a3a7d36/go.mod h1:oIo3/7miWTtrzlcLrpceTYc6/59RtCoZjSLgquHikEg=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca h1:WW+3Hs5oLau3ofkf0IQzupL4dxJ3HSOuAwwJ8L+lnC4=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca/go.mod h1:oIo3/7miWTtrzlcLrpceTYc6/59RtCoZjSLgquHikEg=
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/PuerkitoBio/purell v1.1.1 h1:WEQqlqaGbrPkxLJWfBwQmfEAE1Z7ONdDLqrN38tNFfI=
