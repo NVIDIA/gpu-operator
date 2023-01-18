@@ -272,7 +272,7 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 			defer wg.Done()
 			running := false
 			for _, pod := range podList.Items {
-				running = m.IsPodRunning(pod)
+				running = m.IsPodRunningOrPending(pod)
 				if running {
 					break
 				}
@@ -345,20 +345,20 @@ func (m *PodManagerImpl) HandleTimeoutOnPodCompletions(ctx context.Context, node
 	return nil
 }
 
-// IsPodRunning returns true when the given pod is currently running
-func (m *PodManagerImpl) IsPodRunning(pod corev1.Pod) bool {
+// IsPodRunningOrPending returns true when the given pod is currently in Running or Pending state
+func (m *PodManagerImpl) IsPodRunningOrPending(pod corev1.Pod) bool {
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
 		m.log.V(consts.LogLevelDebug).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodRunning)
+		return true
+	case corev1.PodPending:
+		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodPending)
 		return true
 	case corev1.PodFailed:
 		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodFailed)
 		return false
 	case corev1.PodSucceeded:
 		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodSucceeded)
-		return false
-	case corev1.PodPending:
-		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodPending)
 		return false
 	}
 	return false
