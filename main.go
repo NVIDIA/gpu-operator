@@ -169,6 +169,11 @@ func gpuPodSpecFilter(pod corev1.Pod) bool {
 		return false
 	}
 
+	//  ignore pods other than in running and pending state
+	if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+		return false
+	}
+
 	for _, c := range pod.Spec.Containers {
 		if gpuInResourceList(c.Resources.Limits) || gpuInResourceList(c.Resources.Requests) {
 			return true
