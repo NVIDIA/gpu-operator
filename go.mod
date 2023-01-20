@@ -3,7 +3,7 @@ module github.com/NVIDIA/gpu-operator
 go 1.19
 
 require (
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230109211555-38532a3a7d36
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca
 	github.com/go-logr/logr v1.2.3
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/openshift/api v0.0.0-20210924154557-a4f696157341
