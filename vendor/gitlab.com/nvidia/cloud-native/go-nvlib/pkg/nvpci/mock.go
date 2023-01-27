@@ -18,7 +18,6 @@ package nvpci
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -34,7 +33,7 @@ var _ Interface = (*MockNvpci)(nil)
 
 // NewMockNvpci create new mock PCI and remove old devices
 func NewMockNvpci() (mock *MockNvpci, rerr error) {
-	rootDir, err := ioutil.TempDir("", "")
+	rootDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +86,24 @@ func (m *MockNvpci) AddMockA100(address string, numaNode int) error {
 		return err
 	}
 	_, err = device.WriteString("0x20bf")
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Create(filepath.Join(deviceDir, "nvidia"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(deviceDir, "nvidia"), filepath.Join(deviceDir, "driver"))
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Create(filepath.Join(deviceDir, "20"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(deviceDir, "20"), filepath.Join(deviceDir, "iommu_group"))
 	if err != nil {
 		return err
 	}

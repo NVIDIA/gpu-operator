@@ -51,6 +51,8 @@ spec:
             mountPath: /host
             readOnly: true
             mountPropagation: HostToContainer
+          - name: host-dev-char
+            mountPath: /host-dev-char
       containers:
       - image: "FILLED BY THE OPERATOR"
         command: [bash, -c]
@@ -97,3 +99,6 @@ spec:
         - name: crio-hooks
           hostPath:
             path: /run/containers/oci/hooks.d
+        - name: host-dev-char
+          hostPath:
+            path: /dev/char

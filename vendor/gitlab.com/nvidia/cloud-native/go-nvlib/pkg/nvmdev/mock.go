@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -34,7 +33,7 @@ var _ Interface = (*MockNvmdev)(nil)
 
 // NewMock creates new mock mediated (vGPU) and parent PCI devices and removes old devices
 func NewMock() (mock *MockNvmdev, rerr error) {
-	mdevParentsRootDir, err := ioutil.TempDir("", "")
+	mdevParentsRootDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func NewMock() (mock *MockNvmdev, rerr error) {
 			os.RemoveAll(mdevParentsRootDir)
 		}
 	}()
-	mdevDevicesRootDir, err := ioutil.TempDir("", "")
+	mdevDevicesRootDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +96,24 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 		return err
 	}
 	_, err = device.WriteString("0x20bf")
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Create(filepath.Join(deviceDir, "nvidia"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(deviceDir, "nvidia"), filepath.Join(deviceDir, "driver"))
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Create(filepath.Join(deviceDir, "20"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(deviceDir, "20"), filepath.Join(deviceDir, "iommu_group"))
 	if err != nil {
 		return err
 	}
@@ -184,14 +201,35 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 
 // AddMockA100Mdev creates an A100 like MDEV (vGPU) mock device.
 // The corresponding mocked parent A100 device must be created beforehand.
-func (m *MockNvmdev) AddMockA100Mdev(uuid string, mdevType string, parentMdevTypeDir string) error {
-	deviceDir := filepath.Join(m.mdevDevicesRoot, uuid)
-	err := os.MkdirAll(deviceDir, 0755)
+func (m *MockNvmdev) AddMockA100Mdev(uuid string, mdevType string, mdevTypeDir string, parentDeviceDir string) error {
+	mdevDeviceDir := filepath.Join(parentDeviceDir, uuid)
+	err := os.Mkdir(mdevDeviceDir, 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.Symlink(parentMdevTypeDir, filepath.Join(deviceDir, "mdev_type"))
+	parentMdevTypeDir := filepath.Join(parentDeviceDir, "mdev_supported_types", mdevTypeDir)
+	err = os.Symlink(parentMdevTypeDir, filepath.Join(mdevDeviceDir, "mdev_type"))
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Create(filepath.Join(mdevDeviceDir, "vfio_mdev"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(mdevDeviceDir, "vfio_mdev"), filepath.Join(mdevDeviceDir, "driver"))
+
+	_, err = os.Create(filepath.Join(mdevDeviceDir, "200"))
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(filepath.Join(mdevDeviceDir, "200"), filepath.Join(mdevDeviceDir, "iommu_group"))
+	if err != nil {
+		return err
+	}
+
+	err = os.Symlink(mdevDeviceDir, filepath.Join(m.mdevDevicesRoot, uuid))
 	if err != nil {
 		return err
 	}

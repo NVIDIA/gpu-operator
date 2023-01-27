@@ -18,7 +18,7 @@ package nvpci
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes"
 )
@@ -71,7 +71,7 @@ type PCICapabilities struct {
 }
 
 func (cs *ConfigSpace) Read() (ConfigSpaceIO, error) {
-	config, err := ioutil.ReadFile(cs.Path)
+	config, err := os.ReadFile(cs.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
@@ -129,6 +129,10 @@ func (cs *configSpaceIO) GetPCICapabilities() (*PCICapabilities, error) {
 		if int(eoffset) >= PCICfgSpaceExtendedSize {
 			return nil, fmt.Errorf("extended capability list pointer out of bounds")
 		}
+
+		// |31                20|19  16|15                      0|
+		// |--------------------|------|-------------------------|
+		// | Next Cap Offset    |Vers. |PCI Express Ext. Cap ID  |
 		data := cs.Read32(int(eoffset))
 		id := uint16(data & 0xffff)
 		version := uint8((data >> 16) & 0xf)
@@ -136,7 +140,7 @@ func (cs *configSpaceIO) GetPCICapabilities() (*PCICapabilities, error) {
 			cs.Slice(int(eoffset), cs.Len()-int(eoffset)),
 			version,
 		}
-		eoffset = uint16((data >> 4) & 0xffc)
+		eoffset = uint16((data >> 20) & 0xfff)
 	}
 
 	return caps, nil
