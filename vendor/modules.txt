@@ -32,6 +32,13 @@ github.com/MakeNowJust/heredoc
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
+# github.com/NVIDIA/nvidia-container-toolkit v1.12.0-rc.2.0.20230127101129-9fc2c5912242
+## explicit; go 1.18
+github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/hook/create-dev-char-symlinks
+github.com/NVIDIA/nvidia-container-toolkit/internal/info/proc/devices
+github.com/NVIDIA/nvidia-container-toolkit/internal/ldcache
+github.com/NVIDIA/nvidia-container-toolkit/internal/lookup
+github.com/NVIDIA/nvidia-container-toolkit/internal/nvcaps
 # github.com/PuerkitoBio/purell v1.1.1
 ## explicit
 github.com/PuerkitoBio/purell
@@ -130,7 +137,7 @@ github.com/google/gofuzz
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 ## explicit; go 1.13
 github.com/google/shlex
-# github.com/google/uuid v1.1.2
+# github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
 # github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
@@ -235,7 +242,7 @@ github.com/russross/blackfriday
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/sirupsen/logrus v1.8.1
+# github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.4.0
@@ -254,12 +261,13 @@ github.com/urfave/cli/v2
 # github.com/xlab/treeprint v1.1.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20220525163429-038b3f8b475d
+# gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230119114711-6fe07bb33342
 ## explicit; go 1.16
 gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev
 gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci
 gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes
 gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/mmio
+gitlab.com/nvidia/cloud-native/go-nvlib/pkg/pciids
 # go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
 ## explicit; go 1.13
 go.starlark.net/internal/compile

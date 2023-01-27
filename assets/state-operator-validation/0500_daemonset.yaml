@@ -50,6 +50,8 @@ spec:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
+            - name: host-dev-char
+              mountPath: /host-dev-char
         - name: nvidia-fs-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
@@ -162,3 +164,6 @@ spec:
         - name: host-root
           hostPath:
             path: /
+        - name: host-dev-char
+          hostPath:
+            path: /dev/char
