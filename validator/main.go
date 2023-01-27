@@ -28,10 +28,12 @@ import (
 	"syscall"
 	"time"
 
+	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/hook/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,18 +101,19 @@ type VGPUDevices struct {
 }
 
 var (
-	kubeconfigFlag               string
-	nodeNameFlag                 string
-	namespaceFlag                string
-	withWaitFlag                 bool
-	withWorkloadFlag             bool
-	componentFlag                string
-	cleanupAllFlag               bool
-	outputDirFlag                string
-	sleepIntervalSecondsFlag     int
-	migStrategyFlag              string
-	metricsPort                  int
-	defaultGPUWorkloadConfigFlag string
+	kubeconfigFlag                string
+	nodeNameFlag                  string
+	namespaceFlag                 string
+	withWaitFlag                  bool
+	withWorkloadFlag              bool
+	componentFlag                 string
+	cleanupAllFlag                bool
+	outputDirFlag                 string
+	sleepIntervalSecondsFlag      int
+	migStrategyFlag               string
+	metricsPort                   int
+	defaultGPUWorkloadConfigFlag  string
+	disableDevCharSymlinkCreation bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -124,6 +127,10 @@ const (
 	defaultSleepIntervalSeconds = 5
 	// defaultMetricsPort indicates the port on which the metrics will be exposed.
 	defaultMetricsPort = 0
+	// hostDevCharPath indicates the path in the container where the host '/dev/char' directory is mounted to
+	hostDevCharPath = "/host-dev-char"
+	// driverContainerRoot indicates the path on the host where driver container mounts it's root filesystem
+	driverContainerRoot = "/run/nvidia/driver"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
 	// hostDriverStatusFile indicates status file for host driver readiness
@@ -297,6 +304,13 @@ func main() {
 			Usage:       "default GPU workload config. determines what components to validate by default when sandbox workloads are enabled in the cluster.",
 			Destination: &defaultGPUWorkloadConfigFlag,
 			EnvVars:     []string{"DEFAULT_GPU_WORKLOAD_CONFIG"},
+		},
+		&cli.BoolFlag{
+			Name:        "disable-dev-char-symlink-creation",
+			Value:       false,
+			Usage:       "disable creation of symlinks under /dev/char corresponding to NVIDIA character devices",
+			Destination: &disableDevCharSymlinkCreation,
+			EnvVars:     []string{"DISABLE_DEV_CHAR_SYMLINK_CREATION"},
 		},
 	}
 
@@ -574,7 +588,7 @@ func getDriverRoot() (string, bool) {
 		return "/host", true
 	}
 
-	return "/run/nvidia/driver", false
+	return driverContainerRoot, false
 }
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
@@ -625,8 +639,30 @@ func (d *Driver) validate() error {
 
 	hostDriver, err := d.runValidation(false)
 	if err != nil {
-		fmt.Println("driver is not ready")
+		log.Error("driver is not ready")
 		return err
+	}
+
+	if !disableDevCharSymlinkCreation {
+		log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
+		err = createDevCharSymlinks(hostDriver)
+		if err != nil {
+			msg := strings.Join([]string{
+				"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
+				"The existence of these symlinks is required to address the following bug:",
+				"",
+				"    https://github.com/NVIDIA/gpu-operator/issues/430",
+				"",
+				"This bug impacts container runtimes configured with systemd cgroup management enabled.",
+				"To disable the symlink creation, set the following envvar in ClusterPolicy:",
+				"",
+				"    validator:",
+				"      driver:",
+				"        env:",
+				"        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION",
+				"          value: \"true\""}, "\n")
+			return fmt.Errorf("%v\n\n%s", err, msg)
+		}
 	}
 
 	statusFile := driverStatusFile
@@ -639,6 +675,29 @@ func (d *Driver) validate() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func createDevCharSymlinks(hostDriver bool) error {
+	driverRoot := driverContainerRoot
+	if hostDriver {
+		driverRoot = "/"
+	}
+
+	creator, err := devchar.NewSymlinkCreator(
+		devchar.WithDriverRoot(driverRoot),
+		devchar.WithDevCharPath(hostDevCharPath),
+		devchar.WithCreateAll(true),
+	)
+	if err != nil {
+		return fmt.Errorf("error creating symlink creator: %v", err)
+	}
+
+	err = creator.CreateLinks()
+	if err != nil {
+		return fmt.Errorf("error creating symlinks: %v", err)
+	}
+
 	return nil
 }
 

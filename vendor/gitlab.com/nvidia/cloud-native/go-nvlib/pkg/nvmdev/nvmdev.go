@@ -18,14 +18,14 @@ package nvmdev
 
 import (
 	"fmt"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 )
 
 const (
@@ -54,10 +54,12 @@ type ParentDevice struct {
 
 // Device represents an NVIDIA MDEV (vGPU) device
 type Device struct {
-	Path     string
-	UUID     string
-	MDEVType string
-	Parent   *ParentDevice
+	Path       string
+	UUID       string
+	MDEVType   string
+	Driver     string
+	IommuGroup int
+	Parent     *ParentDevice
 }
 
 // New interface that allows us to get a list of all NVIDIA parent and MDEV (vGPU) devices
@@ -67,7 +69,7 @@ func New() Interface {
 
 // GetAllParentDevices returns all NVIDIA Parent PCI devices on the system
 func (m *nvmdev) GetAllParentDevices() ([]*ParentDevice, error) {
-	deviceDirs, err := ioutil.ReadDir(m.mdevParentsRoot)
+	deviceDirs, err := os.ReadDir(m.mdevParentsRoot)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read PCI bus devices: %v", err)
 	}
@@ -101,7 +103,7 @@ func (m *nvmdev) GetAllParentDevices() ([]*ParentDevice, error) {
 
 // GetAllDevices returns all NVIDIA mdev (vGPU) devices on the system
 func (m *nvmdev) GetAllDevices() ([]*Device, error) {
-	deviceDirs, err := ioutil.ReadDir(m.mdevDevicesRoot)
+	deviceDirs, err := os.ReadDir(m.mdevDevicesRoot)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read MDEV devices directory: %v", err)
 	}
@@ -144,37 +146,65 @@ func NewDevice(root string, uuid string) (*Device, error) {
 		return nil, fmt.Errorf("error getting mdev type: %v", err)
 	}
 
+	driver, err := m.driver()
+	if err != nil {
+		return nil, fmt.Errorf("error detecting driver: %v", err)
+	}
+
+	iommuGroup, err := m.iommuGroup()
+	if err != nil {
+		return nil, fmt.Errorf("error getting iommu_group: %v", err)
+	}
+
 	device := Device{
-		Path:     path,
-		UUID:     uuid,
-		MDEVType: mdevType,
-		Parent:   parent,
+		Path:       path,
+		UUID:       uuid,
+		MDEVType:   mdevType,
+		Driver:     driver,
+		IommuGroup: iommuGroup,
+		Parent:     parent,
 	}
 
 	return &device, nil
 }
 
+// mdev represents the path to an NVIDIA mdev (vGPU) device.
 type mdev string
 
 func newMdev(devicePath string) (mdev, error) {
-	mdevTypeDir, err := filepath.EvalSymlinks(path.Join(devicePath, "mdev_type"))
+	mdevDir, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
-		return "", fmt.Errorf("error resolving mdev_type link: %v", err)
+		return "", fmt.Errorf("error resolving symlink for %s: %v", devicePath, err)
 	}
 
-	return mdev(mdevTypeDir), nil
+	return mdev(mdevDir), nil
 }
 
 func (m mdev) String() string {
 	return string(m)
 }
+
+func (m mdev) resolve(target string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path.Join(string(m), target))
+	if err != nil {
+		return "", fmt.Errorf("error resolving %q: %v", target, err)
+	}
+
+	return resolved, nil
+}
+
 func (m mdev) parentDevicePath() string {
-	// /sys/bus/pci/devices/<addr>/mdev_supported_types/<mdev_type>
-	return path.Dir(path.Dir(string(m)))
+	// /sys/bus/pci/devices/<addr>/<uuid>
+	return path.Dir(string(m))
 }
 
 func (m mdev) Type() (string, error) {
-	mdevType, err := ioutil.ReadFile(path.Join(string(m), "name"))
+	mdevTypeDir, err := m.resolve("mdev_type")
+	if err != nil {
+		return "", err
+	}
+
+	mdevType, err := os.ReadFile(path.Join(mdevTypeDir, "name"))
 	if err != nil {
 		return "", fmt.Errorf("unable to read mdev_type name for mdev %s: %v", m, err)
 	}
@@ -188,9 +218,31 @@ func (m mdev) Type() (string, error) {
 	return mdevTypeSplit[1], nil
 }
 
+func (m mdev) driver() (string, error) {
+	driver, err := m.resolve("driver")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Base(driver), nil
+}
+
+func (m mdev) iommuGroup() (int, error) {
+	iommu, err := m.resolve("iommu_group")
+	if err != nil {
+		return -1, err
+	}
+	iommuGroupStr := strings.TrimSpace(filepath.Base(iommu))
+	iommuGroup, err := strconv.ParseInt(iommuGroupStr, 0, 64)
+	if err != nil {
+		return -1, fmt.Errorf("unable to convert iommu_group string to int64: %v", iommuGroupStr)
+	}
+
+	return int(iommuGroup), nil
+}
+
 // NewParentDevice constructs a ParentDevice
 func NewParentDevice(devicePath string) (*ParentDevice, error) {
-	nvdevice, err := nvpci.NewDevice(devicePath)
+	nvdevice, err := newNvidiaPCIDeviceFromPath(devicePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct NVIDIA PCI device: %v", err)
 	}
@@ -205,7 +257,7 @@ func NewParentDevice(devicePath string) (*ParentDevice, error) {
 	}
 	mdevTypesMap := make(map[string]string)
 	for _, path := range paths {
-		name, err := ioutil.ReadFile(path)
+		name, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read file %s: %v", path, err)
 		}
@@ -268,6 +320,25 @@ func (m *Device) Delete() error {
 	return nil
 }
 
+// GetPhysicalFunction gets the physical PCI device backing a 'parent' device
+func (p *ParentDevice) GetPhysicalFunction() (*nvpci.NvidiaPCIDevice, error) {
+	if !p.IsVF {
+		return p.NvidiaPCIDevice, nil
+	}
+
+	physfnPath, err := filepath.EvalSymlinks(path.Join(p.Path, "physfn"))
+	if err != nil {
+		return nil, fmt.Errorf("unable to resolve %s: %v", path.Join(p.Path, "physfn"), err)
+	}
+
+	return newNvidiaPCIDeviceFromPath(physfnPath)
+}
+
+// GetPhysicalFunction gets the physical PCI device that a vGPU is created on
+func (m *Device) GetPhysicalFunction() (*nvpci.NvidiaPCIDevice, error) {
+	return m.Parent.GetPhysicalFunction()
+}
+
 // IsMDEVTypeSupported checks if the mdevType is supported by the GPU
 func (p *ParentDevice) IsMDEVTypeSupported(mdevType string) bool {
 	_, found := p.mdevPaths[mdevType]
@@ -292,7 +363,7 @@ func (p *ParentDevice) GetAvailableMDEVInstances(mdevType string) (int, error) {
 		return -1, nil
 	}
 
-	available, err := ioutil.ReadFile(filepath.Join(mdevPath, "available_instances"))
+	available, err := os.ReadFile(filepath.Join(mdevPath, "available_instances"))
 	if err != nil {
 		return -1, fmt.Errorf("unable to read available_instances file: %v", err)
 	}
@@ -303,4 +374,11 @@ func (p *ParentDevice) GetAvailableMDEVInstances(mdevType string) (int, error) {
 	}
 
 	return availableInstances, nil
+}
+
+// newNvidiaPCIDeviceFromPath constructs an NvidiaPCIDevice for the specified device path.
+func newNvidiaPCIDeviceFromPath(devicePath string) (*nvpci.NvidiaPCIDevice, error) {
+	root := filepath.Dir(devicePath)
+	address := filepath.Base(devicePath)
+	return nvpci.NewFrom(root).GetGPUByPciBusID(address)
 }
