@@ -1335,33 +1335,17 @@ func (v *VfioPCI) validate() error {
 
 func (v *VfioPCI) runValidation(silent bool) error {
 	nvpci := nvpci.New()
-	nvdevices, err := nvpci.GetAllDevices()
+	nvdevices, err := nvpci.GetGPUs()
 	if err != nil {
 		return fmt.Errorf("error getting NVIDIA PCI devices: %v", err)
 	}
 
 	for _, dev := range nvdevices {
-		path := filepath.Join(dev.Path, "driver")
-		fileInfo, err := os.Lstat(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("device %s is not bound to any driver", dev.Address)
-			}
-			return fmt.Errorf("failed to get file info for %s: %v", path, err)
-		}
-
-		driverName := ""
-		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			link, _ := filepath.EvalSymlinks(path)
-			driverName = filepath.Base(link)
-		} else {
-			return fmt.Errorf("%s is malinformed: %v", path, err)
-		}
-
-		if driverName != "vfio-pci" {
-			return fmt.Errorf("device %s is bound to driver '%s'", dev.Address, driverName)
+		if dev.Driver != "vfio-pci" {
+			return fmt.Errorf("device not bound to 'vfio-pci'; device: %s driver: '%s'", dev.Address, dev.Driver)
 		}
 	}
+
 	return nil
 }
 
