@@ -89,18 +89,24 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	if clusterPolicy.Spec.Driver.UpgradePolicy == nil ||
-		!clusterPolicy.Spec.Driver.UpgradePolicy.AutoUpgrade {
-		reqLogger.V(1).Info("Driver Upgrade Policy is disabled, skipping driver upgrade")
+	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
+		reqLogger.V(consts.LogLevelInfo).Info("Advanced driver upgrade policy is not supported when 'sandboxWorkloads.enabled=true'" +
+			"in ClusterPolicy, cleaning up upgrade state and skipping reconciliation")
 		// disable driver upgrade metrics
 		if clusterPolicyCtrl.operatorMetrics != nil {
 			clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
 		}
-		err = r.removeNodeUpgradeStateLabels(ctx)
-		if err != nil {
-			return ctrl.Result{}, err
+		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
+	}
+
+	if clusterPolicy.Spec.Driver.UpgradePolicy == nil ||
+		!clusterPolicy.Spec.Driver.UpgradePolicy.AutoUpgrade {
+		reqLogger.V(consts.LogLevelInfo).Info("Advanced driver upgrade policy is disabled, cleaning up upgrade state and skipping reconciliation")
+		// disable driver upgrade metrics
+		if clusterPolicyCtrl.operatorMetrics != nil {
+			clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
 	}
 	// enable driver upgrade metrics
 	if clusterPolicyCtrl.operatorMetrics != nil {
@@ -122,7 +128,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	reqLogger.Info("Propagate state to state manager")
-	reqLogger.V(1).Info("Current cluster upgrade state", "state", state)
+	reqLogger.V(consts.LogLevelInfo).Info("Current cluster upgrade state", "state", state)
 
 	// log metrics with the current state
 	if clusterPolicyCtrl.operatorMetrics != nil {
