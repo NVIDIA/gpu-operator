@@ -410,7 +410,9 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 		updateRequired := false
 		value := "true"
 		annotationValue, annotationExists := node.ObjectMeta.Annotations[driverAutoUpgradeAnnotationKey]
-		if n.singleton.Spec.Driver.UpgradePolicy != nil && n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade {
+		if n.singleton.Spec.Driver.UpgradePolicy != nil &&
+			n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade &&
+			!n.sandboxEnabled {
 			// check if we need to add the annotation
 			if !annotationExists {
 				updateRequired = true
