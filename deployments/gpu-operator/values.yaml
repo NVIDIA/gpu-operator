@@ -73,6 +73,10 @@ operator:
     operator: "Equal"
     value: ""
     effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
   annotations:
     openshift.io/scc: restricted-readonly
   affinity:
