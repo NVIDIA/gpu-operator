@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	pspRemovalAPIVersion    = "v1.25.0"
+	pspRemovalAPIVersion    = "v1.25.0-0"
 	nodev1MinimumAPIVersion = "v1.20.0"
 )
 
