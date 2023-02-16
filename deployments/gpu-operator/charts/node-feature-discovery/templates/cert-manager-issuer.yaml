@@ -8,6 +8,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: nfd-ca-bootstrap
+  namespace: {{ include "node-feature-discovery.namespace" . }}
 spec:
   selfSigned: {}
 
@@ -16,6 +17,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: nfd-ca-cert
+  namespace: {{ include "node-feature-discovery.namespace" . }}
 spec:
   isCA: true
   secretName: nfd-ca-cert
@@ -33,6 +35,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: nfd-ca-issuer
+  namespace: {{ include "node-feature-discovery.namespace" . }}
 spec:
   ca:
     secretName: nfd-ca-cert

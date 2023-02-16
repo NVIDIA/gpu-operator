@@ -10,32 +10,29 @@ rules:
   - ""
   resources:
   - nodes
-  # when using command line flag --resource-labels to create extended resources
-  # you will need to uncomment "- nodes/status"
-  # - nodes/status
+{{- if .Values.master.resourceLabels | empty | not }}
+  - nodes/status
+{{- end }}
   verbs:
   - get
   - patch
   - update
   - list
 - apiGroups:
+    - ""
+  resources:
+    - nodes/proxy
+  verbs:
+    - get
+- apiGroups:
   - nfd.k8s-sigs.io
   resources:
+  - nodefeatures
   - nodefeaturerules
   verbs:
   - get
   - list
   - watch
-{{- if .Values.topologyUpdater.enable }}
-- apiGroups:
-  - topology.node.k8s.io
-  resources:
-  - noderesourcetopologies
-  verbs:
-  - create
-  - get
-  - update
-{{- end }}
 {{- end }}
 
 ---
@@ -60,4 +57,12 @@ rules:
   - pods
   verbs:
   - get
+- apiGroups:
+  - topology.node.k8s.io
+  resources:
+  - noderesourcetopologies
+  verbs:
+  - create
+  - get
+  - update
 {{- end }}

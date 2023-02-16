@@ -390,6 +390,7 @@ sandboxDevicePlugin:
   resources: {}
 
 node-feature-discovery:
+  enableNodeFeatureApi: true
   worker:
     tolerations:
     - key: "node-role.kubernetes.io/master"
