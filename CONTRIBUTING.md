@@ -19,18 +19,22 @@ The GPU Operator is made up of the following software components - each of the c
 * [k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin)
 * [driver](https://gitlab.com/nvidia/container-images/driver)
 * [container-toolkit](https://gitlab.com/nvidia/container-toolkit/container-config)
-* [dcgm-exporter](https://gitlab.com/nvidia/container-toolkit/gpu-monitoring-tools)
-* [samples](https://gitlab.com/nvidia/container-images/samples/-/tree/master/cuda/rhel-ubi8/vector-add)
+* [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter)
+* [gpu-feature-discovery](https://gitlab.com/nvidia/kubernetes/gpu-feature-discovery)
+* [mig-manager](https://gitlab.com/nvidia/cloud-native/mig-parted)
+* [samples](https://gitlab.com/nvidia/container-images/samples/-/tree/main/cuda/archive/rhel-ubi8/vector-add)
 
 ```
 gitlab.com/
 ├── nvidia/
-│   ├── gpu-operator		(CRD and controller logic that implements the reconciliation)
-│   ├── k8s-device-plugin	(NVIDIA Device Plugin for Kubernetes)
-│   ├── driver              (NVIDIA Driver qualified for data center GPUs)
-│   ├── container-toolkit   (NVIDIA Container Toolkit, runtime for Docker)
-│   ├── dcgm-exporter    	(NVIDIA DCGM for monitoring and telemetry)
-│   ├── samples		        (CUDA VectorAdd sample used for validation steps)
+│   ├── gpu-operator          (CRD and controller logic that implements the reconciliation)
+│   ├── k8s-device-plugin     (NVIDIA Device Plugin for Kubernetes)
+│   ├── driver                (NVIDIA Driver qualified for data center GPUs)
+│   ├── container-toolkit     (NVIDIA Container Toolkit, runtime for Docker)
+│   ├── dcgm-exporter         (NVIDIA DCGM for monitoring and telemetry)
+│   ├── gpu-feature-discovery (NVIDIA GPU Feature Discovery for Kubernetes)
+│   ├── mig-manager           (NVIDIA Multi-Instance GPU Manager for Kubernetes)
+│   ├── samples               (CUDA VectorAdd sample used for validation steps)
 ```
 
 ## License
@@ -42,7 +46,7 @@ The NVIDIA GPU Operator has three artifacts as part of the product release:
 1. [Container Images](#container-images)
 1. [Helm Charts](#helm-charts)
 
-The GPU Operator releases follow semantic versioning.
+The GPU Operator releases follow [calendar versioning](https://calver.org/).
 
 ### <a name="source-code"></a> Source Code
 
@@ -61,16 +65,19 @@ Releases of the GPU Operator include container images that are currently availab
 The following are the container images (and tag format) that are released:
 ```
 ├── nvidia/
-│   ├── gpu-operator		(<version-number>)
-│   ├── k8s-device-plugin	(<version-number><os--base-image>)
-│   ├── driver          (<driver-branch><version-number><kernel-version><operating-system>)
-│   ├── container-toolkit	(<version-number><os-base-image>)
-│   ├── dcgm-exporter	    (<dcgm-version><version-number><os-base-image>)
-│   ├── samples		        (<version-number><sample-name>)
+│   ├── gpu-operator          (<version-number>)
+│   ├── k8s-device-plugin     (<version-number><os-base-image>)
+│   ├── driver                (<driver-branch><version-number><kernel-version><operating-system>)
+│   ├── container-toolkit     (<version-number><os-base-image>)
+│   ├── dcgm-exporter         (<dcgm-version><version-number><os-base-image>)
+│   ├── gpu-feature-discovery (<version-number><os-base-image>)
+│   ├── mig-manager           (<version-number><operating-system>)
+│   ├── samples               (<version-number><sample-name>)
 ```
 
 ### <a name="helm-charts"></a> Helm Charts
-To simplify the deployment, the Operator can be installed using a Helm chart (note only Helm v3 is supported). A Helm chart repository is maintained at the following URL: https://nvidia.github.io/gpu-operator (which in turn is maintained at the corresponding ‘gh-pages’ directory under https://github.com/NVIDIA/gpu-operator/tree/gh-pages)
+To simplify the deployment, the Operator can be installed using a Helm chart (note only Helm v3 is supported). The documentation for helm installation
+can be viewed [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html#install-helm).
 
 Continuous (‘nightly’) releases of the operator are available. Release milestones are available under ‘stable’.
 ```
