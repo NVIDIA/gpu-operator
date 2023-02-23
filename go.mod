@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator
 
-go 1.19
+go 1.20
 
 require (
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca
