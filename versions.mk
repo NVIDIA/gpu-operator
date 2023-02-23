@@ -20,6 +20,6 @@
 VERSION ?= v22.9.2
 
 CUDA_VERSION ?= 11.8.0
-GOLANG_VERSION ?= 1.19
+GOLANG_VERSION ?= 1.20.1
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
