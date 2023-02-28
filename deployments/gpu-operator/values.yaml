@@ -302,7 +302,8 @@ migManager:
       value: "false"
   resources: {}
   config:
-    name: ""
+    name: "default-mig-parted-config"
+    default: "all-disabled"
   gpuClientsConfig:
     name: ""
 

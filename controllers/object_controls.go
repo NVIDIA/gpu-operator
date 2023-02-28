@@ -443,7 +443,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
 	if obj.Name == MigPartedDefaultConfigMapName {
 		config := n.singleton.Spec
-		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" {
+		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" && config.MIGManager.Config.Name != MigPartedDefaultConfigMapName {
 			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.Config.Name))
 			return gpuv1.Ready, nil
 		}
@@ -1396,7 +1396,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		}
 
 		name := MigPartedDefaultConfigMapName
-		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" {
+		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" && config.MIGManager.Config.Name != MigPartedDefaultConfigMapName {
 			name = config.MIGManager.Config.Name
 		}
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
