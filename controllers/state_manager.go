@@ -33,6 +33,8 @@ const (
 	migManagerLabelValue                = "true"
 	migCapableLabelKey                  = "nvidia.com/mig.capable"
 	migCapableLabelValue                = "true"
+	migConfigLabelKey                   = "nvidia.com/mig.config"
+	migConfigDisabledValue              = "all-disabled"
 	vgpuHostDriverLabelKey              = "nvidia.com/vgpu.host-driver-version"
 	gpuProductLabelKey                  = "nvidia.com/gpu.product"
 	nfdLabelPrefix                      = "feature.node.kubernetes.io/"
@@ -211,6 +213,15 @@ func GetClusterWideProxy(ctx context.Context) (*apiconfigv1.Proxy, error) {
 		return nil, err
 	}
 	return proxy, nil
+}
+
+func hasMIGConfigLabel(labels map[string]string) bool {
+	if _, ok := labels[migConfigLabelKey]; ok {
+		if labels[migConfigLabelKey] != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // hasCommonGPULabel returns true if common Nvidia GPU label exists among provided node labels
@@ -460,6 +471,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	}
 
 	clusterHasNFDLabels := false
+	updateLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		// get node labels
@@ -480,16 +492,9 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			// label the node with common Nvidia GPU label
 			n.rec.Log.Info("Setting node label", "NodeName", node.ObjectMeta.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
-			// label the node with the state GPU labels
-			n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
-			gpuWorkloadConfig.updateGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
-			err = n.rec.Client.Update(ctx, &node)
-			if err != nil {
-				return false, 0, fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
-					node.ObjectMeta.Name, err.Error())
-			}
+			updateLabels = true
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
 			// previously labelled node and no longer has GPU's
 			// label node to reset common Nvidia GPU label
@@ -500,25 +505,30 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			removeAllGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
-			err = n.rec.Client.Update(ctx, &node)
-			if err != nil {
-				return false, 0, fmt.Errorf("Unable to reset the GPU Operator labels for node %s, err %s",
-					node.ObjectMeta.Name, err.Error())
-			}
+			updateLabels = true
 		}
+
 		if hasCommonGPULabel(labels) {
+			// If node has GPU, then add state labels as per the workload type
 			n.rec.Log.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
 			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
 				n.rec.Log.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
 				node.SetLabels(labels)
-				err = n.rec.Client.Update(ctx, &node)
-				if err != nil {
-					return false, 0, fmt.Errorf("Unable to update the GPU Operator labels for node %s, err %s",
-						node.ObjectMeta.Name, err.Error())
+				updateLabels = true
+			}
+			// Disable MIG on the node explicitly where no MIG config is specified
+			if n.singleton.Spec.MIGManager.IsEnabled() && hasMIGCapableGPU(labels) && !hasMIGConfigLabel(labels) {
+				if n.singleton.Spec.MIGManager.Config != nil && n.singleton.Spec.MIGManager.Config.Default == migConfigDisabledValue {
+					n.rec.Log.Info("Setting MIG config label", "NodeName", node.ObjectMeta.Name, "Label", migConfigLabelKey, "Value", migConfigDisabledValue)
+					labels[migConfigLabelKey] = migConfigDisabledValue
+					node.SetLabels(labels)
+					updateLabels = true
 				}
 			}
+			// increment GPU node count
 			gpuNodesTotal++
 
+			// add GPU node CoreOS version for OCP
 			if n.ocpDriverToolkit.requested {
 				rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
 				if ok {
@@ -533,13 +543,21 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 						"nfdLabel", nfdOSTreeVersionLabelKey,
 					)
 				}
-
 			}
 		}
-	}
+
+		// update node with the latest labels
+		if updateLabels {
+			err = n.rec.Client.Update(ctx, &node)
+			if err != nil {
+				return false, 0, fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
+					node.ObjectMeta.Name, err.Error())
+			}
+		}
+	} // end node loop
+
 	n.rec.Log.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
-
 	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 

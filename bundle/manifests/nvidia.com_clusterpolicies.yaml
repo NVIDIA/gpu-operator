@@ -1449,7 +1449,16 @@ spec:
                     description: 'Optional: Custom mig-parted configuration for NVIDIA
                       MIG Manager container'
                     properties:
+                      default:
+                        default: all-disabled
+                        description: Default MIG config to be applied on the node,
+                          when there is no config specified with the node label nvidia.com/mig.config
+                        enum:
+                        - all-disabled
+                        - ""
+                        type: string
                       name:
+                        default: default-mig-parted-config
                         description: ConfigMap name
                         type: string
                     type: object

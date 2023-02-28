@@ -1161,10 +1161,19 @@ type GPUDirectStorageSpec struct {
 type MIGPartedConfigSpec struct {
 	// ConfigMap name
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=default-mig-parted-config
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
+	// Default MIG config to be applied on the node, when there is no config specified with the node label nvidia.com/mig.config
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=all-disabled
+	// +kubebuilder:validation:Enum=all-disabled;""
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Default MIG config"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Default string `json:"default,omitempty"`
 }
 
 // MIGGPUClientsConfigSpec defines custom gpu-clients config for NVIDIA MIG Manager container
