@@ -15,7 +15,14 @@ spec:
     singular: clusterpolicy
   scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: ClusterPolicy is the Schema for the clusterpolicies API
