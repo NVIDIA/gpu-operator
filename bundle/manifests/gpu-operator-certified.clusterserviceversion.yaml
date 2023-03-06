@@ -157,7 +157,7 @@ spec:
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:efb88937f73434994d1bbadc87b492a1df047aa9f8d6e9f5ec3b09536e6e7691
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:268c26781c46b36fe691638e807eb5c3a2cd077029ddb095ac75264adac04925
+      image: nvcr.io/nvidia/driver@sha256:89c02facde038604b5aa33cc1ac0006508062d8348e7ab32515b12f46d095ef9
     - name: driver-image-515
       image: nvcr.io/nvidia/driver@sha256:f250d1e4989fd4821e81bad9227eeeaa531ca8810f3a40e996f1ca2af7945f96
     - name: driver-image-510
@@ -804,7 +804,7 @@ spec:
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:9c17d3a907eb77eb8f7b4f3faf52d8352e4252af92003f828083f80d629bd2c3"
                   - name: "DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/driver@sha256:268c26781c46b36fe691638e807eb5c3a2cd077029ddb095ac75264adac04925"
+                    value: "nvcr.io/nvidia/driver@sha256:89c02facde038604b5aa33cc1ac0006508062d8348e7ab32515b12f46d095ef9"
                   - name: "DRIVER_IMAGE-515"
                     value: "nvcr.io/nvidia/driver@sha256:f250d1e4989fd4821e81bad9227eeeaa531ca8810f3a40e996f1ca2af7945f96"
                   - name: "DRIVER_IMAGE-510"
