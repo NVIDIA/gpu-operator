@@ -161,8 +161,8 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, RuntimeClass)
 		case "PodSecurityPolicy":
-			if semver.Compare(n.k8sVersion, pspRemovalAPIVersion) >= 0 {
-				n.rec.Log.Info("PodSecurityPolicy no longer supported by API. Skipping...")
+			if n.openshift != "" || semver.Compare(n.k8sVersion, pspRemovalAPIVersion) >= 0 {
+				n.rec.Log.Info("PodSecurityPolicy API is not supported. Skipping...")
 				continue
 			}
 			_, _, err := s.Decode(m, nil, &res.PodSecurityPolicy)
