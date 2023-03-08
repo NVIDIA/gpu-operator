@@ -2056,18 +2056,24 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	return nil
 }
 
+// check if running with openshift and add an ENV VAR to the OCP DTK CTR
 func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+
 	for i, container := range obj.Spec.Template.Spec.Containers {
+
 		// skip if not nvidia-fs
+
 		if !strings.Contains(container.Name, "nvidia-fs") {
 			continue
 		}
 		if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
 			// remove nvidia-fs sidecar container from driver Daemonset if GDS is not enabled
+
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
 		}
 		// update nvidia-fs(sidecar) image and pull policy
+
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
 		if err != nil {
 			return err
@@ -2079,10 +2085,19 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUDirectStorage.ImagePullPolicy)
 		}
 		// set image pull secrets
+
 		if len(config.GPUDirectStorage.ImagePullSecrets) > 0 {
 			for _, secret := range config.GPUDirectStorage.ImagePullSecrets {
 				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 			}
+		}
+
+		// transform the nvidia-fs-ctr to use the openshift driver toolkit
+		// notify openshift driver toolkit container GDS is enabled
+
+		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-fs-ctr")
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 		}
 	}
 	return nil
@@ -2120,6 +2135,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* find the main container and driver-toolkit sidecar container */
+
 	var mainContainer, driverToolkitContainer *v1.Container
 
 	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
@@ -2134,7 +2150,9 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	rhcosVersion := n.ocpDriverToolkit.currentRhcosVersion
 
-	obj.ObjectMeta.Name += "-" + rhcosVersion
+	if !strings.Contains(obj.ObjectMeta.Name, rhcosVersion) {
+		obj.ObjectMeta.Name += "-" + rhcosVersion
+	}
 	obj.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
 	obj.Spec.Selector.MatchLabels["app"] = obj.ObjectMeta.Name
 	obj.Spec.Template.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
@@ -2152,12 +2170,19 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
 
-	image, _ := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
+	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
+		setContainerEnv(driverToolkitContainer, "GDS_ENABLED", "true")
+		n.rec.Log.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDS_ENABLED", config.GPUDirectStorage.IsEnabled())
+	}
+
+	image := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
 	if image != "" {
 		driverToolkitContainer.Image = image
 		n.rec.Log.Info("DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
+
 		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
+
 		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
@@ -2169,6 +2194,15 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
 
+	/* prepare the main container to start from the DriverToolkit entrypoint */
+
+	if strings.Contains(mainContainerName, "nvidia-fs") {
+		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		mainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
+	} else {
+		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
+	}
 	/* prepare the shared volumes */
 
 	// shared directory
@@ -2185,12 +2219,16 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		},
 	}
 
+	// Check if the volume already exists, if not add it
+
+	for i := range obj.Spec.Template.Spec.Volumes {
+		if obj.Spec.Template.Spec.Volumes[i].Name == volSharedDirName {
+			// already exists, avoid duplicated volume
+			return nil
+		}
+	}
+
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
-
-	/* prepare the main container to start from the DriverToolkit entrypoint */
-
-	mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-	mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
 
 	return nil
 }
