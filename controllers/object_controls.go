@@ -131,7 +131,7 @@ var RepoConfigPathMap = map[string]string{
 // https://access.redhat.com/documentation/en-us/openshift_container_platform/4.3/html/authentication/ocp-certificates#proxy-certificates_ocp-certificates
 var CertConfigPathMap = map[string]string{
 	"centos": "/etc/pki/ca-trust/extracted/pem",
-	"ubuntu": "/etc/ssl/certs",
+	"ubuntu": "/usr/local/share/ca-certificates",
 	"rhcos":  "/etc/pki/ca-trust/extracted/pem",
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
 }
