@@ -2,7 +2,6 @@ apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
-  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
