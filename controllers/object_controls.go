@@ -603,6 +603,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 // by the user in the podSpec
 func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
 	if len(dsSpec.Labels) > 0 {
+		if obj.Spec.Template.ObjectMeta.Labels == nil {
+			obj.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+		}
 		for labelKey, labelValue := range dsSpec.Labels {
 			// if the user specifies an override of the "app" or the ""app.kubernetes.io/part-of"" key, we skip it.
 			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
@@ -615,6 +618,9 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 	}
 
 	if len(dsSpec.Annotations) > 0 {
+		if obj.Spec.Template.ObjectMeta.Annotations == nil {
+			obj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+		}
 		for annoKey, annoVal := range dsSpec.Annotations {
 			obj.Spec.Template.ObjectMeta.Annotations[annoKey] = annoVal
 		}
