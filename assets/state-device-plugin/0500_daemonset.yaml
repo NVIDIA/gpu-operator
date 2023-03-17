@@ -64,8 +64,9 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin
-        command: [bash, -c]
-        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; exec nvidia-device-plugin;"]
+        command: ["/bin/bash", "-c"]
+        args:
+          - /bin/entrypoint.sh
         securityContext:
           privileged: true
         env:
@@ -82,11 +83,21 @@ spec:
           - name: NVIDIA_DRIVER_CAPABILITIES
             value: all
         volumeMounts:
+          - name: nvidia-device-plugin-entrypoint
+            readOnly: true
+            mountPath: /bin/entrypoint.sh
+            subPath: entrypoint.sh
           - name: device-plugin
             mountPath: /var/lib/kubelet/device-plugins
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: HostToContainer
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
+          - name: cdi-root
+            mountPath: /var/run/cdi
       - image: "FILLED BY THE OPERATOR"
         name: config-manager
         command: ["config-manager"]
@@ -116,6 +127,10 @@ spec:
         - name: PROCESS_TO_SIGNAL
           value: "nvidia-device-plugin"
       volumes:
+        - name: nvidia-device-plugin-entrypoint
+          configMap:
+            name: nvidia-device-plugin-entrypoint
+            defaultMode: 448
         - name: device-plugin
           hostPath:
             path: /var/lib/kubelet/device-plugins
@@ -123,3 +138,10 @@ spec:
           hostPath:
             path: "/run/nvidia"
             type: Directory
+        - name: host-root
+          hostPath:
+            path: /
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate

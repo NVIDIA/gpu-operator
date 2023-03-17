@@ -129,6 +129,9 @@ spec:
     {{- end }}
   psp:
     enabled: {{ .Values.psp.enabled }}
+  cdi:
+    enabled: {{ .Values.cdi.enabled }}
+    default: {{ .Values.cdi.default }}
   driver:
     enabled: {{ .Values.driver.enabled }}
     {{- if .Values.driver.repository }}

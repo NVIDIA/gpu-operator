@@ -567,6 +567,7 @@ spec:
           - create
           - update
           - watch
+          - delete
         - apiGroups:
           - coordination.k8s.io
           resources:

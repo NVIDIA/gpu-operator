@@ -42,6 +42,21 @@ spec:
           spec:
             description: ClusterPolicySpec defines the desired state of ClusterPolicy
             properties:
+              cdi:
+                description: CDI configures how the Container Device Interface is
+                  used in the cluster
+                properties:
+                  default:
+                    default: false
+                    description: Default indicates whether to use CDI as the default
+                      mechanism for providing GPU access to containers.
+                    type: boolean
+                  enabled:
+                    default: false
+                    description: Enabled indicates whether CDI can be used to make
+                      GPUs accessible to containers.
+                    type: boolean
+                type: object
               daemonsets:
                 description: Daemonset defines common configuration for all Daemonsets
                 properties:

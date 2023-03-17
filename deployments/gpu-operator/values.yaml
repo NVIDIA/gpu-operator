@@ -11,6 +11,10 @@ nfd:
 psp:
   enabled: false
 
+cdi:
+  enabled: false
+  default: false
+
 sandboxWorkloads:
   enabled: false
   defaultWorkload: "container"

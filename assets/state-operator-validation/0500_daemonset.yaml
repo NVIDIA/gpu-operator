@@ -78,6 +78,8 @@ spec:
           command: ['sh', '-c']
           args: ["nvidia-validator"]
           env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: "all"
           - name: WITH_WAIT
             value: "false"
           - name: COMPONENT

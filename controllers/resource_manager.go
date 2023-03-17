@@ -48,7 +48,7 @@ type Resources struct {
 	Taint                      corev1.Taint
 	SecurityContextConstraints secv1.SecurityContextConstraints
 	PodSecurityPolicy          policyv1beta1.PodSecurityPolicy
-	RuntimeClass               nodev1.RuntimeClass
+	RuntimeClasses             []nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
 }
 
@@ -157,9 +157,14 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, SecurityContextConstraints)
 		case "RuntimeClass":
-			_, _, err := s.Decode(m, nil, &res.RuntimeClass)
+			rt := nodev1.RuntimeClass{}
+			_, _, err := s.Decode(m, nil, &rt)
 			panicIfError(err)
-			ctrl = append(ctrl, RuntimeClass)
+			res.RuntimeClasses = append(res.RuntimeClasses, rt)
+			// only add the ctrl function when the first RuntimeClass is added
+			if len(res.RuntimeClasses) == 1 {
+				ctrl = append(ctrl, RuntimeClasses)
+			}
 		case "PodSecurityPolicy":
 			if n.openshift != "" || semver.Compare(n.k8sVersion, pspRemovalAPIVersion) >= 0 {
 				n.rec.Log.Info("PodSecurityPolicy API is not supported. Skipping...")
