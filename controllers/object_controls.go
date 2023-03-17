@@ -115,6 +115,14 @@ const (
 	VgpuDMDefaultConfigMapName = "default-vgpu-devices-config"
 	// VgpuDMDefaultConfigName indicates name of default configuration in the vGPU devices config file
 	VgpuDMDefaultConfigName = "default"
+	// NvidiaCtrRuntimeModeEnvName is the name of the toolkit container env for configuring the NVIDIA Container Runtime mode
+	NvidiaCtrRuntimeModeEnvName = "NVIDIA_CONTAINER_RUNTIME_MODE"
+	// CDIEnabledEnvName is the name of the envvar used to enable CDI in the operands
+	CDIEnabledEnvName = "CDI_ENABLED"
+	// NvidiaCTKPathEnvName is the name of the envvar specifying the path to the 'nvidia-ctk' binary
+	NvidiaCTKPathEnvName = "NVIDIA_CTK_PATH"
+	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
+	CrioConfigModeEnvName = "CRIO_CONFIG_MODE"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -979,6 +987,15 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
+	// update env required for CDI support
+	if config.CDI.IsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
+		if config.CDI.IsDefault() {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
+		}
+	}
+
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
 		// set args for the toolkit
@@ -1110,6 +1127,14 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
 
+	// update env required for CDI support
+	if config.CDI.IsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		if config.Toolkit.IsEnabled() {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
+		}
+	}
+
 	return nil
 }
 
@@ -1195,6 +1220,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
 		// enable hostNetwork for communication with external DCGM using NODE_IP(localhost)
@@ -3577,17 +3603,21 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error) {
+func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
 	ctx := n.ctx
-	state := n.idx
 	obj := &nodev1beta1.RuntimeClass{}
 
-	// apply runtime class name as per ClusterPolicy
-	runtimeClassName := getRuntimeClass(&n.singleton.Spec)
-	obj.Name = runtimeClassName
-	obj.Handler = runtimeClassName
+	obj.Name = spec.Name
+	obj.Handler = spec.Handler
 
-	obj.Labels = n.resources[state].RuntimeClass.Labels
+	// apply runtime class name as per ClusterPolicy
+	if obj.Name == "FILLED_BY_OPERATOR" {
+		runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+		obj.Name = runtimeClassName
+		obj.Handler = runtimeClassName
+	}
+
+	obj.Labels = spec.Labels
 
 	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
 
@@ -3620,17 +3650,21 @@ func transformRuntimeClassLegacy(n ClusterPolicyController) (gpuv1.State, error)
 	return gpuv1.Ready, nil
 }
 
-func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
-	state := n.idx
+func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
 	ctx := n.ctx
 	obj := &nodev1.RuntimeClass{}
 
-	// apply runtime class name as per ClusterPolicy
-	runtimeClassName := getRuntimeClass(&n.singleton.Spec)
-	obj.Name = runtimeClassName
-	obj.Handler = runtimeClassName
+	obj.Name = spec.Name
+	obj.Handler = spec.Handler
 
-	obj.Labels = n.resources[state].RuntimeClass.Labels
+	// apply runtime class name as per ClusterPolicy
+	if obj.Name == "FILLED_BY_OPERATOR" {
+		runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+		obj.Name = runtimeClassName
+		obj.Handler = runtimeClassName
+	}
+
+	obj.Labels = spec.Labels
 
 	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
 
@@ -3663,12 +3697,36 @@ func transformRuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// RuntimeClass creates RuntimeClass object
-func RuntimeClass(n ClusterPolicyController) (gpuv1.State, error) {
+func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+
+	createRuntimeClassFunc := transformRuntimeClass
 	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
-		return transformRuntimeClassLegacy(n)
+		createRuntimeClassFunc = transformRuntimeClassLegacy
 	}
-	return transformRuntimeClass(n)
+
+	for _, obj := range n.resources[state].RuntimeClasses {
+		// When CDI is disabled, do not create the additional 'nvidia-cdi' and
+		// 'nvidia-legacy' runtime classes. Delete these objects if they were
+		// previously created.
+		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
+			err := n.rec.Client.Delete(context.TODO(), &obj)
+			if err != nil && !errors.IsNotFound(err) {
+				n.rec.Log.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
+				return gpuv1.NotReady, err
+			}
+			continue
+		}
+		stat, err := createRuntimeClassFunc(n, obj)
+		if err != nil {
+			return stat, err
+		}
+		if stat != gpuv1.Ready {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 // PrometheusRule creates PrometheusRule object

@@ -145,6 +145,7 @@ rules:
   - create
   - update
   - watch
+  - delete
 - apiGroups:
   - image.openshift.io
   resources:

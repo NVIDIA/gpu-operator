@@ -52,7 +52,7 @@ COPY --from=build /artifacts/plugin-workload-validation.yaml /var/nvidia/manifes
 COPY --from=build /artifacts/cuda-workload-validation.yaml /var/nvidia/manifests
 
 ENV NVIDIA_DISABLE_REQUIRE="true"
-ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_VISIBLE_DEVICES=void
 ENV NVIDIA_DRIVER_CAPABILITIES=utility,compute
 
 ARG VERSION="N/A"

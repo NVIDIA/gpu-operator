@@ -74,6 +74,8 @@ type ClusterPolicySpec struct {
 	VGPUManager VGPUManagerSpec `json:"vgpuManager,omitempty"`
 	// VGPUDeviceManager spec
 	VGPUDeviceManager VGPUDeviceManagerSpec `json:"vgpuDeviceManager,omitempty"`
+	// CDI configures how the Container Device Interface is used in the cluster
+	CDI CDIConfigSpec `json:"cdi,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1317,6 +1319,25 @@ type VGPUDevicesConfigSpec struct {
 	Default string `json:"default,omitempty"`
 }
 
+// CDIConfigSpec defines how the Container Device Interface is used in the cluster.
+type CDIConfigSpec struct {
+	// Enabled indicates whether CDI can be used to make GPUs accessible to containers.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable CDI as a mechanism for making GPUs accessible to containers"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Default indicates whether to use CDI as the default mechanism for providing GPU access to containers.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Configure CDI as the default mechanism for making GPUs accessible to containers"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Default *bool `json:"default,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -1652,4 +1673,22 @@ func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
 		return false
 	}
 	return *l.NLSEnabled
+}
+
+// IsEnabled returns true if CDI is enabled as a mechanism for
+// providing GPU access to containers
+func (c *CDIConfigSpec) IsEnabled() bool {
+	if c.Enabled == nil {
+		return false
+	}
+	return *c.Enabled
+}
+
+// IsDefault returns true if CDI is enabled as the default
+// mechanism for providing GPU access to containers
+func (c *CDIConfigSpec) IsDefault() bool {
+	if c.Default == nil {
+		return false
+	}
+	return *c.Default
 }

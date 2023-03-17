@@ -18,6 +18,9 @@ spec:
     imagePullPolicy: IfNotPresent
     command: ['sh', '-c']
     args: ["vectorAdd"]
+    env:
+    - name: NVIDIA_VISIBLE_DEVICES
+      value: "all"
     securityContext:
       privileged: true
   containers:

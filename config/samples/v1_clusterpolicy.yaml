@@ -12,6 +12,8 @@ spec:
   psp:
     enabled: false
 
+  cdi: {}
+
   sandboxWorkloads:
     enabled: false
     defaultWorkload: "container"

@@ -55,11 +55,14 @@ spec:
             mountPath: /host-dev-char
       containers:
       - image: "FILLED BY THE OPERATOR"
-        command: [bash, -c]
-        args: ["[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; sleep 5; exec nvidia-toolkit /usr/local/nvidia"]
+        command: ["/bin/bash", "-c"]
+        args:
+          - /bin/entrypoint.sh
         env:
         - name: RUNTIME_ARGS
           value: ""
+        - name: NVIDIA_CONTAINER_RUNTIME_MODES_CDI_DEFAULT_KIND
+          value: "management.nvidia.com/gpu"
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:
@@ -67,6 +70,10 @@ spec:
           seLinuxOptions:
             level: "s0"
         volumeMounts:
+          - name: nvidia-container-toolkit-entrypoint
+            readOnly: true
+            mountPath: /bin/entrypoint.sh
+            subPath: entrypoint.sh
           - name: nvidia-run-path
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
@@ -78,7 +85,13 @@ spec:
             mountPath: /host
             readOnly: true
             mountPropagation: HostToContainer
+          - name: cdi-root
+            mountPath: /var/run/cdi
       volumes:
+        - name: nvidia-container-toolkit-entrypoint
+          configMap:
+            name: nvidia-container-toolkit-entrypoint
+            defaultMode: 448
         - name: nvidia-run-path
           hostPath:
             path: /run/nvidia
@@ -102,3 +115,8 @@ spec:
         - name: host-dev-char
           hostPath:
             path: /dev/char
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+
