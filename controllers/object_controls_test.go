@@ -38,11 +38,9 @@ const (
 	driverAssetsPath              = "assets/state-driver/"
 	vGPUManagerAssetsPath         = "assets/state-vgpu-manager/"
 	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
-	driverDaemonsetName           = "nvidia-driver-daemonset"
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
 	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
-	nfdOsNameLabelKey             = "feature.node.kubernetes.io/system-os_release.ID"
-	nfdOsVersionLabelKey          = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	upgradedKernel                = "5.4.135-generic"
 )
 
 type testConfig struct {
@@ -60,10 +58,10 @@ var (
 )
 
 var nfdLabels = map[string]string{
-	nfdNvidiaPCILabelKey: "true",
-	nfdKernelLabelKey:    "5.4.0",
-	nfdOsNameLabelKey:    "ubuntu",
-	nfdOsVersionLabelKey: "18.04",
+	nfdNvidiaPCILabelKey:   "true",
+	nfdKernelLabelKey:      "5.4.0-generic",
+	nfdOSReleaseIDLabelKey: "ubuntu",
+	nfdOSVersionIDLabelKey: "22.04",
 }
 
 var kubernetesResources = []client.Object{
@@ -104,7 +102,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("error in test setup: could not get module root: %v", err)
 	}
-	cfg = &testConfig{root: moduleRoot, nodes: 1}
+	cfg = &testConfig{root: moduleRoot, nodes: 2}
 
 	err = setup()
 	if err != nil {
@@ -212,6 +210,12 @@ func setup() error {
 	clusterPolicyController.hasGPUNodes = gpuNodeCount != 0
 	clusterPolicyController.hasNFDLabels = hasNFDLabels
 
+	// setup kernelVersionMap for pre-compiled driver tests
+	kernelVersionMap, err := clusterPolicyController.getKernelVersionsMap()
+	if err != nil {
+		return fmt.Errorf("Unable to obtain all kernel versions of the GPU nodes in the cluster: %v", err)
+	}
+	clusterPolicyController.kernelVersionMap = kernelVersionMap
 	return nil
 }
 
@@ -234,6 +238,10 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 					ready,
 				},
 			},
+		}
+		// set one node with different kernel for pre-compiled driver tests
+		if nodes > 1 && i == nodes-1 {
+			n.ObjectMeta.Labels[nfdKernelLabelKey] = upgradedKernel
 		}
 		err := cl.Create(ctx, n)
 		if err != nil {
@@ -375,6 +383,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 	if err != nil {
 		t.Fatalf("error in test setup: %v", err)
 	}
+
 	// add manifests
 	err = addState(&clusterPolicyController, manifestFile)
 	if err != nil {
@@ -414,9 +423,15 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 	}
 	mainCtr := ds.Spec.Template.Spec.Containers[mainCtrIdx]
 
-	require.Equal(t, mainCtrImage, mainCtr.Image, "unexpected Image")
+	if component == "Driver" && cp.Spec.Driver.UsePrecompiledDrivers() {
+		// for pre-compiled drivers, container image is kernel specific
+		require.Contains(t, mainCtr.Image, "-generic-ubuntu22.04", "unexpected Image")
+	} else {
+		require.Equal(t, mainCtrImage, mainCtr.Image, "unexpected Image")
+	}
 	require.Equal(t, gpuv1.ImagePullPolicy(spec.imagePullPolicy), mainCtr.ImagePullPolicy, "unexpected ImagePullPolicy")
 	require.Equal(t, spec.imagePullSecrets, ds.Spec.Template.Spec.ImagePullSecrets, "unexpected ImagePullSecrets")
+
 	if spec.args != nil {
 		require.Equal(t, spec.args, mainCtr.Args, "unexpected Args")
 	}
@@ -432,7 +447,6 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 // driver test case. This function will grow as new test cases are added
 func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp := clusterPolicy.DeepCopy()
-
 	// Until we create sample ClusterPolicies that have all fields
 	// set, hardcode some default values:
 	cp.Spec.Driver.Repository = "nvcr.io/nvidia"
@@ -446,6 +460,9 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	switch testCase {
 	case "default":
 		// Do nothing
+	case "precompiled":
+		usePrecompiled := true
+		cp.Spec.Driver.UsePrecompiled = &usePrecompiled
 	default:
 		return nil
 	}
@@ -461,17 +478,18 @@ func getDriverTestOutput(testCase string) map[string]interface{} {
 		"numDaemonsets":          1,
 		"mofedValidationPresent": false,
 		"nvPeerMemPresent":       false,
-		"driverImage":            "nvcr.io/nvidia/driver:470.57.02-ubuntu18.04",
 		"driverManagerImage":     "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
 	}
 
 	switch testCase {
 	case "default":
-		// Do nothing
+		output["driverImage"] = "nvcr.io/nvidia/driver:470.57.02-ubuntu22.04"
+	case "precompiled":
+		output["driverImage"] = "nvcr.io/nvidia/driver:470.57.02-5.4.0-generic-ubuntu22.04"
+		output["numDaemonsets"] = 2
 	default:
 		return nil
 	}
-
 	return output
 }
 
@@ -487,6 +505,11 @@ func TestDriver(t *testing.T) {
 			"Default",
 			getDriverTestInput("default"),
 			getDriverTestOutput("default"),
+		},
+		{
+			"Precompiled Drivers",
+			getDriverTestInput("precompiled"),
+			getDriverTestOutput("precompiled"),
 		},
 	}
 
@@ -699,7 +722,7 @@ func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
 	// default output
 	output := map[string]interface{}{
 		"numDaemonsets":      1,
-		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu18.04",
+		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu22.04",
 		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.3.0",
 	}
 

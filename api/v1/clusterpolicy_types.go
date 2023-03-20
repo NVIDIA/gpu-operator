@@ -380,6 +380,12 @@ type DriverManagerSpec struct {
 
 // DriverSpec defines the properties for NVIDIA Driver deployment
 type DriverSpec struct {
+	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment using pre-compiled modules"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
+
 	// Enabled indicates if deployment of NVIDIA Driver through operator is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment through GPU Operator"
@@ -1518,6 +1524,15 @@ func (d *DriverSpec) IsEnabled() bool {
 		return true
 	}
 	return *d.Enabled
+}
+
+// UsePrecompiledDrivers returns true if driver install is enabled using pre-compiled modules
+func (d *DriverSpec) UsePrecompiledDrivers() bool {
+	if d.UsePrecompiled == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *d.UsePrecompiled
 }
 
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator

@@ -40,11 +40,16 @@ const (
 	nfdLabelPrefix                      = "feature.node.kubernetes.io/"
 	nfdKernelLabelKey                   = "feature.node.kubernetes.io/kernel-version.full"
 	nfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+	nfdOSReleaseIDLabelKey              = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOSVersionIDLabelKey              = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
 	ocpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	ocpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
+	appLabelKey                         = "app"
 	ocpDriverToolkitIdentificationValue = "true"
 	ocpNamespaceMonitoringLabelKey      = "openshift.io/cluster-monitoring"
 	ocpNamespaceMonitoringLabelValue    = "true"
+	precompiledIdentificationLabelKey   = "nvidia.com/precompiled"
+	precompiledIdentificationLabelValue = "true"
 	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
 	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
 	ocpSuggestedNamespace          = "nvidia-gpu-operator"
@@ -55,6 +60,8 @@ const (
 	podSecurityLabelPrefix         = "pod-security.kubernetes.io/"
 	podSecurityLevelPrivileged     = "privileged"
 	driverAutoUpgradeAnnotationKey = "nvidia.com/gpu-driver-upgrade-enabled"
+	commonDriverDaemonsetName      = "nvidia-driver-daemonset"
+	commonVGPUManagerDaemonsetName = "nvidia-vgpu-manager-daemonset"
 )
 
 var (
@@ -128,12 +135,14 @@ type ClusterPolicyController struct {
 	singleton         *gpuv1.ClusterPolicy
 	operatorNamespace string
 
-	resources       []Resources
-	controls        []controlFunc
-	stateNames      []string
-	operatorMetrics *OperatorMetrics
-	rec             *ClusterPolicyReconciler
-	idx             int
+	resources            []Resources
+	controls             []controlFunc
+	stateNames           []string
+	operatorMetrics      *OperatorMetrics
+	rec                  *ClusterPolicyReconciler
+	idx                  int
+	kernelVersionMap     map[string]string
+	currentKernelVersion string
 
 	k8sVersion       string
 	openshift        string
@@ -854,13 +863,37 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 	n.rec.Log.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
 
-	if n.ocpDriverToolkit.requested {
+	// fetch all kernel versions from the GPU nodes in the cluster
+	if n.singleton.Spec.Driver.IsEnabled() && n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+		kernelVersionMap, err := n.getKernelVersionsMap()
+		if err != nil {
+			n.rec.Log.Info("Unable to obtain all kernel versions of the GPU nodes in the cluster", "err", err)
+			return err
+		}
+		n.kernelVersionMap = kernelVersionMap
+	}
+
+	if n.openshift != "" {
+		// initialize openshift specific parameters
+		err = n.initOCPParams(n.ctx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n *ClusterPolicyController) initOCPParams(ctx context.Context) error {
+	// initialize openshift specific parameters
+	if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+		// disable DTK for OCP when already pre-compiled drivers are used
+		n.ocpDriverToolkit.enabled = false
+	} else if n.ocpDriverToolkit.requested {
 		hasImageStream, err := ocpHasDriverToolkitImageStream(n)
 		if err != nil {
 			n.rec.Log.Info("ocpHasDriverToolkitImageStream", "err", err)
 			return err
 		}
-
 		hasCompatibleNFD := len(n.ocpDriverToolkit.rhcosVersions) != 0
 		n.ocpDriverToolkit.enabled = hasImageStream && hasCompatibleNFD
 
@@ -887,13 +920,10 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 			n.operatorMetrics.openshiftDriverToolkitNfdTooOld.Set(0)
 		}
 	}
-
-	if n.openshift != "" {
-		if err := n.ocpEnsureNamespaceMonitoring(); err != nil {
-			return err
-		}
+	// enable monitoring for the gpu-operator namespace
+	if err := n.ocpEnsureNamespaceMonitoring(); err != nil {
+		return err
 	}
-
 	return nil
 }
 

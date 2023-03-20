@@ -1125,6 +1125,10 @@ spec:
                             type: integer
                         type: object
                     type: object
+                  usePrecompiled:
+                    description: UsePrecompiled indicates if deployment of NVIDIA
+                      Driver using pre-compiled modules is enabled
+                    type: boolean
                   version:
                     description: NVIDIA Driver image tag
                     type: string
