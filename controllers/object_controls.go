@@ -504,6 +504,56 @@ func ConfigMaps(n ClusterPolicyController) (gpuv1.State, error) {
 	return status, nil
 }
 
+// getKernelVersionsMap returns a map of kernel versions to their corresponding OS from all GPU nodes in the cluster
+func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, error) {
+	kernelVersionMap := make(map[string]string)
+	ctx := n.ctx
+	logger := n.rec.Log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
+
+	// Filter only GPU nodes
+	opts := []client.ListOption{
+		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
+	}
+
+	list := &corev1.NodeList{}
+	err := n.rec.Client.List(ctx, list, opts...)
+	if err != nil {
+		logger.Info("Could not get NodeList", "ERROR", err)
+		return nil, err
+	}
+
+	if len(list.Items) == 0 {
+		// none of the nodes matched nvidia GPU label
+		// either the nodes do not have GPUs, or NFD is not running
+		logger.Info("Could not get any nodes to match nvidia.com/gpu.present label")
+		return nil, nil
+	}
+
+	for _, node := range list.Items {
+		labels := node.GetLabels()
+		if kernelVersion, ok := labels[nfdKernelLabelKey]; ok {
+			logger.Info("Found kernel version label", "version", kernelVersion)
+			// get OS version for this kernel
+			osType := labels[nfdOSReleaseIDLabelKey]
+			osVersion := labels[nfdOSVersionIDLabelKey]
+			nodeOS := fmt.Sprintf("%s%s", osType, osVersion)
+			if os, ok := kernelVersionMap[kernelVersion]; ok {
+				if os != nodeOS {
+					return nil, fmt.Errorf("different OS versions found for the same kernel version %s, unsupported configuration", kernelVersion)
+				}
+			}
+			// add mapping for "kernelVersion" --> "OS"
+			kernelVersionMap[kernelVersion] = nodeOS
+		} else {
+			err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
+			logger.Error(err, "Failed to get kernel version of GPU node using Node Feature Discovery (NFD) labels. Is NFD installed in the cluster?")
+			return nil, err
+		}
+	}
+
+	return kernelVersionMap, nil
+}
+
 func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	ctx := n.ctx
 	logger := n.rec.Log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
@@ -541,11 +591,11 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 		return "", "", ""
 	}
 
-	osName, ok := labels["feature.node.kubernetes.io/system-os_release.ID"]
+	osName, ok := labels[nfdOSReleaseIDLabelKey]
 	if !ok {
 		return kFVersion, "", ""
 	}
-	osVersion, ok := labels["feature.node.kubernetes.io/system-os_release.VERSION_ID"]
+	osVersion, ok := labels[nfdOSVersionIDLabelKey]
 	if !ok {
 		return kFVersion, "", ""
 	}
@@ -766,12 +816,19 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return err
 	}
 
-	// update OpenShift Driver Toolkit sidecar container
+	// update/remove OpenShift Driver Toolkit sidecar container
 	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 	}
 
+	// updates for per kernel version pods using pre-compiled drivers
+	if config.Driver.UsePrecompiledDrivers() {
+		err = transformPrecompiledDriverDaemonset(obj, config, n)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to transform the pre-compiled Driver Daemonset: %s", err)
+		}
+	}
 	return nil
 }
 
@@ -2064,22 +2121,22 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 
 // check if running with openshift and add an ENV VAR to the OCP DTK CTR
 func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-
 	for i, container := range obj.Spec.Template.Spec.Containers {
-
 		// skip if not nvidia-fs
-
 		if !strings.Contains(container.Name, "nvidia-fs") {
 			continue
 		}
 		if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
+			n.rec.Log.Info("GPUDirect Storage is disabled")
 			// remove nvidia-fs sidecar container from driver Daemonset if GDS is not enabled
-
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
 		}
-		// update nvidia-fs(sidecar) image and pull policy
+		if config.Driver.UsePrecompiledDrivers() {
+			return fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
+		}
 
+		// update nvidia-fs(sidecar) image and pull policy
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
 		if err != nil {
 			return err
@@ -2090,8 +2147,8 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if config.GPUDirectStorage.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUDirectStorage.ImagePullPolicy)
 		}
-		// set image pull secrets
 
+		// set image pull secrets
 		if len(config.GPUDirectStorage.ImagePullSecrets) > 0 {
 			for _, secret := range config.GPUDirectStorage.ImagePullSecrets {
 				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
@@ -2100,12 +2157,35 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 		// transform the nvidia-fs-ctr to use the openshift driver toolkit
 		// notify openshift driver toolkit container GDS is enabled
-
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-fs-ctr")
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 		}
 	}
+	return nil
+}
+
+// getSanitizedKernelVersion returns kernelVersion with following changes
+// 1. Remove arch suffix (as we use multi-arch images) and
+// 2. ensure to meet k8s constraints for metadata.name, i.e it
+// must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character
+func getSanitizedKernelVersion(kernelVersion string) string {
+	archRegex := regexp.MustCompile("x86_64|aarch64")
+	// remove arch strings, "_" and any trailing "." from the kernel version
+	sanitizedVersion := strings.TrimSuffix(strings.ReplaceAll(archRegex.ReplaceAllString(kernelVersion, ""), "_", "."), ".")
+	return strings.ToLower(sanitizedVersion)
+}
+
+func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) (err error) {
+	sanitizedVersion := getSanitizedKernelVersion(n.currentKernelVersion)
+	// prepare the DaemonSet to be kernel-version specific
+	obj.ObjectMeta.Name += "-" + sanitizedVersion + "-" + n.kernelVersionMap[n.currentKernelVersion]
+
+	// add unique labels for each kernel-version specific Daemonset
+	obj.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
+	obj.Spec.Template.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
+	// append kernel-version specific node-selector
+	obj.Spec.Template.Spec.NodeSelector[nfdKernelLabelKey] = n.currentKernelVersion
 	return nil
 }
 
@@ -2130,20 +2210,16 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	if !n.ocpDriverToolkit.enabled {
 		if n.ocpDriverToolkit.requested {
-			n.rec.Log.Info("WARNING: OpenShift DriverToolkit was requested but could not be enabled (dependencies missing)")
+			n.rec.Log.Info("OpenShift DriverToolkit was requested but could not be enabled (dependencies missing)")
 		}
 
 		/* remove OpenShift Driver Toolkit side-car container from the Driver DaemonSet */
-
 		_, err = getContainer("openshift-driver-toolkit-ctr", true)
-
 		return err
 	}
 
 	/* find the main container and driver-toolkit sidecar container */
-
 	var mainContainer, driverToolkitContainer *v1.Container
-
 	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
 		return err
 	}
@@ -2153,7 +2229,6 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* prepare the DaemonSet to be RHCOS-version specific */
-
 	rhcosVersion := n.ocpDriverToolkit.currentRhcosVersion
 
 	if !strings.Contains(obj.ObjectMeta.Name, rhcosVersion) {
@@ -2164,16 +2239,13 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	obj.Spec.Template.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
 
 	obj.ObjectMeta.Labels[ocpDriverToolkitVersionLabel] = rhcosVersion
-
 	obj.Spec.Template.Spec.NodeSelector[nfdOSTreeVersionLabelKey] = rhcosVersion
 
 	/* prepare the DaemonSet to be searchable */
-
 	obj.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
 	obj.Spec.Template.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
 
 	/* prepare the DriverToolkit container */
-
 	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
 
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
@@ -2186,9 +2258,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		driverToolkitContainer.Image = image
 		n.rec.Log.Info("DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
-
 		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
-
 		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
@@ -2201,7 +2271,6 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* prepare the main container to start from the DriverToolkit entrypoint */
-
 	if strings.Contains(mainContainerName, "nvidia-fs") {
 		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
 		mainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
@@ -2210,9 +2279,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
 	}
 	/* prepare the shared volumes */
-
 	// shared directory
-
 	volSharedDirName, volSharedDirPath := "shared-nvidia-driver-toolkit", "/mnt/shared-nvidia-driver-toolkit"
 
 	volMountSharedDir := corev1.VolumeMount{Name: volSharedDirName, MountPath: volSharedDirPath}
@@ -2226,16 +2293,13 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	// Check if the volume already exists, if not add it
-
 	for i := range obj.Spec.Template.Spec.Volumes {
 		if obj.Spec.Template.Spec.Volumes[i].Name == volSharedDirName {
 			// already exists, avoid duplicated volume
 			return nil
 		}
 	}
-
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
-
 	return nil
 }
 
@@ -2253,9 +2317,24 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	switch v := driverSpec.(type) {
 	case *gpuv1.DriverSpec:
 		spec := driverSpec.(*gpuv1.DriverSpec)
-		image, err = gpuv1.ImagePath(spec)
-		if err != nil {
-			return "", err
+		// check if this is pre-compiled driver deployment.
+		if spec.UsePrecompiledDrivers() {
+			if spec.Repository == "" && spec.Version == "" {
+				if spec.Image != "" {
+					// this is useful for tools like kbld(carvel) which will just specify driver.image param as path:version
+					image = spec.Image + "-" + n.currentKernelVersion
+				} else {
+					return "", fmt.Errorf("Unable to resolve driver image path for pre-compiled drivers, driver.repository, driver.image and driver.version have to be specified in the ClusterPolicy")
+				}
+			} else {
+				// use per kernel version tag
+				image = spec.Repository + "/" + spec.Image + ":" + spec.Version + "-" + n.currentKernelVersion
+			}
+		} else {
+			image, err = gpuv1.ImagePath(spec)
+			if err != nil {
+				return "", err
+			}
 		}
 	case *gpuv1.GPUDirectStorageSpec:
 		spec := driverSpec.(*gpuv1.GPUDirectStorageSpec)
@@ -2379,207 +2458,221 @@ func createEmptyDirVolume(volumeName string) corev1.Volume {
 }
 
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	driverIndex := 0
+	driverCtrFound := false
 	for i, container := range obj.Spec.Template.Spec.Containers {
-		// skip if not nvidia-driver container
-		if !strings.Contains(container.Name, "nvidia-driver") {
-			continue
+		// check if this is the main nvidia-driver container
+		if container.Name == "nvidia-driver-ctr" {
+			driverIndex = i
+			driverCtrFound = true
+			break
 		}
-		image, err := resolveDriverTag(n, &config.Driver)
-		if err != nil {
-			return err
-		}
-		if image != "" {
-			obj.Spec.Template.Spec.Containers[i].Image = image
-		}
+	}
 
-		// update image pull policy
-		obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+	if !driverCtrFound {
+		return fmt.Errorf("driver container (nvidia-driver-ctr) is missing from the driver daemonset manifest")
+	}
 
-		// set image pull secrets
-		if len(config.Driver.ImagePullSecrets) > 0 {
-			for _, secret := range config.Driver.ImagePullSecrets {
-				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-			}
+	image, err := resolveDriverTag(n, &config.Driver)
+	if err != nil {
+		return err
+	}
+	if image != "" {
+		obj.Spec.Template.Spec.Containers[driverIndex].Image = image
+	}
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[driverIndex].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.Driver.ImagePullSecrets) > 0 {
+		for _, secret := range config.Driver.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
-		// set resource limits
-		if config.Driver.Resources != nil {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.Driver.Resources
+	}
+	// set resource limits
+	if config.Driver.Resources != nil {
+		obj.Spec.Template.Spec.Containers[driverIndex].Resources = *config.Driver.Resources
+	}
+	// set arguments if specified for driver container
+	if len(config.Driver.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[driverIndex].Args = config.Driver.Args
+	}
+	// set/append environment variables for exporter container
+	if len(config.Driver.Env) > 0 {
+		for _, env := range config.Driver.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), env.Name, env.Value)
 		}
-		// set arguments if specified for driver container
-		if len(config.Driver.Args) > 0 {
-			obj.Spec.Template.Spec.Containers[i].Args = config.Driver.Args
-		}
-		// set/append environment variables for exporter container
-		if len(config.Driver.Env) > 0 {
-			for _, env := range config.Driver.Env {
-				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
-			}
-		}
-		if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
-			// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), GPUDirectRDMAEnabledEnvName, "true")
-			// check if MOFED drives are directly installed on host and update source path accordingly
-			// to build nvidia-peermem module
-			if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
-				// mount /usr/src/ofa_kernel path directly from host to build using MOFED drivers installed on host
-				for index, volume := range obj.Spec.Template.Spec.Volumes {
-					if volume.Name == "mlnx-ofed-usr-src" {
-						obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
-					}
+	}
+	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
+		// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), GPUDirectRDMAEnabledEnvName, "true")
+		// check if MOFED drives are directly installed on host and update source path accordingly
+		// to build nvidia-peermem module
+		if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
+			// mount /usr/src/ofa_kernel path directly from host to build using MOFED drivers installed on host
+			for index, volume := range obj.Spec.Template.Spec.Volumes {
+				if volume.Name == "mlnx-ofed-usr-src" {
+					obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
 				}
-				// set env indicating host-mofed is enabled
-				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), UseHostMOFEDEnvName, "true")
 			}
+			// set env indicating host-mofed is enabled
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), UseHostMOFEDEnvName, "true")
+		}
+	}
+
+	// set any licensing configuration required
+	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
+		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, licensingConfigVolMount)
+
+		// gridd.conf always mounted
+		licenseItemsToInclude := []corev1.KeyToPath{
+			{
+				Key:  VGPULicensingFileName,
+				Path: VGPULicensingFileName,
+			},
+		}
+		// client config token only mounted when NLS is enabled
+		if config.Driver.LicensingConfig.IsNLSEnabled() {
+			licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
+				Key:  NLSClientTokenFileName,
+				Path: NLSClientTokenFileName,
+			})
+			nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
+			obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, nlsTokenVolMount)
 		}
 
-		// set any custom repo configuration provided
-		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
-			destinationDir, err := getRepoConfigPath()
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
-			}
-			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
-			}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
-		}
-
-		// mount any custom kernel module configuration parameters at /drivers
-		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
-			destinationDir := "/drivers"
-			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
-			}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
-		}
-
-		// set any custom ssl key/certificate configuration provided
-		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
-			destinationDir, err := getCertConfigPath()
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
-			}
-			volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
-			}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
-		}
-
-		// set any licensing configuration required
-		if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
-			licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, licensingConfigVolMount)
-
-			// gridd.conf always mounted
-			licenseItemsToInclude := []corev1.KeyToPath{
-				{
-					Key:  VGPULicensingFileName,
-					Path: VGPULicensingFileName,
+		licensingConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.LicensingConfig.ConfigMapName,
 				},
-			}
-			// client config token only mounted when NLS is enabled
-			if config.Driver.LicensingConfig.IsNLSEnabled() {
-				licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
-					Key:  NLSClientTokenFileName,
-					Path: NLSClientTokenFileName,
-				})
-				nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
-				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, nlsTokenVolMount)
-			}
-
-			licensingConfigVolumeSource := corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.Driver.LicensingConfig.ConfigMapName,
-					},
-					Items: licenseItemsToInclude,
-				},
-			}
-			licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
+				Items: licenseItemsToInclude,
+			},
 		}
+		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
+	}
 
-		// set virtual topology daemon configuration if specified for vGPU driver
-		if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
-			topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
-			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, topologyConfigVolMount)
+	// set virtual topology daemon configuration if specified for vGPU driver
+	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
+		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
+		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, topologyConfigVolMount)
 
-			topologyConfigVolumeSource := corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.Driver.VirtualTopology.Config,
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  VGPUTopologyConfigFileName,
-							Path: VGPUTopologyConfigFileName,
-						},
+		topologyConfigVolumeSource := corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.VirtualTopology.Config,
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  VGPUTopologyConfigFileName,
+						Path: VGPUTopologyConfigFileName,
 					},
 				},
-			}
-			topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
+			},
 		}
+		topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
+	}
 
-		release, err := parseOSRelease()
+	// mount any custom kernel module configuration parameters at /drivers
+	if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
+		destinationDir := "/drivers"
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 		}
+		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
+	}
 
-		// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
-		if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
-			n.rec.Log.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
-			pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
-			}
+	// no further repo configuration required when using pre-compiled drivers, return here.
+	if config.Driver.UsePrecompiledDrivers() {
+		return nil
+	}
 
-			// sort host path volumes to ensure ordering is preserved when adding to pod spec
-			mountPaths := make([]string, 0, len(pathToVolumeSource))
-			for k := range pathToVolumeSource {
-				mountPaths = append(mountPaths, k)
-			}
-			sort.Strings(mountPaths)
-
-			for num, mountPath := range mountPaths {
-				volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
-
-				volMountSubscription := corev1.VolumeMount{
-					Name:      volMountSubscriptionName,
-					MountPath: mountPath,
-					ReadOnly:  true,
-				}
-				obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volMountSubscription)
-
-				subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
-				obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, subscriptionVol)
-			}
-		}
-
-		// skip proxy and env settings if not ocp cluster
-		if _, ok := release["OPENSHIFT_VERSION"]; !ok {
-			return nil
-		}
-
-		// Add env vars needed by nvidia-driver to enable the right releasever and EUS rpm repos
-		rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
-		ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]}
-
-		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, rhelVersion)
-		obj.Spec.Template.Spec.Containers[i].Env = append(obj.Spec.Template.Spec.Containers[i].Env, ocpVersion)
-
-		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
-		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
-		err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+	// set any custom repo configuration provided when using runfile based driver installation
+	if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
+		destinationDir, err := getRepoConfigPath()
 		if err != nil {
-			return err
+			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 		}
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
+		}
+		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
+	}
+
+	// set any custom ssl key/certificate configuration provided
+	if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
+		destinationDir, err := getCertConfigPath()
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
+		}
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
+		}
+		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+	}
+
+	release, err := parseOSRelease()
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	}
+
+	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
+	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
+		n.rec.Log.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
+		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
+		}
+
+		// sort host path volumes to ensure ordering is preserved when adding to pod spec
+		mountPaths := make([]string, 0, len(pathToVolumeSource))
+		for k := range pathToVolumeSource {
+			mountPaths = append(mountPaths, k)
+		}
+		sort.Strings(mountPaths)
+
+		for num, mountPath := range mountPaths {
+			volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+
+			volMountSubscription := corev1.VolumeMount{
+				Name:      volMountSubscriptionName,
+				MountPath: mountPath,
+				ReadOnly:  true,
+			}
+			obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volMountSubscription)
+
+			subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
+			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, subscriptionVol)
+		}
+	}
+
+	// skip proxy and env settings if not ocp cluster
+	if _, ok := release["OPENSHIFT_VERSION"]; !ok {
+		return nil
+	}
+
+	// Add env vars needed by nvidia-driver to enable the right releasever and EUS rpm repos
+	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
+	ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]}
+
+	obj.Spec.Template.Spec.Containers[driverIndex].Env = append(obj.Spec.Template.Spec.Containers[driverIndex].Env, rhelVersion)
+	obj.Spec.Template.Spec.Containers[driverIndex].Env = append(obj.Spec.Template.Spec.Containers[driverIndex].Env, ocpVersion)
+
+	// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+	// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
+	err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -2654,7 +2747,7 @@ func applyUpdateStrategyConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		if config.Daemonsets.RollingUpdate == nil || config.Daemonsets.RollingUpdate.MaxUnavailable == "" {
 			return nil
 		}
-		if obj.Name == "nvidia-driver-daemonset" {
+		if strings.HasPrefix(obj.Name, commonDriverDaemonsetName) {
 			// disallow setting RollingUpdate strategy with the driver container
 			return nil
 		}
@@ -2742,27 +2835,17 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 
 func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	ctx := n.ctx
-	opts := []client.ListOption{
-		client.MatchingLabels{"app": name},
-	}
-	n.rec.Log.V(1).Info("DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
-	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	ds := &appsv1.DaemonSet{}
+	n.rec.Log.V(1).Info("checking daemonset for readiness", "name", name)
+	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, ds)
 	if err != nil {
-		n.rec.Log.Info("Could not get DaemonSetList", err)
+		n.rec.Log.Error(err, "could not get daemonset", "name", name)
 	}
-	n.rec.Log.V(1).Info("DaemonSet", "NumberOfDaemonSets", len(list.Items))
-	if len(list.Items) == 0 {
-		return gpuv1.NotReady
-	}
-
-	ds := list.Items[0]
-	n.rec.Log.V(1).Info("DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
 
 	if ds.Status.NumberUnavailable != 0 {
+		n.rec.Log.Info("daemonset not ready", "name", name)
 		return gpuv1.NotReady
 	}
-
 	return gpuv1.Ready
 }
 
@@ -2886,12 +2969,93 @@ func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyControlle
 	return false, nil
 }
 
+// cleanupStalePrecompiledDaemonsets deletes stale driver daemonsets which can happen
+// 1. If all nodes upgraded to the latest kernel
+// 2. no GPU nodes are present
+func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.Context) error {
+	opts := []client.ListOption{
+		client.MatchingLabels{
+			precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
+		},
+	}
+	list := &appsv1.DaemonSetList{}
+	err := n.rec.Client.List(ctx, list, opts...)
+	if err != nil {
+		n.rec.Log.Error(err, "could not get daemonset list")
+		return err
+	}
+
+	for idx := range list.Items {
+		name := list.Items[idx].ObjectMeta.Name
+		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
+
+		n.rec.Log.V(1).Info("Driver DaemonSet found",
+			"Name", name,
+			"desiredNumberScheduled", desiredNumberScheduled)
+
+		if desiredNumberScheduled != 0 {
+			n.rec.Log.Info("Driver DaemonSet active, keep it.",
+				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
+			continue
+		}
+
+		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
+
+		err = n.rec.Client.Delete(ctx, &list.Items[idx])
+		if err != nil {
+			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
+				"Name", name, "Error", err)
+		}
+	}
+	return nil
+}
+
+// precompiledDriverDaemonsets goes through all the kernel versions
+// found in the cluster, sets `currentKernelVersion` and calls the
+// original DaemonSet() function to create/update the kernel-specific
+// DaemonSet.
+func precompiledDriverDaemonsets(ctx context.Context, n ClusterPolicyController) (gpuv1.State, []error) {
+	overallState := gpuv1.Ready
+	var errs []error
+	n.rec.Log.Info("cleaning any stale precompiled driver daemonsets")
+	err := n.cleanupStalePrecompiledDaemonsets(ctx)
+	if err != nil {
+		return gpuv1.NotReady, append(errs, err)
+	}
+
+	n.rec.Log.V(1).Info("preparing pre-compiled driver daemonsets")
+	for kernelVersion, os := range n.kernelVersionMap {
+		// set current kernel version
+		n.currentKernelVersion = kernelVersion
+
+		n.rec.Log.Info("preparing pre-compiled driver daemonset",
+			"version", n.currentKernelVersion, "os", os)
+
+		state, err := DaemonSet(n)
+		if state != gpuv1.Ready {
+			n.rec.Log.Info("pre-compiled driver daemonset not ready",
+				"version", n.currentKernelVersion, "state", state)
+			overallState = state
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to handle Precompiled Driver Daemonset for version %s: %v", kernelVersion, err))
+		}
+	}
+
+	// reset current kernel version
+	n.currentKernelVersion = ""
+	return overallState, errs
+}
+
 // ocpDriverToolkitDaemonSets goes through all the RHCOS versions
 // found in the cluster, sets `currentRhcosVersion` and calls the
 // original DaemonSet() function to create/update the RHCOS-specific
 // DaemonSet.
-func ocpDriverToolkitDaemonSets(ctx context.Context, n ClusterPolicyController) (gpuv1.State, error) {
-	ocpCleanupUnusedDriverToolkitDaemonSets(n)
+func (n ClusterPolicyController) ocpDriverToolkitDaemonSets(ctx context.Context) (gpuv1.State, error) {
+	err := n.ocpCleanupStaleDriverToolkitDaemonSets(ctx)
+	if err != nil {
+		return gpuv1.NotReady, err
+	}
 
 	state := n.idx
 	saObj := n.resources[state].ServiceAccount.DeepCopy()
@@ -2951,15 +3115,14 @@ func ocpDriverToolkitDaemonSets(ctx context.Context, n ClusterPolicyController) 
 	return overallState, errs
 }
 
-// ocpCleanupUnusedDriverToolkitDaemonSets scans the DriverToolkit
+// ocpCleanupStaleDriverToolkitDaemonSets scans the DriverToolkit
 // RHCOS-version specific DaemonSets, and deletes the unused one:
 // - RHCOS version wasn't found in the node labels (upgrade finished)
 // - RHCOS version marked for deletion earlier in the Reconciliation loop (currently unexpected)
 // - no RHCOS version label (unexpected)
 // The DaemonSet set is kept if:
 // - RHCOS version was found in the node labels (most likely case)
-func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
-	ctx := n.ctx
+func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx context.Context) error {
 	opts := []client.ListOption{
 		client.MatchingLabels{
 			ocpDriverToolkitIdentificationLabel: ocpDriverToolkitIdentificationValue,
@@ -2970,7 +3133,7 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 	err := n.rec.Client.List(ctx, list, opts...)
 	if err != nil {
 		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
-		return
+		return err
 	}
 
 	for idx := range list.Items {
@@ -3018,56 +3181,132 @@ func ocpCleanupUnusedDriverToolkitDaemonSets(n ClusterPolicyController) {
 		}
 
 		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
-
 		err = n.rec.Client.Delete(ctx, &list.Items[idx])
 		if err != nil {
 			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
 				"Name", name, "Error", err)
-
+			return err
 		}
 	}
+	return nil
 }
 
-// cleanupUnusedDriverDaemonSets cleans up the driver DaemonSet(s)
-// according to the UseOpenShiftDriverToolkit flag. This allows
-// switching toggling the flag after the initial deployment.  If no
+// cleanupUnusedVGPUManagerDaemonsets cleans up the vgpu-manager DaemonSet(s)
+// according to the operator.useOCPDriverToolkit is enabled for ocp
+// This allows switching toggling the flag after the initial deployment.  If no
 // error happens, returns the number of Pods belonging to these
 // DaemonSets.
-func cleanupUnusedDriverDaemonSets(n ClusterPolicyController) (int, error) {
-	// in the future, these flags can be extended to also check the
-	// value of n.singleton.Spec.Driver.IsEnabled()
-
-	cleanupNvidiaDriver := n.ocpDriverToolkit.enabled
-	cleanupOcpDriverToolkitDriver := !cleanupNvidiaDriver
-
-	var podCount = 0
-
-	if cleanupNvidiaDriver {
-		count, err := cleanupDaemonSets(n, "app", "nvidia-driver-daemonset")
-		if err != nil {
-			return 0, err
-		}
-		podCount += count
+func (n ClusterPolicyController) cleanupUnusedVGPUManagerDaemonsets(ctx context.Context) (int, error) {
+	podCount := 0
+	if n.openshift == "" {
+		return podCount, nil
 	}
 
-	if cleanupOcpDriverToolkitDriver {
-		count, err := cleanupDaemonSets(n,
+	if !n.ocpDriverToolkit.enabled {
+		// cleanup DTK daemonsets
+		count, err := n.cleanupDriverDaemonsets(ctx,
 			ocpDriverToolkitIdentificationLabel,
-			ocpDriverToolkitIdentificationValue)
+			ocpDriverToolkitIdentificationValue, commonVGPUManagerDaemonsetName)
 		if err != nil {
 			return 0, err
 		}
-		podCount += count
+		podCount = count
+	} else {
+		// cleanup legacy vgpu-manager daemonsets
+		count, err := n.cleanupDriverDaemonsets(ctx,
+			appLabelKey,
+			commonVGPUManagerDaemonsetName, commonVGPUManagerDaemonsetName)
+		if err != nil {
+			return 0, err
+		}
+		podCount = count
 	}
-
 	return podCount, nil
 }
 
-// cleanupDaemonSets deletes the DaemonSets matching a given key/value
+// cleanupUnusedDriverDaemonSets cleans up the driver DaemonSet(s)
+// according to following.
+// 1. If driver.usePrecompiled is enabled
+// 2. if operator.useOCPDriverToolkit is enabled for ocp
+// This allows switching toggling the flag after the initial deployment.  If no
+// error happens, returns the number of Pods belonging to these
+// DaemonSets.
+func (n ClusterPolicyController) cleanupUnusedDriverDaemonSets(ctx context.Context) (int, error) {
+	podCount := 0
+	if n.openshift != "" {
+		if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+			// cleanup DTK daemonsets
+			count, err := n.cleanupDriverDaemonsets(ctx,
+				ocpDriverToolkitIdentificationLabel,
+				ocpDriverToolkitIdentificationValue, commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount = count
+			// cleanup legacy driver daemonsets that use run file
+			count, err = n.cleanupDriverDaemonsets(ctx,
+				precompiledIdentificationLabelKey,
+				"false", commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount += count
+		} else if n.ocpDriverToolkit.enabled {
+			// cleanup pre-compiled and legacy driver daemonsets
+			count, err := n.cleanupDriverDaemonsets(ctx,
+				appLabelKey,
+				commonDriverDaemonsetName, commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount = count
+		} else {
+			// cleanup pre-compiled
+			count, err := n.cleanupDriverDaemonsets(ctx,
+				precompiledIdentificationLabelKey,
+				precompiledIdentificationLabelValue, commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount = count
+
+			// cleanup DTK daemonsets
+			count, err = n.cleanupDriverDaemonsets(ctx,
+				ocpDriverToolkitIdentificationLabel,
+				ocpDriverToolkitIdentificationValue, commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount += count
+		}
+	} else {
+		if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+			// cleanup legacy driver daemonsets that use run file
+			count, err := n.cleanupDriverDaemonsets(ctx,
+				precompiledIdentificationLabelKey,
+				"false", commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount = count
+		} else {
+			// cleanup pre-compiled driver daemonsets
+			count, err := n.cleanupDriverDaemonsets(ctx,
+				precompiledIdentificationLabelKey,
+				precompiledIdentificationLabelValue, commonDriverDaemonsetName)
+			if err != nil {
+				return 0, err
+			}
+			podCount = count
+		}
+	}
+	return podCount, nil
+}
+
+// cleanupDriverDaemonSets deletes the DaemonSets matching a given key/value
 // pairs If no error happens, returns the number of Pods belonging to
 // the DaemonSet.
-func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string) (int, error) {
-	ctx := n.ctx
+func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, searchKey string, searchValue string, namePrefix string) (int, error) {
 	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}}
 
 	dsList := &appsv1.DaemonSetList{}
@@ -3081,7 +3320,10 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 		n.rec.Log.Info("Delete DaemonSet",
 			"Name", dsList.Items[idx].ObjectMeta.Name,
 		)
-
+		// ignore daemonsets that doesn't match the required name
+		if !strings.HasPrefix(dsList.Items[idx].ObjectMeta.Name, namePrefix) {
+			continue
+		}
 		if err := n.rec.Client.Delete(ctx, &dsList.Items[idx]); err != nil {
 			n.rec.Log.Error(err, "Could not get delete DaemonSet",
 				"Name", dsList.Items[idx].ObjectMeta.Name)
@@ -3100,7 +3342,15 @@ func cleanupDaemonSets(n ClusterPolicyController, searchKey, searchValue string)
 		return 0, err
 	}
 
-	return len(podList.Items), nil
+	podCount := 0
+	for idx := range podList.Items {
+		// ignore pods that doesn't match the required name
+		if !strings.HasPrefix(podList.Items[idx].ObjectMeta.Name, namePrefix) {
+			continue
+		}
+		podCount++
+	}
+	return podCount, nil
 }
 
 // DaemonSet creates Daemonset resource
@@ -3128,23 +3378,46 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		// deployment for now. The operator will be notified
 		// (addWatchNewGPUNode) when new nodes will join the cluster.
 		logger.Info("No GPU node in the cluster, do not create DaemonSets")
-
 		return gpuv1.Ready, nil
 	}
 
-	if n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-driver-daemonset" ||
-		n.resources[state].DaemonSet.ObjectMeta.Name == "nvidia-vgpu-manager-daemonset" {
-		podCount, err := cleanupUnusedDriverDaemonSets(n)
+	if n.resources[state].DaemonSet.GetName() == commonDriverDaemonsetName {
+		podCount, err := n.cleanupUnusedDriverDaemonSets(n.ctx)
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
 		if podCount != 0 {
 			logger.Info("Driver DaemonSet cleanup in progress", "podCount", podCount)
-
 			return gpuv1.NotReady, nil
 		}
 
-		if n.ocpDriverToolkit.enabled &&
+		// Daemonsets using pre-compiled packages or using driver-toolkit (openshift) require creation of
+		// one daemonset per kernel version (or rhcos version).
+		// If currentKernelVersion or currentRhcosVersion (ocp) are not set, we intercept here
+		// and call Daemonset() per specific version
+		if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+			if n.currentKernelVersion == "" {
+				overallState, errs := precompiledDriverDaemonsets(ctx, n)
+				if len(errs) != 0 {
+					// log errors
+					return overallState, fmt.Errorf("Unable to deploy precompiled driver daemonsets %v", errs)
+				}
+				return overallState, nil
+			}
+		} else if n.openshift != "" && n.ocpDriverToolkit.enabled &&
+			n.ocpDriverToolkit.currentRhcosVersion == "" {
+			return n.ocpDriverToolkitDaemonSets(ctx)
+		}
+	} else if n.resources[state].DaemonSet.ObjectMeta.Name == commonVGPUManagerDaemonsetName {
+		podCount, err := n.cleanupUnusedVGPUManagerDaemonsets(ctx)
+		if err != nil {
+			return gpuv1.NotReady, err
+		}
+		if podCount != 0 {
+			logger.Info("Driver DaemonSet cleanup in progress", "podCount", podCount)
+			return gpuv1.NotReady, nil
+		}
+		if n.openshift != "" && n.ocpDriverToolkit.enabled &&
 			n.ocpDriverToolkit.currentRhcosVersion == "" {
 			// OpenShift Driver Toolkit requires the creation of
 			// one Driver DaemonSet per RHCOS version (stored in
@@ -3155,8 +3428,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 			//
 			// Initiate the multi-DaemonSet OCP DriverToolkit
 			// deployment.
-
-			return ocpDriverToolkitDaemonSets(ctx, n)
+			return n.ocpDriverToolkitDaemonSets(ctx)
 		}
 	}
 
@@ -3168,7 +3440,6 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
 		logger.Info("SetControllerReference failed", "Error", err)
-
 		return gpuv1.NotReady, err
 	}
 

@@ -131,6 +131,7 @@ spec:
     enabled: {{ .Values.psp.enabled }}
   driver:
     enabled: {{ .Values.driver.enabled }}
+    usePrecompiled: {{ .Values.driver.usePrecompiled }}
     {{- if .Values.driver.repository }}
     repository: {{ .Values.driver.repository }}
     {{- end }}

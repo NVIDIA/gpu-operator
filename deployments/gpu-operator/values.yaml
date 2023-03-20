@@ -109,6 +109,9 @@ mig:
 
 driver:
   enabled: true
+  # use pre-compiled packages for NVIDIA driver installation.
+  # only supported for as a tech-preview feature on ubuntu22.04 kernels.
+  usePrecompiled: false
   repository: nvcr.io/nvidia
   image: driver
   version: "525.85.12"

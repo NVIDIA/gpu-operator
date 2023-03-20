@@ -3,6 +3,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-driver-daemonset
+    nvidia.com/precompiled: "false"
   name: nvidia-driver-daemonset
   namespace: "FILLED BY THE OPERATOR"
   annotations:
@@ -17,6 +18,7 @@ spec:
     metadata:
       labels:
         app: nvidia-driver-daemonset
+        nvidia.com/precompiled: "false"
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
