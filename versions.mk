@@ -19,7 +19,7 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= v22.9.2
 
-CUDA_VERSION ?= 11.8.0
+CUDA_VERSION ?= 12.1.0
 GOLANG_VERSION ?= 1.20.1
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
