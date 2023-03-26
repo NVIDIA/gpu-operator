@@ -583,7 +583,7 @@ func cleanupStatusFiles() error {
 
 func getDriverRoot() (string, bool) {
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
+	if fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
 		log.Infof("Detected pre-installed driver on the host")
 		return "/host", true
 	}
