@@ -33,4 +33,4 @@ data:
     #
     sleep 5
 
-    exec nvidia-toolkit /usr/local/nvidia
+    exec nvidia-toolkit

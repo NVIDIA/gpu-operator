@@ -45,6 +45,10 @@ const (
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
+	// DefaultCRIOConfigFile indicates default config file path for cri-o.
+	// Note, config files in the drop-in directory, /etc/crio/crio.conf.d,
+	// have a higher priority than the default /etc/crio/crio.conf file.
+	DefaultCRIOConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
 	// TrustedCAConfigMapName indicates configmap with custom user CA injected
 	TrustedCAConfigMapName = "gpu-operator-trusted-ca"
 	// TrustedCABundleFileName indicates custom user ca certificate filename
@@ -111,6 +115,8 @@ const (
 	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
 	// DefaultToolkitInstallDir is the default toolkit installation directory on the host
 	DefaultToolkitInstallDir = "/usr/local/nvidia"
+	// ToolkitInstallDirEnvName is the name of the toolkit container env for configuring where NVIDIA Container Toolkit is installed
+	ToolkitInstallDirEnvName = "ROOT"
 	// VgpuDMDefaultConfigMapName indicates name of ConfigMap containing default vGPU devices configuration
 	VgpuDMDefaultConfigMapName = "default-vgpu-devices-config"
 	// VgpuDMDefaultConfigName indicates name of default configuration in the vGPU devices config file
@@ -1055,13 +1061,8 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		// set args for the toolkit
-		toolkitArgStrFmt := "[[ -f /run/nvidia/validations/host-driver-ready ]] && driver_root=/ || driver_root=/run/nvidia/driver; export NVIDIA_DRIVER_ROOT=$driver_root; sleep 5; exec nvidia-toolkit %s"
-		toolkitArg := fmt.Sprintf(toolkitArgStrFmt, config.Toolkit.InstallDir)
-		args := []string{toolkitArg}
-		obj.Spec.Template.Spec.Containers[0].Args = args
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
 
-		// update install directory for the toolkit
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
 			if volume.Name == "toolkit-install-dir" {
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.Toolkit.InstallDir
@@ -1086,27 +1087,30 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
 	}
 
-	// setup mounts for runtime config file and socket file
+	// setup mounts for runtime config file
+	runtimeConfigFile, err := getRuntimeConfigFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
+	if err != nil {
+		return fmt.Errorf("error getting path to runtime config file: %v", err)
+	}
+	sourceConfigFileName := path.Base(runtimeConfigFile)
+	runtimeArgs := "--config " + DefaultRuntimeConfigTargetDir + sourceConfigFileName
+
+	volMountConfigName := fmt.Sprintf("%s-config", runtime)
+	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
+	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountConfig)
+
+	configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile), Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+
+	// setup mounts for runtime socket file
 	if runtime == gpuv1.Docker.String() || runtime == gpuv1.Containerd.String() {
-		runtimeConfigFile := getRuntimeConfigFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
-		runtimeSocketFile := getRuntimeSocketFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
-
+		runtimeSocketFile, err := getRuntimeSocketFile(&(obj.Spec.Template.Spec.Containers[0]), runtime)
+		if err != nil {
+			return fmt.Errorf("error getting path to runtime socket: %v", err)
+		}
 		sourceSocketFileName := path.Base(runtimeSocketFile)
-		sourceConfigFileName := path.Base(runtimeConfigFile)
+		runtimeArgs += " --socket " + DefaultRuntimeSocketTargetDir + sourceSocketFileName
 
-		// docker needs socket file as runtime arg
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS",
-			"--socket "+DefaultRuntimeSocketTargetDir+sourceSocketFileName+" --config "+DefaultRuntimeConfigTargetDir+sourceConfigFileName)
-
-		// setup config file mount
-		volMountConfigName := fmt.Sprintf("%s-config", runtime)
-		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
-		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountConfig)
-
-		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile)}}}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
-
-		// setup socket file mount
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
 		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMountSocket)
@@ -1114,6 +1118,9 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
+
+	// update runtime args
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS", runtimeArgs)
 
 	// Update CRI-O hooks path to use default path for non OCP cases
 	if n.openshift == "" && n.runtime == gpuv1.CRIO {
@@ -1856,35 +1863,50 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 }
 
 // get runtime(docker, containerd) config file path based on toolkit container env or default
-func getRuntimeConfigFile(c *corev1.Container, runtime string) (runtimeConfigFile string) {
-	if runtime == gpuv1.Docker.String() {
+func getRuntimeConfigFile(c *corev1.Container, runtime string) (string, error) {
+	var runtimeConfigFile string
+	switch runtime {
+	case gpuv1.Docker.String():
 		runtimeConfigFile = DefaultDockerConfigFile
-		if getContainerEnv(c, "DOCKER_CONFIG") != "" {
-			runtimeConfigFile = getContainerEnv(c, "DOCKER_CONFIG")
+		if value := getContainerEnv(c, "DOCKER_CONFIG"); value != "" {
+			runtimeConfigFile = value
 		}
-	} else if runtime == gpuv1.Containerd.String() {
+	case gpuv1.Containerd.String():
 		runtimeConfigFile = DefaultContainerdConfigFile
-		if getContainerEnv(c, "CONTAINERD_CONFIG") != "" {
-			runtimeConfigFile = getContainerEnv(c, "CONTAINERD_CONFIG")
+		if value := getContainerEnv(c, "CONTAINERD_CONFIG"); value != "" {
+			runtimeConfigFile = value
 		}
+	case gpuv1.CRIO.String():
+		runtimeConfigFile = DefaultCRIOConfigFile
+		if value := getContainerEnv(c, "CRIO_CONFIG"); value != "" {
+			runtimeConfigFile = value
+		}
+	default:
+		return "", fmt.Errorf("invalid runtime: %s", runtime)
 	}
-	return runtimeConfigFile
+
+	return runtimeConfigFile, nil
 }
 
 // get runtime(docker, containerd) socket file path based on toolkit container env or default
-func getRuntimeSocketFile(c *corev1.Container, runtime string) (runtimeSocketFile string) {
-	if runtime == gpuv1.Docker.String() {
+func getRuntimeSocketFile(c *corev1.Container, runtime string) (string, error) {
+	var runtimeSocketFile string
+	switch runtime {
+	case gpuv1.Docker.String():
 		runtimeSocketFile = DefaultDockerSocketFile
 		if getContainerEnv(c, "DOCKER_SOCKET") != "" {
 			runtimeSocketFile = getContainerEnv(c, "DOCKER_SOCKET")
 		}
-	} else if runtime == gpuv1.Containerd.String() {
+	case gpuv1.Containerd.String():
 		runtimeSocketFile = DefaultContainerdSocketFile
 		if getContainerEnv(c, "CONTAINERD_SOCKET") != "" {
 			runtimeSocketFile = getContainerEnv(c, "CONTAINERD_SOCKET")
 		}
+	default:
+		return "", fmt.Errorf("invalid runtime: %s", runtime)
 	}
-	return runtimeSocketFile
+
+	return runtimeSocketFile, nil
 }
 
 func getContainerEnv(c *corev1.Container, key string) string {
