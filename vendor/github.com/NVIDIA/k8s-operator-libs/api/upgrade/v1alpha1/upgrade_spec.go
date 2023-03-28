@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 // DriverUpgradePolicySpec describes policy configuration for automatic upgrades
 // +kubebuilder:object:root=true
@@ -32,10 +35,17 @@ type DriverUpgradePolicySpec struct {
 	// +optional
 	// +kubebuilder:default:=1
 	// +kubebuilder:validation:Minimum:=0
-	MaxParallelUpgrades int                    `json:"maxParallelUpgrades,omitempty"`
-	PodDeletion         *PodDeletionSpec       `json:"podDeletion,omitempty"`
-	WaitForCompletion   *WaitForCompletionSpec `json:"waitForCompletion,omitempty"`
-	DrainSpec           *DrainSpec             `json:"drain,omitempty"`
+	MaxParallelUpgrades int `json:"maxParallelUpgrades,omitempty"`
+	// MaxUnavailable is the maximum number of nodes with the driver installed, that can be unavailable during the upgrade.
+	// Value can be an absolute number (ex: 5) or a percentage of total nodes at the start of upgrade (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// By default, a fixed value of 25% is used.
+	// +optional
+	// +kubebuilder:default:="25%"
+	MaxUnavailable    *intstr.IntOrString    `json:"maxUnavailable,omitempty"`
+	PodDeletion       *PodDeletionSpec       `json:"podDeletion,omitempty"`
+	WaitForCompletion *WaitForCompletionSpec `json:"waitForCompletion,omitempty"`
+	DrainSpec         *DrainSpec             `json:"drain,omitempty"`
 }
 
 // WaitForCompletionSpec describes the configuration for waiting on job completions

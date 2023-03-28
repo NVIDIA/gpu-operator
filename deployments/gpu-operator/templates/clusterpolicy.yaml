@@ -196,6 +196,7 @@ spec:
     upgradePolicy:
       autoUpgrade: {{ .Values.driver.upgradePolicy.autoUpgrade | default false }}
       maxParallelUpgrades: {{ .Values.driver.upgradePolicy.maxParallelUpgrades | default 0 }}
+      maxUnavailable : {{ .Values.driver.upgradePolicy.maxUnavailable | default "25%" }}
       waitForCompletion:
         timeoutSeconds: {{ .Values.driver.upgradePolicy.waitForCompletion.timeoutSeconds }}
         {{- if .Values.driver.upgradePolicy.waitForCompletion.podSelector }}

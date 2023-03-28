@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -133,6 +134,27 @@ func (m *ClusterUpgradeStateManager) IsPodDeletionEnabled() bool {
 
 func (m *ClusterUpgradeStateManager) IsValidationEnabled() bool {
 	return m.validationStateEnabled
+}
+
+// GetCurrentUnavailableNodes returns all nodes that are not in ready state
+func (m *ClusterUpgradeStateManager) GetCurrentUnavailableNodes(ctx context.Context, currentState *ClusterUpgradeState) int {
+	unavailableNodes := 0
+	for _, nodeUpgradeStateList := range currentState.NodeStates {
+		for _, nodeUpgradeState := range nodeUpgradeStateList {
+			// check if the node is cordoned
+			if m.isNodeUnschedulable(nodeUpgradeState.Node) {
+				m.Log.V(consts.LogLevelDebug).Info("Node is cordoned", "node", nodeUpgradeState.Node.Name)
+				unavailableNodes++
+				continue
+			}
+			// check if the node is not ready
+			if !m.isNodeConditionReady(nodeUpgradeState.Node) {
+				m.Log.V(consts.LogLevelDebug).Info("Node is not-ready", "node", nodeUpgradeState.Node.Name)
+				unavailableNodes++
+			}
+		}
+	}
+	return unavailableNodes
 }
 
 func (m *ClusterUpgradeStateManager) BuildState(ctx context.Context, namespace string, driverLabels map[string]string) (*ClusterUpgradeState, error) {
@@ -252,7 +274,7 @@ func (m *ClusterUpgradeStateManager) getPodsOwnedbyDs(ds *appsv1.DaemonSet, pods
 // The function is stateless and idempotent. If the error was returned before all nodes' states were processed,
 // ApplyState would be called again and complete the processing - all the decisions are based on the input data.
 func (m *ClusterUpgradeStateManager) ApplyState(ctx context.Context,
-	currentState *ClusterUpgradeState, upgradePolicy *v1alpha1.DriverUpgradePolicySpec) error {
+	currentState *ClusterUpgradeState, upgradePolicy *v1alpha1.DriverUpgradePolicySpec) (err error) {
 	m.Log.V(consts.LogLevelInfo).Info("State Manager, got state update")
 
 	if currentState == nil {
@@ -277,33 +299,34 @@ func (m *ClusterUpgradeStateManager) ApplyState(ctx context.Context,
 		UpgradeStateValidationRequired, len(currentState.NodeStates[UpgradeStateValidationRequired]),
 		UpgradeStateUncordonRequired, len(currentState.NodeStates[UpgradeStateUncordonRequired]))
 
-	upgradesInProgress := len(currentState.NodeStates[UpgradeStateCordonRequired]) +
-		len(currentState.NodeStates[UpgradeStateDrainRequired]) +
-		len(currentState.NodeStates[UpgradeStatePodRestartRequired]) +
-		len(currentState.NodeStates[UpgradeStateWaitForJobsRequired]) +
-		len(currentState.NodeStates[UpgradeStatePodDeletionRequired]) +
-		len(currentState.NodeStates[UpgradeStateValidationRequired]) +
-		len(currentState.NodeStates[UpgradeStateFailed]) +
-		len(currentState.NodeStates[UpgradeStateUncordonRequired])
+	totalNodes := m.GetTotalManagedNodes(ctx, currentState)
+	upgradesInProgress := m.GetUpgradesInProgress(ctx, currentState)
+	currentUnavailableNodes := m.GetCurrentUnavailableNodes(ctx, currentState)
+	maxUnavailable := totalNodes
 
-	var upgradesAvailable int
-	if upgradePolicy.MaxParallelUpgrades == 0 {
-		// Only nodes in UpgradeStateUpgradeRequired can start upgrading, so all of them will move to drain stage
-		upgradesAvailable = len(currentState.NodeStates[UpgradeStateUpgradeRequired])
-	} else {
-		upgradesAvailable = upgradePolicy.MaxParallelUpgrades - upgradesInProgress
+	if upgradePolicy.MaxUnavailable != nil {
+		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(upgradePolicy.MaxUnavailable, totalNodes, true)
+		if err != nil {
+			m.Log.V(consts.LogLevelError).Error(err, "Failed to compute maxUnavailable from the current total nodes")
+			return err
+		}
 	}
+
+	upgradesAvailable := m.GetUpgradesAvailable(ctx, currentState, upgradePolicy.MaxParallelUpgrades, maxUnavailable)
 
 	m.Log.V(consts.LogLevelInfo).Info("Upgrades in progress",
 		"currently in progress", upgradesInProgress,
 		"max parallel upgrades", upgradePolicy.MaxParallelUpgrades,
-		"upgrade slots available", upgradesAvailable)
+		"upgrade slots available", upgradesAvailable,
+		"currently unavailable nodes", currentUnavailableNodes,
+		"total number of nodes", totalNodes,
+		"maximum nodes that can be unavailable", maxUnavailable)
 
 	// Determine the object to log this event
 	//m.EventRecorder.Eventf(m.Namespace, v1.EventTypeNormal, GetEventReason(), "InProgress: %d, MaxParallelUpgrades: %d, UpgradeSlotsAvailable: %s", upgradesInProgress, upgradePolicy.MaxParallelUpgrades, upgradesAvailable)
 
 	// First, check if unknown or ready nodes need to be upgraded
-	err := m.ProcessDoneOrUnknownNodes(ctx, currentState, UpgradeStateUnknown)
+	err = m.ProcessDoneOrUnknownNodes(ctx, currentState, UpgradeStateUnknown)
 	if err != nil {
 		m.Log.V(consts.LogLevelError).Error(err, "Failed to process nodes", "state", UpgradeStateUnknown)
 		return err
@@ -435,22 +458,27 @@ func (m *ClusterUpgradeStateManager) ProcessDoneOrUnknownNodes(
 // ProcessUpgradeRequiredNodes processes UpgradeStateUpgradeRequired nodes and moves them to UpgradeStateCordonRequired until
 // the limit on max parallel upgrades is reached.
 func (m *ClusterUpgradeStateManager) ProcessUpgradeRequiredNodes(
-	ctx context.Context, currentClusterState *ClusterUpgradeState, limit int) error {
+	ctx context.Context, currentClusterState *ClusterUpgradeState, upgradesAvailable int) error {
 	m.Log.V(consts.LogLevelInfo).Info("ProcessUpgradeRequiredNodes")
 	for _, nodeState := range currentClusterState.NodeStates[UpgradeStateUpgradeRequired] {
-		if limit <= 0 {
-			m.Log.V(consts.LogLevelInfo).Info("Limit for new upgrades is exceeded, skipping the iteration")
-			break
-		}
-
 		if m.skipNodeUpgrade(nodeState.Node) {
 			m.Log.V(consts.LogLevelInfo).Info("Node is marked for skipping upgrades", "node", nodeState.Node.Name)
 			continue
 		}
 
+		if upgradesAvailable <= 0 {
+			// when no new node upgrades are available, progess with manually cordoned nodes
+			if m.isNodeUnschedulable(nodeState.Node) {
+				m.Log.V(consts.LogLevelDebug).Info("Node is already cordoned, progressing for driver upgrade", "node", nodeState.Node.Name)
+			} else {
+				m.Log.V(consts.LogLevelDebug).Info("Node upgrade limit reached, pausing further upgrades", "node", nodeState.Node.Name)
+				continue
+			}
+		}
+
 		err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateCordonRequired)
 		if err == nil {
-			limit--
+			upgradesAvailable--
 			m.Log.V(consts.LogLevelInfo).Info("Node waiting for cordon",
 				"node", nodeState.Node.Name)
 		} else {
@@ -806,6 +834,21 @@ func (m *ClusterUpgradeStateManager) isDriverPodFailing(pod *corev1.Pod) bool {
 	return false
 }
 
+// isNodeUnschedulable returns true if the node is cordoned
+func (m *ClusterUpgradeStateManager) isNodeUnschedulable(node *corev1.Node) bool {
+	return node.Spec.Unschedulable
+}
+
+// isNodeConditionReady returns true if the node condition is ready
+func (m *ClusterUpgradeStateManager) isNodeConditionReady(node *corev1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady && condition.Status != corev1.ConditionTrue {
+			return false
+		}
+	}
+	return true
+}
+
 // skipNodeUpgrade returns true if node is labelled to skip driver upgrades
 func (m *ClusterUpgradeStateManager) skipNodeUpgrade(node *corev1.Node) bool {
 	if node.Labels[GetUpgradeSkipNodeLabelKey()] == "true" {
@@ -851,16 +894,31 @@ func isNodeUnschedulable(node *corev1.Node) bool {
 	return false
 }
 
-// GetUpgradesInProgress returns count of nodes on which upgrade is in progress
-func (m *ClusterUpgradeStateManager) GetUpgradesInProgress(ctx context.Context,
+// GetTotalManagedNodes returns the total count of nodes managed for driver upgrades
+func (m *ClusterUpgradeStateManager) GetTotalManagedNodes(ctx context.Context,
 	currentState *ClusterUpgradeState) int {
-	return len(currentState.NodeStates[UpgradeStateCordonRequired]) +
-		len(currentState.NodeStates[UpgradeStateDrainRequired]) +
-		len(currentState.NodeStates[UpgradeStatePodRestartRequired]) +
+	totalNodes := len(currentState.NodeStates[UpgradeStateUnknown]) +
+		len(currentState.NodeStates[UpgradeStateDone]) +
+		len(currentState.NodeStates[UpgradeStateUpgradeRequired]) +
+		len(currentState.NodeStates[UpgradeStateCordonRequired]) +
 		len(currentState.NodeStates[UpgradeStateWaitForJobsRequired]) +
 		len(currentState.NodeStates[UpgradeStatePodDeletionRequired]) +
 		len(currentState.NodeStates[UpgradeStateFailed]) +
-		len(currentState.NodeStates[UpgradeStateUncordonRequired])
+		len(currentState.NodeStates[UpgradeStateDrainRequired]) +
+		len(currentState.NodeStates[UpgradeStatePodRestartRequired]) +
+		len(currentState.NodeStates[UpgradeStateUncordonRequired]) +
+		len(currentState.NodeStates[UpgradeStateValidationRequired])
+
+	return totalNodes
+}
+
+// GetUpgradesInProgress returns count of nodes on which upgrade is in progress
+func (m *ClusterUpgradeStateManager) GetUpgradesInProgress(ctx context.Context,
+	currentState *ClusterUpgradeState) int {
+	totalNodes := m.GetTotalManagedNodes(ctx, currentState)
+	return totalNodes - (len(currentState.NodeStates[UpgradeStateUnknown]) +
+		len(currentState.NodeStates[UpgradeStateDone]) +
+		len(currentState.NodeStates[UpgradeStateUpgradeRequired]))
 }
 
 // GetUpgradesDone returns count of nodes on which upgrade is complete
@@ -871,14 +929,9 @@ func (m *ClusterUpgradeStateManager) GetUpgradesDone(ctx context.Context,
 
 // GetUpgradesAvailable returns count of nodes on which upgrade can be done
 func (m *ClusterUpgradeStateManager) GetUpgradesAvailable(ctx context.Context,
-	currentState *ClusterUpgradeState, maxParallelUpgrades int) int {
-	upgradesInProgress := len(currentState.NodeStates[UpgradeStateCordonRequired]) +
-		len(currentState.NodeStates[UpgradeStateDrainRequired]) +
-		len(currentState.NodeStates[UpgradeStatePodRestartRequired]) +
-		len(currentState.NodeStates[UpgradeStateWaitForJobsRequired]) +
-		len(currentState.NodeStates[UpgradeStatePodDeletionRequired]) +
-		len(currentState.NodeStates[UpgradeStateFailed]) +
-		len(currentState.NodeStates[UpgradeStateUncordonRequired])
+	currentState *ClusterUpgradeState, maxParallelUpgrades int, maxUnavailable int) int {
+	upgradesInProgress := m.GetUpgradesInProgress(ctx, currentState)
+	totalNodes := m.GetTotalManagedNodes(ctx, currentState)
 
 	var upgradesAvailable int
 	if maxParallelUpgrades == 0 {
@@ -886,6 +939,20 @@ func (m *ClusterUpgradeStateManager) GetUpgradesAvailable(ctx context.Context,
 		upgradesAvailable = len(currentState.NodeStates[UpgradeStateUpgradeRequired])
 	} else {
 		upgradesAvailable = maxParallelUpgrades - upgradesInProgress
+	}
+
+	// Apply the maxUnavailable constraint based on the number of nodes unavailable in the cluster
+	// Get nodes in cordoned/not-ready state and also include nodes that are about to be cordoned.
+	currentUnavailableNodes := m.GetCurrentUnavailableNodes(ctx, currentState) + len(currentState.NodeStates[UpgradeStateCordonRequired])
+	// always limit upgradesAvailalbe to maxUnavailable
+	if upgradesAvailable > maxUnavailable {
+		upgradesAvailable = maxUnavailable
+	}
+	// apply additional limits when there are already unavailable nodes
+	if currentUnavailableNodes >= maxUnavailable {
+		upgradesAvailable = 0
+	} else if maxUnavailable < totalNodes && currentUnavailableNodes+upgradesAvailable > maxUnavailable {
+		upgradesAvailable = maxUnavailable - currentUnavailableNodes
 	}
 	return upgradesAvailable
 }
