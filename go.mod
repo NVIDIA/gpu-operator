@@ -3,7 +3,7 @@ module github.com/NVIDIA/gpu-operator
 go 1.20
 
 require (
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230327211827-89451d4d7524
 	github.com/NVIDIA/nvidia-container-toolkit v1.12.0-rc.2.0.20230127101129-9fc2c5912242
 	github.com/go-logr/logr v1.2.3
 	github.com/mitchellh/hashstructure v1.1.0

@@ -15,6 +15,9 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 	"github.com/go-logr/logr"
@@ -22,6 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+)
+
+const (
+	validationTimeoutSeconds = 600
 )
 
 // ValidationManagerImpl implements the ValidationManager interface and waits on a validation pod,
@@ -84,8 +91,20 @@ func (m *ValidationManagerImpl) Validate(ctx context.Context, node *corev1.Node)
 	done := true
 	for _, pod := range podList.Items {
 		if !m.isPodReady(pod) {
+			err = m.handleTimeout(ctx, node, int64(validationTimeoutSeconds))
+			if err != nil {
+				logEventf(m.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(), "Failed to handle timeout for validation state", err.Error())
+				return false, fmt.Errorf("unable to handle timeout for validation state: %v", err)
+			}
 			done = false
 			break
+		}
+		// remove annotation used for tracking state time
+		annotationKey := GetValidationStartTimeAnnotationKey()
+		err = m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey, "null")
+		if err != nil {
+			m.log.V(consts.LogLevelError).Error(err, "Failed to remove annotation used to track validation completion", "node", node.Name, "annotation", annotationKey)
+			return done, err
 		}
 	}
 	return done, nil
@@ -109,4 +128,38 @@ func (m *ValidationManagerImpl) isPodReady(pod corev1.Pod) bool {
 	}
 
 	return true
+}
+
+// HandleTimeoutOnPodCompletions transitions node based on the timeout for job completions on the node
+func (m *ValidationManagerImpl) handleTimeout(ctx context.Context, node *corev1.Node, timeoutSeconds int64) error {
+	annotationKey := GetValidationStartTimeAnnotationKey()
+	currentTime := time.Now().Unix()
+	// check if annotation already exists for tracking start time
+	if _, present := node.Annotations[annotationKey]; !present {
+		// add the annotation to track start time
+		err := m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey, strconv.FormatInt(currentTime, 10))
+		if err != nil {
+			m.log.V(consts.LogLevelError).Error(err, "Failed to add annotation to track validation completion", "node", node.Name, "annotation", annotationKey)
+			return err
+		}
+		return nil
+	}
+	// check if timeout reached
+	startTime, err := strconv.ParseInt(node.Annotations[annotationKey], 10, 64)
+	if err != nil {
+		m.log.V(consts.LogLevelError).Error(err, "Failed to convert start time to track validation completion", "node", node.Name)
+		return err
+	}
+	if currentTime > startTime+timeoutSeconds {
+		// timeout exceeded, mark node in failed state
+		_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, node, UpgradeStateFailed)
+		m.log.V(consts.LogLevelInfo).Info("Timeout exceeded for validation, updated the node state", "node", node.Name, "state", UpgradeStateFailed)
+		// remove annotation used for tracking start time
+		err = m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey, "null")
+		if err != nil {
+			m.log.V(consts.LogLevelError).Error(err, "Failed to remove annotation used to track validation completion", "node", node.Name, "annotation", annotationKey)
+			return err
+		}
+	}
+	return nil
 }

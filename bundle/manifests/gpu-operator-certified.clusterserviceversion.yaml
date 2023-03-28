@@ -40,6 +40,7 @@ metadata:
                   "timeoutSeconds": 300
                 },
                 "maxParallelUpgrades": 1,
+                "maxUnavailable": "25%",
                 "podDeletion": {
                   "deleteEmptyDir": false,
                   "force": false,
