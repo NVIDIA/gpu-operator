@@ -10,12 +10,18 @@ data:
     #!/bin/bash
 
     host_driver=""
+    driver_root=""
+    driver_root_ctr_path=""
     while true; do
       if [[ -f /run/nvidia/validations/host-driver-ready ]]; then
         host_driver=true
+        driver_root="/"
+        driver_root_ctr_path="/host"
         break
       elif [[ -f /run/nvidia/validations/driver-ready ]]; then
         host_driver=false
+        driver_root="/run/nvidia/driver"
+        driver_root_ctr_path="/run/nvidia/driver"
         break
       else
         echo "waiting for the driver validations to be ready..."
@@ -25,6 +31,12 @@ data:
 
     export WITH_SHUTDOWN_HOST_GPU_CLIENTS=$host_driver
     echo "WITH_SHUTDOWN_HOST_GPU_CLIENTS=$WITH_SHUTDOWN_HOST_GPU_CLIENTS"
+
+    export DRIVER_ROOT=$driver_root
+    echo "DRIVER_ROOT=$DRIVER_ROOT"
+
+    export DRIVER_ROOT_CTR_PATH=$driver_root_ctr_path
+    echo "DRIVER_ROOT_CTR_PATH=$DRIVER_ROOT_CTR_PATH"
 
     echo "Starting nvidia-mig-manager"
     exec nvidia-mig-manager
