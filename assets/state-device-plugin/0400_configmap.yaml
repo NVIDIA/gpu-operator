@@ -10,15 +10,15 @@ data:
     #!/bin/bash
 
     driver_root=""
-    driver_root_ctr_path=""
+    container_driver_root=""
     while true; do
       if [[ -f /run/nvidia/validations/host-driver-ready ]]; then
         driver_root=/
-        driver_root_ctr_path=/host
+        container_driver_root=/host
         break
       elif [[ -f /run/nvidia/validations/driver-ready ]]; then
         driver_root=/run/nvidia/driver
-        driver_root_ctr_path=$driver_root
+        container_driver_root=$driver_root
         break
       else
         echo "waiting for the driver validations to be ready..."
@@ -29,8 +29,8 @@ data:
     export NVIDIA_DRIVER_ROOT=$driver_root
     echo "NVIDIA_DRIVER_ROOT=$NVIDIA_DRIVER_ROOT"
 
-    export DRIVER_ROOT_CTR_PATH=$driver_root_ctr_path
-    echo "DRIVER_ROOT_CTR_PATH=$DRIVER_ROOT_CTR_PATH"
+    export CONTAINER_DRIVER_ROOT=$container_driver_root
+    echo "CONTAINER_DRIVER_ROOT=$CONTAINER_DRIVER_ROOT"
 
     echo "Starting nvidia-device-plugin"
     exec nvidia-device-plugin
