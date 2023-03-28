@@ -15,10 +15,11 @@ package upgrade
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
 	"strings"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 )
 
 type StringSet struct {
@@ -110,6 +111,11 @@ func GetUpgradeInitialStateAnnotationKey() string {
 // GetWaitForPodCompletionStartTimeAnnotationKey returns the key for annotation used to track start time for waiting on pod/job completions
 func GetWaitForPodCompletionStartTimeAnnotationKey() string {
 	return fmt.Sprintf(UpgradeWaitForPodCompletionStartTimeAnnotationKeyFmt, DriverName)
+}
+
+// GetValidationTimeoutAnnotationKey returns the key for annotation indicating start time for validation-required state
+func GetValidationStartTimeAnnotationKey() string {
+	return fmt.Sprintf(UpgradeValidationStartTimeAnnotationKeyFmt, DriverName)
 }
 
 // GetEventReason returns the reason type based on the driver name

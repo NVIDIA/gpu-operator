@@ -291,6 +291,13 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 				}
 				return
 			}
+			// remove annotation used for tracking start time
+			annotationKey := GetWaitForPodCompletionStartTimeAnnotationKey()
+			err = m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, &node, annotationKey, "null")
+			if err != nil {
+				logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(), "Failed to remove annotation used to track job completions: %s", err.Error())
+				return
+			}
 			// update node state
 			_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, &node, UpgradeStatePodDeletionRequired)
 			m.log.V(consts.LogLevelInfo).Info("Updated the node state", "node", node.Name, "state", UpgradeStatePodDeletionRequired)
