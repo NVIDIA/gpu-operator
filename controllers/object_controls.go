@@ -123,12 +123,18 @@ const (
 	VgpuDMDefaultConfigName = "default"
 	// NvidiaCtrRuntimeModeEnvName is the name of the toolkit container env for configuring the NVIDIA Container Runtime mode
 	NvidiaCtrRuntimeModeEnvName = "NVIDIA_CONTAINER_RUNTIME_MODE"
+	// NvidiaCtrRuntimeCDIPrefixesEnvName is the name of toolkit container env for configuring the CDI annotation prefixes
+	NvidiaCtrRuntimeCDIPrefixesEnvName = "NVIDIA_CONTAINER_RUNTIME_MODES_CDI_ANNOTATION_PREFIXES"
 	// CDIEnabledEnvName is the name of the envvar used to enable CDI in the operands
 	CDIEnabledEnvName = "CDI_ENABLED"
 	// NvidiaCTKPathEnvName is the name of the envvar specifying the path to the 'nvidia-ctk' binary
 	NvidiaCTKPathEnvName = "NVIDIA_CTK_PATH"
 	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
 	CrioConfigModeEnvName = "CRIO_CONFIG_MODE"
+	// DeviceListStrategyEnvName is the name of the envvar for configuring the device-list-strategy in the device-plugin
+	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
+	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
+	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -1053,6 +1059,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
 		if config.CDI.IsDefault() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
@@ -1194,6 +1201,8 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
 		if config.Toolkit.IsEnabled() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
 		}
