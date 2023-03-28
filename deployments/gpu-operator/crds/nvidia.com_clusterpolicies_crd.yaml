@@ -1085,6 +1085,18 @@ spec:
                           will be upgraded in parallel
                         minimum: 0
                         type: integer
+                      maxUnavailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 25%
+                        description: 'MaxUnavailable is the maximum number of nodes
+                          with the driver installed, that can be unavailable during
+                          the upgrade. Value can be an absolute number (ex: 5) or
+                          a percentage of total nodes at the start of upgrade (ex:
+                          10%). Absolute number is calculated from percentage by rounding
+                          up. By default, a fixed value of 1 is used.'
+                        x-kubernetes-int-or-string: true
                       podDeletion:
                         description: PodDeletionSpec describes configuration for deletion
                           of pods using special resources during automatic upgrade

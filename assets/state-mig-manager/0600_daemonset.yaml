@@ -40,7 +40,8 @@ spec:
         image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         command: [bash, -c]
-        args: [" [[ -f /run/nvidia/validations/host-driver-ready ]] && host_driver=true || host_driver=false; export WITH_SHUTDOWN_HOST_GPU_CLIENTS=$host_driver; exec nvidia-mig-manager"]
+        args:
+          - /bin/entrypoint.sh
         env:
         - name: NODE_NAME
           valueFrom:
@@ -57,6 +58,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        - name: nvidia-mig-manager-entrypoint
+          readOnly: true
+          mountPath: /bin/entrypoint.sh
+          subPath: entrypoint.sh
         - mountPath: /sys
           name: host-sys
         - mountPath: /mig-parted-config
@@ -69,7 +74,13 @@ spec:
         - name: run-nvidia
           mountPath: /run/nvidia
           mountPropagation: HostToContainer
+        - name: cdi-root
+          mountPath: /var/run/cdi
       volumes:
+      - name: nvidia-mig-manager-entrypoint
+        configMap:
+          name: nvidia-mig-manager-entrypoint
+          defaultMode: 448
       - name: host-sys
         hostPath:
           path: /sys
@@ -87,3 +98,7 @@ spec:
       - name: gpu-clients
         configMap:
           name: "FILLED_BY_OPERATOR"
+      - name: cdi-root
+        hostPath:
+          path: /var/run/cdi
+          type: DirectoryOrCreate

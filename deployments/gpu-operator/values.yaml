@@ -131,6 +131,12 @@ driver:
     # how many nodes can be upgraded in parallel
     # 0 means no limit, all nodes will be upgraded in parallel
     maxParallelUpgrades: 1
+    # maximum number of nodes with the driver installed, that can be unavailable during
+    # the upgrade. Value can be an absolute number (ex: 5) or
+    # a percentage of total nodes at the start of upgrade (ex:
+    # 10%). Absolute number is calculated from percentage by rounding
+    # up. By default, a fixed value of 25% is used.'
+    maxUnavailable: 25%
     # options for waiting on pod(job) completions
     waitForCompletion:
       timeoutSeconds: 0
@@ -400,6 +406,10 @@ sandboxDevicePlugin:
 node-feature-discovery:
   enableNodeFeatureApi: true
   worker:
+    serviceAccount:
+      name: node-feature-discovery
+      # disable creation to avoid duplicate serviceaccount creation by master spec below
+      create: false
     tolerations:
     - key: "node-role.kubernetes.io/master"
       operator: "Equal"
@@ -408,7 +418,6 @@ node-feature-discovery:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-
     config:
       sources:
         pci:
@@ -420,9 +429,9 @@ node-feature-discovery:
           - "0302"
           deviceLabelFields:
           - vendor
-
   master:
     extraLabelNs:
       - nvidia.com
     serviceAccount:
       name: node-feature-discovery
+      create: true

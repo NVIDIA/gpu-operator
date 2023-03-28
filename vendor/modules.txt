@@ -27,7 +27,7 @@ github.com/Azure/go-autorest/tracing
 # github.com/MakeNowJust/heredoc v1.0.0
 ## explicit; go 1.12
 github.com/MakeNowJust/heredoc
-# github.com/NVIDIA/k8s-operator-libs v0.0.0-20230118182127-8e73980389ca
+# github.com/NVIDIA/k8s-operator-libs v0.0.0-20230327211827-89451d4d7524
 ## explicit; go 1.18
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
