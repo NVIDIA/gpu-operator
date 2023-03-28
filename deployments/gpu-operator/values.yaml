@@ -400,6 +400,10 @@ sandboxDevicePlugin:
 node-feature-discovery:
   enableNodeFeatureApi: true
   worker:
+    serviceAccount:
+      name: node-feature-discovery
+      # disable creation to avoid duplicate serviceaccount creation by master spec below
+      create: false
     tolerations:
     - key: "node-role.kubernetes.io/master"
       operator: "Equal"
@@ -408,7 +412,6 @@ node-feature-discovery:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-
     config:
       sources:
         pci:
@@ -420,9 +423,9 @@ node-feature-discovery:
           - "0302"
           deviceLabelFields:
           - vendor
-
   master:
     extraLabelNs:
       - nvidia.com
     serviceAccount:
       name: node-feature-discovery
+      create: true
