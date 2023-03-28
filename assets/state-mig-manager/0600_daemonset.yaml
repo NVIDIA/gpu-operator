@@ -74,6 +74,8 @@ spec:
         - name: run-nvidia
           mountPath: /run/nvidia
           mountPropagation: HostToContainer
+        - name: cdi-root
+          mountPath: /var/run/cdi
       volumes:
       - name: nvidia-mig-manager-entrypoint
         configMap:
@@ -96,3 +98,7 @@ spec:
       - name: gpu-clients
         configMap:
           name: "FILLED_BY_OPERATOR"
+      - name: cdi-root
+        hostPath:
+          path: /var/run/cdi
+          type: DirectoryOrCreate

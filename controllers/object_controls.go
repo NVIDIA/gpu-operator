@@ -1522,6 +1522,11 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		break
 	}
 
+	// update env required for CDI support
+	if config.CDI.IsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+	}
+
 	return nil
 }
 
