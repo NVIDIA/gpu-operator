@@ -118,7 +118,7 @@ driver:
   usePrecompiled: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "525.85.12"
+  version: "525.105.17"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   rdma:
@@ -197,7 +197,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.13.0-rc.2-ubuntu20.04
+  version: v1.13.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -208,7 +208,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.14.0-rc.2-ubi8
+  version: v0.14.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -262,7 +262,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 3.1.6-1-ubuntu20.04
+  version: 3.1.7-1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -273,7 +273,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 3.1.6-3.1.3-ubuntu20.04
+  version: 3.1.7-3.1.4-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
@@ -293,7 +293,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.8.0-rc.1-ubi8
+  version: v0.8.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -307,7 +307,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.5.1-ubuntu20.04
+  version: v0.5.2-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -364,7 +364,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: "v0.2.0"
+  version: "v0.2.1"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
