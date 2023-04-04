@@ -50,6 +50,9 @@ spec:
     config:
       name: ""
 
+  gds:
+    enabled: false
+
   migManager:
     enabled: true
     config:
