@@ -33,9 +33,10 @@ spec:
           command:
           - /bin/sh
           - -c
-          - kubectl apply -f /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml;
+          - >
+            kubectl apply -f /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml;
         {{- if .Values.nfd.enabled }}
-          - kubectl apply -f /opt/gpu-operator/nfd-api-crds.yaml;
+            kubectl apply -f /opt/gpu-operator/nfd-api-crds.yaml;
         {{- end }}
       restartPolicy: OnFailure
 {{- end }}
