@@ -21,6 +21,9 @@ spec:
       annotations:
         {{- toYaml .Values.worker.annotations | nindent 8 }}
     spec:
+    {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+    {{- end }}
       dnsPolicy: ClusterFirstWithHostNet
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

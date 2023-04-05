@@ -12,6 +12,8 @@ namespaceOverride: ""
 
 enableNodeFeatureApi: true
 
+priorityClassName: ""
+
 master:
   instance:
   featureApi:
