@@ -186,9 +186,9 @@ rules:
   - get
   - list
   - watch
-{{- if or (.Values.operator.cleanupCRD) (.Values.operator.upgradeCRD) }}
-  - delete
-  - create
   - update
   - patch
+  - create
+{{- if .Values.operator.cleanupCRD }}
+  - delete
 {{- end }}
