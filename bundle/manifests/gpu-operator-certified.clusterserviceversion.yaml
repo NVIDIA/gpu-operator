@@ -159,7 +159,7 @@ spec:
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:03e43d6b1460cadb33509d5ee07a5e27603ab89d7ec35f67d8a51bb78745b463
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:5489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:3df118f2330e95db3c76173cca35e542b2da120ec0bb8f6aff83c4c96c0c2daf
     - name: driver-image-515
@@ -801,7 +801,7 @@ spec:
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:84ce86490d0d313ed6517f2ac3a271e1179d7478d86c772da3846727d7feddc3"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:5489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a"
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:03e43d6b1460cadb33509d5ee07a5e27603ab89d7ec35f67d8a51bb78745b463"
                   - name: "DCGM_EXPORTER_IMAGE"
