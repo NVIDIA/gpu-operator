@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <23.3.0'
+    olm.skipRange: '>=1.9.0 <23.3.1'
     alm-examples: |-
       [
         {
@@ -141,19 +141,19 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
-    createdAt: "Wed Sep 14 07:33:59 PDT 2022"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:f076ebbd2694c18f0a2944e2ccd026013074640062107dd77b021457776dfc4c
+    createdAt: "Wed Apr  5 14:14:54 PDT 2023"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v23.3.0
+  name: gpu-operator-certified.v23.3.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:f076ebbd2694c18f0a2944e2ccd026013074640062107dd77b021457776dfc4c
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:f10170b076badda8f669af8b0f7b47eb5470abaf35a67dda9c4e182d66138177
     - name: dcgm-image
@@ -177,7 +177,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a
     - name: gpu-operator-validator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:72b7988ef65359feb5c7b77f2c1d0c4060e40686a244d6a622f9fd085cdb11ec
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:cab21c93987a5c884075efe0fb4a8abaa1997e1696cbc773ba69889f42f8329b
     - name: vfio-manager-image
@@ -759,7 +759,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:f076ebbd2694c18f0a2944e2ccd026013074640062107dd77b021457776dfc4c
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -797,7 +797,7 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:72b7988ef65359feb5c7b77f2c1d0c4060e40686a244d6a622f9fd085cdb11ec"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:84ce86490d0d313ed6517f2ac3a271e1179d7478d86c772da3846727d7feddc3"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
@@ -860,5 +860,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 23.3.0
-  replaces: gpu-operator-certified.v22.9.2
+  version: 23.3.1
+  replaces: gpu-operator-certified.v23.3.0

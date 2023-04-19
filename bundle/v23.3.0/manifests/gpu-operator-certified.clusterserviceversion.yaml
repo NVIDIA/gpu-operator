@@ -141,8 +141,8 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
-    createdAt: "Wed Sep 14 07:33:59 PDT 2022"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:2133086c10c1888cb9c8527ed9ecf89c29b5a34b5f92ac41126f405540397c8c
+    createdAt: "Tue Apr  4 16:54:00 PDT 2023"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
@@ -153,13 +153,13 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:2133086c10c1888cb9c8527ed9ecf89c29b5a34b5f92ac41126f405540397c8c
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:f10170b076badda8f669af8b0f7b47eb5470abaf35a67dda9c4e182d66138177
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:03e43d6b1460cadb33509d5ee07a5e27603ab89d7ec35f67d8a51bb78745b463
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:5489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:3df118f2330e95db3c76173cca35e542b2da120ec0bb8f6aff83c4c96c0c2daf
     - name: driver-image-515
@@ -177,7 +177,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a
     - name: gpu-operator-validator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:f48ff3aadd107dabe86a0dab3b72950c86087a82c038af8557e46ddc19e4a0ad
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:cab21c93987a5c884075efe0fb4a8abaa1997e1696cbc773ba69889f42f8329b
     - name: vfio-manager-image
@@ -759,7 +759,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:2133086c10c1888cb9c8527ed9ecf89c29b5a34b5f92ac41126f405540397c8c
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -797,11 +797,11 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:f48ff3aadd107dabe86a0dab3b72950c86087a82c038af8557e46ddc19e4a0ad"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:84ce86490d0d313ed6517f2ac3a271e1179d7478d86c772da3846727d7feddc3"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:5489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:489125ceae5864280e4d6a9ab52ab0f650b3179349a7298c4a204feb60b661a"
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:03e43d6b1460cadb33509d5ee07a5e27603ab89d7ec35f67d8a51bb78745b463"
                   - name: "DCGM_EXPORTER_IMAGE"
