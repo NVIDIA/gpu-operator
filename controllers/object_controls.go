@@ -2267,6 +2267,12 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 				obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil, nil
 		}
+
+		// if a container is not found, then it must have been removed already, return success
+		if remove {
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf(fmt.Sprintf("could not find the '%s' container", name))
 	}
 
