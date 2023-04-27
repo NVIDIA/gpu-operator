@@ -131,11 +131,11 @@ spec:
           exec:
             command:
               [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
-          timeoutSeconds: 10
+          timeoutSeconds: 60
         lifecycle:
           preStop:
             exec:

@@ -121,6 +121,13 @@ driver:
   version: "525.105.17"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    # nvidia-smi can take longer than 30s in some cases
+    # ensure enough timeout is set
+    timeoutSeconds: 60
+    failureThreshold: 120
   rdma:
     enabled: false
     useHostMofed: false

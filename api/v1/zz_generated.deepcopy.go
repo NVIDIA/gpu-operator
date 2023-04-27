@@ -521,6 +521,21 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.StartupProbe != nil {
+		in, out := &in.StartupProbe, &out.StartupProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ReadinessProbe != nil {
+		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = new(corev1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.GPUDirectRDMA != nil {
 		in, out := &in.GPUDirectRDMA, &out.GPUDirectRDMA
 		*out = new(GPUDirectRDMASpec)
