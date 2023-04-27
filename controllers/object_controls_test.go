@@ -94,6 +94,7 @@ type commonDaemonsetSpec struct {
 	args             []string
 	env              []corev1.EnvVar
 	resources        *corev1.ResourceRequirements
+	startupProbe     *corev1.Probe
 }
 
 func TestMain(m *testing.M) {
@@ -312,6 +313,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 			args:             cp.Spec.Driver.Args,
 			env:              cp.Spec.Driver.Env,
 			resources:        cp.Spec.Driver.Resources,
+			startupProbe:     cp.Spec.Driver.StartupProbe,
 		}
 		dsLabel = "nvidia-driver-daemonset"
 		mainCtrName = "nvidia-driver"
@@ -432,6 +434,13 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 	require.Equal(t, gpuv1.ImagePullPolicy(spec.imagePullPolicy), mainCtr.ImagePullPolicy, "unexpected ImagePullPolicy")
 	require.Equal(t, spec.imagePullSecrets, ds.Spec.Template.Spec.ImagePullSecrets, "unexpected ImagePullSecrets")
 
+	if spec.startupProbe != nil {
+		require.Equal(t, spec.startupProbe.InitialDelaySeconds, mainCtr.StartupProbe.InitialDelaySeconds)
+		require.Equal(t, spec.startupProbe.PeriodSeconds, mainCtr.StartupProbe.PeriodSeconds)
+		require.Equal(t, spec.startupProbe.TimeoutSeconds, mainCtr.StartupProbe.TimeoutSeconds)
+		require.Equal(t, spec.startupProbe.FailureThreshold, mainCtr.StartupProbe.FailureThreshold)
+	}
+
 	if spec.args != nil {
 		require.Equal(t, spec.args, mainCtr.Args, "unexpected Args")
 	}
@@ -456,6 +465,8 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.Driver.Manager.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.Driver.Manager.Image = "k8s-driver-manager"
 	cp.Spec.Driver.Manager.Version = "test"
+
+	cp.Spec.Driver.StartupProbe = &corev1.Probe{InitialDelaySeconds: 60, PeriodSeconds: 10, FailureThreshold: 120, TimeoutSeconds: 60}
 
 	switch testCase {
 	case "default":

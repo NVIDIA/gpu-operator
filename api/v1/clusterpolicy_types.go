@@ -392,6 +392,15 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// NVIDIA Driver container startup probe settings
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+
+	// NVIDIA Driver container liveness probe settings
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// NVIDIA Driver container readiness probe settings
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
 
 	// Driver auto-upgrade settings
