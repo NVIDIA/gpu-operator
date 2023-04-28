@@ -378,6 +378,35 @@ type DriverManagerSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
+// ContainerProbeSpec defines the properties for configuring container probes
+type ContainerProbeSpec struct {
+	// Number of seconds after the container has started before liveness probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +kubebuilder:validation:Optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
+	// Number of seconds after which the probe times out.
+	// Defaults to 1 second. Minimum value is 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+	// How often (in seconds) to perform the probe.
+	// Default to 10 seconds. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// Defaults to 3. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
 // DriverSpec defines the properties for NVIDIA Driver deployment
 type DriverSpec struct {
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
@@ -393,13 +422,13 @@ type DriverSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// NVIDIA Driver container startup probe settings
-	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+	StartupProbe *ContainerProbeSpec `json:"startupProbe,omitempty"`
 
 	// NVIDIA Driver container liveness probe settings
-	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+	LivenessProbe *ContainerProbeSpec `json:"livenessProbe,omitempty"`
 
 	// NVIDIA Driver container readiness probe settings
-	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+	ReadinessProbe *ContainerProbeSpec `json:"readinessProbe,omitempty"`
 
 	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
 
