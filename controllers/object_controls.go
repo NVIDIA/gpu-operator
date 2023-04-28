@@ -1972,7 +1972,7 @@ func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClas
 	}
 }
 
-func setContainerProbe(container *corev1.Container, probe *corev1.Probe, probeType ContainerProbe) error {
+func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) error {
 	var containerProbe *corev1.Probe
 
 	// determine probe type to update

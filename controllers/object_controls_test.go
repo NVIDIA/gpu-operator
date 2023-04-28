@@ -94,7 +94,7 @@ type commonDaemonsetSpec struct {
 	args             []string
 	env              []corev1.EnvVar
 	resources        *corev1.ResourceRequirements
-	startupProbe     *corev1.Probe
+	startupProbe     *gpuv1.ContainerProbeSpec
 }
 
 func TestMain(m *testing.M) {
@@ -466,7 +466,7 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.Driver.Manager.Image = "k8s-driver-manager"
 	cp.Spec.Driver.Manager.Version = "test"
 
-	cp.Spec.Driver.StartupProbe = &corev1.Probe{InitialDelaySeconds: 60, PeriodSeconds: 10, FailureThreshold: 120, TimeoutSeconds: 60}
+	cp.Spec.Driver.StartupProbe = &gpuv1.ContainerProbeSpec{InitialDelaySeconds: 20, PeriodSeconds: 5, FailureThreshold: 1, TimeoutSeconds: 60}
 
 	switch testCase {
 	case "default":
