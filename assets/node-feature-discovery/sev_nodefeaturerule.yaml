@@ -1,0 +1,33 @@
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  generation: 1
+  name: sev-rule
+  resourceVersion: "7509"
+spec:
+  rules:
+  - labels:
+      sev.enabled: "true"
+    matchFeatures:
+    - feature: cpu.security
+      matchExpressions:
+        sev.enabled:
+          op: IsTrue
+    name: "SEV rule"
+  - labels:
+      sev.es.enabled: "true"
+    matchFeatures:
+    - feature: cpu.security
+      matchExpressions:
+        sev.es.enabled:
+          op: IsTrue
+    name: "SEV-ES rule"
+  - extendedResources:
+      sev_asids: '@cpu.security.sev.asids'
+      sev_es: '@cpu.security.sev.encrypted_state_ids'
+    matchFeatures:
+    - feature: cpu.security
+      matchExpressions:
+        sev.enabled:
+          op: Exists
+    name: SEV system capacitys
