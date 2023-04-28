@@ -1,0 +1,90 @@
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: nvidia-cc-capable
+spec:
+  rules:
+    - name: "NVIDIA CC capable"
+      labels:
+        "nvidia.com/cc.capable": "true"
+      matchAny: # TDX/SEV + Hopper GPU
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              sev.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2339"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              sev.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2331"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              sev.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2330"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              sev.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2324"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              sev.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2322"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              tdx.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2339"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              tdx.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2331"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              tdx.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2330"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              tdx.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2324"]}
+       - matchFeatures:
+          - feature: cpu.security
+            matchExpressions:
+              tdx.enabled: { op: Exists }
+          - feature: pci.device
+            matchExpressions:
+              vendor: {op: In, value: ["10de"]}
+              device: {op: In, value: ["2322"]}
