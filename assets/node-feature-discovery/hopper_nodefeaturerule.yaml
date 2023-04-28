@@ -1,0 +1,51 @@
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: nvidia-gpu-hopper
+spec:
+  rules:
+    - name: "NVIDIA H100"
+      labels:
+        "nvidia.com/gpu.H100": "true"
+        "nvidia.com/gpu.hopper": "true"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2339"]}
+    - name: "NVIDIA H100 PCIe"
+      labels:
+        "nvidia.com/gpu.H100.pcie": "true"
+        "nvidia.com/gpu.hopper": "true"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2331"]}
+    - name: "NVIDIA H100 80GB HBM3"
+      labels:
+        "nvidia.com/gpu.H100.HBM3": "true"
+        "nvidia.com/gpu.hopper": "true"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2330"]}
+    - name: "NVIDIA H800"
+      labels:
+        "nvidia.com/gpu.H800": "true"
+        "nvidia.com/gpu.hopper": "true"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2324"]}
+    - name: "NVIDIA H800 PCIE"
+      labels:
+        "nvidia.com/gpu.H800.pcie": "true"
+        "nvidia.com/gpu.hopper": "true"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2322"]}
