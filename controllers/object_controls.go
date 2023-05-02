@@ -137,6 +137,18 @@ const (
 	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
 )
 
+// ContainerProbe defines container probe types
+type ContainerProbe string
+
+const (
+	// Startup probe
+	Startup ContainerProbe = "startup"
+	// Liveness probe
+	Liveness ContainerProbe = "liveness"
+	// Readiness probe
+	Readiness ContainerProbe = "readiness"
+)
+
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
 	"centos": "/etc/yum.repos.d",
@@ -1960,6 +1972,40 @@ func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClas
 	}
 }
 
+func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) error {
+	var containerProbe *corev1.Probe
+
+	// determine probe type to update
+	switch probeType {
+	case Startup:
+		containerProbe = container.StartupProbe
+	case Liveness:
+		containerProbe = container.LivenessProbe
+	case Readiness:
+		containerProbe = container.ReadinessProbe
+	default:
+		return fmt.Errorf("invalid container probe type %s specified", probeType)
+	}
+
+	// set probe parameters if specified
+	if probe.InitialDelaySeconds != 0 {
+		containerProbe.InitialDelaySeconds = probe.InitialDelaySeconds
+	}
+	if probe.TimeoutSeconds != 0 {
+		containerProbe.TimeoutSeconds = probe.TimeoutSeconds
+	}
+	if probe.FailureThreshold != 0 {
+		containerProbe.FailureThreshold = probe.FailureThreshold
+	}
+	if probe.SuccessThreshold != 0 {
+		containerProbe.SuccessThreshold = probe.SuccessThreshold
+	}
+	if probe.PeriodSeconds != 0 {
+		containerProbe.PeriodSeconds = probe.PeriodSeconds
+	}
+	return nil
+}
+
 // applies MIG related configuration env to container spec
 func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy) {
 	// if not set then let plugin decide this per node(default: none)
@@ -2566,6 +2612,17 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), env.Name, env.Value)
 		}
 	}
+	// set container probe timeouts
+	if config.Driver.StartupProbe != nil {
+		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.StartupProbe, Startup)
+	}
+	if config.Driver.LivenessProbe != nil {
+		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.LivenessProbe, Liveness)
+	}
+	if config.Driver.ReadinessProbe != nil {
+		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.ReadinessProbe, Readiness)
+	}
+
 	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
 		// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), GPUDirectRDMAEnabledEnvName, "true")
