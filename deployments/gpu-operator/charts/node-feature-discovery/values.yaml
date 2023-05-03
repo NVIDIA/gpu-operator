@@ -1,0 +1,484 @@
+image:
+  repository: registry.k8s.io/nfd/node-feature-discovery
+  # This should be set to 'IfNotPresent' for released version
+  pullPolicy: IfNotPresent
+  # tag, if defined will use the given image tag, else Chart.AppVersion will be used
+  # tag
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+enableNodeFeatureApi: false
+
+master:
+  config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
+    # noPublish: false
+    # extraLabelNs: ["added.ns.io","added.kubernets.io"]
+    # denyLabelNs: ["denied.ns.io","denied.kubernetes.io"]
+    # resourceLabels: ["vendor-1.com/feature-1","vendor-2.io/feature-2"]
+    # enableTaints: false
+    # labelWhiteList: "foo"
+  ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
+  # The TCP port that nfd-master listens for incoming requests. Default: 8080
+  port: 8080
+  instance:
+  featureApi:
+  denyLabelNs: []
+  extraLabelNs: []
+  resourceLabels: []
+  enableTaints: false
+  crdController: null
+  featureRulesController: null
+  deploymentAnnotations: {}
+  replicaCount: 1
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ "ALL" ]
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    # runAsUser: 1000
+
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name:
+
+  rbac:
+    create: true
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+
+  annotations: {}
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/master"
+                operator: In
+                values: [""]
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: In
+                values: [""]
+
+worker:
+  config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
+    #core:
+    #  labelWhiteList:
+    #  noPublish: false
+    #  sleepInterval: 60s
+    #  featureSources: [all]
+    #  labelSources: [all]
+    #  klog:
+    #    addDirHeader: false
+    #    alsologtostderr: false
+    #    logBacktraceAt:
+    #    logtostderr: true
+    #    skipHeaders: false
+    #    stderrthreshold: 2
+    #    v: 0
+    #    vmodule:
+    ##   NOTE: the following options are not dynamically run-time configurable
+    ##         and require a nfd-worker restart to take effect after being changed
+    #    logDir:
+    #    logFile:
+    #    logFileMaxSize: 1800
+    #    skipLogHeaders: false
+    #sources:
+    #  cpu:
+    #    cpuid:
+    ##     NOTE: whitelist has priority over blacklist
+    #      attributeBlacklist:
+    #        - "BMI1"
+    #        - "BMI2"
+    #        - "CLMUL"
+    #        - "CMOV"
+    #        - "CX16"
+    #        - "ERMS"
+    #        - "F16C"
+    #        - "HTT"
+    #        - "LZCNT"
+    #        - "MMX"
+    #        - "MMXEXT"
+    #        - "NX"
+    #        - "POPCNT"
+    #        - "RDRAND"
+    #        - "RDSEED"
+    #        - "RDTSCP"
+    #        - "SGX"
+    #        - "SSE"
+    #        - "SSE2"
+    #        - "SSE3"
+    #        - "SSE4"
+    #        - "SSE42"
+    #        - "SSSE3"
+    #      attributeWhitelist:
+    #  kernel:
+    #    kconfigFile: "/path/to/kconfig"
+    #    configOpts:
+    #      - "NO_HZ"
+    #      - "X86"
+    #      - "DMI"
+    #  pci:
+    #    deviceClassWhitelist:
+    #      - "0200"
+    #      - "03"
+    #      - "12"
+    #    deviceLabelFields:
+    #      - "class"
+    #      - "vendor"
+    #      - "device"
+    #      - "subsystem_vendor"
+    #      - "subsystem_device"
+    #  usb:
+    #    deviceClassWhitelist:
+    #      - "0e"
+    #      - "ef"
+    #      - "fe"
+    #      - "ff"
+    #    deviceLabelFields:
+    #      - "class"
+    #      - "vendor"
+    #      - "device"
+    #  local:
+    #    hooksEnabled: true
+    #  custom:
+    #    # The following feature demonstrates the capabilities of the matchFeatures
+    #    - name: "my custom rule"
+    #      labels:
+    #        my-ng-feature: "true"
+    #      # matchFeatures implements a logical AND over all matcher terms in the
+    #      # list (i.e. all of the terms, or per-feature matchers, must match)
+    #      matchFeatures:
+    #        - feature: cpu.cpuid
+    #          matchExpressions:
+    #            AVX512F: {op: Exists}
+    #        - feature: cpu.cstate
+    #          matchExpressions:
+    #            enabled: {op: IsTrue}
+    #        - feature: cpu.pstate
+    #          matchExpressions:
+    #            no_turbo: {op: IsFalse}
+    #            scaling_governor: {op: In, value: ["performance"]}
+    #        - feature: cpu.rdt
+    #          matchExpressions:
+    #            RDTL3CA: {op: Exists}
+    #        - feature: cpu.sst
+    #          matchExpressions:
+    #            bf.enabled: {op: IsTrue}
+    #        - feature: cpu.topology
+    #          matchExpressions:
+    #            hardware_multithreading: {op: IsFalse}
+    #
+    #        - feature: kernel.config
+    #          matchExpressions:
+    #            X86: {op: Exists}
+    #            LSM: {op: InRegexp, value: ["apparmor"]}
+    #        - feature: kernel.loadedmodule
+    #          matchExpressions:
+    #            e1000e: {op: Exists}
+    #        - feature: kernel.selinux
+    #          matchExpressions:
+    #            enabled: {op: IsFalse}
+    #        - feature: kernel.version
+    #          matchExpressions:
+    #            major: {op: In, value: ["5"]}
+    #            minor: {op: Gt, value: ["10"]}
+    #
+    #        - feature: storage.block
+    #          matchExpressions:
+    #            rotational: {op: In, value: ["0"]}
+    #            dax: {op: In, value: ["0"]}
+    #
+    #        - feature: network.device
+    #          matchExpressions:
+    #            operstate: {op: In, value: ["up"]}
+    #            speed: {op: Gt, value: ["100"]}
+    #
+    #        - feature: memory.numa
+    #          matchExpressions:
+    #            node_count: {op: Gt, value: ["2"]}
+    #        - feature: memory.nv
+    #          matchExpressions:
+    #            devtype: {op: In, value: ["nd_dax"]}
+    #            mode: {op: In, value: ["memory"]}
+    #
+    #        - feature: system.osrelease
+    #          matchExpressions:
+    #            ID: {op: In, value: ["fedora", "centos"]}
+    #        - feature: system.name
+    #          matchExpressions:
+    #            nodename: {op: InRegexp, value: ["^worker-X"]}
+    #
+    #        - feature: local.label
+    #          matchExpressions:
+    #            custom-feature-knob: {op: Gt, value: ["100"]}
+    #
+    #    # The following feature demonstrates the capabilities of the matchAny
+    #    - name: "my matchAny rule"
+    #      labels:
+    #        my-ng-feature-2: "my-value"
+    #      # matchAny implements a logical IF over all elements (sub-matchers) in
+    #      # the list (i.e. at least one feature matcher must match)
+    #      matchAny:
+    #        - matchFeatures:
+    #            - feature: kernel.loadedmodule
+    #              matchExpressions:
+    #                driver-module-X: {op: Exists}
+    #            - feature: pci.device
+    #              matchExpressions:
+    #                vendor: {op: In, value: ["8086"]}
+    #                class: {op: In, value: ["0200"]}
+    #        - matchFeatures:
+    #            - feature: kernel.loadedmodule
+    #              matchExpressions:
+    #                driver-module-Y: {op: Exists}
+    #            - feature: usb.device
+    #              matchExpressions:
+    #                vendor: {op: In, value: ["8086"]}
+    #                class: {op: In, value: ["02"]}
+    #
+    #    # The following features demonstreate label templating capabilities
+    #    - name: "my template rule"
+    #      labelsTemplate: |
+    #        {{ range .system.osrelease }}my-system-feature.{{ .Name }}={{ .Value }}
+    #        {{ end }}
+    #      matchFeatures:
+    #        - feature: system.osrelease
+    #          matchExpressions:
+    #            ID: {op: InRegexp, value: ["^open.*"]}
+    #            VERSION_ID.major: {op: In, value: ["13", "15"]}
+    #
+    #    - name: "my template rule 2"
+    #      labelsTemplate: |
+    #        {{ range .pci.device }}my-pci-device.{{ .class }}-{{ .device }}=with-cpuid
+    #        {{ end }}
+    #      matchFeatures:
+    #        - feature: pci.device
+    #          matchExpressions:
+    #            class: {op: InRegexp, value: ["^06"]}
+    #            vendor: ["8086"]
+    #        - feature: cpu.cpuid
+    #          matchExpressions:
+    #            AVX: {op: Exists}
+    #
+    #    # The following examples demonstrate vars field and back-referencing
+    #    # previous labels and vars
+    #    - name: "my dummy kernel rule"
+    #      labels:
+    #        "my.kernel.feature": "true"
+    #      matchFeatures:
+    #        - feature: kernel.version
+    #          matchExpressions:
+    #            major: {op: Gt, value: ["2"]}
+    #
+    #    - name: "my dummy rule with no labels"
+    #      vars:
+    #        "my.dummy.var": "1"
+    #      matchFeatures:
+    #        - feature: cpu.cpuid
+    #          matchExpressions: {}
+    #
+    #    - name: "my rule using backrefs"
+    #      labels:
+    #        "my.backref.feature": "true"
+    #      matchFeatures:
+    #        - feature: rule.matched
+    #          matchExpressions:
+    #            my.kernel.feature: {op: IsTrue}
+    #            my.dummy.var: {op: Gt, value: ["0"]}
+    #
+### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
+
+  daemonsetAnnotations: {}
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ "ALL" ]
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    # runAsUser: 1000
+
+  serviceAccount:
+    # Specifies whether a service account should be created.
+    # We create this by default to make it easier for downstream users to apply PodSecurityPolicies.
+    create: true
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name:
+
+  rbac:
+    create: true
+
+  # Allow users to mount the hostPath /usr/src, useful for RHCOS on s390x
+  # Does not work on systems without /usr/src AND a read-only /usr, such as Talos
+  mountUsrSrc: false
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  annotations: {}
+
+  affinity: {}
+
+  priorityClassName: ""
+
+topologyUpdater:
+  config: ### <NFD-TOPOLOGY-UPDATER-CONF-START-DO-NOT-REMOVE>
+    ## key = node name, value = list of resources to be excluded.
+    ## use * to exclude from all nodes.
+    ## an example for how the exclude list should looks like
+    #excludeList:
+    #  node1: [cpu]
+    #  node2: [memory, example/deviceA]
+    #  *: [hugepages-2Mi]
+### <NFD-TOPOLOGY-UPDATER-CONF-END-DO-NOT-REMOVE>
+
+  enable: false
+  createCRDs: false
+
+  serviceAccount:
+    create: false
+    annotations: {}
+    name:
+  rbac:
+    create: true
+
+  kubeletConfigPath:
+  kubeletPodResourcesSockPath:
+  updateInterval: 60s
+  watchNamespace: "*"
+  kubeletStateDir: /host-var/lib/kubelet
+
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ "ALL" ]
+    readOnlyRootFilesystem: true
+    runAsUser: 0
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+  tolerations: []
+  annotations: {}
+  affinity: {}
+  podSetFingerprint: true
+
+topologyGC:
+  enable: true
+  replicaCount: 1
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name:
+  rbac:
+    create: true
+
+  interval: 1h
+
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ "ALL" ]
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+  tolerations: []
+  annotations: {}
+  affinity: {}
+
+# Optionally use encryption for worker <--> master comms
+# TODO: verify hostname is not yet supported
+#
+# If you do not enable certManager (and have it installed) you will
+# need to manually, or otherwise, provision the TLS certs as secrets
+tls:
+  enable: false
+  certManager: false
