@@ -1,17 +1,17 @@
 apiVersion: nfd.k8s-sigs.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
-  name: sev-rule
+  name: sev-snp-rule
 spec:
   rules:
   - labels:
-      sev.enabled: "true"
+      sev.snp.enabled: "true"
     matchFeatures:
     - feature: cpu.security
       matchExpressions:
-        sev.enabled:
+        sev.snp.enabled:
           op: IsTrue
-    name: "SEV rule"
+    name: "SEV-SNP rule"
   - labels:
       sev.es.enabled: "true"
     matchFeatures:

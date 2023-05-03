@@ -1,17 +1,17 @@
 apiVersion: nfd.k8s-sigs.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
-  name: nvidia-cc-capable
+  name: nvidia-cc-enabled
 spec:
   rules:
-    - name: "NVIDIA CC capable"
+    - name: "NVIDIA CC Enabled"
       labels:
-        "nvidia.com/cc.capable": "true"
+        "nvidia.com/cc.enabled": "true"
       matchAny: # TDX/SEV + Hopper GPU
        - matchFeatures:
           - feature: cpu.security
             matchExpressions:
-              sev.enabled: { op: Exists }
+              sev.snp.enabled: { op: Exists }
           - feature: pci.device
             matchExpressions:
               vendor: {op: In, value: ["10de"]}
@@ -19,7 +19,7 @@ spec:
        - matchFeatures:
           - feature: cpu.security
             matchExpressions:
-              sev.enabled: { op: Exists }
+              sev.snp.enabled: { op: Exists }
           - feature: pci.device
             matchExpressions:
               vendor: {op: In, value: ["10de"]}
@@ -27,7 +27,7 @@ spec:
        - matchFeatures:
           - feature: cpu.security
             matchExpressions:
-              sev.enabled: { op: Exists }
+              sev.snp.enabled: { op: Exists }
           - feature: pci.device
             matchExpressions:
               vendor: {op: In, value: ["10de"]}
@@ -35,7 +35,7 @@ spec:
        - matchFeatures:
           - feature: cpu.security
             matchExpressions:
-              sev.enabled: { op: Exists }
+              sev.snp.enabled: { op: Exists }
           - feature: pci.device
             matchExpressions:
               vendor: {op: In, value: ["10de"]}
@@ -43,7 +43,7 @@ spec:
        - matchFeatures:
           - feature: cpu.security
             matchExpressions:
-              sev.enabled: { op: Exists }
+              sev.snp.enabled: { op: Exists }
           - feature: pci.device
             matchExpressions:
               vendor: {op: In, value: ["10de"]}
