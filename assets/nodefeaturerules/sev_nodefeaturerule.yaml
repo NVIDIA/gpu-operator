@@ -1,9 +1,7 @@
 apiVersion: nfd.k8s-sigs.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
-  generation: 1
   name: sev-rule
-  resourceVersion: "7509"
 spec:
   rules:
   - labels:
