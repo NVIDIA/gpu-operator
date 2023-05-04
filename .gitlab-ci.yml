@@ -5,7 +5,7 @@ include:
     ref: 21.06.24
 
 helm-lint:
-  stage: lint
+  stage: config-checks
   allow_failure: true
   image:
     name: alpine/git
@@ -33,6 +33,25 @@ build-dev-image:
 
 .requires-build-image:
   image: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-build
+
+.config-check:
+  extends:
+    - .requires-build-image
+  stage: config-checks
+
+validate-csv:
+  extends:
+    - .config-check
+  script:
+    - make validate-csv
+
+validate-helm-values:
+  extends:
+    - .config-check
+  before_script:
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+  script:
+    - make validate-helm-values
 
 .go-check:
   extends:

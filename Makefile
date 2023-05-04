@@ -148,8 +148,11 @@ push-bundle-image: build-bundle-image
 
 # Define local and dockerized golang targets
 
+CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
+CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
+
 CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
-MAKE_TARGETS := build check coverage $(CHECK_TARGETS)
+MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
 
@@ -211,6 +214,10 @@ misspell:
 vet:
 	go vet ./...
 
+cmds: $(CMD_TARGETS)
+$(CMD_TARGETS): cmd-%:
+	go build -ldflags "-s -w" $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
+
 build:
 	go build ./...
 
@@ -223,6 +230,14 @@ validate-modules:
 	@echo "- Checking if the vendor dir is in sync..."
 	go mod vendor
 	@git diff --exit-code -- vendor
+
+validate-csv: cmds
+	./gpuop-cfg validate csv --input=./bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+
+validate-helm-values: cmds
+	helm template gpu-operator deployments/gpu-operator --show-only templates/clusterpolicy.yaml --set gds.enabled=true | \
+		sed '/^--/d' | \
+		./gpuop-cfg validate clusterpolicy --input="-"
 
 COVERAGE_FILE := coverage.out
 unit-test: build
