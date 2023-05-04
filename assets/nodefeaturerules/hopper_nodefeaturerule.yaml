@@ -7,7 +7,7 @@ spec:
     - name: "NVIDIA H100"
       labels:
         "nvidia.com/gpu.H100": "true"
-        "nvidia.com/gpu.hopper": "true"
+        "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
@@ -16,7 +16,7 @@ spec:
     - name: "NVIDIA H100 PCIe"
       labels:
         "nvidia.com/gpu.H100.pcie": "true"
-        "nvidia.com/gpu.hopper": "true"
+        "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
@@ -25,7 +25,7 @@ spec:
     - name: "NVIDIA H100 80GB HBM3"
       labels:
         "nvidia.com/gpu.H100.HBM3": "true"
-        "nvidia.com/gpu.hopper": "true"
+        "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
@@ -34,7 +34,7 @@ spec:
     - name: "NVIDIA H800"
       labels:
         "nvidia.com/gpu.H800": "true"
-        "nvidia.com/gpu.hopper": "true"
+        "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
@@ -43,7 +43,7 @@ spec:
     - name: "NVIDIA H800 PCIE"
       labels:
         "nvidia.com/gpu.H800.pcie": "true"
-        "nvidia.com/gpu.hopper": "true"
+        "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
