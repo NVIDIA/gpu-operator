@@ -13,7 +13,7 @@ variables:
 stages:
   - trigger
   - image
-  - lint
+  - config-checks
   - go-checks
   - go-build
   - unit-tests
