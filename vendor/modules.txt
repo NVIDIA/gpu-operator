@@ -48,6 +48,9 @@ github.com/PuerkitoBio/urlesc
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/blang/semver/v4 v4.0.0
+## explicit; go 1.14
+github.com/blang/semver/v4
 # github.com/cespare/xxhash/v2 v2.1.2
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -63,6 +66,9 @@ github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7
+## explicit
+github.com/docker/libtrust
 # github.com/emicklei/go-restful/v3 v3.8.0
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -192,6 +198,9 @@ github.com/monochromegane/go-gitignore
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
+# github.com/opencontainers/go-digest v1.0.0
+## explicit; go 1.13
+github.com/opencontainers/go-digest
 # github.com/openshift/api v0.0.0-20210924154557-a4f696157341
 ## explicit; go 1.16
 github.com/openshift/api/config/v1
@@ -203,6 +212,11 @@ github.com/openshift/api/security/v1
 ## explicit; go 1.16
 github.com/openshift/client-go/config/clientset/versioned/scheme
 github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
+# github.com/operator-framework/api v0.17.3
+## explicit; go 1.19
+github.com/operator-framework/api/pkg/lib/version
+github.com/operator-framework/api/pkg/operators
+github.com/operator-framework/api/pkg/operators/v1alpha1
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
@@ -236,6 +250,36 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/regclient/regclient v0.4.7
+## explicit; go 1.20
+github.com/regclient/regclient
+github.com/regclient/regclient/config
+github.com/regclient/regclient/internal/auth
+github.com/regclient/regclient/internal/conffile
+github.com/regclient/regclient/internal/httplink
+github.com/regclient/regclient/internal/reghttp
+github.com/regclient/regclient/internal/rwfs
+github.com/regclient/regclient/internal/timejson
+github.com/regclient/regclient/internal/units
+github.com/regclient/regclient/internal/version
+github.com/regclient/regclient/internal/wraperr
+github.com/regclient/regclient/pkg/archive
+github.com/regclient/regclient/scheme
+github.com/regclient/regclient/scheme/ocidir
+github.com/regclient/regclient/scheme/reg
+github.com/regclient/regclient/types
+github.com/regclient/regclient/types/blob
+github.com/regclient/regclient/types/docker
+github.com/regclient/regclient/types/docker/schema1
+github.com/regclient/regclient/types/docker/schema2
+github.com/regclient/regclient/types/manifest
+github.com/regclient/regclient/types/oci
+github.com/regclient/regclient/types/oci/v1
+github.com/regclient/regclient/types/platform
+github.com/regclient/regclient/types/ref
+github.com/regclient/regclient/types/referrer
+github.com/regclient/regclient/types/repo
+github.com/regclient/regclient/types/tag
 # github.com/russross/blackfriday v1.5.2
 ## explicit
 github.com/russross/blackfriday
@@ -316,6 +360,9 @@ golang.org/x/oauth2/google/internal/externalaccount
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+# golang.org/x/sync v0.1.0
+## explicit
+golang.org/x/sync/semaphore
 # golang.org/x/sys v0.5.0
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
