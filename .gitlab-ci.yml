@@ -11,7 +11,7 @@ helm-lint:
     name: alpine/git
     entrypoint: ['/usr/bin/env']
   before_script:
-    - apk add --update curl openssl bash git openssh make
+    - apk add --update curl curl-dev openssl bash git openssh make
     - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
   script:
     - helm lint deployments/gpu-operator/
