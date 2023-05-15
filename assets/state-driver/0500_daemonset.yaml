@@ -16,6 +16,8 @@ spec:
     type: OnDelete
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
         app: nvidia-driver-daemonset
         nvidia.com/precompiled: "false"
