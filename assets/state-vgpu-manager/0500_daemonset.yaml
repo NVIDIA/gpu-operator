@@ -78,6 +78,10 @@ spec:
               mountPath: /dev/vfio
             - name: cgroup
               mountPath: /sys/fs/cgroup
+            - name: var-log
+              mountPath: /var/log
+            - name: dev-log
+              mountPath: /dev/log
         # Only kept when OpenShift DriverToolkit side-car is enabled.
         - image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
@@ -104,6 +108,10 @@ spec:
             - name: run-nvidia
               mountPath: /run/nvidia
               mountPropagation: Bidirectional
+            - name: var-log
+              mountPath: /var/log
+            - name: dev-log
+              mountPath: /dev/log
       volumes:
         - name: run-nvidia
           hostPath:
@@ -127,3 +135,10 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+        - name: var-log
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: dev-log
+          hostPath:
+            path: /dev/log
