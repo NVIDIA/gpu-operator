@@ -175,13 +175,13 @@ spec:
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8f03f74076b5aa6672a5d75a398fa7515fcde57fdb1cf8079e015b3366efd3b5
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a
+      image: nvcr.io/nvidia/cuda@sha256:62d845b4bd6de4be65f0b6daaae6831c29d4529955f99db5d26f5f7179106285
     - name: gpu-operator-validator-image
       image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:cab21c93987a5c884075efe0fb4a8abaa1997e1696cbc773ba69889f42f8329b
     - name: vfio-manager-image
-      image: nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a
+      image: nvcr.io/nvidia/cuda@sha256:62d845b4bd6de4be65f0b6daaae6831c29d4529955f99db5d26f5f7179106285
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:0d47dad29d2ef445b301c5c64717758eed43a606345b79f97bce2e64b40a91a8
     - name: vgpu-device-manager-image
@@ -821,9 +821,9 @@ spec:
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8f03f74076b5aa6672a5d75a398fa7515fcde57fdb1cf8079e015b3366efd3b5"
                   - name: "CUDA_BASE_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a"
+                    value: "nvcr.io/nvidia/cuda@sha256:62d845b4bd6de4be65f0b6daaae6831c29d4529955f99db5d26f5f7179106285"
                   - name: "VFIO_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:00291fe0accce8b2cb0c69d65743afb924d5b205a4e80296210b9924687c2c7a"
+                    value: "nvcr.io/nvidia/cuda@sha256:62d845b4bd6de4be65f0b6daaae6831c29d4529955f99db5d26f5f7179106285"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:0d47dad29d2ef445b301c5c64717758eed43a606345b79f97bce2e64b40a91a8"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
