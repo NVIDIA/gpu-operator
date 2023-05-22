@@ -65,6 +65,8 @@ spec:
           value: ""
         - name: NVIDIA_CONTAINER_RUNTIME_MODES_CDI_DEFAULT_KIND
           value: "management.nvidia.com/gpu"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "void"
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:
