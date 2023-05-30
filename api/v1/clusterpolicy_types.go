@@ -60,6 +60,8 @@ type ClusterPolicySpec struct {
 	MIGManager MIGManagerSpec `json:"migManager,omitempty"`
 	// PSP defines spec for handling PodSecurityPolicies
 	PSP PSPSpec `json:"psp,omitempty"`
+	// PSA defines spec for PodSecurityAdmission configuration
+	PSA PSASpec `json:"psa,omitempty"`
 	// Validator defines the spec for operator-validator daemonset
 	Validator ValidatorSpec `json:"validator,omitempty"`
 	// GPUDirectStorage defines the spec for GDS components(Experimental)
@@ -156,6 +158,12 @@ type SandboxWorkloadsSpec struct {
 // PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
 type PSPSpec struct {
 	// Enabled indicates if PodSecurityPolicies needs to be enabled for all Pods
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// PSASpec describes configuration for PodSecurityAdmission to apply for all Pods
+type PSASpec struct {
+	// Enabled indicates if PodSecurityAdmission configuration needs to be enabled for all Pods
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
@@ -1668,6 +1676,15 @@ func (s *SandboxDevicePluginSpec) IsEnabled() bool {
 func (p *PSPSpec) IsEnabled() bool {
 	if p.Enabled == nil {
 		// PSP is disabled by default
+		return false
+	}
+	return *p.Enabled
+}
+
+// IsEnabled returns true if PodSecurityAdmission configuration is enabled for all gpu-operator pods
+func (p *PSASpec) IsEnabled() bool {
+	if p.Enabled == nil {
+		// PSA is disabled by default
 		return false
 	}
 	return *p.Enabled

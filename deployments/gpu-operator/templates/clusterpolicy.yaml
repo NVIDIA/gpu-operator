@@ -128,6 +128,8 @@ spec:
     {{- end }}
   psp:
     enabled: {{ .Values.psp.enabled }}
+  psa:
+    enabled: {{ .Values.psa.enabled }}
   cdi:
     enabled: {{ .Values.cdi.enabled }}
     default: {{ .Values.cdi.default }}
