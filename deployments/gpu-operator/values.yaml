@@ -7,6 +7,7 @@ platform:
 
 nfd:
   enabled: true
+  nodefeaturerules: true
 
 psp:
   enabled: false

@@ -28,4 +28,4 @@ spec:
       matchExpressions:
         sev.enabled:
           op: Exists
-    name: SEV system capacitys
+    name: SEV system capacities
