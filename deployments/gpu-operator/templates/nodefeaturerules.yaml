@@ -7,7 +7,7 @@ spec:
   rules:
     - name: "TDX rule"
       labels:
-        sev.enabled: "true"
+        tdx.enabled: "true"
       matchFeatures:
         - feature: cpu.security
           matchExpressions:
@@ -91,86 +91,16 @@ spec:
             device: {op: In, value: ["2322"]}
     - name: "NVIDIA CC Enabled"
       labels:
-        "nvidia.com/cc.enabled": "true"
+        "nvidia.com/cc.capable": "true"
       matchAny: # TDX/SEV + Hopper GPU
        - matchFeatures:
-          - feature: cpu.security
+          - feature: rule.matched
             matchExpressions:
-              sev.snp.enabled: { op: Exists }
-          - feature: pci.device
+              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
+              sev.snp.enabled: {op: IsTrue}
+          - feature: rule.matched
             matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2339"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              sev.snp.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2331"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              sev.snp.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2330"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              sev.snp.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2324"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              sev.snp.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2322"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              tdx.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2339"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              tdx.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2331"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              tdx.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2330"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              tdx.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2324"]}
-       - matchFeatures:
-          - feature: cpu.security
-            matchExpressions:
-              tdx.enabled: { op: Exists }
-          - feature: pci.device
-            matchExpressions:
-              vendor: {op: In, value: ["10de"]}
-              device: {op: In, value: ["2322"]}
+              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
+              tdx.enabled: {op: IsTrue}
 {{- end }}
+
