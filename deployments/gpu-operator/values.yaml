@@ -8,7 +8,11 @@ platform:
 nfd:
   enabled: true
 
+# deprecated: use PodSecurityAdmission (PSA) controls instead
 psp:
+  enabled: false
+
+psa:
   enabled: false
 
 cdi:

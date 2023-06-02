@@ -1157,6 +1157,14 @@ spec:
                 required:
                 - defaultRuntime
                 type: object
+              psa:
+                description: PSA defines spec for PodSecurityAdmission configuration
+                properties:
+                  enabled:
+                    description: Enabled indicates if PodSecurityAdmission configuration
+                      needs to be enabled for all Pods
+                    type: boolean
+                type: object
               psp:
                 description: PSP defines spec for handling PodSecurityPolicies
                 properties:
