@@ -88,9 +88,18 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 		},
 		OS:           "linux",
 		Architecture: "amd64",
+		History: []v1.History{
+			{
+				Created:   &now,
+				CreatedBy: "# regclient",
+				Comment:   "scratch blob",
+			},
+		},
 		RootFS: v1.RootFS{
-			Type:    "layers",
-			DiffIDs: []digest.Digest{},
+			Type: "layers",
+			DiffIDs: []digest.Digest{
+				types.ScratchDigest,
+			},
 		},
 	}
 	confB, err := json.Marshal(conf)
@@ -116,7 +125,13 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 				Digest:    confDigest,
 				Size:      int64(len(confB)),
 			},
-			Layers: []types.Descriptor{},
+			Layers: []types.Descriptor{
+				{
+					MediaType: types.MediaTypeOCI1Layer,
+					Size:      int64(len(types.ScratchData)),
+					Digest:    types.ScratchDigest,
+				},
+			},
 		}))
 		if err != nil {
 			return err
@@ -129,7 +144,13 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 				Digest:    confDigest,
 				Size:      int64(len(confB)),
 			},
-			Layers: []types.Descriptor{},
+			Layers: []types.Descriptor{
+				{
+					MediaType: types.MediaTypeDocker2LayerGzip,
+					Size:      int64(len(types.ScratchData)),
+					Digest:    types.ScratchDigest,
+				},
+			},
 		}))
 		if err != nil {
 			return err
@@ -138,6 +159,12 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 	reg.log.WithFields(logrus.Fields{
 		"ref": r.Reference,
 	}).Debug("Sending dummy manifest to replace tag")
+
+	// push scratch layer
+	_, err = reg.BlobPut(ctx, r, types.Descriptor{Digest: types.ScratchDigest, Size: int64(len(types.ScratchData))}, bytes.NewReader(types.ScratchData))
+	if err != nil {
+		return err
+	}
 
 	// push config
 	_, err = reg.BlobPut(ctx, r, types.Descriptor{Digest: confDigest, Size: int64(len(confB))}, bytes.NewReader(confB))

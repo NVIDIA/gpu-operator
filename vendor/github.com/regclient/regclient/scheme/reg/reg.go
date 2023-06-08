@@ -13,21 +13,26 @@ import (
 )
 
 const (
-	// DefaultBlobChunk 1M chunks, this is allocated in a memory buffer
-	DefaultBlobChunk = 1024 * 1024
-	// DefaultBlobMax is disabled to support registries without chunked upload support
-	DefaultBlobMax = -1
+	// blobChunkMinHeader is returned by registries requesting a minimum chunk size
+	blobChunkMinHeader = "OCI-Chunk-Min-Length"
+	// defaultBlobChunk 1M chunks, this is allocated in a memory buffer
+	defaultBlobChunk = 1024 * 1024
+	// defaultBlobChunkLimit 1G chunks, prevents a memory exhaustion attack
+	defaultBlobChunkLimit = 1024 * 1024 * 1024
+	// defaultBlobMax is disabled to support registries without chunked upload support
+	defaultBlobMax = -1
 )
 
 // Reg is used for interacting with remote registry servers
 type Reg struct {
-	reghttp       *reghttp.Client
-	reghttpOpts   []reghttp.Opts
-	log           *logrus.Logger
-	hosts         map[string]*config.Host
-	blobChunkSize int64
-	blobMaxPut    int64
-	mu            sync.Mutex
+	reghttp        *reghttp.Client
+	reghttpOpts    []reghttp.Opts
+	log            *logrus.Logger
+	hosts          map[string]*config.Host
+	blobChunkSize  int64
+	blobChunkLimit int64
+	blobMaxPut     int64
+	mu             sync.Mutex
 }
 
 // Opts provides options to access registries
@@ -36,10 +41,11 @@ type Opts func(*Reg)
 // New returns a Reg pointer with any provided options
 func New(opts ...Opts) *Reg {
 	r := Reg{
-		reghttpOpts:   []reghttp.Opts{},
-		blobChunkSize: DefaultBlobChunk,
-		blobMaxPut:    DefaultBlobMax,
-		hosts:         map[string]*config.Host{},
+		reghttpOpts:    []reghttp.Opts{},
+		blobChunkSize:  defaultBlobChunk,
+		blobChunkLimit: defaultBlobChunkLimit,
+		blobMaxPut:     defaultBlobMax,
+		hosts:          map[string]*config.Host{},
 	}
 	for _, opt := range opts {
 		opt(&r)
@@ -63,13 +69,25 @@ func (reg *Reg) hostGet(hostname string) *config.Host {
 }
 
 // WithBlobSize overrides default blob sizes
-func WithBlobSize(chunk, max int64) Opts {
+func WithBlobSize(size, max int64) Opts {
 	return func(r *Reg) {
-		if chunk > 0 {
-			r.blobChunkSize = chunk
+		if size > 0 {
+			r.blobChunkSize = size
 		}
 		if max != 0 {
 			r.blobMaxPut = max
+		}
+	}
+}
+
+// WithBlobLimit overrides default blob limit
+func WithBlobLimit(limit int64) Opts {
+	return func(r *Reg) {
+		if limit > 0 {
+			r.blobChunkLimit = limit
+		}
+		if r.blobMaxPut > 0 && r.blobMaxPut < limit {
+			r.blobMaxPut = limit
 		}
 	}
 }

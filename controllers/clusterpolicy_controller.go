@@ -217,10 +217,10 @@ func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedNa
 	return nil
 }
 
-func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller) error {
+func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
-	mapFn := func(a client.Object) []reconcile.Request {
+	mapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
 		// find all the ClusterPolicy to trigger their reconciliation
 		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
 		list := &gpuv1.ClusterPolicyList{}
@@ -306,7 +306,7 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 	}
 
 	err := c.Watch(
-		&source.Kind{Type: &corev1.Node{}},
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
 		handler.EnqueueRequestsFromMapFunc(mapFn),
 		p)
 
@@ -322,23 +322,20 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	}
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(&source.Kind{Type: &gpuv1.ClusterPolicy{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node labels and requeue the owner ClusterPolicy
-	err = addWatchNewGPUNode(ctx, r, c)
+	err = addWatchNewGPUNode(ctx, r, c, mgr)
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Daemonsets and requeue the owner ClusterPolicy
-	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &gpuv1.ClusterPolicy{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}

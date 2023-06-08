@@ -15,7 +15,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 type OAuth struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata"`
 	// spec holds user settable values for configuration
 	// +kubebuilder:validation:Required
@@ -31,6 +34,7 @@ type OAuthSpec struct {
 	// identityProviders is an ordered list of ways for a user to identify themselves.
 	// When this list is empty, no identities are provisioned for users.
 	// +optional
+	// +listType=atomic
 	IdentityProviders []IdentityProvider `json:"identityProviders,omitempty"`
 
 	// tokenConfig contains options for authorization and access tokens
@@ -532,29 +536,45 @@ type OpenIDIdentityProvider struct {
 
 // UserIDClaim is the claim used to provide a stable identifier for OIDC identities.
 // Per http://openid.net/specs/openid-connect-core-1_0.html#ClaimStability
-//  "The sub (subject) and iss (issuer) Claims, used together, are the only Claims that an RP can
-//   rely upon as a stable identifier for the End-User, since the sub Claim MUST be locally unique
-//   and never reassigned within the Issuer for a particular End-User, as described in Section 2.
-//   Therefore, the only guaranteed unique identifier for a given End-User is the combination of the
-//   iss Claim and the sub Claim."
+//
+//	"The sub (subject) and iss (issuer) Claims, used together, are the only Claims that an RP can
+//	 rely upon as a stable identifier for the End-User, since the sub Claim MUST be locally unique
+//	 and never reassigned within the Issuer for a particular End-User, as described in Section 2.
+//	 Therefore, the only guaranteed unique identifier for a given End-User is the combination of the
+//	 iss Claim and the sub Claim."
 const UserIDClaim = "sub"
+
+// OpenIDClaim represents a claim retrieved from an OpenID provider's tokens or userInfo
+// responses
+// +kubebuilder:validation:MinLength=1
+type OpenIDClaim string
 
 // OpenIDClaims contains a list of OpenID claims to use when authenticating with an OpenID identity provider
 type OpenIDClaims struct {
 	// preferredUsername is the list of claims whose values should be used as the preferred username.
 	// If unspecified, the preferred username is determined from the value of the sub claim
+	// +listType=atomic
 	// +optional
 	PreferredUsername []string `json:"preferredUsername,omitempty"`
 
 	// name is the list of claims whose values should be used as the display name. Optional.
 	// If unspecified, no display name is set for the identity
+	// +listType=atomic
 	// +optional
 	Name []string `json:"name,omitempty"`
 
 	// email is the list of claims whose values should be used as the email address. Optional.
 	// If unspecified, no email is set for the identity
+	// +listType=atomic
 	// +optional
 	Email []string `json:"email,omitempty"`
+
+	// groups is the list of claims value of which should be used to synchronize groups
+	// from the OIDC provider to OpenShift for the user.
+	// If multiple claims are specified, the first one with a non-empty value is used.
+	// +listType=atomic
+	// +optional
+	Groups []OpenIDClaim `json:"groups,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -563,6 +583,9 @@ type OpenIDClaims struct {
 // +openshift:compatibility-gen:level=1
 type OAuthList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
 	Items []OAuth `json:"items"`

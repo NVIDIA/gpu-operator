@@ -16,7 +16,7 @@ type Info struct {
 	VCSDate    string `json:"vcsDate"`    // commit date in RFC3339 format
 	VCSRef     string `json:"vcsRef"`     // commit sha + dirty if state is not clean
 	VCSState   string `json:"vcsState"`   // clean or dirty
-	VCSTag     string `json:"-"`          // tag
+	VCSTag     string `json:"vcsTag"`     // tag
 }
 
 func GetInfo() Info {

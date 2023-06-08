@@ -253,6 +253,30 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref) (*url.URL, erro
 		return nil, fmt.Errorf("failed to send blob post, ref %s: %w", r.CommonName(), reghttp.HTTPError(resp.HTTPResponse().StatusCode))
 	}
 
+	// if min size header received, check/adjust host settings
+	minSizeStr := resp.HTTPResponse().Header.Get(blobChunkMinHeader)
+	if minSizeStr != "" {
+		minSize, err := strconv.ParseInt(minSizeStr, 10, 64)
+		if err != nil {
+			reg.log.WithFields(logrus.Fields{
+				"size": minSizeStr,
+				"err":  err,
+			}).Warn("Failed to parse chunk size header")
+		} else {
+			host := reg.hostGet(r.Registry)
+			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
+				if minSize > reg.blobChunkLimit {
+					host.BlobChunk = reg.blobChunkLimit
+				} else {
+					host.BlobChunk = minSize
+				}
+				reg.log.WithFields(logrus.Fields{
+					"size": host.BlobChunk,
+					"host": host.Name,
+				}).Debug("Registry requested min chunk size")
+			}
+		}
+	}
 	// Extract the location into a new putURL based on whether it's relative, fqdn with a scheme, or without a scheme.
 	location := resp.HTTPResponse().Header.Get("Location")
 	if location == "" {
@@ -278,8 +302,10 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d types.Descriptor,
 	// build/send request
 	query := url.Values{}
 	query.Set("mount", d.Digest.String())
+	ignoreErr := true // ignore errors from anonymous blob mount attempts
 	if rSrc.Registry == rTgt.Registry && rSrc.Repository != "" {
 		query.Set("from", rSrc.Repository)
+		ignoreErr = false
 	}
 
 	req := &reghttp.Req{
@@ -291,6 +317,7 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d types.Descriptor,
 				Repository: rTgt.Repository,
 				Path:       "blobs/uploads/",
 				Query:      query,
+				IgnoreErr:  ignoreErr,
 			},
 		},
 	}
@@ -299,6 +326,31 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d types.Descriptor,
 		return nil, "", fmt.Errorf("failed to mount blob, digest %s, ref %s: %w", d.Digest.String(), rTgt.CommonName(), err)
 	}
 	defer resp.Close()
+
+	// if min size header received, check/adjust host settings
+	minSizeStr := resp.HTTPResponse().Header.Get(blobChunkMinHeader)
+	if minSizeStr != "" {
+		minSize, err := strconv.ParseInt(minSizeStr, 10, 64)
+		if err != nil {
+			reg.log.WithFields(logrus.Fields{
+				"size": minSizeStr,
+				"err":  err,
+			}).Warn("Failed to parse chunk size header")
+		} else {
+			host := reg.hostGet(rTgt.Registry)
+			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
+				if minSize > reg.blobChunkLimit {
+					host.BlobChunk = reg.blobChunkLimit
+				} else {
+					host.BlobChunk = minSize
+				}
+				reg.log.WithFields(logrus.Fields{
+					"size": host.BlobChunk,
+					"host": host.Name,
+				}).Debug("Registry requested min chunk size")
+			}
+		}
+	}
 	// 201 indicates the blob mount succeeded
 	if resp.HTTPResponse().StatusCode == 201 {
 		return nil, "", nil

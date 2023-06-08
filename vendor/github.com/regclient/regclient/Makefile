@@ -11,7 +11,7 @@ ifneq ($(shell git status --porcelain 2>/dev/null),)
 endif
 VCS_DATE?=$(shell date -d "@$(shell git log -1 --format=%at)" +%Y-%m-%dT%H:%M:%SZ --utc)
 VCS_TAG?=$(shell git describe --tags --abbrev=0 2>/dev/null || true)
-LD_FLAGS?=-s -w -extldflags -static -buildid=
+LD_FLAGS?=-s -w -extldflags -static -buildid= -X \"github.com/regclient/regclient/internal/version.vcsTag=$(VCS_TAG)\"
 GO_BUILD_FLAGS?=-trimpath -ldflags "$(LD_FLAGS)" -tags nolegacy
 DOCKERFILE_EXT?=$(shell if docker build --help 2>/dev/null | grep -q -- '--progress'; then echo ".buildkit"; fi)
 DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)"
@@ -27,15 +27,15 @@ ifeq "$(strip $(VER_BUMP))" ''
 endif
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v0.73.0
-SYFT_CONTAINER?=anchore/syft:v0.73.0@sha256:6a13beb5cc8eedb2a42a5b91a69a36105880a2a1fdba75cc8c4dbcd61a0eed2b
+SYFT_VERSION?=v0.77.0
+SYFT_CONTAINER?=anchore/syft:v0.77.0@sha256:0135d844712731b86fab20ea584e594ad25b9f5a7fd262b5feb490e865edef89
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
 		-u "$(shell id -u):$(shell id -g)" \
 		$(SYFT_CONTAINER)
 endif
-STATICCHECK_VER?=v0.4.2
+STATICCHECK_VER?=v0.4.3
 
 .PHONY: all fmt vet test lint lint-go lint-md vendor binaries docker artifacts artifact-pre plugin-user plugin-host .FORCE
 

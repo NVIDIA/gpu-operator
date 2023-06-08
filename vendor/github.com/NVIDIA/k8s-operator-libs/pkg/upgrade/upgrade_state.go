@@ -323,7 +323,7 @@ func (m *ClusterUpgradeStateManager) ApplyState(ctx context.Context,
 		"maximum nodes that can be unavailable", maxUnavailable)
 
 	// Determine the object to log this event
-	//m.EventRecorder.Eventf(m.Namespace, v1.EventTypeNormal, GetEventReason(), "InProgress: %d, MaxParallelUpgrades: %d, UpgradeSlotsAvailable: %s", upgradesInProgress, upgradePolicy.MaxParallelUpgrades, upgradesAvailable)
+	// m.EventRecorder.Eventf(m.Namespace, v1.EventTypeNormal, GetEventReason(), "InProgress: %d, MaxParallelUpgrades: %d, UpgradeSlotsAvailable: %s", upgradesInProgress, upgradePolicy.MaxParallelUpgrades, upgradesAvailable)
 
 	// First, check if unknown or ready nodes need to be upgraded
 	err = m.ProcessDoneOrUnknownNodes(ctx, currentState, UpgradeStateUnknown)
@@ -558,6 +558,14 @@ func (m *ClusterUpgradeStateManager) ProcessWaitForJobsRequiredNodes(
 func (m *ClusterUpgradeStateManager) ProcessPodDeletionRequiredNodes(
 	ctx context.Context, currentClusterState *ClusterUpgradeState, podDeletionSpec *v1alpha1.PodDeletionSpec, drainEnabled bool) error {
 	m.Log.V(consts.LogLevelInfo).Info("ProcessPodDeletionRequiredNodes")
+
+	if !m.IsPodDeletionEnabled() {
+		m.Log.V(consts.LogLevelInfo).Info("PodDeletion is not enabled, proceeding straight to the next state")
+		for _, nodeState := range currentClusterState.NodeStates[UpgradeStatePodDeletionRequired] {
+			_ = m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateDrainRequired)
+		}
+		return nil
+	}
 
 	podManagerConfig := PodManagerConfig{
 		DeletionSpec: podDeletionSpec,

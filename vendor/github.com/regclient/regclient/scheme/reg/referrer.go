@@ -63,10 +63,6 @@ func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Refe
 
 	// attempt to call the referrer API
 	rl, err := reg.referrerListAPI(ctx, r, config)
-	// attempt to call the referrer extension API
-	if err != nil {
-		rl, err = reg.referrerListExtAPI(ctx, r, config)
-	}
 	if err != nil {
 		rl, err = reg.referrerListTag(ctx, r)
 	}
@@ -139,6 +135,7 @@ func (reg *Reg) referrerListAPIReq(ctx context.Context, r ref.Ref, config scheme
 				Repository: r.Repository,
 				Path:       "referrers/" + r.Digest,
 				Query:      query,
+				IgnoreErr:  true,
 			},
 		},
 	}
@@ -182,60 +179,6 @@ func (reg *Reg) referrerListAPIReq(ctx context.Context, r ref.Ref, config scheme
 	rl.Annotations = ociML.Annotations
 
 	return rl, resp, nil
-}
-
-func (reg *Reg) referrerListExtAPI(ctx context.Context, r ref.Ref, config scheme.ReferrerConfig) (referrer.ReferrerList, error) {
-	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
-	}
-	query := url.Values{}
-	query.Set("digest", r.Digest)
-	if config.FilterArtifactType != "" {
-		query.Set("artifactType", config.FilterArtifactType)
-	}
-	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "GET",
-				Repository: r.Repository,
-				Path:       "_oci/artifacts/referrers",
-				Query:      query,
-			},
-		},
-	}
-	resp, err := reg.reghttp.Do(ctx, req)
-	if err != nil {
-		return rl, fmt.Errorf("failed to get referrers %s: %w", r.CommonName(), err)
-	}
-	defer resp.Close()
-	if resp.HTTPResponse().StatusCode != 200 {
-		return rl, fmt.Errorf("failed to get referrers %s: %w", r.CommonName(), reghttp.HTTPError(resp.HTTPResponse().StatusCode))
-	}
-
-	// read manifest
-	rawBody, err := io.ReadAll(resp)
-	if err != nil {
-		return rl, fmt.Errorf("error reading referrers for %s: %w", r.CommonName(), err)
-	}
-
-	m, err := manifest.New(
-		manifest.WithRef(r),
-		manifest.WithHeader(resp.HTTPResponse().Header),
-		manifest.WithRaw(rawBody),
-	)
-	if err != nil {
-		return rl, err
-	}
-	ociML, ok := m.GetOrig().(v1.Index)
-	if !ok {
-		return rl, fmt.Errorf("unexpected manifest type for referrers: %s, %w", m.GetDescriptor().MediaType, types.ErrUnsupportedMediaType)
-	}
-	rl.Manifest = m
-	rl.Descriptors = ociML.Manifests
-	rl.Annotations = ociML.Annotations
-	return rl, nil
 }
 
 func (reg *Reg) referrerListTag(ctx context.Context, r ref.Ref) (referrer.ReferrerList, error) {
@@ -367,11 +310,6 @@ func (reg *Reg) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest)
 
 // referrerPing verifies the registry supports the referrers API
 func (reg *Reg) referrerPing(ctx context.Context, r ref.Ref) bool {
-	return reg.referrerPingAPI(ctx, r) || reg.referrerPingExt(ctx, r)
-}
-
-// referrerPingAPI checks the OCI API
-func (reg *Reg) referrerPingAPI(ctx context.Context, r ref.Ref) bool {
 	req := &reghttp.Req{
 		Host: r.Registry,
 		APIs: map[string]reghttp.ReqAPI{
@@ -379,30 +317,6 @@ func (reg *Reg) referrerPingAPI(ctx context.Context, r ref.Ref) bool {
 				Method:     "GET",
 				Repository: r.Repository,
 				Path:       "referrers/" + r.Digest,
-			},
-		},
-	}
-	resp, err := reg.reghttp.Do(ctx, req)
-	if err != nil {
-		return false
-	}
-	resp.Close()
-	return resp.HTTPResponse().StatusCode == 200
-}
-
-// referrerPingExt checks the extension API
-// TODO: delete extension API in future releases
-func (reg *Reg) referrerPingExt(ctx context.Context, r ref.Ref) bool {
-	query := url.Values{}
-	query.Set("digest", r.Digest)
-	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "GET",
-				Repository: r.Repository,
-				Path:       "_oci/artifacts/referrers",
-				Query:      query,
 			},
 		},
 	}

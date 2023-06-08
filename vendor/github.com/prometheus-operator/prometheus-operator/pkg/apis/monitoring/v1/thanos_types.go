@@ -26,23 +26,29 @@ const (
 	ThanosRulerKindKey = "thanosrulers"
 )
 
-// ThanosRuler defines a ThanosRuler deployment.
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:resource:categories="prometheus-operator",shortName="ruler"
-// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="The desired replicas number of Thanos Rulers"
+// +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".spec.version",description="The version of Thanos Ruler"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="The number of desired replicas"
+// +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.availableReplicas",description="The number of ready replicas"
+// +kubebuilder:printcolumn:name="Reconciled",type="string",JSONPath=".status.conditions[?(@.type == 'Reconciled')].status"
+// +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.conditions[?(@.type == 'Available')].status"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Paused",type="boolean",JSONPath=".status.paused",description="Whether the resource reconciliation is paused or not",priority=1
+// +kubebuilder:subresource:status
+
+// ThanosRuler defines a ThanosRuler deployment.
 type ThanosRuler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the ThanosRuler cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec ThanosRulerSpec `json:"spec"`
-	// Most recent observed status of the ThanosRuler cluster. Read-only. Not
-	// included when requesting from the apiserver, only from the ThanosRuler
-	// Operator API itself. More info:
+	// Most recent observed status of the ThanosRuler cluster. Read-only.
+	// More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	Status *ThanosRulerStatus `json:"status,omitempty"`
+	Status ThanosRulerStatus `json:"status,omitempty"`
 }
 
 // ThanosRulerList is a list of ThanosRulers.
@@ -60,10 +66,16 @@ type ThanosRulerList struct {
 // https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 // +k8s:openapi-gen=true
 type ThanosRulerSpec struct {
+	// Version of Thanos to be deployed.
+	Version string `json:"version,omitempty"`
 	// PodMetadata contains Labels and Annotations gets propagated to the thanos ruler pods.
 	PodMetadata *EmbeddedObjectMetadata `json:"podMetadata,omitempty"`
 	// Thanos container image URL.
 	Image string `json:"image,omitempty"`
+	// Image pull policy for the 'thanos', 'init-config-reloader' and 'config-reloader' containers.
+	// See https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy for more details.
+	// +kubebuilder:validation:Enum="";Always;Never;IfNotPresent
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	// An optional list of references to secrets in the same namespace
 	// to use for pulling thanos images from registries
 	// see http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod
@@ -148,13 +160,16 @@ type ThanosRulerSpec struct {
 	//+kubebuilder:validation:Enum="";logfmt;json
 	LogFormat string `json:"logFormat,omitempty"`
 	// Port name used for the pods and governing service.
-	// This defaults to web
+	// Defaults to `web`.
+	// +kubebuilder:default:="web"
 	PortName string `json:"portName,omitempty"`
 	// Interval between consecutive evaluations.
-	EvaluationInterval string `json:"evaluationInterval,omitempty"`
+	// +kubebuilder:default:="15s"
+	EvaluationInterval Duration `json:"evaluationInterval,omitempty"`
 	// Time duration ThanosRuler shall retain data for. Default is '24h',
 	// and must match the regular expression `[0-9]+(ms|s|m|h|d|w|y)` (milliseconds seconds minutes hours days weeks years).
-	Retention string `json:"retention,omitempty"`
+	// +kubebuilder:default:="24h"
+	Retention Duration `json:"retention,omitempty"`
 	// Containers allows injecting additional containers or modifying operator generated
 	// containers. This can be used to allow adding an authentication proxy to a ThanosRuler pod or
 	// to change the behavior of an operator generated container. Containers described here modify
@@ -173,6 +188,9 @@ type ThanosRulerSpec struct {
 	InitContainers []v1.Container `json:"initContainers,omitempty"`
 	// TracingConfig configures tracing in Thanos. This is an experimental feature, it may change in any upcoming release in a breaking way.
 	TracingConfig *v1.SecretKeySelector `json:"tracingConfig,omitempty"`
+	// TracingConfig specifies the path of the tracing configuration file.
+	// When used alongside with TracingConfig, TracingConfigFile takes precedence.
+	TracingConfigFile string `json:"tracingConfigFile,omitempty"`
 	// Labels configure the external label pairs to ThanosRuler. A default replica label
 	// `thanos_ruler_replica` will be always added  as a label with the value of the pod's name and it will be dropped in the alerts.
 	Labels map[string]string `json:"labels,omitempty"`
@@ -197,7 +215,7 @@ type ThanosRulerSpec struct {
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// This is an alpha field from kubernetes 1.22 until 1.24 which requires enabling the StatefulSetMinReadySeconds feature gate.
 	// +optional
 	MinReadySeconds *uint32 `json:"minReadySeconds,omitempty"`
 	// AlertRelabelConfigs configures alert relabeling in ThanosRuler.
@@ -208,11 +226,23 @@ type ThanosRulerSpec struct {
 	// AlertRelabelConfigFile specifies the path of the alert relabeling configuration file.
 	// When used alongside with AlertRelabelConfigs, alertRelabelConfigFile takes precedence.
 	AlertRelabelConfigFile *string `json:"alertRelabelConfigFile,omitempty"`
+	// Pods' hostAliases configuration
+	// +listType=map
+	// +listMapKey=ip
+	HostAliases []HostAlias `json:"hostAliases,omitempty"`
+	// AdditionalArgs allows setting additional arguments for the ThanosRuler container.
+	// It is intended for e.g. activating hidden flags which are not supported by
+	// the dedicated configuration options yet. The arguments are passed as-is to the
+	// ThanosRuler container which may cause issues if they are invalid or not supported
+	// by the given ThanosRuler version.
+	// In case of an argument conflict (e.g. an argument which is already set by the
+	// operator itself) or when providing an invalid argument the reconciliation will
+	// fail and an error will be logged.
+	AdditionalArgs []Argument `json:"additionalArgs,omitempty"`
 }
 
-// ThanosRulerStatus is the most recent observed status of the ThanosRuler. Read-only. Not
-// included when requesting from the apiserver, only from the Prometheus
-// Operator API itself. More info:
+// ThanosRulerStatus is the most recent observed status of the ThanosRuler. Read-only.
+// More info:
 // https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 // +k8s:openapi-gen=true
 type ThanosRulerStatus struct {
@@ -230,7 +260,24 @@ type ThanosRulerStatus struct {
 	AvailableReplicas int32 `json:"availableReplicas"`
 	// Total number of unavailable pods targeted by this ThanosRuler deployment.
 	UnavailableReplicas int32 `json:"unavailableReplicas"`
+	// The current state of the Alertmanager object.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []Condition `json:"conditions,omitempty"`
 }
+
+func (tr *ThanosRuler) ExpectedReplicas() int {
+	if tr.Spec.Replicas == nil {
+		return 1
+	}
+	return int(*tr.Spec.Replicas)
+}
+
+func (tr *ThanosRuler) SetReplicas(i int)            { tr.Status.Replicas = int32(i) }
+func (tr *ThanosRuler) SetUpdatedReplicas(i int)     { tr.Status.UpdatedReplicas = int32(i) }
+func (tr *ThanosRuler) SetAvailableReplicas(i int)   { tr.Status.AvailableReplicas = int32(i) }
+func (tr *ThanosRuler) SetUnavailableReplicas(i int) { tr.Status.UnavailableReplicas = int32(i) }
 
 // DeepCopyObject implements the runtime.Object interface.
 func (l *ThanosRuler) DeepCopyObject() runtime.Object {

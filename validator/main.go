@@ -28,7 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/hook/create-dev-char-symlinks"
+	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev"

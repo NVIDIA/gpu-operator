@@ -93,7 +93,7 @@ type commonDaemonsetSpec struct {
 	imagePullSecrets []corev1.LocalObjectReference
 	args             []string
 	env              []gpuv1.EnvVar
-	resources        *corev1.ResourceRequirements
+	resources        *gpuv1.ResourceRequirements
 	startupProbe     *gpuv1.ContainerProbeSpec
 }
 

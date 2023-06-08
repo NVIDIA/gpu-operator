@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var vcsTag = ""
+
 type Info struct {
 	GoVer      string           `json:"goVersion"`       // go version
 	GoCompiler string           `json:"goCompiler"`      // go compiler
@@ -18,7 +20,7 @@ type Info struct {
 	VCSDate    string           `json:"vcsDate"`         // commit date in RFC3339 format
 	VCSRef     string           `json:"vcsRef"`          // commit sha + dirty if state is not clean
 	VCSState   string           `json:"vcsState"`        // clean or dirty
-	VCSTag     string           `json:"-"`               // tag is not available from Go
+	VCSTag     string           `json:"vcsTag"`          // tag is not available from Go
 	Debug      *debug.BuildInfo `json:"debug,omitempty"` // build info debugging data
 }
 
@@ -30,7 +32,7 @@ func GetInfo() Info {
 		VCSDate:   unknown,
 		VCSRef:    unknown,
 		VCSState:  unknown,
-		VCSTag:    "",
+		VCSTag:    vcsTag,
 	}
 
 	i.GoVer = runtime.Version()
@@ -39,6 +41,9 @@ func GetInfo() Info {
 
 	if bi, ok := debug.ReadBuildInfo(); ok && bi != nil {
 		i.Debug = bi
+		if i.VCSTag == "" {
+			i.VCSTag = bi.Main.Version
+		}
 		date := biSetting(bi, biVCSDate)
 		if t, err := time.Parse(time.RFC3339, date); err == nil {
 			i.VCSDate = t.UTC().Format(time.RFC3339)
