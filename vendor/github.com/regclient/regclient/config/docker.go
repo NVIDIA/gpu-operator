@@ -91,6 +91,14 @@ func dockerParse(cf *conffile.File) ([]Host, error) {
 		}
 		hosts = append(hosts, *h)
 	}
+	// add credStore entries
+	if dc.CredentialsStore != "" {
+		ch := newCredHelper(dockerHelperPre+dc.CredentialsStore, map[string]string{})
+		csHosts, err := ch.list()
+		if err == nil {
+			hosts = append(hosts, csHosts...)
+		}
+	}
 	return hosts, nil
 }
 
@@ -98,8 +106,6 @@ func dockerAuthToHost(name string, conf dockerConfig, auth dockerAuthConfig) (Ho
 	helper := ""
 	if conf.CredentialHelpers != nil && conf.CredentialHelpers[name] != "" {
 		helper = dockerHelperPre + conf.CredentialHelpers[name]
-	} else if conf.CredentialsStore != "" {
-		helper = dockerHelperPre + conf.CredentialsStore
 	}
 	// parse base64 auth into user/pass
 	if auth.Auth != "" {

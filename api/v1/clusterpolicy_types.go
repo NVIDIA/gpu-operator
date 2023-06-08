@@ -143,6 +143,20 @@ type EnvVar struct {
 	Value string `json:"value,omitempty"`
 }
 
+// ResourceRequirements describes the compute resource requirements.
+type ResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits corev1.ResourceList `json:"limits,omitempty"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests corev1.ResourceList `json:"requests,omitempty"`
+}
+
 // SandboxWorkloadsSpec describes configuration for handling sandbox workloads (i.e. Virtual Machines)
 type SandboxWorkloadsSpec struct {
 	// Enabled indicates if the GPU Operator should manage additional operands required
@@ -280,7 +294,7 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -485,7 +499,7 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -563,7 +577,7 @@ type VGPUManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -619,7 +633,7 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -680,7 +694,7 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -754,7 +768,7 @@ type SandboxDevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -807,7 +821,7 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -909,7 +923,7 @@ type DCGMSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -967,7 +981,7 @@ type NodeStatusExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1081,7 +1095,7 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1134,7 +1148,7 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1287,7 +1301,7 @@ type VFIOManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1343,7 +1357,7 @@ type VGPUDeviceManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true

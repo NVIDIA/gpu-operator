@@ -95,11 +95,45 @@ func New(opts ...Opt) *RegClient {
 	return &rc
 }
 
+// WithBlobLimit sets the max size for chunked blob uploads which get stored in memory
+//
+// Deprecated: replace with WithRegOpts(reg.WithBlobLimit(limit))
+func WithBlobLimit(limit int64) Opt {
+	return func(rc *RegClient) {
+		rc.regOpts = append(rc.regOpts, reg.WithBlobLimit(limit))
+	}
+}
+
+// WithBlobSize overrides default blob sizes
+//
+// Deprecated: replace with WithRegOpts(reg.WithBlobSize(chunk, max))
+func WithBlobSize(chunk, max int64) Opt {
+	return func(rc *RegClient) {
+		rc.regOpts = append(rc.regOpts, reg.WithBlobSize(chunk, max))
+	}
+}
+
 // WithCertDir adds a path of certificates to trust similar to Docker's /etc/docker/certs.d
+//
+// Deprecated: replace with WithRegOpts(reg.WithCertDirs(path))
 func WithCertDir(path ...string) Opt {
 	return func(rc *RegClient) {
 		rc.regOpts = append(rc.regOpts, reg.WithCertDirs(path))
 	}
+}
+
+// WithConfigHost adds a list of config host settings
+func WithConfigHost(configHost ...config.Host) Opt {
+	return func(rc *RegClient) {
+		rc.hostLoad("host", configHost)
+	}
+}
+
+// WithConfigHosts adds a list of config host settings
+//
+// Deprecated: replace with WithConfigHost
+func WithConfigHosts(configHosts []config.Host) Opt {
+	return WithConfigHost(configHosts...)
 }
 
 // WithDockerCerts adds certificates trusted by docker in /etc/docker/certs.d
@@ -122,25 +156,6 @@ func WithDockerCreds() Opt {
 	}
 }
 
-// WithConfigHosts adds a list of config host settings
-func WithConfigHosts(configHosts []config.Host) Opt {
-	return func(rc *RegClient) {
-		rc.hostLoad("host", configHosts)
-	}
-}
-
-// WithConfigHost adds config host settings
-func WithConfigHost(configHost config.Host) Opt {
-	return WithConfigHosts([]config.Host{configHost})
-}
-
-// WithBlobSize overrides default blob sizes
-func WithBlobSize(chunk, max int64) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithBlobSize(chunk, max))
-	}
-}
-
 // WithFS overrides the backing filesystem (used by ocidir)
 func WithFS(fs rwfs.RWFS) Opt {
 	return func(rc *RegClient) {
@@ -155,7 +170,19 @@ func WithLog(log *logrus.Logger) Opt {
 	}
 }
 
+// WithRegOpts passes through opts to the reg scheme
+func WithRegOpts(opts ...reg.Opts) Opt {
+	return func(rc *RegClient) {
+		if len(opts) == 0 {
+			return
+		}
+		rc.regOpts = append(rc.regOpts, opts...)
+	}
+}
+
 // WithRetryDelay specifies the time permitted for retry delays
+//
+// Deprecated: replace with WithRegOpts(reg.WithDelay(delayInit, delayMax))
 func WithRetryDelay(delayInit, delayMax time.Duration) Opt {
 	return func(rc *RegClient) {
 		rc.regOpts = append(rc.regOpts, reg.WithDelay(delayInit, delayMax))
@@ -163,6 +190,8 @@ func WithRetryDelay(delayInit, delayMax time.Duration) Opt {
 }
 
 // WithRetryLimit specifies the number of retries for non-fatal errors
+//
+// Deprecated: replace with WithRegOpts(reg.WithRetryLimit(retryLimit))
 func WithRetryLimit(retryLimit int) Opt {
 	return func(rc *RegClient) {
 		rc.regOpts = append(rc.regOpts, reg.WithRetryLimit(retryLimit))

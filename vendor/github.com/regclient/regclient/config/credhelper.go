@@ -70,4 +70,25 @@ func (ch *credHelper) get(host *Host) error {
 	return nil
 }
 
-// store and list methods not implemented
+func (ch *credHelper) list() ([]Host, error) {
+	credList := map[string]string{}
+	outB, err := ch.run("list", bytes.NewReader([]byte{}))
+	if err != nil {
+		outS := strings.TrimSpace(string(outB))
+		return nil, fmt.Errorf("error getting credential list, output: %s, error: %v", outS, err)
+	}
+	err = json.NewDecoder(bytes.NewReader(outB)).Decode(&credList)
+	if err != nil {
+		return nil, fmt.Errorf("error reading credential list: %w", err)
+	}
+	hostList := []Host{}
+	for host, user := range credList {
+		h := HostNewName(host)
+		h.User = user
+		h.CredHelper = ch.prog
+		hostList = append(hostList, *h)
+	}
+	return hostList, nil
+}
+
+// store method not implemented

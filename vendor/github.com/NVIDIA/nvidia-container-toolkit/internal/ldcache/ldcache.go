@@ -302,13 +302,12 @@ func (c *ldcache) resolve(target string) (string, error) {
 		return "", fmt.Errorf("failed to resolve symlink: %v", err)
 	}
 
-	if filepath.IsAbs(link) {
-		c.logger.Debugf("Found absolute link %v", link)
-		link = filepath.Join(c.root, link)
+	// We return absolute paths for all targets
+	if !filepath.IsAbs(link) || strings.HasPrefix(link, ".") {
+		link = filepath.Join(filepath.Dir(target), link)
 	}
 
-	c.logger.Debugf("Resolved link: '%v' => '%v'", name, link)
-	return link, nil
+	return c.resolve(link)
 }
 
 // bytesToString converts a byte slice to a string.

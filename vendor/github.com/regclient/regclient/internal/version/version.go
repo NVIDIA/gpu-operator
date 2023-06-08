@@ -19,6 +19,7 @@ const (
 func (i Info) MarshalPretty() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(tw, "VCSTag:\t%s\n", i.VCSTag)
 	fmt.Fprintf(tw, "VCSRef:\t%s\n", i.VCSRef)
 	fmt.Fprintf(tw, "VCSCommit:\t%s\n", i.VCSCommit)
 	fmt.Fprintf(tw, "VCSState:\t%s\n", i.VCSState)

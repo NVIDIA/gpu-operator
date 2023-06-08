@@ -24,6 +24,7 @@ import (
 	v1 "github.com/regclient/regclient/types/oci/v1"
 	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
+	"github.com/regclient/regclient/types/warning"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,6 +75,7 @@ type imageOpt struct {
 	checkBaseRef    string
 	checkSkipConfig bool
 	child           bool
+	exportRef       ref.Ref
 	forceRecursive  bool
 	includeExternal bool
 	digestTags      bool
@@ -111,6 +113,13 @@ func ImageWithCheckSkipConfig() ImageOpts {
 func ImageWithChild() ImageOpts {
 	return func(opts *imageOpt) {
 		opts.child = true
+	}
+}
+
+// ImageWithExportRef overrides the image name embedded in the export file
+func ImageWithExportRef(r ref.Ref) ImageOpts {
+	return func(opts *imageOpt) {
+		opts.exportRef = r
 	}
 }
 
@@ -387,6 +396,10 @@ func (rc *RegClient) ImageCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.R
 	var opt imageOpt
 	for _, optFn := range opts {
 		optFn(&opt)
+	}
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
 	}
 	return rc.imageCopyOpt(ctx, refSrc, refTgt, types.Descriptor{}, opt.child, &opt)
 }
@@ -681,8 +694,16 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 // index.json: created at top level, single descriptor with org.opencontainers.image.ref.name annotation pointing to the tag
 // manifest.json: created at top level, based on every layer added, only works for a single arch image
 // blobs/$algo/$hash: each content addressable object (manifest, config, or layer), created recursively
-func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Writer) error {
+func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Writer, opts ...ImageOpts) error {
 	var ociIndex v1.Index
+
+	var opt imageOpt
+	for _, optFn := range opts {
+		optFn(&opt)
+	}
+	if opt.exportRef.IsZero() {
+		opt.exportRef = r
+	}
 
 	// create tar writer object
 	tw := tar.NewWriter(outStream)
@@ -716,8 +737,8 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 	if mDesc.Annotations == nil {
 		mDesc.Annotations = map[string]string{}
 	}
-	mDesc.Annotations[annotationImageName] = r.CommonName()
-	mDesc.Annotations[annotationRefName] = r.Tag
+	mDesc.Annotations[annotationImageName] = opt.exportRef.CommonName()
+	mDesc.Annotations[annotationRefName] = opt.exportRef.Tag
 
 	// generate/write an OCI index
 	ociIndex.Versioned = v1.IndexSchemaVersion
@@ -733,7 +754,7 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 		if err != nil {
 			return err
 		}
-		refTag := r.ToReg()
+		refTag := opt.exportRef.ToReg()
 		if refTag.Digest != "" {
 			refTag.Digest = ""
 		}

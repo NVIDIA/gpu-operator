@@ -322,7 +322,7 @@ func ParseAuthHeaders(ahl []string) ([]Challenge, error) {
 	for _, ah := range ahl {
 		c, err := ParseAuthHeader(ah)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse challenge header: %s", ah)
+			return nil, fmt.Errorf("failed to parse challenge header: %s, %w", ah, err)
 		}
 		cl = append(cl, c...)
 	}

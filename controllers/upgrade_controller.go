@@ -204,19 +204,19 @@ func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(&source.Kind{Type: &gpuv1.ClusterPolicy{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
-	mapFn := func(a client.Object) []reconcile.Request {
+	mapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
 		// find all the ClusterPolicy to trigger their reconciliation
 		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
 		list := &gpuv1.ClusterPolicyList{}
 
-		err := mgr.GetClient().List(context.TODO(), list, opts...)
+		err := mgr.GetClient().List(ctx, list, opts...)
 		if err != nil {
 			r.Log.Error(err, "Unable to list ClusterPolicies")
 			return []reconcile.Request{}
@@ -237,7 +237,7 @@ func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to node labels
 	// TODO: only watch for changes to upgrade state label
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Node{}},
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
 		handler.EnqueueRequestsFromMapFunc(mapFn),
 		predicate.LabelChangedPredicate{},
 	)
@@ -248,11 +248,8 @@ func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to Daemonsets and requeue the owner ClusterPolicy.
 	// TODO: only watch for changes to driver Daemonset
 	err = c.Watch(
-		&source.Kind{Type: &appsv1.DaemonSet{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &gpuv1.ClusterPolicy{},
-		},
+		source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{}, handler.OnlyControllerOwner()),
 	)
 	if err != nil {
 		return err

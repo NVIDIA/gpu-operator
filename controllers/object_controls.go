@@ -758,7 +758,8 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	if config.GPUFeatureDiscovery.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.GPUFeatureDiscovery.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.GPUFeatureDiscovery.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.GPUFeatureDiscovery.Resources.Limits
 		}
 	}
 
@@ -1058,7 +1059,8 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if config.Toolkit.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.Toolkit.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.Toolkit.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Toolkit.Resources.Limits
 		}
 	}
 	// set/append environment variables for toolkit container
@@ -1179,7 +1181,8 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if config.DevicePlugin.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.DevicePlugin.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DevicePlugin.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DevicePlugin.Resources.Limits
 		}
 	}
 	// set arguments if specified for device-plugin container
@@ -1249,7 +1252,8 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	if config.SandboxDevicePlugin.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.SandboxDevicePlugin.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.SandboxDevicePlugin.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.SandboxDevicePlugin.Resources.Limits
 		}
 	}
 	// set arguments if specified for device-plugin container
@@ -1292,7 +1296,8 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if config.DCGMExporter.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.DCGMExporter.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DCGMExporter.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DCGMExporter.Resources.Limits
 		}
 	}
 	// set arguments if specified for exporter container
@@ -1428,7 +1433,8 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	if config.DCGM.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.DCGM.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DCGM.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DCGM.Resources.Limits
 		}
 	}
 	// set arguments if specified for exporter container
@@ -1487,7 +1493,8 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	if config.MIGManager.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.MIGManager.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.MIGManager.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.MIGManager.Resources.Limits
 		}
 	}
 
@@ -1571,7 +1578,8 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	if config.VFIOManager.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.VFIOManager.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.VFIOManager.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.VFIOManager.Resources.Limits
 		}
 	}
 
@@ -1619,7 +1627,8 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	if config.VGPUDeviceManager.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.VGPUDeviceManager.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.VGPUDeviceManager.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.VGPUDeviceManager.Resources.Limits
 		}
 	}
 
@@ -1715,7 +1724,8 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if config.Validator.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.Validator.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.Validator.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Validator.Resources.Limits
 		}
 	}
 	// set arguments if specified for validator container
@@ -1869,7 +1879,8 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	if config.NodeStatusExporter.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources = *config.NodeStatusExporter.Resources
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.NodeStatusExporter.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.NodeStatusExporter.Resources.Limits
 		}
 	}
 
@@ -2606,7 +2617,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 	// set resource limits
 	if config.Driver.Resources != nil {
-		obj.Spec.Template.Spec.Containers[driverIndex].Resources = *config.Driver.Resources
+		obj.Spec.Template.Spec.Containers[driverIndex].Resources.Requests = config.Driver.Resources.Requests
+		obj.Spec.Template.Spec.Containers[driverIndex].Resources.Limits = config.Driver.Resources.Limits
 	}
 	// set arguments if specified for driver container
 	if len(config.Driver.Args) > 0 {
@@ -2834,7 +2846,8 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	}
 	// set resource limits
 	if config.VGPUManager.Resources != nil {
-		container.Resources = *config.VGPUManager.Resources
+		container.Resources.Requests = config.VGPUManager.Resources.Requests
+		container.Resources.Limits = config.VGPUManager.Resources.Limits
 	}
 	// set arguments if specified for driver container
 	if len(config.VGPUManager.Args) > 0 {
