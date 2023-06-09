@@ -869,6 +869,11 @@ type DCGMExporterServiceMonitorConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Additional labels to add to ServiceMonitor instance for NVIDIA DCGM Exporter"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+
+	// Relabelings allows to rewrite labels on metric sets for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Relabelings allows to rewrite labels on metric sets for NVIDIA DCGM Exporter"
+	Relabelings []*promv1.RelabelConfig `json:"relabelings,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment

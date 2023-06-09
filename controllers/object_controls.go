@@ -3926,8 +3926,11 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 				obj.ObjectMeta.Labels[key] = value
 			}
 		}
-	}
 
+		if serviceMonitor.Relabelings != nil {
+			obj.Spec.Endpoints[0].RelabelConfigs = serviceMonitor.Relabelings
+		}
+	}
 	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
 		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
 		if !serviceMonitorCRDExists {
