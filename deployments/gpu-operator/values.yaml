@@ -299,6 +299,13 @@ dcgmExporter:
     interval: 15s
     honorLabels: false
     additionalLabels: {}
+    relabelings: []
+    # - source_labels:
+    #     - __meta_kubernetes_pod_node_name
+    #   regex: (.*)
+    #   target_label: instance
+    #   replacement: $1
+    #   action: replace
 
 gfd:
   enabled: true

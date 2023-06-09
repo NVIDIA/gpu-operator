@@ -23,6 +23,7 @@ package v1
 
 import (
 	"github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -234,6 +235,17 @@ func (in *DCGMExporterServiceMonitorConfig) DeepCopyInto(out *DCGMExporterServic
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
+		}
+	}
+	if in.Relabelings != nil {
+		in, out := &in.Relabelings, &out.Relabelings
+		*out = make([]*monitoringv1.RelabelConfig, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(monitoringv1.RelabelConfig)
+				(*in).DeepCopyInto(*out)
+			}
 		}
 	}
 }
