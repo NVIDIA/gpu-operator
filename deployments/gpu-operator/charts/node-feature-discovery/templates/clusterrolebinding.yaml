@@ -32,3 +32,21 @@ subjects:
   name: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
   namespace: {{ include "node-feature-discovery.namespace" .  }}
 {{- end }}
+
+---
+{{- if and .Values.topologyGC.enable .Values.topologyGC.rbac.create .Values.topologyUpdater.enable }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "node-feature-discovery.fullname" . }}-topology-gc
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "node-feature-discovery.fullname" . }}-topology-gc
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.topologyGC.serviceAccount.name | default "nfd-topology-gc" }}
+  namespace: {{ include "node-feature-discovery.namespace" .  }}
+{{- end }}

@@ -45,14 +45,14 @@ spec:
         command:
         - "nfd-worker"
         args:
-        - "--server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
+        - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
         {{- if .Values.enableNodeFeatureApi }}
         - "-enable-nodefeature-api"
         {{- end }}
 {{- if .Values.tls.enable }}
-        - "--ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-        - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-        - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+        - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+        - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+        - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
 {{- end }}
         volumeMounts:
         - name: host-boot
@@ -66,6 +66,9 @@ spec:
           readOnly: true
         - name: host-usr-lib
           mountPath: "/host-usr/lib"
+          readOnly: true
+        - name: host-lib
+          mountPath: "/host-lib"
           readOnly: true
         {{- if .Values.worker.mountUsrSrc }}
         - name: host-usr-src
@@ -99,6 +102,9 @@ spec:
         - name: host-usr-lib
           hostPath:
             path: "/usr/lib"
+        - name: host-lib
+          hostPath:
+            path: "/lib"
         {{- if .Values.worker.mountUsrSrc }}
         - name: host-usr-src
           hostPath:

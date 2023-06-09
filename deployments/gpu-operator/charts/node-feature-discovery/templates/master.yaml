@@ -27,6 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
     {{- end }}
       serviceAccountName: {{ include "node-feature-discovery.master.serviceAccountName" . }}
+      enableServiceLinks: false
       securityContext:
         {{- toYaml .Values.master.podSecurityContext | nindent 8 }}
       containers:
@@ -39,7 +40,7 @@ spec:
             exec:
               command:
               - "/usr/bin/grpc_health_probe"
-              - "-addr=:8080"
+              - "-addr=:{{ .Values.master.port | default "8080" }}"
               {{- if .Values.tls.enable }}
               - "-tls"
               - "-tls-ca-cert=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
@@ -52,7 +53,7 @@ spec:
             exec:
               command:
               - "/usr/bin/grpc_health_probe"
-              - "-addr=:8080"
+              - "-addr=:{{ .Values.master.port | default "8080" }}"
               {{- if .Values.tls.enable }}
               - "-tls"
               - "-tls-ca-cert=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
@@ -63,7 +64,7 @@ spec:
             periodSeconds: 10
             failureThreshold: 10
           ports:
-          - containerPort: 8080
+          - containerPort: {{ .Values.master.port | default "8080" }}
             name: grpc
           env:
           - name: NODE_NAME
@@ -76,16 +77,23 @@ spec:
             {{- toYaml .Values.master.resources | nindent 12 }}
           args:
             {{- if .Values.master.instance | empty | not }}
-            - "--instance={{ .Values.master.instance }}"
+            - "-instance={{ .Values.master.instance }}"
             {{- end }}
+            - "-port={{ .Values.master.port | default "8080" }}"
             {{- if .Values.enableNodeFeatureApi }}
             - "-enable-nodefeature-api"
             {{- end }}
             {{- if .Values.master.extraLabelNs | empty | not }}
-            - "--extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
+            - "-extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
+            {{- end }}
+            {{- if .Values.master.denyLabelNs | empty | not }}
+            - "-deny-label-ns={{- join "," .Values.master.denyLabelNs }}"
             {{- end }}
             {{- if .Values.master.resourceLabels | empty | not }}
-            - "--resource-labels={{- join "," .Values.master.resourceLabels }}"
+            - "-resource-labels={{- join "," .Values.master.resourceLabels }}"
+            {{- end }}
+            {{- if .Values.master.enableTaints }}
+            - "-enable-taints"
             {{- end }}
             {{- if .Values.master.crdController | kindIs "invalid" | not }}
             - "-crd-controller={{ .Values.master.crdController }}"
@@ -97,17 +105,27 @@ spec:
             - "-featurerules-controller={{ .Values.master.featureRulesController }}"
             {{- end }}
     {{- if .Values.tls.enable }}
-            - "--ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-            - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-            - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+            - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+            - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+            - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
           volumeMounts:
             - name: nfd-master-cert
               mountPath: "/etc/kubernetes/node-feature-discovery/certs"
+              readOnly: true
+            - name: nfd-master-conf
+              mountPath: "/etc/kubernetes/node-feature-discovery"
               readOnly: true
       volumes:
         - name: nfd-master-cert
           secret:
             secretName: nfd-master-cert
+        - name: nfd-master-conf
+          configMap:
+            name: {{ include "node-feature-discovery.fullname" . }}-master-conf
+            items:
+              - key: nfd-master.conf
+                path: nfd-master.conf
+
     ## /TLS ##
     {{- end }}
     {{- with .Values.master.nodeSelector }}

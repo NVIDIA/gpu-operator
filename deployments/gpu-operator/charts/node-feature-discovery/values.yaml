@@ -10,13 +10,25 @@ nameOverride: ""
 fullnameOverride: ""
 namespaceOverride: ""
 
-enableNodeFeatureApi: true
+enableNodeFeatureApi: false
 
 master:
+  config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
+    # noPublish: false
+    # extraLabelNs: ["added.ns.io","added.kubernets.io"]
+    # denyLabelNs: ["denied.ns.io","denied.kubernetes.io"]
+    # resourceLabels: ["vendor-1.com/feature-1","vendor-2.io/feature-2"]
+    # enableTaints: false
+    # labelWhiteList: "foo"
+  ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
+  # The TCP port that nfd-master listens for incoming requests. Default: 8080
+  port: 8080
   instance:
   featureApi:
+  denyLabelNs: []
   extraLabelNs: []
   resourceLabels: []
+  enableTaints: false
   crdController: null
   featureRulesController: null
   deploymentAnnotations: {}
@@ -390,12 +402,13 @@ topologyUpdater:
     annotations: {}
     name:
   rbac:
-    create: false
+    create: true
 
   kubeletConfigPath:
   kubeletPodResourcesSockPath:
   updateInterval: 60s
   watchNamespace: "*"
+  kubeletStateDir: /host-var/lib/kubelet
 
   podSecurityContext: {}
   securityContext:
@@ -404,6 +417,45 @@ topologyUpdater:
       drop: [ "ALL" ]
     readOnlyRootFilesystem: true
     runAsUser: 0
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+  tolerations: []
+  annotations: {}
+  affinity: {}
+  podSetFingerprint: true
+
+topologyGC:
+  enable: true
+  replicaCount: 1
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name:
+  rbac:
+    create: true
+
+  interval: 1h
+
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ "ALL" ]
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
 
   resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious

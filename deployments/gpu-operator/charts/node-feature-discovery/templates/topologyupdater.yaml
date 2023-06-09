@@ -41,27 +41,40 @@ spec:
           - "nfd-topology-updater"
         args:
           {{- if .Values.topologyUpdater.updateInterval | empty | not }}
-          - "--sleep-interval={{ .Values.topologyUpdater.updateInterval }}"
+          - "-sleep-interval={{ .Values.topologyUpdater.updateInterval }}"
           {{- else }}
-          - "--sleep-interval=3s"
+          - "-sleep-interval=3s"
           {{- end }}
           {{- if .Values.topologyUpdater.watchNamespace | empty | not }}
-          - "--watch-namespace={{ .Values.topologyUpdater.watchNamespace }}"
+          - "-watch-namespace={{ .Values.topologyUpdater.watchNamespace }}"
           {{- else }}
-          - "--watch-namespace=*"
+          - "-watch-namespace=*"
           {{- end }}
           {{- if .Values.tls.enable }}
-          - "--ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-          - "--key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-          - "--cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+          - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
+          - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
+          - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+          {{- end }}
+          {{- if .Values.topologyUpdater.podSetFingerprint }}
+          - "-pods-fingerprint"
+          {{- end }}
+          {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
+          - "-kubelet-config-uri=file:///host-var/kubelet-config"
           {{- end }}
         volumeMounts:
+        {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
         - name: kubelet-config
-          mountPath: /host-var/lib/kubelet/config.yaml
+          mountPath: /host-var/kubelet-config
+        {{- end }}
         - name: kubelet-podresources-sock
           mountPath: /host-var/lib/kubelet/pod-resources/kubelet.sock
         - name: host-sys
           mountPath: /host-sys
+        {{- if .Values.topologyUpdater.kubeletStateDir | empty | not }}
+        - name: kubelet-state-files
+          mountPath: /host-var/lib/kubelet
+          readOnly: true
+        {{- end }}
         {{- if .Values.tls.enable }}
         - name: nfd-topology-updater-cert
           mountPath: "/etc/kubernetes/node-feature-discovery/certs"
@@ -79,13 +92,11 @@ spec:
       - name: host-sys
         hostPath:
           path: "/sys"
+      {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
       - name: kubelet-config
         hostPath:
-          {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
           path: {{ .Values.topologyUpdater.kubeletConfigPath }}
-          {{- else }}
-          path: /var/lib/kubelet/config.yaml
-          {{- end }}
+      {{- end }}
       - name: kubelet-podresources-sock
         hostPath:
           {{- if .Values.topologyUpdater.kubeletPodResourcesSockPath | empty | not }}
@@ -93,6 +104,11 @@ spec:
           {{- else }}
           path: /var/lib/kubelet/pod-resources/kubelet.sock
           {{- end }}
+      {{- if .Values.topologyUpdater.kubeletStateDir | empty | not }}
+      - name: kubelet-state-files
+        hostPath:
+          path: {{ .Values.topologyUpdater.kubeletStateDir }}
+      {{- end }}
       - name: nfd-topology-updater-conf
         configMap:
           name: {{ include "node-feature-discovery.fullname" . }}-topology-updater-conf

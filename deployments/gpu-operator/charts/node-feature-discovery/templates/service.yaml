@@ -9,7 +9,7 @@ metadata:
 spec:
   type: {{ .Values.master.service.type }}
   ports:
-    - port: {{ .Values.master.service.port }}
+    - port: {{ .Values.master.service.port | default "8080" }}
       targetPort: grpc
       protocol: TCP
       name: grpc

@@ -94,3 +94,14 @@ Create the name of the service account which topologyUpdater will use
     {{ default "default" .Values.topologyUpdater.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Create the name of the service account which topologyGC will use
+*/}}
+{{- define "node-feature-discovery.topologyGC.serviceAccountName" -}}
+{{- if .Values.topologyGC.serviceAccount.create -}}
+    {{ default (printf "%s-topology-gc" (include "node-feature-discovery.fullname" .)) .Values.topologyGC.serviceAccount.name }}
+{{- else -}}
+    {{ default "default" .Values.topologyGC.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
