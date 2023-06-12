@@ -1114,7 +1114,8 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		return fmt.Errorf("error getting path to runtime config file: %v", err)
 	}
 	sourceConfigFileName := path.Base(runtimeConfigFile)
-	runtimeArgs := "--config " + DefaultRuntimeConfigTargetDir + sourceConfigFileName
+	// update runtime args
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_CONFIG", DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
 	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
@@ -1130,7 +1131,8 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			return fmt.Errorf("error getting path to runtime socket: %v", err)
 		}
 		sourceSocketFileName := path.Base(runtimeSocketFile)
-		runtimeArgs += " --socket " + DefaultRuntimeSocketTargetDir + sourceSocketFileName
+		// update runtime args
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
@@ -1139,9 +1141,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
-
-	// update runtime args
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_ARGS", runtimeArgs)
 
 	// Update CRI-O hooks path to use default path for non OCP cases
 	if n.openshift == "" && n.runtime == gpuv1.CRIO {
