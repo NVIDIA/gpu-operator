@@ -135,6 +135,12 @@ const (
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
 	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
+	// NvidiaCtrRuntimeSocket is the EnvVar name for the Container toolkit runtime socket
+	NvidiaCtrRuntimeSocket = "RUNTIME_SOCKET"
+	// NvidiaCtrRuntimeSocket is the EnvVar name for the Container toolkit runtime config
+	NvidiaCtrRuntimeConfig = "RUNTIME_CONFIG"
+	// NvidiaCtrRuntimeSocket is the EnvVar name for the Container toolkit runtime class name
+	NvidiaCtrRuntimeName = "NVIDIA_RUNTIME_NAME"
 )
 
 // ContainerProbe defines container probe types
@@ -1105,7 +1111,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeName, getRuntimeClass(config))
 	}
 
 	// setup mounts for runtime config file
@@ -1115,7 +1121,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	}
 	sourceConfigFileName := path.Base(runtimeConfigFile)
 	// update runtime args
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_CONFIG", DefaultRuntimeConfigTargetDir+sourceConfigFileName)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeConfig, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
 	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
@@ -1132,7 +1138,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 		sourceSocketFileName := path.Base(runtimeSocketFile)
 		// update runtime args
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeSocket, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
