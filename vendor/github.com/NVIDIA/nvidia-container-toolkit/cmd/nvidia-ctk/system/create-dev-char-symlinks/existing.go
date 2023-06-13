@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/NVIDIA/nvidia-container-toolkit/internal/logger"
 	"github.com/NVIDIA/nvidia-container-toolkit/internal/lookup"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -30,8 +30,8 @@ type nodeLister interface {
 }
 
 type existing struct {
-	logger     *logrus.Logger
-	driverRoot string
+	logger  logger.Interface
+	devRoot string
 }
 
 // DeviceNodes returns a list of NVIDIA device nodes in the specified root.
@@ -39,22 +39,22 @@ type existing struct {
 func (m existing) DeviceNodes() ([]deviceNode, error) {
 	locator := lookup.NewCharDeviceLocator(
 		lookup.WithLogger(m.logger),
-		lookup.WithRoot(m.driverRoot),
+		lookup.WithRoot(m.devRoot),
 		lookup.WithOptional(true),
 	)
 
 	devices, err := locator.Locate("/dev/nvidia*")
 	if err != nil {
-		m.logger.Warnf("Error while locating device: %v", err)
+		m.logger.Warningf("Error while locating device: %v", err)
 	}
 
 	capDevices, err := locator.Locate("/dev/nvidia-caps/nvidia-*")
 	if err != nil {
-		m.logger.Warnf("Error while locating caps device: %v", err)
+		m.logger.Warningf("Error while locating caps device: %v", err)
 	}
 
 	if len(devices) == 0 && len(capDevices) == 0 {
-		m.logger.Infof("No NVIDIA devices found in %s", m.driverRoot)
+		m.logger.Infof("No NVIDIA devices found in %s", m.devRoot)
 		return nil, nil
 	}
 
@@ -67,7 +67,7 @@ func (m existing) DeviceNodes() ([]deviceNode, error) {
 		var stat unix.Stat_t
 		err := unix.Stat(d, &stat)
 		if err != nil {
-			m.logger.Warnf("Could not stat device: %v", err)
+			m.logger.Warningf("Could not stat device: %v", err)
 			continue
 		}
 		deviceNode := deviceNode{
