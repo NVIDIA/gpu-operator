@@ -3,6 +3,7 @@ module github.com/NVIDIA/gpu-operator
 go 1.20
 
 require (
+	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230504161004-dd428b908f5a
 	github.com/NVIDIA/nvidia-container-toolkit v1.13.1
 	github.com/go-logr/logr v1.2.4
@@ -19,6 +20,7 @@ require (
 	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230530114152-c48c1fc89f89
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.9.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.27.2
 	k8s.io/apiextensions-apiserver v0.27.2
 	k8s.io/apimachinery v0.27.2
@@ -98,7 +100,6 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cli-runtime v0.26.4 // indirect
 	k8s.io/component-base v0.27.2 // indirect

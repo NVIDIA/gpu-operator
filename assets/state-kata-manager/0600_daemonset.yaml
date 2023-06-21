@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-kata-manager
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-kata-manager
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-kata-manager
+  template:
+    metadata:
+      labels:
+        name: nvidia-kata-manager
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.kata-manager: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-kata-manager
+      hostPID: true
+      containers:
+        - name: nvidia-kata-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["k8s-kata-manager"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CONFIG_FILE
+              value: "/etc/kata-manager/config.yaml"
+            - name: LOAD_KERNEL_MODULES
+              value: "true"
+          resources: {}
+          volumeMounts:
+          - name: nvidia-kata-manager-config
+            mountPath: /etc/kata-manager/config.yaml
+            subPath: config.yaml
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: nvidia-kata-manager-config
+          configMap:
+            name: nvidia-kata-manager-config
+            defaultMode: 448
+        - name: host-root
+          hostPath:
+            path: /

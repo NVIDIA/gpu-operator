@@ -4,6 +4,8 @@ github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
+github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a h1:3nyTp1cXzZMHoUuhMwHdz9QDzl100ECvIDYFxdjWk6o=
+github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a/go.mod h1:K7HCLTndSwBEZwBu6sU7daVeryV1Qt/DtKH8nONJj4o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230504161004-dd428b908f5a h1:k8HalV8rdGshw0hCPxVLt8FRzpd9hnXfjggc/ePAn3A=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230504161004-dd428b908f5a/go.mod h1:o7UeOk3V0xlOX87NnSaGNDje23VKCKPdfN6aSIZ9BwM=
 github.com/NVIDIA/nvidia-container-toolkit v1.13.1 h1:GSB4ySiL0iuozRTVhYdafPj/lMtv75lT0g7ovEHTnqY=

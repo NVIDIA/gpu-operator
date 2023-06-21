@@ -329,15 +329,31 @@ spec:
                             action:
                               default: replace
                               description: Action to perform based on regex matching.
-                                Default is 'replace'
+                                Default is 'replace'. uppercase and lowercase actions
+                                require Prometheus >= 2.36.
                               enum:
                               - replace
+                              - Replace
                               - keep
+                              - Keep
                               - drop
+                              - Drop
                               - hashmod
+                              - HashMod
                               - labelmap
+                              - LabelMap
                               - labeldrop
+                              - LabelDrop
                               - labelkeep
+                              - LabelKeep
+                              - lowercase
+                              - Lowercase
+                              - uppercase
+                              - Uppercase
+                              - keepequal
+                              - KeepEqual
+                              - dropequal
+                              - DropEqual
                               type: string
                             modulus:
                               description: Modulus to take of the hash of the source
@@ -974,6 +990,130 @@ spec:
                     type: object
                   version:
                     description: GFD image tag
+                    type: string
+                type: object
+              kataManager:
+                description: KataManager component spec
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  config:
+                    description: Kata Manager config
+                    properties:
+                      artifactsDir:
+                        default: /opt/nvidia-gpu-operator/artifacts/runtimeclasses
+                        description: ArtifactsDir is the directory where kata artifacts
+                          (e.g. kernel / guest images, configuration, etc.) are placed
+                          on the local filesystem.
+                        type: string
+                      runtimeClasses:
+                        description: RuntimeClasses is a list of kata runtime classes
+                          to configure.
+                        items:
+                          description: RuntimeClass defines the configuration for
+                            a kata RuntimeClass
+                          properties:
+                            artifacts:
+                              description: Artifacts are the kata artifacts associated
+                                with the runtime class.
+                              properties:
+                                pullSecret:
+                                  description: PullSecret is the secret used to pull
+                                    the OCI artifact.
+                                  type: string
+                                url:
+                                  description: URL is the path to the OCI artifact
+                                    (payload) containing all artifacts associated
+                                    with a kata runtime class.
+                                  type: string
+                              required:
+                              - url
+                              type: object
+                            name:
+                              description: Name is the name of the kata runtime class.
+                              type: string
+                            nodeSelector:
+                              additionalProperties:
+                                type: string
+                              description: NodeSelector specifies the nodeSelector
+                                for the RuntimeClass object. This ensures pods running
+                                with the RuntimeClass only get scheduled onto nodes
+                                which support it.
+                              type: object
+                          required:
+                          - artifacts
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  enabled:
+                    description: Enabled indicates if deployment of Kata Manager is
+                      enabled
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: Kata Manager image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: Kata Manager image repository
+                    type: string
+                  resources:
+                    description: 'Optional: Define resources requests and limits for
+                      each pod'
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. Requests cannot exceed
+                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                    type: object
+                  version:
+                    description: Kata Manager image tag
                     type: string
                 type: object
               mig:

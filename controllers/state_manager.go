@@ -84,6 +84,7 @@ var gpuStateLabels = map[string]map[string]string{
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
 		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
 		"nvidia.com/gpu.deploy.vfio-manager":          "true",
+		"nvidia.com/gpu.deploy.kata-manager":          "true",
 	},
 	gpuWorkloadConfigVMVgpu: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
@@ -797,6 +798,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-sandbox-validation")
 		addState(n, "/opt/gpu-operator/state-vfio-manager")
 		addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
+		addState(n, "/opt/gpu-operator/state-kata-manager")
 	}
 
 	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
@@ -981,6 +983,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return clusterPolicySpec.NodeStatusExporter.IsEnabled()
 	case "state-sandbox-device-plugin":
 		return n.sandboxEnabled && clusterPolicySpec.SandboxDevicePlugin.IsEnabled()
+	case "state-kata-manager":
+		return n.sandboxEnabled && clusterPolicySpec.KataManager.IsEnabled()
 	case "state-vfio-manager":
 		return n.sandboxEnabled && clusterPolicySpec.VFIOManager.IsEnabled()
 	case "state-vgpu-device-manager":
