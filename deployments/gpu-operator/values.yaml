@@ -411,6 +411,24 @@ vfioManager:
       - name: ENABLE_AUTO_DRAIN
         value: "false"
 
+kataManager:
+  enabled: false
+  config:
+    artifactsDir: "/opt/nvidia-gpu-operator/artifacts/runtimeclasses"
+    runtimeClasses:
+      - name: kata-qemu-nvidia-gpu
+        nodeSelector: {}
+        artifacts:
+          url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-530
+          pullSecret: ""
+  repository: nvcr.io/nvidia/cloud-native
+  image: k8s-kata-manager
+  version: v0.1.0
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  resources: {}
+
 sandboxDevicePlugin:
   enabled: true
   repository: nvcr.io/nvidia

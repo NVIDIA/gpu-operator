@@ -268,6 +268,33 @@ spec:
       {{- if .Values.vgpuManager.driverManager.env }}
       env: {{ toYaml .Values.vgpuManager.driverManager.env | nindent 8 }}
       {{- end }}
+  kataManager:
+    enabled: {{ .Values.kataManager.enabled }}
+    config: {{ toYaml .Values.kataManager.config | nindent 6 }}
+    {{- if .Values.kataManager.repository }}
+    repository: {{ .Values.kataManager.repository }}
+    {{- end }}
+    {{- if .Values.kataManager.image }}
+    image: {{ .Values.kataManager.image }}
+    {{- end }}
+    {{- if .Values.kataManager.version }}
+    version: {{ .Values.kataManager.version | quote }}
+    {{- end }}
+    {{- if .Values.kataManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.kataManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.kataManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.kataManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataManager.resources }}
+    resources: {{ toYaml .Values.kataManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataManager.env }}
+    env: {{ toYaml .Values.kataManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataManager.args }}
+    args: {{ toYaml .Values.kataManager.args | nindent 6 }}
+    {{- end }}
   vfioManager:
     enabled: {{ .Values.vfioManager.enabled }}
     {{- if .Values.vfioManager.repository }}

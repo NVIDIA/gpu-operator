@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,6 +79,8 @@ type ClusterPolicySpec struct {
 	VGPUDeviceManager VGPUDeviceManagerSpec `json:"vgpuDeviceManager,omitempty"`
 	// CDI configures how the Container Device Interface is used in the cluster
 	CDI CDIConfigSpec `json:"cdi,omitempty"`
+	// KataManager component spec
+	KataManager KataManagerSpec `json:"kataManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1268,6 +1271,64 @@ type MIGGPUClientsConfigSpec struct {
 	Name string `json:"name,omitempty"`
 }
 
+// KataManagerSpec defines the configuration for the kata-manager which prepares NVIDIA-specific kata runtimes
+type KataManagerSpec struct {
+	// Enabled indicates if deployment of Kata Manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable Kata Manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Kata Manager config
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kata Manager configuration"
+	Config *kata_v1alpha1.Config `json:"config,omitempty"`
+
+	// Kata Manager image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// Kata Manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// Kata Manager image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
 // VFIOManagerSpec defines the properties for deploying VFIO-PCI manager
 type VFIOManagerSpec struct {
 	// Enabled indicates if deployment of VFIO Manager is enabled
@@ -1570,6 +1631,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *VGPUDeviceManagerSpec:
 		config := spec.(*VGPUDeviceManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "VGPU_DEVICE_MANAGER_IMAGE")
+	case *KataManagerSpec:
+		config := spec.(*KataManagerSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "KATA_MANAGER_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
@@ -1789,4 +1853,12 @@ func (c *CDIConfigSpec) IsDefault() bool {
 		return false
 	}
 	return *c.Default
+}
+
+// IsEnabled returns true if Kata Manager is enabled
+func (k *KataManagerSpec) IsEnabled() bool {
+	if k.Enabled == nil {
+		return false
+	}
+	return *k.Enabled
 }

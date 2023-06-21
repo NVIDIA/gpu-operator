@@ -117,3 +117,7 @@ spec:
 
   sandboxDevicePlugin:
     enabled: true
+
+  kataManager:
+    enabled: false
+    config: {}

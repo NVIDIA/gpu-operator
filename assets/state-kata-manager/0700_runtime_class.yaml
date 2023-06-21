@@ -1,0 +1,11 @@
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  labels:
+    app.kubernetes.io/component: gpu-operator
+    nvidia.com/kata-runtime-class: "true"
+  name: "FILLED_BY_OPERATOR"
+handler: "FILLED_BY_OPERATOR"
+scheduling:
+  nodeSelector:
+    nvidia.com/gpu.deploy.kata-manager: "true"
