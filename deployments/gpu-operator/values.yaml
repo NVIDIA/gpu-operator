@@ -54,7 +54,7 @@ validator:
   plugin:
     env:
       - name: WITH_WORKLOAD
-        value: "true"
+        value: "false"
 
 operator:
   repository: nvcr.io/nvidia
