@@ -561,6 +561,7 @@ spec:
           verbs:
           - get
           - list
+          - watch
         - apiGroups:
           - node.k8s.io
           resources:
@@ -668,6 +669,7 @@ spec:
           verbs:
           - get
           - list
+          - watch
         - apiGroups:
           - monitoring.coreos.com
           resources:

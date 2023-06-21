@@ -140,6 +140,8 @@ const (
 	KataManagerAnnotationHashKey = "nvidia.com/kata-manager.last-applied-hash"
 	// DefaultKataArtifactsDir is the default directory to store kata artifacts on the host
 	DefaultKataArtifactsDir = "/opt/nvidia-gpu-operator/artifacts/runtimeclasses/"
+	// PodControllerRevisionHashLabelKey is the annotation key for pod controller revision hash value
+	PodControllerRevisionHashLabelKey = "controller-revision-hash"
 )
 
 // ContainerProbe defines container probe types
@@ -2418,6 +2420,7 @@ func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, config *gpuv1.Cl
 	// add unique labels for each kernel-version specific Daemonset
 	obj.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
 	obj.Spec.Template.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
+
 	// append kernel-version specific node-selector
 	obj.Spec.Template.Spec.NodeSelector[nfdKernelLabelKey] = n.currentKernelVersion
 	return nil
@@ -3089,7 +3092,7 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	ctx := n.ctx
 	ds := &appsv1.DaemonSet{}
-	n.rec.Log.V(1).Info("checking daemonset for readiness", "name", name)
+	n.rec.Log.V(2).Info("checking daemonset for readiness", "name", name)
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, ds)
 	if err != nil {
 		n.rec.Log.Error(err, "could not get daemonset", "name", name)
@@ -3099,7 +3102,124 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		n.rec.Log.Info("daemonset not ready", "name", name)
 		return gpuv1.NotReady
 	}
+
+	// if ds is running with "OnDelete" strategy, check if the revision matches for all pods
+	if ds.Spec.UpdateStrategy.Type != appsv1.OnDeleteDaemonSetStrategyType {
+		return gpuv1.Ready
+	}
+
+	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Template.ObjectMeta.Labels)}
+
+	n.rec.Log.V(2).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
+	list := &corev1.PodList{}
+	err = n.rec.Client.List(ctx, list, opts...)
+	if err != nil {
+		n.rec.Log.Info("Could not get PodList", err)
+		return gpuv1.NotReady
+	}
+	n.rec.Log.V(2).Info("Pod", "NumberOfPods", len(list.Items))
+	if len(list.Items) == 0 {
+		return gpuv1.NotReady
+	}
+
+	dsPods := getPodsOwnedbyDaemonset(ds, list.Items, n)
+	daemonsetRevisionHash, err := getDaemonsetControllerRevisionHash(ctx, ds, n)
+	if err != nil {
+		n.rec.Log.Error(
+			err, "Failed to get daemonset template revision hash", "daemonset", ds)
+		return gpuv1.NotReady
+	}
+	n.rec.Log.V(2).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
+
+	for _, pod := range dsPods {
+		podRevisionHash, err := getPodControllerRevisionHash(ctx, &pod)
+		if err != nil {
+			n.rec.Log.Error(
+				err, "Failed to get pod template revision hash", "pod", pod)
+			return gpuv1.NotReady
+		}
+		n.rec.Log.V(2).Info("pod template revision hash", "hash", podRevisionHash)
+
+		// check if the revision hashes are matching and pod is in running state
+		if podRevisionHash != daemonsetRevisionHash || pod.Status.Phase != "Running" {
+			return gpuv1.NotReady
+		}
+
+		// If the pod generation matches the daemonset generation and the pod is running
+		// and it has at least 1 container
+		if len(pod.Status.ContainerStatuses) != 0 {
+			for i := range pod.Status.ContainerStatuses {
+				if !pod.Status.ContainerStatuses[i].Ready {
+					// Return false if at least 1 container isn't ready
+					return gpuv1.NotReady
+				}
+			}
+		}
+	}
+
+	// All containers are ready
 	return gpuv1.Ready
+}
+
+func getPodsOwnedbyDaemonset(ds *appsv1.DaemonSet, pods []corev1.Pod, n ClusterPolicyController) []corev1.Pod {
+	dsPodList := []corev1.Pod{}
+	for _, pod := range pods {
+		if pod.OwnerReferences == nil || len(pod.OwnerReferences) < 1 {
+			n.rec.Log.Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
+			continue
+		}
+		n.rec.Log.V(2).Info("Pod", "pod", pod.Name, "owner", pod.OwnerReferences[0].Name)
+
+		if ds.UID != pod.OwnerReferences[0].UID {
+			n.rec.Log.Info("Driver Pod is not owned by a Driver DaemonSet",
+				"pod", pod, "actual owner", pod.OwnerReferences[0])
+			continue
+		}
+		dsPodList = append(dsPodList, pod)
+	}
+	return dsPodList
+}
+
+func getPodControllerRevisionHash(ctx context.Context, pod *corev1.Pod) (string, error) {
+	if hash, ok := pod.Labels[PodControllerRevisionHashLabelKey]; ok {
+		return hash, nil
+	}
+	return "", fmt.Errorf("controller-revision-hash label not present for pod %s", pod.Name)
+}
+
+func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.DaemonSet, n ClusterPolicyController) (string, error) {
+
+	// get all revisions for the daemonset
+	opts := []client.ListOption{
+		client.MatchingLabels(daemonset.Spec.Selector.MatchLabels),
+		client.InNamespace(n.operatorNamespace),
+	}
+	list := &appsv1.ControllerRevisionList{}
+	err := n.rec.Client.List(ctx, list, opts...)
+	if err != nil {
+		return "", fmt.Errorf("error getting controller revision list for daemonset %s: %v", daemonset.Name, err)
+	}
+
+	n.rec.Log.V(2).Info("obtained controller revisions", "Daemonset", daemonset.Name, "len", len(list.Items))
+
+	var revisions []appsv1.ControllerRevision
+	for _, controllerRevision := range list.Items {
+		if strings.HasPrefix(controllerRevision.Name, daemonset.Name) {
+			revisions = append(revisions, controllerRevision)
+		}
+	}
+
+	if len(revisions) == 0 {
+		return "", fmt.Errorf("no revision found for daemonset %s", daemonset.Name)
+	}
+
+	// sort the revision list to make sure we obtain latest revision always
+	sort.Slice(revisions, func(i, j int) bool { return revisions[i].Revision < revisions[j].Revision })
+
+	currentRevision := revisions[len(revisions)-1]
+	hash := strings.TrimPrefix(currentRevision.Name, fmt.Sprintf("%s-", daemonset.Name))
+
+	return hash, nil
 }
 
 // Deployment creates Deployment resource
