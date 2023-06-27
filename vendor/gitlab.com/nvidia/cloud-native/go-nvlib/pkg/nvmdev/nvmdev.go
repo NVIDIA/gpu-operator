@@ -380,5 +380,7 @@ func (p *ParentDevice) GetAvailableMDEVInstances(mdevType string) (int, error) {
 func newNvidiaPCIDeviceFromPath(devicePath string) (*nvpci.NvidiaPCIDevice, error) {
 	root := filepath.Dir(devicePath)
 	address := filepath.Base(devicePath)
-	return nvpci.NewFrom(root).GetGPUByPciBusID(address)
+	return nvpci.New(
+		nvpci.WithPCIDevicesRoot(root),
+	).GetGPUByPciBusID(address)
 }

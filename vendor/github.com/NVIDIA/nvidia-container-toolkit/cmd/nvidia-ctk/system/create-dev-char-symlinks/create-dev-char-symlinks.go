@@ -24,8 +24,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/NVIDIA/nvidia-container-toolkit/internal/logger"
+	"github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvdevices"
+	"github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvmodules"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -34,19 +36,21 @@ const (
 )
 
 type command struct {
-	logger *logrus.Logger
+	logger logger.Interface
 }
 
 type config struct {
-	devCharPath string
-	driverRoot  string
-	dryRun      bool
-	watch       bool
-	createAll   bool
+	devCharPath       string
+	driverRoot        string
+	dryRun            bool
+	watch             bool
+	createAll         bool
+	createDeviceNodes bool
+	loadKernelModules bool
 }
 
 // NewCommand constructs a command sub-command with the specified logger
-func NewCommand(logger *logrus.Logger) *cli.Command {
+func NewCommand(logger logger.Interface) *cli.Command {
 	c := command{
 		logger: logger,
 	}
@@ -98,6 +102,18 @@ func (m command) build() *cli.Command {
 			EnvVars:     []string{"CREATE_ALL"},
 		},
 		&cli.BoolFlag{
+			Name:        "load-kernel-modules",
+			Usage:       "Load the NVIDIA kernel modules before creating symlinks. This is only applicable when --create-all is set.",
+			Destination: &cfg.loadKernelModules,
+			EnvVars:     []string{"LOAD_KERNEL_MODULES"},
+		},
+		&cli.BoolFlag{
+			Name:        "create-device-nodes",
+			Usage:       "Create the NVIDIA control device nodes in the driver root if they do not exist. This is only applicable when --create-all is set",
+			Destination: &cfg.createDeviceNodes,
+			EnvVars:     []string{"CREATE_DEVICE_NODES"},
+		},
+		&cli.BoolFlag{
 			Name:        "dry-run",
 			Usage:       "If set, the command will not create any symlinks.",
 			Value:       false,
@@ -112,6 +128,16 @@ func (m command) build() *cli.Command {
 func (m command) validateFlags(r *cli.Context, cfg *config) error {
 	if cfg.createAll && cfg.watch {
 		return fmt.Errorf("create-all and watch are mutually exclusive")
+	}
+
+	if cfg.loadKernelModules && !cfg.createAll {
+		m.logger.Warning("load-kernel-modules is only applicable when create-all is set; ignoring")
+		cfg.loadKernelModules = false
+	}
+
+	if cfg.createDeviceNodes && !cfg.createAll {
+		m.logger.Warning("create-device-nodes is only applicable when create-all is set; ignoring")
+		cfg.createDeviceNodes = false
 	}
 
 	return nil
@@ -137,6 +163,8 @@ func (m command) run(c *cli.Context, cfg *config) error {
 		WithDriverRoot(cfg.driverRoot),
 		WithDryRun(cfg.dryRun),
 		WithCreateAll(cfg.createAll),
+		WithLoadKernelModules(cfg.loadKernelModules),
+		WithCreateDeviceNodes(cfg.createDeviceNodes),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create symlink creator: %v", err)
@@ -186,12 +214,15 @@ create:
 }
 
 type linkCreator struct {
-	logger      *logrus.Logger
-	lister      nodeLister
-	driverRoot  string
-	devCharPath string
-	dryRun      bool
-	createAll   bool
+	logger            logger.Interface
+	lister            nodeLister
+	driverRoot        string
+	devRoot           string
+	devCharPath       string
+	dryRun            bool
+	createAll         bool
+	createDeviceNodes bool
+	loadKernelModules bool
 }
 
 // Creator is an interface for creating symlinks to /dev/nv* devices in /dev/char.
@@ -209,31 +240,78 @@ func NewSymlinkCreator(opts ...Option) (Creator, error) {
 		opt(&c)
 	}
 	if c.logger == nil {
-		c.logger = logrus.StandardLogger()
+		c.logger = logger.New()
 	}
 	if c.driverRoot == "" {
 		c.driverRoot = "/"
+	}
+	if c.devRoot == "" {
+		c.devRoot = "/"
 	}
 	if c.devCharPath == "" {
 		c.devCharPath = defaultDevCharPath
 	}
 
+	if err := c.setup(); err != nil {
+		return nil, err
+	}
+
 	if c.createAll {
-		lister, err := newAllPossible(c.logger, c.driverRoot)
+		lister, err := newAllPossible(c.logger, c.devRoot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create all possible device lister: %v", err)
 		}
 		c.lister = lister
 	} else {
-		c.lister = existing{c.logger, c.driverRoot}
+		c.lister = existing{c.logger, c.devRoot}
 	}
 	return c, nil
 }
 
+func (m linkCreator) setup() error {
+	if !m.loadKernelModules && !m.createDeviceNodes {
+		return nil
+	}
+
+	if m.loadKernelModules {
+		modules := nvmodules.New(
+			nvmodules.WithLogger(m.logger),
+			nvmodules.WithDryRun(m.dryRun),
+			nvmodules.WithRoot(m.driverRoot),
+		)
+		if err := modules.LoadAll(); err != nil {
+			return fmt.Errorf("failed to load NVIDIA kernel modules: %v", err)
+		}
+	}
+
+	if m.createDeviceNodes {
+		devices, err := nvdevices.New(
+			nvdevices.WithLogger(m.logger),
+			nvdevices.WithDryRun(m.dryRun),
+			nvdevices.WithDevRoot(m.devRoot),
+		)
+		if err != nil {
+			return err
+		}
+		if err := devices.CreateNVIDIAControlDevices(); err != nil {
+			return fmt.Errorf("failed to create NVIDIA device nodes: %v", err)
+		}
+	}
+	return nil
+}
+
 // WithDriverRoot sets the driver root path.
+// This is the path in which kernel modules must be loaded.
 func WithDriverRoot(root string) Option {
 	return func(c *linkCreator) {
 		c.driverRoot = root
+	}
+}
+
+// WithDevRoot sets the root path for the /dev directory.
+func WithDevRoot(root string) Option {
+	return func(c *linkCreator) {
+		c.devRoot = root
 	}
 }
 
@@ -252,7 +330,7 @@ func WithDryRun(dryRun bool) Option {
 }
 
 // WithLogger sets the logger.
-func WithLogger(logger *logrus.Logger) Option {
+func WithLogger(logger logger.Interface) Option {
 	return func(c *linkCreator) {
 		c.logger = logger
 	}
@@ -262,6 +340,20 @@ func WithLogger(logger *logrus.Logger) Option {
 func WithCreateAll(createAll bool) Option {
 	return func(lc *linkCreator) {
 		lc.createAll = createAll
+	}
+}
+
+// WithLoadKernelModules sets the loadKernelModules flag for the linkCreator.
+func WithLoadKernelModules(loadKernelModules bool) Option {
+	return func(lc *linkCreator) {
+		lc.loadKernelModules = loadKernelModules
+	}
+}
+
+// WithCreateDeviceNodes sets the createDeviceNodes flag for the linkCreator.
+func WithCreateDeviceNodes(createDeviceNodes bool) Option {
+	return func(lc *linkCreator) {
+		lc.createDeviceNodes = createDeviceNodes
 	}
 }
 
@@ -290,7 +382,7 @@ func (m linkCreator) CreateLinks() error {
 
 		err = os.Symlink(target, linkPath)
 		if err != nil {
-			m.logger.Warnf("Could not create symlink: %v", err)
+			m.logger.Warningf("Could not create symlink: %v", err)
 		}
 	}
 
