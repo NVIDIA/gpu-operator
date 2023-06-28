@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,9 +86,6 @@ func (m *PodManagerImpl) GetPodControllerRevisionHash(ctx context.Context, pod *
 }
 
 func (m *PodManagerImpl) GetDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.DaemonSet) (string, error) {
-	hash := ""
-	controllerRevisionList := &appsv1.ControllerRevisionList{}
-
 	// get all revisions for the daemonset
 	listOptions := meta_v1.ListOptions{LabelSelector: labels.SelectorFromSet(daemonset.Spec.Selector.MatchLabels).String()}
 	controllerRevisionList, err := m.k8sInterface.AppsV1().ControllerRevisions(daemonset.Namespace).List(ctx, listOptions)
@@ -96,24 +93,22 @@ func (m *PodManagerImpl) GetDaemonsetControllerRevisionHash(ctx context.Context,
 		return "", fmt.Errorf("error getting controller revision list for daemonset %s: %v", daemonset.Name, err)
 	}
 
-	var revisions = make([]int64, len(controllerRevisionList.Items))
-	for i, controllerRevision := range controllerRevisionList.Items {
-		revisions[i] = controllerRevision.Revision
+	var revisions []appsv1.ControllerRevision
+	for _, controllerRevision := range controllerRevisionList.Items {
+		if strings.HasPrefix(controllerRevision.Name, daemonset.Name) {
+			revisions = append(revisions, controllerRevision)
+		}
+	}
+
+	if len(revisions) == 0 {
+		return "", fmt.Errorf("no revision found for daemonset %s", daemonset.Name)
 	}
 
 	// sort the revision list to make sure we obtain latest revision always
-	sort.Slice(revisions, func(i, j int) bool { return revisions[i] < revisions[j] })
+	sort.Slice(revisions, func(i, j int) bool { return revisions[i].Revision < revisions[j].Revision })
 
 	currentRevision := revisions[len(revisions)-1]
-	for _, controllerRevision := range controllerRevisionList.Items {
-		if controllerRevision.Revision != currentRevision {
-			continue
-		}
-		// trim the daemonset name: nvidia-driver-daemonset-5698dd78cf
-		re := regexp.MustCompile(".*-")
-		hash = re.ReplaceAllString(controllerRevision.Name, "")
-		break
-	}
+	hash := strings.TrimPrefix(currentRevision.Name, fmt.Sprintf("%s-", daemonset.Name))
 	return hash, nil
 }
 
