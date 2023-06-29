@@ -209,7 +209,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.13.0-ubuntu20.04
+  version: v1.13.3-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -470,7 +470,7 @@ node-feature-discovery:
     serviceAccount:
       name: node-feature-discovery
       create: true
-    config: 
+    config:
       extraLabelNs: ["nvidia.com"]
       # noPublish: false
       # resourceLabels: ["nvidia.com/feature-1","nvidia.com/feature-2"]
