@@ -220,7 +220,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.14.0-ubi8
+  version: v0.14.1-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
