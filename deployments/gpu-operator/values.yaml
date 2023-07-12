@@ -171,7 +171,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.1
+    version: v0.6.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -371,7 +371,7 @@ vgpuManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.1
+    version: v0.6.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -403,7 +403,7 @@ vfioManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.1
+    version: v0.6.2
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
