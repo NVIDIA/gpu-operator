@@ -312,7 +312,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.8.0-ubi8
+  version: v0.8.1-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
