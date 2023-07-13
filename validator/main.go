@@ -100,6 +100,12 @@ type VGPUDevices struct {
 	ctx context.Context
 }
 
+// CCManager represents spec to validate CC Manager installation
+type CCManager struct {
+	ctx        context.Context
+	kubeClient kubernetes.Interface
+}
+
 var (
 	kubeconfigFlag                string
 	nodeNameFlag                  string
@@ -153,6 +159,8 @@ const (
 	hostVGPUManagerStatusFile = "host-vgpu-manager-ready"
 	// vGPUDevicesStatusFile is name of the file which indicates vGPU Manager is installed and vGPU devices have been created
 	vGPUDevicesStatusFile = "vgpu-devices-ready"
+	// ccManagerStatusFile indicates status file for cc-manager readiness
+	ccManagerStatusFile = "cc-manager-ready"
 	// workloadTypeStatusFile is the name of the file which specifies the workload type configured for the node
 	workloadTypeStatusFile = "workload-type"
 	// podCreationWaitRetries indicates total retries to wait for plugin validation pod creation
@@ -202,6 +210,8 @@ const (
 	gpuWorkloadConfigContainer     = "container"
 	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
+	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
+	CCCapableLabelKey = "nvidia.com/cc.capable"
 )
 
 func main() {
@@ -389,6 +399,8 @@ func isValidComponent() bool {
 		fallthrough
 	case "vgpu-devices":
 		fallthrough
+	case "cc-manager":
+		fallthrough
 	case "nvidia-fs":
 		return true
 	default:
@@ -537,6 +549,15 @@ func start(c *cli.Context) error {
 		err := vGPUDevices.validate()
 		if err != nil {
 			return fmt.Errorf("error validating vGPU devices: %s", err)
+		}
+		return nil
+	case "cc-manager":
+		CCManager := &CCManager{
+			ctx: c.Context,
+		}
+		err := CCManager.validate()
+		if err != nil {
+			return fmt.Errorf("error validating CC Manager installation: %s", err)
 		}
 		return nil
 	default:
@@ -1423,6 +1444,78 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	}
 
 	return hostDriver, runCommand(command, args, silent)
+}
+
+func (c *CCManager) validate() error {
+	// delete status file if already present
+	err := deleteStatusFile(outputDirFlag + "/" + ccManagerStatusFile)
+	if err != nil {
+		return err
+	}
+
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("Error getting cluster config - %s", err.Error())
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		log.Errorf("Error getting k8s client - %s\n", err.Error())
+		return err
+	}
+
+	// update k8s client for fetching node labels
+	c.setKubeClient(kubeClient)
+
+	err = c.runValidation(false)
+	if err != nil {
+		fmt.Println("CC Manager is not ready")
+		return err
+	}
+
+	// create driver status file
+	err = createStatusFile(outputDirFlag + "/" + ccManagerStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *CCManager) runValidation(silent bool) error {
+	node, err := getNode(c.ctx, c.kubeClient)
+	if err != nil {
+		return fmt.Errorf("unable to fetch node by name %s to check for %s label: %s", nodeNameFlag, CCCapableLabelKey, err)
+	}
+
+	// make sure this is a CC capable node
+	nodeLabels := node.GetLabels()
+	if enabled, ok := nodeLabels[CCCapableLabelKey]; !ok || enabled != "true" {
+		log.Info("Not a CC capable node, skipping CC Manager validation")
+		return nil
+	}
+
+	// check if the ccManager container is ready
+	err = assertCCManagerContainerReady(silent, withWaitFlag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *CCManager) setKubeClient(kubeClient kubernetes.Interface) {
+	c.kubeClient = kubeClient
+}
+
+// Check that the ccManager container is ready after applying required ccMode
+func assertCCManagerContainerReady(silent, withWaitFlag bool) error {
+	command := "bash"
+	args := []string{"-c", "stat /run/nvidia/validations/.cc-manager-ctr-ready"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+
+	return runCommand(command, args, silent)
 }
 
 func (v *VGPUDevices) validate() error {

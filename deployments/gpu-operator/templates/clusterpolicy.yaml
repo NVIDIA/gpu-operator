@@ -366,6 +366,33 @@ spec:
     {{- if .Values.vgpuDeviceManager.config }}
     config: {{ toYaml .Values.vgpuDeviceManager.config | nindent 6 }}
     {{- end  }}
+  ccManager:
+    enabled: {{ .Values.ccManager.enabled }}
+    defaultMode: {{ .Values.ccManager.defaultMode | quote }}
+    {{- if .Values.ccManager.repository }}
+    repository: {{ .Values.ccManager.repository }}
+    {{- end }}
+    {{- if .Values.ccManager.image }}
+    image: {{ .Values.ccManager.image }}
+    {{- end }}
+    {{- if .Values.ccManager.version }}
+    version: {{ .Values.ccManager.version | quote }}
+    {{- end }}
+    {{- if .Values.ccManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.ccManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.ccManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.ccManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.ccManager.resources }}
+    resources: {{ toYaml .Values.ccManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.ccManager.env }}
+    env: {{ toYaml .Values.vfioManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.ccManager.args }}
+    args: {{ toYaml .Values.ccManager.args | nindent 6 }}
+    {{- end }}
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
     {{- if .Values.toolkit.repository }}
