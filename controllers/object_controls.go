@@ -142,6 +142,8 @@ const (
 	DefaultKataArtifactsDir = "/opt/nvidia-gpu-operator/artifacts/runtimeclasses/"
 	// PodControllerRevisionHashLabelKey is the annotation key for pod controller revision hash value
 	PodControllerRevisionHashLabelKey = "controller-revision-hash"
+	// DefaultCCModeEnvName is the name of the envvar for configuring default CC mode on all compatible GPUs on the node
+	DefaultCCModeEnvName = "DEFAULT_CC_MODE"
 )
 
 // ContainerProbe defines container probe types
@@ -669,6 +671,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-operator-validator":              TransformValidator,
 		"nvidia-sandbox-validator":               TransformSandboxValidator,
 		"nvidia-kata-manager":                    TransformKataManager,
+		"nvidia-cc-manager":                      TransformCCManager,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -1728,6 +1731,53 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	return nil
 }
 
+// TransformCCManager transforms CC Manager daemonset with required config as per ClusterPolicy
+func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update image
+	image, err := gpuv1.ImagePath(&config.CCManager)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.CCManager.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.CCManager.ImagePullSecrets) > 0 {
+		for _, secret := range config.CCManager.ImagePullSecrets {
+			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+
+	// set resource limits
+	if config.CCManager.Resources != nil {
+		// apply resource limits to all containers
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.CCManager.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.CCManager.Resources.Limits
+		}
+	}
+
+	// set arguments if specified for cc-manager container
+	if len(config.CCManager.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.CCManager.Args
+	}
+
+	// set/append environment variables for cc-manager container
+	if len(config.CCManager.Env) > 0 {
+		for _, env := range config.CCManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+	// set default cc mode env
+	if config.CCManager.DefaultMode != "" {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DefaultCCModeEnvName, config.CCManager.DefaultMode)
+	}
+
+	return nil
+}
+
 // TransformVGPUDeviceManager transforms VGPU Device Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
@@ -1827,6 +1877,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	// apply changes for individual component validators(initContainers)
+	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cc-manager")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vfio-pci")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-manager")
 	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-devices")
@@ -1881,6 +1932,11 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		}
 		if component == "nvidia-fs" && (config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled()) {
 			// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
+			podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+			return nil
+		}
+		if component == "cc-manager" && !config.CCManager.IsEnabled() {
+			// remove  cc-manager init container from validator Daemonset if it is not enabled
 			podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
 			return nil
 		}
@@ -1942,6 +1998,8 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "nvidia-fs":
 			// no additional config required for nvidia-fs validation
+		case "cc-manager":
+			// no additional config required for cc-manager validation
 		case "toolkit":
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {

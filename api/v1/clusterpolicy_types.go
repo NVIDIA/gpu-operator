@@ -81,6 +81,8 @@ type ClusterPolicySpec struct {
 	CDI CDIConfigSpec `json:"cdi,omitempty"`
 	// KataManager component spec
 	KataManager KataManagerSpec `json:"kataManager,omitempty"`
+	// CCManager component spec
+	CCManager CCManagerSpec `json:"ccManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1329,6 +1331,66 @@ type KataManagerSpec struct {
 	Env []EnvVar `json:"env,omitempty"`
 }
 
+// CCManagerSpec defines the properties for deploying Confidential Containers (CC) manager
+type CCManagerSpec struct {
+	// Enabled indicates if deployment of CC Manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable CC Manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Default CC mode setting for compatible GPUs on the node
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Default CC mode setting for all CC-capable GPUs"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	// +kubebuilder:validation:Enum=on;off;devtools
+	DefaultMode string `json:"defaultMode,omitempty"`
+
+	// CC Manager image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// CC Manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// CC Manager image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
 // VFIOManagerSpec defines the properties for deploying VFIO-PCI manager
 type VFIOManagerSpec struct {
 	// Enabled indicates if deployment of VFIO Manager is enabled
@@ -1634,6 +1696,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *KataManagerSpec:
 		config := spec.(*KataManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "KATA_MANAGER_IMAGE")
+	case *CCManagerSpec:
+		config := spec.(*CCManagerSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "CC_MANAGER_IMAGE")
 	default:
 		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
 	}
@@ -1861,4 +1926,13 @@ func (k *KataManagerSpec) IsEnabled() bool {
 		return false
 	}
 	return *k.Enabled
+}
+
+// IsEnabled returns true if CC Manager is enabled for configuring
+// CC mode on compatible GPUs on the node
+func (c *CCManagerSpec) IsEnabled() bool {
+	if c.Enabled == nil {
+		return false
+	}
+	return *c.Enabled
 }

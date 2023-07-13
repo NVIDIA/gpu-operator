@@ -26,6 +26,27 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-sandbox-validator
       initContainers:
+        - name: cc-manager-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: cc-manager
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
         - name: vfio-pci-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']

@@ -42,6 +42,89 @@ spec:
           spec:
             description: ClusterPolicySpec defines the desired state of ClusterPolicy
             properties:
+              ccManager:
+                description: CCManager component spec
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  defaultMode:
+                    description: Default CC mode setting for compatible GPUs on the
+                      node
+                    enum:
+                    - "on"
+                    - "off"
+                    - devtools
+                    type: string
+                  enabled:
+                    description: Enabled indicates if deployment of CC Manager is
+                      enabled
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: CC Manager image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: CC Manager image repository
+                    type: string
+                  resources:
+                    description: 'Optional: Define resources requests and limits for
+                      each pod'
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. Requests cannot exceed
+                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                    type: object
+                  version:
+                    description: CC Manager image tag
+                    type: string
+                type: object
               cdi:
                 description: CDI configures how the Container Device Interface is
                   used in the cluster

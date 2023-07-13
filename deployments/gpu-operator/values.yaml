@@ -440,6 +440,19 @@ sandboxDevicePlugin:
   env: []
   resources: {}
 
+ccManager:
+  enabled: false
+  defaultMode: "off"
+  repository: nvcr.io/nvidia/cloud-native
+  image: k8s-cc-manager
+  version: v0.1.0
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env:
+    - name: CC_CAPABLE_DEVICE_IDS
+      value: "0x2339,0x2331,0x2330,0x2324,0x2322,0x233d"
+  resources: {}
+
 node-feature-discovery:
   enableNodeFeatureApi: true
   worker:
