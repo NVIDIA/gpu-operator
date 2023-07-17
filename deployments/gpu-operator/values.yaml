@@ -97,6 +97,12 @@ operator:
               - key: "node-role.kubernetes.io/master"
                 operator: In
                 values: [""]
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: In
+                values: [""]
   logging:
     # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch
@@ -462,6 +468,10 @@ node-feature-discovery:
       create: false
     tolerations:
     - key: "node-role.kubernetes.io/master"
+      operator: "Equal"
+      value: ""
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/control-plane"
       operator: "Equal"
       value: ""
       effect: "NoSchedule"
