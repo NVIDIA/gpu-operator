@@ -3117,6 +3117,25 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 			}
 		}
 
+		// TODO: refactor the component-specific validation logic so that we are not duplicating TransformValidatorComponent()
+		// Pass env for driver-validation init container
+		if strings.HasPrefix(initContainer.Name, "driver") {
+			if len(config.Validator.Driver.Env) > 0 {
+				for _, env := range config.Validator.Driver.Env {
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		}
+
+		// Pass env for toolkit-validation init container
+		if strings.HasPrefix(initContainer.Name, "toolkit") {
+			if len(config.Validator.Toolkit.Env) > 0 {
+				for _, env := range config.Validator.Toolkit.Env {
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		}
+
 		// update validation image
 		image, err := gpuv1.ImagePath(&config.Validator)
 		if err != nil {
