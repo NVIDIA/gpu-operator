@@ -3190,6 +3190,11 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		n.rec.Log.Error(err, "could not get daemonset", "name", name)
 	}
 
+	if ds.Status.DesiredNumberScheduled == 0 {
+		n.rec.Log.V(2).Info("Daemonset has desired pods of 0", "name", name)
+		return gpuv1.Ready
+	}
+
 	if ds.Status.NumberUnavailable != 0 {
 		n.rec.Log.Info("daemonset not ready", "name", name)
 		return gpuv1.NotReady

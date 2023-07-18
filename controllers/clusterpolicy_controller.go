@@ -141,10 +141,6 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		if status == gpuv1.NotReady {
-			// if CR was previously set to ready(prior reboot etc), reset it to current state
-			if instance.Status.State == gpuv1.Ready {
-				updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
-			}
 			overallStatus = gpuv1.NotReady
 			statesNotReady = append(statesNotReady, clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx-1])
 		}
@@ -163,7 +159,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 
 		r.Log.Info("ClusterPolicy isn't ready", "states not ready", statesNotReady)
-
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -175,8 +171,8 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			"requeueAfter", requeueAfter)
 
 		// Update CR state as ready as all states are complete
-		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
-		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.Ready)
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
 
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
