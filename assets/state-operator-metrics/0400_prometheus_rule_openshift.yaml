@@ -12,8 +12,7 @@ spec:
     - alert: GPUOperatorReconciliationFailed
       expr: |
         gpu_operator_reconciliation_status != 1
-        AND
-        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 3600)
+      for: 1h
       labels:
         severity: warning
       annotations:
