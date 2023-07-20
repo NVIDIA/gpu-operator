@@ -2464,6 +2464,13 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			}
 		}
 
+		// set/append environment variables for GDS container
+		if len(config.GPUDirectStorage.Env) > 0 {
+			for _, env := range config.GPUDirectStorage.Env {
+				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
+			}
+		}
+
 		// transform the nvidia-fs-ctr to use the openshift driver toolkit
 		// notify openshift driver toolkit container GDS is enabled
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-fs-ctr")
