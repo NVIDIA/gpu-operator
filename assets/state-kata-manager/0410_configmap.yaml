@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-kata-manager-entrypoint
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-kata-manager
+data:
+  entrypoint.sh: |-
+    #!/bin/bash
+
+    if [[ "${CDI_ENABLED}" == "true" ]]; then
+      while true; do
+        if [[ -f /run/nvidia/validations/vfio-pci-ready ]]; then
+          break
+        fi
+        echo "waiting for vfio-pci validations to complete..."
+        sleep 5
+      done
+    fi
+
+    echo "Starting k8s-kata-manager"
+    exec k8s-kata-manager
