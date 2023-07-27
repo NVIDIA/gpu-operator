@@ -186,8 +186,6 @@ spec:
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:9484110986c80ab83bc404066ca4b7be115124ec04ca16bce775403e92bfd890
     - name: vgpu-device-manager-image
       image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:bf06c8ad380a36e5014607bd3ab05b80e8e5e7e77d23d0dd89fe53a5564152fa
-    - name: gds-driver-image
-      image: nvcr.io/nvidia/cloud-native/nvidia-fs@sha256:68f9c6c008e08c5a5584b842d1d3e82f2bf27e2bc7e275b899848a7d57fffd8c
   customresourcedefinitions:
     owned:
     - name: clusterpolicies.nvidia.com
@@ -830,8 +828,6 @@ spec:
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:9484110986c80ab83bc404066ca4b7be115124ec04ca16bce775403e92bfd890"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:bf06c8ad380a36e5014607bd3ab05b80e8e5e7e77d23d0dd89fe53a5564152fa"
-                  - name: "GDS_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/nvidia-fs@sha256:68f9c6c008e08c5a5584b842d1d3e82f2bf27e2bc7e275b899848a7d57fffd8c"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
