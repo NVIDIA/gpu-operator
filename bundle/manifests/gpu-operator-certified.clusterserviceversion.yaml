@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <23.3.0'
+    olm.skipRange: '>=1.9.0 <23.6.0'
     alm-examples: |-
       [
         {
@@ -142,12 +142,12 @@ metadata:
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
     containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
-    createdAt: "Wed Sep 14 07:33:59 PDT 2022"
+    createdAt: "Thu Jul 27 13:57:56 PDT 2023"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v23.3.0
+  name: gpu-operator-certified.v23.6.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -858,5 +858,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 23.3.0
-  replaces: gpu-operator-certified.v22.9.2
+  version: 23.6.0
+  replaces: gpu-operator-certified.v23.3.2
