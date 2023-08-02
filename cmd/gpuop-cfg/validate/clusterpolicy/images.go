@@ -27,7 +27,7 @@ import (
 
 var client = regclient.New()
 
-func validateImages(spec *v1.ClusterPolicySpec) error {
+func validateImages(ctx context.Context, spec *v1.ClusterPolicySpec) error {
 	// Driver
 	path, err := v1.ImagePath(&spec.Driver)
 	if err != nil {
@@ -36,7 +36,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 	// For driver, we must append the os-tag
 	path = path + "-ubuntu22.04"
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -47,7 +47,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -58,7 +58,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -69,7 +69,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -80,7 +80,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -91,7 +91,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -102,7 +102,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -115,7 +115,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 	// For GDS driver, we must append the os-tag
 	path = path + "-ubuntu22.04"
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -126,7 +126,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -137,7 +137,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -148,7 +148,7 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to construct the image path: %v", err)
 	}
 
-	err = validateImage(path)
+	err = validateImage(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
@@ -156,13 +156,13 @@ func validateImages(spec *v1.ClusterPolicySpec) error {
 	return nil
 }
 
-func validateImage(path string) error {
+func validateImage(ctx context.Context, path string) error {
 	ref, err := ref.New(path)
 	if err != nil {
 		return fmt.Errorf("failed to construct an image reference: %v", err)
 	}
 
-	_, err = client.ManifestGet(context.TODO(), ref)
+	_, err = client.ManifestGet(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to get image manifest: %v", err)
 	}

@@ -4537,7 +4537,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
-			err := n.rec.Client.Delete(context.TODO(), &obj)
+			err := n.rec.Client.Delete(n.ctx, &obj)
 			if err != nil && !errors.IsNotFound(err) {
 				n.rec.Log.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
 				return gpuv1.NotReady, err

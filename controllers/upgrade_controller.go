@@ -74,7 +74,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Fetch the ClusterPolicy instance
 	clusterPolicy := &gpuv1.ClusterPolicy{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, clusterPolicy)
+	err := r.Client.Get(ctx, req.NamespacedName, clusterPolicy)
 	if err != nil {
 		reqLogger.V(consts.LogLevelError).Error(err, "Error getting ClusterPolicy object")
 		if clusterPolicyCtrl.operatorMetrics != nil {
