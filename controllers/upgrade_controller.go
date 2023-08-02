@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +47,7 @@ type UpgradeReconciler struct {
 	client.Client
 	Log          logr.Logger
 	Scheme       *runtime.Scheme
-	StateManager *upgrade.ClusterUpgradeStateManager
+	StateManager upgrade.ClusterUpgradeStateManager
 }
 
 const (
@@ -56,7 +57,7 @@ const (
 	// DriverLabelValue indicates pod label value of the driver
 	DriverLabelValue = "nvidia-driver-daemonset"
 	// UpgradeSkipDrainLabel indicates label to skip drain
-	UpgradeSkipDrainLabel = "nvidia.com/gpu.driver-upgrade-skip-drain"
+	UpgradeSkipDrainLabelSelector = "nvidia.com/gpu-driver-upgrade-drain.skip=true"
 )
 
 //nolint
@@ -139,6 +140,17 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.Log.Error(err, "Failed to compute maxUnavailable from the current total nodes")
 			return ctrl.Result{}, err
 		}
+	}
+
+	// We want to skip operator itself during the drain because the upgrade process might hang
+	// if the operator is evicted and can't be rescheduled to any other node, e.g. in a single-node cluster.
+	// It's safe to do because the goal of the node draining during the upgrade is to
+	// evict pods that might use driver and operator doesn't use in its own pod.
+	if clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector == "" {
+		clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector = UpgradeSkipDrainLabelSelector
+	} else {
+		clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector =
+			fmt.Sprintf("%s,%s", clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector, UpgradeSkipDrainLabelSelector)
 	}
 
 	// log metrics with the current state

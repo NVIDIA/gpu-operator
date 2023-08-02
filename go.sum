@@ -6,8 +6,8 @@ github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a h1:3nyTp1cXzZMHoUuhMwHdz9QDzl100ECvIDYFxdjWk6o=
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a/go.mod h1:K7HCLTndSwBEZwBu6sU7daVeryV1Qt/DtKH8nONJj4o=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20230628163652-9e4583f4bc29 h1:NI257NSIMQx2bhe1ud1MGlgDqzhDKmXSQa5DIk02FYc=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20230628163652-9e4583f4bc29/go.mod h1:o7UeOk3V0xlOX87NnSaGNDje23VKCKPdfN6aSIZ9BwM=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20230725070147-f9977c284782 h1:9jGM4DcBgHIVaAK/mv+I0Hz0rfHt/BJCt2nmPUHWoxk=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20230725070147-f9977c284782/go.mod h1:o7UeOk3V0xlOX87NnSaGNDje23VKCKPdfN6aSIZ9BwM=
 github.com/NVIDIA/nvidia-container-toolkit v1.13.2-0.20230626083051-a25b1c10485a h1:XFcGrm+0QdmopKYuopL+hmrYQBVgTOR7XoEcFXkbh5o=
 github.com/NVIDIA/nvidia-container-toolkit v1.13.2-0.20230626083051-a25b1c10485a/go.mod h1:giT7hV6YQQ5xJIw0yRKNLMc96KIUdj4oAv5gRWp0zX4=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=

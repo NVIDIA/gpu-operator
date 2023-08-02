@@ -19,8 +19,6 @@ package upgrade
 const (
 	// UpgradeStateLabelKeyFmt is the format of the node label key indicating driver upgrade states
 	UpgradeStateLabelKeyFmt = "nvidia.com/%s-driver-upgrade-state"
-	// UpgradeSkipDrainPodLabelKeyFmt is the format of the pod label boolean key indicating to skip eviction during node drain
-	UpgradeSkipDrainPodLabelKeyFmt = "nvidia.com/%s-driver-upgrade-drain.skip"
 	// UpgradeSkipNodeLabelKeyFmt is the format of the node label boolean key indicating to skip driver upgrade
 	UpgradeSkipNodeLabelKeyFmt = "nvidia.com/%s-driver-upgrade.skip"
 	// UpgradeInitialStateAnnotationKeyFmt is the format of the node annotation indicating node was unschedulable at beginning of upgrade process

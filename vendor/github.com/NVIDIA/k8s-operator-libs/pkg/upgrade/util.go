@@ -98,11 +98,6 @@ func GetUpgradeSkipNodeLabelKey() string {
 	return fmt.Sprintf(UpgradeSkipNodeLabelKeyFmt, DriverName)
 }
 
-// GetUpgradeSkipDrainPodLabelKey returns pod label used to skip eviction during drain
-func GetUpgradeSkipDrainPodLabelKey() string {
-	return fmt.Sprintf(UpgradeSkipDrainPodLabelKeyFmt, DriverName)
-}
-
 // GetUpgradeInitialStateAnnotationKey returns the key for annotation used to track initial state of the node
 func GetUpgradeInitialStateAnnotationKey() string {
 	return fmt.Sprintf(UpgradeInitialStateAnnotationKeyFmt, DriverName)
