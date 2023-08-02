@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -3980,11 +3982,15 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func getDaemonsetHash(daemonset *appsv1.DaemonSet) string {
-	hash, err := hashstructure.Hash(daemonset, nil)
-	if err != nil {
-		panic(err.Error())
+	hasher := fnv.New32a()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
 	}
-	return strconv.FormatUint(hash, 16)
+	printer.Fprintf(hasher, "%#v", daemonset)
+	return fmt.Sprint(hasher.Sum32())
 }
 
 // isDaemonsetSpecChanged returns true if the spec has changed between existing one
