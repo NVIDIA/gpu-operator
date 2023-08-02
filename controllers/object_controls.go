@@ -4480,7 +4480,10 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 		obj.Handler = rc.Name
 		obj.Labels = template.Labels
 		obj.Scheduling = &nodev1.Scheduling{}
-		nodeSelector := template.Scheduling.NodeSelector
+		nodeSelector := make(map[string]string)
+		for k, v := range template.Scheduling.NodeSelector {
+			nodeSelector[k] = v
+		}
 		if rc.NodeSelector != nil {
 			// append user provided selectors to default nodeSelector
 			for k, v := range rc.NodeSelector {
