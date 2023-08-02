@@ -28,11 +28,11 @@ import (
 
 var client = regclient.New()
 
-func validateImages(csv *v1alpha1.ClusterServiceVersion) error {
+func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) error {
 	// validate all 'relatedImages'
 	images := csv.Spec.RelatedImages
 	for _, image := range images {
-		err := validateImage(image.Image)
+		err := validateImage(ctx, image.Image)
 		if err != nil {
 			return fmt.Errorf("failed to validate image %s: %v", image.Name, err)
 		}
@@ -43,7 +43,7 @@ func validateImages(csv *v1alpha1.ClusterServiceVersion) error {
 	ctr := deployment.Spec.Template.Spec.Containers[0]
 
 	// validate the gpu-operator image
-	err := validateImage(ctr.Image)
+	err := validateImage(ctx, ctr.Image)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", ctr.Image, err)
 	}
@@ -53,7 +53,7 @@ func validateImages(csv *v1alpha1.ClusterServiceVersion) error {
 		if !strings.HasSuffix(env.Name, "_IMAGE") {
 			continue
 		}
-		err = validateImage(env.Value)
+		err = validateImage(ctx, env.Value)
 		if err != nil {
 			return fmt.Errorf("failed to validate image %s: %v", env.Name, err)
 		}
@@ -62,13 +62,13 @@ func validateImages(csv *v1alpha1.ClusterServiceVersion) error {
 	return nil
 }
 
-func validateImage(path string) error {
+func validateImage(ctx context.Context, path string) error {
 	ref, err := ref.New(path)
 	if err != nil {
 		return fmt.Errorf("failed to construct an image reference: %v", err)
 	}
 
-	_, err = client.ManifestGet(context.TODO(), ref)
+	_, err = client.ManifestGet(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to get image manifest: %v", err)
 	}

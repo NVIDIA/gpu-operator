@@ -81,7 +81,7 @@ func (m command) run(c *cli.Context, opts *options) error {
 		return fmt.Errorf("failed to load csv yaml: %v", err)
 	}
 
-	err = validateImages(csv)
+	err = validateImages(c.Context, csv)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
 	}
