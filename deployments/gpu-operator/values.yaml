@@ -425,13 +425,13 @@ kataManager:
       - name: kata-qemu-nvidia-gpu
         nodeSelector: {}
         artifacts:
-          url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535
+          url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535.54.03
           pullSecret: ""
       - name: kata-qemu-nvidia-gpu-snp
         nodeSelector:
           "nvidia.com/cc.capable": "true"
         artifacts:
-          url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535-snp
+          url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535.86.10-snp
           pullSecret: ""
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-kata-manager
