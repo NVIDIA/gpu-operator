@@ -294,7 +294,6 @@ func (m *ClusterUpgradeStateManagerImpl) ApplyState(ctx context.Context,
 	currentState *ClusterUpgradeState, upgradePolicy *v1alpha1.DriverUpgradePolicySpec) (err error) {
 	m.Log.V(consts.LogLevelInfo).Info("State Manager, got state update")
 
-	m.Log.V(consts.LogLevelInfo).Info("Driver Upgrade Policy", "policy", upgradePolicy)
 	if currentState == nil {
 		return fmt.Errorf("currentState should not be empty")
 	}
