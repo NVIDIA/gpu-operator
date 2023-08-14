@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
+    security.openshift.io/scc.podSecurityLabelSync: 'false'
     pod-security.kubernetes.io/enforce: privileged
   name: system
 ---
@@ -10,6 +11,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-operator
+  namespace: system
   labels:
     app.kubernetes.io/component: gpu-operator
     app: gpu-operator
@@ -28,7 +30,7 @@ spec:
       serviceAccountName: gpu-operator
       containers:
       - name: gpu-operator
-        image: nvcr.io/nvidia/gpu-operator:1.7.0
+        image: gpu-operator
         args:
           - --leader-elect
         command:
@@ -63,6 +65,9 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+        envFrom:
+          - configMapRef:
+              name: gpu-operator-envs-cm
         ports:
           - name: metrics
             containerPort: 8080

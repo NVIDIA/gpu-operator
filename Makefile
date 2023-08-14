@@ -100,9 +100,12 @@ uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 # Deploy gpu-operator in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
+deploy: manifests generate-env kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image gpu-operator=${IMAGE}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+generate-env:
+	./hack/prepare-env.sh
 
 # UnDeploy gpu-operator from the configured Kubernetes cluster in ~/.kube/config
 undeploy:

@@ -8,5 +8,5 @@ roleRef:
   name: gpu-operator-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: gpu-operator
   namespace: system
