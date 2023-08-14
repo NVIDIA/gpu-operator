@@ -27,8 +27,8 @@ testbin/*
 .vscode
 
 # Credentials and runtime environment
-hack/kubeconfig
-hack/.env
+kubeconfig
+.env
 
 # Bundle artifacts
 bundle.Dockerfile

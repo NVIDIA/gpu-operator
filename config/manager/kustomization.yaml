@@ -8,6 +8,9 @@ configMapGenerator:
 - files:
   - controller_manager_config.yaml
   name: manager-config
+- envs:
+  - .env
+  name: gpu-operator-envs-cm
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:

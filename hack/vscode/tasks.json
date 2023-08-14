@@ -1,9 +1,0 @@
-{
-    "version": "2.0.0",
-    "tasks": [{
-      "label": "prepare-env",
-      "command": "${workspaceFolder}/hack/prepare-env.sh",
-      "args": [],
-      "type": "shell"
-    }]
-}
