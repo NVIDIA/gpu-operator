@@ -56,8 +56,8 @@ const (
 	DriverLabelKey = "app"
 	// DriverLabelValue indicates pod label value of the driver
 	DriverLabelValue = "nvidia-driver-daemonset"
-	// UpgradeSkipDrainLabel indicates label to skip drain
-	UpgradeSkipDrainLabelSelector = "nvidia.com/gpu-driver-upgrade-drain.skip=true"
+	// UpgradeSkipDrainLabelSelector indicates the pod selector label to skip with drain
+	UpgradeSkipDrainLabelSelector = "nvidia.com/gpu-driver-upgrade-drain.skip!=true"
 )
 
 //nolint
