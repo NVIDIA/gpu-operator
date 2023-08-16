@@ -121,6 +121,7 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
 	KernelModuleConfig *gpuv1.KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
+
 	//+kubebuilder:validation:Optional
 	// NodeSelector specifies a selector for installation of NVIDIA driver
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -153,6 +154,9 @@ type NVIDIADriverStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
+//+kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // NVIDIADriver is the Schema for the nvidiadrivers API
 type NVIDIADriver struct {
