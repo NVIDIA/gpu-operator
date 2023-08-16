@@ -40,6 +40,7 @@ import (
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 
 	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -54,6 +55,7 @@ func init() {
 
 	utilruntime.Must(clusterpolicyv1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(nvidiav1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -141,6 +143,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controllers.NVIDIADriverReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

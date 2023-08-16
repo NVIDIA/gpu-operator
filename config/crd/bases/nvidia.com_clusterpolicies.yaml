@@ -936,6 +936,10 @@ spec:
                             type: integer
                         type: object
                     type: object
+                  useNvidiaDriverCRD:
+                    description: UseNVIDIADriverCRD indicates if the deployment of
+                      NVIDIA Driver is managed by the NVIDIADriver CRD type
+                    type: boolean
                   usePrecompiled:
                     description: UsePrecompiled indicates if deployment of NVIDIA
                       Driver using pre-compiled modules is enabled

@@ -1,0 +1,481 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: nvidiadrivers.nvidia.com
+spec:
+  group: nvidia.com
+  names:
+    kind: NVIDIADriver
+    listKind: NVIDIADriverList
+    plural: nvidiadrivers
+    singular: nvidiadriver
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: NVIDIADriver is the Schema for the nvidiadrivers API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NVIDIADriverSpec defines the desired state of NVIDIADriver
+            properties:
+              args:
+                description: 'Optional: List of arguments'
+                items:
+                  type: string
+                type: array
+              certConfig:
+                description: 'Optional: Custom certificates configuration for NVIDIA
+                  Driver container'
+                properties:
+                  name:
+                    type: string
+                type: object
+              env:
+                description: 'Optional: List of environment variables'
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable.
+                      type: string
+                    value:
+                      description: Value of the environment variable.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              gds:
+                description: GPUDirectStorage defines the spec for GDS driver
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled indicates if GPUDirect Storage is enabled
+                      through GPU operator
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: NVIDIA GPUDirect Storage Driver image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: NVIDIA GPUDirect Storage Driver image repository
+                    type: string
+                  version:
+                    description: NVIDIA GPUDirect Storage Driver image tag
+                    type: string
+                type: object
+              image:
+                description: NVIDIA Driver image name
+                pattern: '[a-zA-Z0-9\-]+'
+                type: string
+              imagePullPolicy:
+                description: Image pull policy
+                type: string
+              imagePullSecrets:
+                description: Image pull secrets
+                items:
+                  type: string
+                type: array
+              kernelModuleConfig:
+                description: 'Optional: Kernel module configuration parameters for
+                  the NVIDIA Driver'
+                properties:
+                  name:
+                    type: string
+                type: object
+              licensingConfig:
+                description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
+                properties:
+                  configMapName:
+                    type: string
+                  nlsEnabled:
+                    description: NLSEnabled indicates if NVIDIA Licensing System is
+                      used for licensing.
+                    type: boolean
+                type: object
+              livenessProbe:
+                description: NVIDIA Driver container liveness probe settings
+                properties:
+                  failureThreshold:
+                    description: Minimum consecutive failures for the probe to be
+                      considered failed after having succeeded. Defaults to 3. Minimum
+                      value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  initialDelaySeconds:
+                    description: 'Number of seconds after the container has started
+                      before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    type: integer
+                  periodSeconds:
+                    description: How often (in seconds) to perform the probe. Default
+                      to 10 seconds. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  successThreshold:
+                    description: Minimum consecutive successes for the probe to be
+                      considered successful after having failed. Defaults to 1. Must
+                      be 1 for liveness and startup. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  timeoutSeconds:
+                    description: 'Number of seconds after which the probe times out.
+                      Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+              manager:
+                description: Manager represents configuration for NVIDIA Driver Manager
+                  initContainer
+                properties:
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: Image represents NVIDIA Driver Manager image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: Repository represents Driver Managerrepository path
+                    type: string
+                  version:
+                    description: Version represents NVIDIA Driver Manager image tag(version)
+                    type: string
+                type: object
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: NodeSelector specifies a selector for installation of
+                  NVIDIA driver
+                type: object
+              rdma:
+                description: GPUDirectRDMA defines the spec for NVIDIA Peer Memory
+                  driver
+                properties:
+                  enabled:
+                    description: Enabled indicates if GPUDirect RDMA is enabled through
+                      GPU operator
+                    type: boolean
+                  useHostMofed:
+                    description: UseHostMOFED indicates to use MOFED drivers directly
+                      installed on the host to enable GPUDirect RDMA
+                    type: boolean
+                type: object
+              readinessProbe:
+                description: NVIDIA Driver container readiness probe settings
+                properties:
+                  failureThreshold:
+                    description: Minimum consecutive failures for the probe to be
+                      considered failed after having succeeded. Defaults to 3. Minimum
+                      value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  initialDelaySeconds:
+                    description: 'Number of seconds after the container has started
+                      before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    type: integer
+                  periodSeconds:
+                    description: How often (in seconds) to perform the probe. Default
+                      to 10 seconds. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  successThreshold:
+                    description: Minimum consecutive successes for the probe to be
+                      considered successful after having failed. Defaults to 1. Must
+                      be 1 for liveness and startup. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  timeoutSeconds:
+                    description: 'Number of seconds after which the probe times out.
+                      Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+              repoConfig:
+                description: 'Optional: Custom repo configuration for NVIDIA Driver
+                  container'
+                properties:
+                  configMapName:
+                    type: string
+                type: object
+              resources:
+                description: 'Optional: Define resources requests and limits for each
+                  pod'
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources
+                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute
+                      resources required. If Requests is omitted for a container,
+                      it defaults to Limits if that is explicitly specified, otherwise
+                      to an implementation-defined value. Requests cannot exceed Limits.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                type: object
+              startupProbe:
+                description: NVIDIA Driver container startup probe settings
+                properties:
+                  failureThreshold:
+                    description: Minimum consecutive failures for the probe to be
+                      considered failed after having succeeded. Defaults to 3. Minimum
+                      value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  initialDelaySeconds:
+                    description: 'Number of seconds after the container has started
+                      before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    type: integer
+                  periodSeconds:
+                    description: How often (in seconds) to perform the probe. Default
+                      to 10 seconds. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  successThreshold:
+                    description: Minimum consecutive successes for the probe to be
+                      considered successful after having failed. Defaults to 1. Must
+                      be 1 for liveness and startup. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  timeoutSeconds:
+                    description: 'Number of seconds after which the probe times out.
+                      Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+              upgradePolicy:
+                description: Driver auto-upgrade settings
+                properties:
+                  autoUpgrade:
+                    default: false
+                    description: AutoUpgrade is a global switch for automatic upgrade
+                      feature if set to false all other options are ignored
+                    type: boolean
+                  drain:
+                    description: DrainSpec describes configuration for node drain
+                      during automatic upgrade
+                    properties:
+                      deleteEmptyDir:
+                        default: false
+                        description: DeleteEmptyDir indicates if should continue even
+                          if there are pods using emptyDir (local data that will be
+                          deleted when the node is drained)
+                        type: boolean
+                      enable:
+                        default: false
+                        description: Enable indicates if node draining is allowed
+                          during upgrade
+                        type: boolean
+                      force:
+                        default: false
+                        description: Force indicates if force draining is allowed
+                        type: boolean
+                      podSelector:
+                        description: 'PodSelector specifies a label selector to filter
+                          pods on the node that need to be drained For more details
+                          on label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                        type: string
+                      timeoutSeconds:
+                        default: 300
+                        description: TimeoutSecond specifies the length of time in
+                          seconds to wait before giving up drain, zero means infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                  maxParallelUpgrades:
+                    default: 1
+                    description: MaxParallelUpgrades indicates how many nodes can
+                      be upgraded in parallel 0 means no limit, all nodes will be
+                      upgraded in parallel
+                    minimum: 0
+                    type: integer
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    default: 25%
+                    description: 'MaxUnavailable is the maximum number of nodes with
+                      the driver installed, that can be unavailable during the upgrade.
+                      Value can be an absolute number (ex: 5) or a percentage of total
+                      nodes at the start of upgrade (ex: 10%). Absolute number is
+                      calculated from percentage by rounding up. By default, a fixed
+                      value of 25% is used.'
+                    x-kubernetes-int-or-string: true
+                  podDeletion:
+                    description: PodDeletionSpec describes configuration for deletion
+                      of pods using special resources during automatic upgrade
+                    properties:
+                      deleteEmptyDir:
+                        default: false
+                        description: DeleteEmptyDir indicates if should continue even
+                          if there are pods using emptyDir (local data that will be
+                          deleted when the pod is deleted)
+                        type: boolean
+                      force:
+                        default: false
+                        description: Force indicates if force deletion is allowed
+                        type: boolean
+                      timeoutSeconds:
+                        default: 300
+                        description: TimeoutSecond specifies the length of time in
+                          seconds to wait before giving up on pod termination, zero
+                          means infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                  waitForCompletion:
+                    description: WaitForCompletionSpec describes the configuration
+                      for waiting on job completions
+                    properties:
+                      podSelector:
+                        description: 'PodSelector specifies a label selector for the
+                          pods to wait for completion For more details on label selectors,
+                          see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                        type: string
+                      timeoutSeconds:
+                        default: 0
+                        description: TimeoutSecond specifies the length of time in
+                          seconds to wait before giving up on pod termination, zero
+                          means infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                type: object
+              usePrecompiled:
+                description: UsePrecompiled indicates if deployment of NVIDIA Driver
+                  using pre-compiled modules is enabled
+                type: boolean
+              version:
+                description: NVIDIA Driver image tag/digest (or just branch for precompiled
+                  drivers)
+                type: string
+              virtualTopology:
+                description: 'Optional: Virtual Topology Daemon configuration for
+                  NVIDIA vGPU drivers'
+                properties:
+                  config:
+                    description: 'Optional: Config name representing virtual topology
+                      daemon configuration file nvidia-topologyd.conf'
+                    type: string
+                type: object
+            type: object
+          status:
+            description: NVIDIADriverStatus defines the observed state of NVIDIADriver
+            properties:
+              state:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file State indicates status of ClusterPolicy'
+                enum:
+                - ignored
+                - ready
+                - notReady
+                type: string
+            required:
+            - state
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

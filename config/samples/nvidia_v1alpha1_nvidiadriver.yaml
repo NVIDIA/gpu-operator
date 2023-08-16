@@ -1,0 +1,7 @@
+apiVersion: nvidia.com/v1alpha1
+kind: NVIDIADriver
+metadata:
+  name: nvidiadriver-sample
+spec:
+  # Add fields here
+  foo: bar
