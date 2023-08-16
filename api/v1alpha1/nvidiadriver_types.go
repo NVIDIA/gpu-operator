@@ -51,9 +51,6 @@ type NVIDIADriverSpec struct {
 	// GPUDirectStorage defines the spec for GDS driver
 	GPUDirectStorage *gpuv1.GPUDirectStorageSpec `json:"gds,omitempty"`
 
-	// Driver auto-upgrade settings
-	UpgradePolicy *upgrade_v1alpha1.DriverUpgradePolicySpec `json:"upgradePolicy,omitempty"`
-
 	// NVIDIA Driver image name
 	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
 	Image string `json:"image,omitempty"`

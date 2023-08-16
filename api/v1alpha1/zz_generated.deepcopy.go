@@ -23,7 +23,6 @@ package v1alpha1
 
 import (
 	"github.com/NVIDIA/gpu-operator/api/v1"
-	upgradev1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -118,11 +117,6 @@ func (in *NVIDIADriverSpec) DeepCopyInto(out *NVIDIADriverSpec) {
 	if in.GPUDirectStorage != nil {
 		in, out := &in.GPUDirectStorage, &out.GPUDirectStorage
 		*out = new(v1.GPUDirectStorageSpec)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.UpgradePolicy != nil {
-		in, out := &in.UpgradePolicy, &out.UpgradePolicy
-		*out = new(upgradev1alpha1.DriverUpgradePolicySpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ImagePullSecrets != nil {

@@ -124,6 +124,7 @@ mig:
 
 driver:
   enabled: true
+  useNvidiaDriverCRD: false
   # use pre-compiled packages for NVIDIA driver installation.
   # only supported for as a tech-preview feature on ubuntu22.04 kernels.
   usePrecompiled: false
