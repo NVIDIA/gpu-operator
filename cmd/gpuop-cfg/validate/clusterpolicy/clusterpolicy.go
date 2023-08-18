@@ -21,10 +21,11 @@ import (
 	"io"
 	"os"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"sigs.k8s.io/yaml"
+
+	v1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 type command struct {

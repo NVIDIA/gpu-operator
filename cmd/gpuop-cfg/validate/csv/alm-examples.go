@@ -19,9 +19,10 @@ package csv
 import (
 	"fmt"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"sigs.k8s.io/json"
+
+	v1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 func validateALMExample(csv *v1alpha1.ClusterServiceVersion) error {

@@ -78,17 +78,17 @@ all: gpu-operator
 
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: generate fmt vet manifests
+test: generate fmt golangci-lint manifests
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
 # Build gpu-operator binary
-gpu-operator: generate fmt vet
+gpu-operator: generate fmt golangci-lint
 	go build -o bin/gpu-operator main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+run: generate fmt golangci-lint manifests
 	go run ./main.go
 
 # Install CRDs into a cluster
@@ -154,7 +154,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := assert-fmt vet lint ineffassign misspell
+CHECK_TARGETS := assert-fmt golangci-lint
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -208,14 +208,8 @@ assert-fmt:
 		rm fmt.out; \
 	fi
 
-ineffassign:
-	golangci-lint run --disable-all --enable ineffassign ./...
-
-misspell:
-	golangci-lint run --disable-all --enable misspell ./...
-
-vet:
-	go vet ./...
+golangci-lint:
+	golangci-lint run ./...
 
 cmds: $(CMD_TARGETS)
 $(CMD_TARGETS): cmd-%:

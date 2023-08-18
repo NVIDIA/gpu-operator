@@ -67,29 +67,17 @@ fmt:
   script:
     - make assert-fmt
 
-vet:
+golangci-lint:
   extends:
     - .go-check
   script:
-    - make vet
+    - make golangci-lint
 
 go-validate-modules:
   extends:
     - .go-check
   script:
     - make validate-modules
-
-ineffassign:
-  extends:
-    - .go-check
-  script:
-    - make ineffassign
-
-misspell:
-  extends:
-    - .go-check
-  script:
-    - make misspell
 
 go-build:
   extends:

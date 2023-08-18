@@ -43,8 +43,6 @@ const (
 	driverValidationCheckDelaySeconds = 60
 	// pluginValidationCheckDelaySeconds indicates the delay between two checks of the device plugin validation, in seconds
 	pluginValidationCheckDelaySeconds = 30
-	// nvidiaPciDevicesCheckDeplaySeconds indicates the deplay between two checks of the number of NVIDIA PCI devices in the local node, in seconds
-	nvidiaPciDevicesCheckDeplaySeconds = 60
 )
 
 // NodeMetrics contains the port of the metrics server and the
@@ -189,7 +187,7 @@ func (nm *NodeMetrics) watchStatusFile(statusFile *promcli.Gauge, statusFileFile
 	}
 }
 
-func (nm *NodeMetrics) watchDevicePluginValidation() error {
+func (nm *NodeMetrics) watchDevicePluginValidation() {
 	p := &Plugin{
 		ctx: nm.ctx,
 	}
@@ -197,13 +195,13 @@ func (nm *NodeMetrics) watchDevicePluginValidation() error {
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
 		log.Errorf("metrics: DevicePlugin validation: Error getting config cluster - %s\n", err.Error())
-		return err
+		return
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		log.Errorf("metrics: DevicePlugin validation: Error getting k8s client - %s\n", err.Error())
-		return err
+		return
 	}
 
 	// update k8s client for the plugin
@@ -316,5 +314,10 @@ func (nm *NodeMetrics) Run() error {
 	log.Printf("Running the metrics server, listening on :%d/metrics", nm.port)
 	http.Handle("/metrics", promhttp.Handler())
 
-	return http.ListenAndServe(fmt.Sprintf(":%d", nm.port), nil)
+	server := &http.Server{
+		Addr:        fmt.Sprintf(":%d", nm.port),
+		ReadTimeout: 5 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }

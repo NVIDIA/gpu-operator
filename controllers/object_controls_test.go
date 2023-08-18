@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/require"
@@ -30,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 const (
@@ -77,7 +78,7 @@ var kubernetesResources = []client.Object{
 	&corev1.Service{},
 	&promv1.ServiceMonitor{},
 	&schedv1.PriorityClass{},
-	//&corev1.Taint{},
+	// &corev1.Taint{},
 	&secv1.SecurityContextConstraints{},
 	&policyv1beta1.PodSecurityPolicy{},
 	&corev1.Namespace{},
@@ -387,10 +388,8 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 	}
 
 	// add manifests
-	err = addState(&clusterPolicyController, manifestFile)
-	if err != nil {
-		t.Fatalf("unable to add state: %v", err)
-	}
+	addState(&clusterPolicyController, manifestFile)
+
 	// create resources
 	_, err = clusterPolicyController.step()
 	if err != nil {
@@ -802,12 +801,10 @@ func TestVGPUManager(t *testing.T) {
 func TestVGPUManagerAssets(t *testing.T) {
 	manifestPath := filepath.Join(cfg.root, vGPUManagerAssetsPath)
 	// add manifests
-	err := addState(&clusterPolicyController, manifestPath)
-	if err != nil {
-		t.Fatalf("unable to add state: %v", err)
-	}
+	addState(&clusterPolicyController, manifestPath)
+
 	// create resources
-	_, err = clusterPolicyController.step()
+	_, err := clusterPolicyController.step()
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
 	}
@@ -906,12 +903,10 @@ func TestSandboxDevicePlugin(t *testing.T) {
 func TestSandboxDevicePluginAssets(t *testing.T) {
 	manifestPath := filepath.Join(cfg.root, sandboxDevicePluginAssetsPath)
 	// add manifests
-	err := addState(&clusterPolicyController, manifestPath)
-	if err != nil {
-		t.Fatalf("unable to add state: %v", err)
-	}
+	addState(&clusterPolicyController, manifestPath)
+
 	// create resources
-	_, err = clusterPolicyController.step()
+	_, err := clusterPolicyController.step()
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
 	}

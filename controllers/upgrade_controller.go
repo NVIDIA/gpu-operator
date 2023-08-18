@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
@@ -40,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade

@@ -95,7 +95,7 @@ func main() {
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {
-		leaseDuration := renewDeadline + time.Duration(5*time.Second)
+		leaseDuration := renewDeadline + 5*time.Second
 
 		options.RenewDeadline = &renewDeadline
 		options.LeaseDuration = &leaseDuration
