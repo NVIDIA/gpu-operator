@@ -34,6 +34,20 @@ fi
 # Create the test namespace
 kubectl create namespace "${TEST_NAMESPACE}"
 
+# Create k8s secret for pulling vgpu images from nvcr.io 
+if [[ "${GPU_MODE}" == "vgpu" ]]; then
+
+	: ${REGISTRY_SECRET_NAME:="nvcrio-registry"}
+	: ${PRIVATE_REGISTRY:="nvcr.io/ea-cnt/nv_only"}
+	OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set driver.repository=${PRIVATE_REGISTRY} --set driver.image=vgpu-guest-driver --set driver.version=${TARGET_DRIVER_VERSION} --set driver.imagePullSecrets={${REGISTRY_SECRET_NAME}}"
+	
+	kubectl create secret docker-registry ${REGISTRY_SECRET_NAME} \
+		--docker-server=${PRIVATE_REGISTRY} \
+		--docker-username='$oauthtoken' \
+		--docker-password=${NGC_API_KEY} \
+		-n "${TEST_NAMESPACE}"
+fi
+
 # Run the helm install command
 ${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
 	-n "${TEST_NAMESPACE}" \

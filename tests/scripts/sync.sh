@@ -10,8 +10,7 @@ source ${SCRIPT_DIR}/.definitions.sh
 
 source ${SCRIPT_DIR}/.local.sh
 
-# TODO: Create an exclude file for this instead
 rsync -e "ssh -i ${private_key} -o StrictHostKeyChecking=no" \
     -avz --delete \
-        --exclude="vendor/" --exclude=".git" --exclude="aws-kube-ci" \
+    --exclude-from="${SCRIPT_DIR}/.rsync-excludes" \
         ${@}

@@ -1,0 +1,4 @@
+vendor/
+.git
+aws-kube-ci
+cnt-ci

@@ -4,6 +4,9 @@ include:
     file: aws-kube-ci.yml
     ref: 21.06.24
 
+variables:
+  GIT_SUBMODULE_PATHS: aws-kube-ci
+
 helm-lint:
   stage: config-checks
   allow_failure: true
@@ -139,6 +142,7 @@ build:gpu-operator-validator:
     OPERATOR_IMAGE: "${CI_REGISTRY_IMAGE}"
     VALIDATOR_VERSION: "${CI_COMMIT_SHORT_SHA}-${DIST}"
     VALIDATOR_IMAGE: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
+    GPU_PRODUCT_NAME: "Tesla-T4"
   extends:
     - .dist-ubi8
   except:
@@ -161,7 +165,7 @@ build:gpu-operator-validator:
     - export private_key="${CI_PROJECT_DIR}/aws-kube-ci/${private_key}"
     - export instance_hostname="${instance_hostname}"
     - rc=0
-    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} || rc=$?
+    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} || rc=$?
     - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
     - exit $rc
   artifacts:

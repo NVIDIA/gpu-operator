@@ -125,6 +125,12 @@ test_gpu_sharing() {
     check_pod_ready "gpu-feature-discovery"
 
     echo "validating workloads on timesliced GPU"
+
+    shared_product_name="${GPU_PRODUCT_NAME}-SHARED" 
+    
+    # set the name of GPU product in plugin test spec
+    sed -i "s/nvidia.com\/gpu.product: Tesla-T4-SHARED/nvidia.com\/gpu.product: ${shared_product_name}/g" ${TEST_DIR}/plugin-test.yaml
+
     # Deploy test-pod to validate GPU sharing
     kubectl apply -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
 
@@ -143,7 +149,7 @@ test_gpu_sharing() {
     fi
 
     product_name=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.product"]' | tr -d '"')
-    if [ "$product_name" != "Tesla-T4-SHARED" ]; then
+    if [ "$product_name" != ${shared_product_name} ]; then
         echo "Label nvidia.com/gpu.product is incorrect when GPU sharing is enabled - $product_name"
         exit 1
     fi
