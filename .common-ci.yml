@@ -47,7 +47,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG != ""
     - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: manual
 
 trigger-pipeline:
   stage: trigger
