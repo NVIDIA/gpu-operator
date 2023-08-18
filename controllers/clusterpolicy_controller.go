@@ -194,26 +194,23 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) error {
+func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &gpuv1.ClusterPolicy{}
 	err := r.Client.Get(ctx, namespacedName, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
-		return err
 	}
 	if instance.Status.State == state {
 		// state is unchanged
-		return nil
+		return
 	}
 	// Update the CR state
 	instance.SetStatus(state, clusterPolicyCtrl.operatorNamespace)
 	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to update ClusterPolicy status")
-		return err
 	}
-	return nil
 }
 
 func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
@@ -263,8 +260,8 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
 			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
 
-			oldOSTreeLabel, _ := oldLabels[nfdOSTreeVersionLabelKey]
-			newOSTreeLabel, _ := newLabels[nfdOSTreeVersionLabelKey]
+			oldOSTreeLabel := oldLabels[nfdOSTreeVersionLabelKey]
+			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]
 			osTreeLabelChanged := oldOSTreeLabel != newOSTreeLabel
 
 			needsUpdate := gpuCommonLabelMissing ||

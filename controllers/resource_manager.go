@@ -29,8 +29,6 @@ const (
 
 type assetsFromFile []byte
 
-var manifests []assetsFromFile
-
 // Resources indicates resources managed by GPU operator
 type Resources struct {
 	ServiceAccount             corev1.ServiceAccount
@@ -97,7 +95,7 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	reg, _ := regexp.Compile(`\b(\w*kind:\w*)\B.*\b`)
+	reg := regexp.MustCompile(`\b(\w*kind:\w*)\B.*\b`)
 
 	for _, m := range manifests {
 		kind := reg.FindString(string(m))

@@ -14,8 +14,8 @@ import (
 
 	"path/filepath"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 const (
@@ -1864,12 +1866,25 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
+	var validatorErr error
 	// apply changes for individual component validators(initContainers)
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "driver")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "nvidia-fs")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "toolkit")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cuda")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "plugin")
+	components := []string{
+		"driver",
+		"nvidia-fs",
+		"toolkit",
+		"cuda",
+		"plugin",
+	}
+
+	for _, component := range components {
+		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
+			validatorErr = multierror.Append(validatorErr, err)
+		}
+	}
+
+	if validatorErr != nil {
+		n.rec.Log.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+	}
 
 	return nil
 }
@@ -1881,11 +1896,24 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return fmt.Errorf("%v", err)
 	}
 
+	var validatorErr error
 	// apply changes for individual component validators(initContainers)
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "cc-manager")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vfio-pci")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-manager")
-	TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-devices")
+	components := []string{
+		"cc-manager",
+		"vfio-pci",
+		"vgpu-manager",
+		"vgpu-devices",
+	}
+
+	for _, component := range components {
+		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
+			validatorErr = multierror.Append(validatorErr, err)
+		}
+	}
+
+	if validatorErr != nil {
+		n.rec.Log.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+	}
 
 	return nil
 }
@@ -2178,7 +2206,7 @@ func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClas
 	}
 }
 
-func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) error {
+func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) {
 	var containerProbe *corev1.Probe
 
 	// determine probe type to update
@@ -2189,8 +2217,6 @@ func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeS
 		containerProbe = container.LivenessProbe
 	case Readiness:
 		containerProbe = container.ReadinessProbe
-	default:
-		return fmt.Errorf("invalid container probe type %s specified", probeType)
 	}
 
 	// set probe parameters if specified
@@ -2209,7 +2235,6 @@ func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeS
 	if probe.PeriodSeconds != 0 {
 		containerProbe.PeriodSeconds = probe.PeriodSeconds
 	}
-	return nil
 }
 
 // applies MIG related configuration env to container spec
@@ -3241,6 +3266,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	n.rec.Log.V(2).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
 
 	for _, pod := range dsPods {
+		pod := pod
 		podRevisionHash, err := getPodControllerRevisionHash(ctx, &pod)
 		if err != nil {
 			n.rec.Log.Error(
@@ -4450,6 +4476,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 		// Delete all Kata RuntimeClasses
 		n.rec.Log.Info("Kata Manager disabled, deleting all Kata RuntimeClasses")
 		for _, rc := range list.Items {
+			rc := rc
 			n.rec.Log.V(1).Info("Deleting Kata RuntimeClass", "Name", rc.Name)
 			err := n.rec.Client.Delete(ctx, &rc)
 			if err != nil {
@@ -4468,6 +4495,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	// Delete any existing Kata RuntimeClasses that are no longer specified in KataManager configuration
 	for _, rc := range list.Items {
 		if _, ok := rcNames[rc.Name]; !ok {
+			rc := rc
 			n.rec.Log.Info("Deleting Kata RuntimeClass", "Name", rc.Name)
 			err := n.rec.Client.Delete(ctx, &rc)
 			if err != nil {
@@ -4542,6 +4570,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	for _, obj := range n.resources[state].RuntimeClasses {
+		obj := obj
 		// When CDI is disabled, do not create the additional 'nvidia-cdi' and
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.

@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 
 	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
@@ -102,13 +104,6 @@ var gpuNodeLabels = map[string]string{
 	"feature.node.kubernetes.io/pci-0300_10de.present": "true",
 }
 
-type state interface {
-	init(*ClusterPolicyReconciler, *gpuv1.ClusterPolicy)
-	step()
-	validate()
-	last()
-}
-
 type gpuWorkloadConfiguration struct {
 	config string
 	node   string
@@ -157,15 +152,13 @@ type ClusterPolicyController struct {
 	sandboxEnabled bool
 }
 
-func addState(n *ClusterPolicyController, path string) error {
+func addState(n *ClusterPolicyController, path string) {
 	// TODO check for path
 	res, ctrl := addResourcesControls(n, path)
 
 	n.controls = append(n.controls, ctrl)
 	n.resources = append(n.resources, res)
 	n.stateNames = append(n.stateNames, filepath.Base(path))
-
-	return nil
 }
 
 // OpenshiftVersion fetches OCP version
@@ -277,10 +270,7 @@ func hasMIGCapableGPU(labels map[string]string) bool {
 	}
 
 	if value, exists := labels[migCapableLabelKey]; exists {
-		if value == migCapableLabelValue {
-			return true
-		}
-		return false
+		return value == migCapableLabelValue
 	}
 
 	// check product label if mig.capable label does not exist
@@ -424,6 +414,7 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 		return fmt.Errorf("Unable to list nodes to check annotations, err %s", err.Error())
 	}
 	for _, node := range list.Items {
+		node := node
 		labels := node.GetLabels()
 		if !hasCommonGPULabel(labels) {
 			// not a gpu node
@@ -486,6 +477,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	updateLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
+		node := node
 		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
@@ -775,10 +767,10 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.k8sVersion = k8sVersion
 		n.rec.Log.Info("Kubernetes version detected", "version", k8sVersion)
 
-		promv1.AddToScheme(reconciler.Scheme)
-		secv1.Install(reconciler.Scheme)
-		apiconfigv1.Install(reconciler.Scheme)
-		apiimagev1.Install(reconciler.Scheme)
+		utilruntime.Must(promv1.AddToScheme(reconciler.Scheme))
+		utilruntime.Must(secv1.Install(reconciler.Scheme))
+		utilruntime.Must(apiconfigv1.Install(reconciler.Scheme))
+		utilruntime.Must(apiimagev1.Install(reconciler.Scheme))
 
 		n.operatorMetrics = initOperatorMetrics(n)
 		n.rec.Log.Info("Operator metrics initialized.")
@@ -948,20 +940,18 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	}
 
 	// move to next state
-	n.idx = n.idx + 1
+	n.idx++
 
 	return result, nil
 }
 
-func (n ClusterPolicyController) validate() {
-	// TODO add custom validation functions
-}
+// TODO
+// func (n ClusterPolicyController) validate() {
+//	 add custom validation functions
+// }
 
 func (n ClusterPolicyController) last() bool {
-	if n.idx == len(n.controls) {
-		return true
-	}
-	return false
+	return n.idx == len(n.controls)
 }
 
 func (n ClusterPolicyController) isStateEnabled(stateName string) bool {

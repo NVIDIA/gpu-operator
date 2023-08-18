@@ -81,8 +81,7 @@ type MOFED struct {
 
 // Metrics represents spec to run metrics exporter
 type Metrics struct {
-	ctx        context.Context
-	kubeClient kubernetes.Interface
+	ctx context.Context
 }
 
 // VfioPCI represents spec to validate vfio-pci driver
@@ -175,18 +174,12 @@ const (
 	genericGPUResourceType = "nvidia.com/gpu"
 	// migGPUResourcePrefix indicates the prefix of the MIG resources exposed by NVIDIA DevicePlugin
 	migGPUResourcePrefix = "nvidia.com/mig-"
-	// devicePluginEnvMigStrategy indicates the name of the DevicePlugin Env variable used to configure the MIG strategy
-	devicePluginEnvMigStrategy = "MIG_STRATEGY"
-	// migStrategyMixed indicates mixed MIG strategy
-	migStrategyMixed = "mixed"
 	// migStrategySingle indicates mixed MIG strategy
 	migStrategySingle = "single"
 	// pluginWorkloadPodSpecPath indicates path to plugin validation pod definition
 	pluginWorkloadPodSpecPath = "/var/nvidia/manifests/plugin-workload-validation.yaml"
 	// cudaWorkloadPodSpecPath indicates path to cuda validation pod definition
 	cudaWorkloadPodSpecPath = "/var/nvidia/manifests/cuda-workload-validation.yaml"
-	// NodeSelectorKey indicates node label key to use as node selector for plugin validation pod
-	nodeSelectorKey = "kubernetes.io/hostname"
 	// validatorImageEnvName indicates env name for validator image passed
 	validatorImageEnvName = "VALIDATOR_IMAGE"
 	// validatorImagePullPolicyEnvName indicates env name for validator image pull policy passed
@@ -592,16 +585,6 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 	}
 }
 
-func cleanupStatusFiles() error {
-	command := "rm"
-	args := []string{"-f", fmt.Sprintf("%s/*-ready", outputDirFlag)}
-	err := runCommand(command, args, false)
-	if err != nil {
-		return fmt.Errorf("unable to cleanup status files: %s", err)
-	}
-	return nil
-}
-
 func getDriverRoot() (string, bool) {
 	// check if driver is pre-installed on the host and use host path for validation
 	if fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
@@ -783,7 +766,7 @@ func (n *NvidiaFs) validate() error {
 }
 
 func (n *NvidiaFs) runValidation(silent bool) error {
-	//check for nvidia_fs module to be loaded
+	// check for nvidia_fs module to be loaded
 	command := "bash"
 	args := []string{"-c", "lsmod | grep nvidia_fs"}
 
@@ -918,7 +901,7 @@ func (m *MOFED) validate() error {
 }
 
 func (m *MOFED) runValidation(silent bool) error {
-	//check for mlx5_core module to be loaded
+	// check for mlx5_core module to be loaded
 	command := "bash"
 	args := []string{"-c", "lsmod | grep mlx5_core"}
 
@@ -980,7 +963,10 @@ func (p *Plugin) runWorkload() error {
 	}
 
 	// update owner reference
-	setOwnerReference(ctx, p.kubeClient, pod)
+	err = setOwnerReference(ctx, p.kubeClient, pod)
+	if err != nil {
+		return fmt.Errorf("unable to set ownerReference for validator pod: %s", err)
+	}
 
 	// set pod tolerations
 	err = setTolerations(ctx, p.kubeClient, pod)
@@ -1087,7 +1073,7 @@ func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
 	}
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	reg, _ := regexp.Compile(`\b(\w*kind:\w*)\B.*\b`)
+	reg := regexp.MustCompile(`\b(\w*kind:\w*)\B.*\b`)
 
 	kind := reg.FindString(string(manifest))
 	slice := strings.Split(kind, ":")
