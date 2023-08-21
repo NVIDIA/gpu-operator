@@ -3,6 +3,7 @@ run:
 
 linters:
   enable:
+    - contextcheck
     - gocritic
     - gofmt
     - goimports
