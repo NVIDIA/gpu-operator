@@ -167,6 +167,7 @@ DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 		$(DOCKER) build \
 			--progress=plain \
 			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
+			--build-arg GOLANGCI_LINT_VERSION="$(GOLANGCI_LINT_VERSION)" \
 			--tag $(BUILDIMAGE) \
 			-f $(^) \
 			docker; \

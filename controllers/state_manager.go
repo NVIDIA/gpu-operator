@@ -873,7 +873,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 
 	if n.openshift != "" {
 		// initialize openshift specific parameters
-		err = n.initOCPParams(n.ctx)
+		err = n.initOCPParams()
 		if err != nil {
 			return err
 		}
@@ -881,7 +881,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	return nil
 }
 
-func (n *ClusterPolicyController) initOCPParams(ctx context.Context) error {
+func (n *ClusterPolicyController) initOCPParams() error {
 	// initialize openshift specific parameters
 	if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
 		// disable DTK for OCP when already pre-compiled drivers are used
