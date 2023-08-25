@@ -56,28 +56,12 @@ validate-helm-values:
   script:
     - make validate-helm-values
 
-.go-check:
+go-checks:
   extends:
     - .requires-build-image
   stage: go-checks
-
-fmt:
-  extends:
-    - .go-check
   script:
-    - make assert-fmt
-
-golangci-lint:
-  extends:
-    - .go-check
-  script:
-    - make golangci-lint
-
-go-validate-modules:
-  extends:
-    - .go-check
-  script:
-    - make validate-modules
+    - make check
 
 go-build:
   extends:

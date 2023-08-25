@@ -9,7 +9,6 @@ require (
 	github.com/NVIDIA/nvidia-container-toolkit v1.14.0-rc.2.0.20230823085558-fca30d7acc67
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
