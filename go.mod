@@ -8,7 +8,6 @@ require (
 	github.com/NVIDIA/nvidia-container-toolkit v1.14.0-rc.2.0.20230823085558-fca30d7acc67
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/openshift/api v0.0.0-20230607151152-bdd886567621
 	github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
@@ -61,7 +60,6 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

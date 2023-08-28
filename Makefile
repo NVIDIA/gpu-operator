@@ -78,17 +78,17 @@ all: gpu-operator
 
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: generate fmt golangci-lint manifests
+test: generate check manifests
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
 # Build gpu-operator binary
-gpu-operator: generate fmt golangci-lint
+gpu-operator: generate check
 	go build -o bin/gpu-operator main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt golangci-lint manifests
+run: generate check manifests
 	go run ./main.go
 
 # Install CRDs into a cluster
@@ -154,7 +154,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := assert-fmt golangci-lint
+CHECK_TARGETS := golangci-lint validate-modules
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -167,7 +167,6 @@ DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 		$(DOCKER) build \
 			--progress=plain \
 			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-			--build-arg GOLANGCI_LINT_VERSION="$(GOLANGCI_LINT_VERSION)" \
 			--tag $(BUILDIMAGE) \
 			-f $(^) \
 			docker; \
@@ -192,22 +191,11 @@ $(DOCKER_TARGETS): docker-%: .build-image
 
 check: $(CHECK_TARGETS)
 
+
 # Apply go fmt to the codebase
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
 		| xargs gofmt -s -l -w
-
-assert-fmt:
-	go list -f '{{.Dir}}' $(MODULE)/... \
-		| xargs gofmt -s -l | ( grep -v /vendor/ || true ) > fmt.out
-	@if [ -s fmt.out ]; then \
-		echo "\nERROR: The following files are not formatted:\n"; \
-		cat fmt.out; \
-		rm fmt.out; \
-		exit 1; \
-	else \
-		rm fmt.out; \
-	fi
 
 golangci-lint:
 	golangci-lint run ./...

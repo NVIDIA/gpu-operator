@@ -3,6 +3,7 @@ package controllers
 import (
 	"bufio"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -1878,7 +1878,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = multierror.Append(validatorErr, err)
+			validatorErr = stderrors.Join(validatorErr, err)
 		}
 	}
 
@@ -1907,7 +1907,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = multierror.Append(validatorErr, err)
+			validatorErr = stderrors.Join(validatorErr, err)
 		}
 	}
 
