@@ -19,7 +19,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -258,7 +258,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 func updateClusterPolicy(n *ClusterPolicyController, cp *gpuv1.ClusterPolicy) error {
 	n.singleton = cp
 	err := n.rec.Client.Update(n.ctx, cp)
-	if err != nil && !errors.IsConflict(err) {
+	if err != nil && !apierrors.IsConflict(err) {
 		return fmt.Errorf("failed to update ClusterPolicy: %v", err)
 	}
 	return nil
