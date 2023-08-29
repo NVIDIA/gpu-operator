@@ -3,7 +3,7 @@ package controllers
 import (
 	"bufio"
 	"context"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -30,7 +30,7 @@ import (
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -265,7 +265,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -277,7 +277,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, skipping update")
 			return gpuv1.Ready, nil
 		}
@@ -300,7 +300,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -312,7 +312,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -341,7 +341,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -363,7 +363,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -392,7 +392,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -404,7 +404,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -433,7 +433,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -449,7 +449,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -479,7 +479,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -525,7 +525,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if !errors.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -598,7 +598,7 @@ func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, erro
 			// add mapping for "kernelVersion" --> "OS"
 			kernelVersionMap[kernelVersion] = nodeOS
 		} else {
-			err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
+			err := apierrors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
 			logger.Error(err, "Failed to get kernel version of GPU node using Node Feature Discovery (NFD) labels. Is NFD installed in the cluster?")
 			return nil, err
 		}
@@ -639,7 +639,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	if ok {
 		logger.Info(kFVersion)
 	} else {
-		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
+		err := apierrors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
 		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", "Error", err)
 		return "", "", ""
 	}
@@ -1003,7 +1003,7 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 
 	found := &corev1.ConfigMap{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating")
 		err = n.rec.Client.Create(ctx, configMap)
 		if err != nil {
@@ -1878,7 +1878,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = stderrors.Join(validatorErr, err)
+			validatorErr = errors.Join(validatorErr, err)
 		}
 	}
 
@@ -1907,7 +1907,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = stderrors.Join(validatorErr, err)
+			validatorErr = errors.Join(validatorErr, err)
 		}
 	}
 
@@ -3368,7 +3368,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -3380,7 +3380,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -3404,7 +3404,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	namespace := "openshift"
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			n.rec.Log.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
 				"Name", name,
 				"Namespace", namespace)
@@ -3452,7 +3452,7 @@ func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyControlle
 
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Info("ServiceAccount not found",
 				"Namespace", n.operatorNamespace, "err", err)
 			return false, nil
@@ -3872,7 +3872,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -3969,7 +3969,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &appsv1.DaemonSet{}
 	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("DaemonSet not found, creating",
 			"Name", obj.Name,
 		)
@@ -4092,7 +4092,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4117,7 +4117,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	found := &secv1.SecurityContextConstraints{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4152,7 +4152,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if PSP is disabled and cleanup resource if exists
 	if !n.singleton.Spec.PSP.IsEnabled() {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4165,7 +4165,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &policyv1beta1.PodSecurityPolicy{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4201,7 +4201,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4214,7 +4214,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &corev1.Service{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4241,7 +4241,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 func crdExists(n ClusterPolicyController, name string) (bool, error) {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	err := n.rec.Client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -4271,7 +4271,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			return gpuv1.Ready, nil
 		}
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4286,7 +4286,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 				return gpuv1.Ready, nil
 			}
 			err := n.rec.Client.Delete(ctx, obj)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				logger.Info("Couldn't delete", "Error", err)
 				return gpuv1.NotReady, err
 			}
@@ -4339,7 +4339,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &promv1.ServiceMonitor{}
 	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4386,7 +4386,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	found := &nodev1beta1.RuntimeClass{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4433,7 +4433,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	found := &nodev1.RuntimeClass{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4531,7 +4531,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 
 		found := &nodev1.RuntimeClass{}
 		err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-		if err != nil && errors.IsNotFound(err) {
+		if err != nil && apierrors.IsNotFound(err) {
 			logger.Info("Not found, creating...")
 			err = n.rec.Client.Create(ctx, &obj)
 			if err != nil {
@@ -4575,7 +4575,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
 			err := n.rec.Client.Delete(n.ctx, &obj)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				n.rec.Log.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
 				return gpuv1.NotReady, err
 			}
@@ -4607,7 +4607,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &promv1.PrometheusRule{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
