@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,7 +38,7 @@ type stateManager struct {
 
 var _ Manager = (*stateManager)(nil)
 
-func NewManager(crdKind string, k8sClient client.Client, scheme *runtime.Scheme, log logr.Logger) (Manager, error) {
+func NewManager(crdKind string, k8sClient client.Client, scheme *runtime.Scheme) (Manager, error) {
 	states, err := newStates(crdKind, k8sClient, scheme)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add states: %v", err)
@@ -86,9 +85,9 @@ func newStates(crdKind string, k8sClient client.Client, scheme *runtime.Scheme) 
 }
 
 func newNVIDIADriverStates(k8sClient client.Client, scheme *runtime.Scheme) ([]State, error) {
-	driverState, err := NewStateDriver(k8sClient, scheme, "/opt/gpu-operator/manfiests/state-driver")
+	driverState, err := NewStateDriver(k8sClient, scheme, "/opt/gpu-operator/manifests/state-driver")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create NVIDIA driver state")
+		return nil, fmt.Errorf("failed to create NVIDIA driver state: %v", err)
 	}
 
 	return []State{driverState}, nil

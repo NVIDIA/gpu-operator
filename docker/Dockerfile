@@ -33,6 +33,7 @@ COPY vendor vendor
 COPY main.go main.go
 COPY api/ api/
 COPY controllers/ controllers/
+COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on \
@@ -61,8 +62,9 @@ LABEL vsc-ref=${GIT_COMMIT}
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
 
-RUN mkdir -p /opt/gpu-operator
+RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
+COPY manifests /opt/gpu-operator/manifests
 RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
 
