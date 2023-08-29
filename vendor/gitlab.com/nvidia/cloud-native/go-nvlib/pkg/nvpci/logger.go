@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+/**
+# Copyright (c) NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG GOLANG_VERSION=x.x.x
-ARG GOLANGCI_LINT_VERSION=1.54.2
-FROM golang:${GOLANG_VERSION}
+**/
 
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}
+package nvpci
+
+import "log"
+
+type logger interface {
+	Warningf(string, ...interface{})
+}
+
+type simpleLogger struct{}
+
+func (l simpleLogger) Warningf(format string, v ...interface{}) {
+	log.Printf("WARNING: "+format, v)
+}

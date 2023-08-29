@@ -6,10 +6,9 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe
-	github.com/NVIDIA/nvidia-container-toolkit v1.13.2-0.20230626083051-a25b1c10485a
+	github.com/NVIDIA/nvidia-container-toolkit v1.14.0-rc.2.0.20230823085558-fca30d7acc67
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
@@ -23,7 +22,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli/v2 v2.25.7
-	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230613182322-7663cf900f0a
+	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.10.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -69,7 +68,6 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect

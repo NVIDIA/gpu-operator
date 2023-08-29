@@ -3,6 +3,7 @@ package controllers
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -30,7 +30,7 @@ import (
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -265,7 +265,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -277,7 +277,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, skipping update")
 			return gpuv1.Ready, nil
 		}
@@ -300,7 +300,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -312,7 +312,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -341,7 +341,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -363,7 +363,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -392,7 +392,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -404,7 +404,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -433,7 +433,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -449,7 +449,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -479,7 +479,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -525,7 +525,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if !errors.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -598,7 +598,7 @@ func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, erro
 			// add mapping for "kernelVersion" --> "OS"
 			kernelVersionMap[kernelVersion] = nodeOS
 		} else {
-			err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
+			err := apierrors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
 			logger.Error(err, "Failed to get kernel version of GPU node using Node Feature Discovery (NFD) labels. Is NFD installed in the cluster?")
 			return nil, err
 		}
@@ -639,7 +639,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	if ok {
 		logger.Info(kFVersion)
 	} else {
-		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
+		err := apierrors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
 		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", "Error", err)
 		return "", "", ""
 	}
@@ -1003,7 +1003,7 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 
 	found := &corev1.ConfigMap{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating")
 		err = n.rec.Client.Create(ctx, configMap)
 		if err != nil {
@@ -1878,7 +1878,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = multierror.Append(validatorErr, err)
+			validatorErr = errors.Join(validatorErr, err)
 		}
 	}
 
@@ -1907,7 +1907,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
-			validatorErr = multierror.Append(validatorErr, err)
+			validatorErr = errors.Join(validatorErr, err)
 		}
 	}
 
@@ -2813,7 +2813,9 @@ func createEmptyDirVolume(volumeName string) corev1.Volume {
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	driverIndex := 0
 	driverCtrFound := false
-	for i, container := range obj.Spec.Template.Spec.Containers {
+
+	podSpec := &obj.Spec.Template.Spec
+	for i, container := range podSpec.Containers {
 		// check if this is the main nvidia-driver container
 		if container.Name == "nvidia-driver-ctr" {
 			driverIndex = i
@@ -2826,70 +2828,72 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		return fmt.Errorf("driver container (nvidia-driver-ctr) is missing from the driver daemonset manifest")
 	}
 
+	driverContainer := &podSpec.Containers[driverIndex]
+
 	image, err := resolveDriverTag(n, &config.Driver)
 	if err != nil {
 		return err
 	}
 	if image != "" {
-		obj.Spec.Template.Spec.Containers[driverIndex].Image = image
+		driverContainer.Image = image
 	}
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[driverIndex].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
+	driverContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.Driver.ImagePullSecrets) > 0 {
 		for _, secret := range config.Driver.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
 	// set resource limits
 	if config.Driver.Resources != nil {
-		obj.Spec.Template.Spec.Containers[driverIndex].Resources.Requests = config.Driver.Resources.Requests
-		obj.Spec.Template.Spec.Containers[driverIndex].Resources.Limits = config.Driver.Resources.Limits
+		driverContainer.Resources.Requests = config.Driver.Resources.Requests
+		driverContainer.Resources.Limits = config.Driver.Resources.Limits
 	}
 	// set arguments if specified for driver container
 	if len(config.Driver.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[driverIndex].Args = config.Driver.Args
+		driverContainer.Args = config.Driver.Args
 	}
 	// set/append environment variables for exporter container
 	if len(config.Driver.Env) > 0 {
 		for _, env := range config.Driver.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), env.Name, env.Value)
+			setContainerEnv(driverContainer, env.Name, env.Value)
 		}
 	}
 	// set container probe timeouts
 	if config.Driver.StartupProbe != nil {
-		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.StartupProbe, Startup)
+		setContainerProbe(driverContainer, config.Driver.StartupProbe, Startup)
 	}
 	if config.Driver.LivenessProbe != nil {
-		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.LivenessProbe, Liveness)
+		setContainerProbe(driverContainer, config.Driver.LivenessProbe, Liveness)
 	}
 	if config.Driver.ReadinessProbe != nil {
-		setContainerProbe(&(obj.Spec.Template.Spec.Containers[driverIndex]), config.Driver.ReadinessProbe, Readiness)
+		setContainerProbe(driverContainer, config.Driver.ReadinessProbe, Readiness)
 	}
 
 	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
 		// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), GPUDirectRDMAEnabledEnvName, "true")
+		setContainerEnv(driverContainer, GPUDirectRDMAEnabledEnvName, "true")
 		// check if MOFED drives are directly installed on host and update source path accordingly
 		// to build nvidia-peermem module
 		if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
 			// mount /usr/src/ofa_kernel path directly from host to build using MOFED drivers installed on host
-			for index, volume := range obj.Spec.Template.Spec.Volumes {
+			for index, volume := range podSpec.Volumes {
 				if volume.Name == "mlnx-ofed-usr-src" {
-					obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/src"
+					podSpec.Volumes[index].HostPath.Path = "/usr/src"
 				}
 			}
 			// set env indicating host-mofed is enabled
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[driverIndex]), UseHostMOFEDEnvName, "true")
+			setContainerEnv(driverContainer, UseHostMOFEDEnvName, "true")
 		}
 	}
 
 	// set any licensing configuration required
 	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
 		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
-		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, licensingConfigVolMount)
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
 
 		// gridd.conf always mounted
 		licenseItemsToInclude := []corev1.KeyToPath{
@@ -2905,7 +2909,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				Path: NLSClientTokenFileName,
 			})
 			nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
-			obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, nlsTokenVolMount)
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
 		}
 
 		licensingConfigVolumeSource := corev1.VolumeSource{
@@ -2917,13 +2921,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			},
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, licensingConfigVol)
+		podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
 	}
 
 	// set virtual topology daemon configuration if specified for vGPU driver
 	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
 		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
-		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, topologyConfigVolMount)
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, topologyConfigVolMount)
 
 		topologyConfigVolumeSource := corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -2939,7 +2943,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			},
 		}
 		topologyConfigVol := corev1.Volume{Name: "topology-config", VolumeSource: topologyConfigVolumeSource}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, topologyConfigVol)
+		podSpec.Volumes = append(podSpec.Volumes, topologyConfigVol)
 	}
 
 	// mount any custom kernel module configuration parameters at /drivers
@@ -2949,8 +2953,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 		}
-		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	// no further repo configuration required when using pre-compiled drivers, return here.
@@ -2968,8 +2972,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
 		}
-		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 	}
 
 	// set any custom ssl key/certificate configuration provided
@@ -2982,8 +2986,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
 		}
-		obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volumeMounts...)
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
 	}
 
 	release, err := parseOSRelease()
@@ -3014,10 +3018,10 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				MountPath: mountPath,
 				ReadOnly:  true,
 			}
-			obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts = append(obj.Spec.Template.Spec.Containers[driverIndex].VolumeMounts, volMountSubscription)
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volMountSubscription)
 
 			subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
-			obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, subscriptionVol)
+			podSpec.Volumes = append(podSpec.Volumes, subscriptionVol)
 		}
 	}
 
@@ -3026,16 +3030,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		return nil
 	}
 
-	// Add env vars needed by nvidia-driver to enable the right releasever and EUS rpm repos
-	rhelVersion := corev1.EnvVar{Name: "RHEL_VERSION", Value: release["RHEL_VERSION"]}
 	ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]}
-
-	obj.Spec.Template.Spec.Containers[driverIndex].Env = append(obj.Spec.Template.Spec.Containers[driverIndex].Env, rhelVersion)
-	obj.Spec.Template.Spec.Containers[driverIndex].Env = append(obj.Spec.Template.Spec.Containers[driverIndex].Env, ocpVersion)
+	driverContainer.Env = append(driverContainer.Env, ocpVersion)
 
 	// Automatically apply proxy settings for OCP and inject custom CA if configured by user
 	// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
-	err = applyOCPProxySpec(n, &obj.Spec.Template.Spec)
+	err = applyOCPProxySpec(n, podSpec)
 	if err != nil {
 		return err
 	}
@@ -3096,7 +3096,6 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	// add env for OCP
 	if _, ok := release["OPENSHIFT_VERSION"]; ok {
 		setContainerEnv(container, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
-		setContainerEnv(container, "RHEL_VERSION", release["RHEL_VERSION"])
 	}
 
 	return nil
@@ -3369,7 +3368,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -3381,7 +3380,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if err := n.rec.Client.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
 			err = n.rec.Client.Update(ctx, obj)
 			if err != nil {
@@ -3405,7 +3404,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	namespace := "openshift"
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			n.rec.Log.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
 				"Name", name,
 				"Namespace", namespace)
@@ -3453,7 +3452,7 @@ func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyControlle
 
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Info("ServiceAccount not found",
 				"Namespace", n.operatorNamespace, "err", err)
 			return false, nil
@@ -3873,7 +3872,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -3970,7 +3969,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &appsv1.DaemonSet{}
 	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("DaemonSet not found, creating",
 			"Name", obj.Name,
 		)
@@ -4093,7 +4092,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4118,7 +4117,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	found := &secv1.SecurityContextConstraints{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4153,7 +4152,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if PSP is disabled and cleanup resource if exists
 	if !n.singleton.Spec.PSP.IsEnabled() {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4166,7 +4165,7 @@ func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &policyv1beta1.PodSecurityPolicy{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4202,7 +4201,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4215,7 +4214,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &corev1.Service{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4242,7 +4241,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 func crdExists(n ClusterPolicyController, name string) (bool, error) {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	err := n.rec.Client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -4272,7 +4271,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			return gpuv1.Ready, nil
 		}
 		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
@@ -4287,7 +4286,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 				return gpuv1.Ready, nil
 			}
 			err := n.rec.Client.Delete(ctx, obj)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				logger.Info("Couldn't delete", "Error", err)
 				return gpuv1.NotReady, err
 			}
@@ -4340,7 +4339,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &promv1.ServiceMonitor{}
 	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4387,7 +4386,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	found := &nodev1beta1.RuntimeClass{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4434,7 +4433,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	found := &nodev1.RuntimeClass{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {
@@ -4532,7 +4531,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 
 		found := &nodev1.RuntimeClass{}
 		err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-		if err != nil && errors.IsNotFound(err) {
+		if err != nil && apierrors.IsNotFound(err) {
 			logger.Info("Not found, creating...")
 			err = n.rec.Client.Create(ctx, &obj)
 			if err != nil {
@@ -4576,7 +4575,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
 			err := n.rec.Client.Delete(n.ctx, &obj)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				n.rec.Log.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
 				return gpuv1.NotReady, err
 			}
@@ -4608,7 +4607,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 
 	found := &promv1.PrometheusRule{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.rec.Client.Create(ctx, obj)
 		if err != nil {

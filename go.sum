@@ -14,8 +14,8 @@ github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a h1:3nyTp1c
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a/go.mod h1:K7HCLTndSwBEZwBu6sU7daVeryV1Qt/DtKH8nONJj4o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe h1:8HlU+Vj9JsKRsyI39BLlv0cGPa5dE15PDy7XrPsMQYE=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe/go.mod h1:o7UeOk3V0xlOX87NnSaGNDje23VKCKPdfN6aSIZ9BwM=
-github.com/NVIDIA/nvidia-container-toolkit v1.13.2-0.20230626083051-a25b1c10485a h1:XFcGrm+0QdmopKYuopL+hmrYQBVgTOR7XoEcFXkbh5o=
-github.com/NVIDIA/nvidia-container-toolkit v1.13.2-0.20230626083051-a25b1c10485a/go.mod h1:giT7hV6YQQ5xJIw0yRKNLMc96KIUdj4oAv5gRWp0zX4=
+github.com/NVIDIA/nvidia-container-toolkit v1.14.0-rc.2.0.20230823085558-fca30d7acc67 h1:K8lhT9HM9VMRgjTp6bKufVbDSAkpEIS3SNS9S75n/ek=
+github.com/NVIDIA/nvidia-container-toolkit v1.14.0-rc.2.0.20230823085558-fca30d7acc67/go.mod h1:/4gu9BaABwXw/4iWY2oVpGbtd1X9uRDwegwnf1jN5Hw=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
@@ -112,11 +112,6 @@ github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 h1:pdN6V1QBWetyv/0+wjACpqVH+eVULgEjkurDLq3goeM=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
-github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
-github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
-github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
-github.com/hashicorp/go-multierror v1.1.1 h1:H5DkEtf6CXdFp0N0Em5UCwQpXMWke8IA0+lD48awMYo=
-github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9/fmwbPZ6JB6eMoM=
 github.com/huandu/xstrings v1.3.3 h1:/Gcsuc1x8JVbJ9/rlye4xZnVAbEkGauT8lbebqcQws4=
 github.com/huandu/xstrings v1.3.3/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
@@ -240,8 +235,8 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230613182322-7663cf900f0a h1:lceJVurLqiWFdxK6KMDw+SIwrAsFW/af44XrNlbGw78=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230613182322-7663cf900f0a/go.mod h1:KYZksBgh18o+uzgnpDazzG4LVYtnfB96VXHMXypEtik=
+gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884 h1:V0LUbfm4kVA1CPG8FgG9AGZqa3ykE5U12Gd3PZgoItA=
+gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884/go.mod h1:/x5Ky1ZJNyCjDkgSL1atII0EFKQF5WaIHKeP5nkaQfk=
 go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 h1:+FNtrFTmVw0YZGpBGX56XDee331t6JAXeK2bcyhLOOc=
 go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5/go.mod h1:nmDLcffg48OtT/PSW0Hg7FvpRQsQh5OSqIylirxKC7o=
 go.uber.org/atomic v1.7.0 h1:ADUqmZGgLDDfbSL9ZmPxKTybcoEYHgpYfELNoN+7hsw=
