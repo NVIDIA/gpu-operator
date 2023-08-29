@@ -281,6 +281,9 @@ spec:
                   configMapName:
                     type: string
                 type: object
+              repository:
+                description: NVIDIA Driver image repository
+                type: string
               resources:
                 description: 'Optional: Define resources requests and limits for each
                   pod'
