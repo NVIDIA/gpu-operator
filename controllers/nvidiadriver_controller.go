@@ -18,19 +18,32 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/state"
+	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 )
 
 // NVIDIADriverReconciler reconciles a NVIDIADriver object
 type NVIDIADriverReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	stateManager state.Manager
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
@@ -47,16 +60,96 @@ type NVIDIADriverReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
+	logger.V(consts.LogLevelInfo).Info("Reconciling NVIDIADriver")
+
+	// Get the NvidiaDriver instance from this request
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	if err != nil {
+		logger.V(consts.LogLevelError).Error(err, "Error getting NVIDIADriver object")
+		if apierrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			return reconcile.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
 
 	// your logic here
+	logger.Info("Controller logic goes here!")
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&nvidiav1alpha1.NVIDIADriver{}).
-		Complete(r)
+	// Create state manager
+	stateManager, err := state.NewManager(
+		nvidiav1alpha1.NVIDIADriverCRDName,
+		mgr.GetClient(),
+		mgr.GetScheme())
+	if err != nil {
+		return fmt.Errorf("error creating state manager: %v", err)
+	}
+	r.stateManager = stateManager
+
+	// Create a new NVIDIADriver controller
+	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: 1,
+		RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR),
+	})
+
+	// Watch for changes to the primary resource NVIDIaDriver
+	err = c.Watch(source.Kind(mgr.GetCache(), &nvidiav1alpha1.NVIDIADriver{}), &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to ClusterPolicy. Whenever an event is generated for ClusterPolicy, enqueue
+	// a reconcile request for all NVIDIADriver instances.
+	mapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
+		logger := log.FromContext(ctx)
+		opts := []client.ListOption{}
+		list := &nvidiav1alpha1.NVIDIADriverList{}
+
+		err := mgr.GetClient().List(ctx, list, opts...)
+		if err != nil {
+			logger.Error(err, "Unable to list NVIDIADriver resources")
+			return []reconcile.Request{}
+		}
+
+		reconcileRequests := []reconcile.Request{}
+		for _, nvidiaDriver := range list.Items {
+			reconcileRequests = append(reconcileRequests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      nvidiaDriver.ObjectMeta.GetName(),
+						Namespace: nvidiaDriver.ObjectMeta.GetNamespace(),
+					},
+				})
+		}
+
+		return reconcileRequests
+	}
+
+	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), handler.EnqueueRequestsFromMapFunc(mapFn))
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resources which each state manager manages
+	watchSources := stateManager.GetWatchSources(mgr)
+	for _, watchSource := range watchSources {
+		err = c.Watch(watchSource, handler.EnqueueRequestForOwner(
+			mgr.GetScheme(),
+			mgr.GetRESTMapper(),
+			&nvidiav1alpha1.NVIDIADriver{},
+			handler.OnlyControllerOwner()))
+	}
+
+	return nil
 }
