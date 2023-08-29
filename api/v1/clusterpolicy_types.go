@@ -445,11 +445,11 @@ type ContainerProbeSpec struct {
 
 // DriverSpec defines the properties for NVIDIA Driver deployment
 type DriverSpec struct {
-	// UseNVIDIADriverCRD indicates if the deployment of NVIDIA Driver is managed by the NVIDIADriver CRD type
+	// UseNvidiaDriverCRD indicates if the deployment of NVIDIA Driver is managed by the NVIDIADriver CRD type
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment through NVIDIADriver CRD type"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
-	UseNVIDIADriverCRD *bool `json:"useNvidiaDriverCRD,omitempty"`
+	UseNvidiaDriverCRD *bool `json:"useNvidiaDriverCRD,omitempty"`
 
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1737,13 +1737,13 @@ func (d *DriverSpec) IsEnabled() bool {
 	return *d.Enabled
 }
 
-// UseNVIDIADriverCRDType returns true if the driver installation is managed by NVIDIADriver CRD type
-func (d *DriverSpec) UseNVIDIADriverCRDType() bool {
-	if d.UseNVIDIADriverCRD == nil {
+// UseNvdiaDriverCRDType returns true if the driver installation is managed by NVIDIADriver CRD type
+func (d *DriverSpec) UseNvdiaDriverCRDType() bool {
+	if d.UseNvidiaDriverCRD == nil {
 		// default is false if not specified by user
 		return false
 	}
-	return *d.UseNVIDIADriverCRD
+	return *d.UseNvidiaDriverCRD
 }
 
 // UsePrecompiledDrivers returns true if driver install is enabled using pre-compiled modules

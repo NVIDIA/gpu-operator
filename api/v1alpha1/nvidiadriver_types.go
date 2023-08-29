@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +33,10 @@ const (
 type NVIDIADriverSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// +kubebuilder:validation:Enum=gpu;vgpu;vgpu-host-manager
+	// +kubebuilder:default=gpu
+	DriverType DriverType `json:"driverType"`
 
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -129,7 +134,23 @@ type NVIDIADriverSpec struct {
 	//+kubebuilder:validation:Optional
 	// NodeSelector specifies a selector for installation of NVIDIA driver
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Affinity specifies node affinity rules for driver pods
+	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
 }
+
+// DriverType defines NVIDIA driver type
+type DriverType string
+
+const (
+	// GPU driver type
+	GPU DriverType = "gpu"
+	// VGPU guest driver type
+	VGPU DriverType = "vgpu"
+	// VGPUHostManager specifies vgpu host manager type
+	VGPUHostManager DriverType = "vgpu-host-manager"
+)
 
 // State indicates state of the NVIDIA driver managed by this instance
 type State string

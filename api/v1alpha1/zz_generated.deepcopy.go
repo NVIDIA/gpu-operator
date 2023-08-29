@@ -23,6 +23,7 @@ package v1alpha1
 
 import (
 	"github.com/NVIDIA/gpu-operator/api/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -171,6 +172,11 @@ func (in *NVIDIADriverSpec) DeepCopyInto(out *NVIDIADriverSpec) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.NodeAffinity != nil {
+		in, out := &in.NodeAffinity, &out.NodeAffinity
+		*out = new(corev1.NodeAffinity)
+		(*in).DeepCopyInto(*out)
 	}
 }
 
