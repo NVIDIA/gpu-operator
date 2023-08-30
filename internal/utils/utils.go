@@ -24,7 +24,7 @@ import (
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
-// The operation is performed recurively on sub directories as well
+// The operation is performed recursively on subdirectories as well
 func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
@@ -51,4 +51,9 @@ func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 		return nil, fmt.Errorf("error traversing directory tree: %w", err)
 	}
 	return files, nil
+}
+
+// BoolPtr returns a pointer to the bool value passed in.
+func BoolPtr(v bool) *bool {
+	return &v
 }

@@ -22,7 +22,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +32,8 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/render"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 func TestDriverRenderMinimal(t *testing.T) {
@@ -44,7 +45,36 @@ func TestDriverRenderMinimal(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
-	_, err = stateDriver.renderer.RenderObjects(
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+			Funcs: template.FuncMap{
+				"Deref": func(b *bool) bool {
+					if b == nil {
+						return false
+					}
+					return *b
+				},
+			},
+		})
+	require.NotEmpty(t, objs)
+	require.Nil(t, err)
+}
+
+func TestDriverRenderRDMA(t *testing.T) {
+	// Construct a sample driver state manager
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.GPUDirectRDMA = &gpuv1.GPUDirectRDMASpec{
+		Enabled: utils.BoolPtr(true),
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
 			Funcs: template.FuncMap{
@@ -57,6 +87,38 @@ func TestDriverRenderMinimal(t *testing.T) {
 			},
 		})
 	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	ds, err := getDaemonSetObj(objs)
+	require.Nil(t, err)
+	require.NotNil(t, ds)
+
+	nvidiaDriverCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.Nil(t, err, "nvidia-driver-ctr should be in the list of containers")
+
+	driverEnvars := []gpuv1.EnvVar{
+		{
+			Name:  "NVIDIA_VISIBLE_DEVICES",
+			Value: "void",
+		},
+		{
+			Name:  "GPU_DIRECT_RDMA_ENABLED",
+			Value: "true",
+		},
+	}
+	checkEnv(t, driverEnvars, nvidiaDriverCtr.Env)
+
+	nvidiaPeermemCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-peermem-ctr")
+	require.Nil(t, err, "nvidia-peermem-ctr should be in the list of containers")
+
+	peermemEnvars := []gpuv1.EnvVar{
+		{
+			Name:  "NVIDIA_VISIBLE_DEVICES",
+			Value: "void",
+		},
+	}
+
+	checkEnv(t, peermemEnvars, nvidiaPeermemCtr.Env)
 }
 
 func TestDriverSpec(t *testing.T) {
@@ -136,18 +198,13 @@ func TestDriverSpec(t *testing.T) {
 	checkPullSecrets(t, renderData.Driver.Spec.ImagePullSecrets, ds.Spec.Template.Spec.ImagePullSecrets)
 
 	nvidiaDriverCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
-	require.Nilf(t, err, "nvidia-driver-ctr should be in the list of containers")
+	require.Nil(t, err, "nvidia-driver-ctr should be in the list of containers")
 
 	require.Equal(t, renderData.Driver.ImagePath, nvidiaDriverCtr.Image)
 	checkImagePullPolicy(t, renderData.Driver.Spec.ImagePullPolicy, string(nvidiaDriverCtr.ImagePullPolicy))
 	checkEnv(t, renderData.Driver.Spec.Env, nvidiaDriverCtr.Env)
 	checkResources(t, renderData.Driver.Spec.Resources, nvidiaDriverCtr.Resources)
 	checkArgs(t, []string{"init"}, renderData.Driver.Spec.Args, nvidiaDriverCtr.Args)
-}
-
-func newTrue() *bool {
-	b := true
-	return &b
 }
 
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {

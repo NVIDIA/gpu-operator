@@ -75,7 +75,7 @@ type textTemplateRenderer struct {
 
 // RenderObjects renders kubernetes objects utilizing the provided TemplatingData.
 func (r *textTemplateRenderer) RenderObjects(data *TemplatingData) ([]*unstructured.Unstructured, error) {
-	objs := []*unstructured.Unstructured{}
+	var objs []*unstructured.Unstructured
 
 	for _, file := range r.files {
 		out, err := r.renderFile(file, data)
