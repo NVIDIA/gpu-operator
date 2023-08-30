@@ -53,7 +53,7 @@ spec:
       {{- end }}
       {{- end }}
       initContainers:
-        {{- if and (.Driver.Spec.GPUDirectRDMA) (Deref .Driver.Spec.GPUDirectRDMA.Enabled) }}
+        {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
         - name: mofed-validation
           image: {{ .Validator.ImagePath }}
           imagePullPolicy: {{ default "IfNotPresent" .Validator.Spec.ImagePullPolicy }}
@@ -73,7 +73,7 @@ spec:
               value: void
             - name: GPU_DIRECT_RDMA_ENABLED
               value: "true"
-            {{- if (Deref .Driver.Spec.GPUDirectRDMA.UseHostMOFED) }}
+            {{- if (Deref .GPUDirectRDMA.UseHostMOFED) }}
             - name: USE_HOST_MOFED
               value: "true"
             {{- end }}
@@ -161,10 +161,10 @@ spec:
           value : {{ .Value }}
         {{- end }}
       {{- end }}
-      {{- if and (.Driver.Spec.GPUDirectRDMA) (Deref .Driver.Spec.GPUDirectRDMA.Enabled) }}
+      {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
-        {{- if Deref .Driver.Spec.GPUDirectRDMA.UseHostMOFED }}
+        {{- if Deref .GPUDirectRDMA.UseHostMOFED }}
         - name: USE_HOST_MOFED
           value: "true"
         {{- end }}
@@ -213,7 +213,7 @@ spec:
           preStop:
             exec:
               command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
-      {{- if and (.Driver.Spec.GPUDirectRDMA) (Deref .Driver.Spec.GPUDirectRDMA.Enabled) }}
+      {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
         name: nvidia-peermem-ctr
@@ -227,7 +227,7 @@ spec:
         env:
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
-          {{- if Deref .Driver.Spec.GPUDirectRDMA.UseHostMOFED }}
+          {{- if Deref .GPUDirectRDMA.UseHostMOFED }}
           - name: USE_HOST_MOFED
             value: "true"
           {{- end }}
@@ -362,7 +362,7 @@ spec:
             type: DirectoryOrCreate
         - name: mlnx-ofed-usr-src
           hostPath:
-            {{- if and (.Driver.Spec.GPUDirectRDMA) (Deref .Driver.Spec.GPUDirectRDMA.UseHostMofed) }}
+            {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.UseHostMOFED) }}
             path: /usr/src
             {{- else}}
             path: /run/mellanox/drivers/usr/src

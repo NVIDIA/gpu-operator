@@ -20,18 +20,19 @@ import (
 	"context"
 	"fmt"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
-	"github.com/NVIDIA/gpu-operator/internal/image"
-	"github.com/NVIDIA/gpu-operator/internal/render"
-	"github.com/NVIDIA/gpu-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/image"
+	"github.com/NVIDIA/gpu-operator/internal/render"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 type stateDriver struct {
@@ -56,6 +57,7 @@ type driverRenderData struct {
 	Operator               *gpuv1.OperatorSpec
 	Validator              *validatorSpec
 	GDS                    *gpuv1.GPUDirectStorageSpec
+	GPUDirectRDMA          *gpuv1.GPUDirectRDMASpec
 	RuntimeSpec            driverRuntimeSpec
 	AdditionalVolumeMounts additionalVolumeMounts
 }
