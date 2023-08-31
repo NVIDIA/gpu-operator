@@ -56,7 +56,7 @@ type driverRenderData struct {
 	Driver                 *driverSpec
 	Operator               *gpuv1.OperatorSpec
 	Validator              *validatorSpec
-	GDS                    *gpuv1.GPUDirectStorageSpec
+	GDS                    *gdsDriverSpec
 	GPUDirectRDMA          *gpuv1.GPUDirectRDMASpec
 	RuntimeSpec            driverRuntimeSpec
 	AdditionalVolumeMounts additionalVolumeMounts
