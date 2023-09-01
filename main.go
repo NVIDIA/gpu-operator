@@ -42,6 +42,7 @@ import (
 	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -143,9 +144,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: Decide whether cluster info should be fetched during every reconciliation
+	// or once here in main. Note, the 'oneshot' option is set currently which means
+	// we fetch cluster info once before controllers start.
+	clusterInfo, err := clusterinfo.New(
+		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
+		clusterinfo.WithOneShot(true),
+	)
+	if err != nil {
+		setupLog.Error(err, "failed to get cluster wide information needed by controllers")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.NVIDIADriverReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClusterInfo: clusterInfo,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
 		os.Exit(1)

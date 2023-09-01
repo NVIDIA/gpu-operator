@@ -927,6 +927,22 @@ func (n *ClusterPolicyController) initOCPParams() error {
 
 func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	result := gpuv1.Ready
+
+	// Skip state-driver if NVIDIADriver CRD is enabled
+	// TODO:
+	//   - Properly clean up any k8s object associated with 'state-driver'
+	//     and owned by the Clusterpolicy controller.
+	//   - In object_controls.go, check the OwnerRef for existing objects
+	//     before managing them. Clusterpolicy controller should not be creating /
+	//     updating / deleting objects owned by another controller.
+	if n.stateNames[n.idx] == "state-driver" &&
+		n.singleton.Spec.Driver.UseNvidiaDriverCRD != nil &&
+		*n.singleton.Spec.Driver.UseNvidiaDriverCRD {
+		n.rec.Log.Info("NVIDIADriver CRD is enabled, skipping state 'state-driver'")
+		n.idx++
+		return result, nil
+	}
+
 	for _, fs := range n.controls[n.idx] {
 		stat, err := fs(*n)
 		if err != nil {
