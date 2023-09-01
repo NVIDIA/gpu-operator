@@ -33,7 +33,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
 	"github.com/NVIDIA/gpu-operator/internal/render"

@@ -35,7 +35,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 )
