@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -108,6 +109,10 @@ func getOpenshiftVersion(config *rest.Config) (string, error) {
 
 	v, err := client.ClusterVersions().Get(context.TODO(), "version", metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// not an OpenShift cluster
+			return "", nil
+		}
 		return "", err
 	}
 

@@ -42,6 +42,7 @@ import (
 	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
+	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -143,9 +144,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	clusterInfo, err := clusterinfo.New(
+		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
+	)
+	if err != nil {
+		setupLog.Error(err, "failed to get cluster wide information needed by controllers")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.NVIDIADriverReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClusterInfo: clusterInfo,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
 		os.Exit(1)

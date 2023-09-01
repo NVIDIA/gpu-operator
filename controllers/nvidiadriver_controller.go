@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +35,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 )
@@ -41,7 +43,8 @@ import (
 // NVIDIADriverReconciler reconciles a NVIDIADriver object
 type NVIDIADriverReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme      *runtime.Scheme
+	ClusterInfo clusterinfo.Interface
 
 	stateManager state.Manager
 }
@@ -78,10 +81,41 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, err
 	}
 
-	// your logic here
-	logger.Info("Controller logic goes here!")
+	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
+	clusterPolicyList := &gpuv1.ClusterPolicyList{}
+	err = r.Client.List(ctx, clusterPolicyList)
+	if err != nil {
+		logger.V(consts.LogLevelError).Error(err, "error getting ClusterPolicyList")
+		return reconcile.Result{}, fmt.Errorf("error getting ClusterPolicyList: %v", err)
+	}
 
-	return ctrl.Result{}, nil
+	if len(clusterPolicyList.Items) == 0 {
+		logger.V(consts.LogLevelError).Error(nil, "no ClusterPolicy object found in the cluster")
+		return reconcile.Result{}, fmt.Errorf("no ClusterPolicy object found in the cluster")
+	}
+	clusterPolicyInstance := clusterPolicyList.Items[0]
+
+	// Create a new InfoCatalog which is a generic interface for passing information to state managers
+	infoCatalog := state.NewInfoCatalog()
+
+	// Add an entry for ClusterInfo, which was collected before the NVIDIADriver controller was started
+	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
+
+	// Add an entry for Clusterpolicy, which is needed to deploy the driver daemonset
+	infoCatalog.Add(state.InfoTypeClusterPolicyCR, clusterPolicyInstance)
+
+	// Sync state and update status
+	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
+
+	// TODO: update CR status
+	// r.updateCrStatus(ctx, instance, managerStatus)
+
+	if managerStatus.Status != state.SyncStateReady {
+		logger.Info("NVIDIADriver instance is not ready")
+		return reconcile.Result{RequeueAfter: time.Duration(time.Second * 5)}, nil
+	}
+
+	return reconcile.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

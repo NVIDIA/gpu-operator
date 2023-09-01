@@ -24,7 +24,7 @@ import (
 
 func ImagePath(repository string, image string, version string, imagePathEnvName string) (string, error) {
 	// ImagePath is obtained using following priority
-	// 1. ClusterPolicy (i.e through repository/image/path variables in CRD)
+	// 1. CR (i.e through repository/image/path variables in CRD)
 	var crdImagePath string
 	if repository == "" && version == "" {
 		if image != "" {
@@ -50,5 +50,5 @@ func ImagePath(repository string, image string, version string, imagePathEnvName
 	}
 
 	// 3. If both are not set, error out
-	return "", fmt.Errorf("Empty image path provided through both ClusterPolicy CR and ENV %s", imagePathEnvName)
+	return "", fmt.Errorf("empty image path provided through both CR and ENV %s", imagePathEnvName)
 }

@@ -22,8 +22,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 type Manager interface {
@@ -71,7 +73,39 @@ func (m *stateManager) GetWatchSources(ctrlManager ctrlManager) []SyncingSource 
 }
 
 func (m *stateManager) SyncState(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) Results {
-	return Results{}
+	logger := log.FromContext(ctx)
+	logger.V(consts.LogLevelInfo).Info("Syncing system state")
+
+	managerResult := Results{
+		Status: SyncStateNotReady,
+	}
+	statesReady := true
+
+	for _, state := range m.states {
+		logger.V(consts.LogLevelInfo).Info("Sync State", "Name", state.Name(), "Description", state.Description())
+		stateCtx := log.IntoContext(ctx, logger.WithName("state").WithName(state.Name()))
+		ss, err := state.Sync(stateCtx, customResource, infoCatalog)
+		result := Result{StateName: state.Name(), Status: ss, ErrInfo: err}
+		managerResult.StatesStatus = append(managerResult.StatesStatus, result)
+
+		if result.Status == SyncStateNotReady || result.Status == SyncStateError {
+			statesReady = false
+		}
+
+		if result.ErrInfo != nil {
+			logger.V(consts.LogLevelWarning).Error(result.ErrInfo, "Error while syncing state")
+		}
+	}
+
+	if statesReady {
+		// Done Syncing CR
+		managerResult.Status = SyncStateReady
+		logger.V(consts.LogLevelInfo).Info("Sync Done for custom resource")
+	} else {
+		logger.V(consts.LogLevelInfo).Info("Sync not Done for custom resource")
+	}
+
+	return managerResult
 }
 
 func newStates(crdKind string, k8sClient client.Client, scheme *runtime.Scheme) ([]State, error) {
