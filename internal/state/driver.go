@@ -169,8 +169,14 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	if operatorNamespace == "" {
 		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
 	}
-	k8s, _ := clusterInfo.GetKubernetesVersion()
-	openshift, _ := clusterInfo.GetOpenshiftVersion()
+	k8s, err := clusterInfo.GetKubernetesVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
+	}
+	openshift, err := clusterInfo.GetOpenshiftVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openshift version: %v", err)
+	}
 	runtimeSpec := driverRuntimeSpec{
 		Namespace:         operatorNamespace,
 		KubernetesVersion: k8s,

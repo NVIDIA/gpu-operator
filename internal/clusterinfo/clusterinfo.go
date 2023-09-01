@@ -36,7 +36,9 @@ type Interface interface {
 }
 
 type clusterInfo struct {
-	config            *rest.Config
+	config  *rest.Config
+	oneshot bool
+
 	kubernetesVersion string
 	openshiftVersion  string
 }
@@ -51,6 +53,13 @@ func New(opts ...Option) (Interface, error) {
 		l.config = config.GetConfigOrDie()
 	}
 
+	if !l.oneshot {
+		return l, nil
+	}
+
+	// The 'oneshot' option is configured. Get cluster information now and store
+	// it in the struct. This information will be used when clients request
+	// cluster information.
 	kubernetesVersion, err := getKubernetesVersion(l.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
@@ -76,15 +85,32 @@ func WithKubernetesConfig(config *rest.Config) Option {
 	}
 }
 
+// WithOneShot provides an option to get the cluster information once during initialization
+// of the clusterInfo library. If false, cluster information is fetched every time a client
+// requests information via the interface.
+func WithOneShot(oneshot bool) Option {
+	return func(l *clusterInfo) {
+		l.oneshot = oneshot
+	}
+}
+
 // GetKubernetesVersion returns the k8s version detected in the cluster
 func (l *clusterInfo) GetKubernetesVersion() (string, error) {
-	return l.kubernetesVersion, nil
+	if l.oneshot {
+		return l.kubernetesVersion, nil
+	}
+
+	return getKubernetesVersion(l.config)
 }
 
 // GetOpenShiftVersion returns the OpenShift version detected in the cluster.
 // An empty string, "", is returned if it is determined we are not running on OpenShift.
 func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
-	return l.openshiftVersion, nil
+	if l.oneshot {
+		return l.openshiftVersion, nil
+	}
+
+	return getOpenshiftVersion(l.config)
 }
 
 func getKubernetesVersion(config *rest.Config) (string, error) {

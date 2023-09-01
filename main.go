@@ -144,8 +144,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: Decide whether cluster info should be fetched during every reconciliation
+	// or once here in main. Note, the 'oneshot' option is set currently which means
+	// we fetch cluster info once before controllers start.
 	clusterInfo, err := clusterinfo.New(
 		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
+		clusterinfo.WithOneShot(true),
 	)
 	if err != nil {
 		setupLog.Error(err, "failed to get cluster wide information needed by controllers")
