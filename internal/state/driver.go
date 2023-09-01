@@ -183,8 +183,6 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		OpenshiftVersion:  openshift,
 	}
 
-	additionalVolumeMounts := additionalVolumeMounts{}
-
 	renderData := &driverRenderData{
 		Driver:                 driverSpec,
 		Operator:               operatorSpec,
@@ -192,7 +190,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		GDS:                    gdsSpec,
 		GPUDirectRDMA:          gpuDirectRDMASpec,
 		RuntimeSpec:            runtimeSpec,
-		AdditionalVolumeMounts: additionalVolumeMounts,
+		AdditionalConfigs:      &additionalConfigs{},
 	}
 
 	logger.V(consts.LogLevelDebug).Info("Rendering objects", "data:", renderData)
