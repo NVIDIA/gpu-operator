@@ -212,6 +212,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 }
 
 func getDriverSpec(spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverSpec, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("no NVIDIADriverSpec provided")
+	}
 	// TODO: construct image path differently for precompiled
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "DRIVER_IMAGE")
 	if err != nil {
@@ -231,6 +234,9 @@ func getDriverSpec(spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverSpec, error) {
 }
 
 func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("no validator spec provided")
+	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "VALIDATOR_IMAGE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to contruct image path for validator: %v", err)
@@ -243,6 +249,10 @@ func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
 }
 
 func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
+	if spec == nil {
+		// note: GDS is optional in Clusterpolicy CRD
+		return nil, nil
+	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "GDS_IMAGE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to contruct image path for validator: %v", err)
