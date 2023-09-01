@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -76,14 +75,6 @@ func TestDriverRenderMinimal(t *testing.T) {
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		})
 	require.NotEmpty(t, objs)
 	require.Nil(t, err)
@@ -117,14 +108,6 @@ func TestDriverRenderRDMA(t *testing.T) {
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		})
 	require.Nil(t, err)
 	require.NotEmpty(t, objs)
@@ -208,14 +191,6 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		})
 	require.Nil(t, err)
 	require.NotEmpty(t, objs)
@@ -285,14 +260,6 @@ func TestDriverSpec(t *testing.T) {
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		})
 	require.Nil(t, err)
 
@@ -339,17 +306,64 @@ func TestDriverGDS(t *testing.T) {
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		})
 	require.Nil(t, err)
 	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
+func TestDriverAdditionalConfigs(t *testing.T) {
+	const (
+		testName = "driver-additional-configs"
+	)
+
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.AdditionalConfigs = &additionalConfigs{
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name: "test-cm",
+				ReadOnly: true,
+				MountPath: "/opt/config/test-file",
+				SubPath: "test-file",
+			},
+		},
+		Volumes: []corev1.Volume{
+			{
+				Name: "test-cm",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cm",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key: "test-file",
+								Path: "test-file",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
 
 	actual, err := getYAMLString(objs)
 	require.Nil(t, err)
@@ -407,17 +421,17 @@ func getMinimalDriverRenderData() *driverRenderData {
 	}
 }
 
-func getAdditionalVolumeMounts(names ...string) additionalVolumeMounts {
-	vms := additionalVolumeMounts{}
+func getAdditionalVolumeMounts(names ...string) additionalConfigs {
+	cfgs := additionalConfigs{}
 	for _, name := range names {
-		vms.VolumeMounts = append(vms.VolumeMounts, corev1.VolumeMount{
+		cfgs.VolumeMounts = append(cfgs.VolumeMounts, corev1.VolumeMount{
 			Name:      name,
 			ReadOnly:  true,
 			MountPath: filepath.Join("/path/to/", name),
 			SubPath:   filepath.Join("/path/to/", name, "subpath"),
 		})
 
-		vms.Volumes = append(vms.Volumes, corev1.Volume{
+		cfgs.Volumes = append(cfgs.Volumes, corev1.Volume{
 			Name: name,
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -431,7 +445,7 @@ func getAdditionalVolumeMounts(names ...string) additionalVolumeMounts {
 			},
 		})
 	}
-	return vms
+	return cfgs
 }
 
 func getDefaultContainerProbeSpec() *gpuv1.ContainerProbeSpec {
