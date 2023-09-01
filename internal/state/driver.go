@@ -52,19 +52,19 @@ type driverRuntimeSpec struct {
 	KubernetesVersion string
 }
 
-type additionalVolumeMounts struct {
+type additionalConfigs struct {
 	VolumeMounts []corev1.VolumeMount
 	Volumes      []corev1.Volume
 }
 
 type driverRenderData struct {
-	Driver                 *driverSpec
-	Operator               *gpuv1.OperatorSpec
-	Validator              *validatorSpec
-	GDS                    *gdsDriverSpec
-	GPUDirectRDMA          *gpuv1.GPUDirectRDMASpec
-	RuntimeSpec            driverRuntimeSpec
-	AdditionalVolumeMounts additionalVolumeMounts
+	Driver            *driverSpec
+	Operator          *gpuv1.OperatorSpec
+	Validator         *validatorSpec
+	GDS               *gdsDriverSpec
+	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
+	RuntimeSpec       driverRuntimeSpec
+	AdditionalConfigs *additionalConfigs
 }
 
 func NewStateDriver(

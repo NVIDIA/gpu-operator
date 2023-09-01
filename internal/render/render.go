@@ -88,20 +88,6 @@ func (r *textTemplateRenderer) RenderObjects(data *TemplatingData) ([]*unstructu
 	return objs, nil
 }
 
-func indent(spaces int, v string) string {
-	pad := strings.Repeat(" ", spaces)
-	return pad + strings.Replace(v, "\n", "\n"+pad, -1)
-}
-
-func nindent(spaces int, v string) string {
-	return "\n" + indent(spaces, v)
-}
-
-// nindentPrefix adds a prefix in front of the indented string, left from the initial indentation
-func nindentPrefix(spaces int, prefix, v string) string {
-	// Remove len(prefix) spaces from the beginning of the indented string
-	return strings.Replace(nindent(spaces, prefix+v), " ", "", len(prefix))
-}
 
 // renderFile renders a single file to a list of k8s unstructured objects
 func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData) ([]*unstructured.Unstructured, error) {
@@ -119,7 +105,12 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 			yamlBytes, err := yamlConverter.Marshal(obj)
 			return string(yamlBytes), err
 		},
-		"nindentPrefix": nindentPrefix,
+		"deref": func(b *bool) bool {
+			if b == nil {
+				return false
+			}
+			return *b
+		},
 	})
 
 	if data.Funcs != nil {
