@@ -26,6 +26,7 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -80,7 +81,7 @@ func (r *textTemplateRenderer) RenderObjects(data *TemplatingData) ([]*unstructu
 	for _, file := range r.files {
 		out, err := r.renderFile(file, data)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error rendering file %s: %w", file, err)
 		}
 		objs = append(objs, out...)
 	}

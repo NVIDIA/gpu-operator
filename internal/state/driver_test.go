@@ -17,18 +17,22 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"text/template"
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
@@ -36,8 +40,32 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
+const (
+	manifestResultDir = "./golden"
+)
+
+func getYAMLString(objs []*unstructured.Unstructured) (string, error) {
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
+		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
+	var sb strings.Builder
+	for _, obj := range objs {
+		var b bytes.Buffer
+		err := s.Encode(obj, &b)
+		if err != nil {
+			return "", err
+		}
+		sb.WriteString(b.String())
+		sb.WriteString("---\n")
+	}
+	return sb.String(), nil
+}
+
 func TestDriverRenderMinimal(t *testing.T) {
 	// Construct a sample driver state manager
+	const (
+		testName = "driver-minimal"
+	)
+
 	state, err := NewStateDriver(nil, nil, "./testdata")
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
@@ -59,10 +87,22 @@ func TestDriverRenderMinimal(t *testing.T) {
 		})
 	require.NotEmpty(t, objs)
 	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
 }
 
 func TestDriverRenderRDMA(t *testing.T) {
 	// Construct a sample driver state manager
+	const (
+		testName = "driver-rdma"
+	)
+
 	state, err := NewStateDriver(nil, nil, "./testdata")
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
@@ -96,7 +136,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 	nvidiaDriverCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
 	require.Nil(t, err, "nvidia-driver-ctr should be in the list of containers")
 
-	driverEnvars := []gpuv1.EnvVar{
+	driverEnvars := []corev1.EnvVar{
 		{
 			Name:  "NVIDIA_VISIBLE_DEVICES",
 			Value: "void",
@@ -111,7 +151,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 	nvidiaPeermemCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-peermem-ctr")
 	require.Nil(t, err, "nvidia-peermem-ctr should be in the list of containers")
 
-	peermemEnvars := []gpuv1.EnvVar{
+	peermemEnvars := []corev1.EnvVar{
 		{
 			Name:  "NVIDIA_VISIBLE_DEVICES",
 			Value: "void",
@@ -119,6 +159,74 @@ func TestDriverRenderRDMA(t *testing.T) {
 	}
 
 	checkEnv(t, peermemEnvars, nvidiaPeermemCtr.Env)
+
+	mofedValidationCtr, err := getContainerObj(ds.Spec.Template.Spec.InitContainers, "mofed-validation")
+	require.Nil(t, err, "mofed-validation should be in the list of containers")
+
+	mofedValidationEnvars := getMofedValidationEnvars()
+
+	checkEnv(t, mofedValidationEnvars, mofedValidationCtr.Env)
+
+	expectedVolumes := getDriverVolumes()
+	expectedVolumes = append(expectedVolumes, corev1.Volume{
+		Name: "mlnx-ofed-usr-src",
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/run/mellanox/drivers/usr/src",
+				Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+			},
+		},
+	})
+
+	checkVolumes(t, expectedVolumes, ds.Spec.Template.Spec.Volumes)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
+func TestDriverRDMAHostMOFED(t *testing.T) {
+	const (
+		testName = "driver-rdma-hostmofed"
+	)
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.GPUDirectRDMA = &gpuv1.GPUDirectRDMASpec{
+		Enabled: utils.BoolPtr(true),
+		UseHostMOFED: utils.BoolPtr(true),
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+			Funcs: template.FuncMap{
+				"Deref": func(b *bool) bool {
+					if b == nil {
+						return false
+					}
+					return *b
+				},
+			},
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
 }
 
 func TestDriverSpec(t *testing.T) {
@@ -131,7 +239,7 @@ func TestDriverSpec(t *testing.T) {
 	// set every field in driverSpec
 	driverSpec := &driverSpec{
 		ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
-		ManagerImagePath: "nvcr.io/nvida/cloud-native/k8s-driver-manager:devel",
+		ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
 		Spec: &nvidiav1alpha1.NVIDIADriverSpec{
 			Manager: gpuv1.DriverManagerSpec{
 				Repository:       "/path/to/repository",
@@ -154,7 +262,7 @@ func TestDriverSpec(t *testing.T) {
 			ImagePullPolicy:  "Always",
 			ImagePullSecrets: []string{"secret-a", "secret-b"},
 			Resources: &gpuv1.ResourceRequirements{
-				Limits: v1.ResourceList{
+				Limits: corev1.ResourceList{
 					"memory": resource.MustParse("200Mi"),
 					"cpu":    resource.MustParse("500m"),
 				},
@@ -202,9 +310,54 @@ func TestDriverSpec(t *testing.T) {
 
 	require.Equal(t, renderData.Driver.ImagePath, nvidiaDriverCtr.Image)
 	checkImagePullPolicy(t, renderData.Driver.Spec.ImagePullPolicy, string(nvidiaDriverCtr.ImagePullPolicy))
-	checkEnv(t, renderData.Driver.Spec.Env, nvidiaDriverCtr.Env)
+	checkEnv(t, toCoreV1Envars(renderData.Driver.Spec.Env), nvidiaDriverCtr.Env)
 	checkResources(t, renderData.Driver.Spec.Resources, nvidiaDriverCtr.Resources)
 	checkArgs(t, []string{"init"}, renderData.Driver.Spec.Args, nvidiaDriverCtr.Args)
+}
+
+func TestDriverGDS(t *testing.T) {
+	const (
+		testName = "driver-gds"
+	)
+
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.GDS = &gdsDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+		Spec: &gpuv1.GPUDirectStorageSpec{
+			Enabled: utils.BoolPtr(true),
+			ImagePullSecrets: []string{"ngc-secrets"},
+
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+			Funcs: template.FuncMap{
+				"Deref": func(b *bool) bool {
+					if b == nil {
+						return false
+					}
+					return *b
+				},
+			},
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
 }
 
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
@@ -223,13 +376,13 @@ func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, erro
 	return nil, fmt.Errorf("could not find object of kind 'DaemonSet'")
 }
 
-func getContainerObj(containers []v1.Container, name string) (v1.Container, error) {
+func getContainerObj(containers []corev1.Container, name string) (corev1.Container, error) {
 	for _, c := range containers {
 		if c.Name == name {
 			return c, nil
 		}
 	}
-	return v1.Container{}, fmt.Errorf("failed to find container with name '%s'", name)
+	return corev1.Container{}, fmt.Errorf("failed to find container with name '%s'", name)
 }
 
 func getMinimalDriverRenderData() *driverRenderData {
@@ -241,7 +394,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 			},
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
-			ManagerImagePath: "nvcr.io/nvida/cloud-native/k8s-driver-manager:devel",
+			ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
 		},
 		Validator: &validatorSpec{
 			Spec:      &gpuv1.ValidatorSpec{},
@@ -319,7 +472,7 @@ func checkImagePullPolicy(t *testing.T, input string, output string) {
 	}
 }
 
-func checkPullSecrets(t *testing.T, input []string, output []v1.LocalObjectReference) {
+func checkPullSecrets(t *testing.T, input []string, output []corev1.LocalObjectReference) {
 	secrets := []string{}
 	for _, secret := range output {
 		secrets = append(secrets, secret.Name)
@@ -329,7 +482,7 @@ func checkPullSecrets(t *testing.T, input []string, output []v1.LocalObjectRefer
 	}
 }
 
-func checkEnv(t *testing.T, input []gpuv1.EnvVar, output []v1.EnvVar) {
+func checkEnv(t *testing.T, input []corev1.EnvVar, output []corev1.EnvVar) {
 	inputMap := map[string]string{}
 	for _, env := range input {
 		inputMap[env.Name] = env.Value
@@ -347,7 +500,32 @@ func checkEnv(t *testing.T, input []gpuv1.EnvVar, output []v1.EnvVar) {
 	}
 }
 
-func checkResources(t *testing.T, input *gpuv1.ResourceRequirements, output v1.ResourceRequirements) {
+func checkVolumes(t *testing.T, expected []corev1.Volume, actual []corev1.Volume) {
+	expectedMap := volumeSliceToMap(expected)
+	actualMap := volumeSliceToMap(actual)
+
+	require.Equal(t, len(expectedMap), len(actualMap))
+
+	for k, vol := range expectedMap {
+		expectedVol, exists := actualMap[k]
+		require.True(t, exists)
+		require.Equal(t, expectedVol.HostPath.Path, vol.HostPath.Path,
+			"Mismatch in Host Path value for volume %s", vol.Name)
+		require.Equal(t, expectedVol.HostPath.Type, vol.HostPath.Type,
+			"Mismatch in Host Path type for volume %s", vol.Name)
+	}
+}
+
+func volumeSliceToMap(volumes []corev1.Volume) map[string]corev1.Volume {
+	volumeMap := map[string]corev1.Volume{}
+	for _, v := range volumes {
+		volumeMap[v.Name] = v
+	}
+
+	return volumeMap
+}
+
+func checkResources(t *testing.T, input *gpuv1.ResourceRequirements, output corev1.ResourceRequirements) {
 	if input == nil {
 		return
 	}
@@ -368,4 +546,130 @@ func checkResources(t *testing.T, input *gpuv1.ResourceRequirements, output v1.R
 
 func checkArgs(t *testing.T, defaultArgs []string, input []string, output []string) {
 	require.Equal(t, append(defaultArgs, input...), output)
+}
+
+// TODO: make this a public utils method
+func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
+	hostPathType := new(corev1.HostPathType)
+	*hostPathType = pathType
+	return hostPathType
+}
+
+func getDriverVolumes() []corev1.Volume {
+	return []corev1.Volume{
+		{
+			Name: "run-nvidia",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia",
+					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		},
+		{
+			Name: "var-log",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/var/log",
+				},
+			},
+		},
+		{
+			Name: "dev-log",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/dev/log",
+				},
+			},
+		},
+		{
+			Name: "host-os-release",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/etc/os-release",
+				},
+			},
+		},
+		{
+			Name: "run-nvidia-topologyd",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia-topologyd",
+					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		},
+		{
+			Name: "run-mellanox-drivers",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/mellanox/drivers",
+					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		},
+		{
+			Name: "run-nvidia-validations",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia/validations",
+					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		},
+		{
+			Name: "host-root",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/",
+				},
+			},
+		},
+		{
+			Name: "host-sys",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/sys",
+					Type: newHostPathType(corev1.HostPathDirectory),
+				},
+			},
+		},
+	}
+}
+
+func getMofedValidationEnvars() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "WITH_WAIT",
+			Value: "true",
+		},
+		{
+			Name:  "COMPONENT",
+			Value: "mofed",
+		},
+		{
+			Name:  "NVIDIA_VISIBLE_DEVICES",
+			Value: "void",
+		},
+		{
+			Name:  "GPU_DIRECT_RDMA_ENABLED",
+			Value: "true",
+		},
+	}
+}
+
+// TODO: make this a public utils method
+func toCoreV1Envars(envs []gpuv1.EnvVar) []corev1.EnvVar {
+	if len(envs) == 0 {
+		return []corev1.EnvVar{}
+	}
+	var res []corev1.EnvVar
+	for _, e := range envs {
+		resEnv := corev1.EnvVar{
+			Name:  e.Name,
+			Value: e.Value,
+		}
+		res = append(res, resEnv)
+	}
+	return res
 }
