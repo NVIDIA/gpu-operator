@@ -18,12 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -43,8 +45,9 @@ import (
 )
 
 const (
-	minDelayCR = 100 * time.Millisecond
-	maxDelayCR = 3 * time.Second
+	minDelayCR                      = 100 * time.Millisecond
+	maxDelayCR                      = 3 * time.Second
+	clusterPolicyControllerIndexKey = "metadata.nvidia.clusterpolicy.controller"
 )
 
 // blank assignment to verify that ReconcileClusterPolicy implements reconcile.Reconciler
@@ -334,6 +337,31 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
+	}
+
+	// Add an index key which allows our reconciler to quickly look up DaemonSets owned by it.
+	//
+	// (cdesiniotis) Ideally we could duplicate this index for all the k8s objects
+	// that ClusterPolicy manages, that way, we could easily restrict the ClusterPolicy
+	// controller to only update / delete objects it owns. Unfortunately, the
+	// underlying implementation of the index does not support generic container types
+	// (i.e. unstructured.Unstructured{}). For additional details, see the comment in
+	// the last link of the below call stack:
+	// IndexField(): https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/cache/informer_cache.go#L204
+	//   GetInformer(): https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/cache/informer_cache.go#L168
+	//     GVKForObject(): https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/client/apiutil/apimachinery.go#L113
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &appsv1.DaemonSet{}, clusterPolicyControllerIndexKey, func(rawObj client.Object) []string {
+		ds := rawObj.(*appsv1.DaemonSet)
+		owner := metav1.GetControllerOf(ds)
+		if owner == nil {
+			return nil
+		}
+		if owner.APIVersion != gpuv1.GroupVersion.String() || owner.Kind != "ClusterPolicy" {
+			return nil
+		}
+		return []string{owner.Name}
+	}); err != nil {
+		return fmt.Errorf("failed to add index key: %w", err)
 	}
 
 	return nil
