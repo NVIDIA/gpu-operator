@@ -147,7 +147,7 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
-	driverSpec, err := getDriverSpec(&cr.Spec)
+	driverSpec, err := getDriverSpec(cr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
 	}
@@ -184,13 +184,13 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	renderData := &driverRenderData{
-		Driver:                 driverSpec,
-		Operator:               operatorSpec,
-		Validator:              validatorSpec,
-		GDS:                    gdsSpec,
-		GPUDirectRDMA:          gpuDirectRDMASpec,
-		RuntimeSpec:            runtimeSpec,
-		AdditionalConfigs:      &additionalConfigs{},
+		Driver:            driverSpec,
+		Operator:          operatorSpec,
+		Validator:         validatorSpec,
+		GDS:               gdsSpec,
+		GPUDirectRDMA:     gpuDirectRDMASpec,
+		RuntimeSpec:       runtimeSpec,
+		AdditionalConfigs: &additionalConfigs{},
 	}
 
 	logger.V(consts.LogLevelDebug).Info("Rendering objects", "data:", renderData)
@@ -215,25 +215,45 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	return objs, nil
 }
 
-func getDriverSpec(spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverSpec, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("no NVIDIADriverSpec provided")
+func getDriverName(cr *nvidiav1alpha1.NVIDIADriver) string {
+	const (
+		nameFormat = "nvidia-%s-driver-%s"
+		// https://github.com/kubernetes/apimachinery/blob/v0.28.1/pkg/util/validation/validation.go#L35
+		qualifiedNameMaxLength = 63
+	)
+
+	name := fmt.Sprintf(nameFormat, cr.Spec.DriverType, cr.Name)
+	// truncate name if it exceeds the maximum length
+	if len(name) > qualifiedNameMaxLength {
+		name = name[:qualifiedNameMaxLength]
 	}
+	return name
+}
+
+func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver) (*driverSpec, error) {
+	if cr == nil {
+		return nil, fmt.Errorf("no NVIDIADriver CR provided")
+	}
+
+	nvidiaDriverName := getDriverName(cr)
+
+	spec := &cr.Spec
 	// TODO: construct image path differently for precompiled
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "DRIVER_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for driver: %v", err)
+		return nil, fmt.Errorf("failed to construct image path for driver: %w", err)
 	}
 
 	managerImagePath, err := image.ImagePath(spec.Manager.Repository, spec.Manager.Image, spec.Manager.Version, "DRIVER_MANAGER_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for driver manager: %v", err)
+		return nil, fmt.Errorf("failed to construct image path for driver manager: %w", err)
 	}
 
 	return &driverSpec{
-		spec,
-		imagePath,
-		managerImagePath,
+		Spec:             spec,
+		Name:             nvidiaDriverName,
+		ImagePath:        imagePath,
+		ManagerImagePath: managerImagePath,
 	}, nil
 }
 

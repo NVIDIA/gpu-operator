@@ -31,6 +31,7 @@ type SyncingSource source.SyncingSource
 // which is to be populated with the fully-qualified image path.
 type driverSpec struct {
 	Spec             *nvidiav1alpha1.NVIDIADriverSpec
+	Name             string
 	ImagePath        string
 	ManagerImagePath string
 }
@@ -48,4 +49,3 @@ type gdsDriverSpec struct {
 	Spec      *gpuv1.GPUDirectStorageSpec
 	ImagePath string
 }
-
