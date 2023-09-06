@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 rules:
 - apiGroups:
@@ -47,7 +47,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
 rules:
 - apiGroups:
   - config.openshift.io
@@ -91,39 +91,39 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
 subjects:
 - kind: ServiceAccount
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
 subjects:
 - kind: ServiceAccount
-  name: nvidia-driver
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    openshift.io/scc: nvidia-driver
+    openshift.io/scc: nvidia-gpu-driver-ubuntu22.04
   labels:
     app: nvidia-driver-daemonset
     nvidia.com/precompiled: "false"
-  name: nvidia-driver-daemonset
+  name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 spec:
   selector:
@@ -324,7 +324,7 @@ spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-driver
+      serviceAccountName: nvidia-gpu-driver-ubuntu22.04
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu

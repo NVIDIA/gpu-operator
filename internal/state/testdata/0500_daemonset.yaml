@@ -4,10 +4,10 @@ metadata:
   labels:
     app: nvidia-driver-daemonset
     nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
-  name: nvidia-driver-daemonset
+  name: {{ .Driver.Name }}
   namespace: {{ .RuntimeSpec.Namespace }}
   annotations:
-    openshift.io/scc: nvidia-driver
+    openshift.io/scc: {{ .Driver.Name }}
 spec:
   selector:
     matchLabels:
@@ -32,7 +32,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-driver
+      serviceAccountName: {{ .Driver.Name }}
       hostPID: true
       # Add any configured pull secrets
       {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets .Validator.Spec.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) }}

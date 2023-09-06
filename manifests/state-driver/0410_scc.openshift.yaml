@@ -30,7 +30,7 @@ metadata:
       any SELinux context.  WARNING: this is the most relaxed SCC and should be used
       only for cluster administration. Grant with caution.'
 
-  name: nvidia-driver
+  name: {{ .Driver.Name }}
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
@@ -43,7 +43,7 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:{{ .RuntimeSpec.Namespace }}:nvidia-driver
+- system:serviceaccount:{{ .RuntimeSpec.Namespace }}:{{ .Driver.Name }}
 volumes:
 - '*'
 {{end}}

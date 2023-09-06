@@ -184,7 +184,7 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 
 	renderData.GPUDirectRDMA = &gpuv1.GPUDirectRDMASpec{
-		Enabled: utils.BoolPtr(true),
+		Enabled:      utils.BoolPtr(true),
 		UseHostMOFED: utils.BoolPtr(true),
 	}
 
@@ -297,9 +297,8 @@ func TestDriverGDS(t *testing.T) {
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
 		Spec: &gpuv1.GPUDirectStorageSpec{
-			Enabled: utils.BoolPtr(true),
+			Enabled:          utils.BoolPtr(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
-
 		},
 	}
 
@@ -334,10 +333,10 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	renderData.AdditionalConfigs = &additionalConfigs{
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name: "test-cm",
-				ReadOnly: true,
+				Name:      "test-cm",
+				ReadOnly:  true,
 				MountPath: "/opt/config/test-file",
-				SubPath: "test-file",
+				SubPath:   "test-file",
 			},
 		},
 		Volumes: []corev1.Volume{
@@ -350,7 +349,7 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 						},
 						Items: []corev1.KeyToPath{
 							{
-								Key: "test-file",
+								Key:  "test-file",
 								Path: "test-file",
 							},
 						},
@@ -407,6 +406,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 			},
+			Name:             "nvidia-gpu-driver-ubuntu22.04",
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 			ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
 		},
