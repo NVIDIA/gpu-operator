@@ -3476,6 +3476,33 @@ func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyControlle
 	return false, nil
 }
 
+func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context) error {
+	// Get all DaemonSets owned by ClusterPolicy
+	//
+	// (cdesiniotis) There is a limitation with the controller-runtime client where only a single field selector
+	// is allowed when specifying ListOptions or DeleteOptions.
+	// See GH issue: https://github.com/kubernetes-sigs/controller-runtime/issues/612
+	list := &appsv1.DaemonSetList{}
+	err := n.rec.Client.List(ctx, list, client.MatchingFields{clusterPolicyControllerIndexKey: n.singleton.Name})
+	if err != nil {
+		return fmt.Errorf("failed to list all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
+	}
+
+	for _, ds := range list.Items {
+		// filter out DaemonSets which are not the NVIDIA driver
+		if !strings.HasPrefix(ds.Name, commonDriverDaemonsetName) {
+			continue
+		}
+		n.rec.Log.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
+		err = n.rec.Client.Delete(ctx, &ds)
+		if err != nil {
+			return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // cleanupStalePrecompiledDaemonsets deletes stale driver daemonsets which can happen
 // 1. If all nodes upgraded to the latest kernel
 // 2. no GPU nodes are present

@@ -3,7 +3,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-driver-daemonset
-    nvidia.com/precompiled: {{ toString (Deref .Driver.Spec.UsePrecompiled) | quote }}
+    nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
   name: nvidia-driver-daemonset
   namespace: {{ .RuntimeSpec.Namespace }}
   annotations:
@@ -20,7 +20,7 @@ spec:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
         app: nvidia-driver-daemonset
-        nvidia.com/precompiled: {{ toString (Deref .Driver.Spec.UsePrecompiled) | quote }}
+        nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
@@ -35,7 +35,7 @@ spec:
       serviceAccountName: nvidia-driver
       hostPID: true
       # Add any configured pull secrets
-      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets .Validator.Spec.ImagePullSecrets (and .GDS .GDS.ImagePullSecrets) }}
+      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets .Validator.Spec.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) }}
       imagePullSecrets:
       {{- range .Driver.Spec.ImagePullSecrets }}
         - name: {{ . }}
@@ -47,13 +47,13 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- if .GDS }}
-      {{- range .GDS.ImagePullSecrets }}
+      {{- range .GDS.Spec.ImagePullSecrets }}
         - name: {{ . }}
       {{- end }}
       {{- end }}
       {{- end }}
       initContainers:
-        {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
+        {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
         - name: mofed-validation
           image: {{ .Validator.ImagePath }}
           imagePullPolicy: {{ default "IfNotPresent" .Validator.Spec.ImagePullPolicy }}
@@ -73,7 +73,7 @@ spec:
               value: void
             - name: GPU_DIRECT_RDMA_ENABLED
               value: "true"
-            {{- if (Deref .GPUDirectRDMA.UseHostMOFED) }}
+            {{- if (deref .GPUDirectRDMA.UseHostMOFED) }}
             - name: USE_HOST_MOFED
               value: "true"
             {{- end }}
@@ -161,10 +161,10 @@ spec:
           value : {{ .Value }}
         {{- end }}
       {{- end }}
-      {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
+      {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
-        {{- if Deref .GPUDirectRDMA.UseHostMOFED }}
+        {{- if deref .GPUDirectRDMA.UseHostMOFED }}
         - name: USE_HOST_MOFED
           value: "true"
         {{- end }}
@@ -188,8 +188,8 @@ spec:
           - name: run-mellanox-drivers
             mountPath: /run/mellanox/drivers
             mountPropagation: HostToContainer
-          {{- if .AdditionalVolumeMounts.VolumeMounts }}
-          {{- range .AdditionalVolumeMounts.VolumeMounts }}
+          {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+          {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
             mountPath: {{ .MountPath }}
             subPath: {{ .SubPath }}
@@ -213,7 +213,7 @@ spec:
           preStop:
             exec:
               command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
-      {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.Enabled) }}
+      {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
         name: nvidia-peermem-ctr
@@ -227,7 +227,7 @@ spec:
         env:
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
-          {{- if Deref .GPUDirectRDMA.UseHostMOFED }}
+          {{- if deref .GPUDirectRDMA.UseHostMOFED }}
           - name: USE_HOST_MOFED
             value: "true"
           {{- end }}
@@ -243,12 +243,16 @@ spec:
           - name: run-mellanox-drivers
             mountPath: /run/mellanox/drivers
             mountPropagation: HostToContainer
-          {{- if.AdditionalVolumeMounts.VolumeMounts }}
-          {{- range .AdditionalVolumeMounts.VolumeMounts }}
+          {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+          {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
             mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
             subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
             readOnly: {{ .ReadOnly }}
+            {{- end }}
           {{- end }}
           {{- end }}
         startupProbe:
@@ -273,8 +277,8 @@ spec:
       # Note: GDS is not supported along with precompiled drivers.
       #       Detect this in the controller and throw an error if
       #       GDS and precompiled are enabled
-      {{- if and (.GDS) (Deref .GDS.Enabled) }}
-      - image: "FILLED BY THE OPERATOR"
+      {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
+      - image: {{ .GDS.ImagePath }}
         imagePullPolicy: IfNotPresent
         name: nvidia-fs-ctr
         command: [bash, -xc]
@@ -312,7 +316,7 @@ spec:
           timeoutSeconds: 10
       {{- end }}
       # TODO: introduce UseOpenShiftDriverToolkit field into NVIDIADriver CR?
-      {{ if and (.RuntimeSpec.OpenshiftVersion) (Deref .OperatorSpec.UseOpenShiftDriverToolkit) }}
+      {{ if and (.RuntimeSpec.OpenshiftVersion) (deref .OperatorSpec.UseOpenShiftDriverToolkit) }}
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
@@ -362,11 +366,11 @@ spec:
             type: DirectoryOrCreate
         - name: mlnx-ofed-usr-src
           hostPath:
-            {{- if and (.GPUDirectRDMA) (Deref .GPUDirectRDMA.UseHostMOFED) }}
+            {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.UseHostMOFED) }}
             path: /usr/src
-            {{- else}}
+            {{- else }}
             path: /run/mellanox/drivers/usr/src
-            {{- end}}
+            {{- end }}
             type: DirectoryOrCreate
         - name: run-mellanox-drivers
           hostPath:
@@ -383,12 +387,18 @@ spec:
           hostPath:
             path: /sys
             type: Directory
-        {{- range .AdditionalVolumeMounts.Volumes }}
+        {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
+        {{- range .AdditionalConfigs.Volumes }}
         - name: {{ .Name }}
           configMap:
             name: {{ .Name }}
             items:
             {{- range .ConfigMap.Items }}
-            {{ . | yaml | nindentPrefix 14 "- " }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- if .Mode }}
+                mode: {{ .Mode }}
+              {{- end }}
             {{- end }}
+        {{- end }}
         {{- end }}

@@ -938,9 +938,14 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	if n.stateNames[n.idx] == "state-driver" &&
 		n.singleton.Spec.Driver.UseNvidiaDriverCRD != nil &&
 		*n.singleton.Spec.Driver.UseNvidiaDriverCRD {
-		n.rec.Log.Info("NVIDIADriver CRD is enabled, skipping state 'state-driver'")
+		n.rec.Log.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++
-		return result, nil
+		// Cleanup all driver daemonsets owned by ClusterPolicy.
+		err := n.cleanupAllDriverDaemonSets(n.ctx)
+		if err != nil {
+			return gpuv1.NotReady, fmt.Errorf("failed to cleanup all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
+		}
+		return gpuv1.Disabled, nil
 	}
 
 	for _, fs := range n.controls[n.idx] {
