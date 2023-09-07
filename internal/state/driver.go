@@ -40,6 +40,11 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
+const (
+	nfdOSReleaseIDLabelKey = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOSVersionIDLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+)
+
 type stateDriver struct {
 	stateSkel
 }
@@ -239,7 +244,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver) (*driverSpec, error) {
 
 	spec := &cr.Spec
 	// TODO: construct image path differently for precompiled
-	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "DRIVER_IMAGE")
+	imagePath, err := spec.GetImagePath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct image path for driver: %w", err)
 	}
@@ -247,6 +252,22 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver) (*driverSpec, error) {
 	managerImagePath, err := image.ImagePath(spec.Manager.Repository, spec.Manager.Image, spec.Manager.Version, "DRIVER_MANAGER_IMAGE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct image path for driver manager: %w", err)
+	}
+
+	// If osVersion is set in the CR, add nodeSelectors (using NFD labels)
+	// which ensure this driver only gets scheduled on nodes matching osVersion
+	if spec.OSVersion != "" {
+		id, versionID, err := spec.ParseOSVersion()
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse osVersion: %w", err)
+		}
+
+		if spec.NodeSelector == nil {
+			spec.NodeSelector = make(map[string]string)
+		}
+
+		spec.NodeSelector[nfdOSReleaseIDLabelKey] = id
+		spec.NodeSelector[nfdOSVersionIDLabelKey] = versionID
 	}
 
 	return &driverSpec{

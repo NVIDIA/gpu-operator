@@ -231,9 +231,6 @@ func TestDriverSpec(t *testing.T) {
 			LivenessProbe:    getDefaultContainerProbeSpec(),
 			ReadinessProbe:   getDefaultContainerProbeSpec(),
 			UsePrecompiled:   new(bool),
-			Repository:       "/path/to/repo",
-			Image:            "image",
-			Version:          "version",
 			ImagePullPolicy:  "Always",
 			ImagePullSecrets: []string{"secret-a", "secret-b"},
 			Resources: &gpuv1.ResourceRequirements{
