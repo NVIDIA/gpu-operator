@@ -126,8 +126,8 @@ spec:
                     type: string
                 type: object
               image:
-                description: NVIDIA Driver image name
-                pattern: '[a-zA-Z0-9\-]+'
+                default: nvcr.io/nvidia/driver
+                description: NVIDIA Driver container image
                 type: string
               imagePullPolicy:
                 description: Image pull policy
@@ -427,6 +427,9 @@ spec:
                 description: NodeSelector specifies a selector for installation of
                   NVIDIA driver
                 type: object
+              osVersion:
+                description: Operating System version
+                type: string
               rdma:
                 description: GPUDirectRDMA defines the spec for NVIDIA Peer Memory
                   driver
@@ -482,9 +485,6 @@ spec:
                   configMapName:
                     type: string
                 type: object
-              repository:
-                description: NVIDIA Driver image repository
-                type: string
               resources:
                 description: 'Optional: Define resources requests and limits for each
                   pod'
@@ -553,7 +553,7 @@ spec:
                   using pre-compiled modules is enabled
                 type: boolean
               version:
-                description: NVIDIA Driver image tag/digest (or just branch for precompiled
+                description: NVIDIA Driver version (or just branch for precompiled
                   drivers)
                 type: string
               virtualTopology:
@@ -567,6 +567,7 @@ spec:
                 type: object
             required:
             - driverType
+            - image
             type: object
           status:
             description: NVIDIADriverStatus defines the observed state of NVIDIADriver

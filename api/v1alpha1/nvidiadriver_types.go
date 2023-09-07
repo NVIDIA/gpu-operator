@@ -17,7 +17,12 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+	"unicode"
+
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	"github.com/regclient/regclient/types/ref"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -59,17 +64,17 @@ type NVIDIADriverSpec struct {
 	// GPUDirectStorage defines the spec for GDS driver
 	GPUDirectStorage *gpuv1.GPUDirectStorageSpec `json:"gds,omitempty"`
 
-	// NVIDIA Driver image repository
-	// +kubebuilder:validation:Optional
-	Repository string `json:"repository,omitempty"`
+	// NVIDIA Driver container image
+	// +kubebuilder:default=nvcr.io/nvidia/driver
+	Image string `json:"image"`
 
-	// NVIDIA Driver image name
-	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
-	Image string `json:"image,omitempty"`
-
-	// NVIDIA Driver image tag/digest (or just branch for precompiled drivers)
+	// NVIDIA Driver version (or just branch for precompiled drivers)
 	// +kubebuilder:validation:Optional
 	Version string `json:"version,omitempty"`
+
+	// Operating System version
+	// +kubebuilder:validation:Optional
+	OSVersion string `json:"osVersion,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -215,4 +220,57 @@ func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 		ns["nvidia.com/gpu.present"] = "true"
 	}
 	return ns
+}
+
+func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
+	_, err := ref.New(d.Image)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse driver image: %w", err)
+	}
+
+	if strings.Contains(d.Image, ":") || strings.Contains(d.Image, "@") {
+		// tag or digest is provided, return full image path
+		return d.Image, nil
+	}
+
+	if d.Version == "" {
+		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
+	}
+	if d.OSVersion == "" {
+		return "", fmt.Errorf("'osVersion' not set in NVIDIADriver spec")
+	}
+
+	_, _, err = d.ParseOSVersion()
+	if err != nil {
+		return "", fmt.Errorf("failed to parse osVersion: %w", err)
+	}
+
+	return fmt.Sprintf("%s:%s-%s", d.Image, d.Version, d.OSVersion), nil
+}
+
+// ParseOSVersion parses the OSVersion field in NVIDIADriverSpec
+// and returns the ID and VERSION_ID for the operating system.
+//
+// OsVersion is expected to be in the form of {ID}{VERSION_ID},
+// where ID identifies the OS name and VERSION_ID identifies the
+// OS version. This aligns with the information reported in
+// /etc/os-release, for example.
+// https://www.freedesktop.org/software/systemd/man/os-release.html
+func (d *NVIDIADriverSpec) ParseOSVersion() (string, string, error) {
+	return parseOSString(d.OSVersion)
+}
+
+func parseOSString(os string) (string, string, error) {
+	idx := 0
+	for _, r := range os {
+		if unicode.IsNumber(r) {
+			break
+		}
+		idx++
+	}
+
+	if idx == len(os) {
+		return "", "", fmt.Errorf("no number in string")
+	}
+	return os[:idx], os[idx:], nil
 }
