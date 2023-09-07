@@ -22,13 +22,10 @@ import (
 	"os"
 	"text/template"
 
-	apiimagev1 "github.com/openshift/api/image/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -174,7 +171,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	var openshiftSpec *openshiftSpec
 
 	if openshiftVersion != "" {
-		openshiftSpec = getOpenshiftSpec(ctx, clusterInfo)
+		openshiftSpec = getOpenshiftSpec(clusterInfo)
 	}
 
 	driverSpec, err := getDriverSpec(cr)
@@ -334,52 +331,10 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	}, nil
 }
 
-func getOpenshiftContainerToolkitImage(driverCRSpec *nvidiav1alpha1.NVIDIADriverSpec) {
-
-}
-
-func (s *stateDriver) fetchOCPDriverToolkitImages(ctx context.Context) (map[string]string, bool) {
-	logger := log.FromContext(ctx)
-
-	var rhcosDriverToolkitImages map[string]string
-
-	imgStream := &apiimagev1.ImageStream{}
-	name := "driver-toolkit"
-	namespace := "openshift"
-
-	err := s.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, imgStream)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
-				"Name", name,
-				"Namespace", namespace)
-		}
-		logger.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
-		return nil, false
-	}
-
-	for _, tag := range imgStream.Spec.Tags {
-		if tag.Name == "" {
-			logger.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
-			continue
-		}
-		if tag.Name == "latest" || tag.From == nil {
-			continue
-		}
-		logger.Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
-		rhcosDriverToolkitImages[tag.Name] = tag.From.Name
-	}
-
-	// TODO: Add code to update operator metrics
-	// TODO: Add code to ensure OCP Namespace Monitoring setting
-
-	return rhcosDriverToolkitImages, true
-}
-
-func getOpenshiftSpec(ctx context.Context, info clusterinfo.Interface) *openshiftSpec {
+func getOpenshiftSpec(info clusterinfo.Interface) *openshiftSpec {
 	spec := &openshiftSpec{}
 
-	rhcosVersions := info.GetRedHatContainerOSVersions()
+	rhcosVersions := info.GetRHCOSVersions()
 	openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
 
 	spec.DriverToolkitEnabled = len(rhcosVersions) > 0 && len(openshiftDTKMap) > 0

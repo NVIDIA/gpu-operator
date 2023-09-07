@@ -36,7 +36,7 @@ import (
 type Interface interface {
 	GetKubernetesVersion() (string, error)
 	GetOpenshiftVersion() (string, error)
-	GetRedHatContainerOSVersions() []string
+	GetRHCOSVersions() []string
 	GetOpenshiftDriverToolkitImages() map[string]string
 }
 
@@ -53,6 +53,8 @@ type clusterInfo struct {
 	openshiftVersion             string
 	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
+
+	nodeListOptions *metav1.ListOptions
 }
 
 // New creates a new instance of clusterinfo API
@@ -65,6 +67,9 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	if l.config == nil {
 		l.config = config.GetConfigOrDie()
+	}
+	if l.nodeListOptions == nil {
+		l.nodeListOptions = &metav1.ListOptions{}
 	}
 
 	if !l.oneshot {
@@ -80,13 +85,13 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	l.kubernetesVersion = kubernetesVersion
 
-	openshiftVersion, err := getOpenshiftVersion(l.config)
+	openshiftVersion, err := getOpenshiftVersion(l.ctx, l.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %w", err)
 	}
 	l.openshiftVersion = openshiftVersion
 
-	l.rhcosVersions = getRhcOSVersions(l.ctx, l.config)
+	l.rhcosVersions = getRHCOSVersions(l.ctx, l.config, l.nodeListOptions)
 
 	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(l.ctx, l.config)
 
@@ -100,6 +105,12 @@ type Option func(*clusterInfo)
 func WithKubernetesConfig(config *rest.Config) Option {
 	return func(l *clusterInfo) {
 		l.config = config
+	}
+}
+
+func WithNodeListOptions(opts metav1.ListOptions) Option {
+	return func(l *clusterInfo) {
+		l.nodeListOptions = &opts
 	}
 }
 
@@ -128,31 +139,32 @@ func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
 		return l.openshiftVersion, nil
 	}
 
-	return getOpenshiftVersion(l.config)
+	return getOpenshiftVersion(l.ctx, l.config)
 }
 
-func (l *clusterInfo) GetRedHatContainerOSVersions() []string {
+// GetRHCOSVersions returns the list of RedHat CoreOS versions used in the Openshift Cluster
+func (l *clusterInfo) GetRHCOSVersions() []string {
 	if l.oneshot {
 		return l.rhcosVersions
 	}
 
-	return getRhcOSVersions(l.ctx, l.config)
+	return getRHCOSVersions(l.ctx, l.config, l.nodeListOptions)
 }
 
-func getRhcOSVersions(ctx context.Context, config *rest.Config) []string {
+func getRHCOSVersions(ctx context.Context, config *rest.Config, listOpts *metav1.ListOptions) []string {
 	logger := log.FromContext(ctx)
 	var rhcosVersions []string
 
 	k8sClient, err := corev1client.NewForConfig(config)
 	if err != nil {
-		logger.Info("failed to build k8s core v1 client", "Error", err)
+		logger.Error(err, "failed to build k8s core v1 client")
 		return nil
 	}
 
-	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{})
+	nodeList, err := k8sClient.Nodes().List(ctx, *listOpts)
 
 	if err != nil {
-		logger.Info("failed to list Nodes", "Error", err)
+		logger.Error(err, "failed to list Nodes")
 		return nil
 	}
 
@@ -168,6 +180,8 @@ func getRhcOSVersions(ctx context.Context, config *rest.Config) []string {
 	return rhcosVersions
 }
 
+// GetOpenshiftDriverToolkitImages returns a map of the Openshift DriverToolkit Images available for use in the
+// openshift cluster
 func (l *clusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
 	if l.oneshot {
 		return l.openshiftDriverToolkitImages
@@ -190,13 +204,13 @@ func getKubernetesVersion(config *rest.Config) (string, error) {
 	return info.GitVersion, nil
 }
 
-func getOpenshiftVersion(config *rest.Config) (string, error) {
+func getOpenshiftVersion(ctx context.Context, config *rest.Config) (string, error) {
 	client, err := configv1.NewForConfig(config)
 	if err != nil {
 		return "", err
 	}
 
-	v, err := client.ClusterVersions().Get(context.TODO(), "version", metav1.GetOptions{})
+	v, err := client.ClusterVersions().Get(ctx, "version", metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// not an OpenShift cluster
@@ -229,7 +243,7 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 
 	ocpImageClient, err := imagesv1.NewForConfig(c)
 	if err != nil {
-		logger.Info("failed to build openshift image stream client", "Error", err)
+		logger.Error(err, "failed to build openshift image stream client")
 		return nil
 	}
 
@@ -240,7 +254,7 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 				"Name", name,
 				"Namespace", namespace)
 		}
-		logger.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
+		logger.Error(err, "Couldn't get the driver-toolkit imagestream")
 		return nil
 	}
 

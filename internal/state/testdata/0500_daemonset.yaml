@@ -332,7 +332,7 @@ spec:
         name: nvidia-fs-ctr
         {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
         command: ["ocp_dtk_entrypoint"]
-		    args: ["nv-fs-ctr-run-with-dtk"]
+        args: ["nv-fs-ctr-run-with-dtk"]
         {{- else }}
         command: [bash, -xc]
         args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gds-driver install"]
@@ -398,11 +398,11 @@ spec:
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
           {{- if not .Openshift.ToolkitImage }}
-          - name: "RHCOS_IMAGE_MISSING
+          - name: RHCOS_IMAGE_MISSING
             value: "true"
           {{- end }}
           {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
-          - name: "GDS_ENABLED"
+          - name: GDS_ENABLED
             value: "true"
           {{- end }}
         volumeMounts:
