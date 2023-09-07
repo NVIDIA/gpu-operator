@@ -22,30 +22,44 @@ import (
 	"strings"
 
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Interface to the clusterinfo package
 type Interface interface {
 	GetKubernetesVersion() (string, error)
 	GetOpenshiftVersion() (string, error)
+	GetRedHatContainerOSVersions() []string
+	GetOpenshiftDriverToolkitImages() map[string]string
 }
 
+const (
+	nfdOSTreeVersionLabelKey = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+)
+
 type clusterInfo struct {
+	ctx     context.Context
 	config  *rest.Config
 	oneshot bool
 
-	kubernetesVersion string
-	openshiftVersion  string
+	kubernetesVersion            string
+	openshiftVersion             string
+	rhcosVersions                []string
+	openshiftDriverToolkitImages map[string]string
 }
 
 // New creates a new instance of clusterinfo API
-func New(opts ...Option) (Interface, error) {
-	l := &clusterInfo{}
+func New(ctx context.Context, opts ...Option) (Interface, error) {
+	l := &clusterInfo{
+		ctx: ctx,
+	}
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -62,15 +76,19 @@ func New(opts ...Option) (Interface, error) {
 	// cluster information.
 	kubernetesVersion, err := getKubernetesVersion(l.config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
+		return nil, fmt.Errorf("failed to get kubernetes version: %w", err)
 	}
 	l.kubernetesVersion = kubernetesVersion
 
 	openshiftVersion, err := getOpenshiftVersion(l.config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get openshift version: %v", err)
+		return nil, fmt.Errorf("failed to get openshift version: %w", err)
 	}
 	l.openshiftVersion = openshiftVersion
+
+	l.rhcosVersions = getRhcOSVersions(l.ctx, l.config)
+
+	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(l.ctx, l.config)
 
 	return l, nil
 }
@@ -103,7 +121,7 @@ func (l *clusterInfo) GetKubernetesVersion() (string, error) {
 	return getKubernetesVersion(l.config)
 }
 
-// GetOpenShiftVersion returns the OpenShift version detected in the cluster.
+// GetOpenshiftVersion returns the OpenShift version detected in the cluster.
 // An empty string, "", is returned if it is determined we are not running on OpenShift.
 func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
 	if l.oneshot {
@@ -113,10 +131,55 @@ func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
 	return getOpenshiftVersion(l.config)
 }
 
+func (l *clusterInfo) GetRedHatContainerOSVersions() []string {
+	if l.oneshot {
+		return l.rhcosVersions
+	}
+
+	return getRhcOSVersions(l.ctx, l.config)
+}
+
+func getRhcOSVersions(ctx context.Context, config *rest.Config) []string {
+	logger := log.FromContext(ctx)
+	var rhcosVersions []string
+
+	k8sClient, err := corev1client.NewForConfig(config)
+	if err != nil {
+		logger.Info("failed to build k8s core v1 client", "Error", err)
+		return nil
+	}
+
+	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{})
+
+	if err != nil {
+		logger.Info("failed to list Nodes", "Error", err)
+		return nil
+	}
+
+	for _, node := range nodeList.Items {
+		node := node
+
+		labels := node.GetLabels()
+		if rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]; ok {
+			rhcosVersions = append(rhcosVersions, rhcosVersion)
+		}
+	}
+
+	return rhcosVersions
+}
+
+func (l *clusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
+	if l.oneshot {
+		return l.openshiftDriverToolkitImages
+	}
+
+	return getOpenshiftDTKImages(l.ctx, l.config)
+}
+
 func getKubernetesVersion(config *rest.Config) (string, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return "", fmt.Errorf("error building discovery client: %v", err)
+		return "", fmt.Errorf("error building discovery client: %w", err)
 	}
 
 	info, err := discoveryClient.ServerVersion()
@@ -155,4 +218,46 @@ func getOpenshiftVersion(config *rest.Config) (string, error) {
 	}
 
 	return "", fmt.Errorf("failed to find Completed Cluster Version")
+}
+
+func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]string {
+	var rhcosDriverToolkitImages map[string]string
+	logger := log.FromContext(ctx)
+
+	name := "driver-toolkit"
+	namespace := "openshift"
+
+	ocpImageClient, err := imagesv1.NewForConfig(c)
+	if err != nil {
+		logger.Info("failed to build openshift image stream client", "Error", err)
+		return nil
+	}
+
+	imgStream, err := ocpImageClient.ImageStreams(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
+				"Name", name,
+				"Namespace", namespace)
+		}
+		logger.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
+		return nil
+	}
+
+	for _, tag := range imgStream.Spec.Tags {
+		if tag.Name == "" {
+			logger.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
+			continue
+		}
+		if tag.Name == "latest" || tag.From == nil {
+			continue
+		}
+		logger.Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
+		rhcosDriverToolkitImages[tag.Name] = tag.From.Name
+	}
+
+	// TODO: Add code to update operator metrics
+	// TODO: Add code to ensure OCP Namespace Monitoring setting
+
+	return rhcosDriverToolkitImages
 }

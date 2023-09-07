@@ -148,6 +148,7 @@ func main() {
 	// or once here in main. Note, the 'oneshot' option is set currently which means
 	// we fetch cluster info once before controllers start.
 	clusterInfo, err := clusterinfo.New(
+		ctx,
 		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
 		clusterinfo.WithOneShot(true),
 	)

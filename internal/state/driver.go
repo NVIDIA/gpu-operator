@@ -22,10 +22,13 @@ import (
 	"os"
 	"text/template"
 
+	apiimagev1 "github.com/openshift/api/image/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -57,6 +60,12 @@ type driverRuntimeSpec struct {
 	KubernetesVersion string
 }
 
+type openshiftSpec struct {
+	DriverToolkitEnabled bool
+	ToolkitImage         string
+	RHCOSVersion         string
+}
+
 type additionalConfigs struct {
 	VolumeMounts []corev1.VolumeMount
 	Volumes      []corev1.Volume
@@ -69,6 +78,7 @@ type driverRenderData struct {
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
 	RuntimeSpec       driverRuntimeSpec
+	Openshift         *openshiftSpec
 	AdditionalConfigs *additionalConfigs
 }
 
@@ -152,6 +162,21 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
+	k8sVersion, err := clusterInfo.GetKubernetesVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
+	}
+	openshiftVersion, err := clusterInfo.GetOpenshiftVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openshift version: %v", err)
+	}
+
+	var openshiftSpec *openshiftSpec
+
+	if openshiftVersion != "" {
+		openshiftSpec = getOpenshiftSpec(ctx, clusterInfo)
+	}
+
 	driverSpec, err := getDriverSpec(cr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
@@ -174,18 +199,11 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	if operatorNamespace == "" {
 		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
 	}
-	k8s, err := clusterInfo.GetKubernetesVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
-	}
-	openshift, err := clusterInfo.GetOpenshiftVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get openshift version: %v", err)
-	}
+
 	runtimeSpec := driverRuntimeSpec{
 		Namespace:         operatorNamespace,
-		KubernetesVersion: k8s,
-		OpenshiftVersion:  openshift,
+		KubernetesVersion: k8sVersion,
+		OpenshiftVersion:  openshiftVersion,
 	}
 
 	renderData := &driverRenderData{
@@ -194,6 +212,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		Validator:         validatorSpec,
 		GDS:               gdsSpec,
 		GPUDirectRDMA:     gpuDirectRDMASpec,
+		Openshift:         openshiftSpec,
 		RuntimeSpec:       runtimeSpec,
 		AdditionalConfigs: &additionalConfigs{},
 	}
@@ -278,6 +297,12 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver) (*driverSpec, error) {
 	}, nil
 }
 
+func getMergedNodeSelector(spec *nvidiav1alpha1.NVIDIADriverSpec) map[string]string {
+	res := map[string]string{}
+
+	return res
+}
+
 func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("no validator spec provided")
@@ -307,4 +332,57 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 		spec,
 		imagePath,
 	}, nil
+}
+
+func getOpenshiftContainerToolkitImage(driverCRSpec *nvidiav1alpha1.NVIDIADriverSpec) {
+
+}
+
+func (s *stateDriver) fetchOCPDriverToolkitImages(ctx context.Context) (map[string]string, bool) {
+	logger := log.FromContext(ctx)
+
+	var rhcosDriverToolkitImages map[string]string
+
+	imgStream := &apiimagev1.ImageStream{}
+	name := "driver-toolkit"
+	namespace := "openshift"
+
+	err := s.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, imgStream)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
+				"Name", name,
+				"Namespace", namespace)
+		}
+		logger.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
+		return nil, false
+	}
+
+	for _, tag := range imgStream.Spec.Tags {
+		if tag.Name == "" {
+			logger.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
+			continue
+		}
+		if tag.Name == "latest" || tag.From == nil {
+			continue
+		}
+		logger.Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
+		rhcosDriverToolkitImages[tag.Name] = tag.From.Name
+	}
+
+	// TODO: Add code to update operator metrics
+	// TODO: Add code to ensure OCP Namespace Monitoring setting
+
+	return rhcosDriverToolkitImages, true
+}
+
+func getOpenshiftSpec(ctx context.Context, info clusterinfo.Interface) *openshiftSpec {
+	spec := &openshiftSpec{}
+
+	rhcosVersions := info.GetRedHatContainerOSVersions()
+	openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
+
+	spec.DriverToolkitEnabled = len(rhcosVersions) > 0 && len(openshiftDTKMap) > 0
+
+	return spec
 }
