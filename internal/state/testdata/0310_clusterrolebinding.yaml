@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ .Driver.Name }}
-  namespace: {{ .RuntimeSpec.Namespace }}
+  namespace: {{ .Runtime.Namespace }}

@@ -76,7 +76,7 @@ type driverRenderData struct {
 	Validator         *validatorSpec
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
-	RuntimeSpec       *driverRuntimeSpec
+	Runtime           *driverRuntimeSpec
 	Openshift         *openshiftSpec
 	AdditionalConfigs *additionalConfigs
 }
@@ -130,7 +130,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
 
-	// Create objects if they dont exist, Update objects if they do exist
+	// Create objects if they don't exist, Update objects if they do exist
 	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %v", err)
@@ -190,7 +190,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		Validator:         validatorSpec,
 		GDS:               gdsSpec,
 		GPUDirectRDMA:     gpuDirectRDMASpec,
-		RuntimeSpec:       runtimeSpec,
+		Runtime:           runtimeSpec,
 		AdditionalConfigs: &additionalConfigs{},
 	}
 

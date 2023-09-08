@@ -2,32 +2,32 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    {{- if and (.Openshift) ( .Openshift.DriverToolkitEnabled) }}
-    app: nvidia-driver-daemonset-{{ .Driver.Openshift.RHCOSVersion }}
+    {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+    app: nvidia-driver-daemonset-{{ .Openshift.RHCOSVersion }}
     {{- else }}
     app: nvidia-driver-daemonset
     {{- end }}
     nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
-    {{- if and (.Openshift) ( .Openshift.DriverToolkitEnabled) }}
-    openshift.driver-toolkit.rhcos: {{ .Driver.Openshift.RHCOSVersion | quote }}
+    {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+    openshift.driver-toolkit.rhcos: {{ .Openshift.RHCOSVersion | quote }}
     openshift.driver-toolkit: "true"
-    {{- if and (.Openshift) (not .Driver.Openshift.ToolkitImage) }}
+    {{- if and (.Openshift) (not .Openshift.ToolkitImage) }}
     openshift.driver-toolkit.rhcos-image-missing: "true"
     {{- end }}
     {{- end }}
-  {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
-  name: {{ .Driver.Name }}-{{ .Driver.Openshift.RHCOSVersion }}
+  {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+  name: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
   {{- else }}
   name: {{ .Driver.Name }}
   {{- end }}
-  namespace: {{ .RuntimeSpec.Namespace }}
+  namespace: {{ .Runtime.Namespace }}
   annotations:
     openshift.io/scc: {{ .Driver.Name }}
 spec:
   selector:
     matchLabels:
-      {{- if and (.Openshift) ( .Openshift.DriverToolkitEnabled) }}
-      app: nvidia-driver-daemonset-{{ .Driver.Openshift.RHCOSVersion }}
+      {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+      app: nvidia-driver-daemonset-{{ .Openshift.RHCOSVersion }}
       {{- else }}
       app: nvidia-driver-daemonset
       {{- end }}
@@ -38,7 +38,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         app: nvidia-driver-daemonset-{{ .Openshift.RHCOSVersion }}
         openshift.driver-toolkit: "true"
         {{- if not .Openshift.ToolkitImage }}
@@ -54,7 +54,7 @@ spec:
         {{- if .Driver.Spec.NodeSelector }}
         {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
         {{- end }}
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         feature.node.kubenernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
         {{- end }}
       tolerations:
@@ -171,12 +171,12 @@ spec:
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
         name: nvidia-driver-ctr
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         command: ["ocp_dtk_entrypoint"]
         {{- else }}
         command: ["nvidia-driver"]
         {{- end }}
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         args:
         - "nv-ctr-run-with-dtk"
         {{- else }}
@@ -208,7 +208,7 @@ spec:
           value: "true"
         {{- end }}
       {{- end}}
-      {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) (not .Openshift.ToolkitImage) }}
+      {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) (not .Openshift.ToolkitImage) }}
         - name: RHCOS_IMAGE_MISSING
           value: "true"
         - name: RHCOS_VERSION
@@ -300,7 +300,7 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
-          {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+          {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
           {{- end}}
@@ -330,7 +330,7 @@ spec:
       - image: {{ .GDS.ImagePath }}
         imagePullPolicy: IfNotPresent
         name: nvidia-fs-ctr
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         command: ["ocp_dtk_entrypoint"]
         args: ["nv-fs-ctr-run-with-dtk"]
         {{- else }}
@@ -350,7 +350,7 @@ spec:
           - name: dev-log
             mountPath: /dev/log
             readOnly: true
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
         {{- end}}
@@ -374,7 +374,7 @@ spec:
           timeoutSeconds: 10
       {{- end }}
       # TODO: introduce UseOpenShiftDriverToolkit field into NVIDIADriver CR?
-    {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+    {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       {{- if .Openshift.ToolkitImage }}
       - image: {{ .Openshift.ToolkitImage }}
@@ -472,7 +472,7 @@ spec:
             {{- end }}
         {{- end }}
         {{- end }}
-        {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         - name: shared-nvidia-driver-toolkit
           emptyDir: {}
         {{- end }}
