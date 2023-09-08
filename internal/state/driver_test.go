@@ -263,7 +263,7 @@ func TestDriverSpec(t *testing.T) {
 	ds, err := getDaemonSetObj(objs)
 	require.Nil(t, err)
 
-	require.Equal(t, renderData.RuntimeSpec.Namespace, ds.Namespace)
+	require.Equal(t, renderData.Runtime.Namespace, ds.Namespace)
 	checkNodeSelector(t, renderData.Driver.Spec.NodeSelector, ds.Spec.Template.Spec.NodeSelector)
 	checkPrecompiledLabel(t, renderData.Driver.Spec.UsePrecompiled, ds.Labels)
 	checkPrecompiledLabel(t, renderData.Driver.Spec.UsePrecompiled, ds.Spec.Template.Labels)
@@ -370,6 +370,43 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverOpenshiftDriverToolkit(t *testing.T) {
+	const (
+		testName     = "driver-openshift-drivertoolkit"
+		rhcosVersion = "413.92.202304252344-0"
+		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
+	)
+
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
+	renderData.Openshift = &openshiftSpec{
+		ToolkitImage: toolkitImage,
+		RHCOSVersion: rhcosVersion,
+	}
+	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
+	renderData.Runtime.OpenshiftVersion = "4.13"
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 
@@ -411,7 +448,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 			Spec:      &gpuv1.ValidatorSpec{},
 			ImagePath: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel",
 		},
-		RuntimeSpec: driverRuntimeSpec{
+		Runtime: &driverRuntimeSpec{
 			Namespace:         "test-operator",
 			KubernetesVersion: "1.28.0",
 		},

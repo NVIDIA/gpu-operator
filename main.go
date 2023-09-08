@@ -26,6 +26,8 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"go.uber.org/zap/zapcore"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	corev1 "k8s.io/api/core/v1"
@@ -148,8 +150,12 @@ func main() {
 	// or once here in main. Note, the 'oneshot' option is set currently which means
 	// we fetch cluster info once before controllers start.
 	clusterInfo, err := clusterinfo.New(
+		ctx,
 		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
 		clusterinfo.WithOneShot(true),
+		clusterinfo.WithNodeListOptions(metav1.ListOptions{
+			LabelSelector: labels.Set{"nvidia.com/gpu.present": "true"}.AsSelector().String(),
+		}),
 	)
 	if err != nil {
 		setupLog.Error(err, "failed to get cluster wide information needed by controllers")

@@ -30,10 +30,11 @@ type SyncingSource source.SyncingSource
 // driverSpec is a wrapper of NVIDIADriverSpec with an additional ImagePath field
 // which is to be populated with the fully-qualified image path.
 type driverSpec struct {
-	Spec             *nvidiav1alpha1.NVIDIADriverSpec
-	Name             string
-	ImagePath        string
-	ManagerImagePath string
+	Spec              *nvidiav1alpha1.NVIDIADriverSpec
+	Name              string
+	ImagePath         string
+	ManagerImagePath  string
+	OCPToolkitEnabled bool
 }
 
 // validatorSpec is a wrapper of ValidatorSpec with an additional ImagePath field
@@ -48,4 +49,15 @@ type validatorSpec struct {
 type gdsDriverSpec struct {
 	Spec      *gpuv1.GPUDirectStorageSpec
 	ImagePath string
+}
+
+type openshiftDriverSpecOverlay struct {
+	NameSuffix         string
+	ContainerEnvs      map[string][]gpuv1.EnvVar
+	ContainerArgs      map[string][]string
+	ContainerCmd       map[string][]string
+	DriverToolkitImage string
+	Labels             map[string]string
+	NodeSelector       map[string]string
+	PodTemplateLabels  map[string]string
 }

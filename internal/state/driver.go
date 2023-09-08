@@ -52,9 +52,17 @@ type stateDriver struct {
 var _ State = (*stateDriver)(nil)
 
 type driverRuntimeSpec struct {
-	Namespace         string
-	OpenshiftVersion  string
-	KubernetesVersion string
+	Namespace                     string
+	KubernetesVersion             string
+	OpenshiftVersion              string
+	OpenshiftDriverToolkitEnabled bool
+	OpenshiftRHCOSVersions        []string
+	OpenshiftDriverToolkitImages  map[string]string
+}
+
+type openshiftSpec struct {
+	ToolkitImage string
+	RHCOSVersion string
 }
 
 type additionalConfigs struct {
@@ -68,7 +76,8 @@ type driverRenderData struct {
 	Validator         *validatorSpec
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
-	RuntimeSpec       driverRuntimeSpec
+	Runtime           *driverRuntimeSpec
+	Openshift         *openshiftSpec
 	AdditionalConfigs *additionalConfigs
 }
 
@@ -121,7 +130,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
 
-	// Create objects if they dont exist, Update objects if they do exist
+	// Create objects if they don't exist, Update objects if they do exist
 	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %v", err)
@@ -157,6 +166,11 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
 	}
 
+	runtimeSpec, err := getRuntimeSpec(clusterInfo, cr.Spec.NodeSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
+	}
+
 	validatorSpec, err := getValidatorSpec(&clusterPolicy.Spec.Validator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct validator spec: %v", err)
@@ -170,35 +184,42 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	operatorSpec := &clusterPolicy.Spec.Operator
 	gpuDirectRDMASpec := clusterPolicy.Spec.Driver.GPUDirectRDMA
 
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
-	}
-	k8s, err := clusterInfo.GetKubernetesVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
-	}
-	openshift, err := clusterInfo.GetOpenshiftVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get openshift version: %v", err)
-	}
-	runtimeSpec := driverRuntimeSpec{
-		Namespace:         operatorNamespace,
-		KubernetesVersion: k8s,
-		OpenshiftVersion:  openshift,
-	}
-
 	renderData := &driverRenderData{
 		Driver:            driverSpec,
 		Operator:          operatorSpec,
 		Validator:         validatorSpec,
 		GDS:               gdsSpec,
 		GPUDirectRDMA:     gpuDirectRDMASpec,
-		RuntimeSpec:       runtimeSpec,
+		Runtime:           runtimeSpec,
 		AdditionalConfigs: &additionalConfigs{},
 	}
 
+	var objs []*unstructured.Unstructured
+	if runtimeSpec.OpenshiftDriverToolkitEnabled {
+		for _, rhcosVersion := range runtimeSpec.OpenshiftRHCOSVersions {
+			renderData.Openshift = &openshiftSpec{
+				RHCOSVersion: rhcosVersion,
+				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[rhcosVersion],
+			}
+			manifestObjs, err := s.renderManifestObjects(ctx, renderData)
+			if err != nil {
+				logger.Error(err, "error rendering manifests for openshift build", "RHCOSVersion", rhcosVersion)
+				return nil, err
+			}
+			objs = append(objs, manifestObjs...)
+		}
+	} else {
+		objs, err = s.renderManifestObjects(ctx, renderData)
+	}
+
+	return objs, nil
+}
+
+func (s *stateDriver) renderManifestObjects(ctx context.Context, renderData *driverRenderData) ([]*unstructured.Unstructured, error) {
+	logger := log.FromContext(ctx)
+
 	logger.V(consts.LogLevelDebug).Info("Rendering objects", "data:", renderData)
+
 	objs, err := s.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
@@ -307,4 +328,40 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 		spec,
 		imagePath,
 	}, nil
+}
+
+func getRuntimeSpec(info clusterinfo.Interface, nodeSelector map[string]string) (*driverRuntimeSpec, error) {
+	k8sVersion, err := info.GetKubernetesVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
+	}
+	openshiftVersion, err := info.GetOpenshiftVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openshift version: %v", err)
+	}
+
+	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	if operatorNamespace == "" {
+		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
+	}
+
+	rs := &driverRuntimeSpec{
+		Namespace:         operatorNamespace,
+		KubernetesVersion: k8sVersion,
+		OpenshiftVersion:  openshiftVersion,
+	}
+
+	if openshiftVersion != "" {
+		rhcosVersions, err := info.GetRHCOSVersions(nodeSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list openshift versions: %w", err)
+		}
+		openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
+
+		rs.OpenshiftDriverToolkitEnabled = len(rhcosVersions) > 0 && len(openshiftDTKMap) > 0
+		rs.OpenshiftRHCOSVersions = rhcosVersions
+		rs.OpenshiftDriverToolkitImages = openshiftDTKMap
+	}
+
+	return rs, nil
 }

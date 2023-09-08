@@ -32,4 +32,9 @@ const (
 	NicClusterPolicyResourceName = "nic-cluster-policy"
 	OfedDriverLabel              = "nvidia.com/ofed-driver"
 	StateLabel                   = "nvidia.network-operator.state"
+	GPUPresentLabel              = "nvidia.com/gpu.present"
+
+	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
+	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
+	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 )
