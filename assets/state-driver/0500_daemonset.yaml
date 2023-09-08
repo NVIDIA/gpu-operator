@@ -237,8 +237,8 @@ spec:
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
         volumeMounts:
-          # corresponding volumes are dynamically inject by the
-          # operator when OCP DriverToolkit side-car is enabled
+          # corresponding volumes are dynamically injected by the
+          # operator when the OCP DriverToolkit side-car is enabled
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
           - name: var-log
@@ -246,6 +246,9 @@ spec:
           - name: mlnx-ofed-usr-src
             mountPath: /run/mellanox/drivers/usr/src
             mountPropagation: HostToContainer
+          - name: host-os-release
+            mountPath: /host-etc/os-release
+            readOnly: true
       volumes:
         - name: run-nvidia
           hostPath:
