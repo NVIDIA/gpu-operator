@@ -25,6 +25,7 @@ import (
 	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -36,7 +37,7 @@ import (
 type Interface interface {
 	GetKubernetesVersion() (string, error)
 	GetOpenshiftVersion() (string, error)
-	GetRHCOSVersions() []string
+	GetRHCOSVersions(map[string]string) ([]string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
 }
 
@@ -53,8 +54,6 @@ type clusterInfo struct {
 	openshiftVersion             string
 	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
-
-	nodeListOptions *metav1.ListOptions
 }
 
 // New creates a new instance of clusterinfo API
@@ -67,9 +66,6 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	if l.config == nil {
 		l.config = config.GetConfigOrDie()
-	}
-	if l.nodeListOptions == nil {
-		l.nodeListOptions = &metav1.ListOptions{}
 	}
 
 	if !l.oneshot {
@@ -91,7 +87,10 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	l.openshiftVersion = openshiftVersion
 
-	l.rhcosVersions = getRHCOSVersions(l.ctx, l.config, l.nodeListOptions)
+	l.rhcosVersions, err = getRHCOSVersions(l.ctx, l.config, map[string]string{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list rhcos versions: %w", err)
+	}
 
 	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(l.ctx, l.config)
 
@@ -105,12 +104,6 @@ type Option func(*clusterInfo)
 func WithKubernetesConfig(config *rest.Config) Option {
 	return func(l *clusterInfo) {
 		l.config = config
-	}
-}
-
-func WithNodeListOptions(opts metav1.ListOptions) Option {
-	return func(l *clusterInfo) {
-		l.nodeListOptions = &opts
 	}
 }
 
@@ -143,29 +136,31 @@ func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
 }
 
 // GetRHCOSVersions returns the list of RedHat CoreOS versions used in the Openshift Cluster
-func (l *clusterInfo) GetRHCOSVersions() []string {
+func (l *clusterInfo) GetRHCOSVersions(labelSelector map[string]string) ([]string, error) {
 	if l.oneshot {
-		return l.rhcosVersions
+		return l.rhcosVersions, nil
 	}
 
-	return getRHCOSVersions(l.ctx, l.config, l.nodeListOptions)
+	return getRHCOSVersions(l.ctx, l.config, labelSelector)
 }
 
-func getRHCOSVersions(ctx context.Context, config *rest.Config, listOpts *metav1.ListOptions) []string {
+func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[string]string) ([]string, error) {
 	logger := log.FromContext(ctx)
 	var rhcosVersions []string
 
 	k8sClient, err := corev1client.NewForConfig(config)
 	if err != nil {
 		logger.Error(err, "failed to build k8s core v1 client")
-		return nil
+		return nil, err
 	}
 
-	nodeList, err := k8sClient.Nodes().List(ctx, *listOpts)
+	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(selector).String(),
+	})
 
 	if err != nil {
 		logger.Error(err, "failed to list Nodes")
-		return nil
+		return nil, err
 	}
 
 	for _, node := range nodeList.Items {
@@ -177,7 +172,7 @@ func getRHCOSVersions(ctx context.Context, config *rest.Config, listOpts *metav1
 		}
 	}
 
-	return rhcosVersions
+	return rhcosVersions, nil
 }
 
 // GetOpenshiftDriverToolkitImages returns a map of the Openshift DriverToolkit Images available for use in the

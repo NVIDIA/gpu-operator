@@ -389,6 +389,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 		RHCOSVersion: rhcosVersion,
 	}
 	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
+	renderData.Runtime.OpenshiftVersion = "4.13"
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{

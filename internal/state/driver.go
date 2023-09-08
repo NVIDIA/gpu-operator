@@ -161,7 +161,7 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
-	runtimeSpec, err := getRuntimeSpec(clusterInfo)
+	runtimeSpec, err := getRuntimeSpec(clusterInfo, cr.Spec.NodeSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
@@ -330,7 +330,7 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	}, nil
 }
 
-func getRuntimeSpec(info clusterinfo.Interface) (*driverRuntimeSpec, error) {
+func getRuntimeSpec(info clusterinfo.Interface, nodeSelector map[string]string) (*driverRuntimeSpec, error) {
 	k8sVersion, err := info.GetKubernetesVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
@@ -352,7 +352,10 @@ func getRuntimeSpec(info clusterinfo.Interface) (*driverRuntimeSpec, error) {
 	}
 
 	if openshiftVersion != "" {
-		rhcosVersions := info.GetRHCOSVersions()
+		rhcosVersions, err := info.GetRHCOSVersions(nodeSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list openshift versions: %w", err)
+		}
 		openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
 
 		rs.OpenshiftDriverToolkitEnabled = len(rhcosVersions) > 0 && len(openshiftDTKMap) > 0
