@@ -383,7 +383,8 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
-
+	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
 	renderData.Openshift = &openshiftSpec{
 		ToolkitImage: toolkitImage,
 		RHCOSVersion: rhcosVersion,

@@ -32,8 +32,7 @@ const (
 	NicClusterPolicyResourceName = "nic-cluster-policy"
 	OfedDriverLabel              = "nvidia.com/ofed-driver"
 	StateLabel                   = "nvidia.network-operator.state"
-	GPUDriverDeployLabel         = "nvidia.com/gpu.deploy.driver"
-	GPUDriverPresentLabel        = "nvidia.com/gpu.present"
+	GPUPresentLabel              = "nvidia.com/gpu.present"
 
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"

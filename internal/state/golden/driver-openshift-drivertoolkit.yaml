@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
   namespace: test-operator
 rules:
 - apiGroups:
@@ -47,7 +47,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
 rules:
 - apiGroups:
   - config.openshift.io
@@ -91,28 +91,28 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
   namespace: test-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
   namespace: test-operator
 ---
 allowHostDirVolumePlugin: true
@@ -141,7 +141,7 @@ metadata:
       features and the ability to run as any user, any group, any fsGroup, and with
       any SELinux context.  WARNING: this is the most relaxed SCC and should be used
       only for cluster administration. Grant with caution.'
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-gpu-driver-openshift
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
@@ -154,7 +154,7 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:test-operator:nvidia-gpu-driver-ubuntu22.04
+- system:serviceaccount:test-operator:nvidia-gpu-driver-openshift
 volumes:
 - '*'
 ---
@@ -162,13 +162,13 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    openshift.io/scc: nvidia-gpu-driver-ubuntu22.04
+    openshift.io/scc: nvidia-gpu-driver-openshift
   labels:
     app: nvidia-driver-daemonset-413.92.202304252344-0
     nvidia.com/precompiled: "false"
     openshift.driver-toolkit: "true"
     openshift.driver-toolkit.rhcos: 413.92.202304252344-0
-  name: nvidia-gpu-driver-ubuntu22.04-413.92.202304252344-0
+  name: nvidia-gpu-driver-openshift-413.92.202304252344-0
   namespace: test-operator
 spec:
   selector:
@@ -193,7 +193,7 @@ spec:
           value: void
         - name: OPENSHIFT_VERSION
           value: "4.13"
-        image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
+        image: nvcr.io/nvidia/driver:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
@@ -317,7 +317,7 @@ spec:
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
         nvidia.com/gpu.deploy.driver: "true"
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-gpu-driver-ubuntu22.04
+      serviceAccountName: nvidia-gpu-driver-openshift
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu

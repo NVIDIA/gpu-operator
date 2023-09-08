@@ -153,8 +153,7 @@ func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[str
 	var rhcosVersions []string
 
 	nodeSelector := map[string]string{
-		consts.GPUDriverDeployLabel:  "true",
-		consts.GPUDriverPresentLabel: "true",
+		consts.GPUPresentLabel: "true",
 	}
 
 	// merge defaultSelector with user-input selector
