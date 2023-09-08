@@ -19,8 +19,10 @@ package clusterinfo
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -87,7 +89,9 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	l.openshiftVersion = openshiftVersion
 
-	l.rhcosVersions, err = getRHCOSVersions(l.ctx, l.config, map[string]string{})
+	l.rhcosVersions, err = getRHCOSVersions(l.ctx, l.config, map[string]string{
+		"nvidia.com/gpu.deploy.driver": "true",
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list rhcos versions: %w", err)
 	}
@@ -148,6 +152,14 @@ func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[str
 	logger := log.FromContext(ctx)
 	var rhcosVersions []string
 
+	nodeSelector := map[string]string{
+		consts.GPUDriverDeployLabel:  "true",
+		consts.GPUDriverPresentLabel: "true",
+	}
+
+	// merge defaultSelector with user-input selector
+	maps.Copy(nodeSelector, selector)
+
 	k8sClient, err := corev1client.NewForConfig(config)
 	if err != nil {
 		logger.Error(err, "failed to build k8s core v1 client")
@@ -155,7 +167,7 @@ func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[str
 	}
 
 	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(selector).String(),
+		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
 	})
 
 	if err != nil {
@@ -166,8 +178,8 @@ func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[str
 	for _, node := range nodeList.Items {
 		node := node
 
-		labels := node.GetLabels()
-		if rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]; ok {
+		nodeLabels := node.GetLabels()
+		if rhcosVersion, ok := nodeLabels[nfdOSTreeVersionLabelKey]; ok {
 			rhcosVersions = append(rhcosVersions, rhcosVersion)
 		}
 	}

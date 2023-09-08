@@ -266,6 +266,9 @@ spec:
         - mountPath: /run/mellanox/drivers/usr/src
           mountPropagation: HostToContainer
           name: mlnx-ofed-usr-src
+        - mountPath: /host-etc/os-release
+          name: host-os-release
+          readOnly: true
       hostPID: true
       initContainers:
       - args:

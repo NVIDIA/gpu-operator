@@ -161,14 +161,14 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
-	runtimeSpec, err := getRuntimeSpec(clusterInfo, cr.Spec.NodeSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
-	}
-
 	driverSpec, err := getDriverSpec(cr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
+	}
+
+	runtimeSpec, err := getRuntimeSpec(clusterInfo, cr.Spec.NodeSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
 
 	validatorSpec, err := getValidatorSpec(&clusterPolicy.Spec.Validator)
