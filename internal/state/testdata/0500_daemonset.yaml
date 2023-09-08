@@ -55,7 +55,7 @@ spec:
         {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-        feature.node.kubenernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
+        feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
         {{- end }}
       tolerations:
         - key: nvidia.com/gpu
@@ -241,6 +241,10 @@ spec:
             readOnly: {{ .ReadOnly }}
           {{- end }}
           {{- end }}
+          {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+          {{- end}}
         {{- with .Driver.Spec.Resources }}
         resources:
           {{ . | yaml | nindent 10 }}
@@ -300,10 +304,6 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
-          {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-          - name: shared-nvidia-driver-toolkit
-            mountPath: /mnt/shared-nvidia-driver-toolkit
-          {{- end}}
         startupProbe:
           exec:
             command:

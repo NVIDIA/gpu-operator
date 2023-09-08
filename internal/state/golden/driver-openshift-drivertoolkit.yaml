@@ -192,6 +192,8 @@ spec:
         - mountPath: /run/mellanox/drivers
           mountPropagation: HostToContainer
           name: run-mellanox-drivers
+        - mountPath: /mnt/shared-nvidia-driver-toolkit
+          name: shared-nvidia-driver-toolkit
       - args:
         - until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting
           for nvidia-driver-ctr container to prepare the shared directory ...; sleep
@@ -264,7 +266,7 @@ spec:
         - mountPath: /sys
           name: host-sys
       nodeSelector:
-        feature.node.kubenernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
+        feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
         nvidia.com/gpu.deploy.driver: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-gpu-driver-ubuntu22.04
