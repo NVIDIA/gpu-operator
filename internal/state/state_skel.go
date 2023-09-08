@@ -38,10 +38,6 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/render"
 )
 
-type runtimeSpec struct {
-	Namespace string
-}
-
 // a state skeleton intended to be embedded in structs implementing the State interface
 // it provides many of the common constructs and functionality needed to implement a state.
 type stateSkel struct {

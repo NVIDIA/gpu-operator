@@ -50,14 +50,3 @@ type gdsDriverSpec struct {
 	Spec      *gpuv1.GPUDirectStorageSpec
 	ImagePath string
 }
-
-type openshiftDriverSpecOverlay struct {
-	NameSuffix         string
-	ContainerEnvs      map[string][]gpuv1.EnvVar
-	ContainerArgs      map[string][]string
-	ContainerCmd       map[string][]string
-	DriverToolkitImage string
-	Labels             map[string]string
-	NodeSelector       map[string]string
-	PodTemplateLabels  map[string]string
-}

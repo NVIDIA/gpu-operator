@@ -21,10 +21,11 @@ import (
 	"strings"
 	"unicode"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/regclient/regclient/types/ref"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 const (

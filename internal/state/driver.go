@@ -210,6 +210,10 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		}
 	} else {
 		objs, err = s.renderManifestObjects(ctx, renderData)
+		if err != nil {
+			logger.Error(err, "error rendering manifests for openshift build")
+			return nil, err
+		}
 	}
 
 	return objs, nil
@@ -305,7 +309,7 @@ func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
 	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "VALIDATOR_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to contruct image path for validator: %v", err)
+		return nil, fmt.Errorf("failed to construct image path for validator: %v", err)
 	}
 
 	return &validatorSpec{
@@ -321,7 +325,7 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "GDS_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to contruct image path for validator: %v", err)
+		return nil, fmt.Errorf("failed to construct image path for validator: %v", err)
 	}
 
 	return &gdsDriverSpec{
