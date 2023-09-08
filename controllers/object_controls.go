@@ -3489,6 +3489,7 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 	}
 
 	for _, ds := range list.Items {
+		ds := ds
 		// filter out DaemonSets which are not the NVIDIA driver
 		if !strings.HasPrefix(ds.Name, commonDriverDaemonsetName) {
 			continue

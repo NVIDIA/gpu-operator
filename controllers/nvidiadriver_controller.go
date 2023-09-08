@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +38,6 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/state"
-	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 )
 
 // NVIDIADriverReconciler reconciles a NVIDIADriver object
@@ -112,7 +112,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if managerStatus.Status != state.SyncStateReady {
 		logger.Info("NVIDIADriver instance is not ready")
-		return reconcile.Result{RequeueAfter: time.Duration(time.Second * 5)}, nil
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -136,6 +136,9 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR),
 	})
+	if err != nil {
+		return err
+	}
 
 	// Watch for changes to the primary resource NVIDIaDriver
 	err = c.Watch(source.Kind(mgr.GetCache(), &nvidiav1alpha1.NVIDIADriver{}), &handler.EnqueueRequestForObject{})
@@ -183,6 +186,10 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			mgr.GetRESTMapper(),
 			&nvidiav1alpha1.NVIDIADriver{},
 			handler.OnlyControllerOwner()))
+
+		if err != nil {
+			return fmt.Errorf("error setting up Watch for source type%v: %w", watchSource, err)
+		}
 	}
 
 	return nil

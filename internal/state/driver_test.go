@@ -360,6 +360,7 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 		&render.TemplatingData{
 			Data: renderData,
 		})
+	require.Nil(t, err)
 
 	actual, err := getYAMLString(objs)
 	require.Nil(t, err)
@@ -453,33 +454,6 @@ func getMinimalDriverRenderData() *driverRenderData {
 			KubernetesVersion: "1.28.0",
 		},
 	}
-}
-
-func getAdditionalVolumeMounts(names ...string) additionalConfigs {
-	cfgs := additionalConfigs{}
-	for _, name := range names {
-		cfgs.VolumeMounts = append(cfgs.VolumeMounts, corev1.VolumeMount{
-			Name:      name,
-			ReadOnly:  true,
-			MountPath: filepath.Join("/path/to/", name),
-			SubPath:   filepath.Join("/path/to/", name, "subpath"),
-		})
-
-		cfgs.Volumes = append(cfgs.Volumes, corev1.Volume{
-			Name: name,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: name,
-					},
-					Items: []corev1.KeyToPath{
-						{Key: "subpath", Path: "subpath"},
-					},
-				},
-			},
-		})
-	}
-	return cfgs
 }
 
 func getDefaultContainerProbeSpec() *gpuv1.ContainerProbeSpec {

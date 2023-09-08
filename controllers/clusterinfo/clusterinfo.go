@@ -22,7 +22,6 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +32,8 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // Interface to the clusterinfo package
@@ -83,20 +84,20 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	l.kubernetesVersion = kubernetesVersion
 
-	openshiftVersion, err := getOpenshiftVersion(l.ctx, l.config)
+	openshiftVersion, err := getOpenshiftVersion(ctx, l.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %w", err)
 	}
 	l.openshiftVersion = openshiftVersion
 
-	l.rhcosVersions, err = getRHCOSVersions(l.ctx, l.config, map[string]string{
-		"nvidia.com/gpu.deploy.driver": "true",
+	l.rhcosVersions, err = getRHCOSVersions(ctx, l.config, map[string]string{
+		consts.GPUPresentLabel: "true",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list rhcos versions: %w", err)
 	}
 
-	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(l.ctx, l.config)
+	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(ctx, l.config)
 
 	return l, nil
 }
@@ -272,6 +273,11 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 		if tag.Name == "latest" || tag.From == nil {
 			continue
 		}
+
+		if rhcosDriverToolkitImages == nil {
+			rhcosDriverToolkitImages = map[string]string{}
+		}
+
 		logger.Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
 		rhcosDriverToolkitImages[tag.Name] = tag.From.Name
 	}

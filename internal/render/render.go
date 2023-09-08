@@ -88,7 +88,6 @@ func (r *textTemplateRenderer) RenderObjects(data *TemplatingData) ([]*unstructu
 	return objs, nil
 }
 
-
 // renderFile renders a single file to a list of k8s unstructured objects
 func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData) ([]*unstructured.Unstructured, error) {
 	// Read file
