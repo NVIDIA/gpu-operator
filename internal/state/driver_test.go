@@ -411,7 +411,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 			Spec:      &gpuv1.ValidatorSpec{},
 			ImagePath: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel",
 		},
-		RuntimeSpec: driverRuntimeSpec{
+		RuntimeSpec: &driverRuntimeSpec{
 			Namespace:         "test-operator",
 			KubernetesVersion: "1.28.0",
 		},

@@ -44,7 +44,7 @@ spec:
         {{- if not .Openshift.ToolkitImage }}
         openshift.driver-toolkit.rhcos-image-missing: "true"
         {{- end }}
-        {{ - else }}
+        {{- else }}
         app: nvidia-driver-daemonset
         {{- end }}
         nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
@@ -52,7 +52,7 @@ spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
         {{- if .Driver.Spec.NodeSelector }}
-        {{ .Driver.Spec.NodeSelector | yaml }}
+        {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
         {{- end }}
         {{- if and (.Openshift) (.Openshift.DriverToolkitEnabled) }}
         feature.node.kubenernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
@@ -194,8 +194,8 @@ spec:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
-      {{- if .Driver.Spec.Envs }}
-        {{- range .Driver.Spec.Envs }}
+      {{- if .Driver.Spec.Env }}
+        {{- range .Driver.Spec.Env }}
         - name: {{ .Name }}
           value : {{ .Value }}
         {{- end }}
