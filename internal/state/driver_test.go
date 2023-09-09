@@ -408,6 +408,41 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverPrecompiled(t *testing.T) {
+	const (
+		testName     = "driver-precompiled"
+		rhcosVersion = "5.4.0-150-generic"
+	)
+
+	state, err := NewStateDriver(nil, nil, "./testdata")
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.UsePrecompiled = utils.BoolPtr(true)
+	renderData.Driver.Name = "nvidia-gpu-driver-ubuntu22.04"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04"
+	renderData.Precompiled = &precompiledSpec{
+		KernelVersion:          "5.4.0-150-generic",
+		SanitizedKernelVersion: "5.4.0-150-generic",
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 
