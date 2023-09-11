@@ -211,6 +211,14 @@ func init() {
 	SchemeBuilder.Register(&NVIDIADriver{}, &NVIDIADriverList{})
 }
 
+// UsePrecompiledDrivers returns true if usePrecompiled option is enabled in spec
+func (d *NVIDIADriverSpec) UsePrecompiledDrivers() bool {
+	if d.UsePrecompiled == nil {
+		return false
+	}
+	return *d.UsePrecompiled
+}
+
 // GetNodeSelector returns node selector labels for NVIDIA driver installation
 func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 	ns := d.Spec.NodeSelector
@@ -223,6 +231,10 @@ func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 	return ns
 }
 
+// GetImagePath returns the driver image path given the information
+// provided in NVIDIADriverSpec. The driver image path will be
+// in the following format unless spec.Image contains a tag or digest.
+// <image>:<driver-ver>-<os-ver>
 func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
 	_, err := ref.New(d.Image)
 	if err != nil {
@@ -247,6 +259,35 @@ func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
 	}
 
 	return fmt.Sprintf("%s:%s-%s", d.Image, d.Version, d.OSVersion), nil
+}
+
+// GetPrecompiledImagePath returns the precompiled driver image path for a
+// given kernel version. Precompiled driver images follow the following
+// format: <image>:<driver-ver>-<kernel-ver>-<os-ver>
+func (d *NVIDIADriverSpec) GetPrecompiledImagePath(kernelVersion string) (string, error) {
+	_, err := ref.New(d.Image)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse driver image: %w", err)
+	}
+
+	if strings.Contains(d.Image, ":") || strings.Contains(d.Image, "@") {
+		// tag or digest is not supported for precompiled
+		return "", fmt.Errorf("specifying image tag / digest is not supported when precompiled is enabled")
+	}
+
+	if d.Version == "" {
+		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
+	}
+	if d.OSVersion == "" {
+		return "", fmt.Errorf("'osVersion' not set in NVIDIADriver spec")
+	}
+
+	_, _, err = d.ParseOSVersion()
+	if err != nil {
+		return "", fmt.Errorf("failed to parse osVersion: %w", err)
+	}
+
+	return fmt.Sprintf("%s:%s-%s-%s", d.Image, d.Version, kernelVersion, d.OSVersion), nil
 }
 
 // ParseOSVersion parses the OSVersion field in NVIDIADriverSpec

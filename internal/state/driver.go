@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"text/template"
+	"regexp"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -58,11 +59,17 @@ type driverRuntimeSpec struct {
 	OpenshiftDriverToolkitEnabled bool
 	OpenshiftRHCOSVersions        []string
 	OpenshiftDriverToolkitImages  map[string]string
+	KernelVersions                []string
 }
 
 type openshiftSpec struct {
 	ToolkitImage string
 	RHCOSVersion string
+}
+
+type precompiledSpec struct {
+	KernelVersion          string
+	SanitizedKernelVersion string
 }
 
 type additionalConfigs struct {
@@ -78,6 +85,7 @@ type driverRenderData struct {
 	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
 	Runtime           *driverRuntimeSpec
 	Openshift         *openshiftSpec
+	Precompiled       *precompiledSpec
 	AdditionalConfigs *additionalConfigs
 }
 
@@ -166,7 +174,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
 	}
 
-	runtimeSpec, err := getRuntimeSpec(clusterInfo, cr.Spec.NodeSelector)
+	runtimeSpec, err := getRuntimeSpec(clusterInfo, &cr.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
@@ -195,7 +203,34 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	var objs []*unstructured.Unstructured
-	if runtimeSpec.OpenshiftDriverToolkitEnabled {
+	if cr.Spec.UsePrecompiledDrivers() {
+		if len(runtimeSpec.KernelVersions) == 0 {
+			logger.V(consts.LogLevelWarning).Info("WARNING: precompiled is enabled but no kernel versions found. Is Node Feature Discovery installed in the cluster?")
+		}
+
+		for _, kernelVersion := range runtimeSpec.KernelVersions {
+			renderData.Precompiled = &precompiledSpec{
+				KernelVersion:          kernelVersion,
+				SanitizedKernelVersion: getSanitizedKernelVersion(kernelVersion),
+			}
+			imagePath, err := renderData.Driver.Spec.GetPrecompiledImagePath(kernelVersion)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get precompiled image path: %w", err)
+			}
+			renderData.Driver.ImagePath = imagePath
+		}
+		manifestObjs, err := s.renderManifestObjects(ctx, renderData)
+		if err != nil {
+			logger.Error(err, "error rendering manifests for precompiled")
+		}
+
+		objs = append(objs, manifestObjs...)
+
+	} else if runtimeSpec.OpenshiftDriverToolkitEnabled {
+		if len(runtimeSpec.OpenshiftRHCOSVersions) == 0 {
+			logger.V(consts.LogLevelWarning).Info("WARNING: no RHCOS versions found. Is Node Feature Discovery installed in the cluster?")
+		}
+
 		for _, rhcosVersion := range runtimeSpec.OpenshiftRHCOSVersions {
 			renderData.Openshift = &openshiftSpec{
 				RHCOSVersion: rhcosVersion,
@@ -227,14 +262,6 @@ func (s *stateDriver) renderManifestObjects(ctx context.Context, renderData *dri
 	objs, err := s.renderer.RenderObjects(
 		&render.TemplatingData{
 			Data: renderData,
-			Funcs: template.FuncMap{
-				"Deref": func(b *bool) bool {
-					if b == nil {
-						return false
-					}
-					return *b
-				},
-			},
 		},
 	)
 	if err != nil {
@@ -334,7 +361,7 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	}, nil
 }
 
-func getRuntimeSpec(info clusterinfo.Interface, nodeSelector map[string]string) (*driverRuntimeSpec, error) {
+func getRuntimeSpec(info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
 	k8sVersion, err := info.GetKubernetesVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
@@ -355,8 +382,10 @@ func getRuntimeSpec(info clusterinfo.Interface, nodeSelector map[string]string) 
 		OpenshiftVersion:  openshiftVersion,
 	}
 
-	if openshiftVersion != "" {
-		rhcosVersions, err := info.GetRHCOSVersions(nodeSelector)
+	// Only get information needed for Openshift DriverToolkit if we are
+	// running on an Openshift cluster and precompiled drivers are disabled.
+	if openshiftVersion != "" && !spec.UsePrecompiledDrivers() {
+		rhcosVersions, err := info.GetRHCOSVersions(spec.NodeSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list openshift versions: %w", err)
 		}
@@ -367,5 +396,24 @@ func getRuntimeSpec(info clusterinfo.Interface, nodeSelector map[string]string) 
 		rs.OpenshiftDriverToolkitImages = openshiftDTKMap
 	}
 
+	if spec.UsePrecompiledDrivers() {
+		kernelVersions, err := info.GetKernelVersions(spec.NodeSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list kernel versions: %w", err)
+		}
+		rs.KernelVersions = kernelVersions
+	}
+
 	return rs, nil
+}
+
+// getSanitizedKernelVersion returns kernelVersion with following changes
+// 1. Remove arch suffix (as we use multi-arch images) and
+// 2. ensure to meet k8s constraints for metadata.name, i.e it
+// must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character
+func getSanitizedKernelVersion(kernelVersion string) string {
+	archRegex := regexp.MustCompile("x86_64|aarch64")
+	// remove arch strings, "_" and any trailing "." from the kernel version
+	sanitizedVersion := strings.TrimSuffix(strings.ReplaceAll(archRegex.ReplaceAllString(kernelVersion, ""), "_", "."), ".")
+	return strings.ToLower(sanitizedVersion)
 }

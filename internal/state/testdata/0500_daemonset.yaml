@@ -15,7 +15,9 @@ metadata:
     openshift.driver-toolkit.rhcos-image-missing: "true"
     {{- end }}
     {{- end }}
-  {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+  {{- if .Precompiled }}
+  name: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
+  {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
   name: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
   {{- else }}
   name: {{ .Driver.Name }}
@@ -56,6 +58,9 @@ spec:
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
+        {{- end }}
+        {{- if .Precompiled }}
+        feature.node.kubernetes.io/kernel-version.full: {{ .Precompiled.KernelVersion | quote }}
         {{- end }}
       tolerations:
         - key: nvidia.com/gpu

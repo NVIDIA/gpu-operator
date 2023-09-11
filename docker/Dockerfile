@@ -17,11 +17,27 @@ ARG CUDA_VERSION=undefined
 ARG GIT_COMMIT="unknown"
 
 ARG BASE_DIST=ubi8
+ARG GOLANG_VERSION=x.x.x
 
-ARG GOLANG_VERSION=1.20.1
-ARG BUILDER_IMAGE=golang:${GOLANG_VERSION}
+FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST} as builder
 
-FROM ${BUILDER_IMAGE} as builder
+RUN yum install -y wget make git gcc
+
+ARG GOLANG_VERSION=0.0.0
+RUN set -eux; \
+    \
+    arch="$(uname -m)"; \
+    case "${arch##*-}" in \
+        x86_64 | amd64) ARCH='amd64' ;; \
+        ppc64el | ppc64le) ARCH='ppc64le' ;; \
+        aarch64) ARCH='arm64' ;; \
+        *) echo "unsupported architecture" ; exit 1 ;; \
+    esac; \
+    wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
+    | tar -C /usr/local -xz
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 WORKDIR /workspace
 # Copy the Go Modules manifests

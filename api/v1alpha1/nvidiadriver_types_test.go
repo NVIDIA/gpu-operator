@@ -123,6 +123,89 @@ func TestGetImagePath(t *testing.T) {
 	}
 }
 
+func TestGetPrecompiledImagePath(t *testing.T) {
+	testCases := []struct {
+		description   string
+		spec          *NVIDIADriverSpec
+		kernelVersion string
+		errorExpected bool
+		expectedImage string
+	}{
+		{
+			description: "malformed image",
+			spec: &NVIDIADriverSpec{
+				Image: "malformed?image",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "only image provided",
+			spec: &NVIDIADriverSpec{
+				Image: "nvcr.io/nvidia/driver",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "image provided with tag",
+			spec: &NVIDIADriverSpec{
+				Image: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "image provided with digest",
+			spec: &NVIDIADriverSpec{
+				Image: "nvcr.io/nvidia/driver@sha256:" + testDigest,
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "missing driver branch",
+			spec: &NVIDIADriverSpec{
+				Image:     "nvcr.io/nvidia/driver",
+				OSVersion: "ubuntu22.04",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "missing OS version",
+			spec: &NVIDIADriverSpec{
+				Image:   "nvcr.io/nvidia/driver",
+				Version: "535",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "image with driver branch and OS version specified",
+			spec: &NVIDIADriverSpec{
+				Image:     "nvcr.io/nvidia/driver",
+				Version:   "535",
+				OSVersion: "ubuntu22.04",
+			},
+			kernelVersion: "5.4.0-150-generic",
+			expectedImage: "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			image, err := tc.spec.GetPrecompiledImagePath(tc.kernelVersion)
+			if tc.errorExpected {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, image, tc.expectedImage)
+		})
+	}
+}
+
 func TestParseOSString(t *testing.T) {
 	testCases := []struct {
 		description       string

@@ -42,10 +42,12 @@ type Interface interface {
 	GetOpenshiftVersion() (string, error)
 	GetRHCOSVersions(map[string]string) ([]string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
+	GetKernelVersions(map[string]string) ([]string, error)
 }
 
 const (
 	nfdOSTreeVersionLabelKey = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+	nfdKernelLabelKey        = "feature.node.kubernetes.io/kernel-version.full"
 )
 
 type clusterInfo struct {
@@ -57,6 +59,7 @@ type clusterInfo struct {
 	openshiftVersion             string
 	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
+	kernelVersions               []string
 }
 
 // New creates a new instance of clusterinfo API
@@ -98,6 +101,13 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 
 	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(ctx, l.config)
+
+	l.kernelVersions, err = getKernelVersions(ctx, l.config, map[string]string{
+		consts.GPUPresentLabel: "true",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kernel versions: %w", err)
+	}
 
 	return l, nil
 }
@@ -197,6 +207,14 @@ func (l *clusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
 	return getOpenshiftDTKImages(l.ctx, l.config)
 }
 
+func (l *clusterInfo) GetKernelVersions(labelSelector map[string]string) ([]string, error) {
+	if l.oneshot {
+		return l.kernelVersions, nil
+	}
+
+	return getKernelVersions(l.ctx, l.config, labelSelector)
+}
+
 func getKubernetesVersion(config *rest.Config) (string, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
@@ -286,4 +304,37 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 	// TODO: Add code to ensure OCP Namespace Monitoring setting
 
 	return rhcosDriverToolkitImages
+}
+
+func getKernelVersions(ctx context.Context, config *rest.Config, selector map[string]string) ([]string, error) {
+	logger := log.FromContext(ctx)
+	var kernelVersions []string
+
+	nodeSelector := map[string]string{
+		consts.GPUPresentLabel: "true",
+	}
+
+	// merge defaultSelector with user-input selector
+	maps.Copy(nodeSelector, selector)
+
+	k8sClient, err := corev1client.NewForConfig(config)
+	if err != nil {
+		logger.Error(err, "failed to build k8s core v1 client")
+		return nil, err
+	}
+
+	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
+	})
+
+	for _, node := range nodeList.Items {
+		node := node
+
+		nodeLabels := node.GetLabels()
+		if kernelVersion, ok := nodeLabels[nfdKernelLabelKey]; ok {
+			kernelVersions = append(kernelVersions, kernelVersion)
+		}
+	}
+
+	return kernelVersions, nil
 }
