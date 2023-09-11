@@ -1,7 +1,7 @@
 default:
-  image: docker:stable
+  image: docker:dind
   services:
-    - name: docker:stable-dind
+    - name: docker:dind
       command: ["--experimental"]
 
 variables:
