@@ -346,13 +346,13 @@ func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
 }
 
 func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
-	if spec == nil {
+	if spec == nil || !spec.IsEnabled() {
 		// note: GDS is optional in Clusterpolicy CRD
 		return nil, nil
 	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "GDS_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for validator: %v", err)
+		return nil, fmt.Errorf("failed to construct image path for the GDS container: %v", err)
 	}
 
 	return &gdsDriverSpec{
