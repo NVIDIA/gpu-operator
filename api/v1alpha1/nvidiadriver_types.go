@@ -226,6 +226,7 @@ func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 		ns = make(map[string]string, 0)
 		// If no node selector is specified then the driver is deployed
 		// on all GPU nodes by default
+		// nolint
 		ns["nvidia.com/gpu.present"] = "true"
 	}
 	return ns
