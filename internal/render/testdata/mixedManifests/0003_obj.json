@@ -1,0 +1,11 @@
+{
+  "apiVersion": "v1",
+  "kind": "TestObj3",
+  "metadata": {
+    "name": "{{ .Foo }}"
+  },
+  "spec": {
+    "attribute": "{{ .Bar }}",
+    "anotherAttribute": "{{ .Baz }}"
+  }
+}
