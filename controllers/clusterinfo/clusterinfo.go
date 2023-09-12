@@ -326,6 +326,10 @@ func getKernelVersions(ctx context.Context, config *rest.Config, selector map[st
 	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
 	})
+	if err != nil {
+		logger.Error(err, "failed to list nodes")
+		return nil, err
+	}
 
 	for _, node := range nodeList.Items {
 		node := node

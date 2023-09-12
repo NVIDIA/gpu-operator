@@ -272,6 +272,7 @@ func (s *stateSkel) addStateSpecificLabels(obj *unstructured.Unstructured) {
 	obj.SetLabels(labels)
 }
 
+// nolint
 func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, error) {
 	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info(
@@ -287,6 +288,7 @@ func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, 
 	return SyncStateIgnore, nil
 }
 
+// nolint
 func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error) {
 	stateLabel := map[string]string{
 		consts.StateLabel: s.name,
@@ -421,6 +423,7 @@ func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger l
 }
 
 // Check if provided attrTypes are present in NodeAttributes.Attributes
+// nolint
 func (s *stateSkel) checkAttributesExist(attrs nodeinfo.NodeAttributes, attrTypes ...nodeinfo.AttributeType) error {
 	for _, t := range attrTypes {
 		if _, ok := attrs.Attributes[t]; !ok {

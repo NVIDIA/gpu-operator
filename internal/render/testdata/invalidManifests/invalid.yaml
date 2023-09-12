@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: TestObj1
+metadata:
+  name: {{ .DoesNotExist }}
+spec:
+  attribute: {{ .Bar }}
+  anotherAttribute: {{ .Baz }}
