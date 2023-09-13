@@ -215,17 +215,15 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			}
 			imagePath, err := renderData.Driver.Spec.GetPrecompiledImagePath(kernelVersion)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get precompiled image path: %w", err)
+				return nil, fmt.Errorf("failed to get precompiled image path for kernel version %s: %w", kernelVersion, err)
 			}
 			renderData.Driver.ImagePath = imagePath
+			manifestObjs, err := s.renderManifestObjects(ctx, renderData)
+			if err != nil {
+				logger.Error(err, "error rendering manifests for precompiled", "KernelVersion", kernelVersion)
+			}
+			objs = append(objs, manifestObjs...)
 		}
-		manifestObjs, err := s.renderManifestObjects(ctx, renderData)
-		if err != nil {
-			logger.Error(err, "error rendering manifests for precompiled")
-		}
-
-		objs = append(objs, manifestObjs...)
-
 	} else if runtimeSpec.OpenshiftDriverToolkitEnabled {
 		if len(runtimeSpec.OpenshiftRHCOSVersions) == 0 {
 			logger.V(consts.LogLevelWarning).Info("WARNING: no RHCOS versions found. Is Node Feature Discovery installed in the cluster?")
