@@ -34,7 +34,6 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	yamlConverter "sigs.k8s.io/yaml"
@@ -93,7 +92,7 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 	// Read file
 	txt, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest file %s", filePath)
+		return nil, fmt.Errorf("failed to read manifest file %s: %w", filePath, err)
 	}
 
 	// Create a new template
@@ -117,12 +116,12 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 	}
 
 	if _, err := tmpl.Parse(string(txt)); err != nil {
-		return nil, errors.Wrapf(err, "failed to parse manifest file %s", filePath)
+		return nil, fmt.Errorf("failed to parse manifest file %s: %w", filePath, err)
 	}
 	rendered := bytes.Buffer{}
 
 	if err := tmpl.Execute(&rendered, data.Data); err != nil {
-		return nil, errors.Wrapf(err, "failed to render manifest %s", filePath)
+		return nil, fmt.Errorf("failed to render manifest %s: %w", filePath, err)
 	}
 
 	out := []*unstructured.Unstructured{}
@@ -139,7 +138,7 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 			if err == io.EOF {
 				break
 			}
-			return nil, errors.Wrapf(err, "failed to unmarshal manifest %s", filePath)
+			return nil, fmt.Errorf("failed to unmarshal manifest %s: %w", filePath, err)
 		}
 		// Ensure object is not empty by checking the object kind
 		if u.GetKind() == "" {
