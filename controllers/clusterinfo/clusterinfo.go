@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"sort"
 	"strings"
 
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
@@ -42,6 +44,7 @@ type Interface interface {
 	GetOpenshiftVersion() (string, error)
 	GetRHCOSVersions(map[string]string) ([]string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
+	GetOpenshiftProxyEnvars() ([]gpuv1.EnvVar, error)
 	GetKernelVersions(map[string]string) ([]string, error)
 }
 
@@ -60,6 +63,7 @@ type clusterInfo struct {
 	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
 	kernelVersions               []string
+	proxyEnvars                  []gpuv1.EnvVar
 }
 
 // New creates a new instance of clusterinfo API
@@ -215,6 +219,14 @@ func (l *clusterInfo) GetKernelVersions(labelSelector map[string]string) ([]stri
 	return getKernelVersions(l.ctx, l.config, labelSelector)
 }
 
+func (l *clusterInfo) GetOpenshiftProxyEnvars() ([]gpuv1.EnvVar, error) {
+	if l.oneshot {
+		return l.proxyEnvars, nil
+	}
+
+	return getOpenshiftProxyEnvars(l.ctx, l.config)
+}
+
 func getKubernetesVersion(config *rest.Config) (string, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
@@ -341,4 +353,53 @@ func getKernelVersions(ctx context.Context, config *rest.Config, selector map[st
 	}
 
 	return kernelVersions, nil
+}
+
+func getOpenshiftProxyEnvars(ctx context.Context, cfg *rest.Config) ([]gpuv1.EnvVar, error) {
+	var proxyEnvars []gpuv1.EnvVar
+	logger := log.FromContext(ctx)
+
+	client, err := configv1.NewForConfig(cfg)
+	if err != nil {
+		logger.Error(err, "error instantiating openshift config client")
+	}
+
+	proxy, err := client.Proxies().Get(ctx, "cluster", metav1.GetOptions{})
+	if err != nil {
+		logger.Error(err, "error retrieving proxies for openshift cluster")
+	}
+
+	if proxy == nil {
+		return nil, nil
+	}
+
+	proxies := map[string]string{
+		"HTTPS_PROXY": proxy.Spec.HTTPSProxy,
+		"HTTP_PROXY":  proxy.Spec.HTTPProxy,
+		"NO_PROXY":    proxy.Spec.NoProxy,
+	}
+	var envs []string
+	for k := range proxies {
+		envs = append(envs, k)
+	}
+	// ensure ordering is preserved when we add these env to pod spec
+	sort.Strings(envs)
+
+	for _, e := range envs {
+		v := proxies[e]
+		if len(v) == 0 {
+			continue
+		}
+		upperCaseEnvvar := gpuv1.EnvVar{
+			Name:  strings.ToUpper(e),
+			Value: v,
+		}
+		lowerCaseEnvvar := gpuv1.EnvVar{
+			Name:  strings.ToLower(e),
+			Value: v,
+		}
+		proxyEnvars = append(proxyEnvars, upperCaseEnvvar, lowerCaseEnvvar)
+	}
+
+	return proxyEnvars, nil
 }

@@ -1,0 +1,9 @@
+{{ if and (.Openshift) (.Runtime.OpenshiftProxyEnvars)  }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-operator-trusted-ca
+  namespace: {{ .Runtime.Namespace }}
+data:
+  ca-bundle.crt: ""
+{{ end }}

@@ -158,6 +158,14 @@ users:
 volumes:
 - '*'
 ---
+apiVersion: v1
+data:
+  ca-bundle.crt: ""
+kind: ConfigMap
+metadata:
+  name: gpu-operator-trusted-ca
+  namespace: test-operator
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -193,6 +201,12 @@ spec:
           value: void
         - name: OPENSHIFT_VERSION
           value: "4.13"
+        - name: HTTP_PROXY
+          value: http://user:pass@example:8080
+        - name: HTTPS_PROXY
+          value: https://user:pass@example:8085
+        - name: NO_PROXY
+          value: internal.example.com
         image: nvcr.io/nvidia/driver:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent
         lifecycle:
@@ -239,6 +253,9 @@ spec:
           name: run-mellanox-drivers
         - mountPath: /mnt/shared-nvidia-driver-toolkit
           name: shared-nvidia-driver-toolkit
+        - mountPath: /etc/pki/ca-trust/extracted/pem
+          name: gpu-operator-trusted-ca
+          readOnly: true
       - args:
         - until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting
           for nvidia-driver-ctr container to prepare the shared directory ...; sleep
@@ -361,6 +378,12 @@ spec:
         name: host-sys
       - emptyDir: {}
         name: shared-nvidia-driver-toolkit
+      - configMap:
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+          name: gpu-operator-trusted-ca
+        name: gpu-operator-trusted-ca
   updateStrategy:
     type: OnDelete
 ---

@@ -223,6 +223,12 @@ spec:
         - name: RHCOS_VERSION
           value: {{ .Openshift.RHCOSVersion }}
       {{- end }}
+      {{- if and (.Openshift) (.Runtime.OpenshiftProxyEnvars) }}
+      {{- range .Runtime.OpenshiftProxyEnvars }}
+        - name: {{ .Name }}
+          value : {{ .Value }}
+        {{- end }}
+      {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -253,6 +259,11 @@ spec:
           {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
+          {{- end}}
+          {{- if and (.Openshift) (.Runtime.OpenshiftProxyEnvars) }}
+          - name: gpu-operator-trusted-ca
+            mountPath: /etc/pki/ca-trust/extracted/pem
+            readOnly: true
           {{- end}}
         {{- with .Driver.Spec.Resources }}
         resources:
@@ -487,4 +498,12 @@ spec:
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         - name: shared-nvidia-driver-toolkit
           emptyDir: {}
+        {{- end }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftProxyEnvars) }}
+        - name: gpu-operator-trusted-ca
+          configMap: 
+            name: gpu-operator-trusted-ca
+            items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
         {{- end }}

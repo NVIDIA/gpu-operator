@@ -59,6 +59,7 @@ type driverRuntimeSpec struct {
 	OpenshiftDriverToolkitEnabled bool
 	OpenshiftRHCOSVersions        []string
 	OpenshiftDriverToolkitImages  map[string]string
+	OpenshiftProxyEnvars          []gpuv1.EnvVar
 	KernelVersions                []string
 }
 
@@ -383,6 +384,13 @@ func getRuntimeSpec(info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADrive
 	// Only get information needed for Openshift DriverToolkit if we are
 	// running on an Openshift cluster and precompiled drivers are disabled.
 	if openshiftVersion != "" && !spec.UsePrecompiledDrivers() {
+
+		openshiftProxyEnvars, err := info.GetOpenshiftProxyEnvars()
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve proxy settings for openshift cluster: %w", err)
+		}
+		rs.OpenshiftProxyEnvars = openshiftProxyEnvars
+
 		rhcosVersions, err := info.GetRHCOSVersions(spec.NodeSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list openshift versions: %w", err)

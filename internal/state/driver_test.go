@@ -392,6 +392,20 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	}
 	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
 	renderData.Runtime.OpenshiftVersion = "4.13"
+	renderData.Runtime.OpenshiftProxyEnvars = []gpuv1.EnvVar{
+		{
+			Name:  "HTTP_PROXY",
+			Value: "http://user:pass@example:8080",
+		},
+		{
+			Name:  "HTTPS_PROXY",
+			Value: "https://user:pass@example:8085",
+		},
+		{
+			Name:  "NO_PROXY",
+			Value: "internal.example.com",
+		},
+	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
