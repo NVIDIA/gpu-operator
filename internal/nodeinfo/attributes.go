@@ -17,7 +17,8 @@
 package nodeinfo
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -79,7 +80,7 @@ type NodeAttributes struct {
 func (a *NodeAttributes) fromLabel(attrT AttributeType, nodeLabels map[string]string, selectedLabel string) error {
 	attrVal, ok := nodeLabels[selectedLabel]
 	if !ok {
-		return errors.Errorf("cannot create node attribute, missing label: %s", selectedLabel)
+		return fmt.Errorf("cannot create node attribute, missing label: %s", selectedLabel)
 	}
 
 	// Note: attrVal may be empty, this could indicate a binary attribute which relies on key existence

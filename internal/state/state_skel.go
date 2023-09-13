@@ -22,9 +22,8 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -170,7 +169,7 @@ func (s *stateSkel) getObj(ctx context.Context, obj *unstructured.Unstructured) 
 
 	err := s.client.Get(
 		ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
-	if k8serrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// does not exist (yet)
 		reqLogger.V(consts.LogLevelInfo).Info("Object Does not Exists")
 	}
@@ -184,7 +183,7 @@ func (s *stateSkel) createObj(ctx context.Context, obj *unstructured.Unstructure
 	reqLogger.V(consts.LogLevelInfo).Info("Creating Object", "Namespace:", obj.GetNamespace(), "Name:", obj.GetName())
 	toCreate := obj.DeepCopy()
 	if err := s.client.Create(ctx, toCreate); err != nil {
-		if k8serrors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			reqLogger.V(consts.LogLevelInfo).Info("Object Already Exists")
 		}
 		return err
@@ -214,7 +213,7 @@ func (s *stateSkel) updateObj(ctx context.Context, obj *unstructured.Unstructure
 	// TODO: using Patch preserves runtime attributes. In the future consider using patch if relevant
 	desired := obj.DeepCopy()
 	if err := s.client.Update(ctx, desired); err != nil {
-		return errors.Wrap(err, "failed to update resource")
+		return fmt.Errorf("failed to update resource: %w", err)
 	}
 	reqLogger.V(consts.LogLevelInfo).Info("Object updated successfully")
 	return nil
@@ -230,7 +229,7 @@ func (s *stateSkel) createOrUpdateObjs(
 			"Name", desiredObj.GetName())
 		// Set controller reference for object to allow cleanup on CR deletion
 		if err := setControllerReference(desiredObj); err != nil {
-			return errors.Wrap(err, "failed to set controller reference for object")
+			return fmt.Errorf("failed to set controller reference for object: %w", err)
 		}
 
 		s.addStateSpecificLabels(desiredObj)
@@ -240,7 +239,7 @@ func (s *stateSkel) createOrUpdateObjs(
 			// object created successfully
 			continue
 		}
-		if !k8serrors.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			// Some error occurred
 			return err
 		}
@@ -279,7 +278,7 @@ func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, 
 		"State spec in CR is nil, deleting existing objects if needed", "State:", s.name)
 	found, err := s.deleteStateRelatedObjects(ctx)
 	if err != nil {
-		return SyncStateError, errors.Wrap(err, "failed to delete k8s objects")
+		return SyncStateError, fmt.Errorf("failed to delete k8s objects: %w", err)
 	}
 	if found {
 		reqLogger.V(consts.LogLevelInfo).Info("State deleting objects in progress", "State:", s.name)
@@ -369,13 +368,13 @@ func (s *stateSkel) getSyncState(ctx context.Context, objs []*unstructured.Unstr
 		found := obj.DeepCopy()
 		err := s.getObj(ctx, found)
 		if err != nil {
-			if k8serrors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				// does not exist (yet)
 				reqLogger.V(consts.LogLevelInfo).Info("Object is not ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
 				return SyncStateNotReady, nil
 			}
 			// other error
-			return SyncStateNotReady, errors.Wrapf(err, "failed to get object")
+			return SyncStateNotReady, fmt.Errorf("failed to get object: %w", err)
 		}
 
 		// Object exists, check for Kind specific readiness
@@ -394,12 +393,12 @@ func (s *stateSkel) getSyncState(ctx context.Context, objs []*unstructured.Unstr
 func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger logr.Logger) (bool, error) {
 	buf, err := uds.MarshalJSON()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to marshall unstructured daemonset object")
+		return false, fmt.Errorf("failed to marshall unstructured daemonset object: %w", err)
 	}
 
 	ds := &appsv1.DaemonSet{}
 	if err = json.Unmarshal(buf, ds); err != nil {
-		return false, errors.Wrap(err, "failed to unmarshall to daemonset object")
+		return false, fmt.Errorf("failed to unmarshall to daemonset object: %w", err)
 	}
 
 	reqLogger.V(consts.LogLevelDebug).Info(
