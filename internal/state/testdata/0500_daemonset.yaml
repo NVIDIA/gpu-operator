@@ -157,7 +157,7 @@ spec:
         {{- if .Driver.Spec.Manager.Env }}
           {{- range .Driver.Spec.Manager.Env }}
           - name: {{ .Name }}
-            value: {{ .Value }}
+            value: {{ .Value | quote }}
           {{- end }}
         {{- end }}
           securityContext:
@@ -206,7 +206,7 @@ spec:
       {{- if .Driver.Spec.Env }}
         {{- range .Driver.Spec.Env }}
         - name: {{ .Name }}
-          value : {{ .Value }}
+          value : {{ .Value | quote }}
         {{- end }}
       {{- end }}
       {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
@@ -221,7 +221,7 @@ spec:
         - name: RHCOS_IMAGE_MISSING
           value: "true"
         - name: RHCOS_VERSION
-          value: {{ .Openshift.RHCOSVersion }}
+          value: {{ .Openshift.RHCOSVersion | quote }}
       {{- end }}
         volumeMounts:
           - name: run-nvidia
@@ -345,6 +345,13 @@ spec:
         {{- else }}
         command: [bash, -xc]
         args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gds-driver install"]
+        {{- end }}
+        {{- if .GDS.Spec.Env }}
+        env:
+          {{- range .GDS.Spec.Env }}
+          - name: {{ .Name }}
+            value : {{ .Value | quote }}
+          {{- end }}
         {{- end }}
         securityContext:
           privileged: true
