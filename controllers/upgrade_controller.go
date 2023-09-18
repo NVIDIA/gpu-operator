@@ -280,7 +280,10 @@ func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}),
 		handler.EnqueueRequestsFromMapFunc(dsMapFn),
-		predicate.Or(appLabelSelector, dtkLabelSelector),
+		predicate.And(
+			predicate.GenerationChangedPredicate{},
+			predicate.Or(appLabelSelector, dtkLabelSelector),
+		),
 	)
 	if err != nil {
 		return err
