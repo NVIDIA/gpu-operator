@@ -4,6 +4,8 @@ kind: ConfigMap
 metadata:
   name: gpu-operator-trusted-ca
   namespace: {{ .Runtime.Namespace }}
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
 data:
   ca-bundle.crt: ""
 {{ end }}

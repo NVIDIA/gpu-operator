@@ -163,6 +163,8 @@ data:
   ca-bundle.crt: ""
 kind: ConfigMap
 metadata:
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
   name: gpu-operator-trusted-ca
   namespace: test-operator
 ---
