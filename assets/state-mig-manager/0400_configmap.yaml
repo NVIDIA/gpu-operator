@@ -51,7 +51,7 @@ data:
       # H100-80GB, H800-80GB, A100-80GB, A800-80GB, A100-40GB, A800-40GB
       all-1g.10gb:
         # H100-80GB, H800-80GB, A100-80GB, A800-80GB
-        - device-filter: ["0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE"]
+        - device-filter: ["0x233010DE", "0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE"]
           devices: all
           mig-enabled: true
           mig-devices:
@@ -208,7 +208,7 @@ data:
             "3g.47gb": 1
 
         # H100-80GB, H800-80GB, A100-80GB, A800-80GB
-        - device-filter: ["0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE"]
+        - device-filter: ["0x233010DE", "0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE"]
           devices: all
           mig-enabled: true
           mig-devices:
