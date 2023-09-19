@@ -205,9 +205,15 @@ spec:
           value: "4.13"
         - name: HTTP_PROXY
           value: http://user:pass@example:8080
+        - name: http_proxy
+          value: http://user:pass@example:8080
         - name: HTTPS_PROXY
           value: https://user:pass@example:8085
+        - name: https_proxy
+          value: https://user:pass@example:8085
         - name: NO_PROXY
+          value: internal.example.com
+        - name: no_proxy
           value: internal.example.com
         image: nvcr.io/nvidia/driver:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent

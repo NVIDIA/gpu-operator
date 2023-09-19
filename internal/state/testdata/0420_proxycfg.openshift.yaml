@@ -1,4 +1,4 @@
-{{ if and (.Openshift) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+{{ if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

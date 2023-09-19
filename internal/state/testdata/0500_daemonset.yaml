@@ -227,13 +227,19 @@ spec:
         {{- if .Runtime.OpenshiftProxySpec.HTTPProxy }}
         - name: "HTTP_PROXY"
           value : {{ .Runtime.OpenshiftProxySpec.HTTPProxy | quote }}
+        - name: "http_proxy"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPProxy | quote }}
         {{- end }}
         {{- if .Runtime.OpenshiftProxySpec.HTTPSProxy }}
         - name: "HTTPS_PROXY"
           value : {{ .Runtime.OpenshiftProxySpec.HTTPSProxy | quote }}
+        - name: "https_proxy"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPSProxy | quote }}
         {{- end }}
         {{- if .Runtime.OpenshiftProxySpec.NoProxy }}
         - name: "NO_PROXY"
+          value : {{ .Runtime.OpenshiftProxySpec.NoProxy | quote }}
+        - name: "no_proxy"
           value : {{ .Runtime.OpenshiftProxySpec.NoProxy | quote }}
         {{- end }}
       {{- end }}
@@ -268,7 +274,7 @@ spec:
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
           {{- end}}
-          {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+          {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
           - name: gpu-operator-trusted-ca
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
@@ -507,7 +513,7 @@ spec:
         - name: shared-nvidia-driver-toolkit
           emptyDir: {}
         {{- end }}
-        {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
         - name: gpu-operator-trusted-ca
           configMap: 
             name: gpu-operator-trusted-ca
