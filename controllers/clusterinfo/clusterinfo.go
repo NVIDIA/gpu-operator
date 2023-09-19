@@ -22,7 +22,8 @@ import (
 	"maps"
 	"strings"
 
-	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	ocpconfigv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,7 @@ type Interface interface {
 	GetOpenshiftVersion() (string, error)
 	GetRHCOSVersions(map[string]string) ([]string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
+	GetOpenshiftProxySpec() (*configv1.ProxySpec, error)
 	GetKernelVersions(map[string]string) ([]string, error)
 }
 
@@ -60,6 +62,7 @@ type clusterInfo struct {
 	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
 	kernelVersions               []string
+	proxySpec                    *configv1.ProxySpec
 }
 
 // New creates a new instance of clusterinfo API
@@ -215,6 +218,14 @@ func (l *clusterInfo) GetKernelVersions(labelSelector map[string]string) ([]stri
 	return getKernelVersions(l.ctx, l.config, labelSelector)
 }
 
+func (l *clusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
+	if l.oneshot {
+		return l.proxySpec, nil
+	}
+
+	return getOpenshiftProxySpec(l.ctx, l.config)
+}
+
 func getKubernetesVersion(config *rest.Config) (string, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
@@ -230,7 +241,7 @@ func getKubernetesVersion(config *rest.Config) (string, error) {
 }
 
 func getOpenshiftVersion(ctx context.Context, config *rest.Config) (string, error) {
-	client, err := configv1.NewForConfig(config)
+	client, err := ocpconfigv1.NewForConfig(config)
 	if err != nil {
 		return "", err
 	}
@@ -341,4 +352,20 @@ func getKernelVersions(ctx context.Context, config *rest.Config, selector map[st
 	}
 
 	return kernelVersions, nil
+}
+
+func getOpenshiftProxySpec(ctx context.Context, cfg *rest.Config) (*configv1.ProxySpec, error) {
+	logger := log.FromContext(ctx)
+
+	client, err := ocpconfigv1.NewForConfig(cfg)
+	if err != nil {
+		logger.Error(err, "error instantiating openshift config client")
+	}
+
+	proxy, err := client.Proxies().Get(ctx, "cluster", metav1.GetOptions{})
+	if err != nil {
+		logger.Error(err, "error retrieving proxies for openshift cluster")
+		return nil, err
+	}
+	return &proxy.Spec, nil
 }

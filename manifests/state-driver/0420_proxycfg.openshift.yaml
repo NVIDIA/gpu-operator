@@ -1,0 +1,11 @@
+{{ if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-operator-trusted-ca
+  namespace: {{ .Runtime.Namespace }}
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+data:
+  ca-bundle.crt: ""
+{{ end }}

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -392,6 +393,14 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	}
 	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
 	renderData.Runtime.OpenshiftVersion = "4.13"
+	renderData.Runtime.OpenshiftProxySpec = &configv1.ProxySpec{
+		HTTPProxy:  "http://user:pass@example:8080",
+		HTTPSProxy: "https://user:pass@example:8085",
+		NoProxy:    "internal.example.com",
+		TrustedCA: configv1.ConfigMapNameReference{
+			Name: "gpu-operator-trusted-ca",
+		},
+	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
