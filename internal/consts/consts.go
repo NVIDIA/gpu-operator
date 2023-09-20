@@ -29,10 +29,8 @@ const (
 )
 
 const (
-	NicClusterPolicyResourceName = "nic-cluster-policy"
-	OfedDriverLabel              = "nvidia.com/ofed-driver"
-	StateLabel                   = "nvidia.network-operator.state"
-	GPUPresentLabel              = "nvidia.com/gpu.present"
+	StateLabel      = "nvidia.com/gpu-operator.state"
+	GPUPresentLabel = "nvidia.com/gpu.present"
 
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
