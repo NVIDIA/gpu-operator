@@ -608,12 +608,12 @@ func assertDriverContainerReady(silent, withWaitFlag bool) error {
 	return runCommand(command, args, silent)
 }
 
-func (d *Driver) runValidation(silent bool) (bool, string, error) {
+func (d *Driver) runValidation(silent bool) (string, bool, error) {
 	driverRoot, isHostDriver := getDriverRoot()
 	if !isHostDriver {
 		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
 		if err := assertDriverContainerReady(silent, withWaitFlag); err != nil {
-			return false, "", fmt.Errorf("error checking driver container status: %v", err)
+			return "", false, fmt.Errorf("error checking driver container status: %v", err)
 		}
 	}
 
@@ -622,10 +622,10 @@ func (d *Driver) runValidation(silent bool) (bool, string, error) {
 	args := []string{driverRoot, "nvidia-smi"}
 
 	if withWaitFlag {
-		return isHostDriver, driverRoot, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+		return driverRoot, isHostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
 	}
 
-	return isHostDriver, driverRoot, runCommand(command, args, silent)
+	return driverRoot, isHostDriver, runCommand(command, args, silent)
 }
 
 func (d *Driver) validate() error {
@@ -641,7 +641,7 @@ func (d *Driver) validate() error {
 		return err
 	}
 
-	isHostDriver, driverRoot, err := d.runValidation(false)
+	driverRoot, isHostDriver, err := d.runValidation(false)
 	if err != nil {
 		log.Error("driver is not ready")
 		return err
@@ -649,7 +649,7 @@ func (d *Driver) validate() error {
 
 	if !disableDevCharSymlinkCreation {
 		log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
-		err = createDevCharSymlinks(isHostDriver, driverRoot)
+		err = createDevCharSymlinks(driverRoot, isHostDriver)
 		if err != nil {
 			msg := strings.Join([]string{
 				"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
@@ -683,7 +683,7 @@ func (d *Driver) validate() error {
 }
 
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
-func createDevCharSymlinks(isHostDriver bool, driverRoot string) error {
+func createDevCharSymlinks(driverRoot string, isHostDriver bool) error {
 	// If the host driver is being used, we rely on the fact that we are running a privileged container and as such
 	// have access to /dev
 	devRoot := driverRoot
