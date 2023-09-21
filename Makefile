@@ -139,7 +139,7 @@ bundle: manifests kustomize
 
 # Build the bundle image.
 build-bundle-image:
-	docker build \
+	$(DOCKER) build \
 	--build-arg VERSION=$(VERSION) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
@@ -147,7 +147,7 @@ build-bundle-image:
 
 # Push the bundle image.
 push-bundle-image: build-bundle-image
-	docker push $(BUNDLE_IMAGE)
+	$(DOCKER) push $(BUNDLE_IMAGE)
 
 # Define local and dockerized golang targets
 
