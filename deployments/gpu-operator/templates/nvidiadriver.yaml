@@ -1,0 +1,54 @@
+{{- if and .Values.driver.nvidiaDriverCRD.enabled .Values.driver.nvidiaDriverCRD.deployDefaultCR }}
+apiVersion: nvidia.com/v1alpha1
+kind: NVIDIADriver
+metadata:
+  name: default
+spec:
+  repository: {{ .Values.driver.repository }}
+  image: {{ .Values.driver.image }}
+  version: {{ .Values.driver.version }}
+  usePrecompiled: {{ .Values.driver.usePrecompiled }}
+  driverType: {{ .Values.driver.nvidiaDriverCRD.driverType | default "gpu" }}
+  {{- if .Values.driver.nvidiaDriverCRD.nodeSelector }}
+  nodeSelector: {{ toYaml .Values.driver.nvidiaDriverCRD.nodeSelector | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.manager }}
+  manager: {{ toYaml .Values.driver.manager | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.startupProbe }}
+  startupProbe: {{ toYaml .Values.driver.startupProbe | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.livenessProbe }}
+  livenessProbe: {{ toYaml .Values.driver.livenessProbe | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.readinessProbe }}
+  readinessProbe: {{ toYaml .Values.driver.readinessProbe | nindent 6 }}
+  {{- end }}
+  rdma:
+    enabled: {{ .Values.driver.rdma.enabled }}
+    useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
+  {{- if .Values.driver.repoConfig }}
+  repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.certConfig }}
+  certConfig: {{ toYaml .Values.driver.certConfig | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.licensingConfig }}
+  licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.virtualTopology }}
+  virtualTopology: {{ toYaml .Values.driver.virtualTopology | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.kernelModuleConfig }}
+  kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.resources }}
+  resources: {{ toYaml .Values.driver.resources | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.env }}
+  env: {{ toYaml .Values.driver.env | nindent 6 }}
+  {{- end }}
+  {{- if .Values.driver.args }}
+  args: {{ toYaml .Values.driver.args | nindent 6 }}
+  {{- end }}
+{{- end }}

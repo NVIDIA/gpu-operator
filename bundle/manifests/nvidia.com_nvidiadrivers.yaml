@@ -127,7 +127,7 @@ spec:
                 type: object
               image:
                 default: nvcr.io/nvidia/driver
-                description: NVIDIA Driver container image
+                description: NVIDIA Driver container image name
                 type: string
               imagePullPolicy:
                 description: Image pull policy
@@ -485,6 +485,9 @@ spec:
                   configMapName:
                     type: string
                 type: object
+              repository:
+                description: NVIDIA Driver repository
+                type: string
               resources:
                 description: 'Optional: Define resources requests and limits for each
                   pod'
