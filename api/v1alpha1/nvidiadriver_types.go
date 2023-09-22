@@ -65,7 +65,11 @@ type NVIDIADriverSpec struct {
 	// GPUDirectStorage defines the spec for GDS driver
 	GPUDirectStorage *gpuv1.GPUDirectStorageSpec `json:"gds,omitempty"`
 
-	// NVIDIA Driver container image
+	// NVIDIA Driver repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// NVIDIA Driver container image name
 	// +kubebuilder:default=nvcr.io/nvidia/driver
 	Image string `json:"image"`
 
@@ -247,6 +251,9 @@ func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
 		return d.Image, nil
 	}
 
+	if d.Repository == "" {
+		return "", fmt.Errorf("'repository' not set in NVIDIADriver spec")
+	}
 	if d.Version == "" {
 		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
 	}
@@ -259,7 +266,7 @@ func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
 		return "", fmt.Errorf("failed to parse osVersion: %w", err)
 	}
 
-	return fmt.Sprintf("%s:%s-%s", d.Image, d.Version, d.OSVersion), nil
+	return fmt.Sprintf("%s/%s:%s-%s", d.Repository, d.Image, d.Version, d.OSVersion), nil
 }
 
 // GetPrecompiledImagePath returns the precompiled driver image path for a
@@ -276,6 +283,9 @@ func (d *NVIDIADriverSpec) GetPrecompiledImagePath(kernelVersion string) (string
 		return "", fmt.Errorf("specifying image tag / digest is not supported when precompiled is enabled")
 	}
 
+	if d.Repository == "" {
+		return "", fmt.Errorf("'repository' not set in NVIDIADriver spec")
+	}
 	if d.Version == "" {
 		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
 	}
@@ -288,7 +298,7 @@ func (d *NVIDIADriverSpec) GetPrecompiledImagePath(kernelVersion string) (string
 		return "", fmt.Errorf("failed to parse osVersion: %w", err)
 	}
 
-	return fmt.Sprintf("%s:%s-%s-%s", d.Image, d.Version, kernelVersion, d.OSVersion), nil
+	return fmt.Sprintf("%s/%s:%s-%s-%s", d.Repository, d.Image, d.Version, kernelVersion, d.OSVersion), nil
 }
 
 // ParseOSVersion parses the OSVersion field in NVIDIADriverSpec
