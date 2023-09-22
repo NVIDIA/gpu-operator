@@ -41,7 +41,8 @@ import (
 )
 
 const (
-	manifestResultDir = "./golden"
+	manifestDir       = "../../manifests"
+	manifestResultDir = "./testdata/golden"
 )
 
 func getYAMLString(objs []*unstructured.Unstructured) (string, error) {
@@ -66,7 +67,7 @@ func TestDriverRenderMinimal(t *testing.T) {
 		testName = "driver-minimal"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -95,7 +96,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 		testName = "driver-rdma"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -177,7 +178,7 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	const (
 		testName = "driver-rdma-hostmofed"
 	)
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -207,7 +208,7 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 
 func TestDriverSpec(t *testing.T) {
 	// Construct a sample driver state manager
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -285,7 +286,7 @@ func TestDriverGDS(t *testing.T) {
 		testName = "driver-gds"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -321,7 +322,7 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 		testName = "driver-additional-configs"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -379,7 +380,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -423,7 +424,7 @@ func TestDriverPrecompiled(t *testing.T) {
 		rhcosVersion = "5.4.0-150-generic"
 	)
 
-	state, err := NewStateDriver(nil, nil, "./testdata")
+	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
