@@ -21,13 +21,12 @@ import (
 	"os"
 	"path/filepath"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 type templateData struct {
