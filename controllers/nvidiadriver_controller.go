@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -173,7 +174,11 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return reconcileRequests
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), handler.EnqueueRequestsFromMapFunc(mapFn))
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}),
+		handler.EnqueueRequestsFromMapFunc(mapFn),
+		predicate.GenerationChangedPredicate{},
+	)
 	if err != nil {
 		return err
 	}
