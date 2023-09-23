@@ -19,13 +19,13 @@ package v1alpha1
 import (
 	"fmt"
 	"strings"
-	"unicode"
+
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	"github.com/NVIDIA/gpu-operator/internal/image"
 
 	"github.com/regclient/regclient/types/ref"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 )
 
 const (
@@ -76,10 +76,6 @@ type NVIDIADriverSpec struct {
 	// NVIDIA Driver version (or just branch for precompiled drivers)
 	// +kubebuilder:validation:Optional
 	Version string `json:"version,omitempty"`
-
-	// Operating System version
-	// +kubebuilder:validation:Optional
-	OSVersion string `json:"osVersion,omitempty"`
 
 	// Image pull policy
 	// +kubebuilder:validation:Optional
@@ -236,94 +232,59 @@ func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 	return ns
 }
 
+var imageEnvName = map[DriverType]string{
+	GPU:             "DRIVER_IMAGE",
+	VGPU:            "DRIVER_IMAGE",
+	VGPUHostManager: "VGPU_MANAGER_IMAGE",
+}
+
 // GetImagePath returns the driver image path given the information
-// provided in NVIDIADriverSpec. The driver image path will be
-// in the following format unless spec.Image contains a tag or digest.
-// <image>:<driver-ver>-<os-ver>
-func (d *NVIDIADriverSpec) GetImagePath() (string, error) {
-	_, err := ref.New(d.Image)
+// provided in NVIDIADriverSpec and the osVersion passed as an argument.
+// The driver image path will be in the following format unless the spec
+// contains a digest.
+// <repository>/<image>:<driver-ver>-<os-ver>
+func (d *NVIDIADriverSpec) GetImagePath(osVersion string) (string, error) {
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, imageEnvName[d.DriverType])
 	if err != nil {
-		return "", fmt.Errorf("failed to parse driver image: %w", err)
+		return "", fmt.Errorf("failed to get image path from crd: %w", err)
 	}
 
-	if strings.Contains(d.Image, ":") || strings.Contains(d.Image, "@") {
-		// tag or digest is provided, return full image path
-		return d.Image, nil
+	// if image digest is specified, use it directly
+	if !strings.Contains(image, "sha256:") {
+		// append '-<osVersion>' to the driver tag
+		image = fmt.Sprintf("%s-%s", image, osVersion)
 	}
 
-	if d.Repository == "" {
-		return "", fmt.Errorf("'repository' not set in NVIDIADriver spec")
-	}
-	if d.Version == "" {
-		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
-	}
-	if d.OSVersion == "" {
-		return "", fmt.Errorf("'osVersion' not set in NVIDIADriver spec")
-	}
-
-	_, _, err = d.ParseOSVersion()
+	_, err = ref.New(image)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse osVersion: %w", err)
+		return "", fmt.Errorf("failed to parse driver image path: %w", err)
 	}
 
-	return fmt.Sprintf("%s/%s:%s-%s", d.Repository, d.Image, d.Version, d.OSVersion), nil
+	return image, nil
 }
 
 // GetPrecompiledImagePath returns the precompiled driver image path for a
-// given kernel version. Precompiled driver images follow the following
-// format: <image>:<driver-ver>-<kernel-ver>-<os-ver>
-func (d *NVIDIADriverSpec) GetPrecompiledImagePath(kernelVersion string) (string, error) {
-	_, err := ref.New(d.Image)
+// given os version and kernel version. Precompiled driver images follow
+// the following format:
+// <repository>/<image>:<driver-ver>-<kernel-ver>-<os-ver>
+func (d *NVIDIADriverSpec) GetPrecompiledImagePath(osVersion string, kernelVersion string) (string, error) {
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, imageEnvName[d.DriverType])
 	if err != nil {
-		return "", fmt.Errorf("failed to parse driver image: %w", err)
+		return "", fmt.Errorf("failed to get image path from crd: %w", err)
 	}
 
-	if strings.Contains(d.Image, ":") || strings.Contains(d.Image, "@") {
-		// tag or digest is not supported for precompiled
-		return "", fmt.Errorf("specifying image tag / digest is not supported when precompiled is enabled")
+	// specifying a digest in the spec is not supported when using precompiled
+	if strings.Contains(image, "sha256:") {
+		return "", fmt.Errorf("specifying image digest is not supported when precompiled is enabled")
 	}
 
-	if d.Repository == "" {
-		return "", fmt.Errorf("'repository' not set in NVIDIADriver spec")
-	}
-	if d.Version == "" {
-		return "", fmt.Errorf("'version' not set in NVIDIADriver spec")
-	}
-	if d.OSVersion == "" {
-		return "", fmt.Errorf("'osVersion' not set in NVIDIADriver spec")
-	}
+	// append '-<kernelVersion>-<osVersion>' to the driver tag
+	image = fmt.Sprintf("%s-%s-%s", image, kernelVersion, osVersion)
 
-	_, _, err = d.ParseOSVersion()
+	_, err = ref.New(image)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse osVersion: %w", err)
+		return "", fmt.Errorf("failed to parse driver image path: %w", err)
 	}
 
-	return fmt.Sprintf("%s/%s:%s-%s-%s", d.Repository, d.Image, d.Version, kernelVersion, d.OSVersion), nil
-}
-
-// ParseOSVersion parses the OSVersion field in NVIDIADriverSpec
-// and returns the ID and VERSION_ID for the operating system.
-//
-// OsVersion is expected to be in the form of {ID}{VERSION_ID},
-// where ID identifies the OS name and VERSION_ID identifies the
-// OS version. This aligns with the information reported in
-// /etc/os-release, for example.
-// https://www.freedesktop.org/software/systemd/man/os-release.html
-func (d *NVIDIADriverSpec) ParseOSVersion() (string, string, error) {
-	return parseOSString(d.OSVersion)
-}
-
-func parseOSString(os string) (string, string, error) {
-	idx := 0
-	for _, r := range os {
-		if unicode.IsNumber(r) {
-			break
-		}
-		idx++
-	}
-
-	if idx == len(os) {
-		return "", "", fmt.Errorf("no number in string")
-	}
-	return os[:idx], os[idx:], nil
+	return image, nil
 }

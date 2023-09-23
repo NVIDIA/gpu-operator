@@ -58,10 +58,9 @@ type driverRuntimeSpec struct {
 	KubernetesVersion             string
 	OpenshiftVersion              string
 	OpenshiftDriverToolkitEnabled bool
-	OpenshiftRHCOSVersions        []string
 	OpenshiftDriverToolkitImages  map[string]string
 	OpenshiftProxySpec            *configv1.ProxySpec
-	KernelVersions                []string
+	NodePools                     []nodePool
 }
 
 type openshiftSpec struct {
@@ -171,12 +170,7 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
-	driverSpec, err := getDriverSpec(cr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct driver spec: %v", err)
-	}
-
-	runtimeSpec, err := getRuntimeSpec(clusterInfo, &cr.Spec)
+	runtimeSpec, err := getRuntimeSpec(ctx, s.client, clusterInfo, &cr.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
@@ -195,7 +189,6 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	gpuDirectRDMASpec := clusterPolicy.Spec.Driver.GPUDirectRDMA
 
 	renderData := &driverRenderData{
-		Driver:            driverSpec,
 		Operator:          operatorSpec,
 		Validator:         validatorSpec,
 		GDS:               gdsSpec,
@@ -204,53 +197,40 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		AdditionalConfigs: &additionalConfigs{},
 	}
 
+	// Render kubernetes objects for each node pool.
+	// We deploy one DaemonSet per node pool.
 	var objs []*unstructured.Unstructured
-	if cr.Spec.UsePrecompiledDrivers() {
-		if len(runtimeSpec.KernelVersions) == 0 {
-			logger.V(consts.LogLevelWarning).Info("WARNING: precompiled is enabled but no kernel versions found. Is Node Feature Discovery installed in the cluster?")
-		}
-
-		for _, kernelVersion := range runtimeSpec.KernelVersions {
-			renderData.Precompiled = &precompiledSpec{
-				KernelVersion:          kernelVersion,
-				SanitizedKernelVersion: getSanitizedKernelVersion(kernelVersion),
-			}
-			imagePath, err := renderData.Driver.Spec.GetPrecompiledImagePath(kernelVersion)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get precompiled image path for kernel version %s: %w", kernelVersion, err)
-			}
-			renderData.Driver.ImagePath = imagePath
-			manifestObjs, err := s.renderManifestObjects(ctx, renderData)
-			if err != nil {
-				logger.Error(err, "error rendering manifests for precompiled", "KernelVersion", kernelVersion)
-			}
-			objs = append(objs, manifestObjs...)
-		}
-	} else if runtimeSpec.OpenshiftDriverToolkitEnabled {
-		if len(runtimeSpec.OpenshiftRHCOSVersions) == 0 {
-			logger.V(consts.LogLevelWarning).Info("WARNING: no RHCOS versions found. Is Node Feature Discovery installed in the cluster?")
-		}
-
-		for _, rhcosVersion := range runtimeSpec.OpenshiftRHCOSVersions {
-			renderData.Openshift = &openshiftSpec{
-				RHCOSVersion: rhcosVersion,
-				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[rhcosVersion],
-			}
-			manifestObjs, err := s.renderManifestObjects(ctx, renderData)
-			if err != nil {
-				logger.Error(err, "error rendering manifests for openshift build", "RHCOSVersion", rhcosVersion)
-				return nil, err
-			}
-			objs = append(objs, manifestObjs...)
-		}
-	} else {
-		objs, err = s.renderManifestObjects(ctx, renderData)
+	for _, nodePool := range runtimeSpec.NodePools {
+		// Construct a unique driver spec per node pool. Each node pool
+		// should have a unique nodeSelector and name.
+		driverSpec, err := getDriverSpec(cr, nodePool)
 		if err != nil {
-			logger.Error(err, "error rendering manifests for openshift build")
+			return nil, fmt.Errorf("failed to construct driver spec: %v", err)
+		}
+		renderData.Driver = driverSpec
+
+		if cr.Spec.UsePrecompiledDrivers() {
+			renderData.Precompiled = &precompiledSpec{
+				KernelVersion:          nodePool.kernel,
+				SanitizedKernelVersion: getSanitizedKernelVersion(nodePool.kernel),
+			}
+		}
+
+		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {
+			renderData.Openshift = &openshiftSpec{
+				RHCOSVersion: nodePool.rhcosVersion,
+				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[nodePool.rhcosVersion],
+			}
+		}
+
+		logger.Info("Rendering manifests for node pool", "NodePool", nodePool.name)
+		manifestObjs, err := s.renderManifestObjects(ctx, renderData)
+		if err != nil {
+			logger.Error(err, "error rendering manifests for node pool", "NodePool", nodePool.name)
 			return nil, err
 		}
+		objs = append(objs, manifestObjs...)
 	}
-
 	return objs, nil
 }
 
@@ -272,54 +252,53 @@ func (s *stateDriver) renderManifestObjects(ctx context.Context, renderData *dri
 	return objs, nil
 }
 
-func getDriverName(cr *nvidiav1alpha1.NVIDIADriver) string {
+// getDriverName returns a unique name for an NVIDIA driver instance in the format
+// nvidia-<driverType>-driver-<crName>-<osVersion>
+//
+// In the manifest templates, a '-<kernelVersion>' or '-<rhcosVersion>' suffix may be
+// appended if precompiled drivers are enabled or the OpenShift Driver Toolkit is used.
+func getDriverName(cr *nvidiav1alpha1.NVIDIADriver, osVersion string) string {
 	const (
-		nameFormat = "nvidia-%s-driver-%s"
-		// https://github.com/kubernetes/apimachinery/blob/v0.28.1/pkg/util/validation/validation.go#L35
-		qualifiedNameMaxLength = 63
+		nameFormat = "nvidia-%s-driver-%s-%s"
+		// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
+		// https://github.com/kubernetes/apimachinery/blob/v0.28.1/pkg/util/validation/validation.go#L209
+		nameMaxLength = 253
 	)
 
-	name := fmt.Sprintf(nameFormat, cr.Spec.DriverType, cr.Name)
+	name := fmt.Sprintf(nameFormat, cr.Spec.DriverType, cr.Name, osVersion)
 	// truncate name if it exceeds the maximum length
-	if len(name) > qualifiedNameMaxLength {
-		name = name[:qualifiedNameMaxLength]
+	if len(name) > nameMaxLength {
+		name = name[:nameMaxLength]
 	}
 	return name
 }
 
-func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver) (*driverSpec, error) {
+func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
+	if spec.UsePrecompiledDrivers() {
+		return spec.GetPrecompiledImagePath(nodePool.os, nodePool.kernel)
+	}
+
+	return spec.GetImagePath(nodePool.os)
+}
+
+func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverSpec, error) {
 	if cr == nil {
 		return nil, fmt.Errorf("no NVIDIADriver CR provided")
 	}
 
-	nvidiaDriverName := getDriverName(cr)
+	nvidiaDriverName := getDriverName(cr, nodePool.os)
 
 	spec := &cr.Spec
-	// TODO: construct image path differently for precompiled
-	imagePath, err := spec.GetImagePath()
+	imagePath, err := getDriverImagePath(spec, nodePool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for driver: %w", err)
+		return nil, fmt.Errorf("failed to get driver image path: %v", err)
 	}
+
+	spec.NodeSelector = nodePool.nodeSelector
 
 	managerImagePath, err := image.ImagePath(spec.Manager.Repository, spec.Manager.Image, spec.Manager.Version, "DRIVER_MANAGER_IMAGE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct image path for driver manager: %w", err)
-	}
-
-	// If osVersion is set in the CR, add nodeSelectors (using NFD labels)
-	// which ensure this driver only gets scheduled on nodes matching osVersion
-	if spec.OSVersion != "" {
-		id, versionID, err := spec.ParseOSVersion()
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse osVersion: %w", err)
-		}
-
-		if spec.NodeSelector == nil {
-			spec.NodeSelector = make(map[string]string)
-		}
-
-		spec.NodeSelector[nfdOSReleaseIDLabelKey] = id
-		spec.NodeSelector[nfdOSVersionIDLabelKey] = versionID
 	}
 
 	return &driverSpec{
@@ -361,7 +340,7 @@ func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	}, nil
 }
 
-func getRuntimeSpec(info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
+func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
 	k8sVersion, err := info.GetKubernetesVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
@@ -370,16 +349,23 @@ func getRuntimeSpec(info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADrive
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %v", err)
 	}
+	openshift := (openshiftVersion != "")
 
 	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
 	if operatorNamespace == "" {
 		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
 	}
 
+	nodePools, err := getNodePools(ctx, k8sClient, spec.NodeSelector, spec.UsePrecompiledDrivers(), openshift)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node pools: %v", err)
+	}
+
 	rs := &driverRuntimeSpec{
 		Namespace:         operatorNamespace,
 		KubernetesVersion: k8sVersion,
 		OpenshiftVersion:  openshiftVersion,
+		NodePools:         nodePools,
 	}
 
 	// Only get information needed for Openshift DriverToolkit if we are
@@ -392,23 +378,10 @@ func getRuntimeSpec(info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADrive
 		}
 		rs.OpenshiftProxySpec = openshiftProxySpec
 
-		rhcosVersions, err := info.GetRHCOSVersions(spec.NodeSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list openshift versions: %w", err)
-		}
 		openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
 
-		rs.OpenshiftDriverToolkitEnabled = len(rhcosVersions) > 0 && len(openshiftDTKMap) > 0
-		rs.OpenshiftRHCOSVersions = rhcosVersions
+		rs.OpenshiftDriverToolkitEnabled = len(openshiftDTKMap) > 0
 		rs.OpenshiftDriverToolkitImages = openshiftDTKMap
-	}
-
-	if spec.UsePrecompiledDrivers() {
-		kernelVersions, err := info.GetKernelVersions(spec.NodeSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list kernel versions: %w", err)
-		}
-		rs.KernelVersions = kernelVersions
 	}
 
 	return rs, nil
