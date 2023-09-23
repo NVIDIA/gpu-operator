@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -253,17 +252,6 @@ func (s *stateSkel) createOrUpdateObjs(
 
 		if err := s.mergeObjects(desiredObj, currentObj); err != nil {
 			return err
-		}
-
-		// NOTE: This method compares the expected Object against the current state of the Object .This is done to
-		// prevent superfluous updates to the object by the controller. This will also replace the hash structure
-		// annotation technique used in the ClusterPolicy controller
-		if equality.Semantic.DeepDerivative(desiredObj, currentObj) {
-			reqLogger.V(consts.LogLevelInfo).Info("Object unchanged. Skipping update",
-				"Namespace", desiredObj.GetNamespace(),
-				"Name", desiredObj.GetName(),
-			)
-			return nil
 		}
 
 		// Object found, Update it
