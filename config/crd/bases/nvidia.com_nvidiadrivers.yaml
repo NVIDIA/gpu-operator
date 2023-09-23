@@ -427,9 +427,6 @@ spec:
                 description: NodeSelector specifies a selector for installation of
                   NVIDIA driver
                 type: object
-              osVersion:
-                description: Operating System version
-                type: string
               rdma:
                 description: GPUDirectRDMA defines the spec for NVIDIA Peer Memory
                   driver

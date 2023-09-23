@@ -30,9 +30,18 @@ func TestGetImagePath(t *testing.T) {
 	testCases := []struct {
 		description   string
 		spec          *NVIDIADriverSpec
+		osVersion     string
 		errorExpected bool
 		expectedImage string
 	}{
+		{
+			description: "malformed repository",
+			spec: &NVIDIADriverSpec{
+				Repository: "malformed?/repo",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
 		{
 			description: "malformed image",
 			spec: &NVIDIADriverSpec{
@@ -42,7 +51,7 @@ func TestGetImagePath(t *testing.T) {
 			expectedImage: "",
 		},
 		{
-			description: "only image provided",
+			description: "only image provided with no tag or digest",
 			spec: &NVIDIADriverSpec{
 				Image: "nvcr.io/nvidia/driver",
 			},
@@ -52,8 +61,9 @@ func TestGetImagePath(t *testing.T) {
 		{
 			description: "only image provided with tag",
 			spec: &NVIDIADriverSpec{
-				Image: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+				Image: "nvcr.io/nvidia/driver:525.85.03",
 			},
+			osVersion:     "ubuntu22.04",
 			expectedImage: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 		},
 		{
@@ -61,58 +71,56 @@ func TestGetImagePath(t *testing.T) {
 			spec: &NVIDIADriverSpec{
 				Image: "nvcr.io/nvidia/driver@sha256:" + testDigest,
 			},
+			osVersion:     "ubuntu22.04",
 			expectedImage: "nvcr.io/nvidia/driver@sha256:" + testDigest,
 		},
 		{
-			description: "image provided with tag, version and osVersion ignored",
+			description: "repository, image, and version set but image contains a tag",
 			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
-				Version:   "535.104.05",
-				OSVersion: "ubuntu20.04",
+				Repository: "nvcr.io/nvidia",
+				Image:      "nvcr.io/nvidia/driver:525.85.03",
+				Version:    "535.104.05",
 			},
-			expectedImage: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+			osVersion:     "ubuntu22.04",
+			errorExpected: true,
+			expectedImage: "",
 		},
 		{
-			description: "image provided with digest, version and osVersion ignored",
+			description: "repository, image, and version set but image contains a digest",
 			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver@sha256:" + testDigest,
-				Version:   "535.104.05",
-				OSVersion: "ubuntu20.04",
+				Repository: "nvcr.io/nvidia",
+				Image:      "nvcr.io/nvidia/driver@sha256:" + testDigest,
+				Version:    "535.104.05",
 			},
-			expectedImage: "nvcr.io/nvidia/driver@sha256:" + testDigest,
+			osVersion:     "ubuntu22.04",
+			errorExpected: true,
+			expectedImage: "",
 		},
 		{
 			description: "missing version",
 			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver",
-				OSVersion: "ubuntu22.04",
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
 			},
+			osVersion:     "ubuntu22.04",
 			errorExpected: true,
 			expectedImage: "",
 		},
 		{
-			description: "missing OS version",
+			description: "repository, image, version set correctly",
 			spec: &NVIDIADriverSpec{
-				Image:   "nvcr.io/nvidia/driver",
-				Version: "535.104.05",
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
+				Version:    "535.104.05",
 			},
-			errorExpected: true,
-			expectedImage: "",
-		},
-		{
-			description: "image with version and OS version specified",
-			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver",
-				Version:   "535.104.05",
-				OSVersion: "ubuntu22.04",
-			},
+			osVersion:     "ubuntu22.04",
 			expectedImage: "nvcr.io/nvidia/driver:535.104.05-ubuntu22.04",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			image, err := tc.spec.GetImagePath()
+			image, err := tc.spec.GetImagePath(tc.osVersion)
 			if tc.errorExpected {
 				require.Error(t, err)
 			} else {
@@ -127,10 +135,19 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 	testCases := []struct {
 		description   string
 		spec          *NVIDIADriverSpec
+		osVersion     string
 		kernelVersion string
 		errorExpected bool
 		expectedImage string
 	}{
+		{
+			description: "malformed repository",
+			spec: &NVIDIADriverSpec{
+				Repository: "malformed?/repo",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
 		{
 			description: "malformed image",
 			spec: &NVIDIADriverSpec{
@@ -140,7 +157,7 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 			expectedImage: "",
 		},
 		{
-			description: "only image provided",
+			description: "only image provided with no tag or digest",
 			spec: &NVIDIADriverSpec{
 				Image: "nvcr.io/nvidia/driver",
 			},
@@ -148,46 +165,67 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 			expectedImage: "",
 		},
 		{
-			description: "image provided with tag",
+			description: "only image provided with tag",
 			spec: &NVIDIADriverSpec{
-				Image: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+				Image: "nvcr.io/nvidia/driver:525",
 			},
-			errorExpected: true,
-			expectedImage: "",
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			expectedImage: "nvcr.io/nvidia/driver:525-5.4.0-150-generic-ubuntu22.04",
 		},
 		{
-			description: "image provided with digest",
+			description: "only image provided with digest",
 			spec: &NVIDIADriverSpec{
 				Image: "nvcr.io/nvidia/driver@sha256:" + testDigest,
 			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
 			errorExpected: true,
 			expectedImage: "",
 		},
 		{
-			description: "missing driver branch",
+			description: "repository, image, and version set but image contains a tag",
 			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver",
-				OSVersion: "ubuntu22.04",
+				Repository: "nvcr.io/nvidia",
+				Image:      "nvcr.io/nvidia/driver:525.85.03",
+				Version:    "535.104.05",
 			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
 			errorExpected: true,
 			expectedImage: "",
 		},
 		{
-			description: "missing OS version",
+			description: "repository, image, and version set but image contains a digest",
 			spec: &NVIDIADriverSpec{
-				Image:   "nvcr.io/nvidia/driver",
-				Version: "535",
+				Repository: "nvcr.io/nvidia",
+				Image:      "nvcr.io/nvidia/driver@sha256:" + testDigest,
+				Version:    "535.104.05",
 			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
 			errorExpected: true,
 			expectedImage: "",
 		},
 		{
-			description: "image with driver branch and OS version specified",
+			description: "missing version",
 			spec: &NVIDIADriverSpec{
-				Image:     "nvcr.io/nvidia/driver",
-				Version:   "535",
-				OSVersion: "ubuntu22.04",
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
 			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "repository, image, version set correctly",
+			spec: &NVIDIADriverSpec{
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
+				Version:    "535",
+			},
+			osVersion:     "ubuntu22.04",
 			kernelVersion: "5.4.0-150-generic",
 			expectedImage: "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04",
 		},
@@ -195,65 +233,13 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			image, err := tc.spec.GetPrecompiledImagePath(tc.kernelVersion)
+			image, err := tc.spec.GetPrecompiledImagePath(tc.osVersion, tc.kernelVersion)
 			if tc.errorExpected {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
 			require.Equal(t, image, tc.expectedImage)
-		})
-	}
-}
-
-func TestParseOSString(t *testing.T) {
-	testCases := []struct {
-		description       string
-		input             string
-		errorExpected     bool
-		expectedOS        string
-		expectedOSVersion string
-	}{
-		{
-			description:   "empty string",
-			input:         "",
-			errorExpected: true,
-		},
-		{
-			description:   "no number in os string",
-			input:         "ubuntu",
-			errorExpected: true,
-		},
-		{
-			description:       "ubuntu20.04",
-			input:             "ubuntu20.04",
-			expectedOS:        "ubuntu",
-			expectedOSVersion: "20.04",
-		},
-		{
-			description:       "rhcos4.13",
-			input:             "rhcos4.13",
-			expectedOS:        "rhcos",
-			expectedOSVersion: "4.13",
-		},
-		{
-			description:       "centos7",
-			input:             "centos7",
-			expectedOS:        "centos",
-			expectedOSVersion: "7",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			os, osVersion, err := parseOSString(tc.input)
-			if tc.errorExpected {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			require.Equal(t, tc.expectedOS, os)
-			require.Equal(t, tc.expectedOSVersion, osVersion)
 		})
 	}
 }
