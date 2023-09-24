@@ -1963,16 +1963,6 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		if !strings.Contains(initContainer.Name, fmt.Sprintf("%s-validation", component)) {
 			continue
 		}
-		if component == "nvidia-fs" && (config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled()) {
-			// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
-			podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-			return nil
-		}
-		if component == "cc-manager" && !config.CCManager.IsEnabled() {
-			// remove  cc-manager init container from validator Daemonset if it is not enabled
-			podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-			return nil
-		}
 		// update validation image
 		image, err := gpuv1.ImagePath(&config.Validator)
 		if err != nil {
@@ -2003,6 +1993,11 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
 			}
 		case "plugin":
+			// remove plugin init container from validator Daemonset if it is not enabled
+			if !config.DevicePlugin.IsEnabled() {
+				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+				return nil
+			}
 			// set/append environment variables for plugin-validation container
 			if len(config.Validator.Plugin.Env) > 0 {
 				for _, env := range config.Validator.Plugin.Env {
@@ -2030,9 +2025,18 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				}
 			}
 		case "nvidia-fs":
-			// no additional config required for nvidia-fs validation
+			if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
+				// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
+				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+				return nil
+			}
 		case "cc-manager":
 			// no additional config required for cc-manager validation
+			if !config.CCManager.IsEnabled() {
+				// remove  cc-manager init container from validator Daemonset if it is not enabled
+				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+				return nil
+			}
 		case "toolkit":
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
