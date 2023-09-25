@@ -18,9 +18,13 @@ package utils
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -56,4 +60,17 @@ func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 // BoolPtr returns a pointer to the bool value passed in.
 func BoolPtr(v bool) *bool {
 	return &v
+}
+
+// GetObjectHash invokes Sum32 Hash function to return hash value of an unstructured Object
+func GetObjectHash(obj *unstructured.Unstructured) string {
+	hasher := fnv.New32a()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+	printer.Fprintf(hasher, "%#v", obj)
+	return fmt.Sprint(hasher.Sum32())
 }
