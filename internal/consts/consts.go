@@ -35,4 +35,7 @@ const (
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+
+	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
+	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 )

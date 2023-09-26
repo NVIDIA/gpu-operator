@@ -35,6 +35,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/nodeinfo"
 	"github.com/NVIDIA/gpu-operator/internal/render"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // a state skeleton intended to be embedded in structs implementing the State interface
@@ -234,6 +235,17 @@ func (s *stateSkel) createOrUpdateObjs(
 
 		s.addStateSpecificLabels(desiredObj)
 
+		var desiredObjectHash string
+		if desiredObj.GetKind() == "DaemonSet" {
+			desiredObjectHash = utils.GetObjectHash(desiredObj)
+			annotations := desiredObj.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[consts.NvidiaAnnotationHashKey] = desiredObjectHash
+			desiredObj.SetAnnotations(annotations)
+		}
+
 		err := s.createObj(ctx, desiredObj)
 		if err == nil {
 			// object created successfully
@@ -248,6 +260,16 @@ func (s *stateSkel) createOrUpdateObjs(
 		if err := s.getObj(ctx, currentObj); err != nil {
 			// Some error occurred
 			return err
+		}
+
+		if desiredObj.GetKind() == "DaemonSet" {
+			if currentObjHash, ok := currentObj.GetAnnotations()[consts.NvidiaAnnotationHashKey]; ok {
+				if desiredObjectHash == currentObjHash {
+					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
+						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
+					return nil
+				}
+			}
 		}
 
 		if err := s.mergeObjects(desiredObj, currentObj); err != nil {

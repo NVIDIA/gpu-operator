@@ -185,7 +185,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 	r.Log.Info("Resetting node upgrade labels from all nodes")
 
 	nodeList := &corev1.NodeList{}
-	err := r.List(ctx, nodeList)
+	err := r.Client.List(ctx, nodeList)
 	if err != nil {
 		r.Log.Error(err, "Failed to get node list to reset upgrade labels")
 		return err
@@ -198,7 +198,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 		_, present := node.Labels[upgradeStateLabel]
 		if present {
 			delete(node.Labels, upgradeStateLabel)
-			err = r.Update(ctx, node)
+			err = r.Client.Update(ctx, node)
 			if err != nil {
 				r.Log.V(consts.LogLevelError).Error(
 					err, "Failed to reset upgrade state label from node", "node", node)
