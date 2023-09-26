@@ -62,6 +62,10 @@ const (
 	DriverLabelValue = "nvidia-driver-daemonset"
 	// UpgradeSkipDrainLabelSelector indicates the pod selector label to skip with drain
 	UpgradeSkipDrainLabelSelector = "nvidia.com/gpu-driver-upgrade-drain.skip!=true"
+	// AppComponentLabelKey indicates the label key of the component
+	AppComponentLabelKey = "app.kubernetes.io/component"
+	// AppComponentLabelValue indicates the label values of the nvidia-gpu-driver component
+	AppComponentLabelValue = "nvidia-driver"
 )
 
 //nolint
@@ -119,15 +123,8 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
 	}
 
-	driverLabelKey := DriverLabelKey
-	driverLabelValue := DriverLabelValue
-	if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
-		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
-		// based on rhcos version. Hence use DTK label instead
-		driverLabelKey = ocpDriverToolkitIdentificationLabel
-		driverLabelValue = ocpDriverToolkitIdentificationValue
-	}
-	state, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace, map[string]string{driverLabelKey: driverLabelValue})
+	state, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace,
+		map[string]string{AppComponentLabelKey: AppComponentLabelValue})
 	if err != nil {
 		r.Log.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err

@@ -8,6 +8,7 @@ metadata:
     app: nvidia-driver-daemonset
     {{- end }}
     nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+    app.kubernetes.io/component: "nvidia-driver"
     {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
     openshift.driver-toolkit.rhcos: {{ .Openshift.RHCOSVersion | quote }}
     openshift.driver-toolkit: "true"
@@ -50,6 +51,7 @@ spec:
         app: nvidia-driver-daemonset
         {{- end }}
         nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+        app.kubernetes.io/component: "nvidia-driver"
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
