@@ -21,12 +21,14 @@ import (
 	"reflect"
 	"testing"
 
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 )
 
 const (
@@ -109,7 +111,8 @@ func TestCheckNodeSelector(t *testing.T) {
 
 	for _, tc := range tests {
 		s := scheme.Scheme
-		nvidiav1alpha1.AddToScheme(s)
+		err := nvidiav1alpha1.AddToScheme(s)
+		require.NoError(t, err)
 		c := fake.
 			NewClientBuilder().
 			WithScheme(s).
@@ -117,7 +120,7 @@ func TestCheckNodeSelector(t *testing.T) {
 			Build()
 		nsv := NewNodeSelectorValidator(c)
 
-		err := nsv.Validate(context.Background(), tc.requestedDriver)
+		err = nsv.Validate(context.Background(), tc.requestedDriver)
 		if tc.shouldError {
 			assert.Error(t, err)
 		} else {
