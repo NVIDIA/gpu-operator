@@ -31,6 +31,7 @@ metadata:
             },
             "driver": {
               "enabled": true,
+              "useNvidiaDriverCRD": false,
               "upgradePolicy": {
                 "autoUpgrade": true,
                 "drain": {
@@ -133,6 +134,29 @@ metadata:
               "enabled": false
             }
           }
+        },
+        {
+          "apiVersion": "nvidia.com/v1alpha1",
+          "kind": "NVIDIADriver",
+          "spec": {
+            "driverType": "gpu",
+            "repoConfig": {
+              "configMapName": ""
+            },
+            "certConfig": {
+              "name": ""
+            },
+            "licensingConfig": {
+              "nlsEnabled": false,
+              "configMapName": ""
+            },
+            "virtualTopology": {
+              "config": ""
+            },
+            "kernelModuleConfig": {
+              "name": ""
+            }
+          }
         }
       ]
     operators.operatorframework.io/builder: operator-sdk-v1.4.0
@@ -147,7 +171,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v23.6.0
+  name: gpu-operator-certified.v23.6.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -186,6 +210,72 @@ spec:
       image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:bf06c8ad380a36e5014607bd3ab05b80e8e5e7e77d23d0dd89fe53a5564152fa
   customresourcedefinitions:
     owned:
+    - name: nvidiadrivers.nvidia.com
+      kind: NVIDIADriver
+      version: v1alpha1
+      displayName: NVIDIADriver
+      description: NVIDIADriver allows you to deploy the NVIDIA driver
+      resources:
+        - kind: ServiceAccount
+          name: ''
+          version: v1
+        - kind: DaemonSet
+          name: ''
+          version: apps/v1
+        - kind: ConfigMap
+          name: ''
+          version: v1
+        - kind: Pod
+          name: ''
+          version: v1
+        - kind: clusterpolicies
+          name: ''
+          version: v1
+        - kind: clusterversions
+          name: ''
+          version: v1
+        - kind: nodes
+          name: ''
+          version: v1
+        - kind: status
+          name: ''
+          version: v1
+      specDescriptors:
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+      statusDescriptors:
+        - description: The current state of the driver.
+          displayName: State
+          path: state
+          x-descriptors:
+            - 'urn:alm:descriptor:text'
     - name: clusterpolicies.nvidia.com
       kind: ClusterPolicy
       version: v1
@@ -854,5 +944,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 23.6.0
-  replaces: gpu-operator-certified.v23.3.2
+  version: 23.6.1
+  replaces: gpu-operator-certified.v23.6.0
