@@ -139,7 +139,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
 
-	// Create objects if they don't exist, Update objects if they do exist
+	// Create objects if they dont exist, Update objects if they do exist
 	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %v", err)

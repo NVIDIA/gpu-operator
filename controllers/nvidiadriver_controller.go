@@ -39,6 +39,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/state"
+	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
 
 // NVIDIADriverReconciler reconciles a NVIDIADriver object
@@ -47,7 +48,8 @@ type NVIDIADriverReconciler struct {
 	Scheme      *runtime.Scheme
 	ClusterInfo clusterinfo.Interface
 
-	stateManager state.Manager
+	stateManager          state.Manager
+	nodeSelectorValidator validator.Validator
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
@@ -105,6 +107,14 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Add an entry for Clusterpolicy, which is needed to deploy the driver daemonset
 	infoCatalog.Add(state.InfoTypeClusterPolicyCR, clusterPolicyInstance)
 
+	// Verify the nodeSelector configured for this NVIDIADriver instance does
+	// not conflict with any other instances. This ensures only one driver
+	// is deployed per GPU node.
+	err = r.nodeSelectorValidator.Validate(ctx, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
@@ -130,6 +140,9 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return fmt.Errorf("error creating state manager: %v", err)
 	}
 	r.stateManager = stateManager
+
+	// initialize validators
+	r.nodeSelectorValidator = validator.NewNodeSelectorValidator(r.Client)
 
 	// Create a new NVIDIADriver controller
 	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{
