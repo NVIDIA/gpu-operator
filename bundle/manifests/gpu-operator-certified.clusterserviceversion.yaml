@@ -58,7 +58,7 @@ metadata:
                 "name": ""
               },
               "licensingConfig": {
-                "nlsEnabled": false,
+                "nlsEnabled": true,
                 "configMapName": ""
               },
               "virtualTopology": {
@@ -138,20 +138,28 @@ metadata:
         {
           "apiVersion": "nvidia.com/v1alpha1",
           "kind": "NVIDIADriver",
+          "metadata": {
+            "name": "gpu-driver"
+          },
           "spec": {
             "driverType": "gpu",
+            "repository": "nvcr.io/nvidia",
+            "image": "driver",
+            "version": "sha256:5fbd2908484d5d8f4927159d4511fabb9740f13c1c9fc2b8698ebba1730f3cd2",
+            "nodeSelector": {},
+            "manager": {},
             "repoConfig": {
-              "configMapName": ""
+              "name": ""
             },
             "certConfig": {
               "name": ""
             },
             "licensingConfig": {
-              "nlsEnabled": false,
-              "configMapName": ""
+              "nlsEnabled": true,
+              "name": ""
             },
-            "virtualTopology": {
-              "config": ""
+            "virtualTopologyConfig": {
+              "name": ""
             },
             "kernelModuleConfig": {
               "name": ""

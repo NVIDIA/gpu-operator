@@ -65,6 +65,7 @@ spec:
 
   driver:
     enabled: true
+    useNvidiaDriverCRD: false
     upgradePolicy:
       autoUpgrade: true
       drain:
@@ -79,6 +80,7 @@ spec:
         timeoutSeconds: 300
       waitForCompletion:
         timeoutSeconds: 0
+    manager: {}
     rdma:
       enabled: false
     # private mirror repository configuration
@@ -90,18 +92,13 @@ spec:
     # vGPU licensing configuration
     licensingConfig:
       configMapName: ""
-      nlsEnabled: false
+      nlsEnabled: true
     # vGPU topology daemon configuration
     virtualTopology:
       config: ""
     # kernel module configuration for NVIDIA driver
     kernelModuleConfig:
       name: ""
-    # configuration for controlling rolling update of NVIDIA driver DaemonSet pods
-    rollingUpdate:
-      # maximum number of nodes to simultaneously apply pod updates on.
-      # can be specified either as number or percentage of nodes. Default 1.
-      maxUnavailable: "1"
 
   vgpuManager:
     enabled: true

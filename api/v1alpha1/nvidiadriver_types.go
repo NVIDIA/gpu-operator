@@ -51,19 +51,19 @@ type NVIDIADriverSpec struct {
 	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
 
 	// NVIDIA Driver container startup probe settings
-	StartupProbe *gpuv1.ContainerProbeSpec `json:"startupProbe,omitempty"`
+	StartupProbe *ContainerProbeSpec `json:"startupProbe,omitempty"`
 
 	// NVIDIA Driver container liveness probe settings
-	LivenessProbe *gpuv1.ContainerProbeSpec `json:"livenessProbe,omitempty"`
+	LivenessProbe *ContainerProbeSpec `json:"livenessProbe,omitempty"`
 
 	// NVIDIA Driver container readiness probe settings
-	ReadinessProbe *gpuv1.ContainerProbeSpec `json:"readinessProbe,omitempty"`
+	ReadinessProbe *ContainerProbeSpec `json:"readinessProbe,omitempty"`
 
 	// GPUDirectRDMA defines the spec for NVIDIA Peer Memory driver
-	GPUDirectRDMA *gpuv1.GPUDirectRDMASpec `json:"rdma,omitempty"`
+	GPUDirectRDMA *GPUDirectRDMASpec `json:"rdma,omitempty"`
 
 	// GPUDirectStorage defines the spec for GDS driver
-	GPUDirectStorage *gpuv1.GPUDirectStorageSpec `json:"gds,omitempty"`
+	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
 
 	// NVIDIA Driver repository
 	// +kubebuilder:validation:Optional
@@ -92,13 +92,13 @@ type NVIDIADriverSpec struct {
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// Manager represents configuration for NVIDIA Driver Manager initContainer
-	Manager gpuv1.DriverManagerSpec `json:"manager,omitempty"`
+	Manager DriverManagerSpec `json:"manager,omitempty"`
 
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
-	Resources *gpuv1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 
 	// Optional: List of arguments
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -115,27 +115,27 @@ type NVIDIADriverSpec struct {
 	// Optional: Custom repo configuration for NVIDIA Driver container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For NVIDIA Driver Container"
-	RepoConfig *gpuv1.DriverRepoConfigSpec `json:"repoConfig,omitempty"`
+	RepoConfig *DriverRepoConfigSpec `json:"repoConfig,omitempty"`
 
 	// Optional: Custom certificates configuration for NVIDIA Driver container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Certificates Configuration For NVIDIA Driver Container"
-	CertConfig *gpuv1.DriverCertConfigSpec `json:"certConfig,omitempty"`
+	CertConfig *DriverCertConfigSpec `json:"certConfig,omitempty"`
 
 	// Optional: Licensing configuration for NVIDIA vGPU licensing
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Licensing Configuration For NVIDIA vGPU Driver Container"
-	LicensingConfig *gpuv1.DriverLicensingConfigSpec `json:"licensingConfig,omitempty"`
+	LicensingConfig *DriverLicensingConfigSpec `json:"licensingConfig,omitempty"`
 
 	// Optional: Virtual Topology Daemon configuration for NVIDIA vGPU drivers
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Virtual Topology Daemon Configuration For vGPU Driver Container"
-	VirtualTopology *gpuv1.VirtualTopologyConfigSpec `json:"virtualTopology,omitempty"`
+	VirtualTopologyConfig *VirtualTopologyConfigSpec `json:"virtualTopologyConfig,omitempty"`
 
 	// Optional: Kernel module configuration parameters for the NVIDIA Driver
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
-	KernelModuleConfig *gpuv1.KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
+	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
 
 	//+kubebuilder:validation:Optional
 	// NodeSelector specifies a selector for installation of NVIDIA driver
@@ -144,6 +144,201 @@ type NVIDIADriverSpec struct {
 	// +kubebuilder:validation:Optional
 	// Affinity specifies node affinity rules for driver pods
 	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
+}
+
+// ResourceRequirements describes the compute resource requirements.
+type ResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits corev1.ResourceList `json:"limits,omitempty"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests corev1.ResourceList `json:"requests,omitempty"`
+}
+
+// DriverManagerSpec describes configuration for NVIDIA Driver Manager(initContainer)
+type DriverManagerSpec struct {
+	// Repository represents Driver Managerrepository path
+	Repository string `json:"repository,omitempty"`
+
+	// Image represents NVIDIA Driver Manager image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// Version represents NVIDIA Driver Manager image tag(version)
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	// Name of the environment variable.
+	Name string `json:"name"`
+
+	// Value of the environment variable.
+	Value string `json:"value,omitempty"`
+}
+
+// ContainerProbeSpec defines the properties for configuring container probes
+type ContainerProbeSpec struct {
+	// Number of seconds after the container has started before liveness probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +kubebuilder:validation:Optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
+	// Number of seconds after which the probe times out.
+	// Defaults to 1 second. Minimum value is 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+	// How often (in seconds) to perform the probe.
+	// Default to 10 seconds. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// Defaults to 3. Minimum value is 1.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
+// GPUDirectStorageSpec defines the properties for NVIDIA GPUDirect Storage Driver deployment(Experimental)
+type GPUDirectStorageSpec struct {
+	// Enabled indicates if GPUDirect Storage is enabled through GPU operator
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPUDirect Storage through GPU operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// NVIDIA GPUDirect Storage Driver image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// NVIDIA GPUDirect Storage Driver image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// NVIDIA GPUDirect Storage Driver image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
+// GPUDirectRDMASpec defines the properties for nvidia-peermem deployment
+type GPUDirectRDMASpec struct {
+	// Enabled indicates if GPUDirect RDMA is enabled through GPU operator
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPUDirect RDMA through GPU operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+	// UseHostMOFED indicates to use MOFED drivers directly installed on the host to enable GPUDirect RDMA
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Use MOFED drivers directly installed on the host to enable GPUDirect RDMA"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseHostMOFED *bool `json:"useHostMofed,omitempty"`
+}
+
+// KernelModuleConfigSpec defines custom configuration parameters for the NVIDIA Driver
+type KernelModuleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+}
+
+// VirtualTopologyConfigSpec defines virtual topology daemon configuration with NVIDIA vGPU
+type VirtualTopologyConfigSpec struct {
+	// Optional: Config name representing virtual topology daemon configuration file nvidia-topologyd.conf
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+}
+
+// DriverCertConfigSpec defines custom certificates configuration for NVIDIA Driver container
+type DriverCertConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+}
+
+// DriverRepoConfigSpec defines custom repo configuration for NVIDIA Driver container
+type DriverRepoConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+}
+
+// DriverLicensingConfigSpec defines licensing server configuration for NVIDIA Driver container
+type DriverLicensingConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+
+	// NLSEnabled indicates if NVIDIA Licensing System is used for licensing.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Licensing System licensing"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	NLSEnabled *bool `json:"nlsEnabled,omitempty"`
 }
 
 // DriverType defines NVIDIA driver type
