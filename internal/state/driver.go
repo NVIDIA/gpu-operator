@@ -180,7 +180,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct validator spec: %v", err)
 	}
 
-	gdsSpec, err := getGDSSpec(clusterPolicy.Spec.GPUDirectStorage)
+	gdsSpec, err := getGDSSpec(cr.Spec.GPUDirectStorage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct GDS spec: %v", err)
 	}
