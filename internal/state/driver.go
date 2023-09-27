@@ -324,9 +324,9 @@ func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
 	}, nil
 }
 
-func getGDSSpec(spec *gpuv1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
+func getGDSSpec(spec *nvidiav1alpha1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
 	if spec == nil || !spec.IsEnabled() {
-		// note: GDS is optional in Clusterpolicy CRD
+		// note: GDS is optional in the NvidiaDriver CRD
 		return nil, nil
 	}
 	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "GDS_IMAGE")

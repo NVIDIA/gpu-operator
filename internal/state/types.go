@@ -47,6 +47,6 @@ type validatorSpec struct {
 // validatorSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field
 // which is to be populated with the fully-qualified image path.
 type gdsDriverSpec struct {
-	Spec      *gpuv1.GPUDirectStorageSpec
+	Spec      *nvidiav1alpha1.GPUDirectStorageSpec
 	ImagePath string
 }
