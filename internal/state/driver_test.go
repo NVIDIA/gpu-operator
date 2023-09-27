@@ -218,13 +218,13 @@ func TestDriverSpec(t *testing.T) {
 		ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 		ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
 		Spec: &nvidiav1alpha1.NVIDIADriverSpec{
-			Manager: gpuv1.DriverManagerSpec{
+			Manager: nvidiav1alpha1.DriverManagerSpec{
 				Repository:       "/path/to/repository",
 				Image:            "image",
 				Version:          "version",
 				ImagePullPolicy:  "Always",
 				ImagePullSecrets: []string{"manager-secret"},
-				Env: []gpuv1.EnvVar{
+				Env: []nvidiav1alpha1.EnvVar{
 					{Name: "FOO", Value: "foo"},
 					{Name: "BAR", Value: "bar"},
 				},
@@ -235,7 +235,7 @@ func TestDriverSpec(t *testing.T) {
 			UsePrecompiled:   new(bool),
 			ImagePullPolicy:  "Always",
 			ImagePullSecrets: []string{"secret-a", "secret-b"},
-			Resources: &gpuv1.ResourceRequirements{
+			Resources: &nvidiav1alpha1.ResourceRequirements{
 				Limits: corev1.ResourceList{
 					"memory": resource.MustParse("200Mi"),
 					"cpu":    resource.MustParse("500m"),
@@ -295,7 +295,7 @@ func TestDriverGDS(t *testing.T) {
 
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
-		Spec: &gpuv1.GPUDirectStorageSpec{
+		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
 			Enabled:          utils.BoolPtr(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
 		},
@@ -501,8 +501,8 @@ func getMinimalDriverRenderData() *driverRenderData {
 	}
 }
 
-func getDefaultContainerProbeSpec() *gpuv1.ContainerProbeSpec {
-	return &gpuv1.ContainerProbeSpec{
+func getDefaultContainerProbeSpec() *nvidiav1alpha1.ContainerProbeSpec {
+	return &nvidiav1alpha1.ContainerProbeSpec{
 		InitialDelaySeconds: 60,
 		TimeoutSeconds:      60,
 		PeriodSeconds:       10,
@@ -592,7 +592,7 @@ func volumeSliceToMap(volumes []corev1.Volume) map[string]corev1.Volume {
 	return volumeMap
 }
 
-func checkResources(t *testing.T, input *gpuv1.ResourceRequirements, output corev1.ResourceRequirements) {
+func checkResources(t *testing.T, input *nvidiav1alpha1.ResourceRequirements, output corev1.ResourceRequirements) {
 	if input == nil {
 		return
 	}
