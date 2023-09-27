@@ -208,7 +208,7 @@ driver:
   # vGPU licensing configuration
   licensingConfig:
     configMapName: ""
-    nlsEnabled: false
+    nlsEnabled: true
   # vGPU topology daemon configuration
   virtualTopology:
     config: ""

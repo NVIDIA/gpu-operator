@@ -147,7 +147,7 @@ spec:
               licensingConfig:
                 description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
                 properties:
-                  configMapName:
+                  name:
                     type: string
                   nlsEnabled:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
@@ -479,7 +479,7 @@ spec:
                 description: 'Optional: Custom repo configuration for NVIDIA Driver
                   container'
                 properties:
-                  configMapName:
+                  name:
                     type: string
                 type: object
               repository:
@@ -556,11 +556,11 @@ spec:
                 description: NVIDIA Driver version (or just branch for precompiled
                   drivers)
                 type: string
-              virtualTopology:
+              virtualTopologyConfig:
                 description: 'Optional: Virtual Topology Daemon configuration for
                   NVIDIA vGPU drivers'
                 properties:
-                  config:
+                  name:
                     description: 'Optional: Config name representing virtual topology
                       daemon configuration file nvidia-topologyd.conf'
                     type: string

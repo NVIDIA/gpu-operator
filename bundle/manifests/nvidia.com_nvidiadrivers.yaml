@@ -147,7 +147,7 @@ spec:
               licensingConfig:
                 description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
                 properties:
-                  configMapName:
+                  name:
                     type: string
                   nlsEnabled:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
@@ -479,7 +479,7 @@ spec:
                 description: 'Optional: Custom repo configuration for NVIDIA Driver
                   container'
                 properties:
-                  configMapName:
+                  name:
                     type: string
                 type: object
               repository:

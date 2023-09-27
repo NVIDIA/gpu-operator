@@ -28,19 +28,25 @@ spec:
     enabled: {{ .Values.driver.rdma.enabled }}
     useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
   {{- if .Values.driver.repoConfig }}
-  repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
+  repoConfig:
+    name: {{ .Values.driver.repoConfig.configMapName }}
   {{- end }}
   {{- if .Values.driver.certConfig }}
-  certConfig: {{ toYaml .Values.driver.certConfig | nindent 6 }}
+  certConfig:
+    name: {{ .Values.driver.certConfig.name }}
   {{- end }}
   {{- if .Values.driver.licensingConfig }}
-  licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
+  licensingConfig:
+    name: {{ .Values.driver.licensingConfig.configMapName }}
+    nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
   {{- end }}
   {{- if .Values.driver.virtualTopology }}
-  virtualTopology: {{ toYaml .Values.driver.virtualTopology | nindent 6 }}
+  virtualTopologyConfig:
+    name: {{ .Values.driver.virtualTopology.config }}
   {{- end }}
   {{- if .Values.driver.kernelModuleConfig }}
-  kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
+  kernelModuleConfig:
+    name: {{ .Values.driver.kernelModuleConfig.name }}
   {{- end }}
   {{- if .Values.driver.resources }}
   resources: {{ toYaml .Values.driver.resources | nindent 6 }}
