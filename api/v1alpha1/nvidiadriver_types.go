@@ -232,19 +232,17 @@ func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 	return ns
 }
 
-var imageEnvName = map[DriverType]string{
-	GPU:             "DRIVER_IMAGE",
-	VGPU:            "DRIVER_IMAGE",
-	VGPUHostManager: "VGPU_MANAGER_IMAGE",
-}
-
 // GetImagePath returns the driver image path given the information
 // provided in NVIDIADriverSpec and the osVersion passed as an argument.
 // The driver image path will be in the following format unless the spec
 // contains a digest.
 // <repository>/<image>:<driver-ver>-<os-ver>
 func (d *NVIDIADriverSpec) GetImagePath(osVersion string) (string, error) {
-	image, err := image.ImagePath(d.Repository, d.Image, d.Version, imageEnvName[d.DriverType])
+	// We pass an empty string for the last arg, the imagePathEnvName, since
+	// we do not want any environment variable in the operator container
+	// to be used as the default driver image. This means that the driver
+	// image must be specified in the NVIDIADriver CR spec.
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, "")
 	if err != nil {
 		return "", fmt.Errorf("failed to get image path from crd: %w", err)
 	}
@@ -268,7 +266,11 @@ func (d *NVIDIADriverSpec) GetImagePath(osVersion string) (string, error) {
 // the following format:
 // <repository>/<image>:<driver-ver>-<kernel-ver>-<os-ver>
 func (d *NVIDIADriverSpec) GetPrecompiledImagePath(osVersion string, kernelVersion string) (string, error) {
-	image, err := image.ImagePath(d.Repository, d.Image, d.Version, imageEnvName[d.DriverType])
+	// We pass an empty string for the last arg, the imagePathEnvName, since
+	// we do not want any environment variable in the operator container
+	// to be used as the default driver image. This means that the driver
+	// image must be specified in the NVIDIADriver CR spec.
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, "")
 	if err != nil {
 		return "", fmt.Errorf("failed to get image path from crd: %w", err)
 	}
