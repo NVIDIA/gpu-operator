@@ -340,6 +340,9 @@ spec:
           readOnly: true
         - mountPath: /sys
           name: host-sys
+        - mountPath: /run/mellanox/drivers
+          mountPropagation: HostToContainer
+          name: run-mellanox-drivers
       nodeSelector:
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
         nvidia.com/gpu.deploy.driver: "true"

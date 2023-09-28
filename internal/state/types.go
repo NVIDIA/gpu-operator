@@ -20,7 +20,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 )
 
@@ -37,14 +36,7 @@ type driverSpec struct {
 	OCPToolkitEnabled bool
 }
 
-// validatorSpec is a wrapper of ValidatorSpec with an additional ImagePath field
-// which is to be populated with the fully-qualified image path.
-type validatorSpec struct {
-	Spec      *gpuv1.ValidatorSpec
-	ImagePath string
-}
-
-// validatorSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field
+// gdsDriverSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field
 // which is to be populated with the fully-qualified image path.
 type gdsDriverSpec struct {
 	Spec      *nvidiav1alpha1.GPUDirectStorageSpec

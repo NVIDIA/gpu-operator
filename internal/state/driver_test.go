@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
@@ -144,13 +143,6 @@ func TestDriverRenderRDMA(t *testing.T) {
 	}
 
 	checkEnv(t, peermemEnvars, nvidiaPeermemCtr.Env)
-
-	mofedValidationCtr, err := getContainerObj(ds.Spec.Template.Spec.InitContainers, "mofed-validation")
-	require.Nil(t, err, "mofed-validation should be in the list of containers")
-
-	mofedValidationEnvars := getMofedValidationEnvars()
-
-	checkEnv(t, mofedValidationEnvars, mofedValidationCtr.Env)
 
 	expectedVolumes := getDriverVolumes()
 	expectedVolumes = append(expectedVolumes, corev1.Volume{
@@ -489,10 +481,6 @@ func getMinimalDriverRenderData() *driverRenderData {
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 			ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
 		},
-		Validator: &validatorSpec{
-			Spec:      &gpuv1.ValidatorSpec{},
-			ImagePath: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:devel",
-		},
 		Runtime: &driverRuntimeSpec{
 			Namespace:         "test-operator",
 			KubernetesVersion: "1.28.0",
@@ -692,27 +680,6 @@ func getDriverVolumes() []corev1.Volume {
 					Type: newHostPathType(corev1.HostPathDirectory),
 				},
 			},
-		},
-	}
-}
-
-func getMofedValidationEnvars() []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{
-			Name:  "WITH_WAIT",
-			Value: "true",
-		},
-		{
-			Name:  "COMPONENT",
-			Value: "mofed",
-		},
-		{
-			Name:  "NVIDIA_VISIBLE_DEVICES",
-			Value: "void",
-		},
-		{
-			Name:  "GPU_DIRECT_RDMA_ENABLED",
-			Value: "true",
 		},
 	}
 }
