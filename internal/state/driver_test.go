@@ -103,7 +103,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
-	renderData.GPUDirectRDMA = &gpuv1.GPUDirectRDMASpec{
+	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
 		Enabled: utils.BoolPtr(true),
 	}
 
@@ -185,7 +185,7 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
-	renderData.GPUDirectRDMA = &gpuv1.GPUDirectRDMASpec{
+	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
 		Enabled:      utils.BoolPtr(true),
 		UseHostMOFED: utils.BoolPtr(true),
 	}
