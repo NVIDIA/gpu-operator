@@ -84,7 +84,6 @@ type additionalConfigs struct {
 
 type driverRenderData struct {
 	Driver            *driverSpec
-	Operator          *gpuv1.OperatorSpec
 	Validator         *validatorSpec
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *gpuv1.GPUDirectRDMASpec
@@ -189,11 +188,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct GDS spec: %v", err)
 	}
 
-	operatorSpec := &clusterPolicy.Spec.Operator
 	gpuDirectRDMASpec := clusterPolicy.Spec.Driver.GPUDirectRDMA
 
 	renderData := &driverRenderData{
-		Operator:      operatorSpec,
 		Validator:     validatorSpec,
 		GDS:           gdsSpec,
 		GPUDirectRDMA: gpuDirectRDMASpec,
