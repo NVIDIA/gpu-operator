@@ -107,7 +107,7 @@ func TestGetImagePath(t *testing.T) {
 			expectedImage: "",
 		},
 		{
-			description: "repository, image, version set correctly",
+			description: "repository, image, and version set; version is a tag",
 			spec: &NVIDIADriverSpec{
 				Repository: "nvcr.io/nvidia",
 				Image:      "driver",
@@ -115,6 +115,16 @@ func TestGetImagePath(t *testing.T) {
 			},
 			osVersion:     "ubuntu22.04",
 			expectedImage: "nvcr.io/nvidia/driver:535.104.05-ubuntu22.04",
+		},
+		{
+			description: "repository, image, and version set; version is a digest",
+			spec: &NVIDIADriverSpec{
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
+				Version:    "sha256:" + testDigest,
+			},
+			osVersion:     "ubuntu22.04",
+			expectedImage: "nvcr.io/nvidia/driver@sha256:" + testDigest,
 		},
 	}
 
@@ -219,7 +229,7 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 			expectedImage: "",
 		},
 		{
-			description: "repository, image, version set correctly",
+			description: "repository, image, and version set; version is a tag",
 			spec: &NVIDIADriverSpec{
 				Repository: "nvcr.io/nvidia",
 				Image:      "driver",
@@ -228,6 +238,17 @@ func TestGetPrecompiledImagePath(t *testing.T) {
 			osVersion:     "ubuntu22.04",
 			kernelVersion: "5.4.0-150-generic",
 			expectedImage: "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04",
+		},
+		{
+			description: "repository, image, and version set; version is a digest",
+			spec: &NVIDIADriverSpec{
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
+				Version:    "sha256:" + testDigest,
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
 		},
 	}
 

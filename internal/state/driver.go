@@ -26,8 +26,10 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -229,7 +231,13 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			logger.Error(err, "error rendering manifests for node pool", "NodePool", nodePool.name)
 			return nil, err
 		}
+		manifestObjs, err = s.handleDefaultImagesInObjects(ctx, manifestObjs, cr, *renderData)
+		if err != nil {
+			logger.Error(err, "error handling default images in manifests", "NodePool", nodePool.name)
+			return nil, err
+		}
 		objs = append(objs, manifestObjs...)
+
 	}
 	return objs, nil
 }
@@ -241,15 +249,120 @@ func (s *stateDriver) renderManifestObjects(ctx context.Context, renderData *dri
 
 	objs, err := s.renderer.RenderObjects(
 		&render.TemplatingData{
-			Data: renderData,
+			Data: &renderData,
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to render kubernetes manifests: %v", err)
+		return nil, fmt.Errorf("failed to render kubernetes manifests: %w", err)
 	}
-	logger.V(consts.LogLevelDebug).Info("Rendered", "objects:", objs)
 
+	logger.V(consts.LogLevelDebug).Info("Rendered", "objects:", objs)
 	return objs, nil
+}
+
+func (s *stateDriver) handleDefaultImagesInObjects(
+	ctx context.Context,
+	desiredObjs []*unstructured.Unstructured,
+	cr *nvidiav1alpha1.NVIDIADriver,
+	renderData driverRenderData) ([]*unstructured.Unstructured, error) {
+	logger := log.FromContext(ctx)
+
+	// If 'image' field is not set in spec, then the driver image path
+	// was determined via the DRIVER_MANAGER_IMAGE env var
+	managerImageEnvVarUsed := (cr.Spec.Manager.Image == "")
+	if !managerImageEnvVarUsed {
+		return desiredObjs, nil
+	}
+
+	// If the default image is used for driver-manager, make sure this image
+	// is only upgraded iff the driver spec has been updated. This avoids
+	// triggering undesired driver upgrades when the operator itself is upgraded
+	// but the NVIDIADriver spec is unmodified.
+	logger.V(consts.LogLevelDebug).Info("Default env var is being used for k8s-driver-manager image, checking for an updated default image")
+
+	desiredDs, err := getDaemonsetFromObjects(desiredObjs)
+	if err != nil {
+		return nil, fmt.Errorf("error getting DaemonSet from unstructured objects: %w", err)
+	}
+
+	currentDs := &appsv1.DaemonSet{}
+	err = s.client.Get(ctx, types.NamespacedName{Namespace: desiredDs.Namespace, Name: desiredDs.Name}, currentDs)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return desiredObjs, nil
+		}
+		return nil, fmt.Errorf("failed to get current driver DaemonSet object: %w", err)
+	}
+
+	currentManagerImage := ""
+	for _, container := range currentDs.Spec.Template.Spec.InitContainers {
+		if container.Name == "k8s-driver-manager" {
+			currentManagerImage = container.Image
+			break
+		}
+	}
+
+	logger.V(consts.LogLevelDebug).Info("Current k8s-driver-manager image", "image", currentManagerImage)
+	if currentManagerImage == renderData.Driver.ManagerImagePath {
+		logger.V(consts.LogLevelDebug).Info("Default k8s-driver-manager image has not been updated")
+		return desiredObjs, nil
+	}
+
+	// Render manifests again but with the current k8s-driver-manager being used
+	renderData.Driver.ManagerImagePath = currentManagerImage
+	desiredObjsWithCurrentImages, err := s.renderManifestObjects(ctx, &renderData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render kubernetes manifests: %w", err)
+	}
+
+	obj, err := getObjectOfKind(desiredObjsWithCurrentImages, "DaemonSet")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DaemonSet object: %w", err)
+	}
+
+	// Apply common modifications to the DaemonSet object
+	if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
+		return nil, fmt.Errorf("failed to set controller reference for object: %w", err)
+	}
+	s.addStateSpecificLabels(obj)
+
+	// Compute the hash and compare with the hash of the current DaemonSet deployed
+	newHash := utils.GetObjectHash(obj)
+	currentHash := currentDs.GetAnnotations()[consts.NvidiaAnnotationHashKey]
+	logger.V(consts.LogLevelDebug).Info("Calculating obj hash with old k8s-driver-manager image", "currentHash", currentHash, "newHash", newHash)
+	if newHash == currentHash {
+		// Hash is same when we use the same driver manager image.
+		// Thus, the driver spec has not changed. Do not update
+		// the driver-manager image.
+		logger.V(consts.LogLevelDebug).Info("k8s-driver-manager image can be updated, but driver spec is unchanged. Avoiding update.")
+		return desiredObjsWithCurrentImages, nil
+	}
+
+	logger.V(consts.LogLevelDebug).Info("Driver spec has changed, updating k8s-driver-manager image as well")
+	return desiredObjs, nil
+}
+
+func getDaemonsetFromObjects(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
+	obj, err := getObjectOfKind(objs, "DaemonSet")
+	if err != nil {
+		return nil, err
+	}
+
+	ds := &appsv1.DaemonSet{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ds)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to DaemonSet: %w", err)
+	}
+	return ds, nil
+}
+
+func getObjectOfKind(objs []*unstructured.Unstructured, kind string) (*unstructured.Unstructured, error) {
+	for _, obj := range objs {
+		if obj.GetKind() == kind {
+			return obj, nil
+		}
+	}
+	return nil, fmt.Errorf("did not find object of kind '%s' in Object list", kind)
 }
 
 // getDriverName returns a unique name for an NVIDIA driver instance in the format
