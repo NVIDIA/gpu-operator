@@ -25,6 +25,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	ocpconfigv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	imagesv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +40,7 @@ import (
 
 // Interface to the clusterinfo package
 type Interface interface {
+	GetContainerRuntime() (string, error)
 	GetKubernetesVersion() (string, error)
 	GetOpenshiftVersion() (string, error)
 	GetRHCOSVersions(map[string]string) ([]string, error)
@@ -57,6 +59,7 @@ type clusterInfo struct {
 	config  *rest.Config
 	oneshot bool
 
+	containerRuntime             string
 	kubernetesVersion            string
 	openshiftVersion             string
 	rhcosVersions                []string
@@ -84,6 +87,12 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	// The 'oneshot' option is configured. Get cluster information now and store
 	// it in the struct. This information will be used when clients request
 	// cluster information.
+	containerRuntime, err := getContainerRuntime(ctx, l.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container runtime: %w", err)
+	}
+	l.containerRuntime = containerRuntime
+
 	kubernetesVersion, err := getKubernetesVersion(l.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %w", err)
@@ -132,6 +141,14 @@ func WithOneShot(oneshot bool) Option {
 	return func(l *clusterInfo) {
 		l.oneshot = oneshot
 	}
+}
+
+func (l *clusterInfo) GetContainerRuntime() (string, error) {
+	if l.oneshot {
+		return l.containerRuntime, nil
+	}
+
+	return getContainerRuntime(l.ctx, l.config)
 }
 
 // GetKubernetesVersion returns the k8s version detected in the cluster
@@ -224,6 +241,55 @@ func (l *clusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
 	}
 
 	return getOpenshiftProxySpec(l.ctx, l.config)
+}
+
+func getContainerRuntime(ctx context.Context, config *rest.Config) (string, error) {
+	logger := log.FromContext(ctx)
+
+	k8sClient, err := corev1client.NewForConfig(config)
+	if err != nil {
+		logger.Error(err, "failed to build k8s core v1 client")
+		return "", err
+	}
+
+	ocpVersion, err := getOpenshiftVersion(ctx, config)
+	if err != nil {
+		logger.Error(err, "failed to retrieve")
+	}
+	if ocpVersion != "" {
+		return consts.CRIO, nil
+	}
+
+	nodeSelector := map[string]string{
+		consts.GPUPresentLabel: "true",
+	}
+
+	list, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
+	})
+	if err != nil {
+		return "", fmt.Errorf("unable to list nodes prior to checking container runtime: %w", err)
+	}
+
+	var runtime string
+	for _, node := range list.Items {
+		rt, err := getRuntimeString(node)
+		if err != nil {
+			logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
+			continue
+		}
+		runtime = rt
+		if runtime == consts.Containerd {
+			// default to containerd if >=1 node running containerd
+			break
+		}
+	}
+
+	if runtime == "" {
+		logger.Info("Unable to get runtime info from the cluster, defaulting to containerd")
+		runtime = consts.Containerd
+	}
+	return runtime, nil
 }
 
 func getKubernetesVersion(config *rest.Config) (string, error) {
@@ -368,4 +434,20 @@ func getOpenshiftProxySpec(ctx context.Context, cfg *rest.Config) (*configv1.Pro
 		return nil, err
 	}
 	return &proxy.Spec, nil
+}
+
+func getRuntimeString(node corev1.Node) (string, error) {
+	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
+	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
+	var runtime string
+	if strings.HasPrefix(runtimeVer, "docker") {
+		runtime = consts.Docker
+	} else if strings.HasPrefix(runtimeVer, "containerd") {
+		runtime = consts.Containerd
+	} else if strings.HasPrefix(runtimeVer, "cri-o") {
+		runtime = consts.CRIO
+	} else {
+		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
+	}
+	return runtime, nil
 }
