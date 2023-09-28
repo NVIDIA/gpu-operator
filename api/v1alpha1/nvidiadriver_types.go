@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
-	"github.com/NVIDIA/gpu-operator/internal/image"
-
 	"github.com/regclient/regclient/types/ref"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/NVIDIA/gpu-operator/internal/image"
 )
 
 const (
@@ -110,7 +109,7 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
-	Env []gpuv1.EnvVar `json:"env,omitempty"`
+	Env []EnvVar `json:"env,omitempty"`
 
 	// Optional: Custom repo configuration for NVIDIA Driver container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
