@@ -420,8 +420,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 
 func TestDriverPrecompiled(t *testing.T) {
 	const (
-		testName     = "driver-precompiled"
-		rhcosVersion = "5.4.0-150-generic"
+		testName = "driver-precompiled"
 	)
 
 	state, err := NewStateDriver(nil, nil, manifestDir)
@@ -613,13 +612,6 @@ func checkResources(t *testing.T, input *nvidiav1alpha1.ResourceRequirements, ou
 
 func checkArgs(t *testing.T, defaultArgs []string, input []string, output []string) {
 	require.Equal(t, append(defaultArgs, input...), output)
-}
-
-// TODO: make this a public utils method
-func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = pathType
-	return hostPathType
 }
 
 func getDriverVolumes() []corev1.Volume {

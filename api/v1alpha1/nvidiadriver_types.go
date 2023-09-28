@@ -493,3 +493,12 @@ func (d *GPUDirectStorageSpec) IsEnabled() bool {
 	}
 	return *d.Enabled
 }
+
+// IsNLSEnabled returns true if NLS should be used for licensing the driver
+func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
+	if l.NLSEnabled == nil {
+		// NLS is enabled by default
+		return true
+	}
+	return *l.NLSEnabled
+}

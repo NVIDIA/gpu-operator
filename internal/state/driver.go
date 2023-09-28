@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -141,7 +143,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
 
-	// Create objects if they dont exist, Update objects if they do exist
+	// Create objects if they don't exist, Update objects if they do exist
 	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %v", err)
@@ -191,12 +193,11 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	gpuDirectRDMASpec := clusterPolicy.Spec.Driver.GPUDirectRDMA
 
 	renderData := &driverRenderData{
-		Operator:          operatorSpec,
-		Validator:         validatorSpec,
-		GDS:               gdsSpec,
-		GPUDirectRDMA:     gpuDirectRDMASpec,
-		Runtime:           runtimeSpec,
-		AdditionalConfigs: &additionalConfigs{},
+		Operator:      operatorSpec,
+		Validator:     validatorSpec,
+		GDS:           gdsSpec,
+		GPUDirectRDMA: gpuDirectRDMASpec,
+		Runtime:       runtimeSpec,
 	}
 
 	// Render kubernetes objects for each node pool.
@@ -223,6 +224,11 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 				RHCOSVersion: nodePool.rhcosVersion,
 				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[nodePool.rhcosVersion],
 			}
+		}
+
+		renderData.AdditionalConfigs, err = s.getDriverAdditionalConfigs(ctx, cr, clusterInfo, nodePool)
+		if err != nil {
+			logger.Error(err, "error rendering addition driver volume", "NodePool", nodePool.name)
 		}
 
 		logger.Info("Rendering manifests for node pool", "NodePool", nodePool.name)
@@ -402,11 +408,13 @@ func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alph
 }
 
 func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
+	os := nodePool.getOS()
+
 	if spec.UsePrecompiledDrivers() {
-		return spec.GetPrecompiledImagePath(nodePool.os, nodePool.kernel)
+		return spec.GetPrecompiledImagePath(os, nodePool.kernel)
 	}
 
-	return spec.GetImagePath(nodePool.os)
+	return spec.GetImagePath(os)
 }
 
 func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverSpec, error) {
@@ -414,7 +422,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		return nil, fmt.Errorf("no NVIDIADriver CR provided")
 	}
 
-	nvidiaDriverName := getDriverName(cr, nodePool.os)
+	nvidiaDriverName := getDriverName(cr, nodePool.getOS())
 
 	spec := &cr.Spec
 	imagePath, err := getDriverImagePath(spec, nodePool)
@@ -528,4 +536,47 @@ func getSanitizedKernelVersion(kernelVersion string) string {
 	// remove arch strings, "_" and any trailing "." from the kernel version
 	sanitizedVersion := strings.TrimSuffix(strings.ReplaceAll(archRegex.ReplaceAllString(kernelVersion, ""), "_", "."), ".")
 	return strings.ToLower(sanitizedVersion)
+}
+
+func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace string, configMapName string,
+	destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+	// get the ConfigMap
+	cm := &corev1.ConfigMap{}
+	opts := client.ObjectKey{Namespace: namespace, Name: configMapName}
+	err := s.client.Get(ctx, opts, cm)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ERROR: could not get ConfigMap %s from client: %v", configMapName, err)
+	}
+
+	// create one volume mount per file in the ConfigMap and use subPath
+	var filenames []string
+	for filename := range cm.Data {
+		filenames = append(filenames, filename)
+	}
+	// sort so volume mounts are added to spec in deterministic order
+	sort.Strings(filenames)
+	var itemsToInclude []corev1.KeyToPath
+	var volumeMounts []corev1.VolumeMount
+	for _, filename := range filenames {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{Name: configMapName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
+				SubPath: filename})
+		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
+			Key:  filename,
+			Path: filename,
+		})
+	}
+	return volumeMounts, itemsToInclude, nil
+}
+
+func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: configMapName,
+			},
+			Items: itemsToInclude,
+		},
+	}
+	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
 }

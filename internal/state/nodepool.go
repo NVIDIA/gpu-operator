@@ -35,7 +35,8 @@ const (
 // TODO: add unit tests
 type nodePool struct {
 	name         string
-	os           string
+	osRelease    string
+	osVersion    string
 	rhcosVersion string
 	kernel       string
 	nodeSelector map[string]string
@@ -79,24 +80,25 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 
 		osID, ok := nodeLabels[nfdOSReleaseIDLabelKey]
 		if !ok {
-			logger.Info("WARNING: Could not find NFD labels for node. Is NFD is installed?", "Node", node.Name)
+			logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
 			continue
 		}
 		nodePool.nodeSelector[nfdOSReleaseIDLabelKey] = osID
 
 		osVersion, ok := nodeLabels[nfdOSVersionIDLabelKey]
 		if !ok {
-			logger.Info("WARNING: Could not find NFD labels for node. Is NFD is installed?", "Node", node.Name)
+			logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
 			continue
 		}
 		nodePool.nodeSelector[nfdOSVersionIDLabelKey] = osVersion
-		nodePool.os = fmt.Sprintf("%s%s", osID, osVersion)
-		nodePool.name = nodePool.os
+		nodePool.osRelease = osID
+		nodePool.osVersion = osVersion
+		nodePool.name = nodePool.getOS()
 
 		if precompiled {
 			kernelVersion, ok := nodeLabels[nfdKernelLabelKey]
 			if !ok {
-				logger.Info("WARNING: Could not find NFD labels for node. Is NFD is installed?", "Node", node.Name)
+				logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
 				continue
 			}
 			nodePool.nodeSelector[nfdKernelLabelKey] = kernelVersion
@@ -107,7 +109,7 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 		if !precompiled && openshift {
 			rhcosVersion, ok := nodeLabels[nfdOSTreeVersionLabelKey]
 			if !ok {
-				logger.Info("WARNING: Could not find NFD labels for node. Is NFD is installed?", "Node", node.Name)
+				logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
 				continue
 			}
 			nodePool.nodeSelector[nfdOSTreeVersionLabelKey] = rhcosVersion
@@ -127,4 +129,8 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 	}
 
 	return nodePools, nil
+}
+
+func (n nodePool) getOS() string {
+	return fmt.Sprintf("%s%s", n.osRelease, n.osVersion)
 }

@@ -32,10 +32,30 @@ const (
 	StateLabel      = "nvidia.com/gpu-operator.state"
 	GPUPresentLabel = "nvidia.com/gpu.present"
 
+	// Docker runtime
+	Docker = "docker"
+	// CRIO runtime
+	CRIO = "crio"
+	// Containerd runtime
+	Containerd = "containerd"
+
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
+
+	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration file
+	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
+	// VGPULicensingFileName is the vGPU licensing configuration filename
+	VGPULicensingFileName = "gridd.conf"
+	// NLSClientTokenMountPath inidicates the target mount path for NLS client config token file (.tok)
+	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
+	// NLSClientTokenFileName is the NLS client config token filename
+	NLSClientTokenFileName = "client_configuration_token.tok"
+	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
+	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
+	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename
+	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 )
