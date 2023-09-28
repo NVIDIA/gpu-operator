@@ -4536,6 +4536,10 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	for _, rc := range config.KataManager.Config.RuntimeClasses {
 		logger := n.rec.Log.WithValues("RuntimeClass", rc.Name)
 
+		if rc.Name == config.Operator.RuntimeClass {
+			return gpuv1.NotReady, fmt.Errorf("error creating kata runtimeclass '%s' as it conflicts with the runtimeclass used for the gpu-operator operand pods itself", rc.Name)
+		}
+
 		obj := nodev1.RuntimeClass{}
 		obj.Name = rc.Name
 		obj.Handler = rc.Name
