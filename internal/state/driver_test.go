@@ -242,7 +242,7 @@ func TestDriverSpec(t *testing.T) {
 				},
 			},
 			Args: []string{"--foo", "--bar"},
-			Env: []gpuv1.EnvVar{
+			Env: []nvidiav1alpha1.EnvVar{
 				{Name: "FOO", Value: "foo"},
 				{Name: "BAR", Value: "bar"},
 			},
@@ -726,7 +726,7 @@ func getMofedValidationEnvars() []corev1.EnvVar {
 }
 
 // TODO: make this a public utils method
-func toCoreV1Envars(envs []gpuv1.EnvVar) []corev1.EnvVar {
+func toCoreV1Envars(envs []nvidiav1alpha1.EnvVar) []corev1.EnvVar {
 	if len(envs) == 0 {
 		return []corev1.EnvVar{}
 	}
