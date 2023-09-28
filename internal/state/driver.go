@@ -386,6 +386,21 @@ func getDriverName(cr *nvidiav1alpha1.NVIDIADriver, osVersion string) string {
 	return name
 }
 
+func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alpha1.ContainerProbeSpec {
+	initialDelaySeconds := int32(60)
+	if spec.UsePrecompiledDrivers() {
+		initialDelaySeconds = 5
+	}
+
+	return &nvidiav1alpha1.ContainerProbeSpec{
+		InitialDelaySeconds: initialDelaySeconds,
+		TimeoutSeconds:      60,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    120,
+	}
+}
+
 func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
 	if spec.UsePrecompiledDrivers() {
 		return spec.GetPrecompiledImagePath(nodePool.os, nodePool.kernel)
@@ -412,6 +427,10 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	managerImagePath, err := image.ImagePath(spec.Manager.Repository, spec.Manager.Image, spec.Manager.Version, "DRIVER_MANAGER_IMAGE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct image path for driver manager: %w", err)
+	}
+
+	if spec.StartupProbe == nil {
+		spec.StartupProbe = getDefaultStartupProbe(spec)
 	}
 
 	return &driverSpec{
