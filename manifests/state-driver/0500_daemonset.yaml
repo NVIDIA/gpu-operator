@@ -72,15 +72,12 @@ spec:
       serviceAccountName: {{ .Driver.Name }}
       hostPID: true
       # Add any configured pull secrets
-      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets .Validator.Spec.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) }}
+      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) }}
       imagePullSecrets:
       {{- range .Driver.Spec.ImagePullSecrets }}
         - name: {{ . }}
       {{- end }}
       {{- range .Driver.Spec.Manager.ImagePullSecrets }}
-        - name: {{ . }}
-      {{- end }}
-      {{- range .Validator.Spec.ImagePullSecrets }}
         - name: {{ . }}
       {{- end }}
       {{- if .GDS }}
@@ -90,44 +87,7 @@ spec:
       {{- end }}
       {{- end }}
       initContainers:
-        {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
-        - name: mofed-validation
-          image: {{ .Validator.ImagePath }}
-          imagePullPolicy: {{ default "IfNotPresent" .Validator.Spec.ImagePullPolicy }}
-          command: ['sh', '-c']
-          args: ["nvidia-validator"]
-          env:
-            - name: WITH_WAIT
-              value: "true"
-            - name: COMPONENT
-              value: mofed
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # always use runc for driver containers
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: void
-            - name: GPU_DIRECT_RDMA_ENABLED
-              value: "true"
-            {{- if (deref .GPUDirectRDMA.UseHostMOFED) }}
-            - name: USE_HOST_MOFED
-              value: "true"
-            {{- end }}
-          securityContext:
-            privileged: true
-            seLinuxOptions:
-              level: "s0"
-          volumeMounts:
-            - name: run-nvidia-validations
-              mountPath: /run/nvidia/validations
-              mountPropagation: Bidirectional
-            - name: run-mellanox-drivers
-              mountPath: /run/mellanox/drivers
-              mountPropagation: HostToContainer
-        {{- end }}
         - name: k8s-driver-manager
-          # TODO: implement a filepath.Join method during template rendering
           image: {{ .Driver.ManagerImagePath }}
           imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.Manager.ImagePullPolicy }}
           command: ["driver-manager"]
@@ -156,6 +116,14 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+        {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
+          - name: GPU_DIRECT_RDMA_ENABLED
+            value: "true"
+          {{- if (deref .GPUDirectRDMA.UseHostMOFED) }}
+          - name: USE_HOST_MOFED
+            value: "true"
+          {{- end }}
+        {{- end }}
         {{- if .Driver.Spec.Manager.Env }}
           {{- range .Driver.Spec.Manager.Env }}
           - name: {{ .Name }}
@@ -174,6 +142,9 @@ spec:
               mountPropagation: HostToContainer
             - name: host-sys
               mountPath: /sys
+            - name: run-mellanox-drivers
+              mountPath: /run/mellanox/drivers
+              mountPropagation: HostToContainer
       containers:
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}

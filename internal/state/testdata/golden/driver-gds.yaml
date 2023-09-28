@@ -282,6 +282,9 @@ spec:
           readOnly: true
         - mountPath: /sys
           name: host-sys
+        - mountPath: /run/mellanox/drivers
+          mountPropagation: HostToContainer
+          name: run-mellanox-drivers
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
       priorityClassName: system-node-critical

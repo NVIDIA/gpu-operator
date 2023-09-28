@@ -84,7 +84,6 @@ type additionalConfigs struct {
 
 type driverRenderData struct {
 	Driver            *driverSpec
-	Validator         *validatorSpec
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *nvidiav1alpha1.GPUDirectRDMASpec
 	Runtime           *driverRuntimeSpec
@@ -178,11 +177,6 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
 
-	validatorSpec, err := getValidatorSpec(&clusterPolicy.Spec.Validator)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct validator spec: %v", err)
-	}
-
 	gdsSpec, err := getGDSSpec(cr.Spec.GPUDirectStorage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct GDS spec: %v", err)
@@ -191,7 +185,6 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	gpuDirectRDMASpec := cr.Spec.GPUDirectRDMA
 
 	renderData := &driverRenderData{
-		Validator:     validatorSpec,
 		GDS:           gdsSpec,
 		GPUDirectRDMA: gpuDirectRDMASpec,
 		Runtime:       runtimeSpec,
@@ -443,21 +436,6 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		Name:             nvidiaDriverName,
 		ImagePath:        imagePath,
 		ManagerImagePath: managerImagePath,
-	}, nil
-}
-
-func getValidatorSpec(spec *gpuv1.ValidatorSpec) (*validatorSpec, error) {
-	if spec == nil {
-		return nil, fmt.Errorf("no validator spec provided")
-	}
-	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "VALIDATOR_IMAGE")
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for validator: %v", err)
-	}
-
-	return &validatorSpec{
-		spec,
-		imagePath,
 	}, nil
 }
 
