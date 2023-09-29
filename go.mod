@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe
-	github.com/NVIDIA/nvidia-container-toolkit v1.14.1
+	github.com/NVIDIA/nvidia-container-toolkit v1.14.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
 	github.com/mitchellh/hashstructure v1.1.0
