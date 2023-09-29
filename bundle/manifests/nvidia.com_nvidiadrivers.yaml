@@ -12,6 +12,10 @@ spec:
     kind: NVIDIADriver
     listKind: NVIDIADriverList
     plural: nvidiadrivers
+    shortNames:
+    - nvd
+    - nvdriver
+    - nvdrivers
     singular: nvidiadriver
   scope: Cluster
   versions:
