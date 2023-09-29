@@ -139,6 +139,16 @@ spec:
         app.kubernetes.io/component: nvidia-driver
         nvidia.com/precompiled: "true"
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                - nvidia-driver
+            topologyKey: kubernetes.io/hostname
       containers:
       - args:
         - init
