@@ -2,7 +2,7 @@ include:
   - local: '.common-ci.yml'
   - project: nvidia/container-infrastructure/aws-kube-ci
     file: aws-kube-ci.yml
-    ref: 23.06.22
+    ref: 23.09.29
 
 variables:
   GIT_SUBMODULE_PATHS: aws-kube-ci
