@@ -191,9 +191,9 @@ spec:
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:00a91252be8e62da6f28cdf1ec3721f2e945ae296938b0b925ef9db2bf6dcc8b
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:ba02153004f1eb3c92919c516cc1bf83a0bc7694925e6026ebcd96c7ad598308
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:0ae82cf53a270a1f73926de5dbf850fc9790a58b84f676725b8a65b043647efc
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:5fbd2908484d5d8f4927159d4511fabb9740f13c1c9fc2b8698ebba1730f3cd2
+      image: nvcr.io/nvidia/driver@sha256:7c2df95df9ed4d16ad3b3c84079ccdd161f3639527ac1d90b106217f9f0a3aad
     - name: driver-image-525
       image: nvcr.io/nvidia/driver@sha256:bbdc4415fe2e71eeea1b8a6e50ee562e11704dabb46db1db4aea807102886a35
     - name: driver-image-470
@@ -897,7 +897,7 @@ spec:
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:878a6162a4fa0b61dae02c7cfc13ba4d28bb06f92fd62d0c521633ab507d675a"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:ba02153004f1eb3c92919c516cc1bf83a0bc7694925e6026ebcd96c7ad598308"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:0ae82cf53a270a1f73926de5dbf850fc9790a58b84f676725b8a65b043647efc"
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:00a91252be8e62da6f28cdf1ec3721f2e945ae296938b0b925ef9db2bf6dcc8b"
                   - name: "DCGM_EXPORTER_IMAGE"
@@ -905,7 +905,7 @@ spec:
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:f1617c3fe54fd9f6d4a00358e5da1a9fa9e8963a4ef6b3ed06f47d4971ddff4b"
                   - name: "DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/driver@sha256:5fbd2908484d5d8f4927159d4511fabb9740f13c1c9fc2b8698ebba1730f3cd2"
+                    value: "nvcr.io/nvidia/driver@sha256:7c2df95df9ed4d16ad3b3c84079ccdd161f3639527ac1d90b106217f9f0a3aad"
                   - name: "DRIVER_IMAGE-525"
                     value: "nvcr.io/nvidia/driver@sha256:bbdc4415fe2e71eeea1b8a6e50ee562e11704dabb46db1db4aea807102886a35"
                   - name: "DRIVER_IMAGE-470"

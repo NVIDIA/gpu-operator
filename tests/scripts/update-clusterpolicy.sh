@@ -126,7 +126,10 @@ test_gpu_sharing() {
 
     echo "validating workloads on timesliced GPU"
 
-    shared_product_name="${GPU_PRODUCT_NAME}-SHARED" 
+    shared_product_name="${GPU_PRODUCT_NAME}-SHARED"
+
+    # set the operator validator image version in the plugin test spec
+    sed -i "s/image: nvcr.io\/nvidia\/cloud-native\/gpu-operator-validator:v1.10.1/image: ${VALIDATOR_IMAGE//\//\\/}:${VALIDATOR_VERSION}/g" ${TEST_DIR}/plugin-test.yaml
     
     # set the name of GPU product in plugin test spec
     sed -i "s/nvidia.com\/gpu.product: Tesla-T4-SHARED/nvidia.com\/gpu.product: ${shared_product_name}/g" ${TEST_DIR}/plugin-test.yaml
