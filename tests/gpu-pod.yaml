@@ -6,8 +6,8 @@ spec:
   restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
-      # https://github.com/kubernetes/kubernetes/blob/v1.7.11/test/images/nvidia-cuda/Dockerfile
-      image: "k8s.gcr.io/cuda-vector-add:v0.1"
+      # https://catalog.ngc.nvidia.com/orgs/nvidia/teams/k8s/containers/cuda-sample
+      image: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.7.1-ubuntu20.04"
       resources:
         limits:
           nvidia.com/gpu: 1
