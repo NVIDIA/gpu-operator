@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -55,16 +56,20 @@ func TestConditionsUpdater_SetConditionsReady(t *testing.T) {
 	err := u.SetConditionsReady(context.Background(), driver, "Reconciled", "All resources are successfully reconciled")
 	assert.NoError(t, err)
 
-	assert.Len(t, driver.Status.Conditions, 2)
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err = c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance)
+	assert.NoError(t, err)
 
-	assert.Equal(t, expectedReady.Type, driver.Status.Conditions[0].Type)
-	assert.Equal(t, expectedReady.Status, driver.Status.Conditions[0].Status)
-	assert.Equal(t, expectedReady.Reason, driver.Status.Conditions[0].Reason)
-	assert.Equal(t, expectedReady.Message, driver.Status.Conditions[0].Message)
+	assert.Len(t, instance.Status.Conditions, 2)
 
-	assert.Equal(t, expectedError.Type, driver.Status.Conditions[1].Type)
-	assert.Equal(t, expectedError.Status, driver.Status.Conditions[1].Status)
-	assert.Equal(t, expectedError.Reason, driver.Status.Conditions[1].Reason)
+	assert.Equal(t, expectedReady.Type, instance.Status.Conditions[0].Type)
+	assert.Equal(t, expectedReady.Status, instance.Status.Conditions[0].Status)
+	assert.Equal(t, expectedReady.Reason, instance.Status.Conditions[0].Reason)
+	assert.Equal(t, expectedReady.Message, instance.Status.Conditions[0].Message)
+
+	assert.Equal(t, expectedError.Type, instance.Status.Conditions[1].Type)
+	assert.Equal(t, expectedError.Status, instance.Status.Conditions[1].Status)
+	assert.Equal(t, expectedError.Reason, instance.Status.Conditions[1].Reason)
 }
 
 func TestConditionsUpdater_SetConditionsErrored(t *testing.T) {
@@ -94,14 +99,18 @@ func TestConditionsUpdater_SetConditionsErrored(t *testing.T) {
 	err := u.SetConditionsError(context.Background(), driver, ConflictingNodeSelector, "Conflicting nodes found with given node selector label")
 	assert.NoError(t, err)
 
-	assert.Len(t, driver.Status.Conditions, 2)
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err = c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance)
+	assert.NoError(t, err)
 
-	assert.Equal(t, expectedReady.Type, driver.Status.Conditions[0].Type)
-	assert.Equal(t, expectedReady.Status, driver.Status.Conditions[0].Status)
-	assert.Equal(t, expectedReady.Reason, driver.Status.Conditions[0].Reason)
+	assert.Len(t, instance.Status.Conditions, 2)
 
-	assert.Equal(t, expectedError.Type, driver.Status.Conditions[1].Type)
-	assert.Equal(t, expectedError.Status, driver.Status.Conditions[1].Status)
-	assert.Equal(t, expectedError.Reason, driver.Status.Conditions[1].Reason)
-	assert.Equal(t, expectedError.Message, driver.Status.Conditions[1].Message)
+	assert.Equal(t, expectedReady.Type, instance.Status.Conditions[0].Type)
+	assert.Equal(t, expectedReady.Status, instance.Status.Conditions[0].Status)
+	assert.Equal(t, expectedReady.Reason, instance.Status.Conditions[0].Reason)
+
+	assert.Equal(t, expectedError.Type, instance.Status.Conditions[1].Type)
+	assert.Equal(t, expectedError.Status, instance.Status.Conditions[1].Status)
+	assert.Equal(t, expectedError.Reason, instance.Status.Conditions[1].Reason)
+	assert.Equal(t, expectedError.Message, instance.Status.Conditions[1].Message)
 }

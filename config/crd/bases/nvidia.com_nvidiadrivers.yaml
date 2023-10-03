@@ -653,14 +653,13 @@ spec:
               state:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
-                  this file State indicates status of ClusterPolicy'
+                  this file State indicates status of NVIDIADriver instance'
                 enum:
                 - ignored
                 - ready
                 - notReady
                 type: string
             required:
-            - conditions
             - state
             type: object
         type: object

@@ -158,8 +158,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 			updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
-			reason := r.getReasonByState(clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx])
-			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, reason, statusError.Error())
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Failed to reconcile %s: %s", clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx], statusError.Error()))
 			if condErr != nil {
 				r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
 			}
@@ -233,47 +232,6 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 	return ctrl.Result{}, nil
-}
-
-func (r *ClusterPolicyReconciler) getReasonByState(state string) (reason string) {
-	switch state {
-	case "state-driver":
-		reason = conditions.DriverNotReady
-	case "state-operator-metrics":
-		reason = conditions.OperatorMetricsNotReady
-	case "state-container-toolkit":
-		reason = conditions.ContainerToolkitNotReady
-	case "state-device-plugin":
-		reason = conditions.DevicePluginNotReady
-	case "state-operator-validation":
-		reason = conditions.OperatorValidatorNotReady
-	case "state-dcgm-exporter":
-		reason = conditions.DCGMExporterNotReady
-	case "state-dcgm":
-		reason = conditions.DCGMNotReady
-	case "gpu-feature-discovery":
-		reason = conditions.GPUFeatureDiscoveryNotReady
-	case "state-mig-manager":
-		reason = conditions.MIGManagerNotReady
-	case "state-node-status-exporter":
-		reason = conditions.NodeStatusExporterNotReady
-	case "state-vgpu-manager":
-		reason = conditions.VGPUManagerNotReady
-	case "state-vgpu-device-manager":
-		reason = conditions.VGPUDeviceManagerNotReady
-	case "state-sandbox-validation":
-		reason = conditions.SandboxDevicePluginNotReady
-	case "state-kata-manager":
-		reason = conditions.KataManagerNotReady
-	case "state-vfio-manager":
-		reason = conditions.VFIOManagerNotReady
-	case "state-cc-manager":
-		reason = conditions.CCManagerNotReady
-	default:
-		r.Log.Error(nil, "unknown state passed", "state", state)
-		reason = conditions.OperandNotReady
-	}
-	return reason
 }
 
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {

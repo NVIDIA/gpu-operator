@@ -148,7 +148,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
 	// update CR status
-	r.updateCrStatus(ctx, instance, managerStatus)
+	err = r.updateCrStatus(ctx, instance, managerStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if managerStatus.Status != state.SyncStateReady {
 		logger.Info("NVIDIADriver instance is not ready")
@@ -181,21 +184,31 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *NVIDIADriverReconciler) updateCrStatus(
-	ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, status state.Results) {
+	ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, status state.Results) error {
 	reqLogger := log.FromContext(ctx)
 
-	// Update global State
-	if cr.Status.State == nvidiav1alpha1.State(status.Status) {
-		return
+	// Fetch latest instance and update state to avoid version mismatch
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update")
+		return err
 	}
-	cr.Status.State = nvidiav1alpha1.State(status.Status)
+
+	// Update global State
+	if instance.Status.State == nvidiav1alpha1.State(status.Status) {
+		return nil
+	}
+	instance.Status.State = nvidiav1alpha1.State(status.Status)
 
 	// send status update request to k8s API
-	reqLogger.V(consts.LogLevelInfo).Info("Updating CR Status", "Status", cr.Status)
-	err := r.Status().Update(ctx, cr)
+	reqLogger.V(consts.LogLevelInfo).Info("Updating CR Status", "Status", instance.Status)
+	err = r.Status().Update(ctx, instance)
 	if err != nil {
 		reqLogger.V(consts.LogLevelError).Error(err, "Failed to update CR status")
+		return err
 	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
