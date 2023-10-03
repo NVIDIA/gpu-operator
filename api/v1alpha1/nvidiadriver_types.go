@@ -369,12 +369,12 @@ type NVIDIADriverStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// +kubebuilder:validation:Enum=ignored;ready;notReady
-	// State indicates status of ClusterPolicy
+	// State indicates status of NVIDIADriver instance
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator and driver are installed
 	Namespace string `json:"namespace,omitempty"`
 	// Conditions is a list of conditions representing the NVIDIADriver's current state.
-	Conditions []metav1.Condition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -21,7 +21,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 )
@@ -53,35 +55,52 @@ func (u *nvDriverUpdater) SetConditionsError(ctx context.Context, cr any, reason
 }
 
 func (u *nvDriverUpdater) setConditionsReady(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+	reqLogger := log.FromContext(ctx)
+	// Fetch latest instance and update state to avoid version mismatch
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update", "name", cr.Name)
+		return err
+	}
+
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:    Ready,
 		Status:  metav1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	})
 
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:   Error,
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
 
-	return u.client.Status().Update(ctx, cr)
+	return u.client.Status().Update(ctx, instance)
 }
 
 func (u *nvDriverUpdater) setConditionsError(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+	reqLogger := log.FromContext(ctx)
+	// Fetch latest instance and update state to avoid version mismatch
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
+	if err != nil {
+		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update", "name", cr.Name)
+	}
+
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:   Ready,
 		Status: metav1.ConditionFalse,
 		Reason: Error,
 	})
 
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:    Error,
 		Status:  metav1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	})
 
-	return u.client.Status().Update(ctx, cr)
+	return u.client.Status().Update(ctx, instance)
 }
