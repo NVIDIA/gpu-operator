@@ -136,7 +136,7 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
 	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
 
-	//+kubebuilder:validation:Optional
+	// +kubebuilder:validation:Optional
 	// NodeSelector specifies a selector for installation of NVIDIA driver
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
@@ -417,7 +417,7 @@ func (d *NVIDIADriverSpec) UsePrecompiledDrivers() bool {
 func (d *NVIDIADriver) GetNodeSelector() map[string]string {
 	ns := d.Spec.NodeSelector
 	if ns == nil {
-		ns = make(map[string]string, 0)
+		ns = make(map[string]string)
 		// If no node selector is specified then the driver is deployed
 		// on all GPU nodes by default
 		// nolint

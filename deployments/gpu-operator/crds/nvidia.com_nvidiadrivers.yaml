@@ -560,11 +560,11 @@ spec:
                 description: NVIDIA Driver version (or just branch for precompiled
                   drivers)
                 type: string
-              virtualTopology:
+              virtualTopologyConfig:
                 description: 'Optional: Virtual Topology Daemon configuration for
                   NVIDIA vGPU drivers'
                 properties:
-                  config:
+                  name:
                     description: 'Optional: Config name representing virtual topology
                       daemon configuration file nvidia-topologyd.conf'
                     type: string
