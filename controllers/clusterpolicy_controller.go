@@ -41,7 +41,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
+
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	"github.com/NVIDIA/gpu-operator/internal/conditions"
 )
 
 const (
@@ -57,8 +60,9 @@ var clusterPolicyCtrl ClusterPolicyController
 // ClusterPolicyReconciler reconciles a ClusterPolicy object
 type ClusterPolicyReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log              logr.Logger
+	Scheme           *runtime.Scheme
+	conditionUpdater conditions.Updater
 }
 
 // +kubebuilder:rbac:groups=nvidia.com,resources=*,verbs=get;list;watch;create;update;patch;delete
@@ -92,8 +96,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Fetch the ClusterPolicy instance
 	instance := &gpuv1.ClusterPolicy{}
+	var condErr error
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
+		err = fmt.Errorf("Failed to get ClusterPolicy object: %v", err)
+		r.Log.Error(nil, err.Error())
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -102,6 +109,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -116,8 +127,12 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	err = clusterPolicyCtrl.init(ctx, r, instance)
 	if err != nil {
-		r.Log.Error(err, "Failed to initialize ClusterPolicy controller")
-
+		err = fmt.Errorf("Failed to initialize ClusterPolicy controller: %v", err)
+		r.Log.Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		if clusterPolicyCtrl.operatorMetrics != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		}
@@ -143,6 +158,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 			updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
+			reason := r.getReasonByState(clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx])
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, reason, statusError.Error())
+			if condErr != nil {
+				r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+			}
 			return ctrl.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
@@ -164,7 +184,12 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 
-		r.Log.Info("ClusterPolicy isn't ready", "states not ready", statesNotReady)
+		errStr := fmt.Sprintf("ClusterPolicy is not ready, states not ready: %v", statesNotReady)
+		r.Log.Error(nil, errStr)
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, errStr)
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
@@ -178,6 +203,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// Update CR state as ready as all states are complete
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.Ready)
+		condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.NFDLabelsMissing, "No NFD labels found")
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
 
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
@@ -188,13 +218,62 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusSuccess)
 	clusterPolicyCtrl.operatorMetrics.reconciliationLastSuccess.Set(float64(time.Now().Unix()))
 
+	var infoStr string
 	if !clusterPolicyCtrl.hasGPUNodes {
-		r.Log.Info("No GPU node found, watching for new nodes to join the cluster.", "hasNFDLabels", clusterPolicyCtrl.hasNFDLabels)
+		infoStr = "No GPU node found, watching for new nodes to join the cluster."
+		r.Log.Info(infoStr, "hasNFDLabels", clusterPolicyCtrl.hasNFDLabels)
+		if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.NoGPUNodes, infoStr); condErr != nil {
+			return ctrl.Result{}, condErr
+		}
 	} else {
-		r.Log.Info("ClusterPolicy is ready.")
+		infoStr = "ClusterPolicy is ready as all resources have been successfully reconciled"
+		r.Log.Info(infoStr)
+		if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.Reconciled, infoStr); condErr != nil {
+			return ctrl.Result{}, condErr
+		}
 	}
-
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterPolicyReconciler) getReasonByState(state string) (reason string) {
+	switch state {
+	case "state-driver":
+		reason = conditions.DriverNotReady
+	case "state-operator-metrics":
+		reason = conditions.OperatorMetricsNotReady
+	case "state-container-toolkit":
+		reason = conditions.ContainerToolkitNotReady
+	case "state-device-plugin":
+		reason = conditions.DevicePluginNotReady
+	case "state-operator-validation":
+		reason = conditions.OperatorValidatorNotReady
+	case "state-dcgm-exporter":
+		reason = conditions.DCGMExporterNotReady
+	case "state-dcgm":
+		reason = conditions.DCGMNotReady
+	case "gpu-feature-discovery":
+		reason = conditions.GPUFeatureDiscoveryNotReady
+	case "state-mig-manager":
+		reason = conditions.MIGManagerNotReady
+	case "state-node-status-exporter":
+		reason = conditions.NodeStatusExporterNotReady
+	case "state-vgpu-manager":
+		reason = conditions.VGPUManagerNotReady
+	case "state-vgpu-device-manager":
+		reason = conditions.VGPUDeviceManagerNotReady
+	case "state-sandbox-validation":
+		reason = conditions.SandboxDevicePluginNotReady
+	case "state-kata-manager":
+		reason = conditions.KataManagerNotReady
+	case "state-vfio-manager":
+		reason = conditions.VFIOManagerNotReady
+	case "state-cc-manager":
+		reason = conditions.CCManagerNotReady
+	default:
+		r.Log.Error(nil, "unknown state passed", "state", state)
+		reason = conditions.OperandNotReady
+	}
+	return reason
 }
 
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
@@ -319,6 +398,9 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	if err != nil {
 		return err
 	}
+
+	// initialize condition updater
+	r.conditionUpdater = conditions.NewClusterPolicyUpdater(mgr.GetClient())
 
 	// Watch for changes to primary resource ClusterPolicy
 	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{})
