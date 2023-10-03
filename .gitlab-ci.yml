@@ -137,8 +137,9 @@ build:gpu-operator-validator:
     - source aws-kube-ci/hostname
     - export private_key="${CI_PROJECT_DIR}/aws-kube-ci/${private_key}"
     - export instance_hostname="${instance_hostname}"
+    - export TEST_CASE="${TEST_CASE}"
     - rc=0
-    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} || rc=$?
+    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
     - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
     - exit $rc
   artifacts:
@@ -155,6 +156,18 @@ e2e_tests_containerd:
     - aws_kube_setup_containerd
   variables:
     CONTAINER_RUNTIME: "containerd"
+    TEST_CASE: "./tests/cases/defaults.sh"
+
+e2e_tests_nvidiadriver:
+  extends:
+    - .e2e_tests
+  dependencies:
+    - aws_kube_setup_nvidiadriver
+  needs:
+    - aws_kube_setup_nvidiadriver
+  variables:
+    CONTAINER_RUNTIME: "containerd"
+    TEST_CASE: "./tests/cases/nvidia-driver.sh"
 
 .launch_infra:
   extends:
@@ -171,6 +184,13 @@ aws_kube_setup_containerd:
     TF_VAR_container_runtime: "containerd"
     TF_VAR_project_name: "gpu-operator-containerd"
 
+aws_kube_setup_nvidiadriver:
+  extends:
+    - .launch_infra
+  variables:
+    TF_VAR_container_runtime: "containerd"
+    TF_VAR_project_name: "gpu-operator-nvidiadriver"
+
 aws_kube_clean_containerd:
   extends:
     - .aws_kube_clean
@@ -180,3 +200,13 @@ aws_kube_clean_containerd:
     TF_VAR_project_name: "gpu-operator-containerd"
   dependencies:
     - aws_kube_setup_containerd
+
+aws_kube_clean_nvidiadriver:
+  extends:
+    - .aws_kube_clean
+    - .e2e_defaults
+  variables:
+    TF_VAR_container_runtime: "containerd"
+    TF_VAR_project_name: "gpu-operator-nvidiadriver"
+  dependencies:
+    - aws_kube_setup_nvidiadriver
