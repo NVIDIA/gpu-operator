@@ -182,6 +182,7 @@ $(DOCKER_TARGETS): docker-%: .build-image
 	@echo "Running 'make $(*)' in docker container $(BUILDIMAGE)"
 	$(DOCKER) run \
 		--rm \
+		-e GOLANGCI_LINT_CACHE=/tmp/.cache \
 		-e GOCACHE=/tmp/.cache \
 		-v $(PWD):$(PWD) \
 		-w $(PWD) \

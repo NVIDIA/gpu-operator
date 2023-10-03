@@ -38,6 +38,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -50,6 +51,7 @@ type NVIDIADriverReconciler struct {
 
 	stateManager          state.Manager
 	nodeSelectorValidator validator.Validator
+	conditionUpdater      conditions.Updater
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
@@ -71,9 +73,11 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Get the NvidiaDriver instance from this request
 	instance := &nvidiav1alpha1.NVIDIADriver{}
+	var condErr error
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
-		logger.V(consts.LogLevelError).Error(err, "Error getting NVIDIADriver object")
+		err = fmt.Errorf("Error getting NVIDIADriver object: %v", err)
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -81,6 +85,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -88,13 +96,23 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	clusterPolicyList := &gpuv1.ClusterPolicyList{}
 	err = r.Client.List(ctx, clusterPolicyList)
 	if err != nil {
-		logger.V(consts.LogLevelError).Error(err, "error getting ClusterPolicyList")
+		err = fmt.Errorf("Error getting ClusterPolicy list: %v", err)
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		return reconcile.Result{}, fmt.Errorf("error getting ClusterPolicyList: %v", err)
 	}
 
 	if len(clusterPolicyList.Items) == 0 {
-		logger.V(consts.LogLevelError).Error(nil, "no ClusterPolicy object found in the cluster")
-		return reconcile.Result{}, fmt.Errorf("no ClusterPolicy object found in the cluster")
+		err = fmt.Errorf("no ClusterPolicy object found in the cluster")
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return reconcile.Result{}, err
 	}
 	clusterPolicyInstance := clusterPolicyList.Items[0]
 
@@ -112,21 +130,72 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// is deployed per GPU node.
 	err = r.nodeSelectorValidator.Validate(ctx, instance)
 	if err != nil {
-		return reconcile.Result{}, err
+		_ = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error())
+		return reconcile.Result{}, nil
+	}
+
+	if instance.Spec.DriverType == nvidiav1alpha1.VGPUHostManager {
+		err = fmt.Errorf("vgpu-host-manager driver type is not supported through NVIDIADriver CR")
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return reconcile.Result{}, nil
 	}
 
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
-	// TODO: update CR status
-	// r.updateCrStatus(ctx, instance, managerStatus)
+	// update CR status
+	r.updateCrStatus(ctx, instance, managerStatus)
 
 	if managerStatus.Status != state.SyncStateReady {
 		logger.Info("NVIDIADriver instance is not ready")
+		var errorInfo error
+		for _, result := range managerStatus.StatesStatus {
+			if result.Status != state.SyncStateReady && result.ErrInfo != nil {
+				errorInfo = result.ErrInfo
+				condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo.Error()))
+				if condErr != nil {
+					logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+				}
+				break
+			}
+		}
+		// if no errors are reported from any state, then we would be waiting on driver daemonset pods
+		if errorInfo == nil {
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "")
+			if condErr != nil {
+				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+			}
+		}
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
+	if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, "Reconciled", "All resources have been successfully reconciled"); condErr != nil {
+		return ctrl.Result{}, condErr
+	}
+
 	return reconcile.Result{}, nil
+}
+
+func (r *NVIDIADriverReconciler) updateCrStatus(
+	ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, status state.Results) {
+	reqLogger := log.FromContext(ctx)
+
+	// Update global State
+	if cr.Status.State == nvidiav1alpha1.State(status.Status) {
+		return
+	}
+	cr.Status.State = nvidiav1alpha1.State(status.Status)
+
+	// send status update request to k8s API
+	reqLogger.V(consts.LogLevelInfo).Info("Updating CR Status", "Status", cr.Status)
+	err := r.Status().Update(ctx, cr)
+	if err != nil {
+		reqLogger.V(consts.LogLevelError).Error(err, "Failed to update CR status")
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -143,6 +212,9 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// initialize validators
 	r.nodeSelectorValidator = validator.NewNodeSelectorValidator(r.Client)
+
+	// initialize condition updater
+	r.conditionUpdater = conditions.NewNvDriverUpdater(mgr.GetClient())
 
 	// Create a new NVIDIADriver controller
 	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{

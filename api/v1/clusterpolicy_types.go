@@ -1581,10 +1581,8 @@ type ClusterPolicyStatus struct {
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator is installed
 	Namespace string `json:"namespace,omitempty"`
-
-	// TODO: Uncomment this later once we start using field
 	// Conditions is a list of conditions representing the ClusterPolicy's current state.
-	// Conditions []metav1.Condition `json:"conditions"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
