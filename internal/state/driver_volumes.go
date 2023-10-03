@@ -115,7 +115,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	if !cr.Spec.UsePrecompiledDrivers() {
-		if cr.Spec.RepoConfig != nil && cr.Spec.RepoConfig.Name != "" {
+		if cr.Spec.IsRepoConfigEnabled() {
 			destinationDir, err := getRepoConfigPath(pool.osRelease)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
@@ -130,7 +130,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 		}
 
 		// set any custom ssl key/certificate configuration provided
-		if cr.Spec.CertConfig != nil && cr.Spec.CertConfig.Name != "" {
+		if cr.Spec.IsCertConfigEnabled() {
 			destinationDir, err := getCertConfigPath(pool.osRelease)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
@@ -186,7 +186,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	// mount any custom kernel module configuration parameters at /drivers
-	if cr.Spec.KernelModuleConfig != nil && cr.Spec.KernelModuleConfig.Name != "" {
+	if cr.Spec.IsKernelModuleConfigEnabled() {
 		destinationDir := "/drivers"
 		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
 			cr.Spec.KernelModuleConfig.Name, destinationDir)
@@ -198,7 +198,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	// set any licensing configuration required
-	if cr.Spec.LicensingConfig != nil && cr.Spec.LicensingConfig.Name != "" {
+	if cr.Spec.IsVGPULicensingEnabled() {
 		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true,
 			MountPath: consts.VGPULicensingConfigMountPath, SubPath: consts.VGPULicensingFileName}
 		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, licensingConfigVolMount)
@@ -234,7 +234,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	// set virtual topology daemon configuration if specified for vGPU driver
-	if cr.Spec.VirtualTopologyConfig != nil {
+	if cr.Spec.IsVirtualTopologyConfigEnabled() {
 		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: consts.VGPUTopologyConfigMountPath, SubPath: consts.VGPUTopologyConfigFileName}
 		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, topologyConfigVolMount)
 
