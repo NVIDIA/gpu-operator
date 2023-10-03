@@ -494,6 +494,46 @@ func (d *GPUDirectStorageSpec) IsEnabled() bool {
 	return *d.Enabled
 }
 
+// IsVGPULicensingEnabled returns true if the vgpu driver license config is provided
+func (d *NVIDIADriverSpec) IsVGPULicensingEnabled() bool {
+	if d.LicensingConfig == nil {
+		return false
+	}
+	return d.LicensingConfig.Name != ""
+}
+
+// IsKernelModuleConfigEnabled returns true if kernel module config is provided
+func (d *NVIDIADriverSpec) IsKernelModuleConfigEnabled() bool {
+	if d.KernelModuleConfig == nil {
+		return false
+	}
+	return d.KernelModuleConfig.Name != ""
+}
+
+// IsVirtualTopologyConfigEnabled returns true if the virtual topology daemon config is provided
+func (d *NVIDIADriverSpec) IsVirtualTopologyConfigEnabled() bool {
+	if d.VirtualTopologyConfig == nil {
+		return false
+	}
+	return d.VirtualTopologyConfig.Name != ""
+}
+
+// IsRepoConfigEnabled returns true if additional repo config is provided
+func (d *NVIDIADriverSpec) IsRepoConfigEnabled() bool {
+	if d.RepoConfig == nil {
+		return false
+	}
+	return d.RepoConfig.Name != ""
+}
+
+// IsCertConfigEnabled returns true if additional certificate config is provided
+func (d *NVIDIADriverSpec) IsCertConfigEnabled() bool {
+	if d.RepoConfig == nil {
+		return false
+	}
+	return d.CertConfig.Name != ""
+}
+
 // IsNLSEnabled returns true if NLS should be used for licensing the driver
 func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
 	if l.NLSEnabled == nil {
