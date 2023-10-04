@@ -185,11 +185,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		errStr := fmt.Sprintf("ClusterPolicy is not ready, states not ready: %v", statesNotReady)
 		r.Log.Error(nil, errStr)
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, errStr)
 		if condErr != nil {
 			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
 		}
-		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
@@ -322,7 +322,6 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 					"osTreeLabelChanged", osTreeLabelChanged,
 				)
 			}
-
 			return needsUpdate
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
@@ -361,7 +360,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	r.conditionUpdater = conditions.NewClusterPolicyUpdater(mgr.GetClient())
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
 	if err != nil {
 		return err
 	}

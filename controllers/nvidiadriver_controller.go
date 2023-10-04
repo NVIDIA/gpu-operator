@@ -19,9 +19,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -179,7 +182,6 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, "Reconciled", "All resources have been successfully reconciled"); condErr != nil {
 		return ctrl.Result{}, condErr
 	}
-
 	return reconcile.Result{}, nil
 }
 
@@ -212,7 +214,7 @@ func (r *NVIDIADriverReconciler) updateCrStatus(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create state manager
 	stateManager, err := state.NewManager(
 		nvidiav1alpha1.NVIDIADriverCRDName,
@@ -240,7 +242,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	// Watch for changes to the primary resource NVIDIaDriver
-	err = c.Watch(source.Kind(mgr.GetCache(), &nvidiav1alpha1.NVIDIADriver{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &nvidiav1alpha1.NVIDIADriver{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
 	if err != nil {
 		return err
 	}
@@ -276,6 +278,42 @@ func (r *NVIDIADriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}),
 		handler.EnqueueRequestsFromMapFunc(mapFn),
 		predicate.GenerationChangedPredicate{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nodePredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			labels := e.Object.GetLabels()
+			return hasGPULabels(labels)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			logger := log.FromContext(ctx)
+			newLabels := e.ObjectNew.GetLabels()
+			oldLabels := e.ObjectOld.GetLabels()
+			nodeName := e.ObjectNew.GetName()
+
+			needsUpdate := hasGPULabels(newLabels) && !maps.Equal(newLabels, oldLabels)
+
+			if needsUpdate {
+				logger.Info("Node labels have been changed",
+					"name", nodeName,
+				)
+			}
+			return needsUpdate
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			labels := e.Object.GetLabels()
+			return hasGPULabels(labels)
+		},
+	}
+
+	// Watch for changes to node labels
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
+		handler.EnqueueRequestsFromMapFunc(mapFn),
+		nodePredicate,
 	)
 	if err != nil {
 		return err

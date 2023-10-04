@@ -209,7 +209,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 // SetupWithManager sets up the controller with the Manager.
 //
 //nolint:dupl
-func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new controller
 	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1, RateLimiter: workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR)})
 	if err != nil {
@@ -217,7 +217,7 @@ func (r *UpgradeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
 	if err != nil {
 		return err
 	}

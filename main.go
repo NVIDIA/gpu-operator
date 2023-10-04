@@ -139,7 +139,7 @@ func main() {
 		Log:          upgradeLogger,
 		Scheme:       mgr.GetScheme(),
 		StateManager: clusterUpgradeStateManager,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
 		os.Exit(1)
 	}
@@ -158,7 +158,7 @@ func main() {
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		ClusterInfo: clusterInfo,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
 		os.Exit(1)
 	}
