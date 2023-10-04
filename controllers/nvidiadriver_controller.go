@@ -322,7 +322,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch for changes to secondary resources which each state manager manages
 	watchSources := stateManager.GetWatchSources(mgr)
-	nvDriverPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/component": "nvidia-driver"}})
+	nvDriverPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}})
 	if err != nil {
 		return fmt.Errorf("failed to create labelSelector predicate: %w", err)
 	}
