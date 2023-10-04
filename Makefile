@@ -83,9 +83,13 @@ test: generate check manifests
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
+GOOS ?= linux
+VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
+
 # Build gpu-operator binary
-gpu-operator: generate check
-	go build -o bin/gpu-operator main.go
+gpu-operator:
+	CGO_ENABLED=0 GOOS=$(GOOS) \
+		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate check manifests
