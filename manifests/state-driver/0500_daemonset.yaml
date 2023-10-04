@@ -31,7 +31,9 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+      {{- if .Precompiled }}
+      app: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
+      {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
       app: nvidia-driver-daemonset-{{ .Openshift.RHCOSVersion }}
       {{- else }}
       app: nvidia-driver-daemonset
