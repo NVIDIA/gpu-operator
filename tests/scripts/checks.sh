@@ -162,11 +162,11 @@ check_nvidia_driver_pods_ready() {
 		kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE}
 
 		echo "Checking nvidia driver pod readiness"
-		is_pod_ready=$(kubectl get pods -l "app.kubernetes.io/component=nvidia-driver"-n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null || echo "terminated")
+		is_pod_ready=$(kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null || echo "terminated")
 
 		if [ "${is_pod_ready}" = "True" ]; then
 			# Check if the pod is not in terminating state
-			is_pod_terminating=$(kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o jsonpath='{.items[0].metadata.deletionGracePeriodSeconds}' 2>/dev/null || echo "terminated")
+			is_pod_terminating=$(kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -ojsonpath='{.items[0].metadata.deletionGracePeriodSeconds}' 2>/dev/null || echo "terminated")
 			if [ "${is_pod_terminating}" != "" ]; then
 				echo "nvidia driver pod is in terminating state..."
 			else
@@ -182,7 +182,6 @@ check_nvidia_driver_pods_ready() {
 
 		# Echo useful information on stdout
 		kubectl get pods -n ${TEST_NAMESPACE}
-		kubectl get nvidiadrivers default -o yaml
 
 		echo "Sleeping 5 seconds"
 		current_time=$((${current_time} + 5))
