@@ -182,6 +182,7 @@ check_nvidia_driver_pods_ready() {
 
 		# Echo useful information on stdout
 		kubectl get pods -n ${TEST_NAMESPACE}
+		kubectl get nvidiadrivers default -o yaml
 
 		echo "Sleeping 5 seconds"
 		current_time=$((${current_time} + 5))
