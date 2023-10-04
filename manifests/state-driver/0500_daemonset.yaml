@@ -34,9 +34,9 @@ spec:
       {{- if .Precompiled }}
       app: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
       {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-      app: nvidia-driver-daemonset-{{ .Openshift.RHCOSVersion }}
+      app: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
       {{- else }}
-      app: nvidia-driver-daemonset
+      app: {{ .Driver.Name }}
       {{- end }}
   updateStrategy:
     type: OnDelete

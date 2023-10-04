@@ -184,7 +184,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: nvidia-driver-daemonset-413.92.202304252344-0
+      app: nvidia-gpu-driver-openshift-413.92.202304252344-0
   template:
     metadata:
       annotations:
