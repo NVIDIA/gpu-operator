@@ -129,7 +129,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: nvidia-driver-daemonset
+      app: nvidia-gpu-driver-ubuntu22.04-5.4.0-150-generic
   template:
     metadata:
       annotations:
