@@ -123,8 +123,14 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
 	}
 
+	var driverLabel map[string]string
+	driverLabel = map[string]string{DriverLabelKey: DriverLabelValue}
+	if clusterPolicy.Spec.Driver.UseNvdiaDriverCRDType() {
+		driverLabel = map[string]string{AppComponentLabelKey: AppComponentLabelValue}
+	}
+
 	state, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace,
-		map[string]string{AppComponentLabelKey: AppComponentLabelValue})
+		driverLabel)
 	if err != nil {
 		r.Log.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
@@ -273,13 +279,17 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	if err != nil {
 		return fmt.Errorf("failed to create label selector predicate: %w", err)
 	}
+	componentLabelSelector, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}})
+	if err != nil {
+		return fmt.Errorf("failed to create label selector predicate: %w", err)
+	}
 
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}),
 		handler.EnqueueRequestsFromMapFunc(dsMapFn),
 		predicate.And(
 			predicate.GenerationChangedPredicate{},
-			predicate.Or(appLabelSelector, dtkLabelSelector),
+			predicate.Or(appLabelSelector, dtkLabelSelector, componentLabelSelector),
 		),
 	)
 	if err != nil {
