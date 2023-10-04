@@ -174,7 +174,7 @@ metadata:
   annotations:
     openshift.io/scc: nvidia-gpu-driver-openshift
   labels:
-    app: nvidia-driver-daemonset-413.92.202304252344-0
+    app: nvidia-gpu-driver-openshift-413.92.202304252344-0
     app.kubernetes.io/component: nvidia-driver
     nvidia.com/precompiled: "false"
     openshift.driver-toolkit: "true"
@@ -190,7 +190,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        app: nvidia-driver-daemonset-413.92.202304252344-0
+        app: nvidia-gpu-driver-openshift-413.92.202304252344-0
         app.kubernetes.io/component: nvidia-driver
         nvidia.com/precompiled: "false"
         openshift.driver-toolkit: "true"

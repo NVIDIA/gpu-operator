@@ -121,7 +121,7 @@ metadata:
   annotations:
     openshift.io/scc: nvidia-gpu-driver-ubuntu22.04
   labels:
-    app: nvidia-driver-daemonset
+    app: nvidia-gpu-driver-ubuntu22.04-5.4.0-150-generic
     app.kubernetes.io/component: nvidia-driver
     nvidia.com/precompiled: "true"
   name: nvidia-gpu-driver-ubuntu22.04-5.4.0-150-generic
@@ -135,7 +135,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        app: nvidia-driver-daemonset
+        app: nvidia-gpu-driver-ubuntu22.04-5.4.0-150-generic
         app.kubernetes.io/component: nvidia-driver
         nvidia.com/precompiled: "true"
     spec:
