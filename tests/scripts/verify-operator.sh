@@ -1,7 +1,7 @@
-# !/bin/bash
+#!/bin/bash
 
-if [[ "${SKIP_VERIY}" == "true" ]]; then
-    echo "Skipping verify: SKIP_VERIY=${SKIP_VERIY}"
+if [[ "${SKIP_VERIFY}" == "true" ]]; then
+    echo "Skipping verify: SKIP_VERIFY=${SKIP_VERIFY}"
     exit 0
 fi
 

@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_SYNC}" == "true" ]]; then
     echo "Skipping sync: SKIP_SYNC=${SKIP_SYNC}"

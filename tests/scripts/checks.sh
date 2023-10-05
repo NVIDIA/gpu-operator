@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 check_pod_ready() {
 	local pod_label=$1

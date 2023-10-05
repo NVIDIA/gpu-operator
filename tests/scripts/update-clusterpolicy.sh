@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_UPDATE}" == "true" ]]; then
     echo "Skipping update: SKIP_UPDATE=${SKIP_UPDATE}"

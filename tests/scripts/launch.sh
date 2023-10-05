@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_LAUNCH}" == "true" ]]; then
     echo "Skipping launch: SKIP_LAUNCH=${SKIP_LAUNCH}"

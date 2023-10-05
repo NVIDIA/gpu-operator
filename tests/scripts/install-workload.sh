@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_INSTALL}" == "true" ]]; then
     echo "Skipping install: SKIP_INSTALL=${SKIP_INSTALL}"
