@@ -25,6 +25,7 @@ import (
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -321,15 +322,23 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch for changes to secondary resources which each state manager manages
 	watchSources := stateManager.GetWatchSources(mgr)
+	nvDriverPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}})
+	if err != nil {
+		return fmt.Errorf("failed to create labelSelector predicate: %w", err)
+	}
 	for _, watchSource := range watchSources {
-		err = c.Watch(watchSource, handler.EnqueueRequestForOwner(
-			mgr.GetScheme(),
-			mgr.GetRESTMapper(),
-			&nvidiav1alpha1.NVIDIADriver{},
-			handler.OnlyControllerOwner()))
-
+		err = c.Watch(
+			watchSource,
+			handler.EnqueueRequestForOwner(
+				mgr.GetScheme(),
+				mgr.GetRESTMapper(),
+				&nvidiav1alpha1.NVIDIADriver{},
+				handler.OnlyControllerOwner(),
+			),
+			nvDriverPredicate,
+		)
 		if err != nil {
-			return fmt.Errorf("error setting up Watch for source type%v: %w", watchSource, err)
+			return fmt.Errorf("error setting up Watch for source type %v: %w", watchSource, err)
 		}
 	}
 
