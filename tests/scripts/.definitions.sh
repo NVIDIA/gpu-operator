@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 set -e
 
 [[ -z "${DEBUG}" ]] || set -x
