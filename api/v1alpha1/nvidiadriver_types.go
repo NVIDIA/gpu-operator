@@ -41,6 +41,7 @@ type NVIDIADriverSpec struct {
 
 	// +kubebuilder:validation:Enum=gpu;vgpu;vgpu-host-manager
 	// +kubebuilder:default=gpu
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="driverType is an immutable field"
 	DriverType DriverType `json:"driverType"`
 
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled

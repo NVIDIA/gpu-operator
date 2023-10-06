@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: nvidiadrivers.nvidia.com
 spec:
   group: nvidia.com
@@ -66,6 +65,9 @@ spec:
                 - vgpu
                 - vgpu-host-manager
                 type: string
+                x-kubernetes-validations:
+                - message: driverType is an immutable field
+                  rule: self == oldSelf
               env:
                 description: 'Optional: List of environment variables'
                 items:
@@ -325,6 +327,7 @@ spec:
                                 type: object
                               type: array
                           type: object
+                          x-kubernetes-map-type: atomic
                         weight:
                           description: Weight associated with matching the corresponding
                             nodeSelectorTerm, in the range 1-100.
@@ -420,10 +423,12 @@ spec:
                                 type: object
                               type: array
                           type: object
+                          x-kubernetes-map-type: atomic
                         type: array
                     required:
                     - nodeSelectorTerms
                     type: object
+                    x-kubernetes-map-type: atomic
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -667,9 +672,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
