@@ -199,3 +199,38 @@ check_no_driver_pod_restarts() {
 	echo "Repeated restarts not observed for the nvidia driver pod"
 	return 0
 }
+
+wait_for_driver_upgrade_done() {
+	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
+	local current_time=0
+	echo "waiting for the gpu driver upgrade to complete"
+	while :; do
+		local upgraded_count=0
+		for node in $(kubectl get nodes -o NAME); do
+			upgrade_state=$(kubectl get $node -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}')
+			if [ "${upgrade_state}" = "upgrade-done" ]; then
+				upgraded_count=$((${upgraded_count} + 1))
+			fi
+		done
+		if [[ $upgraded_count -eq $gpu_node_count ]]; then
+			echo "gpu driver upgrade completed successfully"
+			break;
+		else
+			echo "gpu driver still in progress. $upgraded_count/$gpu_node_count node(s) upgraded"
+		fi
+
+		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+			echo "timeout reached"
+			exit 1;
+		fi
+
+		echo "current state of driver upgrade"
+		kubectl get node -l nvidia.com/gpu.present \
+			-o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}{"\n"}{end}'
+
+		
+		echo "Sleeping 5 seconds"
+		current_time=$((${current_time} + 5))
+		sleep 5
+	done
+}

@@ -33,6 +33,9 @@ test_driver_image_updates() {
     # Delete driver pod to trigger update due to OnDelete policy
     kubectl delete pod -l "app.kubernetes.io/component=nvidia-driver" -n "$TEST_NAMESPACE"
 
+    # Wait for the driver upgrade to transition to "upgrade-done" state
+    wait_for_driver_upgrade_done
+    
     echo "ensuring that the new driver pods with version $TARGET_DRIVER_VERSION come up successfully"
 
     check_nvidia_driver_pods_ready
