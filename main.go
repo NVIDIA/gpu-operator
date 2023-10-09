@@ -43,6 +43,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/info"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -85,8 +86,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	ctrl.Log.Info(fmt.Sprintf("version: %s", os.Getenv("VERSION")))
-	ctrl.Log.Info(fmt.Sprintf("commit: %s", os.Getenv("GIT_COMMIT")))
+	ctrl.Log.Info(fmt.Sprintf("version: %s", info.GetVersionString()))
 
 	options := ctrl.Options{
 		Scheme:                 scheme,

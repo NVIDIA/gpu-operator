@@ -43,6 +43,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+
+	"github.com/NVIDIA/gpu-operator/internal/info"
 )
 
 // Component of GPU operator
@@ -211,6 +213,7 @@ func main() {
 	c := cli.NewApp()
 	c.Before = validateFlags
 	c.Action = start
+	c.Version = info.GetVersionString()
 
 	c.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -316,6 +319,9 @@ func main() {
 			EnvVars:     []string{"DISABLE_DEV_CHAR_SYMLINK_CREATION"},
 		},
 	}
+
+	// Log version info
+	log.Infof("version: %s", c.Version)
 
 	// Handle signals
 	go handleSignal()

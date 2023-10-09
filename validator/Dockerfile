@@ -42,7 +42,12 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 WORKDIR /build
 COPY . .
 
-RUN go build -o /artifacts/nvidia-validator ./validator
+ARG VERSION="unknown"
+ARG GIT_COMMIT="unknown"
+
+RUN mkdir /artifacts
+RUN make -C validator/ validator
+RUN cp /build/validator/validator /artifacts/nvidia-validator
 RUN cp /build/validator/plugin-workload-validation.yaml /artifacts/
 RUN cp /build/validator/cuda-workload-validation.yaml /artifacts/
 
@@ -71,14 +76,17 @@ ENV NVIDIA_DISABLE_REQUIRE="true"
 ENV NVIDIA_VISIBLE_DEVICES=void
 ENV NVIDIA_DRIVER_CAPABILITIES=utility,compute
 
-ARG VERSION="N/A"
-LABEL version=${VERSION}
+ARG VERSION="unknown"
+ARG GIT_COMMIT="unknown"
+
+LABEL version="${VERSION}"
 LABEL release="N/A"
 LABEL vendor="NVIDIA"
 LABEL io.k8s.display-name="NVIDIA Validators for the GPU Operator Components"
 LABEL name="NVIDIA Validator for the GPU Operator"
 LABEL summary="NVIDIA Validator for the GPU Operator"
 LABEL description="See summary"
+LABEL vsc-ref=${GIT_COMMIT}
 
 # Install / upgrade packages here that are required to resolve CVEs
 ARG CVE_UPDATES
