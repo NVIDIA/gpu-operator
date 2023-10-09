@@ -138,6 +138,16 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	if instance.Spec.UsePrecompiledDrivers() && instance.Spec.GPUDirectStorage.IsEnabled() {
+		err = fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if instance.Spec.DriverType == nvidiav1alpha1.VGPUHostManager {
 		err = fmt.Errorf("vgpu-host-manager driver type is not supported through NVIDIADriver CR")
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
