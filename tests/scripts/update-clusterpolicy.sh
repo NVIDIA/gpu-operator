@@ -223,7 +223,10 @@ test_custom_labels_override() {
     exit 1
   fi
 
-  operands="nvidia-container-toolkit-daemonset nvidia-operator-validator gpu-feature-discovery nvidia-dcgm-exporter nvidia-device-plugin-daemonset"
+  operands="nvidia-driver-daemonset nvidia-container-toolkit-daemonset nvidia-operator-validator gpu-feature-discovery nvidia-dcgm-exporter nvidia-device-plugin-daemonset"
+
+  # The labels override triggers a rollout of all gpu-operator operands, so we wait for the driver upgrade to transition to "upgrade-done" state.
+  wait_for_driver_upgrade_done
 
   for operand in $operands
   do
