@@ -14,7 +14,6 @@
 
 ARG CUDA_IMAGE=nvcr.io/nvidia/cuda
 ARG CUDA_VERSION=undefined
-ARG GIT_COMMIT="unknown"
 
 ARG BASE_DIST=ubi8
 ARG GOLANG_VERSION=x.x.x
@@ -51,9 +50,14 @@ COPY api/ api/
 COPY controllers/ controllers/
 COPY internal/ internal/
 
+# Copy Makefile
+COPY Makefile Makefile
+COPY *.mk .
+
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on \
-    go build -a -o gpu-operator main.go
+ARG VERSION="unknown"
+ARG GIT_COMMIT="unknown"
+RUN make gpu-operator
 
 FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
 
@@ -62,8 +66,7 @@ RUN dnf remove -y cuda-*
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
-ARG VERSION
-ARG TARGETARCH
+ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
@@ -84,10 +87,8 @@ COPY manifests /opt/gpu-operator/manifests
 RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
 
-ENV VERSION=${VERSION}
-ENV GIT_COMMIT=${GIT_COMMIT}
-
 # Install must-gather dependency: `kubectl`
+ARG TARGETARCH
 RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin

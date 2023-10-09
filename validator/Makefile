@@ -55,8 +55,15 @@ else
 include $(CURDIR)/multi-arch.mk
 endif
 
-ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image validator
 .PHONY: $(ALL_TARGETS)
+
+GOOS ?= linux
+VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
+
+validator:
+	CGO_ENABLED=0 GOOS=$(GOOS) \
+		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o validator .
 
 # For the default push target we also push a short tag equal to the version.
 # We skip this for the development release
@@ -82,6 +89,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
 		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
+		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-$(*) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
