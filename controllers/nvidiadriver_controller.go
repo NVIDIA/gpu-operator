@@ -80,14 +80,14 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var condErr error
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
-		err = fmt.Errorf("Error getting NVIDIADriver object: %v", err)
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
+		err = fmt.Errorf("Error getting NVIDIADriver object: %w", err)
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		// Error reading the object - requeue the request.
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
