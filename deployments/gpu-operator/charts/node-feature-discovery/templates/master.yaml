@@ -6,8 +6,10 @@ metadata:
   labels:
     {{- include "node-feature-discovery.labels" . | nindent 4 }}
     role: master
+  {{- with .Values.master.deploymentAnnotations }}
   annotations:
-    {{- toYaml .Values.master.deploymentAnnotations | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.master.replicaCount }}
   selector:
@@ -19,8 +21,10 @@ spec:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
         role: master
+      {{- with .Values.master.annotations }}
       annotations:
-        {{- toYaml .Values.master.annotations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -66,6 +70,8 @@ spec:
           ports:
           - containerPort: {{ .Values.master.port | default "8080" }}
             name: grpc
+          - containerPort: {{ .Values.master.metricsPort | default "8081" }}
+            name: metrics
           env:
           - name: NODE_NAME
             valueFrom:
@@ -80,8 +86,10 @@ spec:
             - "-instance={{ .Values.master.instance }}"
             {{- end }}
             - "-port={{ .Values.master.port | default "8080" }}"
-            {{- if .Values.enableNodeFeatureApi }}
-            - "-enable-nodefeature-api"
+            {{- if not .Values.enableNodeFeatureApi }}
+            - "-enable-nodefeature-api=false"
+            {{- else if gt (int .Values.master.replicaCount) 1 }}
+            - "-enable-leader-election"
             {{- end }}
             {{- if .Values.master.extraLabelNs | empty | not }}
             - "-extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
@@ -99,35 +107,44 @@ spec:
             - "-crd-controller={{ .Values.master.crdController }}"
             {{- else }}
             ## By default, disable crd controller for other than the default instances
-            - "-featurerules-controller={{ .Values.master.instance | empty }}"
+            - "-crd-controller={{ .Values.master.instance | empty }}"
             {{- end }}
             {{- if .Values.master.featureRulesController | kindIs "invalid" | not }}
             - "-featurerules-controller={{ .Values.master.featureRulesController }}"
             {{- end }}
-    {{- if .Values.tls.enable }}
+            {{- if .Values.master.resyncPeriod }}
+            - "-resync-period={{ .Values.master.resyncPeriod }}"
+            {{- end }}
+            {{- if .Values.master.nfdApiParallelism | empty | not }}
+            - "-nfd-api-parallelism={{ .Values.master.nfdApiParallelism }}"
+            {{- end }}
+            {{- if .Values.tls.enable }}
             - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
             - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
             - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+            {{- end }}
+            - "-metrics={{ .Values.master.metricsPort  | default "8081" }}"
           volumeMounts:
+            {{- if .Values.tls.enable }}
             - name: nfd-master-cert
               mountPath: "/etc/kubernetes/node-feature-discovery/certs"
               readOnly: true
+            {{- end }}
             - name: nfd-master-conf
               mountPath: "/etc/kubernetes/node-feature-discovery"
               readOnly: true
       volumes:
+        {{- if .Values.tls.enable }}
         - name: nfd-master-cert
           secret:
             secretName: nfd-master-cert
+        {{- end }}
         - name: nfd-master-conf
           configMap:
             name: {{ include "node-feature-discovery.fullname" . }}-master-conf
             items:
               - key: nfd-master.conf
                 path: nfd-master.conf
-
-    ## /TLS ##
-    {{- end }}
     {{- with .Values.master.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
