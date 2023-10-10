@@ -6,8 +6,10 @@ metadata:
   labels:
     {{- include "node-feature-discovery.labels" . | nindent 4 }}
     role: worker
+  {{- with .Values.worker.daemonsetAnnotations }}
   annotations:
-    {{- toYaml .Values.worker.daemonsetAnnotations | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   selector:
     matchLabels:
@@ -18,8 +20,10 @@ spec:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
         role: worker
+      {{- with .Values.worker.annotations }}
       annotations:
-        {{- toYaml .Values.worker.annotations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       dnsPolicy: ClusterFirstWithHostNet
     {{- with .Values.imagePullSecrets }}
@@ -46,14 +50,18 @@ spec:
         - "nfd-worker"
         args:
         - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
-        {{- if .Values.enableNodeFeatureApi }}
-        - "-enable-nodefeature-api"
+        {{- if not .Values.enableNodeFeatureApi }}
+        - "-enable-nodefeature-api=false"
         {{- end }}
 {{- if .Values.tls.enable }}
         - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
         - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
         - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
 {{- end }}
+        - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
+        ports:
+          - name: metrics
+            containerPort: {{ .Values.worker.metricsPort | default "8081"}}
         volumeMounts:
         - name: host-boot
           mountPath: "/host-boot"

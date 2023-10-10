@@ -467,6 +467,12 @@ ccManager:
 
 node-feature-discovery:
   enableNodeFeatureApi: true
+  gc:
+    enable: true
+    replicaCount: 1
+    serviceAccount:
+      name: node-feature-discovery
+      create: false
   worker:
     serviceAccount:
       name: node-feature-discovery
