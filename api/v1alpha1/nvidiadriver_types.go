@@ -486,13 +486,13 @@ func (d *NVIDIADriverSpec) GetPrecompiledImagePath(osVersion string, kernelVersi
 	return image, nil
 }
 
-// IsEnabled returns true if GPUDirectStorage is enabled through gpu-operator
-func (d *GPUDirectStorageSpec) IsEnabled() bool {
-	if d.Enabled == nil {
+// IsGDSEnabled returns true if GPUDirectStorage is enabled through gpu-operator
+func (d *NVIDIADriverSpec) IsGDSEnabled() bool {
+	if d.GPUDirectStorage == nil || d.GPUDirectStorage.Enabled == nil {
 		// default is false if not specified by user
 		return false
 	}
-	return *d.Enabled
+	return *d.GPUDirectStorage.Enabled
 }
 
 // IsVGPULicensingEnabled returns true if the vgpu driver license config is provided

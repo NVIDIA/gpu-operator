@@ -177,9 +177,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
 
-	gdsSpec, err := getGDSSpec(cr.Spec.GPUDirectStorage)
+	gdsSpec, err := getGDSSpec(&cr.Spec)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct GDS spec: %v", err)
+		return nil, fmt.Errorf("failed to construct GDS spec: %w", err)
 	}
 
 	gpuDirectRDMASpec := cr.Spec.GPUDirectRDMA
@@ -439,18 +439,19 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	}, nil
 }
 
-func getGDSSpec(spec *nvidiav1alpha1.GPUDirectStorageSpec) (*gdsDriverSpec, error) {
-	if spec == nil || !spec.IsEnabled() {
+func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec) (*gdsDriverSpec, error) {
+	if spec == nil || !spec.IsGDSEnabled() {
 		// note: GDS is optional in the NvidiaDriver CRD
 		return nil, nil
 	}
-	imagePath, err := image.ImagePath(spec.Repository, spec.Image, spec.Version, "GDS_IMAGE")
+	gdsSpec := spec.GPUDirectStorage
+	imagePath, err := image.ImagePath(gdsSpec.Repository, gdsSpec.Image, gdsSpec.Version, "GDS_IMAGE")
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct image path for the GDS container: %v", err)
+		return nil, err
 	}
 
 	return &gdsDriverSpec{
-		spec,
+		gdsSpec,
 		imagePath,
 	}, nil
 }
