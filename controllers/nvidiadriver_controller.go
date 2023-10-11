@@ -138,7 +138,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	if instance.Spec.UsePrecompiledDrivers() && instance.Spec.GPUDirectStorage.IsEnabled() {
+	if instance.Spec.UsePrecompiledDrivers() && instance.Spec.IsGDSEnabled() {
 		err = fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
