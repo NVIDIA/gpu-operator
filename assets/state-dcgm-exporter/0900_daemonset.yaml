@@ -45,6 +45,10 @@ spec:
           value: "true"
         - name: DCGM_EXPORTER_COLLECTORS
           value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         ports:
         - name: "metrics"
           containerPort: 9400
