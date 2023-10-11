@@ -2,13 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    {{- if .Precompiled }}
-    app: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
-    {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-    app: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
-    {{- else }}
-    app: {{ .Driver.Name }}
-    {{- end }}
+    app: {{ .Driver.AppName }}
     nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
     app.kubernetes.io/component: "nvidia-driver"
     {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
@@ -18,26 +12,14 @@ metadata:
     openshift.driver-toolkit.rhcos-image-missing: "true"
     {{- end }}
     {{- end }}
-  {{- if .Precompiled }}
-  name: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
-  {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-  name: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
-  {{- else }}
-  name: {{ .Driver.Name }}
-  {{- end }}
+  name: {{ .Driver.AppName }}
   namespace: {{ .Runtime.Namespace }}
   annotations:
     openshift.io/scc: {{ .Driver.Name }}
 spec:
   selector:
     matchLabels:
-      {{- if .Precompiled }}
-      app: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
-      {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-      app: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
-      {{- else }}
-      app: {{ .Driver.Name }}
-      {{- end }}
+      app: {{ .Driver.AppName }}
   updateStrategy:
     type: OnDelete
   template:
@@ -45,16 +27,12 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        {{- if .Precompiled }}
-        app: {{ .Driver.Name }}-{{ .Precompiled.SanitizedKernelVersion }}
-        {{- else if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-        app: {{ .Driver.Name }}-{{ .Openshift.RHCOSVersion }}
+        app: {{ .Driver.AppName }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         openshift.driver-toolkit: "true"
         {{- if not .Openshift.ToolkitImage }}
         openshift.driver-toolkit.rhcos-image-missing: "true"
         {{- end }}
-        {{- else }}
-        app: {{ .Driver.Name }}
         {{- end }}
         nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
         app.kubernetes.io/component: "nvidia-driver"

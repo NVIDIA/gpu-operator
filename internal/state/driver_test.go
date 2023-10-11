@@ -25,13 +25,16 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
@@ -379,6 +382,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
+	renderData.Driver.AppName = "nvidia-gpu-driver-openshift-79d6bd954f"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
 	renderData.Openshift = &openshiftSpec{
 		ToolkitImage: toolkitImage,
@@ -423,6 +427,7 @@ func TestDriverPrecompiled(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 	renderData.Driver.Spec.UsePrecompiled = utils.BoolPtr(true)
 	renderData.Driver.Name = "nvidia-gpu-driver-ubuntu22.04"
+	renderData.Driver.AppName = "nvidia-gpu-driver-ubuntu22.04-646cdfdb96"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04"
 	renderData.Precompiled = &precompiledSpec{
 		KernelVersion:          "5.4.0-150-generic",
@@ -442,6 +447,54 @@ func TestDriverPrecompiled(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
+}
+
+func TestGetDriverAppName(t *testing.T) {
+	cr := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: apitypes.UID("bfac7359-6033-45ce-88d6-53db0078526e"),
+		},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			DriverType: nvidiav1alpha1.GPU,
+		},
+	}
+
+	pool := nodePool{
+		osRelease: "ubuntu",
+		osVersion: "20.04",
+	}
+
+	actual := getDriverAppName(cr, pool)
+	expected := "nvidia-gpu-driver-ubuntu20.04-67cc6dbb79"
+	assert.Equal(t, expected, actual)
+
+	// Modify nodePool to include kernelVersion
+	pool.kernel = "5.15.0-70-generic"
+
+	actual = getDriverAppName(cr, pool)
+	expected = "nvidia-gpu-driver-ubuntu20.04-59b779bcc5"
+	assert.Equal(t, expected, actual)
+}
+
+func TestGetDriverAppNameRHCOS(t *testing.T) {
+	cr := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: apitypes.UID("d5b3a1f2-38a9-4b72-bff1-21fd569fd305"),
+		},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			DriverType: nvidiav1alpha1.GPU,
+		},
+	}
+
+	pool := nodePool{
+		osRelease:    "rhcos",
+		osVersion:    "4.14",
+		rhcosVersion: "414.92.202309282257",
+	}
+
+	actual := getDriverAppName(cr, pool)
+	expected := "nvidia-gpu-driver-rhcos4.14-6f4fc4fc6"
+	assert.Equal(t, expected, actual)
 }
 
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
@@ -477,6 +530,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 			},
+			AppName:          "nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b",
 			Name:             "nvidia-gpu-driver-ubuntu22.04",
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 			ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
