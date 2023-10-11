@@ -406,9 +406,10 @@ func getDriverAppName(cr *nvidiav1alpha1.NVIDIADriver, pool nodePool) string {
 	hash := utils.GetStringHash(hashBuilder.String())
 	appName := fmt.Sprintf("%s-%s", appNamePrefix, hash)
 
-	// truncate name if it exceeds the maximum length
+	// truncate the prefix if the app name exceeds the maximum length
 	if len(appName) > appNameMaxLength {
-		appName = appName[:appNameMaxLength]
+		appNamePrefixMaxLength := appNameMaxLength - (len(hash) + 1)
+		appName = fmt.Sprintf("%s-%s", appNamePrefix[:appNamePrefixMaxLength], hash)
 	}
 	return appName
 }

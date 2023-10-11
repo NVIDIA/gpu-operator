@@ -474,6 +474,15 @@ func TestGetDriverAppName(t *testing.T) {
 	actual = getDriverAppName(cr, pool)
 	expected = "nvidia-gpu-driver-ubuntu20.04-59b779bcc5"
 	assert.Equal(t, expected, actual)
+
+	// Now set the osVersion to a really long string
+	pool.osRelease = "redhatCoreOS"
+	pool.osVersion = "4.14-414.92.202309282257"
+
+	actual = getDriverAppName(cr, pool)
+	expected = "nvidia-gpu-driver-redhatCoreOS4.14-414.92.2023092822-59b779bcc5"
+	assert.Equal(t, expected, actual)
+	assert.Equal(t, 63, len(actual))
 }
 
 func TestGetDriverAppNameRHCOS(t *testing.T) {
