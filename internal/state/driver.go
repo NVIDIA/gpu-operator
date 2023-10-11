@@ -361,11 +361,7 @@ func getObjectOfKind(objs []*unstructured.Unstructured, kind string) (*unstructu
 	return nil, fmt.Errorf("did not find object of kind '%s' in Object list", kind)
 }
 
-// getDriverName returns a unique name for an NVIDIA driver instance in the format
-// nvidia-<driverType>-driver-<crName>-<osVersion>
-//
-// In the manifest templates, a '-<kernelVersion>' or '-<rhcosVersion>' suffix may be
-// appended if precompiled drivers are enabled or the OpenShift Driver Toolkit is used.
+// getDriverName returns a unique name for an NVIDIA driver instance in the format nvidia-<driverType>-driver-<crName>-<osVersion>
 func getDriverName(cr *nvidiav1alpha1.NVIDIADriver, osVersion string) string {
 	const (
 		nameFormat = "nvidia-%s-driver-%s-%s"
@@ -380,6 +376,42 @@ func getDriverName(cr *nvidiav1alpha1.NVIDIADriver, osVersion string) string {
 		name = name[:nameMaxLength]
 	}
 	return name
+}
+
+// getDriverAppName returns a unique name for an NVIDIA driver instance in the format nvidia-<driverType>-driver-<osVersion>-<hash>
+// The hash string <string> is calculated from the NVIDIADriver CR UID.
+//
+// The '-<kernelVersion>' or '-<rhcosVersion>' suffix may also be used to calculate the hash if precompiled drivers
+// are enabled or the OpenShift Driver Toolkit is used.
+func getDriverAppName(cr *nvidiav1alpha1.NVIDIADriver, pool nodePool) string {
+	const (
+		appNamePrefixFormat = "nvidia-%s-driver-%s"
+		// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+		// https://github.com/kubernetes/apimachinery/blob/v0.28.1/pkg/util/validation/validation.go#L182
+		appNameMaxLength = 63
+	)
+
+	var hashBuilder strings.Builder
+
+	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.getOS())
+	uid := string(cr.ObjectMeta.UID)
+
+	hashBuilder.WriteString(uid)
+	if pool.kernel != "" {
+		hashBuilder.WriteString("-" + pool.kernel)
+	} else if pool.rhcosVersion != "" {
+		hashBuilder.WriteString("-" + pool.rhcosVersion)
+	}
+
+	hash := utils.GetStringHash(hashBuilder.String())
+	appName := fmt.Sprintf("%s-%s", appNamePrefix, hash)
+
+	// truncate the prefix if the app name exceeds the maximum length
+	if len(appName) > appNameMaxLength {
+		appNamePrefixMaxLength := appNameMaxLength - (len(hash) + 1)
+		appName = fmt.Sprintf("%s-%s", appNamePrefix[:appNamePrefixMaxLength], hash)
+	}
+	return appName
 }
 
 func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alpha1.ContainerProbeSpec {
@@ -413,6 +445,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	}
 
 	nvidiaDriverName := getDriverName(cr, nodePool.getOS())
+	nvidiaDriverAppName := getDriverAppName(cr, nodePool)
 
 	spec := &cr.Spec
 	imagePath, err := getDriverImagePath(spec, nodePool)
@@ -433,6 +466,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 
 	return &driverSpec{
 		Spec:             spec,
+		AppName:          nvidiaDriverAppName,
 		Name:             nvidiaDriverName,
 		ImagePath:        imagePath,
 		ManagerImagePath: managerImagePath,

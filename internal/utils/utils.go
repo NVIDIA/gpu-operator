@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -73,4 +74,12 @@ func GetObjectHash(obj *unstructured.Unstructured) string {
 	}
 	printer.Fprintf(hasher, "%#v", obj)
 	return fmt.Sprint(hasher.Sum32())
+}
+
+func GetStringHash(s string) string {
+	hasher := fnv.New32a()
+	if _, err := hasher.Write([]byte(s)); err != nil {
+		panic(err)
+	}
+	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
