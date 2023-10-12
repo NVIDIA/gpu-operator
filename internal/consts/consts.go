@@ -58,4 +58,7 @@ const (
 	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
 	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename
 	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
+
+	// NVIDIADriverControllerIndexKey provides quick lookups for DaemonSets owned by an NVIDIADriver instance
+	NVIDIADriverControllerIndexKey = "metadata.nvidiadriver.controller"
 )
