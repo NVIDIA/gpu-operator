@@ -56,6 +56,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: "DRIVER_MANAGER_IMAGE"
+          value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.6.2"
         volumeMounts:
           - name: host-os-release
             mountPath: "/host-etc/os-release"

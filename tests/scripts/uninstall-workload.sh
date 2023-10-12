@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_UNINSTALL}" == "true" ]]; then
     echo "Skipping uninstall: SKIP_UNINSTALL=${SKIP_UNINSTALL}"

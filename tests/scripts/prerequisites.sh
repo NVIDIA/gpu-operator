@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_PREREQUISITES}" == "true" ]]; then
     echo "Skipping prerequisites: SKIP_PREREQUISITES=${SKIP_PREREQUISITES}"

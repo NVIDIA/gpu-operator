@@ -4,6 +4,7 @@ metadata:
   labels:
     app: nvidia-driver-daemonset
     nvidia.com/precompiled: "false"
+    app.kubernetes.io/component: nvidia-driver
   name: nvidia-driver-daemonset
   namespace: "FILLED BY THE OPERATOR"
   annotations:
@@ -21,6 +22,7 @@ spec:
       labels:
         app: nvidia-driver-daemonset
         nvidia.com/precompiled: "false"
+        app.kubernetes.io/component: nvidia-driver
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
@@ -28,6 +30,16 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - nvidia-driver
+              topologyKey: kubernetes.io/hostname
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-driver
       hostPID: true

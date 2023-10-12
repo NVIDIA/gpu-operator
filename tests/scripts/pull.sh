@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if [[ $# -ne 2 ]]; then
     echo "Pull requires a source and destination"

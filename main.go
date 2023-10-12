@@ -40,7 +40,9 @@ import (
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 
 	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 	// +kubebuilder:scaffold:imports
 )
@@ -55,6 +57,7 @@ func init() {
 
 	utilruntime.Must(clusterpolicyv1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(nvidiav1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -136,11 +139,29 @@ func main() {
 		Log:          upgradeLogger,
 		Scheme:       mgr.GetScheme(),
 		StateManager: clusterUpgradeStateManager,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
 		os.Exit(1)
 	}
 
+	clusterInfo, err := clusterinfo.New(
+		ctx,
+		clusterinfo.WithKubernetesConfig(mgr.GetConfig()),
+		clusterinfo.WithOneShot(false),
+	)
+	if err != nil {
+		setupLog.Error(err, "failed to get cluster wide information needed by controllers")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.NVIDIADriverReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClusterInfo: clusterInfo,
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

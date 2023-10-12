@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if [[ "${SKIP_CLEANUP}" == "true" ]]; then
     echo "Skipping cleanup: SKIP_CLEANUP=${SKIP_CLEANUP}"

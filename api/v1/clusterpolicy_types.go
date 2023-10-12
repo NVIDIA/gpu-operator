@@ -445,6 +445,12 @@ type ContainerProbeSpec struct {
 
 // DriverSpec defines the properties for NVIDIA Driver deployment
 type DriverSpec struct {
+	// UseNvidiaDriverCRD indicates if the deployment of NVIDIA Driver is managed by the NVIDIADriver CRD type
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment through NVIDIADriver CRD type"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseNvidiaDriverCRD *bool `json:"useNvidiaDriverCRD,omitempty"`
+
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment using pre-compiled modules"
@@ -1575,6 +1581,8 @@ type ClusterPolicyStatus struct {
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator is installed
 	Namespace string `json:"namespace,omitempty"`
+	// Conditions is a list of conditions representing the ClusterPolicy's current state.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -1727,6 +1735,15 @@ func (d *DriverSpec) IsEnabled() bool {
 		return true
 	}
 	return *d.Enabled
+}
+
+// UseNvdiaDriverCRDType returns true if the driver installation is managed by NVIDIADriver CRD type
+func (d *DriverSpec) UseNvdiaDriverCRDType() bool {
+	if d.UseNvidiaDriverCRD == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *d.UseNvidiaDriverCRD
 }
 
 // UsePrecompiledDrivers returns true if driver install is enabled using pre-compiled modules
