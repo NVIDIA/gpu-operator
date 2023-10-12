@@ -123,7 +123,9 @@ metadata:
   labels:
     app: nvidia-gpu-driver-ubuntu22.04-646cdfdb96
     app.kubernetes.io/component: nvidia-driver
+    nvidia.com/node.os-version: ubuntu22.04
     nvidia.com/precompiled: "true"
+    nvidia.com/precompiled.kernel-version: 5.4.0-150-generic
   name: nvidia-gpu-driver-ubuntu22.04-646cdfdb96
   namespace: test-operator
 spec:
@@ -137,7 +139,9 @@ spec:
       labels:
         app: nvidia-gpu-driver-ubuntu22.04-646cdfdb96
         app.kubernetes.io/component: nvidia-driver
+        nvidia.com/node.os-version: ubuntu22.04
         nvidia.com/precompiled: "true"
+        nvidia.com/precompiled.kernel-version: 5.4.0-150-generic
     spec:
       affinity:
         podAntiAffinity:

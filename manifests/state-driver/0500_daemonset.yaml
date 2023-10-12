@@ -3,7 +3,11 @@ kind: DaemonSet
 metadata:
   labels:
     app: {{ .Driver.AppName }}
+    nvidia.com/node.os-version: {{ .Driver.OSVersion }}
     nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+    {{- if .Precompiled }}
+    nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
+    {{- end }}
     app.kubernetes.io/component: "nvidia-driver"
     {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
     openshift.driver-toolkit.rhcos: {{ .Openshift.RHCOSVersion | quote }}
@@ -34,7 +38,11 @@ spec:
         openshift.driver-toolkit.rhcos-image-missing: "true"
         {{- end }}
         {{- end }}
+        nvidia.com/node.os-version: {{ .Driver.OSVersion }}
         nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+        {{- if .Precompiled }}
+        nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
+        {{- end }}
         app.kubernetes.io/component: "nvidia-driver"
     spec:
       nodeSelector:
