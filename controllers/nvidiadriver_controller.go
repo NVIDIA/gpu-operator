@@ -182,7 +182,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// if no errors are reported from any state, then we would be waiting on driver daemonset pods
 		if errorInfo == nil {
-			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "")
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "Waiting for driver pod to be ready")
 			if condErr != nil {
 				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
 			}

@@ -190,6 +190,10 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		Runtime:       runtimeSpec,
 	}
 
+	if len(runtimeSpec.NodePools) == 0 {
+		return nil, fmt.Errorf("No nodes matching the given node selector for %s", cr.Name)
+	}
+
 	// Render kubernetes objects for each node pool.
 	// We deploy one DaemonSet per node pool.
 	var objs []*unstructured.Unstructured
