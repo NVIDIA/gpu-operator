@@ -22,7 +22,7 @@ import (
 	"maps"
 	"time"
 
-	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +43,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -350,6 +351,21 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		if err != nil {
 			return fmt.Errorf("error setting up Watch for source type %v: %w", watchSource, err)
 		}
+	}
+
+	// Add an index key which allows our reconciler to quickly look up DaemonSets owned by an NVIDIADriver instance
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &appsv1.DaemonSet{}, consts.NVIDIADriverControllerIndexKey, func(rawObj client.Object) []string {
+		ds := rawObj.(*appsv1.DaemonSet)
+		owner := metav1.GetControllerOf(ds)
+		if owner == nil {
+			return nil
+		}
+		if owner.APIVersion != nvidiav1alpha1.GroupVersion.String() || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
+			return nil
+		}
+		return []string{owner.Name}
+	}); err != nil {
+		return fmt.Errorf("failed to add index key: %w", err)
 	}
 
 	return nil

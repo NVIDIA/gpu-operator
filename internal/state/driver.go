@@ -136,6 +136,11 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 	}
 	clusterInfo := info.(clusterinfo.Interface)
 
+	err := s.cleanupStaleDriverDaemonsets(ctx, cr)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
+	}
+
 	objs, err := s.getManifestObjects(ctx, cr, &clusterPolicy, clusterInfo)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
@@ -167,6 +172,33 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 		&appsv1.DaemonSet{},
 	)
 	return wr
+}
+
+func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+	logger := log.FromContext(ctx)
+	logger.V(consts.LogLevelInfo).Info("Cleaning up stale driver DaemonSets")
+
+	// List all DaemonSets owned by the CR instance
+	list := &appsv1.DaemonSetList{}
+	err := s.client.List(ctx, list, client.MatchingFields{consts.NVIDIADriverControllerIndexKey: cr.Name})
+	if err != nil {
+		return fmt.Errorf("failed to list all NVIDIA driver DaemonSets owned by NVIDIADriver instance: %w", err)
+	}
+
+	for _, ds := range list.Items {
+		ds := ds
+		if ds.Status.DesiredNumberScheduled == 0 {
+			logger.V(consts.LogLevelInfo).Info("Deleting inactive driver DaemonSet", "Name", ds.Name)
+			err = s.client.Delete(ctx, &ds)
+			if err != nil {
+				return fmt.Errorf("error deleting DaemonSet '%s': %w", ds.Name, err)
+			}
+			continue
+		}
+		// TODO: cleanup precompiled / non-precompiled DaemonSets if spec.usePrecompiled is toggled.
+		// TODO: cleanup DaemonSets of a particular type if spec.driverType is toggled.
+	}
+	return nil
 }
 
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
