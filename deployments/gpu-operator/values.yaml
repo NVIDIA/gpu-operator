@@ -182,7 +182,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.2
+    version: v0.6.3
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -285,7 +285,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 3.1.8-1-ubuntu20.04
+  version: 3.2.5-1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -296,7 +296,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 3.1.8-3.1.5-ubuntu20.04
+  version: 3.2.5-3.1.8-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
@@ -337,7 +337,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.5.3-ubuntu20.04
+  version: v0.5.4-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
