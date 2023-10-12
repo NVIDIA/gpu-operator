@@ -384,6 +384,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
 	renderData.Driver.AppName = "nvidia-gpu-driver-openshift-79d6bd954f"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
+	renderData.Driver.OSVersion = "rhel8.0"
 	renderData.Openshift = &openshiftSpec{
 		ToolkitImage: toolkitImage,
 		RHCOSVersion: rhcosVersion,
@@ -543,6 +544,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 			Name:             "nvidia-gpu-driver-ubuntu22.04",
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
 			ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
+			OSVersion:        "ubuntu22.04",
 		},
 		Runtime: &driverRuntimeSpec{
 			Namespace:         "test-operator",

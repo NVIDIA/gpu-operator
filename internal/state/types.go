@@ -35,6 +35,7 @@ type driverSpec struct {
 	ImagePath         string
 	ManagerImagePath  string
 	OCPToolkitEnabled bool
+	OSVersion         string
 }
 
 // gdsDriverSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field

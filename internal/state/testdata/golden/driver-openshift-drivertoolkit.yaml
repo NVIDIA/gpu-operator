@@ -176,6 +176,7 @@ metadata:
   labels:
     app: nvidia-gpu-driver-openshift-79d6bd954f
     app.kubernetes.io/component: nvidia-driver
+    nvidia.com/node.os-version: rhel8.0
     nvidia.com/precompiled: "false"
     openshift.driver-toolkit: "true"
     openshift.driver-toolkit.rhcos: 413.92.202304252344-0
@@ -192,6 +193,7 @@ spec:
       labels:
         app: nvidia-gpu-driver-openshift-79d6bd954f
         app.kubernetes.io/component: nvidia-driver
+        nvidia.com/node.os-version: rhel8.0
         nvidia.com/precompiled: "false"
         openshift.driver-toolkit: "true"
     spec:
