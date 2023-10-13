@@ -13,38 +13,38 @@ spec:
   nodeSelector: {{ toYaml .Values.driver.nvidiaDriverCRD.nodeSelector | nindent 6 }}
   {{- end }}
   {{- if .Values.driver.manager }}
-  manager: {{ toYaml .Values.driver.manager | nindent 6 }}
+  manager: {{ toYaml .Values.driver.manager | nindent 4 }}
   {{- end }}
   {{- if .Values.driver.startupProbe }}
-  startupProbe: {{ toYaml .Values.driver.startupProbe | nindent 6 }}
+  startupProbe: {{ toYaml .Values.driver.startupProbe | nindent 4 }}
   {{- end }}
   {{- if .Values.driver.livenessProbe }}
-  livenessProbe: {{ toYaml .Values.driver.livenessProbe | nindent 6 }}
+  livenessProbe: {{ toYaml .Values.driver.livenessProbe | nindent 4 }}
   {{- end }}
   {{- if .Values.driver.readinessProbe }}
-  readinessProbe: {{ toYaml .Values.driver.readinessProbe | nindent 6 }}
+  readinessProbe: {{ toYaml .Values.driver.readinessProbe | nindent 4 }}
   {{- end }}
   rdma:
     enabled: {{ .Values.driver.rdma.enabled }}
     useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
-  {{- if .Values.driver.repoConfig }}
+  {{- if .Values.driver.repoConfig.configMapName }}
   repoConfig:
     name: {{ .Values.driver.repoConfig.configMapName }}
   {{- end }}
-  {{- if .Values.driver.certConfig }}
+  {{- if .Values.driver.certConfig.name }}
   certConfig:
     name: {{ .Values.driver.certConfig.name }}
   {{- end }}
-  {{- if .Values.driver.licensingConfig }}
+  {{- if .Values.driver.licensingConfig.configMapName }}
   licensingConfig:
     name: {{ .Values.driver.licensingConfig.configMapName }}
     nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
   {{- end }}
-  {{- if .Values.driver.virtualTopology }}
+  {{- if .Values.driver.virtualTopology.config }}
   virtualTopologyConfig:
     name: {{ .Values.driver.virtualTopology.config }}
   {{- end }}
-  {{- if .Values.driver.kernelModuleConfig }}
+  {{- if .Values.driver.kernelModuleConfig.name }}
   kernelModuleConfig:
     name: {{ .Values.driver.kernelModuleConfig.name }}
   {{- end }}
