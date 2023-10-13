@@ -41,13 +41,14 @@ type NVIDIADriverSpec struct {
 
 	// +kubebuilder:validation:Enum=gpu;vgpu;vgpu-host-manager
 	// +kubebuilder:default=gpu
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="driverType is an immutable field"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="driverType is an immutable field. Please create a new NvidiaDriver resource instead when you want to change this setting."
 	DriverType DriverType `json:"driverType"`
 
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment using pre-compiled modules"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="usePrecompiled is an immutable field. Please create a new NvidiaDriver resource instead when you want to change this setting."
 	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
 
 	// NVIDIA Driver container startup probe settings
