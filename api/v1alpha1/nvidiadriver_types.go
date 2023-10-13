@@ -530,7 +530,7 @@ func (d *NVIDIADriverSpec) IsRepoConfigEnabled() bool {
 
 // IsCertConfigEnabled returns true if additional certificate config is provided
 func (d *NVIDIADriverSpec) IsCertConfigEnabled() bool {
-	if d.RepoConfig == nil {
+	if d.CertConfig == nil {
 		return false
 	}
 	return d.CertConfig.Name != ""
