@@ -137,7 +137,7 @@ kustomize:
 .PHONY: bundle
 bundle: manifests kustomize
 	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image gpu-opertor=$(IMAGE)
+	cd config/manager && $(KUSTOMIZE) edit set image gpu-operator=$(IMAGE)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
