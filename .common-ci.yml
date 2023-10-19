@@ -25,6 +25,7 @@ stages:
   - e2e_tests
   - aws_kube_clean
   - release
+  - sign
 
 # Enable pipelines on merge requests, tags, and branches.
 # Avoid duplicate pipelines when pushing to a branch associated with an open MR.
