@@ -35,6 +35,7 @@ spec:
           - -c
           - >
             kubectl apply -f /opt/gpu-operator/nvidia.com_clusterpolicies_crd.yaml;
+            kubectl apply -f /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml;
         {{- if .Values.nfd.enabled }}
             kubectl apply -f /opt/gpu-operator/nfd-api-crds.yaml;
         {{- end }}
