@@ -182,7 +182,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.3
+    version: v0.6.4
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -220,7 +220,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.14.2-ubuntu20.04
+  version: v1.14.3-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -231,7 +231,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.14.1-ubi8
+  version: v0.14.2-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -285,7 +285,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 3.2.5-1-ubuntu20.04
+  version: 3.2.6-1-ubuntu20.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -296,7 +296,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 3.2.5-3.1.8-ubuntu20.04
+  version: 3.2.6-3.1.9-ubuntu20.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
@@ -323,7 +323,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: gpu-feature-discovery
-  version: v0.8.1-ubi8
+  version: v0.8.2-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -337,7 +337,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.5.4-ubuntu20.04
+  version: v0.5.5-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -382,7 +382,7 @@ vgpuManager:
   driverManager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.2
+    version: v0.6.4
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -394,7 +394,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: "v0.2.3"
+  version: "v0.2.4"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -440,7 +440,7 @@ kataManager:
           pullSecret: ""
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-kata-manager
-  version: v0.1.1
+  version: v0.1.2
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -462,7 +462,7 @@ ccManager:
   defaultMode: "off"
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-cc-manager
-  version: v0.1.0
+  version: v0.1.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
