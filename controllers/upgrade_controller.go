@@ -124,10 +124,24 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	var driverLabel map[string]string
-	driverLabel = map[string]string{DriverLabelKey: DriverLabelValue}
+
+	// initialize with common app=nvidia-driver-daemonset label
+	driverLabelKey := DriverLabelKey
+	driverLabelValue := DriverLabelValue
+
 	if clusterPolicy.Spec.Driver.UseNvdiaDriverCRDType() {
-		driverLabel = map[string]string{AppComponentLabelKey: AppComponentLabelValue}
+		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
+		driverLabelKey = AppComponentLabelKey
+		driverLabelValue = AppComponentLabelValue
+	} else if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
+		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
+		// based on rhcos version. Hence use DTK label instead
+		driverLabelKey = ocpDriverToolkitIdentificationLabel
+		driverLabelValue = ocpDriverToolkitIdentificationValue
 	}
+
+	driverLabel = map[string]string{driverLabelKey: driverLabelValue}
+	reqLogger.Info("Using label selector", "key", driverLabelKey, "value", driverLabelValue)
 
 	state, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace,
 		driverLabel)
