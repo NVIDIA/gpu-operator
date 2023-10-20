@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <23.6.0'
+    olm.skipRange: '>=1.9.0 <23.6.1'
     alm-examples: |-
       [
         {
@@ -170,7 +170,7 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.4.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     operatorframework.io/suggested-namespace: nvidia-gpu-operator
-    capabilities: Basic Install
+    capabilities: Deep Insights
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
     containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
@@ -179,7 +179,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v23.6.1
+  name: gpu-operator-certified.v23.9.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -952,5 +952,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 23.6.1
-  replaces: gpu-operator-certified.v23.6.0
+  version: 23.9.0
+  replaces: gpu-operator-certified.v23.6.1
