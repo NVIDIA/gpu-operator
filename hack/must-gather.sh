@@ -52,14 +52,8 @@ if [ -z "$OPERATOR_POD_NAME" ]; then
 fi
 
 OPERATOR_NAMESPACE=$($K get pods -lapp=gpu-operator -A -ojsonpath={.items[].metadata.namespace} --ignore-not-found)
-OPERAND_NAMESPACE=$($K get pods -lapp=nvidia-device-plugin-daemonset -A -ojsonpath={.items[].metadata.namespace} --ignore-not-found)
-
-if [ -z "$OPERAND_NAMESPACE" ]; then
-    echo "WARNING: could not find the GPU Operator operands ..."
-fi
 
 echo "Using '$OPERATOR_NAMESPACE' as operator namespace"
-echo "Using '$OPERAND_NAMESPACE' as operand namespace"
 echo ""
 
 echo "#"
@@ -149,37 +143,32 @@ $K logs $OPERATOR_POD_NAME \
     --previous \
     > "$ARTIFACT_DIR/gpu_operator_pod.previous.log"
 
-if [ -z "$OPERAND_NAMESPACE" ]; then
-    echo "WARNING: could not find the GPU Operator operands, exiting here."
-    exit 0
-fi
-
 echo ""
 echo "#"
 echo "# Operand Pods"
 echo "#"
 echo ""
 
-echo "Get the Pods in $OPERAND_NAMESPACE (status)"
+echo "Get the Pods in $OPERATOR_NAMESPACE (status)"
 $K get pods -owide \
-    -n $OPERAND_NAMESPACE \
+    -n $OPERATOR_NAMESPACE \
     > $ARTIFACT_DIR/gpu_operand_pods.status
 
-echo "Get the Pods in $OPERAND_NAMESPACE (yaml)"
+echo "Get the Pods in $OPERATOR_NAMESPACE (yaml)"
 $K get pods -oyaml \
-    -n $OPERAND_NAMESPACE \
+    -n $OPERATOR_NAMESPACE \
     > $ARTIFACT_DIR/gpu_operand_pods.yaml
 
 echo "Get the GPU Operator Pods Images"
-$K get pods -n $OPERAND_NAMESPACE \
+$K get pods -n $OPERATOR_NAMESPACE \
     -o=jsonpath='{range .items[*]}{"\n"}{.metadata.name}{":\t"}{range .spec.containers[*]}{.image}{" "}{end}{end}' \
     > $ARTIFACT_DIR/gpu_operand_pod_images.txt
 
 echo "Get the description and logs of the GPU Operator Pods"
 
-for pod in $($K get pods -n $OPERAND_NAMESPACE -oname);
+for pod in $($K get pods -n $OPERATOR_NAMESPACE -oname);
 do
-    if ! $K get $pod -n $OPERAND_NAMESPACE -ojsonpath={.metadata.labels} | egrep --quiet '(nvidia|gpu)'; then
+    if ! $K get $pod -n $OPERATOR_NAMESPACE -ojsonpath={.metadata.labels} | egrep --quiet '(nvidia|gpu)'; then
         echo "Skipping $pod, not a NVIDA/GPU Pod ..."
         continue
     fi
@@ -191,18 +180,18 @@ do
     fi
 
     $K logs $pod \
-        -n $OPERAND_NAMESPACE \
+        -n $OPERATOR_NAMESPACE \
         --all-containers --prefix \
         > $ARTIFACT_DIR/gpu_operand_pod_$pod_name.log
 
     $K logs $pod \
-        -n $OPERAND_NAMESPACE \
+        -n $OPERATOR_NAMESPACE \
         --all-containers --prefix \
         --previous \
         > $ARTIFACT_DIR/gpu_operand_pod_$pod_name.previous.log
 
     $K describe $pod \
-        -n $OPERAND_NAMESPACE \
+        -n $OPERATOR_NAMESPACE \
         > $ARTIFACT_DIR/gpu_operand_pod_$pod_name.descr
 done
 
@@ -212,29 +201,29 @@ echo "# Operand DaemonSets"
 echo "#"
 echo ""
 
-echo "Get the DaemonSets in $OPERAND_NAMESPACE (status)"
+echo "Get the DaemonSets in $OPERATOR_NAMESPACE (status)"
 
 $K get ds \
-    -n $OPERAND_NAMESPACE \
+    -n $OPERATOR_NAMESPACE \
     > $ARTIFACT_DIR/gpu_operand_ds.status
 
 
-echo "Get the DaemonSets in $OPERAND_NAMESPACE (yaml)"
+echo "Get the DaemonSets in $OPERATOR_NAMESPACE (yaml)"
 
 $K get ds -oyaml \
-    -n $OPERAND_NAMESPACE \
+    -n $OPERATOR_NAMESPACE \
     > $ARTIFACT_DIR/gpu_operand_ds.yaml
 
 echo "Get the description of the GPU Operator DaemonSets"
 
-for ds in $($K get ds -n $OPERAND_NAMESPACE -oname);
+for ds in $($K get ds -n $OPERATOR_NAMESPACE -oname);
 do
-    if ! $K get $ds -n $OPERAND_NAMESPACE -ojsonpath={.metadata.labels} | egrep --quiet '(nvidia|gpu)'; then
+    if ! $K get $ds -n $OPERATOR_NAMESPACE -ojsonpath={.metadata.labels} | egrep --quiet '(nvidia|gpu)'; then
         echo "Skipping $ds, not a NVIDA/GPU DaemonSet ..."
         continue
     fi
     $K describe $ds \
-        -n $OPERAND_NAMESPACE \
+        -n $OPERATOR_NAMESPACE \
         > $ARTIFACT_DIR/gpu_operand_ds_$(echo "$ds" | cut -d/ -f2).descr
 done
 
@@ -244,13 +233,16 @@ echo "# nvidia-bug-report.sh"
 echo "#"
 echo ""
 
-for pod in $($K get pods -lopenshift.driver-toolkit -oname -n $OPERAND_NAMESPACE; $K get pods -lapp=nvidia-driver-daemonset -oname -n $OPERAND_NAMESPACE);
+for pod in $($K get pods -lopenshift.driver-toolkit -oname -n $OPERATOR_NAMESPACE; $K get pods -lapp=nvidia-driver-daemonset -oname -n $OPERATOR_NAMESPACE; $K get pods -lapp=nvidia-vgpu-manager-daemonset -oname -n $OPERATOR_NAMESPACE);
 do
-    pod_nodename=$($K get $pod -ojsonpath={.spec.nodeName} -n $OPERAND_NAMESPACE)
+    pod_nodename=$($K get $pod -ojsonpath={.spec.nodeName} -n $OPERATOR_NAMESPACE)
     echo "Saving nvidia-bug-report from ${pod_nodename} ..."
 
-    $K exec -c nvidia-driver-ctr -n $OPERAND_NAMESPACE $pod -- bash -c 'cd /tmp && nvidia-bug-report.sh' >&2 || continue
-    $K cp -c nvidia-driver-ctr $OPERAND_NAMESPACE/$(basename $pod):/tmp/nvidia-bug-report.log.gz /tmp/nvidia-bug-report.log.gz || continue
+    $K exec -n $OPERATOR_NAMESPACE $pod -- bash -c 'cd /tmp && nvidia-bug-report.sh' >&2 || \
+        (echo "Failed to collect nvidia-bug-report from ${pod_nodename}" && continue)
+
+    $K cp $OPERATOR_NAMESPACE/$(basename $pod):/tmp/nvidia-bug-report.log.gz /tmp/nvidia-bug-report.log.gz || \
+        (echo "Failed to save nvidia-bug-report from ${pod_nodename}" && continue)
 
     mv /tmp/nvidia-bug-report.log.gz $ARTIFACT_DIR/nvidia-bug-report_${pod_nodename}.log.gz
 done
