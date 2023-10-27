@@ -589,6 +589,11 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.UseOpenKernelModules != nil {
+		in, out := &in.UseOpenKernelModules, &out.UseOpenKernelModules
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
 		*out = new(bool)

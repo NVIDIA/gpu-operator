@@ -939,6 +939,10 @@ spec:
                     description: UseNvidiaDriverCRD indicates if the deployment of
                       NVIDIA Driver is managed by the NVIDIADriver CRD type
                     type: boolean
+                  useOpenKernelModules:
+                    description: UseOpenKernelModules indicates if the open GPU kernel
+                      modules should be used
+                    type: boolean
                   usePrecompiled:
                     description: UsePrecompiled indicates if deployment of NVIDIA
                       Driver using pre-compiled modules is enabled

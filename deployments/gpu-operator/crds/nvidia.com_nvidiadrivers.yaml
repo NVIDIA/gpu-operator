@@ -558,6 +558,10 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
+              useOpenKernelModules:
+                description: UseOpenKernelModules indicates if the open GPU kernel
+                  modules should be used
+                type: boolean
               usePrecompiled:
                 description: UsePrecompiled indicates if deployment of NVIDIA Driver
                   using pre-compiled modules is enabled
