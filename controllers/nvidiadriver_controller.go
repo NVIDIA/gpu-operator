@@ -89,11 +89,12 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		err = fmt.Errorf("Error getting NVIDIADriver object: %w", err)
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
-		// Error reading the object - requeue the request.
+		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
 		}
+		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
@@ -103,6 +104,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		err = fmt.Errorf("Error getting ClusterPolicy list: %v", err)
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
@@ -113,6 +115,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if len(clusterPolicyList.Items) == 0 {
 		err = fmt.Errorf("no ClusterPolicy object found in the cluster")
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
@@ -135,13 +138,18 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// is deployed per GPU node.
 	err = r.nodeSelectorValidator.Validate(ctx, instance)
 	if err != nil {
-		_ = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error())
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
 		return reconcile.Result{}, nil
 	}
 
 	if instance.Spec.UsePrecompiledDrivers() && instance.Spec.IsGDSEnabled() {
 		err = fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
@@ -152,6 +160,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if instance.Spec.DriverType == nvidiav1alpha1.VGPUHostManager {
 		err = fmt.Errorf("vgpu-host-manager driver type is not supported through NVIDIADriver CR")
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())

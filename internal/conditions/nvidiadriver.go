@@ -102,5 +102,13 @@ func (u *nvDriverUpdater) setConditionsError(ctx context.Context, cr *nvidiav1al
 		Message: message,
 	})
 
+	// Ensure status.state is not empty when updating the CR status.
+	// The caller should set the state appropriately in the CR
+	// depending on the error condition.
+	instance.Status.State = cr.Status.State
+	if instance.Status.State == "" {
+		instance.Status.State = nvidiav1alpha1.NotReady
+	}
+
 	return u.client.Status().Update(ctx, instance)
 }
