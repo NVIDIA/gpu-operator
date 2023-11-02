@@ -457,6 +457,12 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
 
+	// UseOpenKernelModules indicates if the open GPU kernel modules should be used
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable use of open GPU kernel modules"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseOpenKernelModules *bool `json:"useOpenKernelModules,omitempty"`
+
 	// Enabled indicates if deployment of NVIDIA Driver through operator is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment through GPU Operator"
@@ -1753,6 +1759,15 @@ func (d *DriverSpec) UsePrecompiledDrivers() bool {
 		return false
 	}
 	return *d.UsePrecompiled
+}
+
+// OpenKernelModulesEnabled returns true if driver install is enabled using open GPU kernel modules
+func (d *DriverSpec) OpenKernelModulesEnabled() bool {
+	if d.UseOpenKernelModules == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *d.UseOpenKernelModules
 }
 
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator

@@ -148,6 +148,8 @@ const (
 	PodControllerRevisionHashLabelKey = "controller-revision-hash"
 	// DefaultCCModeEnvName is the name of the envvar for configuring default CC mode on all compatible GPUs on the node
 	DefaultCCModeEnvName = "DEFAULT_CC_MODE"
+	// OpenKernelModulesEnabledEnvName is the name of the driver-container envvar for enabling open GPU kernel module support
+	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
 )
 
 // ContainerProbe defines container probe types
@@ -2859,12 +2861,16 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if len(config.Driver.Args) > 0 {
 		driverContainer.Args = config.Driver.Args
 	}
-	// set/append environment variables for exporter container
+	// set/append environment variables for driver container
 	if len(config.Driver.Env) > 0 {
 		for _, env := range config.Driver.Env {
 			setContainerEnv(driverContainer, env.Name, env.Value)
 		}
 	}
+	if config.Driver.OpenKernelModulesEnabled() {
+		setContainerEnv(driverContainer, OpenKernelModulesEnabledEnvName, "true")
+	}
+
 	// set container probe timeouts
 	if config.Driver.StartupProbe != nil {
 		setContainerProbe(driverContainer, config.Driver.StartupProbe, Startup)
