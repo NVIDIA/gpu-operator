@@ -400,13 +400,17 @@ func getObjectOfKind(objs []*unstructured.Unstructured, kind string) (*unstructu
 // getDriverName returns a unique name for an NVIDIA driver instance in the format nvidia-<driverType>-driver-<crName>-<osVersion>
 func getDriverName(cr *nvidiav1alpha1.NVIDIADriver, osVersion string) string {
 	const (
-		nameFormat = "nvidia-%s-driver-%s-%s"
 		// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
 		// https://github.com/kubernetes/apimachinery/blob/v0.28.1/pkg/util/validation/validation.go#L209
 		nameMaxLength = 253
 	)
 
-	name := fmt.Sprintf(nameFormat, cr.Spec.DriverType, cr.Name, osVersion)
+	name := fmt.Sprintf("nvidia-%s-driver-%s-%s", cr.Spec.DriverType, cr.Name, osVersion)
+
+	if cr.Spec.DriverType == nvidiav1alpha1.VGPUHostManager {
+		name = fmt.Sprintf("nvidia-vgpu-manager-%s-%s", cr.Name, osVersion)
+	}
+
 	// truncate name if it exceeds the maximum length
 	if len(name) > nameMaxLength {
 		name = name[:nameMaxLength]

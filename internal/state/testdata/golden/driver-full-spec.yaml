@@ -154,6 +154,7 @@ spec:
                 operator: In
                 values:
                 - nvidia-driver
+                - nvidia-vgpu-manager
             topologyKey: kubernetes.io/hostname
       containers:
       - args:

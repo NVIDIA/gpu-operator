@@ -8,7 +8,11 @@ metadata:
     {{- if .Precompiled }}
     nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
     {{- end }}
+    {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+    app.kubernetes.io/component: "nvidia-vgpu-host-manager"
+    {{- else }}
     app.kubernetes.io/component: "nvidia-driver"
+    {{- end }}
     {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
     openshift.driver-toolkit.rhcos: {{ .Openshift.RHCOSVersion | quote }}
     openshift.driver-toolkit: "true"
@@ -46,13 +50,21 @@ spec:
         {{- if .Precompiled }}
         nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
         {{- end }}
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        app.kubernetes.io/component: "nvidia-vgpu-host-manager"
+        {{- else }}
         app.kubernetes.io/component: "nvidia-driver"
+        {{- end }}
         {{- if .Driver.Spec.Labels }}
         {{- .Driver.Spec.Labels | yaml | nindent 8 }}
         {{- end }}
     spec:
       nodeSelector:
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        nvidia.com/gpu.deploy.vgpu-manager: "true"
+        {{- else }}
         nvidia.com/gpu.deploy.driver: "true"
+        {{- end }}
         {{- if .Driver.Spec.NodeSelector }}
         {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
         {{- end }}
@@ -78,6 +90,7 @@ spec:
                     operator: In
                     values:
                       - nvidia-driver
+                      - nvidia-vgpu-manager
               topologyKey: kubernetes.io/hostname
       priorityClassName: {{ default "system-node-critical" .Driver.Spec.PriorityClassName }}
       serviceAccountName: {{ .Driver.Name }}
@@ -114,7 +127,11 @@ spec:
           - name: ENABLE_GPU_POD_EVICTION
             value: "true"
           - name: ENABLE_AUTO_DRAIN
+          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+            value: "false"
+          {{- else }}
             value: "true"
+          {{- end }}
           - name: DRAIN_USE_FORCE
             value: "false"
           - name: DRAIN_POD_SELECTOR_LABEL
@@ -244,6 +261,12 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
+          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+          - name: cgroup
+            mountPath: /sys/fs/cgroup
+          - name: vfio
+            mountPath: /dev/vfio
+          {{- end }}
           - name: mlnx-ofed-usr-src
             mountPath: /run/mellanox/drivers/usr/src
             mountPropagation: HostToContainer
@@ -275,6 +298,7 @@ spec:
         resources:
           {{ . | yaml | nindent 10 }}
         {{- end }}
+        {{- if not (eq .Driver.Spec.DriverType "vgpu-host-manager") }}
         startupProbe:
           exec:
             command:
@@ -288,6 +312,7 @@ spec:
           preStop:
             exec:
               command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
+        {{- end }}
       {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
@@ -466,6 +491,14 @@ spec:
         - name: host-os-release
           hostPath:
             path: "/etc/os-release"
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: vfio
+          hostPath:
+            path: /dev/vfio
+        {{- end }}
         - name: run-nvidia-topologyd
           hostPath:
             path: /run/nvidia-topologyd
