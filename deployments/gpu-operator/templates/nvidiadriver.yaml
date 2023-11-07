@@ -12,6 +12,9 @@ spec:
   {{- if .Values.driver.nvidiaDriverCRD.nodeSelector }}
   nodeSelector: {{ toYaml .Values.driver.nvidiaDriverCRD.nodeSelector | nindent 6 }}
   {{- end }}
+  {{- if .Values.driver.imagePullSecrets }}
+  imagePullSecrets: {{ toYaml .Values.driver.imagePullSecrets | nindent 4 }}
+  {{- end }}
   {{- if .Values.driver.manager }}
   manager: {{ toYaml .Values.driver.manager | nindent 4 }}
   {{- end }}
