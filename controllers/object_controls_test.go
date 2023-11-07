@@ -476,10 +476,12 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.Driver.Repository = "nvcr.io/nvidia"
 	cp.Spec.Driver.Image = "driver"
 	cp.Spec.Driver.Version = "470.57.02"
+	cp.Spec.Driver.ImagePullSecrets = []string{"ngc-secret"}
 
 	cp.Spec.Driver.Manager.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.Driver.Manager.Image = "k8s-driver-manager"
 	cp.Spec.Driver.Manager.Version = "test"
+	cp.Spec.Driver.Manager.ImagePullSecrets = []string{"ngc-secret"}
 
 	cp.Spec.Driver.StartupProbe = &gpuv1.ContainerProbeSpec{InitialDelaySeconds: 20, PeriodSeconds: 5, FailureThreshold: 1, TimeoutSeconds: 60}
 
@@ -505,6 +507,7 @@ func getDriverTestOutput(testCase string) map[string]interface{} {
 		"mofedValidationPresent": false,
 		"nvPeerMemPresent":       false,
 		"driverManagerImage":     "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
+		"imagePullSecret":        "ngc-secret",
 	}
 
 	switch testCase {
@@ -575,6 +578,8 @@ func TestDriver(t *testing.T) {
 			require.Equal(t, tc.output["nvPeerMemPresent"], nvPeerMemPresent, "Unexpected configuration for nv-peermem container")
 			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-driver-ctr image")
 			require.Equal(t, tc.output["driverManagerImage"], driverManagerImage, "Unexpected configuration for k8s-driver-manager image")
+			require.Equal(t, len(ds.Spec.Template.Spec.ImagePullSecrets), 1, "Incorrect number of imagePullSecrets in the daemon set spec")
+			require.Equal(t, tc.output["imagePullSecret"], ds.Spec.Template.Spec.ImagePullSecrets[0].Name, "Incorrect imagePullSecret in the daemon set spec")
 
 			// cleanup by deleting all kubernetes objects
 			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
@@ -596,10 +601,12 @@ func getDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.DevicePlugin.Repository = "nvcr.io/nvidia"
 	cp.Spec.DevicePlugin.Image = "k8s-device-plugin"
 	cp.Spec.DevicePlugin.Version = "v0.12.0-ubi8"
+	cp.Spec.DevicePlugin.ImagePullSecrets = []string{"ngc-secret"}
 
 	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.Validator.Image = "gpu-operator-validator"
 	cp.Spec.Validator.Version = "v1.11.0"
+	cp.Spec.Validator.ImagePullSecrets = []string{"ngc-secret"}
 
 	switch testCase {
 	case "default":
@@ -622,6 +629,7 @@ func getDevicePluginTestOutput(testCase string) map[string]interface{} {
 		"configManagerInitPresent":    false,
 		"configManagerSidecarPresent": false,
 		"devicePluginImage":           "nvcr.io/nvidia/k8s-device-plugin:v0.12.0-ubi8",
+		"imagePullSecret":             "ngc-secret",
 	}
 
 	switch testCase {
@@ -730,6 +738,8 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.VGPUManager.DriverManager.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.VGPUManager.DriverManager.Image = "k8s-driver-manager"
 	cp.Spec.VGPUManager.DriverManager.Version = "v0.3.0"
+	cp.Spec.VGPUManager.ImagePullSecrets = []string{"ngc-secret"}
+	cp.Spec.VGPUManager.DriverManager.ImagePullSecrets = []string{"ngc-secret"}
 	clusterPolicyController.sandboxEnabled = true
 
 	switch testCase {
@@ -750,6 +760,7 @@ func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
 		"numDaemonsets":      1,
 		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu22.04",
 		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.3.0",
+		"imagePullSecret":    "ngc-secret",
 	}
 
 	switch testCase {
@@ -837,10 +848,12 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.SandboxDevicePlugin.Image = "kubevirt-device-plugin"
 	cp.Spec.SandboxDevicePlugin.Version = "v1.1.0"
 	clusterPolicyController.sandboxEnabled = true
+	cp.Spec.SandboxDevicePlugin.ImagePullSecrets = []string{"ngc-secret"}
 
 	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
 	cp.Spec.Validator.Image = "gpu-operator-validator"
 	cp.Spec.Validator.Version = "v1.11.0"
+	cp.Spec.Validator.ImagePullSecrets = []string{"ngc-secret"}
 
 	switch testCase {
 	case "default":
@@ -857,8 +870,9 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 func getSandboxDevicePluginTestOutput(testCase string) map[string]interface{} {
 	// default output
 	output := map[string]interface{}{
-		"numDaemonsets": 1,
-		"image":         "nvcr.io/nvidia/kubevirt-device-plugin:v1.1.0",
+		"numDaemonsets":   1,
+		"image":           "nvcr.io/nvidia/kubevirt-device-plugin:v1.1.0",
+		"imagePullSecret": "ngc-secret",
 	}
 
 	switch testCase {
