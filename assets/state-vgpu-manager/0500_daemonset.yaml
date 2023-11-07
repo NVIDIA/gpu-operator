@@ -13,6 +13,8 @@ spec:
       app: nvidia-vgpu-manager-daemonset
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-vgpu-manager-ctr
       labels:
         app: nvidia-vgpu-manager-daemonset
     spec:
