@@ -250,6 +250,10 @@ spec:
           - name: run-mellanox-drivers
             mountPath: /run/mellanox/drivers
             mountPropagation: HostToContainer
+          - name: firmware-search-path
+            mountPath: /sys/module/firmware_class/parameters/path
+          - name: nv-firmware
+            mountPath: /lib/firmware
           {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
           {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
@@ -489,6 +493,14 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+        - name: firmware-search-path
+          hostPath:
+            path: /sys/module/firmware_class/parameters/path
+            type: FileOrCreate
+        - name: nv-firmware
+          hostPath:
+            path: /run/nvidia/driver/lib/firmware
+            type: DirectoryOrCreate
         {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
         {{- range .AdditionalConfigs.Volumes }}
         - name: {{ .Name }}

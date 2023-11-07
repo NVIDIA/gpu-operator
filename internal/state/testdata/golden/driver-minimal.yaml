@@ -203,6 +203,10 @@ spec:
         - mountPath: /run/mellanox/drivers
           mountPropagation: HostToContainer
           name: run-mellanox-drivers
+        - mountPath: /sys/module/firmware_class/parameters/path
+          name: firmware-search-path
+        - mountPath: /lib/firmware
+          name: nv-firmware
       hostPID: true
       initContainers:
       - args:
@@ -295,6 +299,14 @@ spec:
           path: /sys
           type: Directory
         name: host-sys
+      - hostPath:
+          path: /sys/module/firmware_class/parameters/path
+          type: FileOrCreate
+        name: firmware-search-path
+      - hostPath:
+          path: /run/nvidia/driver/lib/firmware
+          type: DirectoryOrCreate
+        name: nv-firmware
   updateStrategy:
     type: OnDelete
 ---

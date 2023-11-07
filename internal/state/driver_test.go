@@ -696,5 +696,23 @@ func getDriverVolumes() []corev1.Volume {
 				},
 			},
 		},
+		{
+			Name: "firmware-search-path",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/sys/module/firmware_class/parameters/path",
+					Type: newHostPathType(corev1.HostPathFileOrCreate),
+				},
+			},
+		},
+		{
+			Name: "nv-firmware",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia/driver/lib/firmware",
+					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		},
 	}
 }
