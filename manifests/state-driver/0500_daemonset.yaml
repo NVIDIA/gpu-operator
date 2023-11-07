@@ -30,6 +30,9 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
+        {{- if .Driver.Spec.Annotations }}
+        {{- .Driver.Spec.Annotations | yaml | nindent 8 }}
+        {{- end }}
       labels:
         app: {{ .Driver.AppName }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
@@ -44,6 +47,9 @@ spec:
         nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
         {{- end }}
         app.kubernetes.io/component: "nvidia-driver"
+        {{- if .Driver.Spec.Labels }}
+        {{- .Driver.Spec.Labels | yaml | nindent 8 }}
+        {{- end }}
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
@@ -60,6 +66,9 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
+        {{- if .Driver.Spec.Tolerations }}
+        {{- .Driver.Spec.Tolerations | yaml | nindent 8 }}
+        {{- end }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -70,7 +79,7 @@ spec:
                     values:
                       - nvidia-driver
               topologyKey: kubernetes.io/hostname
-      priorityClassName: system-node-critical
+      priorityClassName: {{ default "system-node-critical" .Driver.Spec.PriorityClassName }}
       serviceAccountName: {{ .Driver.Name }}
       hostPID: true
       # Add any configured pull secrets

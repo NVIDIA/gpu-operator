@@ -202,54 +202,75 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 }
 
 func TestDriverSpec(t *testing.T) {
-	// Construct a sample driver state manager
+	const (
+		testName = "driver-full-spec"
+	)
 	state, err := NewStateDriver(nil, nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
 
 	// set every field in driverSpec
-	driverSpec := &driverSpec{
-		ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
-		ManagerImagePath: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel",
-		Spec: &nvidiav1alpha1.NVIDIADriverSpec{
-			Manager: nvidiav1alpha1.DriverManagerSpec{
-				Repository:       "/path/to/repository",
-				Image:            "image",
-				Version:          "version",
-				ImagePullPolicy:  "Always",
-				ImagePullSecrets: []string{"manager-secret"},
-				Env: []nvidiav1alpha1.EnvVar{
-					{Name: "FOO", Value: "foo"},
-					{Name: "BAR", Value: "bar"},
-				},
-			},
-			StartupProbe:     getDefaultContainerProbeSpec(),
-			LivenessProbe:    getDefaultContainerProbeSpec(),
-			ReadinessProbe:   getDefaultContainerProbeSpec(),
-			UsePrecompiled:   new(bool),
+	driverSpec := &nvidiav1alpha1.NVIDIADriverSpec{
+		Manager: nvidiav1alpha1.DriverManagerSpec{
+			Repository:       "/path/to/repository",
+			Image:            "image",
+			Version:          "version",
 			ImagePullPolicy:  "Always",
-			ImagePullSecrets: []string{"secret-a", "secret-b"},
-			Resources: &nvidiav1alpha1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					"memory": resource.MustParse("200Mi"),
-					"cpu":    resource.MustParse("500m"),
-				},
-			},
-			Args: []string{"--foo", "--bar"},
+			ImagePullSecrets: []string{"manager-secret"},
 			Env: []nvidiav1alpha1.EnvVar{
 				{Name: "FOO", Value: "foo"},
 				{Name: "BAR", Value: "bar"},
 			},
-			NodeSelector: map[string]string{
-				"example.com/foo": "foo",
-				"example.com/bar": "bar",
+		},
+		StartupProbe:     getDefaultContainerProbeSpec(),
+		LivenessProbe:    getDefaultContainerProbeSpec(),
+		ReadinessProbe:   getDefaultContainerProbeSpec(),
+		UsePrecompiled:   new(bool),
+		ImagePullPolicy:  "Always",
+		ImagePullSecrets: []string{"secret-a", "secret-b"},
+		Resources: &nvidiav1alpha1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				"memory": resource.MustParse("200Mi"),
+				"cpu":    resource.MustParse("500m"),
 			},
 		},
+		Args: []string{"--foo", "--bar"},
+		Env: []nvidiav1alpha1.EnvVar{
+			{Name: "FOO", Value: "foo"},
+			{Name: "BAR", Value: "bar"},
+		},
+		NodeSelector: map[string]string{
+			"example.com/foo": "foo",
+			"example.com/bar": "bar",
+		},
+		Labels: map[string]string{
+			"custom-label-1": "custom-value-1",
+			"custom-label-2": "custom-value-2",
+			// The below standard labels should not be overridden in the
+			// DaemonSet that gets rendered
+			"app":                       "foo",
+			"app.kubernetes.io/part-of": "foo",
+		},
+		Annotations: map[string]string{
+			"custom-annotation-1": "custom-value-1",
+			"custom-annotation-2": "custom-value-2",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "foo",
+				Operator: "Equal",
+				Value:    "bar",
+				Effect:   "NoSchedule",
+			},
+		},
+		PriorityClassName: "custom-priority-class-name",
 	}
 
+	driverSpec.Labels = sanitizeDriverLabels(driverSpec.Labels)
+
 	renderData := getMinimalDriverRenderData()
-	renderData.Driver = driverSpec
+	renderData.Driver.Spec = driverSpec
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
@@ -257,23 +278,13 @@ func TestDriverSpec(t *testing.T) {
 		})
 	require.Nil(t, err)
 
-	ds, err := getDaemonSetObj(objs)
+	actual, err := getYAMLString(objs)
 	require.Nil(t, err)
 
-	require.Equal(t, renderData.Runtime.Namespace, ds.Namespace)
-	checkNodeSelector(t, renderData.Driver.Spec.NodeSelector, ds.Spec.Template.Spec.NodeSelector)
-	checkPrecompiledLabel(t, renderData.Driver.Spec.UsePrecompiled, ds.Labels)
-	checkPrecompiledLabel(t, renderData.Driver.Spec.UsePrecompiled, ds.Spec.Template.Labels)
-	checkPullSecrets(t, renderData.Driver.Spec.ImagePullSecrets, ds.Spec.Template.Spec.ImagePullSecrets)
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
 
-	nvidiaDriverCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
-	require.Nil(t, err, "nvidia-driver-ctr should be in the list of containers")
-
-	require.Equal(t, renderData.Driver.ImagePath, nvidiaDriverCtr.Image)
-	checkImagePullPolicy(t, renderData.Driver.Spec.ImagePullPolicy, string(nvidiaDriverCtr.ImagePullPolicy))
-	checkEnv(t, toCoreV1Envars(renderData.Driver.Spec.Env), nvidiaDriverCtr.Env)
-	checkResources(t, renderData.Driver.Spec.Resources, nvidiaDriverCtr.Resources)
-	checkArgs(t, []string{"init"}, renderData.Driver.Spec.Args, nvidiaDriverCtr.Args)
+	require.Equal(t, string(o), actual)
 }
 
 func TestDriverGDS(t *testing.T) {
@@ -563,44 +574,6 @@ func getDefaultContainerProbeSpec() *nvidiav1alpha1.ContainerProbeSpec {
 	}
 }
 
-func checkNodeSelector(t *testing.T, input map[string]string, output map[string]string) {
-	for k, v := range input {
-		observedValue, exists := output[k]
-		require.True(t, exists)
-		require.Equal(t, v, observedValue)
-	}
-
-}
-
-func checkPrecompiledLabel(t *testing.T, usePrecompiled *bool, labels map[string]string) {
-	value, exists := labels["nvidia.com/precompiled"]
-	require.True(t, exists, "'nvidia.com/precompiled' label should always be set")
-
-	if usePrecompiled == nil || *usePrecompiled == false {
-		require.Equal(t, "false", value)
-	} else {
-		require.Equal(t, "true", value)
-	}
-}
-
-func checkImagePullPolicy(t *testing.T, input string, output string) {
-	if input != "" {
-		require.Equal(t, input, output)
-	} else {
-		require.Equal(t, "IfNotPresent", output)
-	}
-}
-
-func checkPullSecrets(t *testing.T, input []string, output []corev1.LocalObjectReference) {
-	secrets := []string{}
-	for _, secret := range output {
-		secrets = append(secrets, secret.Name)
-	}
-	for _, secret := range input {
-		require.Contains(t, secrets, secret)
-	}
-}
-
 func checkEnv(t *testing.T, input []corev1.EnvVar, output []corev1.EnvVar) {
 	inputMap := map[string]string{}
 	for _, env := range input {
@@ -642,29 +615,6 @@ func volumeSliceToMap(volumes []corev1.Volume) map[string]corev1.Volume {
 	}
 
 	return volumeMap
-}
-
-func checkResources(t *testing.T, input *nvidiav1alpha1.ResourceRequirements, output corev1.ResourceRequirements) {
-	if input == nil {
-		return
-	}
-
-	for k, v := range input.Limits {
-		outputValue, exists := output.Limits[k]
-		require.True(t, exists, fmt.Sprintf("resource '%v' should exist in resource limits", k))
-		require.Zero(t, v.Cmp(outputValue))
-	}
-
-	for k, v := range input.Requests {
-		outputValue, exists := output.Requests[k]
-		require.True(t, exists, fmt.Sprintf("resource '%v' should exist in resource requests", k))
-		require.Zero(t, v.Cmp(outputValue))
-	}
-
-}
-
-func checkArgs(t *testing.T, defaultArgs []string, input []string, output []string) {
-	require.Equal(t, append(defaultArgs, input...), output)
 }
 
 func getDriverVolumes() []corev1.Volume {
@@ -747,20 +697,4 @@ func getDriverVolumes() []corev1.Volume {
 			},
 		},
 	}
-}
-
-// TODO: make this a public utils method
-func toCoreV1Envars(envs []nvidiav1alpha1.EnvVar) []corev1.EnvVar {
-	if len(envs) == 0 {
-		return []corev1.EnvVar{}
-	}
-	var res []corev1.EnvVar
-	for _, e := range envs {
-		resEnv := corev1.EnvVar{
-			Name:  e.Name,
-			Value: e.Value,
-		}
-		res = append(res, resEnv)
-	}
-	return res
 }
