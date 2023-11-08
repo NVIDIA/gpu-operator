@@ -17,7 +17,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= v23.6.1
+VERSION ?= v23.9.0
 
 CUDA_VERSION ?= 12.2.2
 GOLANG_VERSION ?= 1.21.1
