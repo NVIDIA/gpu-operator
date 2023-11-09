@@ -9,7 +9,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
   annotations:
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-    olm.skipRange: '>=1.9.0 <23.6.1'
+    olm.skipRange: '>=1.9.0 <23.9.1'
     alm-examples: |-
       [
         {
@@ -180,7 +180,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v23.9.0
+  name: gpu-operator-certified.v23.9.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -953,5 +953,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 23.9.0
-  replaces: gpu-operator-certified.v23.6.1
+  version: 23.9.1
+  replaces: gpu-operator-certified.v23.9.0
