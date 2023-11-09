@@ -32,6 +32,7 @@ metadata:
             "driver": {
               "enabled": true,
               "useNvidiaDriverCRD": false,
+              "useOpenKernelModules": false,
               "upgradePolicy": {
                 "autoUpgrade": true,
                 "drain": {
