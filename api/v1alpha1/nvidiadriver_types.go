@@ -51,6 +51,12 @@ type NVIDIADriverSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="usePrecompiled is an immutable field. Please create a new NvidiaDriver resource instead when you want to change this setting."
 	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
 
+	// UseOpenKernelModules indicates if the open GPU kernel modules should be used
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable use of open GPU kernel modules"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseOpenKernelModules *bool `json:"useOpenKernelModules,omitempty"`
+
 	// NVIDIA Driver container startup probe settings
 	StartupProbe *ContainerProbeSpec `json:"startupProbe,omitempty"`
 
@@ -145,6 +151,31 @@ type NVIDIADriverSpec struct {
 	// +kubebuilder:validation:Optional
 	// Affinity specifies node affinity rules for driver pods
 	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Optional: Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Optional: Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Optional: Set tolerations
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Optional: Set priorityClassName
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // ResourceRequirements describes the compute resource requirements.

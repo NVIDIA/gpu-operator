@@ -273,6 +273,11 @@ func (in *NVIDIADriverSpec) DeepCopyInto(out *NVIDIADriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.UseOpenKernelModules != nil {
+		in, out := &in.UseOpenKernelModules, &out.UseOpenKernelModules
+		*out = new(bool)
+		**out = **in
+	}
 	if in.StartupProbe != nil {
 		in, out := &in.StartupProbe, &out.StartupProbe
 		*out = new(ContainerProbeSpec)
@@ -355,6 +360,27 @@ func (in *NVIDIADriverSpec) DeepCopyInto(out *NVIDIADriverSpec) {
 		in, out := &in.NodeAffinity, &out.NodeAffinity
 		*out = new(v1.NodeAffinity)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

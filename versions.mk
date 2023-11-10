@@ -17,9 +17,9 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= v23.9.0
+VERSION ?= v23.9.1
 
-CUDA_VERSION ?= 12.2.2
+CUDA_VERSION ?= 12.3.0
 GOLANG_VERSION ?= 1.21.1
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")

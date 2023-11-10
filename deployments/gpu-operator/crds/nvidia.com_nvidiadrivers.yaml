@@ -45,6 +45,14 @@ spec:
           spec:
             description: NVIDIADriverSpec defines the desired state of NVIDIADriver
             properties:
+              annotations:
+                additionalProperties:
+                  type: string
+                description: 'Optional: Annotations is an unstructured key value map
+                  stored with a resource that may be set by external tools to store
+                  and retrieve arbitrary metadata. They are not queryable and should
+                  be preserved when modifying objects.'
+                type: object
               args:
                 description: 'Optional: List of arguments'
                 items:
@@ -150,6 +158,13 @@ spec:
                 properties:
                   name:
                     type: string
+                type: object
+              labels:
+                additionalProperties:
+                  type: string
+                description: 'Optional: Map of string keys and values that can be
+                  used to organize and categorize (scope and select) objects. May
+                  match selectors of replication controllers and services.'
                 type: object
               licensingConfig:
                 description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
@@ -437,6 +452,9 @@ spec:
                 description: NodeSelector specifies a selector for installation of
                   NVIDIA driver
                 type: object
+              priorityClassName:
+                description: 'Optional: Set priorityClassName'
+                type: string
               rdma:
                 description: GPUDirectRDMA defines the spec for NVIDIA Peer Memory
                   driver
@@ -558,6 +576,50 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
+              tolerations:
+                description: 'Optional: Set tolerations'
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+              useOpenKernelModules:
+                description: UseOpenKernelModules indicates if the open GPU kernel
+                  modules should be used
+                type: boolean
               usePrecompiled:
                 description: UsePrecompiled indicates if deployment of NVIDIA Driver
                   using pre-compiled modules is enabled

@@ -475,6 +475,20 @@ func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool
 	return spec.GetImagePath(os)
 }
 
+func sanitizeDriverLabels(labels map[string]string) map[string]string {
+	sanitizedLabels := make(map[string]string)
+	for k, v := range labels {
+		// if the user specifies an override of the "app" or any "app.kubernetes.io/" keys, we skip it.
+		// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
+		// with the existing daemon set selectors.
+		if k == "app" || strings.HasPrefix(k, "app.kubernetes.io/") {
+			continue
+		}
+		sanitizedLabels[k] = v
+	}
+	return sanitizedLabels
+}
+
 func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverSpec, error) {
 	if cr == nil {
 		return nil, fmt.Errorf("no NVIDIADriver CR provided")
@@ -499,6 +513,8 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	if spec.StartupProbe == nil {
 		spec.StartupProbe = getDefaultStartupProbe(spec)
 	}
+
+	spec.Labels = sanitizeDriverLabels(spec.Labels)
 
 	return &driverSpec{
 		Spec:             spec,
