@@ -166,6 +166,8 @@ spec:
         env:
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
+        - name: OPEN_KERNEL_MODULES_ENABLED
+          value: "true"
         - name: FOO
           value: foo
         - name: BAR

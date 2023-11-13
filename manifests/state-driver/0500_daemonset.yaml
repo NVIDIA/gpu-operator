@@ -200,7 +200,7 @@ spec:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
-      {{- if .Driver.Spec.UseOpenKernelModules }}
+      {{- if deref .Driver.Spec.UseOpenKernelModules }}
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
       {{- end }}
