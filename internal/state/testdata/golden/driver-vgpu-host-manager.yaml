@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
   namespace: test-operator
 rules:
 - apiGroups:
@@ -47,7 +47,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
 rules:
 - apiGroups:
   - config.openshift.io
@@ -91,53 +91,53 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
   namespace: test-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-ubuntu22.04
+  name: nvidia-vgpu-manager-ubuntu22.04
   namespace: test-operator
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    openshift.io/scc: nvidia-gpu-driver-ubuntu22.04
+    openshift.io/scc: nvidia-vgpu-manager-ubuntu22.04
   labels:
-    app: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b
-    app.kubernetes.io/component: nvidia-driver
+    app: nvidia-vgpu-manager-ubuntu22.04-7c6d7bd86b
+    app.kubernetes.io/component: nvidia-vgpu-host-manager
     nvidia.com/node.os-version: ubuntu22.04
     nvidia.com/precompiled: "false"
-  name: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b
+  name: nvidia-vgpu-manager-ubuntu22.04-7c6d7bd86b
   namespace: test-operator
 spec:
   selector:
     matchLabels:
-      app: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b
+      app: nvidia-vgpu-manager-ubuntu22.04-7c6d7bd86b
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        app: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b
-        app.kubernetes.io/component: nvidia-driver
+        app: nvidia-vgpu-manager-ubuntu22.04-7c6d7bd86b
+        app.kubernetes.io/component: nvidia-vgpu-host-manager
         nvidia.com/node.os-version: ubuntu22.04
         nvidia.com/precompiled: "false"
     spec:
@@ -160,35 +160,13 @@ spec:
         env:
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
-        - name: GPU_DIRECT_RDMA_ENABLED
-          value: "true"
-        - name: USE_HOST_MOFED
-          value: "true"
-        image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
+        image: nvcr.io/nvidia/vgpu-manager:525.85.03-ubuntu22.04
         imagePullPolicy: IfNotPresent
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - rm -f /run/nvidia/validations/.driver-ctr-ready
         name: nvidia-driver-ctr
         securityContext:
           privileged: true
           seLinuxOptions:
             level: s0
-        startupProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready
-          failureThreshold: 120
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 60
         volumeMounts:
         - mountPath: /run/nvidia
           mountPropagation: Bidirectional
@@ -202,6 +180,10 @@ spec:
         - mountPath: /host-etc/os-release
           name: host-os-release
           readOnly: true
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - mountPath: /dev/vfio
+          name: vfio
         - mountPath: /run/mellanox/drivers/usr/src
           mountPropagation: HostToContainer
           name: mlnx-ofed-usr-src
@@ -212,56 +194,6 @@ spec:
           name: firmware-search-path
         - mountPath: /lib/firmware
           name: nv-firmware
-      - args:
-        - reload_nvidia_peermem
-        command:
-        - nvidia-driver
-        env:
-        - name: NVIDIA_VISIBLE_DEVICES
-          value: void
-        - name: USE_HOST_MOFED
-          value: "true"
-        image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - nvidia-driver probe_nvidia_peermem
-          failureThreshold: 1
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          successThreshold: 1
-          timeoutSeconds: 10
-        name: nvidia-peermem-ctr
-        securityContext:
-          privileged: true
-          seLinuxOptions:
-            level: s0
-        startupProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - nvidia-driver probe_nvidia_peermem
-          failureThreshold: 120
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 10
-        volumeMounts:
-        - mountPath: /run/nvidia
-          mountPropagation: Bidirectional
-          name: run-nvidia
-        - mountPath: /var/log
-          name: var-log
-        - mountPath: /dev/log
-          name: dev-log
-          readOnly: true
-        - mountPath: /run/mellanox/drivers
-          mountPropagation: HostToContainer
-          name: run-mellanox-drivers
       hostPID: true
       initContainers:
       - args:
@@ -278,7 +210,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL
@@ -291,10 +223,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: GPU_DIRECT_RDMA_ENABLED
-          value: "true"
-        - name: USE_HOST_MOFED
-          value: "true"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
@@ -314,9 +242,9 @@ spec:
           mountPropagation: HostToContainer
           name: run-mellanox-drivers
       nodeSelector:
-        nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-gpu-driver-ubuntu22.04
+      serviceAccountName: nvidia-vgpu-manager-ubuntu22.04
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu
@@ -336,11 +264,17 @@ spec:
           path: /etc/os-release
         name: host-os-release
       - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /dev/vfio
+        name: vfio
+      - hostPath:
           path: /run/nvidia-topologyd
           type: DirectoryOrCreate
         name: run-nvidia-topologyd
       - hostPath:
-          path: /usr/src
+          path: /run/mellanox/drivers/usr/src
           type: DirectoryOrCreate
         name: mlnx-ofed-usr-src
       - hostPath:

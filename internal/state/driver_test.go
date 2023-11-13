@@ -80,8 +80,8 @@ func TestDriverRenderMinimal(t *testing.T) {
 		&render.TemplatingData{
 			Data: renderData,
 		})
-	require.NotEmpty(t, objs)
 	require.Nil(t, err)
+	require.NotEmpty(t, objs)
 
 	actual, err := getYAMLString(objs)
 	require.Nil(t, err)
@@ -518,6 +518,36 @@ func TestGetDriverAppNameRHCOS(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestVGPUHostManagerDaemonset(t *testing.T) {
+	const (
+		testName = "driver-vgpu-host-manager"
+	)
+	state, err := NewStateDriver(nil, nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.DriverType = nvidiav1alpha1.VGPUHostManager
+	renderData.Driver.Name = "nvidia-vgpu-manager-ubuntu22.04"
+	renderData.Driver.AppName = "nvidia-vgpu-manager-ubuntu22.04-7c6d7bd86b"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/vgpu-manager:525.85.03-ubuntu22.04"
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
 	ds := &appsv1.DaemonSet{}
 
@@ -550,6 +580,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				StartupProbe:   getDefaultContainerProbeSpec(),
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
+				DriverType:     nvidiav1alpha1.GPU,
 			},
 			AppName:          "nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b",
 			Name:             "nvidia-gpu-driver-ubuntu22.04",

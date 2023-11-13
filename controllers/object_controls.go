@@ -3483,14 +3483,13 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 
 	for _, ds := range list.Items {
 		ds := ds
-		// filter out DaemonSets which are not the NVIDIA driver
-		if !strings.HasPrefix(ds.Name, commonDriverDaemonsetName) {
-			continue
-		}
-		n.rec.Log.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
-		err = n.rec.Client.Delete(ctx, &ds)
-		if err != nil {
-			return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
+		// filter out DaemonSets which are not the NVIDIA driver/vgpu-manager
+		if strings.HasPrefix(ds.Name, commonDriverDaemonsetName) || strings.HasPrefix(ds.Name, commonVGPUManagerDaemonsetName) {
+			n.rec.Log.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
+			err = n.rec.Client.Delete(ctx, &ds)
+			if err != nil {
+				return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
+			}
 		}
 	}
 

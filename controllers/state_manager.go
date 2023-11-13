@@ -951,7 +951,7 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	//   - In object_controls.go, check the OwnerRef for existing objects
 	//     before managing them. Clusterpolicy controller should not be creating /
 	//     updating / deleting objects owned by another controller.
-	if n.stateNames[n.idx] == "state-driver" &&
+	if (n.stateNames[n.idx] == "state-driver" || n.stateNames[n.idx] == "state-vgpu-manager") &&
 		n.singleton.Spec.Driver.UseNvdiaDriverCRDType() {
 		n.rec.Log.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++

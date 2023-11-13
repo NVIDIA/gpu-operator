@@ -50,7 +50,7 @@ const (
 	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
 	// VGPULicensingFileName is the vGPU licensing configuration filename
 	VGPULicensingFileName = "gridd.conf"
-	// NLSClientTokenMountPath inidicates the target mount path for NLS client config token file (.tok)
+	// NLSClientTokenMountPath indicates the target mount path for NLS client config token file (.tok)
 	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
 	// NLSClientTokenFileName is the NLS client config token filename
 	NLSClientTokenFileName = "client_configuration_token.tok"
