@@ -44,6 +44,15 @@ OUT_IMAGE_VERSION ?= $(VERSION)
 OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
+# Below are variables used when building OLM bundles in CI/CD.
+# We replace the operator / validator images used in the bundle
+# with staging images built in the respective pipelines.
+OPERATOR_IMAGE=nvcr.io/nvidia/gpu-operator
+VALIDATOR_IMAGE=nvcr.io/nvidia/cloud-native/gpu-operator-validator
+STAGING_OPERATOR_IMAGE ?= ""
+STAGING_VALIDATOR_IMAGE ?= ""
+CSV_FILEPATH=./bundle/${VERSION}/manifests/*clusterserviceversion*
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -141,8 +150,21 @@ bundle: manifests kustomize
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
+# When building the OLM bundle image in CI, replace gpu-operator / validator images with staging tags
+.update-bundle-image-paths:
+	@if [ -n $(STAGING_OPERATOR_IMAGE) ]; then \
+		sed -i "s#${OPERATOR_IMAGE}:[^\"]*#${STAGING_OPERATOR_IMAGE}#g" ${CSV_FILEPATH}; \
+		sed -i "s#${OPERATOR_IMAGE}@sha256:[^\"]*#${STAGING_OPERATOR_IMAGE}#g" ${CSV_FILEPATH}; \
+	fi \
+
+	@if [ -n $(STAGING_VALIDATOR_IMAGE) ]; then \
+		sed -i "s#${VALIDATOR_IMAGE}:[^\"]*#${STAGING_VALIDATOR_IMAGE}#g" ${CSV_FILEPATH}; \
+		sed -i "s#${VALIDATOR_IMAGE}@sha256:[^\"]*#${STAGING_VALIDATOR_IMAGE}#g" ${CSV_FILEPATH}; \
+	fi
+
+
 # Build the bundle image.
-build-bundle-image:
+build-bundle-image: .update-bundle-image-paths
 	$(DOCKER) build \
 	--build-arg VERSION=$(VERSION) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \

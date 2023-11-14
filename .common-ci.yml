@@ -224,5 +224,8 @@ release:gpu-operator-bundle-image:
     VERSION: ""
     DEFAULT_CHANNEL: "stable"
     CHANNELS: "stable"
+    # Use staging operator/validator image tags in the OLM bundle
+    STAGING_OPERATOR_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator:${CI_COMMIT_BRANCH}-latest"
+    STAGING_VALIDATOR_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator:${CI_COMMIT_BRANCH}-latest"
   rules:
     - if: $CI_COMMIT_BRANCH
