@@ -237,7 +237,8 @@ validate-helm-values: cmds
 
 COVERAGE_FILE := coverage.out
 unit-test: build
-	go test -v -coverprofile=$(COVERAGE_FILE) $(MODULE)/...
+	go list -f {{.Dir}} $(MODULE)/... | grep -v /tests/e2e \
+		| xargs go test -v -coverprofile=$(COVERAGE_FILE)
 
 coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
