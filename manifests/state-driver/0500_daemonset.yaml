@@ -412,6 +412,14 @@ spec:
           - name: shared-nvidia-driver-toolkit
             mountPath: /mnt/shared-nvidia-driver-toolkit
         {{- end}}
+        {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+        {{- range .AdditionalConfigs.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            subPath: {{ .SubPath }}
+            readOnly: {{ .ReadOnly }}
+        {{- end }}
+        {{- end }}
         startupProbe:
           exec:
             command:

@@ -2455,16 +2455,18 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			return fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
 		}
 
+		gdsContainer := obj.Spec.Template.Spec.Containers[i]
+
 		// update nvidia-fs(sidecar) image and pull policy
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
 		if err != nil {
 			return err
 		}
 		if gdsImage != "" {
-			obj.Spec.Template.Spec.Containers[i].Image = gdsImage
+			gdsContainer.Image = gdsImage
 		}
 		if config.GPUDirectStorage.ImagePullPolicy != "" {
-			obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUDirectStorage.ImagePullPolicy)
+			gdsContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUDirectStorage.ImagePullPolicy)
 		}
 
 		// set image pull secrets
@@ -2475,8 +2477,35 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		// set/append environment variables for GDS container
 		if len(config.GPUDirectStorage.Env) > 0 {
 			for _, env := range config.GPUDirectStorage.Env {
-				setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
+				setContainerEnv(&(gdsContainer), env.Name, env.Value)
 			}
+		}
+
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
+			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
+			// Only add a VolumeMount for nvidia-fs-ctr.
+			destinationDir, err := getRepoConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
+			}
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom package repo config: %w", err)
+			}
+			gdsContainer.VolumeMounts = append(gdsContainer.VolumeMounts, volumeMounts...)
+		}
+
+		// set any custom ssl key/certificate configuration provided
+		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
+			destinationDir, err := getCertConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
+			}
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+			}
+			gdsContainer.VolumeMounts = append(gdsContainer.VolumeMounts, volumeMounts...)
 		}
 
 		// transform the nvidia-fs-ctr to use the openshift driver toolkit
