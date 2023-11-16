@@ -200,21 +200,21 @@ spec:
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:b4517810f2884f345b4f2323e83e41d28f54cdc6e2caf0690bb7ed4f3947dbcc
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:07d5735e4d87c25c9e53cb68bdb231d97290de835fdf0d055e4f51cd70396800
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:d33ae90051cce4f32ee34faf2328832343c6065d808baf62fd38fd4c6bb5ab13
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:d7be3873992d23e15f2995d94be20b8f24c70d02fd0d50ad3839fec81559ed4b
     - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:dc7053f25163279e53b8db2419c11bea2dfee00ac8a6c6287716b88271e01f50
+      image: nvcr.io/nvidia/cuda@sha256:2e6ef1722d56a3390d037fe0770a0b8b9d8851e44ad870d650ed8b602df599dd
     - name: gpu-operator-validator-image
       image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:c3fc8ab2d39d970e3d1a1b0ef16b06792d23cc87be68ed4927c7384ddd1f43cb
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:a360ed5b1335436ef61cd601fa776e6d03f15f76aeaa8d88bd1506edd93843dc
     - name: vfio-manager-image
-      image: nvcr.io/nvidia/cuda@sha256:dc7053f25163279e53b8db2419c11bea2dfee00ac8a6c6287716b88271e01f50
+      image: nvcr.io/nvidia/cuda@sha256:2e6ef1722d56a3390d037fe0770a0b8b9d8851e44ad870d650ed8b602df599dd
     - name: sandbox-device-plugin-image
-      image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:1f2c9317858169d78638c2a7a4c0afa7a4e25cf5883bbbb7a79ee77fc6c832f9
+      image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:387021553dfb16aab633228d42f63f04fa932b4f46add07527f296dfe97e5148
     - name: vgpu-device-manager-image
       image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:925f4a47710e4318ed457930f5406174c1f6d28b1bf6b1bc310687fec0fde712
   customresourcedefinitions:
@@ -904,7 +904,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:698e602773287c649b7ef329dca3fcfb9ce8f86580c282fb5718d8ceeed3d693"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:07d5735e4d87c25c9e53cb68bdb231d97290de835fdf0d055e4f51cd70396800"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:d33ae90051cce4f32ee34faf2328832343c6065d808baf62fd38fd4c6bb5ab13"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:7c2df95df9ed4d16ad3b3c84079ccdd161f3639527ac1d90b106217f9f0a3aad"
                   - name: "DRIVER_IMAGE-525"
@@ -916,11 +916,11 @@ spec:
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:d7be3873992d23e15f2995d94be20b8f24c70d02fd0d50ad3839fec81559ed4b"
                   - name: "CUDA_BASE_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:dc7053f25163279e53b8db2419c11bea2dfee00ac8a6c6287716b88271e01f50"
+                    value: "nvcr.io/nvidia/cuda@sha256:2e6ef1722d56a3390d037fe0770a0b8b9d8851e44ad870d650ed8b602df599dd"
                   - name: "VFIO_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:dc7053f25163279e53b8db2419c11bea2dfee00ac8a6c6287716b88271e01f50"
+                    value: "nvcr.io/nvidia/cuda@sha256:2e6ef1722d56a3390d037fe0770a0b8b9d8851e44ad870d650ed8b602df599dd"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:1f2c9317858169d78638c2a7a4c0afa7a4e25cf5883bbbb7a79ee77fc6c832f9"
+                    value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:387021553dfb16aab633228d42f63f04fa932b4f46add07527f296dfe97e5148"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:925f4a47710e4318ed457930f5406174c1f6d28b1bf6b1bc310687fec0fde712"
               terminationGracePeriodSeconds: 10

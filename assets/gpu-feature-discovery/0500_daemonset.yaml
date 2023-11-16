@@ -73,8 +73,9 @@ spec:
           volumeMounts:
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
-            - name: dmi-product-name
-              mountPath: "/sys/class/dmi/id/product_name"
+            - name: dmi-info-dir
+              mountPath: "/sys/class/dmi/id"
+              readOnly: true
           securityContext:
             privileged: true
         - image: "FILLED BY THE OPERATOR"
@@ -109,9 +110,9 @@ spec:
         - name: output-dir
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/features.d"
-        - name: dmi-product-name
+        - name: dmi-info-dir
           hostPath:
-            path: "/sys/class/dmi/id/product_name"
+            path: "/sys/class/dmi/id"
         - name: run-nvidia
           hostPath:
             path: "/run/nvidia"
