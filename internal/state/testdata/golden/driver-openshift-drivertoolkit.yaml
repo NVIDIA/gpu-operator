@@ -276,6 +276,8 @@ spec:
           name: run-mellanox-drivers
         - mountPath: /sys/module/firmware_class/parameters/path
           name: firmware-search-path
+        - mountPath: /sys/devices/system/memory/auto_online_blocks
+          name: sysfs-memory-online
         - mountPath: /lib/firmware
           name: nv-firmware
         - mountPath: /mnt/shared-nvidia-driver-toolkit
@@ -408,8 +410,10 @@ spec:
         name: host-sys
       - hostPath:
           path: /sys/module/firmware_class/parameters/path
-          type: FileOrCreate
         name: firmware-search-path
+      - hostPath:
+          path: /sys/devices/system/memory/auto_online_blocks
+        name: sysfs-memory-online
       - hostPath:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate

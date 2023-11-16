@@ -275,6 +275,8 @@ spec:
             mountPropagation: HostToContainer
           - name: firmware-search-path
             mountPath: /sys/module/firmware_class/parameters/path
+          - name: sysfs-memory-online
+            mountPath: /sys/devices/system/memory/auto_online_blocks
           - name: nv-firmware
             mountPath: /lib/firmware
           {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
@@ -529,7 +531,9 @@ spec:
         - name: firmware-search-path
           hostPath:
             path: /sys/module/firmware_class/parameters/path
-            type: FileOrCreate
+        - name: sysfs-memory-online
+          hostPath:
+            path: /sys/devices/system/memory/auto_online_blocks
         - name: nv-firmware
           hostPath:
             path: /run/nvidia/driver/lib/firmware
