@@ -28,11 +28,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
+	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

@@ -14,6 +14,13 @@ github.com/Masterminds/semver/v3
 # github.com/Masterminds/sprig/v3 v3.2.3
 ## explicit; go 1.13
 github.com/Masterminds/sprig/v3
+# github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d
+## explicit; go 1.20
+github.com/NVIDIA/go-nvlib/pkg/nvmdev
+github.com/NVIDIA/go-nvlib/pkg/nvpci
+github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
+github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
+github.com/NVIDIA/go-nvlib/pkg/pciids
 # github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 ## explicit; go 1.20
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
@@ -22,7 +29,7 @@ github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
-# github.com/NVIDIA/nvidia-container-toolkit v1.14.2
+# github.com/NVIDIA/nvidia-container-toolkit v1.14.4-0.20231120112525-f6e3593a726a
 ## explicit; go 1.20
 github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/info/proc/devices
@@ -356,13 +363,6 @@ github.com/xlab/treeprint
 # github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673
 ## explicit
 github.com/xrash/smetrics
-# gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230929182546-8ff02ffd5bb4
-## explicit; go 1.20
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvmdev
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/mmio
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/pciids
 # go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
 ## explicit; go 1.13
 go.starlark.net/internal/compile
