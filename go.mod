@@ -4,9 +4,10 @@ go 1.21
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
+	github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe
-	github.com/NVIDIA/nvidia-container-toolkit v1.14.2
+	github.com/NVIDIA/nvidia-container-toolkit v1.14.4-0.20231120112525-f6e3593a726a
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
 	github.com/mitchellh/hashstructure v1.1.0
@@ -21,7 +22,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
-	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230929182546-8ff02ffd5bb4
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.12.0
 	k8s.io/api v0.27.2

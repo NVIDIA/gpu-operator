@@ -18,10 +18,11 @@ package nvmdev
 
 import (
 	"fmt"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes"
 	"os"
 	"path/filepath"
+
+	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
+	"github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes"
 )
 
 // MockNvmdev mock mdev device

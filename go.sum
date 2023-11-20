@@ -10,12 +10,14 @@ github.com/Masterminds/semver/v3 v3.2.0 h1:3MEsd0SM6jqZojhjLWWeBY+Kcjy9i6MQAeY7Y
 github.com/Masterminds/semver/v3 v3.2.0/go.mod h1:qvl/7zhW3nngYb5+80sSMF+FG2BjYrf8m9wsX0PNOMQ=
 github.com/Masterminds/sprig/v3 v3.2.3 h1:eL2fZNezLomi0uOLqjQoN6BfsDD+fyLtgbJMAj9n6YA=
 github.com/Masterminds/sprig/v3 v3.2.3/go.mod h1:rXcFaZ2zZbLRJv/xSysmlgIM1u11eBaRMhvYXJNkGuM=
+github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d h1:XxRHS7eNkZVcPpZZmUcoT4oO8FEcoYKn06sooQh5niU=
+github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d/go.mod h1:HPFNPAYqQeoos58MKUboWsdZMu71EzSQrbmd+QBRD40=
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a h1:3nyTp1cXzZMHoUuhMwHdz9QDzl100ECvIDYFxdjWk6o=
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a/go.mod h1:K7HCLTndSwBEZwBu6sU7daVeryV1Qt/DtKH8nONJj4o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe h1:8HlU+Vj9JsKRsyI39BLlv0cGPa5dE15PDy7XrPsMQYE=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe/go.mod h1:o7UeOk3V0xlOX87NnSaGNDje23VKCKPdfN6aSIZ9BwM=
-github.com/NVIDIA/nvidia-container-toolkit v1.14.2 h1:63Xn9Qzp4JhbDU5x6y/h93kwyKGfzAcyVN1B+o4JRAU=
-github.com/NVIDIA/nvidia-container-toolkit v1.14.2/go.mod h1:/4gu9BaABwXw/4iWY2oVpGbtd1X9uRDwegwnf1jN5Hw=
+github.com/NVIDIA/nvidia-container-toolkit v1.14.4-0.20231120112525-f6e3593a726a h1:WCIh4hzRaFh0/A/FZsHgz4uAz6sxqt0njZfU+HUGG8s=
+github.com/NVIDIA/nvidia-container-toolkit v1.14.4-0.20231120112525-f6e3593a726a/go.mod h1:yd+UnaIUSX3vjLVfewaDQ+R7XrgG38+hMZZXrygK3w0=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
@@ -242,8 +244,6 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230929182546-8ff02ffd5bb4 h1:iA5dwlSFdUaG9x/M5Jdt/823bJTCUE2hEZ1mcOTmjno=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230929182546-8ff02ffd5bb4/go.mod h1:IYJpTTMpaedko3AA7a3rV578q9SDxhSa8E5FvnPC/M0=
 go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 h1:+FNtrFTmVw0YZGpBGX56XDee331t6JAXeK2bcyhLOOc=
 go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5/go.mod h1:nmDLcffg48OtT/PSW0Hg7FvpRQsQh5OSqIylirxKC7o=
 go.uber.org/atomic v1.7.0 h1:ADUqmZGgLDDfbSL9ZmPxKTybcoEYHgpYfELNoN+7hsw=

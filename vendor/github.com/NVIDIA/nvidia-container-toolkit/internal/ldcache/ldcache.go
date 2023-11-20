@@ -81,6 +81,8 @@ type entry2 struct {
 }
 
 // LDCache represents the interface for performing lookups into the LDCache
+//
+//go:generate moq -out ldcache_mock.go . LDCache
 type LDCache interface {
 	List() ([]string, []string)
 	Lookup(...string) ([]string, []string)
@@ -103,7 +105,14 @@ func New(logger logger.Interface, root string) (LDCache, error) {
 
 	logger.Debugf("Opening ld.conf at %v", path)
 	f, err := os.Open(path)
-	if err != nil {
+	if os.IsNotExist(err) {
+		logger.Warningf("Could not find ld.so.cache at %v; creating empty cache", path)
+		e := &empty{
+			logger: logger,
+			path:   path,
+		}
+		return e, nil
+	} else if err != nil {
 		return nil, err
 	}
 	defer f.Close()
@@ -234,7 +243,7 @@ func (c *ldcache) getEntries(selected func(string) bool) []entry {
 	return entries
 }
 
-// List creates a list of libraires in the ldcache.
+// List creates a list of libraries in the ldcache.
 // The 32-bit and 64-bit libraries are returned separately.
 func (c *ldcache) List() ([]string, []string) {
 	all := func(s string) bool { return true }
@@ -287,7 +296,7 @@ func (c *ldcache) resolveSelected(selected func(string) bool) ([]string, []strin
 func (c *ldcache) resolve(target string) (string, error) {
 	name := filepath.Join(c.root, target)
 
-	c.logger.Debugf("checking %v", string(name))
+	c.logger.Debugf("checking %v", name)
 
 	link, err := symlinks.Resolve(name)
 	if err != nil {
