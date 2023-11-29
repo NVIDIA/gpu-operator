@@ -16,9 +16,6 @@ linters:
     - unconvert
 
 linters-settings:
-  gocritic:
-    disabled-checks:
-      - ifElseChain
   goimports:
     local-prefixes: github.com/NVIDIA/gpu-operator
   gosec:

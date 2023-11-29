@@ -585,13 +585,14 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
 	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
 	var runtime gpuv1.Runtime
-	if strings.HasPrefix(runtimeVer, "docker") {
+	switch {
+	case strings.HasPrefix(runtimeVer, "docker"):
 		runtime = gpuv1.Docker
-	} else if strings.HasPrefix(runtimeVer, "containerd") {
+	case strings.HasPrefix(runtimeVer, "containerd"):
 		runtime = gpuv1.Containerd
-	} else if strings.HasPrefix(runtimeVer, "cri-o") {
+	case strings.HasPrefix(runtimeVer, "cri-o"):
 		runtime = gpuv1.CRIO
-	} else {
+	default:
 		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
 	}
 	return runtime, nil
