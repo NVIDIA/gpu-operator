@@ -1138,13 +1138,15 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	sourceConfigFileName := path.Base(runtimeConfigFile)
 
 	var configEnvvarName string
-	if runtime == gpuv1.Containerd.String() {
+	switch runtime {
+	case gpuv1.Containerd.String():
 		configEnvvarName = "CONTAINERD_CONFIG"
-	} else if runtime == gpuv1.Docker.String() {
+	case gpuv1.Docker.String():
 		configEnvvarName = "DOCKER_CONFIG"
-	} else if runtime == gpuv1.CRIO.String() {
+	case gpuv1.CRIO.String():
 		configEnvvarName = "CRIO_CONFIG"
 	}
+
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), configEnvvarName, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
@@ -3715,11 +3717,12 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 				"Name", name, "Label", ocpDriverToolkitVersionLabel,
 			)
 		} else {
-			if !clusterOk {
+			switch {
+			case !clusterOk:
 				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version NOT part of the cluster",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
-			} else if clusterHasRhcosVersion {
+			case clusterHasRhcosVersion:
 				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version is part of the cluster, keep it.",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
@@ -3728,7 +3731,7 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 				// keep it alive
 
 				continue
-			} else /* clusterHasRhcosVersion == false */ {
+			default: /* clusterHasRhcosVersion == false */
 				// currently unexpected
 				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version marked for deletion",
 					"Name", name, "RHCOS version", dsRhcosVersion,
@@ -3790,7 +3793,8 @@ func (n ClusterPolicyController) cleanupUnusedVGPUManagerDaemonsets(ctx context.
 func (n ClusterPolicyController) cleanupUnusedDriverDaemonSets(ctx context.Context) (int, error) {
 	podCount := 0
 	if n.openshift != "" {
-		if n.singleton.Spec.Driver.UsePrecompiledDrivers() {
+		switch {
+		case n.singleton.Spec.Driver.UsePrecompiledDrivers():
 			// cleanup DTK daemonsets
 			count, err := n.cleanupDriverDaemonsets(ctx,
 				ocpDriverToolkitIdentificationLabel,
@@ -3807,7 +3811,8 @@ func (n ClusterPolicyController) cleanupUnusedDriverDaemonSets(ctx context.Conte
 				return 0, err
 			}
 			podCount += count
-		} else if n.ocpDriverToolkit.enabled {
+
+		case n.ocpDriverToolkit.enabled:
 			// cleanup pre-compiled and legacy driver daemonsets
 			count, err := n.cleanupDriverDaemonsets(ctx,
 				appLabelKey,
@@ -3816,7 +3821,7 @@ func (n ClusterPolicyController) cleanupUnusedDriverDaemonSets(ctx context.Conte
 				return 0, err
 			}
 			podCount = count
-		} else {
+		default:
 			// cleanup pre-compiled
 			count, err := n.cleanupDriverDaemonsets(ctx,
 				precompiledIdentificationLabelKey,
