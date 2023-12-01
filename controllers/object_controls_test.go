@@ -941,3 +941,71 @@ func TestSandboxDevicePluginAssets(t *testing.T) {
 		t.Errorf("error creating resources: %v", err)
 	}
 }
+
+func TestIsOpenKernelModulesRequired(t *testing.T) {
+	enable := true
+	disable := false
+	testCases := []struct {
+		description string
+		gds         *gpuv1.GPUDirectStorageSpec
+		output      bool
+	}{
+		{
+			"gds-disabled",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &disable, Version: "v2.14.5"},
+			false,
+		},
+		{
+			"digest",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c"},
+			true,
+		},
+		{
+			"lower",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "v2.14.5"},
+			false,
+		},
+		{
+			"equal",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "v2.17.5"},
+			true,
+		},
+		{
+			"greater",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "v2.17.6"},
+			true,
+		},
+		{
+			"major-bump",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "v3.1.0"},
+			true,
+		},
+		{
+			"non-semver",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "2.14.5"},
+			false,
+		},
+		{
+			"non-semver-greater",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "2.17.6"},
+			true,
+		},
+		{
+			"lower-beta",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "2.14.6-beta"},
+			false,
+		},
+		{
+			"greater-beta",
+			&gpuv1.GPUDirectStorageSpec{Enabled: &enable, Version: "2.17.6-beta"},
+			true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			isOpenRMRequired := tc.gds.IsOpenKernelModulesRequired()
+			require.Equal(t, tc.output, isOpenRMRequired, "Incorrect status from IsOpenKernelModulesRequired() for GDS driver")
+		})
+	}
+}

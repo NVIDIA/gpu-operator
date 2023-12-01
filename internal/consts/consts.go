@@ -61,4 +61,7 @@ const (
 
 	// NVIDIADriverControllerIndexKey provides quick lookups for DaemonSets owned by an NVIDIADriver instance
 	NVIDIADriverControllerIndexKey = "metadata.nvidiadriver.controller"
+
+	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
+	MinimumGDSVersionForOpenRM = "v2.17.5"
 )
