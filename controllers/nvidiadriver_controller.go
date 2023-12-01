@@ -157,6 +157,17 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	if instance.Spec.IsGDSEnabled() && instance.Spec.IsOpenKernelModulesRequired() && !instance.Spec.IsOpenKernelModulesEnabled() {
+		err = fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'useOpenKernelModules=true' to enable OpenRM mode", instance.Spec.GPUDirectStorage.Version)
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		instance.Status.State = nvidiav1alpha1.NotReady
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
