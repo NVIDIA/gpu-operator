@@ -89,11 +89,11 @@ VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
 # Build gpu-operator binary
 gpu-operator:
 	CGO_ENABLED=0 GOOS=$(GOOS) \
-		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator main.go
+		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator ./cmd/gpu-operator/...
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate check manifests
-	go run ./main.go
+	go run ./cmd/gpu-operator/...
 
 # Install CRDs into a cluster
 install: manifests kustomize
