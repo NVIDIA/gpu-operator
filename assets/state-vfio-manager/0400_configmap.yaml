@@ -28,9 +28,12 @@ data:
         local gpu=$1
         local existing_driver_name
         local existing_driver
+
         [ -e "/sys/bus/pci/devices/$gpu/driver" ] || return 0
+
         existing_driver=$(readlink -f "/sys/bus/pci/devices/$gpu/driver")
         existing_driver_name=$(basename "$existing_driver")
+
         echo "unbinding device $gpu from driver $existing_driver_name"
         echo "$gpu" > "$existing_driver/unbind"
         echo > /sys/bus/pci/devices/$gpu/driver_override
@@ -41,14 +44,26 @@ data:
         local gpu=$1
         local existing_driver_name
         local existing_driver
+
         [ -e "/sys/bus/pci/devices/$gpu/driver" ] || return 0
+
         existing_driver=$(readlink -f "/sys/bus/pci/devices/$gpu/driver")
         existing_driver_name=$(basename "$existing_driver")
+
         # return if bound to vfio-pci
         [ "$existing_driver_name" != "vfio-pci" ] || return 0
         echo "unbinding device $gpu from driver $existing_driver_name"
         echo "$gpu" > "$existing_driver/unbind"
         echo > /sys/bus/pci/devices/$gpu/driver_override
+    }
+
+    is_nvidia_gpu_device() {
+        local gpu=$1
+        # make sure device class is for NVIDIA GPU
+        device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
+        device_class=$(cat "$device_class_file")
+        [ "$device_class" == "0x030200" ] || [ "$device_class" == "0x030000" ] || return 1
+        return 0
     }
 
     is_bound_to_vfio() {
@@ -70,9 +85,13 @@ data:
         return 0
     }
 
-
     unbind_device() {
         local gpu=$1
+
+        if ! is_nvidia_gpu_device $gpu; then
+            return 0
+        fi
+
         echo "unbinding device $gpu"
         unbind_from_driver $gpu
     }
@@ -89,6 +108,11 @@ data:
 
     bind_device() {
         local gpu=$1
+
+        if ! is_nvidia_gpu_device $gpu; then
+            return 0
+        fi
+
         if ! is_bound_to_vfio $gpu; then
           unbind_from_other_driver $gpu
           echo "binding device $gpu"
