@@ -24,7 +24,6 @@ import (
 	"golang.org/x/mod/semver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -954,14 +953,14 @@ func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error
 				MountPath: TrustedCABundleMountDir,
 			})
 		podSpec.Volumes = append(podSpec.Volumes,
-			v1.Volume{
+			corev1.Volume{
 				Name: TrustedCAConfigMapName,
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: v1.LocalObjectReference{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: TrustedCAConfigMapName,
 						},
-						Items: []v1.KeyToPath{
+						Items: []corev1.KeyToPath{
 							{
 								Key:  TrustedCABundleFileName,
 								Path: TrustedCACertificate,
@@ -1019,8 +1018,8 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 }
 
 // get proxy env variables from cluster wide proxy in OCP
-func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
-	envVars := []v1.EnvVar{}
+func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
+	envVars := []corev1.EnvVar{}
 	if proxyConfig == nil {
 		return envVars
 	}
@@ -1041,11 +1040,11 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []v1.EnvVar {
 		if len(v) == 0 {
 			continue
 		}
-		upperCaseEnvvar := v1.EnvVar{
+		upperCaseEnvvar := corev1.EnvVar{
 			Name:  strings.ToUpper(e),
 			Value: v,
 		}
-		lowerCaseEnvvar := v1.EnvVar{
+		lowerCaseEnvvar := corev1.EnvVar{
 			Name:  strings.ToLower(e),
 			Value: v,
 		}
@@ -1405,7 +1404,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 
-	initContainer := v1.Container{}
+	initContainer := corev1.Container{}
 	if initImage != "" {
 		initContainer.Image = initImage
 	}
@@ -2548,7 +2547,7 @@ func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, config *gpuv1.Cl
 func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, mainContainerName string) error {
 	var err error
 
-	getContainer := func(name string, remove bool) (*v1.Container, error) {
+	getContainer := func(name string, remove bool) (*corev1.Container, error) {
 		for i, container := range obj.Spec.Template.Spec.Containers {
 			if container.Name != name {
 				continue
@@ -2581,7 +2580,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* find the main container and driver-toolkit sidecar container */
-	var mainContainer, driverToolkitContainer *v1.Container
+	var mainContainer, driverToolkitContainer *corev1.Container
 	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
 		return err
 	}
@@ -3199,15 +3198,15 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 	return nil
 }
 
-func addPullSecrets(podSpec *v1.PodSpec, secrets []string) {
+func addPullSecrets(podSpec *corev1.PodSpec, secrets []string) {
 	for _, secret := range secrets {
 		if !containsSecret(podSpec.ImagePullSecrets, secret) {
-			podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 	}
 }
 
-func containsSecret(secrets []v1.LocalObjectReference, secretName string) bool {
+func containsSecret(secrets []corev1.LocalObjectReference, secretName string) bool {
 	for _, s := range secrets {
 		if s.Name == secretName {
 			return true
@@ -3470,7 +3469,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 // With OpenShift DriverToolkit, we need to ensure that this secret is
 // populated, otherwise, the Pod won't have the credentials to access
 // the DriverToolkit image in the cluster registry.
-func serviceAccountHasDockerCfg(obj *v1.ServiceAccount, n ClusterPolicyController) (bool, error) {
+func serviceAccountHasDockerCfg(obj *corev1.ServiceAccount, n ClusterPolicyController) (bool, error) {
 	ctx := n.ctx
 	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name)
 

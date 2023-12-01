@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,8 +72,8 @@ func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alph
 }
 
 // getNVIDIADriverSelectedNodes returns selected nodes based on the nodeselector labels set for a given NVIDIADriver instance
-func (nsv *nodeSelectorValidator) getNVIDIADriverSelectedNodes(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) (*v1.NodeList, error) {
-	nodeList := &v1.NodeList{}
+func (nsv *nodeSelectorValidator) getNVIDIADriverSelectedNodes(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) (*corev1.NodeList, error) {
+	nodeList := &corev1.NodeList{}
 
 	if cr.Spec.NodeSelector == nil {
 		cr.Spec.NodeSelector = cr.GetNodeSelector()

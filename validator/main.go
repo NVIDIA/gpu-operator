@@ -34,7 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -953,14 +953,14 @@ func (p *Plugin) runWorkload() error {
 
 	imagePullPolicy := os.Getenv(validatorImagePullPolicyEnvName)
 	if imagePullPolicy != "" {
-		pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
-		pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+		pod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(imagePullPolicy)
+		pod.Spec.InitContainers[0].ImagePullPolicy = corev1.PullPolicy(imagePullPolicy)
 	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
 		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")
 		for _, secret := range pullSecrets {
-			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 	}
 	if os.Getenv(validatorRuntimeClassEnvName) != "" {
@@ -988,7 +988,7 @@ func (p *Plugin) runWorkload() error {
 		return err
 	}
 
-	gpuResource := v1.ResourceList{
+	gpuResource := corev1.ResourceList{
 		resourceName: resource.MustParse("1"),
 	}
 
@@ -1027,7 +1027,7 @@ func (p *Plugin) runWorkload() error {
 	return nil
 }
 
-func setOwnerReference(ctx context.Context, kubeClient kubernetes.Interface, pod *v1.Pod) error {
+func setOwnerReference(ctx context.Context, kubeClient kubernetes.Interface, pod *corev1.Pod) error {
 	// get owner of validator daemonset (which is ClusterPolicy)
 	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
 	if err != nil {
@@ -1039,7 +1039,7 @@ func setOwnerReference(ctx context.Context, kubeClient kubernetes.Interface, pod
 	return nil
 }
 
-func setTolerations(ctx context.Context, kubeClient kubernetes.Interface, pod *v1.Pod) error {
+func setTolerations(ctx context.Context, kubeClient kubernetes.Interface, pod *corev1.Pod) error {
 	// get tolerations of validator daemonset
 	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
 	if err != nil {
@@ -1071,8 +1071,8 @@ func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name strin
 	return fmt.Errorf("gave up waiting for pod %s to be available", name)
 }
 
-func loadPodSpec(podSpecPath string) (*v1.Pod, error) {
-	var pod v1.Pod
+func loadPodSpec(podSpecPath string) (*corev1.Pod, error) {
+	var pod corev1.Pod
 	manifest, err := os.ReadFile(podSpecPath)
 	if err != nil {
 		panic(err)
@@ -1134,7 +1134,7 @@ func (p *Plugin) validateGPUResource() error {
 	return fmt.Errorf("GPU resources are not discovered by the node")
 }
 
-func (p *Plugin) availableMIGResourceName(resources v1.ResourceList) v1.ResourceName {
+func (p *Plugin) availableMIGResourceName(resources corev1.ResourceList) corev1.ResourceName {
 	for resourceName, quantity := range resources {
 		if strings.HasPrefix(string(resourceName), migGPUResourcePrefix) && quantity.Value() >= 1 {
 			log.Debugf("Found MIG GPU resource name %s quantity %d", resourceName, quantity.Value())
@@ -1144,7 +1144,7 @@ func (p *Plugin) availableMIGResourceName(resources v1.ResourceList) v1.Resource
 	return ""
 }
 
-func (p *Plugin) availableGenericResourceName(resources v1.ResourceList) v1.ResourceName {
+func (p *Plugin) availableGenericResourceName(resources corev1.ResourceList) corev1.ResourceName {
 	for resourceName, quantity := range resources {
 		if strings.HasPrefix(string(resourceName), genericGPUResourceType) && quantity.Value() >= 1 {
 			log.Debugf("Found GPU resource name %s quantity %d", resourceName, quantity.Value())
@@ -1154,7 +1154,7 @@ func (p *Plugin) availableGenericResourceName(resources v1.ResourceList) v1.Reso
 	return ""
 }
 
-func (p *Plugin) getGPUResourceName() (v1.ResourceName, error) {
+func (p *Plugin) getGPUResourceName() (corev1.ResourceName, error) {
 	// get node info to check allocatable GPU resources
 	node, err := getNode(p.ctx, p.kubeClient)
 	if err != nil {
@@ -1177,7 +1177,7 @@ func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
 	p.kubeClient = kubeClient
 }
 
-func getNode(ctx context.Context, kubeClient kubernetes.Interface) (*v1.Node, error) {
+func getNode(ctx context.Context, kubeClient kubernetes.Interface) (*corev1.Node, error) {
 	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeNameFlag, meta_v1.GetOptions{})
 	if err != nil {
 		log.Errorf("unable to get node with name %s, err %s", nodeNameFlag, err.Error())
@@ -1242,14 +1242,14 @@ func (c *CUDA) runWorkload() error {
 
 	imagePullPolicy := os.Getenv(validatorImagePullPolicyEnvName)
 	if imagePullPolicy != "" {
-		pod.Spec.Containers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
-		pod.Spec.InitContainers[0].ImagePullPolicy = v1.PullPolicy(imagePullPolicy)
+		pod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(imagePullPolicy)
+		pod.Spec.InitContainers[0].ImagePullPolicy = corev1.PullPolicy(imagePullPolicy)
 	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
 		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")
 		for _, secret := range pullSecrets {
-			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 	}
 	if os.Getenv(validatorRuntimeClassEnvName) != "" {
