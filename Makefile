@@ -200,7 +200,7 @@ check: $(CHECK_TARGETS)
 # Apply go fmt to the codebase
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
-		| xargs gofmt -s -l -w
+		| xargs gofmt -s -l -d
 
 golangci-lint:
 	golangci-lint run ./...
