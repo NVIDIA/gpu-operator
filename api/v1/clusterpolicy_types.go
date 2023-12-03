@@ -21,12 +21,14 @@ import (
 	"os"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -1905,6 +1907,28 @@ func (gds *GPUDirectStorageSpec) IsEnabled() bool {
 		return false
 	}
 	return *gds.Enabled
+}
+
+// IsOpenKernelModulesRequired returns true if NVIDIA OpenRM drivers required in this configuration
+func (gds *GPUDirectStorageSpec) IsOpenKernelModulesRequired() bool {
+	// Add constraints here which require OpenRM drivers
+	if !gds.IsEnabled() {
+		return false
+	}
+
+	// If image digest is provided instead of the version, assume that OpenRM driver is required
+	if strings.HasPrefix(gds.Version, "sha256") {
+		return true
+	}
+
+	gdsVersion := gds.Version
+	if !strings.HasPrefix(gdsVersion, "v") {
+		gdsVersion = fmt.Sprintf("v%s", gdsVersion)
+	}
+	if semver.Compare(gdsVersion, consts.MinimumGDSVersionForOpenRM) >= 0 {
+		return true
+	}
+	return false
 }
 
 // IsEnabled returns true if DCGM hostengine as a separate Pod is enabled through gpu-perator

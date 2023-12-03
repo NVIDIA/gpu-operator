@@ -21,9 +21,11 @@ import (
 	"strings"
 
 	"github.com/regclient/regclient/types/ref"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
 )
 
@@ -525,6 +527,36 @@ func (d *NVIDIADriverSpec) IsGDSEnabled() bool {
 		return false
 	}
 	return *d.GPUDirectStorage.Enabled
+}
+
+// IsOpenKernelModulesEnabled returns true if NVIDIA OpenRM drivers are enabled
+func (d *NVIDIADriverSpec) IsOpenKernelModulesEnabled() bool {
+	if d.UseOpenKernelModules == nil || !*d.UseOpenKernelModules {
+		return false
+	}
+	return true
+}
+
+// IsOpenKernelModulesRequired returns true if NVIDIA OpenRM drivers required in this configuration
+func (d *NVIDIADriverSpec) IsOpenKernelModulesRequired() bool {
+	// Add constraints here which require OpenRM drivers
+	if !d.IsGDSEnabled() {
+		return false
+	}
+
+	// If image digest is provided instead of the version, assume that OpenRM driver is required
+	if strings.HasPrefix(d.GPUDirectStorage.Version, "sha256") {
+		return true
+	}
+
+	gdsVersion := d.GPUDirectStorage.Version
+	if !strings.HasPrefix(gdsVersion, "v") {
+		gdsVersion = fmt.Sprintf("v%s", gdsVersion)
+	}
+	if semver.Compare(gdsVersion, consts.MinimumGDSVersionForOpenRM) >= 0 {
+		return true
+	}
+	return false
 }
 
 // IsVGPULicensingEnabled returns true if the vgpu driver license config is provided

@@ -2479,6 +2479,9 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if config.Driver.UsePrecompiledDrivers() {
 			return fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
 		}
+		if config.GPUDirectStorage.IsOpenKernelModulesRequired() && !config.Driver.OpenKernelModulesEnabled() {
+			return fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'driver.useOpenKernelModules=true' in ClusterPolicy to enable OpenRM mode", config.GPUDirectStorage.Version)
+		}
 
 		// update nvidia-fs(sidecar) image and pull policy
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
