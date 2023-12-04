@@ -202,6 +202,11 @@ fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
 		| xargs gofmt -s -l -d
 
+# Apply goimports -local github.com/NVIDIA/gpu-operator to the codebase
+goimports:
+	find . -name \*.go -not -name "zz_generated.deepcopy.go" -not -path "./vendor/*" \
+ 		-exec goimports -local $(MODULE) -w {} \;
+
 golangci-lint:
 	golangci-lint run ./...
 
