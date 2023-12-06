@@ -75,7 +75,7 @@ operator:
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 12.3.0-base-ubi8
+    version: 12.3.1-base-ubi8
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -183,7 +183,7 @@ driver:
   manager:
     image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
-    version: v0.6.4
+    version: v0.6.5
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -407,7 +407,7 @@ vfioManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: cuda
-  version: 12.3.0-base-ubi8
+  version: 12.3.1-base-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
