@@ -146,7 +146,7 @@ metadata:
             "driverType": "gpu",
             "repository": "nvcr.io/nvidia",
             "image": "driver",
-            "version": "sha256:5fbd2908484d5d8f4927159d4511fabb9740f13c1c9fc2b8698ebba1730f3cd2",
+            "version": "sha256:028cc6cf5944c0df4fbee8fe0f45654c09996ac13b5b37fb803d79ae2d37d378",
             "nodeSelector": {},
             "manager": {},
             "repoConfig": {
