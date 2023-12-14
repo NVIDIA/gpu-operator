@@ -209,15 +209,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
 
-	gdsSpec, err := getGDSSpec(&cr.Spec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct GDS spec: %w", err)
-	}
-
 	gpuDirectRDMASpec := cr.Spec.GPUDirectRDMA
 
 	renderData := &driverRenderData{
-		GDS:           gdsSpec,
 		GPUDirectRDMA: gpuDirectRDMASpec,
 		Runtime:       runtimeSpec,
 	}
@@ -234,7 +228,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		// should have a unique nodeSelector and name.
 		driverSpec, err := getDriverSpec(cr, nodePool)
 		if err != nil {
-			return nil, fmt.Errorf("failed to construct driver spec: %v", err)
+			return nil, fmt.Errorf("failed to construct driver spec: %w", err)
 		}
 		renderData.Driver = driverSpec
 
@@ -244,6 +238,12 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 				SanitizedKernelVersion: getSanitizedKernelVersion(nodePool.kernel),
 			}
 		}
+
+		gdsSpec, err := getGDSSpec(&cr.Spec, nodePool)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct GDS spec: %w", err)
+		}
+		renderData.GDS = gdsSpec
 
 		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {
 			renderData.Openshift = &openshiftSpec{
@@ -530,13 +530,13 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	}, nil
 }
 
-func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec) (*gdsDriverSpec, error) {
+func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDriverSpec, error) {
 	if spec == nil || !spec.IsGDSEnabled() {
 		// note: GDS is optional in the NvidiaDriver CRD
 		return nil, nil
 	}
 	gdsSpec := spec.GPUDirectStorage
-	imagePath, err := image.ImagePath(gdsSpec.Repository, gdsSpec.Image, gdsSpec.Version, "GDS_IMAGE")
+	imagePath, err := gdsSpec.GetImagePath(pool.getOS())
 	if err != nil {
 		return nil, err
 	}
