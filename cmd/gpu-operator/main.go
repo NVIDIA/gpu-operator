@@ -36,6 +36,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 
@@ -88,13 +90,21 @@ func main() {
 
 	ctrl.Log.Info(fmt.Sprintf("version: %s", info.GetVersionString()))
 
+	metricsOptions := metricsserver.Options{
+		BindAddress: metricsAddr,
+	}
+
+	webhookServer := webhook.NewServer(webhook.Options{
+		Port: 9443,
+	})
+
 	options := ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Metrics:                metricsOptions,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "53822513.nvidia.com",
+		WebhookServer:          webhookServer,
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {

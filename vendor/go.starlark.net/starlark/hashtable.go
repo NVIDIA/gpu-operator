@@ -66,16 +66,9 @@ func (ht *hashtable) init(size int) {
 func (ht *hashtable) freeze() {
 	if !ht.frozen {
 		ht.frozen = true
-		for i := range ht.table {
-			for p := &ht.table[i]; p != nil; p = p.next {
-				for i := range p.entries {
-					e := &p.entries[i]
-					if e.hash != 0 {
-						e.key.Freeze()
-						e.value.Freeze()
-					}
-				}
-			}
+		for e := ht.head; e != nil; e = e.next {
+			e.key.Freeze()
+			e.value.Freeze()
 		}
 	}
 }
@@ -162,13 +155,12 @@ func overloaded(elems, buckets int) bool {
 
 func (ht *hashtable) grow() {
 	// Double the number of buckets and rehash.
-	// TODO(adonovan): opt:
-	// - avoid reentrant calls to ht.insert, and specialize it.
-	//   e.g. we know the calls to Equals will return false since
-	//   there are no duplicates among the old keys.
-	// - saving the entire hash in the bucket would avoid the need to
-	//   recompute the hash.
-	// - save the old buckets on a free list.
+	//
+	// Even though this makes reentrant calls to ht.insert,
+	// calls Equals unnecessarily (since there can't be duplicate keys),
+	// and recomputes the hash unnecessarily, the gains from
+	// avoiding these steps were found to be too small to justify
+	// the extra logic: -2% on hashtable benchmark.
 	ht.table = make([]bucket, len(ht.table)<<1)
 	oldhead := ht.head
 	ht.head = nil
@@ -371,6 +363,8 @@ func (it *keyIterator) Done() {
 		it.ht.itercount--
 	}
 }
+
+// TODO(adonovan): use go1.19's maphash.String.
 
 // hashString computes the hash of s.
 func hashString(s string) uint32 {
