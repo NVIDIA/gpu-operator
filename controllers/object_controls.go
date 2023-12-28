@@ -2459,7 +2459,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			return fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'driver.useOpenKernelModules=true' in ClusterPolicy to enable OpenRM mode", config.GPUDirectStorage.Version)
 		}
 
-		gdsContainer := obj.Spec.Template.Spec.Containers[i]
+		gdsContainer := &obj.Spec.Template.Spec.Containers[i]
 
 		// update nvidia-fs(sidecar) image and pull policy
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
@@ -2481,7 +2481,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		// set/append environment variables for GDS container
 		if len(config.GPUDirectStorage.Env) > 0 {
 			for _, env := range config.GPUDirectStorage.Env {
-				setContainerEnv(&(gdsContainer), env.Name, env.Value)
+				setContainerEnv(gdsContainer, env.Name, env.Value)
 			}
 		}
 
