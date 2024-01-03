@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
@@ -125,10 +124,6 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 	if info == nil {
 		return SyncStateError, fmt.Errorf("failed to get ClusterPolicy CR from info catalog")
 	}
-	clusterPolicy, ok := info.(gpuv1.ClusterPolicy)
-	if !ok {
-		return SyncStateError, fmt.Errorf("failed to get ClusterPolicy CR from info catalog")
-	}
 
 	info = infoCatalog.Get(InfoTypeClusterInfo)
 	if info == nil {
@@ -141,7 +136,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
 	}
 
-	objs, err := s.getManifestObjects(ctx, cr, &clusterPolicy, clusterInfo)
+	objs, err := s.getManifestObjects(ctx, cr, clusterInfo)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
@@ -201,7 +196,7 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 	return nil
 }
 
-func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterPolicy *gpuv1.ClusterPolicy, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
+func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
 	runtimeSpec, err := getRuntimeSpec(ctx, s.client, clusterInfo, &cr.Spec)
@@ -217,7 +212,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	if len(runtimeSpec.NodePools) == 0 {
-		return nil, fmt.Errorf("No nodes matching the given node selector for %s", cr.Name)
+		return nil, fmt.Errorf("no nodes matching the given node selector for %s", cr.Name)
 	}
 
 	// Render kubernetes objects for each node pool.
