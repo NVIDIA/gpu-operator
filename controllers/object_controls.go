@@ -871,6 +871,12 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		return err
 	}
 
+	// updated nvidia-gdrcopy sidecar container
+	err = transformGDRCopyContainer(obj, config, n)
+	if err != nil {
+		return err
+	}
+
 	// update/remove OpenShift Driver Toolkit sidecar container
 	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
 	if err != nil {
@@ -2522,6 +2528,85 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	return nil
 }
 
+func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		// skip if not nvidia-gdrcopy
+		if !strings.HasPrefix(container.Name, "nvidia-gdrcopy") {
+			continue
+		}
+		if config.GDRCopy == nil || !config.GDRCopy.IsEnabled() {
+			n.rec.Log.Info("GDRCopy is disabled")
+			// remove nvidia-gdrcopy sidecar container from driver Daemonset if gdrcopy is not enabled
+			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
+			return nil
+		}
+		if config.Driver.UsePrecompiledDrivers() {
+			return fmt.Errorf("GDRCopy is not supported along with pre-compiled NVIDIA drivers")
+		}
+
+		gdrcopyContainer := &obj.Spec.Template.Spec.Containers[i]
+
+		// update nvidia-gdrcopy image and pull policy
+		gdrcopyImage, err := resolveDriverTag(n, config.GDRCopy)
+		if err != nil {
+			return err
+		}
+		if gdrcopyImage != "" {
+			gdrcopyContainer.Image = gdrcopyImage
+		}
+		if config.GDRCopy.ImagePullPolicy != "" {
+			gdrcopyContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.GDRCopy.ImagePullPolicy)
+		}
+
+		// set image pull secrets
+		if len(config.GDRCopy.ImagePullSecrets) > 0 {
+			addPullSecrets(&obj.Spec.Template.Spec, config.GDRCopy.ImagePullSecrets)
+		}
+
+		// set/append environment variables for gdrcopy container
+		if len(config.GDRCopy.Env) > 0 {
+			for _, env := range config.GDRCopy.Env {
+				setContainerEnv(gdrcopyContainer, env.Name, env.Value)
+			}
+		}
+
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
+			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
+			// Only add a VolumeMount for nvidia-gdrcopy-ctr.
+			destinationDir, err := getRepoConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
+			}
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom package repo config: %w", err)
+			}
+			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
+		}
+
+		// set any custom ssl key/certificate configuration provided
+		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
+			destinationDir, err := getCertConfigPath()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
+			}
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+			}
+			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
+		}
+
+		// transform the nvidia-gdrcopy-ctr to use the openshift driver toolkit
+		// notify openshift driver toolkit container that gdrcopy is enabled
+		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-gdrcopy-ctr")
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %w", err)
+		}
+	}
+	return nil
+}
+
 // getSanitizedKernelVersion returns kernelVersion with following changes
 // 1. Remove arch suffix (as we use multi-arch images) and
 // 2. ensure to meet k8s constraints for metadata.name, i.e it
@@ -2617,6 +2702,11 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		n.rec.Log.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDS_ENABLED", config.GPUDirectStorage.IsEnabled())
 	}
 
+	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
+		setContainerEnv(driverToolkitContainer, "GDRCOPY_ENABLED", "true")
+		n.rec.Log.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDRCOPY_ENABLED", "true")
+	}
+
 	image := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
 	if image != "" {
 		driverToolkitContainer.Image = image
@@ -2635,13 +2725,18 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* prepare the main container to start from the DriverToolkit entrypoint */
-	if strings.Contains(mainContainerName, "nvidia-fs") {
+	switch mainContainerName {
+	case "nvidia-fs-ctr":
 		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
 		mainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
-	} else {
+	case "nvidia-gdrcopy-ctr":
+		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		mainContainer.Args = []string{"gdrcopy-ctr-run-with-dtk"}
+	default:
 		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
 		mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
 	}
+
 	/* prepare the shared volumes */
 	// shared directory
 	volSharedDirName, volSharedDirPath := "shared-nvidia-driver-toolkit", "/mnt/shared-nvidia-driver-toolkit"
@@ -2708,6 +2803,12 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 		}
 	case *gpuv1.VGPUManagerSpec:
 		spec := driverSpec.(*gpuv1.VGPUManagerSpec)
+		image, err = gpuv1.ImagePath(spec)
+		if err != nil {
+			return "", err
+		}
+	case *gpuv1.GDRCopySpec:
+		spec := driverSpec.(*gpuv1.GDRCopySpec)
 		image, err = gpuv1.ImagePath(spec)
 		if err != nil {
 			return "", err

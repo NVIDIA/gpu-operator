@@ -618,6 +618,29 @@ spec:
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
   {{- end }}
+  {{- if .Values.gdrcopy }}
+  gdrcopy:
+    enabled: {{ .Values.gdrcopy.enabled | default false }}
+    {{- if .Values.gdrcopy.repository }}
+    repository: {{ .Values.gdrcopy.repository }}
+    {{- end }}
+    {{- if .Values.gdrcopy.image }}
+    image: {{ .Values.gdrcopy.image }}
+    {{- end }}
+    version: {{ .Values.gdrcopy.version | quote }}
+    {{- if .Values.gdrcopy.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.gdrcopy.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.gdrcopy.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.gdrcopy.imagePullSecrets | nindent 8 }}
+    {{- end }}
+    {{- if .Values.gdrcopy.env }}
+    env: {{ toYaml .Values.gdrcopy.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gdrcopy.args }}
+    args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
+    {{- end }}
+  {{- end }}
   sandboxWorkloads:
     enabled: {{ .Values.sandboxWorkloads.enabled }}
     {{- if .Values.sandboxWorkloads.defaultWorkload }}
