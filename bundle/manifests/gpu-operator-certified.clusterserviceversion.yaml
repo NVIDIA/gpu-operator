@@ -133,6 +133,9 @@ metadata:
             },
             "gds": {
               "enabled": false
+            },
+            "gdrcopy": {
+              "enabled": false
             }
           }
         },

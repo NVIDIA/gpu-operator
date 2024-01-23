@@ -371,6 +371,16 @@ gds:
   env: []
   args: []
 
+gdrcopy:
+  enabled: false
+  repository: nvcr.io/nvidia/cloud-native
+  image: gdrdrv
+  version: "v2.4.1"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  args: []
+
 vgpuManager:
   enabled: false
   repository: ""
