@@ -85,6 +85,7 @@ type driverRenderData struct {
 	Driver            *driverSpec
 	GDS               *gdsDriverSpec
 	GPUDirectRDMA     *nvidiav1alpha1.GPUDirectRDMASpec
+	GDRCopy           *gdrcopyDriverSpec
 	Runtime           *driverRuntimeSpec
 	Openshift         *openshiftSpec
 	Precompiled       *precompiledSpec
@@ -239,6 +240,12 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			return nil, fmt.Errorf("failed to construct GDS spec: %w", err)
 		}
 		renderData.GDS = gdsSpec
+
+		gdrcopySpec, err := getGDRCopySpec(&cr.Spec, nodePool)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct GDRCopy spec: %w", err)
+		}
+		renderData.GDRCopy = gdrcopySpec
 
 		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {
 			renderData.Openshift = &openshiftSpec{
@@ -538,6 +545,23 @@ func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDrive
 
 	return &gdsDriverSpec{
 		gdsSpec,
+		imagePath,
+	}, nil
+}
+
+func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrcopyDriverSpec, error) {
+	if spec == nil || !spec.IsGDRCopyEnabled() {
+		// note: GDRCopy is optional in the NvidiaDriver CRD
+		return nil, nil
+	}
+	gdrcopySpec := spec.GDRCopy
+	imagePath, err := gdrcopySpec.GetImagePath(pool.getOS())
+	if err != nil {
+		return nil, err
+	}
+
+	return &gdrcopyDriverSpec{
+		gdrcopySpec,
 		imagePath,
 	}, nil
 }

@@ -93,6 +93,53 @@ spec:
                   - name
                   type: object
                 type: array
+              gdrcopy:
+                description: GDRCopy defines the spec for GDRCopy driver
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled indicates if GDRCopy is enabled through GPU
+                      operator
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: GDRCopy driver image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: GDRCopy diver image repository
+                    type: string
+                  version:
+                    description: GDRCopy driver image tag
+                    type: string
+                type: object
               gds:
                 description: GPUDirectStorage defines the spec for GDS driver
                 properties:

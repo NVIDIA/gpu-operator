@@ -333,3 +333,72 @@ func TestGDSGetImagePath(t *testing.T) {
 		})
 	}
 }
+
+func TestGDRCopyGetImagePath(t *testing.T) {
+	testCases := []struct {
+		description   string
+		spec          *GDRCopySpec
+		osVersion     string
+		errorExpected bool
+		expectedImage string
+	}{
+		{
+			description: "malformed repository",
+			spec: &GDRCopySpec{
+				Repository: "malformed?/repo",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "malformed image",
+			spec: &GDRCopySpec{
+				Image: "malformed?image",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "valid image",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "gdrdrv",
+				Version:    "v2.4.1",
+			},
+			osVersion:     "ubuntu20.04",
+			errorExpected: false,
+			expectedImage: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1-ubuntu20.04",
+		},
+		{
+			description: "only image provided with no tag or digest",
+			spec: &GDRCopySpec{
+				Image: "nvcr.io/nvidia/cloud-native",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "repository, image, and version set; version is a digest",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "gdrdrv",
+				Version:    "sha256:" + testDigest,
+			},
+			osVersion:     "ubuntu22.04",
+			errorExpected: false,
+			expectedImage: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:10d1df8034373061366d4fb17b364b3b28d766b54d5a0b700c1a5a75378cf125",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			image, err := tc.spec.GetImagePath(tc.osVersion)
+			if tc.errorExpected {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, image, tc.expectedImage)
+		})
+	}
+}

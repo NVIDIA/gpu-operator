@@ -324,6 +324,42 @@ func TestDriverGDS(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverGDRCopy(t *testing.T) {
+	const (
+		testName = "driver-gdrcopy"
+	)
+
+	state, err := NewStateDriver(nil, nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+		Spec: &nvidiav1alpha1.GDRCopySpec{
+			Enabled:          utils.BoolPtr(true),
+			ImagePullSecrets: []string{"ngc-secrets"},
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func TestDriverAdditionalConfigs(t *testing.T) {
 	const (
 		testName = "driver-additional-configs"
