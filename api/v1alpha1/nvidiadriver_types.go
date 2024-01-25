@@ -74,6 +74,9 @@ type NVIDIADriverSpec struct {
 	// GPUDirectStorage defines the spec for GDS driver
 	GPUDirectStorage *GPUDirectStorageSpec `json:"gds,omitempty"`
 
+	// GDRCopy defines the spec for GDRCopy driver
+	GDRCopy *GDRCopySpec `json:"gdrcopy,omitempty"`
+
 	// NVIDIA Driver repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -323,6 +326,53 @@ type GPUDirectRDMASpec struct {
 	UseHostMOFED *bool `json:"useHostMofed,omitempty"`
 }
 
+// GDRCopySpec defines the properties for NVIDIA GDRCopy driver deployment
+type GDRCopySpec struct {
+	// Enabled indicates if GDRCopy is enabled through GPU operator
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GDRCopy through GPU operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// GDRCopy diver image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// GDRCopy driver image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// GDRCopy driver image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
 // KernelModuleConfigSpec defines custom configuration parameters for the NVIDIA Driver
 type KernelModuleConfigSpec struct {
 	// +kubebuilder:validation:Optional
@@ -515,6 +565,31 @@ func (d *GPUDirectStorageSpec) GetImagePath(osVersion string) (string, error) {
 	return image, nil
 }
 
+// GetImagePath returns the gdrcopy driver image path given the information
+// provided in GDRCopySpec and the osVersion passed as an argument.
+// The driver image path will be in the following format unless the spec
+// contains a digest.
+// <repository>/<image>:<driver-ver>-<os-ver>
+func (d *GDRCopySpec) GetImagePath(osVersion string) (string, error) {
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to get image path from crd: %w", err)
+	}
+
+	// if image digest is specified, use it directly
+	if !strings.Contains(image, "sha256:") {
+		// append '-<osVersion>' to the driver tag
+		image = fmt.Sprintf("%s-%s", image, osVersion)
+	}
+
+	_, err = ref.New(image)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse driver image path: %w", err)
+	}
+
+	return image, nil
+}
+
 // GetPrecompiledImagePath returns the precompiled driver image path for a
 // given os version and kernel version. Precompiled driver images follow
 // the following format:
@@ -552,6 +627,15 @@ func (d *NVIDIADriverSpec) IsGDSEnabled() bool {
 		return false
 	}
 	return *d.GPUDirectStorage.Enabled
+}
+
+// IsGDRCopyEnabled returns true if GDRCopy is enabled through gpu-operator
+func (d *NVIDIADriverSpec) IsGDRCopyEnabled() bool {
+	if d.GDRCopy == nil || d.GDRCopy.Enabled == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *d.GDRCopy.Enabled
 }
 
 // IsOpenKernelModulesEnabled returns true if NVIDIA OpenRM drivers are enabled

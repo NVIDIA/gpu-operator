@@ -96,7 +96,7 @@ spec:
       serviceAccountName: {{ .Driver.Name }}
       hostPID: true
       # Add any configured pull secrets
-      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) }}
+      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) (and .GDRCopy .GDRCopy.Spec.ImagePullSecrets) }}
       imagePullSecrets:
       {{- range .Driver.Spec.ImagePullSecrets }}
         - name: {{ . }}
@@ -107,6 +107,11 @@ spec:
       {{- if .GDS }}
       {{- range .GDS.Spec.ImagePullSecrets }}
         - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .GDRCopy }}
+      {{- range .GDRCopy.Spec.ImagePullSecrets }}
+      - name: {{ . }}
       {{- end }}
       {{- end }}
       {{- end }}
@@ -435,6 +440,71 @@ spec:
           exec:
             command:
               [sh, -c, 'lsmod | grep nvidia_fs']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      {{- end }}
+      # Note: GDRCopy is not supported along with precompiled drivers.
+      #       Detect this in the controller and throw an error if
+      #       GDRCopy and precompiled are enabled
+      {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+      - image: {{ .GDRCopy.ImagePath }}
+        imagePullPolicy: {{ default "IfNotPresent" .GDRCopy.Spec.ImagePullPolicy }}
+        name: nvidia-gdrcopy-ctr
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        command: ["ocp_dtk_entrypoint"]
+        args: ["gdrcopy-ctr-run-with-dtk"]
+        {{- else }}
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gdrcopy-driver install"]
+        {{- end }}
+        {{- if .GDRCopy.Spec.Env }}
+        env:
+          {{- range .GDRCopy.Spec.Env }}
+          - name: {{ .Name }}
+            value : {{ .Value | quote }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        - name: shared-nvidia-driver-toolkit
+          mountPath: /mnt/shared-nvidia-driver-toolkit
+        {{- end}}
+        {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+        {{- range .AdditionalConfigs.VolumeMounts }}
+        - name: {{ .Name }}
+          mountPath: {{ .MountPath }}
+          subPath: {{ .SubPath }}
+          readOnly: {{ .ReadOnly }}
+        {{- end }}
+        {{- end }}
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
           periodSeconds: 30
           initialDelaySeconds: 30
           failureThreshold: 1

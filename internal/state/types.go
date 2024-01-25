@@ -44,3 +44,10 @@ type gdsDriverSpec struct {
 	Spec      *nvidiav1alpha1.GPUDirectStorageSpec
 	ImagePath string
 }
+
+// gdrcopyDriverSpec is a wrapper of GDRCopySpec with an additional ImagePath field
+// which is to be populated with the fully-qualified image path.
+type gdrcopyDriverSpec struct {
+	Spec      *nvidiav1alpha1.GDRCopySpec
+	ImagePath string
+}
