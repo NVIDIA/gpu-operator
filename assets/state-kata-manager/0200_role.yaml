@@ -13,14 +13,6 @@ rules:
   resourceNames:
   - privileged
 - apiGroups:
-  - policy
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-  resourceNames:
-  - gpu-operator-privileged
-- apiGroups:
   - ""
   resources:
   - secrets
@@ -28,4 +20,3 @@ rules:
   - get
   - watch
   - list
-

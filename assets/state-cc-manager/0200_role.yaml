@@ -12,11 +12,3 @@ rules:
   - use
   resourceNames:
   - privileged
-- apiGroups:
-  - policy
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-  resourceNames:
-  - gpu-operator-privileged

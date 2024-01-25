@@ -698,16 +698,6 @@ spec:
           - list
           - watch
         - apiGroups:
-          - policy
-          resources:
-          - podsecuritypolicies
-          verbs:
-          - create
-          - get
-          - update
-          - list
-          - delete
-        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
@@ -819,16 +809,6 @@ spec:
           - leases
           verbs:
           - '*'
-        - apiGroups:
-          - policy
-          resources:
-          - podsecuritypolicies
-          verbs:
-          - create
-          - get
-          - update
-          - list
-          - delete
         - apiGroups:
           - apiextensions.k8s.io
           resources:

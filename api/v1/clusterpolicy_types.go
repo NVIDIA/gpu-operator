@@ -61,6 +61,7 @@ type ClusterPolicySpec struct {
 	MIG MIGSpec `json:"mig,omitempty"`
 	// MIGManager for configuration to deploy MIG Manager
 	MIGManager MIGManagerSpec `json:"migManager,omitempty"`
+	// Deprecated: Pod Security Policies are no longer supported. Please use PodSecurityAdmission instead
 	// PSP defines spec for handling PodSecurityPolicies
 	PSP PSPSpec `json:"psp,omitempty"`
 	// PSA defines spec for PodSecurityAdmission configuration
@@ -1904,15 +1905,6 @@ func (s *SandboxDevicePluginSpec) IsEnabled() bool {
 		return false
 	}
 	return *s.Enabled
-}
-
-// IsEnabled returns true if PodSecurityPolicies are enabled for all Pods
-func (p *PSPSpec) IsEnabled() bool {
-	if p.Enabled == nil {
-		// PSP is disabled by default
-		return false
-	}
-	return *p.Enabled
 }
 
 // IsEnabled returns true if PodSecurityAdmission configuration is enabled for all gpu-operator pods

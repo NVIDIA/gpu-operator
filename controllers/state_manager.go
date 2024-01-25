@@ -847,8 +847,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.operatorMetrics.openshiftDriverToolkitEnabled.Set(openshiftDriverToolkitDisabled)
 	}
 
-	// retain PSP check for backward compatibility
-	if clusterPolicy.Spec.PSP.IsEnabled() || clusterPolicy.Spec.PSA.IsEnabled() {
+	if clusterPolicy.Spec.PSA.IsEnabled() {
 		// label namespace with Pod Security Admission levels
 		n.rec.Log.Info("Pod Security is enabled. Adding labels to GPU Operator namespace", "namespace", n.operatorNamespace)
 		err := n.setPodSecurityLabelsForNamespace()

@@ -9,10 +9,6 @@ nfd:
   enabled: true
   nodefeaturerules: false
 
-# deprecated: use PodSecurityAdmission (PSA) controls instead
-psp:
-  enabled: false
-
 psa:
   enabled: false
 
