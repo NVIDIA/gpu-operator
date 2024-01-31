@@ -195,7 +195,7 @@ spec:
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:6a05d6a1923fda756aed0dddf7ed23a83c30cf1e6c519fc39dd70c0309ec8257
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:e1514b269bc35c514894aebcd37ef68bf40f89cf2bc4975e983cd29c381049b2
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c235ad04aa3767b843f653b2496087b334a4c3e0a2581c61bf6d2b27580141f3
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:028cc6cf5944c0df4fbee8fe0f45654c09996ac13b5b37fb803d79ae2d37d378
     - name: driver-image-525
@@ -203,7 +203,7 @@ spec:
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:060c1005b09e4e3ba587c21104c22c5c2dceab690356e2097c5671233ad72a61
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:d33ae90051cce4f32ee34faf2328832343c6065d808baf62fd38fd4c6bb5ab13
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:426e5ca488c6fdbfefd3b82e58e4fecc0a9096e51699993098b75d3af572698e
     - name: gpu-feature-discovery-image
       image: nvcr.io/nvidia/gpu-feature-discovery@sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c
     - name: mig-manager-image
@@ -901,13 +901,13 @@ spec:
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:e1514b269bc35c514894aebcd37ef68bf40f89cf2bc4975e983cd29c381049b2"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:c235ad04aa3767b843f653b2496087b334a4c3e0a2581c61bf6d2b27580141f3"
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:6a05d6a1923fda756aed0dddf7ed23a83c30cf1e6c519fc39dd70c0309ec8257"
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:011fb450af3fa2e8fe5d28d590e4c653631447bc23d149591ced3d89089c4f2c"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:d33ae90051cce4f32ee34faf2328832343c6065d808baf62fd38fd4c6bb5ab13"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:426e5ca488c6fdbfefd3b82e58e4fecc0a9096e51699993098b75d3af572698e"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:028cc6cf5944c0df4fbee8fe0f45654c09996ac13b5b37fb803d79ae2d37d378"
                   - name: "DRIVER_IMAGE-525"
