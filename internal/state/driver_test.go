@@ -360,6 +360,62 @@ func TestDriverGDRCopy(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverGDRCopyOpenShift(t *testing.T) {
+	const (
+		testName     = "driver-gdrcopy-openshift"
+		rhcosVersion = "413.92.202304252344-0"
+		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
+	)
+
+	state, err := NewStateDriver(nil, nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
+	renderData.Driver.AppName = "nvidia-gpu-driver-openshift-79d6bd954f"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
+	renderData.Driver.OSVersion = "rhel8.0"
+	renderData.Openshift = &openshiftSpec{
+		ToolkitImage: toolkitImage,
+		RHCOSVersion: rhcosVersion,
+	}
+	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
+	renderData.Runtime.OpenshiftVersion = "4.13"
+	renderData.Runtime.OpenshiftProxySpec = &configv1.ProxySpec{
+		HTTPProxy:  "http://user:pass@example:8080",
+		HTTPSProxy: "https://user:pass@example:8085",
+		NoProxy:    "internal.example.com",
+		TrustedCA: configv1.ConfigMapNameReference{
+			Name: "gpu-operator-trusted-ca",
+		},
+	}
+
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1-rhcos4.13",
+		Spec: &nvidiav1alpha1.GDRCopySpec{
+			Enabled:          utils.BoolPtr(true),
+			ImagePullSecrets: []string{"ngc-secret"},
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func TestDriverAdditionalConfigs(t *testing.T) {
 	const (
 		testName = "driver-additional-configs"
