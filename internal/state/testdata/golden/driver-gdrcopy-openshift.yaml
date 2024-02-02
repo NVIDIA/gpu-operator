@@ -1,0 +1,477 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nvidia-gpu-driver-openshift
+  namespace: test-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-gpu-driver-openshift
+  namespace: test-operator
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - privileged
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups:
+  - policy
+  resourceNames:
+  - gpu-operator-privileged
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  - nodes
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-gpu-driver-openshift
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-gpu-driver-openshift
+  namespace: test-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nvidia-gpu-driver-openshift
+subjects:
+- kind: ServiceAccount
+  name: nvidia-gpu-driver-openshift
+  namespace: test-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-gpu-driver-openshift
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nvidia-gpu-driver-openshift
+subjects:
+- kind: ServiceAccount
+  name: nvidia-gpu-driver-openshift
+  namespace: test-operator
+---
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: true
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
+allowedCapabilities:
+- '*'
+allowedUnsafeSysctls:
+- '*'
+apiVersion: security.openshift.io/v1
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups:
+- system:cluster-admins
+- system:nodes
+- system:masters
+kind: SecurityContextConstraints
+metadata:
+  annotations:
+    kubernetes.io/description: 'privileged allows access to all privileged and host
+      features and the ability to run as any user, any group, any fsGroup, and with
+      any SELinux context.  WARNING: this is the most relaxed SCC and should be used
+      only for cluster administration. Grant with caution.'
+  name: nvidia-gpu-driver-openshift
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+seccompProfiles:
+- '*'
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:test-operator:nvidia-gpu-driver-openshift
+volumes:
+- '*'
+---
+apiVersion: v1
+data:
+  ca-bundle.crt: ""
+kind: ConfigMap
+metadata:
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+  name: gpu-operator-trusted-ca
+  namespace: test-operator
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    openshift.io/scc: nvidia-gpu-driver-openshift
+  labels:
+    app: nvidia-gpu-driver-openshift-79d6bd954f
+    app.kubernetes.io/component: nvidia-driver
+    nvidia.com/node.os-version: rhel8.0
+    nvidia.com/precompiled: "false"
+    openshift.driver-toolkit: "true"
+    openshift.driver-toolkit.rhcos: 413.92.202304252344-0
+  name: nvidia-gpu-driver-openshift-79d6bd954f
+  namespace: test-operator
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-gpu-driver-openshift-79d6bd954f
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-driver-ctr
+      labels:
+        app: nvidia-gpu-driver-openshift-79d6bd954f
+        app.kubernetes.io/component: nvidia-driver
+        nvidia.com/node.os-version: rhel8.0
+        nvidia.com/precompiled: "false"
+        openshift.driver-toolkit: "true"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                - nvidia-driver
+                - nvidia-vgpu-manager
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - args:
+        - nv-ctr-run-with-dtk
+        command:
+        - ocp_dtk_entrypoint
+        env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: OPENSHIFT_VERSION
+          value: "4.13"
+        - name: HTTP_PROXY
+          value: http://user:pass@example:8080
+        - name: http_proxy
+          value: http://user:pass@example:8080
+        - name: HTTPS_PROXY
+          value: https://user:pass@example:8085
+        - name: https_proxy
+          value: https://user:pass@example:8085
+        - name: NO_PROXY
+          value: internal.example.com
+        - name: no_proxy
+          value: internal.example.com
+        image: nvcr.io/nvidia/driver:525.85.03-rhel8.0
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - rm -f /run/nvidia/validations/.driver-ctr-ready
+        name: nvidia-driver-ctr
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: s0
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready
+          failureThreshold: 120
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 60
+        volumeMounts:
+        - mountPath: /run/nvidia
+          mountPropagation: Bidirectional
+          name: run-nvidia
+        - mountPath: /run/nvidia-topologyd
+          name: run-nvidia-topologyd
+        - mountPath: /var/log
+          name: var-log
+        - mountPath: /dev/log
+          name: dev-log
+        - mountPath: /host-etc/os-release
+          name: host-os-release
+          readOnly: true
+        - mountPath: /run/mellanox/drivers/usr/src
+          mountPropagation: HostToContainer
+          name: mlnx-ofed-usr-src
+        - mountPath: /run/mellanox/drivers
+          mountPropagation: HostToContainer
+          name: run-mellanox-drivers
+        - mountPath: /sys/module/firmware_class/parameters/path
+          name: firmware-search-path
+        - mountPath: /sys/devices/system/memory/auto_online_blocks
+          name: sysfs-memory-online
+        - mountPath: /lib/firmware
+          name: nv-firmware
+        - mountPath: /mnt/shared-nvidia-driver-toolkit
+          name: shared-nvidia-driver-toolkit
+        - mountPath: /etc/pki/ca-trust/extracted/pem
+          name: gpu-operator-trusted-ca
+          readOnly: true
+      - args:
+        - gdrcopy-ctr-run-with-dtk
+        command:
+        - ocp_dtk_entrypoint
+        image: nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1-rhcos4.13
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - lsmod | grep gdrdrv
+          failureThreshold: 1
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 10
+        name: nvidia-gdrcopy-ctr
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: s0
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - lsmod | grep gdrdrv
+          failureThreshold: 120
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+        volumeMounts:
+        - mountPath: /run/nvidia
+          mountPropagation: HostToContainer
+          name: run-nvidia
+        - mountPath: /var/log
+          name: var-log
+        - mountPath: /dev/log
+          name: dev-log
+          readOnly: true
+        - mountPath: /mnt/shared-nvidia-driver-toolkit
+          name: shared-nvidia-driver-toolkit
+      - args:
+        - until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting
+          for nvidia-driver-ctr container to prepare the shared directory ...; sleep
+          10; done; exec /mnt/shared-nvidia-driver-toolkit/ocp_dtk_entrypoint dtk-build-driver
+        command:
+        - bash
+        - -xc
+        env:
+        - name: RHCOS_VERSION
+          value: 413.92.202304252344-0
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867
+        imagePullPolicy: IfNotPresent
+        name: openshift-driver-toolkit-ctr
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: s0
+        volumeMounts:
+        - mountPath: /mnt/shared-nvidia-driver-toolkit
+          name: shared-nvidia-driver-toolkit
+        - mountPath: /var/log
+          name: var-log
+        - mountPath: /run/mellanox/drivers/usr/src
+          mountPropagation: HostToContainer
+          name: mlnx-ofed-usr-src
+        - mountPath: /host-etc/os-release
+          name: host-os-release
+          readOnly: true
+      hostPID: true
+      imagePullSecrets:
+      - name: ngc-secret
+      initContainers:
+      - args:
+        - uninstall_driver
+        command:
+        - driver-manager
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: ENABLE_GPU_POD_EVICTION
+          value: "true"
+        - name: ENABLE_AUTO_DRAIN
+          value: "true"
+        - name: DRAIN_USE_FORCE
+          value: "false"
+        - name: DRAIN_POD_SELECTOR_LABEL
+          value: ""
+        - name: DRAIN_TIMEOUT_SECONDS
+          value: 0s
+        - name: DRAIN_DELETE_EMPTYDIR_DATA
+          value: "false"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
+        imagePullPolicy: IfNotPresent
+        name: k8s-driver-manager
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /run/nvidia
+          mountPropagation: Bidirectional
+          name: run-nvidia
+        - mountPath: /host
+          mountPropagation: HostToContainer
+          name: host-root
+          readOnly: true
+        - mountPath: /sys
+          name: host-sys
+        - mountPath: /run/mellanox/drivers
+          mountPropagation: HostToContainer
+          name: run-mellanox-drivers
+      nodeSelector:
+        feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
+        nvidia.com/gpu.deploy.driver: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-gpu-driver-openshift
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /run/nvidia
+          type: DirectoryOrCreate
+        name: run-nvidia
+      - hostPath:
+          path: /var/log
+        name: var-log
+      - hostPath:
+          path: /dev/log
+        name: dev-log
+      - hostPath:
+          path: /etc/os-release
+        name: host-os-release
+      - hostPath:
+          path: /run/nvidia-topologyd
+          type: DirectoryOrCreate
+        name: run-nvidia-topologyd
+      - hostPath:
+          path: /run/mellanox/drivers/usr/src
+          type: DirectoryOrCreate
+        name: mlnx-ofed-usr-src
+      - hostPath:
+          path: /run/mellanox/drivers
+          type: DirectoryOrCreate
+        name: run-mellanox-drivers
+      - hostPath:
+          path: /run/nvidia/validations
+          type: DirectoryOrCreate
+        name: run-nvidia-validations
+      - hostPath:
+          path: /
+        name: host-root
+      - hostPath:
+          path: /sys
+          type: Directory
+        name: host-sys
+      - hostPath:
+          path: /sys/module/firmware_class/parameters/path
+        name: firmware-search-path
+      - hostPath:
+          path: /sys/devices/system/memory/auto_online_blocks
+        name: sysfs-memory-online
+      - hostPath:
+          path: /run/nvidia/driver/lib/firmware
+          type: DirectoryOrCreate
+        name: nv-firmware
+      - emptyDir: {}
+        name: shared-nvidia-driver-toolkit
+      - configMap:
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+          name: gpu-operator-trusted-ca
+        name: gpu-operator-trusted-ca
+  updateStrategy:
+    type: OnDelete
+---

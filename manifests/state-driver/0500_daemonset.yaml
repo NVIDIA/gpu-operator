@@ -481,8 +481,8 @@ spec:
             mountPath: /dev/log
             readOnly: true
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
-        - name: shared-nvidia-driver-toolkit
-          mountPath: /mnt/shared-nvidia-driver-toolkit
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
         {{- end}}
         {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
         {{- range .AdditionalConfigs.VolumeMounts }}
