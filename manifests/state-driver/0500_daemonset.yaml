@@ -543,6 +543,10 @@ spec:
           - name: GDS_ENABLED
             value: "true"
           {{- end }}
+          {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+          - name: GDRCOPY_ENABLED
+            value: "true"
+          {{- end }}
         volumeMounts:
           # corresponding volumes are dynamically injected by the
           # operator when the OCP DriverToolkit side-car is enabled
