@@ -19,7 +19,7 @@
 # Pre-requisites:
 #   1. Following environment variables must be set before running this script.
 # 
-#     VGPU_DRIVER_VERSION - NVIDIA vGPU Guest Driver Version (default: 535.129.03)
+#     VGPU_DRIVER_VERSION - NVIDIA vGPU Guest Driver Version (default: 535.154.05)
 #     NVAIE_VERSION - NVAIE version for the driver install
 #     NGC_API_KEY - NGC user API key to create the image pull secret
 #     NGC_USER_EMAIL - NGC user email to create the image pull secret
@@ -29,7 +29,7 @@
 
 set -u
 
-VGPU_DRIVER_VERSION=${VGPU_DRIVER_VERSION:-"535.129.03"}
+VGPU_DRIVER_VERSION=${VGPU_DRIVER_VERSION:-"535.154.05"}
 VGPU_DRIVER_NAME=${VGPU_DRIVER_NAME:-"vgpu-guest-driver"}
 NVAIE_VERSION=${NVAIE_VERSION:-""}
 GPU_OPERATOR_VERSION=${GPU_OPERATOR_VERSION:-""}
