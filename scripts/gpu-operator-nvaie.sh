@@ -29,6 +29,8 @@
 
 set -u
 
+NGC_API_KEY=${NGC_API_KEY:?"Missing NGC_API_KEY"}
+NGC_USER_EMAIL=${NGC_USER_EMAIL:?"Missing NGC_USER_EMAIL"}
 VGPU_DRIVER_VERSION=${VGPU_DRIVER_VERSION:-"535.154.05"}
 VGPU_DRIVER_NAME=${VGPU_DRIVER_NAME:-"vgpu-guest-driver"}
 NVAIE_VERSION=${NVAIE_VERSION:-""}
@@ -77,10 +79,6 @@ create_ngc_secret() {
     # Return if the secret is already created
     kubectl get secret ${REGISTRY_SECRET_NAME} -n ${NAMESPACE} > /dev/null 2>&1 && echo "ngc-secret is already created" && return 0
 
-    # Error out if required params are not set for pull secret
-    NGC_API_KEY=${NGC_API_KEY:?"Missing NGC_API_KEY"}
-    NGC_USER_EMAIL=${NGC_USER_EMAIL:?"Missing NGC_USER_EMAIL"}
-
     # Create a pull secret to pulling images from NGC
     kubectl create secret docker-registry ${REGISTRY_SECRET_NAME} \
         --docker-server=${PRIVATE_REGISTRY} \
@@ -115,12 +113,12 @@ _prepare_upgrade() {
 }
 
 _set_helm_install_options() {
-    if "${GPU_OPERATOR_VERSION}" != "" {
+    if [ -n "${GPU_OPERATOR_VERSION}" ]; then
         HELM_INSTALL_OPTS="${HELM_INSTALL_OPTS} --version=${GPU_OPERATOR_VERSION}"
-    }
-    if "${VALUES_FILE}" != "" {
+    fi
+    if [ -n "${VALUES_FILE}" ]; then
         HELM_INSTALL_OPTS="${HELM_INSTALL_OPTS} --values=${VALUES_FILE}"
-    }
+    fi
     echo "helm options ${HELM_INSTALL_OPTS}"
 }
 
