@@ -168,6 +168,8 @@ const (
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
 	DefaultMPSRoot = "/run/nvidia/mps"
+	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
+	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
 )
 
 // ContainerProbe defines container probe types
@@ -1125,6 +1127,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		if config.CDI.IsDefault() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 		}
+		// do not set 'nvidia' as the default runtime on OpenShift
+		if n.openshift != "" {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaRuntimeSetAsDefaultEnvName, "false")
+		}
 	}
 
 	// set install directory for the toolkit
@@ -1279,7 +1285,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
+		// for OpenShift, use native-CDI support in CRI-O as the 'nvidia' runtime will not be configured as the default runtime
+		cdiAnnotationPrefix := "nvidia.cdi.k8s.io/"
+		if n.openshift != "" {
+			cdiAnnotationPrefix = "cdi.k8s.io/"
+		}
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, cdiAnnotationPrefix)
 		if config.Toolkit.IsEnabled() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
 		}
