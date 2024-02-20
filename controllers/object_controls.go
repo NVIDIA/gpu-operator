@@ -848,7 +848,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// update driver-manager initContainer
-	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager)
+	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
 	if err != nil {
 		return err
 	}
@@ -896,7 +896,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 // TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager)
+	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager, nil)
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for vGPU Manager: %v", err)
 	}
@@ -1688,7 +1688,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager)
+	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
 	}
@@ -2365,7 +2365,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	return nil
 }
 
-func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec) error {
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec) error {
 	var container *corev1.Container
 	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
 		if initCtr.Name == "k8s-driver-manager" {
@@ -2386,6 +2386,13 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpe
 
 	if driverManagerSpec.ImagePullPolicy != "" {
 		container.ImagePullPolicy = gpuv1.ImagePullPolicy(driverManagerSpec.ImagePullPolicy)
+	}
+
+	if rdmaSpec != nil && rdmaSpec.IsEnabled() {
+		setContainerEnv(container, GPUDirectRDMAEnabledEnvName, "true")
+		if rdmaSpec.IsHostMOFED() {
+			setContainerEnv(container, UseHostMOFEDEnvName, "true")
+		}
 	}
 
 	// set/append environment variables for driver-manager initContainer
