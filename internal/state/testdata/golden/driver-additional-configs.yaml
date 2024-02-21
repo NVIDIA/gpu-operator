@@ -214,6 +214,11 @@ spec:
           name: test-cm
           readOnly: true
           subPath: test-file
+        - mountPath: /opt/config/test-host-path
+          name: test-host-path
+        - mountPath: /opt/config/test-host-path-ro
+          name: test-host-path-ro
+          readOnly: true
       hostPID: true
       initContainers:
       - args:
@@ -322,6 +327,14 @@ spec:
             path: test-file
           name: test-cm
         name: test-cm
+      - hostPath:
+          path: /opt/config/test-host-path
+          type: DirectoryOrCreate
+        name: test-host-path
+      - hostPath:
+          path: /opt/config/test-host-path-ro
+          type: DirectoryOrCreate
+        name: test-host-path-ro
   updateStrategy:
     type: OnDelete
 ---
