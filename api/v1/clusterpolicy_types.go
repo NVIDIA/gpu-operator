@@ -1952,6 +1952,15 @@ func (g *GPUDirectRDMASpec) IsEnabled() bool {
 	return *g.Enabled
 }
 
+// IsHostMOFED returns true if GPUDirect RDMA is enabled through MOFED installed on the host
+func (g *GPUDirectRDMASpec) IsHostMOFED() bool {
+	if g.UseHostMOFED == nil {
+		// GPUDirectRDMA is disabled by default
+		return false
+	}
+	return g.IsEnabled() && *g.UseHostMOFED
+}
+
 // IsEnabled returns true if GPUDirect Storage are enabled through gpu-operator
 func (gds *GPUDirectStorageSpec) IsEnabled() bool {
 	if gds.Enabled == nil {

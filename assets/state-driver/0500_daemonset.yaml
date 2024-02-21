@@ -112,6 +112,9 @@ spec:
               mountPropagation: HostToContainer
             - name: host-sys
               mountPath: /sys
+            - name: run-mellanox-drivers
+              mountPath: /run/mellanox/drivers
+              mountPropagation: HostToContainer
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
