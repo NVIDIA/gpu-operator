@@ -344,6 +344,15 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 				MountPath: "/opt/config/test-file",
 				SubPath:   "test-file",
 			},
+			{
+				Name:      "test-host-path",
+				MountPath: "/opt/config/test-host-path",
+			},
+			{
+				Name:      "test-host-path-ro",
+				MountPath: "/opt/config/test-host-path-ro",
+				ReadOnly:  true,
+			},
 		},
 		Volumes: []corev1.Volume{
 			{
@@ -359,6 +368,24 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 								Path: "test-file",
 							},
 						},
+					},
+				},
+			},
+			{
+				Name: "test-host-path",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/opt/config/test-host-path",
+						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+					},
+				},
+			},
+			{
+				Name: "test-host-path-ro",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/opt/config/test-host-path-ro",
+						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
 					},
 				},
 			},
