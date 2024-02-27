@@ -63,13 +63,20 @@ func (m existing) DeviceNodes() ([]deviceNode, error) {
 		if m.nodeIsBlocked(d) {
 			continue
 		}
+
 		var stat unix.Stat_t
 		err := unix.Stat(d, &stat)
 		if err != nil {
 			m.logger.Warningf("Could not stat device: %v", err)
 			continue
 		}
-		deviceNodes = append(deviceNodes, newDeviceNode(d, stat))
+		deviceNode := deviceNode{
+			path:  d,
+			major: unix.Major(uint64(stat.Rdev)),
+			minor: unix.Minor(uint64(stat.Rdev)),
+		}
+
+		deviceNodes = append(deviceNodes, deviceNode)
 	}
 
 	return deviceNodes, nil
