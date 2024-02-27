@@ -798,6 +798,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
@@ -1000,6 +1001,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	case "state-container-toolkit":
 		return clusterPolicySpec.Toolkit.IsEnabled()
 	case "state-device-plugin":
+		return clusterPolicySpec.DevicePlugin.IsEnabled()
+	case "state-mps-control-daemon":
 		return clusterPolicySpec.DevicePlugin.IsEnabled()
 	case "state-dcgm":
 		return clusterPolicySpec.DCGM.IsEnabled()
