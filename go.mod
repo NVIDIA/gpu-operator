@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20230811202718-cd051ba8bafe
-	github.com/NVIDIA/nvidia-container-toolkit v1.14.6-0.20240227204104-5605d191332d
+	github.com/NVIDIA/nvidia-container-toolkit v1.14.6
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
 	github.com/mitchellh/hashstructure v1.1.0
