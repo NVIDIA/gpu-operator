@@ -10,6 +10,12 @@ spec:
   useOpenKernelModules: {{ .Values.driver.useOpenKernelModules }}
   usePrecompiled: {{ .Values.driver.usePrecompiled }}
   driverType: {{ .Values.driver.nvidiaDriverCRD.driverType | default "gpu" }}
+  {{- if .Values.daemonsets.annotations }}
+  annotations: {{ toYaml .Values.daemonsets.annotations | nindent 6 }}
+  {{- end }}
+  {{- if .Values.daemonsets.labels }}
+  labels: {{ toYaml .Values.daemonsets.labels | nindent 6 }}
+  {{- end }}
   {{- if .Values.driver.nvidiaDriverCRD.nodeSelector }}
   nodeSelector: {{ toYaml .Values.driver.nvidiaDriverCRD.nodeSelector | nindent 6 }}
   {{- end }}
@@ -31,6 +37,9 @@ spec:
   rdma:
     enabled: {{ .Values.driver.rdma.enabled }}
     useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
+  {{- if .Values.daemonsets.tolerations }}
+  tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
+  {{- end }}
   {{- if .Values.driver.repoConfig.configMapName }}
   repoConfig:
     name: {{ .Values.driver.repoConfig.configMapName }}
