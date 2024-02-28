@@ -450,7 +450,9 @@ spec:
     {{- if .Values.devicePlugin.config.name }}
     config:
       name: {{ .Values.devicePlugin.config.name }}
+      {{- if .Values.devicePlugin.config.default }}
       default: {{ .Values.devicePlugin.config.default }}
+      {{- end }}
     {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
