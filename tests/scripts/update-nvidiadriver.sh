@@ -43,4 +43,33 @@ test_driver_image_updates() {
     return 0
 }
 
+test_custom_labels_override() {
+  if ! kubectl patch nvidiadriver/default --type='json' -p='[{"op": "add", "path": "/spec/labels", "value": {"cloudprovider": "aws", "platform": "kubernetes"}}]';
+  then
+    echo "cannot update the labels of the NVIDIADriver resource"
+    exit 1
+  fi
+
+  # The labels override triggers a rollout of all gpu-operator operands, so we wait for the driver upgrade to transition to "upgrade-done" state.
+  wait_for_driver_upgrade_done
+
+  check_nvidia_driver_pods_ready
+
+  echo "checking nvidia-driver-daemonset labels"
+  for pod in $(kubectl get pods -n "$TEST_NAMESPACE" -l "app.kubernetes.io/component=nvidia-driver" --output=jsonpath={.items..metadata.name})
+  do
+    cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
+    if [ "$cp_label_value" != "aws" ]; then
+        echo "Custom Label cloudprovider is incorrect when nvidiadriver labels are overridden - $pod"
+        exit 1
+    fi
+    platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
+    if [ "$platform_label_value" != "kubernetes" ]; then
+        echo "Custom Label platform is incorrect when nvidiadriver labels are overridden - $pod"
+        exit 1
+    fi
+  done
+}
+
 test_driver_image_updates
+test_custom_labels_override
