@@ -158,7 +158,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := golangci-lint validate-modules
+CHECK_TARGETS := lint license-check validate-modules
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -196,6 +196,15 @@ $(DOCKER_TARGETS): docker-%: .build-image
 
 check: $(CHECK_TARGETS)
 
+license-check:
+	@echo ">> checking license header"
+	@licRes=$$(for file in $$(find . -type f -iname '*.go' ! -path './vendor/*') ; do \
+               awk 'NR<=5' $$file | grep -Eq "(Copyright|generated|GENERATED)" || echo $$file; \
+       done); \
+       if [ -n "$${licRes}" ]; then \
+               echo "license header checking failed:"; echo "$${licRes}"; \
+               exit 1; \
+       fi
 
 # Apply go fmt to the codebase
 fmt:
@@ -207,7 +216,7 @@ goimports:
 	find . -name \*.go -not -name "zz_generated.deepcopy.go" -not -path "./vendor/*" \
  		-exec goimports -local $(MODULE) -w {} \;
 
-golangci-lint:
+lint:
 	golangci-lint run ./...
 
 cmds: $(CMD_TARGETS)
