@@ -260,8 +260,12 @@ spec:
           {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
             mountPath: {{ .MountPath }}
-            subPath: {{ .SubPath }}
-            readOnly: {{ .ReadOnly }}
+            {{- with .SubPath }}
+            subPath: {{ . }}
+            {{- end }}
+            {{- with .ReadOnly }}
+            readOnly: {{ . }}
+            {{- end }}
           {{- end }}
           {{- end }}
           {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
@@ -508,6 +512,7 @@ spec:
         {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
         {{- range .AdditionalConfigs.Volumes }}
         - name: {{ .Name }}
+          {{- if and .ConfigMap .ConfigMap.Items }}
           configMap:
             name: {{ .Name }}
             items:
@@ -518,6 +523,11 @@ spec:
                 mode: {{ .Mode }}
               {{- end }}
             {{- end }}
+          {{- else if .HostPath }}
+          hostPath:
+            path: {{ .HostPath.Path }}
+            type: {{ .HostPath.Type }}
+          {{- end }}
         {{- end }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
@@ -526,7 +536,7 @@ spec:
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
         - name: gpu-operator-trusted-ca
-          configMap: 
+          configMap:
             name: gpu-operator-trusted-ca
             items:
               - key: ca-bundle.crt

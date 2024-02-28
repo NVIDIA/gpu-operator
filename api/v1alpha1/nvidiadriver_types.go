@@ -490,6 +490,31 @@ func (d *NVIDIADriverSpec) GetImagePath(osVersion string) (string, error) {
 	return image, nil
 }
 
+// GetImagePath returns the gds driver image path given the information
+// provided in GPUDirectStorageSpec and the osVersion passed as an argument.
+// The driver image path will be in the following format unless the spec
+// contains a digest.
+// <repository>/<image>:<driver-ver>-<os-ver>
+func (d *GPUDirectStorageSpec) GetImagePath(osVersion string) (string, error) {
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to get image path from crd: %w", err)
+	}
+
+	// if image digest is specified, use it directly
+	if !strings.Contains(image, "sha256:") {
+		// append '-<osVersion>' to the driver tag
+		image = fmt.Sprintf("%s-%s", image, osVersion)
+	}
+
+	_, err = ref.New(image)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse driver image path: %w", err)
+	}
+
+	return image, nil
+}
+
 // GetPrecompiledImagePath returns the precompiled driver image path for a
 // given os version and kernel version. Precompiled driver images follow
 // the following format:

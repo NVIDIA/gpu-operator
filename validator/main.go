@@ -1209,10 +1209,12 @@ func (c *CUDA) validate() error {
 	// update k8s client for the plugin
 	c.setKubeClient(kubeClient)
 
-	// workload test
-	err = c.runWorkload()
-	if err != nil {
-		return err
+	if withWorkloadFlag {
+		// workload test
+		err = c.runWorkload()
+		if err != nil {
+			return err
+		}
 	}
 
 	// create plugin status file

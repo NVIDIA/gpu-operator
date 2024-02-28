@@ -774,9 +774,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 
 	// set image pull secrets
 	if len(config.GPUFeatureDiscovery.ImagePullSecrets) > 0 {
-		for _, secret := range config.GPUFeatureDiscovery.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.GPUFeatureDiscovery.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1076,10 +1074,9 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// set image pull secrets
 	if len(config.Toolkit.ImagePullSecrets) > 0 {
-		for _, secret := range config.Toolkit.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.Toolkit.ImagePullSecrets)
 	}
+
 	// set resource limits
 	if config.Toolkit.Resources != nil {
 		// apply resource limits to all containers
@@ -1209,12 +1206,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
-		for _, secret := range config.DevicePlugin.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.DevicePlugin.ImagePullSecrets)
 	}
+
 	// set resource limits
 	if config.DevicePlugin.Resources != nil {
 		// apply resource limits to all containers
@@ -1282,9 +1279,7 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.SandboxDevicePlugin.ImagePullPolicy)
 	// set image pull secrets
 	if len(config.SandboxDevicePlugin.ImagePullSecrets) > 0 {
-		for _, secret := range config.SandboxDevicePlugin.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.SandboxDevicePlugin.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.SandboxDevicePlugin.Resources != nil {
@@ -1326,9 +1321,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DCGMExporter.ImagePullPolicy)
 	// set image pull secrets
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
-		for _, secret := range config.DCGMExporter.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.DCGMExporter.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.DCGMExporter.Resources != nil {
@@ -1463,9 +1456,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DCGM.ImagePullPolicy)
 	// set image pull secrets
 	if len(config.DCGM.ImagePullSecrets) > 0 {
-		for _, secret := range config.DCGM.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.DCGM.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.DCGM.Resources != nil {
@@ -1522,9 +1513,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 	// set image pull secrets
 	if len(config.MIGManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.MIGManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.MIGManager.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1601,9 +1590,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 	// set image pull secrets
 	if len(config.KataManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.KataManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.KataManager.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1711,9 +1698,7 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 	// set image pull secrets
 	if len(config.VFIOManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.VFIOManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.VFIOManager.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1754,9 +1739,7 @@ func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	// set image pull secrets
 	if len(config.CCManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.CCManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.CCManager.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1807,9 +1790,7 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 
 	// set image pull secrets
 	if len(config.VGPUDeviceManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.VGPUDeviceManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.VGPUDeviceManager.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -1932,9 +1913,7 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 	// set image pull secrets
 	if len(config.Validator.ImagePullSecrets) > 0 {
-		for _, secret := range config.Validator.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.Validator.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.Validator.Resources != nil {
@@ -2096,9 +2075,7 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 
 	// set image pull secrets
 	if len(config.NodeStatusExporter.ImagePullSecrets) > 0 {
-		for _, secret := range config.NodeStatusExporter.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.NodeStatusExporter.ImagePullSecrets)
 	}
 
 	// set resource limits
@@ -2413,9 +2390,7 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpe
 
 	// add any pull secrets needed for driver-manager image
 	if len(driverManagerSpec.ImagePullSecrets) > 0 {
-		for _, secret := range driverManagerSpec.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, driverManagerSpec.ImagePullSecrets)
 	}
 
 	return nil
@@ -2497,9 +2472,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 		// set image pull secrets
 		if len(config.GPUDirectStorage.ImagePullSecrets) > 0 {
-			for _, secret := range config.GPUDirectStorage.ImagePullSecrets {
-				obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-			}
+			addPullSecrets(&obj.Spec.Template.Spec, config.GPUDirectStorage.ImagePullSecrets)
 		}
 
 		// set/append environment variables for GDS container
@@ -2851,9 +2824,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set image pull secrets
 	if len(config.Driver.ImagePullSecrets) > 0 {
-		for _, secret := range config.Driver.ImagePullSecrets {
-			podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.Driver.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.Driver.Resources != nil {
@@ -3080,9 +3051,7 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 
 	// set image pull secrets
 	if len(config.VGPUManager.ImagePullSecrets) > 0 {
-		for _, secret := range config.VGPUManager.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.VGPUManager.ImagePullSecrets)
 	}
 	// set resource limits
 	if config.VGPUManager.Resources != nil {
@@ -3197,11 +3166,26 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 	}
 	// add any pull secrets needed for validation image
 	if len(config.Validator.ImagePullSecrets) > 0 {
-		for _, secret := range config.Validator.ImagePullSecrets {
-			obj.Spec.Template.Spec.ImagePullSecrets = append(obj.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-		}
+		addPullSecrets(&obj.Spec.Template.Spec, config.Validator.ImagePullSecrets)
 	}
 	return nil
+}
+
+func addPullSecrets(podSpec *v1.PodSpec, secrets []string) {
+	for _, secret := range secrets {
+		if !containsSecret(podSpec.ImagePullSecrets, secret) {
+			podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+		}
+	}
+}
+
+func containsSecret(secrets []v1.LocalObjectReference, secretName string) bool {
+	for _, s := range secrets {
+		if s.Name == secretName {
+			return true
+		}
+	}
+	return false
 }
 
 func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {

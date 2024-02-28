@@ -71,3 +71,10 @@ Full image name with tag
 {{- define "gpu-operator.fullimage" -}}
 {{- .Values.operator.repository -}}/{{- .Values.operator.image -}}:{{- .Values.operator.version | default .Chart.AppVersion -}}
 {{- end }}
+
+{{/*
+Full image name with tag
+*/}}
+{{- define "driver-manager.fullimage" -}}
+{{- .Values.driver.manager.repository -}}/{{- .Values.driver.manager.image -}}:{{- .Values.driver.manager.version -}}
+{{- end }}
