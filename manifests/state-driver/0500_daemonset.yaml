@@ -514,7 +514,7 @@ spec:
         - name: {{ .Name }}
           {{- if and .ConfigMap .ConfigMap.Items }}
           configMap:
-            name: {{ .Name }}
+            name: {{ .ConfigMap.Name }}
             items:
             {{- range .ConfigMap.Items }}
               - key: {{ .Key }}
