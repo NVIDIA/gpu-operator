@@ -503,11 +503,10 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 func getDriverTestOutput(testCase string) map[string]interface{} {
 	// default output
 	output := map[string]interface{}{
-		"numDaemonsets":          1,
-		"mofedValidationPresent": false,
-		"nvPeerMemPresent":       false,
-		"driverManagerImage":     "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
-		"imagePullSecret":        "ngc-secret",
+		"numDaemonsets":      1,
+		"nvPeerMemPresent":   false,
+		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
+		"imagePullSecret":    "ngc-secret",
 	}
 
 	switch testCase {
@@ -552,14 +551,10 @@ func TestDriver(t *testing.T) {
 				return
 			}
 
-			mofedValidationPresent := false
 			nvPeerMemPresent := false
 			driverImage := ""
 			driverManagerImage := ""
 			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
-				if strings.Contains(initContainer.Name, "mofed-validation") {
-					mofedValidationPresent = true
-				}
 				if strings.Contains(initContainer.Name, "k8s-driver-manager") {
 					driverManagerImage = initContainer.Image
 				}
@@ -574,7 +569,6 @@ func TestDriver(t *testing.T) {
 				}
 			}
 
-			require.Equal(t, tc.output["mofedValidationPresent"], mofedValidationPresent, "Unexpected configuration for mofed-validation init container")
 			require.Equal(t, tc.output["nvPeerMemPresent"], nvPeerMemPresent, "Unexpected configuration for nv-peermem container")
 			require.Equal(t, tc.output["driverImage"], driverImage, "Unexpected configuration for nvidia-driver-ctr image")
 			require.Equal(t, tc.output["driverManagerImage"], driverManagerImage, "Unexpected configuration for k8s-driver-manager image")

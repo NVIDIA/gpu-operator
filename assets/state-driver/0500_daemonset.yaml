@@ -44,33 +44,6 @@ spec:
       serviceAccountName: nvidia-driver
       hostPID: true
       initContainers:
-        - name: mofed-validation
-          image: "FILLED BY THE OPERATOR"
-          command: ['sh', '-c']
-          args: ["nvidia-validator"]
-          env:
-            - name: WITH_WAIT
-              value: "true"
-            - name: COMPONENT
-              value: mofed
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # always use runc for driver containers
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: void
-          securityContext:
-            privileged: true
-            seLinuxOptions:
-              level: "s0"
-          volumeMounts:
-            - name: run-nvidia-validations
-              mountPath: /run/nvidia/validations
-              mountPropagation: Bidirectional
-            - name: run-mellanox-drivers
-              mountPath: /run/mellanox/drivers
-              mountPropagation: HostToContainer
         - name: k8s-driver-manager
           image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
