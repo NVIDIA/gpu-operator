@@ -75,7 +75,7 @@ operator:
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 12.3.1-base-ubi8
+    version: 12.3.2-base-ubi8
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -232,7 +232,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.14.3-ubi8
+  version: v0.14.5-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -407,7 +407,7 @@ vfioManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: cuda
-  version: 12.3.1-base-ubi8
+  version: 12.3.2-base-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
