@@ -65,6 +65,7 @@ spec:
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
+          command: ["gpu-feature-discovery"]
           env:
             - name: GFD_SLEEP_INTERVAL
               value: 60s
