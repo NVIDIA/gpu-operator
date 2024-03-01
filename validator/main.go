@@ -250,7 +250,7 @@ func main() {
 		&cli.BoolFlag{
 			Name:        "with-workload",
 			Aliases:     []string{"l"},
-			Value:       false,
+			Value:       true,
 			Usage:       "indicates to validate with GPU workload",
 			Destination: &withWorkloadFlag,
 			EnvVars:     []string{"WITH_WORKLOAD"},
