@@ -135,7 +135,7 @@ driver:
   usePrecompiled: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "535.154.05"
+  version: "550.54.14"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   startupProbe:
