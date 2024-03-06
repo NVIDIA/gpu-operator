@@ -3344,20 +3344,6 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if !strings.Contains(initContainer.Name, "validation") {
 			continue
 		}
-		if strings.Contains(initContainer.Name, "mofed-validation") {
-			if config.Driver.GPUDirectRDMA == nil || !config.Driver.GPUDirectRDMA.IsEnabled() {
-				// remove mofed-validation init container from driver Daemonset if RDMA is not enabled
-				obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
-				continue
-			} else {
-				// pass env for mofed-validation
-				setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), GPUDirectRDMAEnabledEnvName, "true")
-				if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
-					// set env indicating host-mofed is enabled
-					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), UseHostMOFEDEnvName, "true")
-				}
-			}
-		}
 
 		// TODO: refactor the component-specific validation logic so that we are not duplicating TransformValidatorComponent()
 		// Pass env for driver-validation init container
