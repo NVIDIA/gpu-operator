@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: clusterpolicies.nvidia.com
 spec:
   group: nvidia.com
@@ -27,14 +27,19 @@ spec:
         description: ClusterPolicy is the Schema for the clusterpolicies API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -103,8 +108,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -113,11 +119,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -145,17 +151,18 @@ spec:
                   annotations:
                     additionalProperties:
                       type: string
-                    description: 'Optional: Annotations is an unstructured key value
-                      map stored with a resource that may be set by external tools
-                      to store and retrieve arbitrary metadata. They are not queryable
-                      and should be preserved when modifying objects.'
+                    description: |-
+                      Optional: Annotations is an unstructured key value map stored with a resource that may be
+                      set by external tools to store and retrieve arbitrary metadata. They are not
+                      queryable and should be preserved when modifying objects.
                     type: object
                   labels:
                     additionalProperties:
                       type: string
-                    description: 'Optional: Map of string keys and values that can
-                      be used to organize and categorize (scope and select) objects.
-                      May match selectors of replication controllers and services.'
+                    description: |-
+                      Optional: Map of string keys and values that can be used to organize and categorize
+                      (scope and select) objects. May match selectors of replication controllers
+                      and services.
                     type: object
                   priorityClassName:
                     type: string
@@ -169,41 +176,39 @@ spec:
                   tolerations:
                     description: 'Optional: Set tolerations'
                     items:
-                      description: The pod this Toleration is attached to tolerates
-                        any taint that matches the triple <key,value,effect> using
-                        the matching operator <operator>.
+                      description: |-
+                        The pod this Toleration is attached to tolerates any taint that matches
+                        the triple <key,value,effect> using the matching operator <operator>.
                       properties:
                         effect:
-                          description: Effect indicates the taint effect to match.
-                            Empty means match all taint effects. When specified, allowed
-                            values are NoSchedule, PreferNoSchedule and NoExecute.
+                          description: |-
+                            Effect indicates the taint effect to match. Empty means match all taint effects.
+                            When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
                           type: string
                         key:
-                          description: Key is the taint key that the toleration applies
-                            to. Empty means match all taint keys. If the key is empty,
-                            operator must be Exists; this combination means to match
-                            all values and all keys.
+                          description: |-
+                            Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                            If the key is empty, operator must be Exists; this combination means to match all values and all keys.
                           type: string
                         operator:
-                          description: Operator represents a key's relationship to
-                            the value. Valid operators are Exists and Equal. Defaults
-                            to Equal. Exists is equivalent to wildcard for value,
-                            so that a pod can tolerate all taints of a particular
-                            category.
+                          description: |-
+                            Operator represents a key's relationship to the value.
+                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Exists is equivalent to wildcard for value, so that a pod can
+                            tolerate all taints of a particular category.
                           type: string
                         tolerationSeconds:
-                          description: TolerationSeconds represents the period of
-                            time the toleration (which must be of effect NoExecute,
-                            otherwise this field is ignored) tolerates the taint.
-                            By default, it is not set, which means tolerate the taint
-                            forever (do not evict). Zero and negative values will
-                            be treated as 0 (evict immediately) by the system.
+                          description: |-
+                            TolerationSeconds represents the period of time the toleration (which must be
+                            of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                            it is not set, which means tolerate the taint forever (do not evict). Zero and
+                            negative values will be treated as 0 (evict immediately) by the system.
                           format: int64
                           type: integer
                         value:
-                          description: Value is the taint value the toleration matches
-                            to. If the operator is Exists, the value should be empty,
-                            otherwise just a regular string.
+                          description: |-
+                            Value is the taint value the toleration matches to.
+                            If the operator is Exists, the value should be empty, otherwise just a regular string.
                           type: string
                       type: object
                     type: array
@@ -273,8 +278,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -283,11 +289,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -357,8 +363,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -367,11 +374,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   serviceMonitor:
@@ -393,26 +400,25 @@ spec:
                           with target labels.
                         type: boolean
                       interval:
-                        description: 'Interval which metrics should be scraped from
-                          NVIDIA DCGM Exporter. If not specified Prometheus’ global
-                          scrape interval is used. Supported units: y, w, d, h, m,
-                          s, ms'
+                        description: |-
+                          Interval which metrics should be scraped from NVIDIA DCGM Exporter. If not specified Prometheus’ global scrape interval is used.
+                          Supported units: y, w, d, h, m, s, ms
                         pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                         type: string
                       relabelings:
                         description: Relabelings allows to rewrite labels on metric
                           sets for NVIDIA DCGM Exporter
                         items:
-                          description: 'RelabelConfig allows dynamic rewriting of
-                            the label set, being applied to samples before ingestion.
-                            It defines `<metric_relabel_configs>`-section of Prometheus
-                            configuration. More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs'
+                          description: |-
+                            RelabelConfig allows dynamic rewriting of the label set, being applied to samples before ingestion.
+                            It defines `<metric_relabel_configs>`-section of Prometheus configuration.
+                            More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs
                           properties:
                             action:
                               default: replace
-                              description: Action to perform based on regex matching.
-                                Default is 'replace'. uppercase and lowercase actions
-                                require Prometheus >= 2.36.
+                              description: |-
+                                Action to perform based on regex matching. Default is 'replace'.
+                                uppercase and lowercase actions require Prometheus >= 2.36.
                               enum:
                               - replace
                               - Replace
@@ -447,19 +453,19 @@ spec:
                                 value is matched. Default is '(.*)'
                               type: string
                             replacement:
-                              description: Replacement value against which a regex
-                                replace is performed if the regular expression matches.
-                                Regex capture groups are available. Default is '$1'
+                              description: |-
+                                Replacement value against which a regex replace is performed if the
+                                regular expression matches. Regex capture groups are available. Default is '$1'
                               type: string
                             separator:
                               description: Separator placed between concatenated source
                                 label values. default is ';'.
                               type: string
                             sourceLabels:
-                              description: The source labels select values from existing
-                                labels. Their content is concatenated using the configured
-                                separator and matched against the configured regular
-                                expression for the replace, keep, and drop actions.
+                              description: |-
+                                The source labels select values from existing labels. Their content is concatenated
+                                using the configured separator and matched against the configured regular expression
+                                for the replace, keep, and drop actions.
                               items:
                                 description: LabelName is a valid Prometheus label
                                   name which may only contain ASCII letters, numbers,
@@ -468,9 +474,9 @@ spec:
                                 type: string
                               type: array
                             targetLabel:
-                              description: Label to which the resulting value is written
-                                in a replace action. It is mandatory for replace actions.
-                                Regex capture groups are available.
+                              description: |-
+                                Label to which the resulting value is written in a replace action.
+                                It is mandatory for replace actions. Regex capture groups are available.
                               type: string
                           type: object
                         type: array
@@ -546,8 +552,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -556,11 +563,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -636,35 +643,37 @@ spec:
                     description: NVIDIA Driver container liveness probe settings
                     properties:
                       failureThreshold:
-                        description: Minimum consecutive failures for the probe to
-                          be considered failed after having succeeded. Defaults to
-                          3. Minimum value is 1.
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       initialDelaySeconds:
-                        description: 'Number of seconds after the container has started
-                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
                       periodSeconds:
-                        description: How often (in seconds) to perform the probe.
+                        description: |-
+                          How often (in seconds) to perform the probe.
                           Default to 10 seconds. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       successThreshold:
-                        description: Minimum consecutive successes for the probe to
-                          be considered successful after having failed. Defaults to
-                          1. Must be 1 for liveness and startup. Minimum value is
-                          1.
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       timeoutSeconds:
-                        description: 'Number of seconds after which the probe times
-                          out. Defaults to 1 second. Minimum value is 1. More info:
-                          https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         minimum: 1
                         type: integer
@@ -728,35 +737,37 @@ spec:
                     description: NVIDIA Driver container readiness probe settings
                     properties:
                       failureThreshold:
-                        description: Minimum consecutive failures for the probe to
-                          be considered failed after having succeeded. Defaults to
-                          3. Minimum value is 1.
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       initialDelaySeconds:
-                        description: 'Number of seconds after the container has started
-                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
                       periodSeconds:
-                        description: How often (in seconds) to perform the probe.
+                        description: |-
+                          How often (in seconds) to perform the probe.
                           Default to 10 seconds. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       successThreshold:
-                        description: Minimum consecutive successes for the probe to
-                          be considered successful after having failed. Defaults to
-                          1. Must be 1 for liveness and startup. Minimum value is
-                          1.
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       timeoutSeconds:
-                        description: 'Number of seconds after which the probe times
-                          out. Defaults to 1 second. Minimum value is 1. More info:
-                          https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         minimum: 1
                         type: integer
@@ -782,8 +793,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -792,46 +804,48 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   startupProbe:
                     description: NVIDIA Driver container startup probe settings
                     properties:
                       failureThreshold:
-                        description: Minimum consecutive failures for the probe to
-                          be considered failed after having succeeded. Defaults to
-                          3. Minimum value is 1.
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       initialDelaySeconds:
-                        description: 'Number of seconds after the container has started
-                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
                       periodSeconds:
-                        description: How often (in seconds) to perform the probe.
+                        description: |-
+                          How often (in seconds) to perform the probe.
                           Default to 10 seconds. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       successThreshold:
-                        description: Minimum consecutive successes for the probe to
-                          be considered successful after having failed. Defaults to
-                          1. Must be 1 for liveness and startup. Minimum value is
-                          1.
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
                         format: int32
                         minimum: 1
                         type: integer
                       timeoutSeconds:
-                        description: 'Number of seconds after which the probe times
-                          out. Defaults to 1 second. Minimum value is 1. More info:
-                          https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         minimum: 1
                         type: integer
@@ -841,8 +855,9 @@ spec:
                     properties:
                       autoUpgrade:
                         default: false
-                        description: AutoUpgrade is a global switch for automatic
-                          upgrade feature if set to false all other options are ignored
+                        description: |-
+                          AutoUpgrade is a global switch for automatic upgrade feature
+                          if set to false all other options are ignored
                         type: boolean
                       drain:
                         description: DrainSpec describes configuration for node drain
@@ -850,9 +865,9 @@ spec:
                         properties:
                           deleteEmptyDir:
                             default: false
-                            description: DeleteEmptyDir indicates if should continue
-                              even if there are pods using emptyDir (local data that
-                              will be deleted when the node is drained)
+                            description: |-
+                              DeleteEmptyDir indicates if should continue even if there are pods using emptyDir
+                              (local data that will be deleted when the node is drained)
                             type: boolean
                           enable:
                             default: false
@@ -864,9 +879,10 @@ spec:
                             description: Force indicates if force draining is allowed
                             type: boolean
                           podSelector:
-                            description: 'PodSelector specifies a label selector to
-                              filter pods on the node that need to be drained For
-                              more details on label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            description: |-
+                              PodSelector specifies a label selector to filter pods on the node that need to be drained
+                              For more details on label selectors, see:
+                              https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
                             type: string
                           timeoutSeconds:
                             default: 300
@@ -878,9 +894,9 @@ spec:
                         type: object
                       maxParallelUpgrades:
                         default: 1
-                        description: MaxParallelUpgrades indicates how many nodes
-                          can be upgraded in parallel 0 means no limit, all nodes
-                          will be upgraded in parallel
+                        description: |-
+                          MaxParallelUpgrades indicates how many nodes can be upgraded in parallel
+                          0 means no limit, all nodes will be upgraded in parallel
                         minimum: 0
                         type: integer
                       maxUnavailable:
@@ -888,12 +904,11 @@ spec:
                         - type: integer
                         - type: string
                         default: 25%
-                        description: 'MaxUnavailable is the maximum number of nodes
-                          with the driver installed, that can be unavailable during
-                          the upgrade. Value can be an absolute number (ex: 5) or
-                          a percentage of total nodes at the start of upgrade (ex:
-                          10%). Absolute number is calculated from percentage by rounding
-                          up. By default, a fixed value of 25% is used.'
+                        description: |-
+                          MaxUnavailable is the maximum number of nodes with the driver installed, that can be unavailable during the upgrade.
+                          Value can be an absolute number (ex: 5) or a percentage of total nodes at the start of upgrade (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up.
+                          By default, a fixed value of 25% is used.
                         x-kubernetes-int-or-string: true
                       podDeletion:
                         description: PodDeletionSpec describes configuration for deletion
@@ -901,9 +916,9 @@ spec:
                         properties:
                           deleteEmptyDir:
                             default: false
-                            description: DeleteEmptyDir indicates if should continue
-                              even if there are pods using emptyDir (local data that
-                              will be deleted when the pod is deleted)
+                            description: |-
+                              DeleteEmptyDir indicates if should continue even if there are pods using emptyDir
+                              (local data that will be deleted when the pod is deleted)
                             type: boolean
                           force:
                             default: false
@@ -922,9 +937,10 @@ spec:
                           for waiting on job completions
                         properties:
                           podSelector:
-                            description: 'PodSelector specifies a label selector for
-                              the pods to wait for completion For more details on
-                              label selectors, see: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            description: |-
+                              PodSelector specifies a label selector for the pods to wait for completion
+                              For more details on label selectors, see:
+                              https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
                             type: string
                           timeoutSeconds:
                             default: 0
@@ -1108,8 +1124,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1118,11 +1135,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1142,9 +1159,9 @@ spec:
                     properties:
                       artifactsDir:
                         default: /opt/nvidia-gpu-operator/artifacts/runtimeclasses
-                        description: ArtifactsDir is the directory where kata artifacts
-                          (e.g. kernel / guest images, configuration, etc.) are placed
-                          on the local filesystem.
+                        description: |-
+                          ArtifactsDir is the directory where kata artifacts (e.g. kernel / guest images, configuration, etc.)
+                          are placed on the local filesystem.
                         type: string
                       runtimeClasses:
                         description: RuntimeClasses is a list of kata runtime classes
@@ -1162,9 +1179,9 @@ spec:
                                     the OCI artifact.
                                   type: string
                                 url:
-                                  description: URL is the path to the OCI artifact
-                                    (payload) containing all artifacts associated
-                                    with a kata runtime class.
+                                  description: |-
+                                    URL is the path to the OCI artifact (payload) containing all artifacts
+                                    associated with a kata runtime class.
                                   type: string
                               required:
                               - url
@@ -1175,10 +1192,10 @@ spec:
                             nodeSelector:
                               additionalProperties:
                                 type: string
-                              description: NodeSelector specifies the nodeSelector
-                                for the RuntimeClass object. This ensures pods running
-                                with the RuntimeClass only get scheduled onto nodes
-                                which support it.
+                              description: |-
+                                NodeSelector specifies the nodeSelector for the RuntimeClass object.
+                                This ensures pods running with the RuntimeClass only get scheduled
+                                onto nodes which support it.
                               type: object
                           required:
                           - artifacts
@@ -1232,8 +1249,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1242,11 +1260,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1344,8 +1362,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1354,11 +1373,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1419,8 +1438,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1429,11 +1449,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1446,10 +1466,10 @@ spec:
                   annotations:
                     additionalProperties:
                       type: string
-                    description: 'Optional: Annotations is an unstructured key value
-                      map stored with a resource that may be set by external tools
-                      to store and retrieve arbitrary metadata. They are not queryable
-                      and should be preserved when modifying objects.'
+                    description: |-
+                      Optional: Annotations is an unstructured key value map stored with a resource that may be
+                      set by external tools to store and retrieve arbitrary metadata. They are not
+                      queryable and should be preserved when modifying objects.
                     type: object
                   defaultRuntime:
                     default: docker
@@ -1485,9 +1505,10 @@ spec:
                   labels:
                     additionalProperties:
                       type: string
-                    description: 'Optional: Map of string keys and values that can
-                      be used to organize and categorize (scope and select) objects.
-                      May match selectors of replication controllers and services.'
+                    description: |-
+                      Optional: Map of string keys and values that can be used to organize and categorize
+                      (scope and select) objects. May match selectors of replication controllers
+                      and services.
                     type: object
                   runtimeClass:
                     default: nvidia
@@ -1509,7 +1530,9 @@ spec:
                     type: boolean
                 type: object
               psp:
-                description: PSP defines spec for handling PodSecurityPolicies
+                description: |-
+                  Deprecated: Pod Security Policies are no longer supported. Please use PodSecurityAdmission instead
+                  PSP defines spec for handling PodSecurityPolicies
                 properties:
                   enabled:
                     description: Enabled indicates if PodSecurityPolicies needs to
@@ -1570,8 +1593,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1580,11 +1604,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1597,17 +1621,18 @@ spec:
                 properties:
                   defaultWorkload:
                     default: container
-                    description: DefaultWorkload indicates the default GPU workload
-                      type to configure worker nodes in the cluster for
+                    description: |-
+                      DefaultWorkload indicates the default GPU workload type to configure
+                      worker nodes in the cluster for
                     enum:
                     - container
                     - vm-passthrough
                     - vm-vgpu
                     type: string
                   enabled:
-                    description: Enabled indicates if the GPU Operator should manage
-                      additional operands required for sandbox workloads (i.e. VFIO
-                      Manager, vGPU Manager, and additional device plugins)
+                    description: |-
+                      Enabled indicates if the GPU Operator should manage additional operands required
+                      for sandbox workloads (i.e. VFIO Manager, vGPU Manager, and additional device plugins)
                     type: boolean
                 type: object
               toolkit:
@@ -1668,8 +1693,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1678,11 +1704,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -1799,8 +1825,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -1809,11 +1836,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   toolkit:
@@ -1996,8 +2023,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -2006,11 +2034,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -2083,8 +2111,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -2093,11 +2122,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -2200,8 +2229,9 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                       requests:
                         additionalProperties:
@@ -2210,11 +2240,11 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. Requests cannot exceed
-                          Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
                   version:
@@ -2240,42 +2270,42 @@ spec:
                   current state.
                 items:
                   description: "Condition contains details for one aspect of the current
-                    state of this API Resource. --- This struct is intended for direct
-                    use as an array at the field path .status.conditions.  For example,
-                    \n type FooStatus struct{ // Represents the observations of a
-                    foo's current state. // Known .status.conditions.type are: \"Available\",
-                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
-                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
-                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
-                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
                   properties:
                     lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition
-                        transitioned from one status to another. This should be when
-                        the underlying condition changed.  If that is not known, then
-                        using the time when the API field changed is acceptable.
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
-                      description: message is a human readable message indicating
-                        details about the transition. This may be an empty string.
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
                       maxLength: 32768
                       type: string
                     observedGeneration:
-                      description: observedGeneration represents the .metadata.generation
-                        that the condition was set based upon. For instance, if .metadata.generation
-                        is currently 12, but the .status.conditions[x].observedGeneration
-                        is 9, the condition is out of date with respect to the current
-                        state of the instance.
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
                       format: int64
                       minimum: 0
                       type: integer
                     reason:
-                      description: reason contains a programmatic identifier indicating
-                        the reason for the condition's last transition. Producers
-                        of specific condition types may define expected values and
-                        meanings for this field, and whether the values are considered
-                        a guaranteed API. The value should be a CamelCase string.
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
                         This field may not be empty.
                       maxLength: 1024
                       minLength: 1
@@ -2289,11 +2319,12 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                        --- Many .condition.type values are consistent across resources
-                        like Available, but because arbitrary conditions can be useful
-                        (see .node.status.conditions), the ability to deconflict is
-                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

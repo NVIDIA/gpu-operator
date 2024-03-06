@@ -42,7 +42,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4353,54 +4352,6 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	}
 
 	found := &secv1.SecurityContextConstraints{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.rec.Client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
-}
-
-// PodSecurityPolicy creates PSP resources
-func PodSecurityPolicy(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
-	state := n.idx
-	obj := n.resources[state].PodSecurityPolicy.DeepCopy()
-	obj.Namespace = n.operatorNamespace
-
-	logger := n.rec.Log.WithValues("PodSecurityPolicies", obj.Name)
-
-	// Check if PSP is disabled and cleanup resource if exists
-	if !n.singleton.Spec.PSP.IsEnabled() {
-		err := n.rec.Client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &policyv1beta1.PodSecurityPolicy{}
 	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")

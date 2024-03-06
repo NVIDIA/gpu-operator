@@ -19,14 +19,6 @@ rules:
   verbs:
   - use
 - apiGroups:
-  - policy
-  resourceNames:
-  - gpu-operator-privileged
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-- apiGroups:
   - ""
   resources:
   - pods

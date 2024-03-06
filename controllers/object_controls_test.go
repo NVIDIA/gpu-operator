@@ -32,7 +32,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -96,7 +95,6 @@ var kubernetesResources = []client.Object{
 	&schedv1.PriorityClass{},
 	// &corev1.Taint{},
 	&secv1.SecurityContextConstraints{},
-	&policyv1beta1.PodSecurityPolicy{},
 	&corev1.Namespace{},
 	&nodev1.RuntimeClass{},
 	&promv1.PrometheusRule{},

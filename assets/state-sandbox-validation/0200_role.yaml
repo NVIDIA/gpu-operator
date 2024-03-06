@@ -18,11 +18,3 @@ rules:
   - nodes
   verbs:
   - get
-- apiGroups:
-  - policy
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-  resourceNames:
-  - gpu-operator-privileged

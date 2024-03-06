@@ -132,8 +132,6 @@ spec:
     {{- if .Values.mig.strategy }}
     strategy: {{ .Values.mig.strategy }}
     {{- end }}
-  psp:
-    enabled: {{ .Values.psp.enabled }}
   psa:
     enabled: {{ .Values.psa.enabled }}
   cdi:

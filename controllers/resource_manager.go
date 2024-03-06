@@ -27,13 +27,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 
 	secv1 "github.com/openshift/api/security/v1"
 
-	"golang.org/x/mod/semver"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -61,7 +59,6 @@ type Resources struct {
 	PriorityClass              schedv1.PriorityClass
 	Taint                      corev1.Taint
 	SecurityContextConstraints secv1.SecurityContextConstraints
-	PodSecurityPolicy          policyv1beta1.PodSecurityPolicy
 	RuntimeClasses             []nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
 }
@@ -179,14 +176,6 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			if len(res.RuntimeClasses) == 1 {
 				ctrl = append(ctrl, RuntimeClasses)
 			}
-		case "PodSecurityPolicy":
-			if n.openshift != "" || semver.Compare(n.k8sVersion, pspRemovalAPIVersion) >= 0 {
-				n.rec.Log.Info("PodSecurityPolicy API is not supported. Skipping...")
-				continue
-			}
-			_, _, err := s.Decode(m, nil, &res.PodSecurityPolicy)
-			panicIfError(err)
-			ctrl = append(ctrl, PodSecurityPolicy)
 		case "PrometheusRule":
 			_, _, err := s.Decode(m, nil, &res.PrometheusRule)
 			panicIfError(err)
