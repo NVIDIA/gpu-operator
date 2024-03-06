@@ -82,6 +82,8 @@ spec:
             value: all
           - name: NVIDIA_DRIVER_CAPABILITIES
             value: all
+          - name: MPS_ROOT
+            value: /run/nvidia/mps
         volumeMounts:
           - name: nvidia-device-plugin-entrypoint
             readOnly: true
@@ -98,6 +100,11 @@ spec:
             mountPropagation: HostToContainer
           - name: cdi-root
             mountPath: /var/run/cdi
+          # The MPS /dev/shm is needed to allow for MPS daemon health-checking.
+          - name: mps-shm
+            mountPath: /dev/shm
+          - name: mps-root
+            mountPath: /mps
       - image: "FILLED BY THE OPERATOR"
         name: config-manager
         command: ["config-manager"]
@@ -145,3 +152,10 @@ spec:
           hostPath:
             path: /var/run/cdi
             type: DirectoryOrCreate
+        - name: mps-root
+          hostPath:
+            path: /run/nvidia/mps
+            type: DirectoryOrCreate
+        - name: mps-shm
+          hostPath:
+            path: /run/nvidia/mps/shm

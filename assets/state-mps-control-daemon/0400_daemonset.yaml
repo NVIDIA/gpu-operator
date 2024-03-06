@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-device-plugin-mps-control-daemon
+  name: nvidia-device-plugin-mps-control-daemon
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: hostmount-anyuid
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-device-plugin-mps-control-daemon
+  template:
+    metadata:
+      labels:
+        app: nvidia-device-plugin-mps-control-daemon
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.device-plugin: "true"
+        nvidia.com/mps.capable: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-device-plugin
+      initContainers:
+        - image: "FILLED BY THE OPERATOR"
+          name: toolkit-validation
+          command: ['sh', '-c']
+          args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: HostToContainer
+        - image: "FILLED BY THE OPERATOR"
+          name: mps-control-daemon-mounts
+          command: [mps-control-daemon, mount-shm]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: mps-root
+              mountPath: /mps
+              mountPropagation: Bidirectional
+        - image: "FILLED BY OPERATOR"
+          name: config-manager-init
+          command: ["config-manager"]
+          env:
+            - name: ONESHOT
+              value: "true"
+            - name: KUBECONFIG
+              value: ""
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: "spec.nodeName"
+            - name: NODE_LABEL
+              value: "nvidia.com/device-plugin.config"
+            - name: CONFIG_FILE_SRCDIR
+              value: "/available-configs"
+            - name: CONFIG_FILE_DST
+              value: "/config/config.yaml"
+            - name: DEFAULT_CONFIG
+              value: ""
+            - name: SEND_SIGNAL
+              value: "false"
+            - name: SIGNAL
+              value: ""
+            - name: PROCESS_TO_SIGNAL
+              value: ""
+      containers:
+        - image: "FILLED BY OPERATOR"
+          name: mps-control-daemon-ctr
+          command: [mps-control-daemon]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: mps-shm
+              mountPath: /dev/shm
+            - name: mps-root
+              mountPath: /mps
+        - image: "FILLED BY THE OPERATOR"
+          name: config-manager
+          command: ["config-manager"]
+          securityContext:
+            privileged: true
+          env:
+            - name: ONESHOT
+              value: "false"
+            - name: KUBECONFIG
+              value: ""
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: "spec.nodeName"
+            - name: NODE_LABEL
+              value: "nvidia.com/device-plugin.config"
+            - name: CONFIG_FILE_SRCDIR
+              value: "/available-configs"
+            - name: CONFIG_FILE_DST
+              value: "/config/config.yaml"
+            - name: DEFAULT_CONFIG
+              value: ""
+            - name: SEND_SIGNAL
+              value: "true"
+            - name: SIGNAL
+              value: "1" # SIGHUP
+            - name: PROCESS_TO_SIGNAL
+              value: "/usr/bin/mps-control-daemon"
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: Directory
+        - name: mps-root
+          hostPath:
+            path:  /run/nvidia/mps
+            type: DirectoryOrCreate
+        - name: mps-shm
+          hostPath:
+            path: /run/nvidia/mps/shm
