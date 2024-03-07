@@ -22,11 +22,13 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
+// StringSet implements a thread safe Set of Strings
 type StringSet struct {
 	m  map[string]bool
 	mu sync.RWMutex
 }
 
+// NewStringSet creates a StringSet
 func NewStringSet() *StringSet {
 	return &StringSet{
 		m:  make(map[string]bool),
@@ -68,12 +70,16 @@ type KeyedMutex struct {
 	mutexes sync.Map // Zero value is empty and ready for use
 }
 
+// UnlockFunc is a function that release a lock
 type UnlockFunc = func()
 
 // Lock locks a mutex, associated with a given key and returns an unlock function
 func (m *KeyedMutex) Lock(key string) UnlockFunc {
 	value, _ := m.mutexes.LoadOrStore(key, &sync.Mutex{})
-	mtx := value.(*sync.Mutex)
+	mtx, ok := value.(*sync.Mutex)
+	if !ok {
+		panic("object is not of type sync.Mutex which is what was expected")
+	}
 	mtx.Lock()
 	return func() { mtx.Unlock() }
 }
@@ -98,17 +104,31 @@ func GetUpgradeSkipNodeLabelKey() string {
 	return fmt.Sprintf(UpgradeSkipNodeLabelKeyFmt, DriverName)
 }
 
+// GetUpgradeDriverWaitForSafeLoadAnnotationKey returns the key for annotation used to mark node as waiting for driver
+// safe load
+func GetUpgradeDriverWaitForSafeLoadAnnotationKey() string {
+	return fmt.Sprintf(UpgradeWaitForSafeDriverLoadAnnotationKeyFmt, DriverName)
+}
+
+// GetUpgradeRequestedAnnotationKey returns the key for annotation used to mark node as driver upgrade is requested
+// externally (orphaned pod)
+func GetUpgradeRequestedAnnotationKey() string {
+	return fmt.Sprintf(UpgradeRequestedAnnotationKeyFmt, DriverName)
+}
+
 // GetUpgradeInitialStateAnnotationKey returns the key for annotation used to track initial state of the node
 func GetUpgradeInitialStateAnnotationKey() string {
 	return fmt.Sprintf(UpgradeInitialStateAnnotationKeyFmt, DriverName)
 }
 
-// GetWaitForPodCompletionStartTimeAnnotationKey returns the key for annotation used to track start time for waiting on pod/job completions
+// GetWaitForPodCompletionStartTimeAnnotationKey returns the key for annotation used to track start time for waiting on
+// pod/job completions
 func GetWaitForPodCompletionStartTimeAnnotationKey() string {
 	return fmt.Sprintf(UpgradeWaitForPodCompletionStartTimeAnnotationKeyFmt, DriverName)
 }
 
-// GetValidationTimeoutAnnotationKey returns the key for annotation indicating start time for validation-required state
+// GetValidationStartTimeAnnotationKey returns the key for annotation indicating start time for validation-required
+// state
 func GetValidationStartTimeAnnotationKey() string {
 	return fmt.Sprintf(UpgradeValidationStartTimeAnnotationKeyFmt, DriverName)
 }
@@ -118,13 +138,15 @@ func GetEventReason() string {
 	return fmt.Sprintf("%sDriverUpgrade", strings.ToUpper(DriverName))
 }
 
-func logEventf(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string, args ...interface{}) {
+func logEventf(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string,
+	args ...interface{}) {
 	if recorder != nil {
-		recorder.Eventf(object, eventType, reason, messageFmt, args)
+		recorder.Eventf(object, eventType, reason, messageFmt, args, nil)
 	}
 }
 
-func logEvent(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string) {
+func logEvent(recorder record.EventRecorder, object runtime.Object, eventType string, reason string,
+	messageFmt string) {
 	if recorder != nil {
 		recorder.Event(object, eventType, reason, messageFmt)
 	}

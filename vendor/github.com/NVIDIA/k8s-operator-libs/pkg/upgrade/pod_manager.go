@@ -68,16 +68,22 @@ type PodManagerConfig struct {
 }
 
 const (
+	// PodControllerRevisionHashLabelKey is the label key containing the controller-revision-hash
 	PodControllerRevisionHashLabelKey = "controller-revision-hash"
 )
 
 // PodDeletionFilter takes a pod and returns a boolean indicating whether the pod should be deleted
 type PodDeletionFilter func(corev1.Pod) bool
 
+// GetPodDeletionFilter returns the PodDeletionFilter
 func (m *PodManagerImpl) GetPodDeletionFilter() PodDeletionFilter {
 	return m.podDeletionFilter
 }
 
+// GetPodControllerRevisionHash returns the Pod Controller Revision Hash from its labels
+// TODO: Drop ctx as it's not used
+//
+//nolint:revive
 func (m *PodManagerImpl) GetPodControllerRevisionHash(ctx context.Context, pod *corev1.Pod) (string, error) {
 	if hash, ok := pod.Labels[PodControllerRevisionHashLabelKey]; ok {
 		return hash, nil
@@ -85,7 +91,9 @@ func (m *PodManagerImpl) GetPodControllerRevisionHash(ctx context.Context, pod *
 	return "", fmt.Errorf("controller-revision-hash label not present for pod %s", pod.Name)
 }
 
-func (m *PodManagerImpl) GetDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.DaemonSet) (string, error) {
+// GetDaemonsetControllerRevisionHash returns the latest DaemonSet Controller Revision Hash
+func (m *PodManagerImpl) GetDaemonsetControllerRevisionHash(ctx context.Context,
+	daemonset *appsv1.DaemonSet) (string, error) {
 	// get all revisions for the daemonset
 	listOptions := meta_v1.ListOptions{LabelSelector: labels.SelectorFromSet(daemonset.Spec.Selector.MatchLabels).String()}
 	controllerRevisionList, err := m.k8sInterface.AppsV1().ControllerRevisions(daemonset.Namespace).List(ctx, listOptions)
@@ -131,8 +139,8 @@ func (m *PodManagerImpl) SchedulePodEviction(ctx context.Context, config *PodMan
 	// Create a custom drain filter which will be passed to the drain helper.
 	// The drain helper will carry out the actual deletion of pods on a node.
 	customDrainFilter := func(pod corev1.Pod) drain.PodDeleteStatus {
-		delete := m.podDeletionFilter(pod)
-		if !delete {
+		deleteFunc := m.podDeletionFilter(pod)
+		if !deleteFunc {
 			return drain.MakePodDeleteStatusSkip()
 		}
 		return drain.MakePodDeleteStatusOkay()
@@ -171,8 +179,8 @@ func (m *PodManagerImpl) SchedulePodEviction(ctx context.Context, config *PodMan
 				// Get number of pods requiring deletion using the podDeletionFilter
 				numPodsToDelete := 0
 				for _, pod := range podList.Items {
-					if m.podDeletionFilter(pod) == true {
-						numPodsToDelete += 1
+					if m.podDeletionFilter(pod) {
+						numPodsToDelete++
 					}
 				}
 
@@ -188,31 +196,33 @@ func (m *PodManagerImpl) SchedulePodEviction(ctx context.Context, config *PodMan
 				numPodsCanDelete := len(podDeleteList.Pods())
 				if numPodsCanDelete != numPodsToDelete {
 					m.log.V(consts.LogLevelError).Error(nil, "Cannot delete all required pods", "node", node.Name)
-					if errs != nil {
-						for _, err := range errs {
-							m.log.V(consts.LogLevelError).Error(err, "Error reported by drain helper", "node", node.Name)
-						}
+					for _, err := range errs {
+						m.log.V(consts.LogLevelError).Error(err, "Error reported by drain helper", "node", node.Name)
 					}
 					m.updateNodeToDrainOrFailed(ctx, node, config.DrainEnabled)
 					return
 				}
 
 				for _, p := range podDeleteList.Pods() {
-					m.log.V(consts.LogLevelInfo).Info("Identified pod to delete", "node", node.Name, "namespace", p.Namespace, "name", p.Name)
+					m.log.V(consts.LogLevelInfo).Info("Identified pod to delete", "node", node.Name,
+						"namespace", p.Namespace, "name", p.Name)
 				}
-				m.log.V(consts.LogLevelDebug).Info("Warnings when identifying pods to delete", "warnings", podDeleteList.Warnings(), "node", node.Name)
+				m.log.V(consts.LogLevelDebug).Info("Warnings when identifying pods to delete",
+					"warnings", podDeleteList.Warnings(), "node", node.Name)
 
 				err = drainHelper.DeleteOrEvictPods(podDeleteList.Pods())
 				if err != nil {
 					m.log.V(consts.LogLevelError).Error(err, "Failed to delete pods on the node", "node", node.Name)
-					logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(), "Failed to delete workload pods on the node for the driver upgrade, %s", err.Error())
+					logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(),
+						"Failed to delete workload pods on the node for the driver upgrade, %s", err.Error())
 					m.updateNodeToDrainOrFailed(ctx, node, config.DrainEnabled)
 					return
 				}
 
 				m.log.V(consts.LogLevelInfo).Info("Deleted pods on the node", "node", node.Name)
 				_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, &node, UpgradeStatePodRestartRequired)
-				logEvent(m.eventRecorder, &node, corev1.EventTypeNormal, GetEventReason(), "Deleted workload pods on the node for the driver upgrade")
+				logEvent(m.eventRecorder, &node, corev1.EventTypeNormal, GetEventReason(),
+					"Deleted workload pods on the node for the driver upgrade")
 			}(*node)
 		} else {
 			m.log.V(consts.LogLevelInfo).Info("Node is already getting pods deleted, skipping", "node", node.Name)
@@ -235,15 +245,16 @@ func (m *PodManagerImpl) SchedulePodsRestart(ctx context.Context, pods []*corev1
 		err := m.k8sInterface.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, deleteOptions)
 		if err != nil {
 			m.log.V(consts.LogLevelInfo).Error(err, "Failed to delete pod", "pod", pod.Name)
-			logEventf(m.eventRecorder, pod, corev1.EventTypeWarning, GetEventReason(), "Failed to restart driver pod %s", err.Error())
+			logEventf(m.eventRecorder, pod, corev1.EventTypeWarning, GetEventReason(),
+				"Failed to restart driver pod %s", err.Error())
 			return err
 		}
 	}
 	return nil
 }
 
-// ScheduleCheckOnPodCompletion receives PodSelectorConfig and schedules checks for pod statuses on each node in the list.
-// If the checks are successful, the node moves to UpgradeStatePodDeletionRequired state,
+// ScheduleCheckOnPodCompletion receives PodSelectorConfig and schedules checks for pod statuses on each node in the
+// list. If the checks are successful, the node moves to UpgradeStatePodDeletionRequired state,
 // otherwise it will stay in the same current state.
 func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, config *PodManagerConfig) error {
 	m.log.V(consts.LogLevelInfo).Info("Pod Manager, starting checks on pod statuses")
@@ -254,11 +265,13 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 		// fetch the pods using the label selector provided
 		podList, err := m.ListPods(ctx, config.WaitForCompletionSpec.PodSelector, node.Name)
 		if err != nil {
-			m.log.V(consts.LogLevelError).Error(err, "Failed to list pods", "selector", config.WaitForCompletionSpec.PodSelector, "node", node.Name)
+			m.log.V(consts.LogLevelError).Error(err, "Failed to list pods",
+				"selector", config.WaitForCompletionSpec.PodSelector, "node", node.Name)
 			return err
 		}
 		if len(podList.Items) > 0 {
-			m.log.V(consts.LogLevelDebug).Error(err, "Found workload pods", "selector", config.WaitForCompletionSpec.PodSelector, "node", node.Name, "pods", len(podList.Items))
+			m.log.V(consts.LogLevelDebug).Error(err, "Found workload pods",
+				"selector", config.WaitForCompletionSpec.PodSelector, "node", node.Name, "pods", len(podList.Items))
 		}
 		// Increment the WaitGroup counter.
 		wg.Add(1)
@@ -280,7 +293,8 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 				if config.WaitForCompletionSpec.TimeoutSecond != 0 {
 					err = m.HandleTimeoutOnPodCompletions(ctx, &node, int64(config.WaitForCompletionSpec.TimeoutSecond))
 					if err != nil {
-						logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(), "Failed to handle timeout for job completions, %s", err.Error())
+						logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(),
+							"Failed to handle timeout for job completions, %s", err.Error())
 						return
 					}
 				}
@@ -290,12 +304,14 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 			annotationKey := GetWaitForPodCompletionStartTimeAnnotationKey()
 			err = m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, &node, annotationKey, "null")
 			if err != nil {
-				logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(), "Failed to remove annotation used to track job completions: %s", err.Error())
+				logEventf(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(),
+					"Failed to remove annotation used to track job completions: %s", err.Error())
 				return
 			}
 			// update node state
 			_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, &node, UpgradeStatePodDeletionRequired)
-			m.log.V(consts.LogLevelInfo).Info("Updated the node state", "node", node.Name, "state", UpgradeStatePodDeletionRequired)
+			m.log.V(consts.LogLevelInfo).Info("Updated the node state", "node", node.Name,
+				"state", UpgradeStatePodDeletionRequired)
 		}(*node)
 	}
 	// Wait for all goroutines to complete
@@ -305,7 +321,8 @@ func (m *PodManagerImpl) ScheduleCheckOnPodCompletion(ctx context.Context, confi
 
 // ListPods returns the list of pods in all namespaces with the given selector
 func (m *PodManagerImpl) ListPods(ctx context.Context, selector string, nodeName string) (*corev1.PodList, error) {
-	listOptions := meta_v1.ListOptions{LabelSelector: selector, FieldSelector: "spec.nodeName=" + nodeName}
+	listOptions := meta_v1.ListOptions{LabelSelector: selector,
+		FieldSelector: fmt.Sprintf(nodeNameFieldSelectorFmt, nodeName)}
 	podList, err := m.k8sInterface.CoreV1().Pods("").List(ctx, listOptions)
 	if err != nil {
 		return nil, err
@@ -314,15 +331,18 @@ func (m *PodManagerImpl) ListPods(ctx context.Context, selector string, nodeName
 }
 
 // HandleTimeoutOnPodCompletions transitions node based on the timeout for job completions on the node
-func (m *PodManagerImpl) HandleTimeoutOnPodCompletions(ctx context.Context, node *corev1.Node, timeoutSeconds int64) error {
+func (m *PodManagerImpl) HandleTimeoutOnPodCompletions(ctx context.Context, node *corev1.Node,
+	timeoutSeconds int64) error {
 	annotationKey := GetWaitForPodCompletionStartTimeAnnotationKey()
 	currentTime := time.Now().Unix()
 	// check if annotation already exists for tracking start time
 	if _, present := node.Annotations[annotationKey]; !present {
 		// add the annotation to track start time
-		err := m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey, strconv.FormatInt(currentTime, 10))
+		err := m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey,
+			strconv.FormatInt(currentTime, 10))
 		if err != nil {
-			m.log.V(consts.LogLevelError).Error(err, "Failed to add annotation to track job completions", "node", node.Name, "annotation", annotationKey)
+			m.log.V(consts.LogLevelError).Error(err, "Failed to add annotation to track job completions",
+				"node", node.Name, "annotation", annotationKey)
 			return err
 		}
 		return nil
@@ -330,17 +350,20 @@ func (m *PodManagerImpl) HandleTimeoutOnPodCompletions(ctx context.Context, node
 	// check if timeout reached
 	startTime, err := strconv.ParseInt(node.Annotations[annotationKey], 10, 64)
 	if err != nil {
-		m.log.V(consts.LogLevelError).Error(err, "Failed to convert start time to track job completions", "node", node.Name)
+		m.log.V(consts.LogLevelError).Error(err, "Failed to convert start time to track job completions",
+			"node", node.Name)
 		return err
 	}
 	if currentTime > startTime+timeoutSeconds {
 		// timeout exceeded, mark node for pod/job deletions
 		_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, node, UpgradeStatePodDeletionRequired)
-		m.log.V(consts.LogLevelInfo).Info("Timeout exceeded for job completions, updated the node state", "node", node.Name, "state", UpgradeStatePodDeletionRequired)
+		m.log.V(consts.LogLevelInfo).Info("Timeout exceeded for job completions, updated the node state",
+			"node", node.Name, "state", UpgradeStatePodDeletionRequired)
 		// remove annotation used for tracking start time
 		err = m.nodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, node, annotationKey, "null")
 		if err != nil {
-			m.log.V(consts.LogLevelError).Error(err, "Failed to remove annotation used to track job completions", "node", node.Name, "annotation", annotationKey)
+			m.log.V(consts.LogLevelError).Error(err, "Failed to remove annotation used to track job completions",
+				"node", node.Name, "annotation", annotationKey)
 			return err
 		}
 	}
@@ -351,16 +374,20 @@ func (m *PodManagerImpl) HandleTimeoutOnPodCompletions(ctx context.Context, node
 func (m *PodManagerImpl) IsPodRunningOrPending(pod corev1.Pod) bool {
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
-		m.log.V(consts.LogLevelDebug).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodRunning)
+		m.log.V(consts.LogLevelDebug).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName,
+			"state", corev1.PodRunning)
 		return true
 	case corev1.PodPending:
-		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodPending)
+		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName,
+			"state", corev1.PodPending)
 		return true
 	case corev1.PodFailed:
-		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodFailed)
+		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName,
+			"state", corev1.PodFailed)
 		return false
 	case corev1.PodSucceeded:
-		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName, "state", corev1.PodSucceeded)
+		m.log.V(consts.LogLevelInfo).Info("Pod status", "pod", pod.Name, "node", pod.Spec.NodeName,
+			"state", corev1.PodSucceeded)
 		return false
 	}
 	return false
@@ -369,12 +396,13 @@ func (m *PodManagerImpl) IsPodRunningOrPending(pod corev1.Pod) bool {
 func (m *PodManagerImpl) updateNodeToDrainOrFailed(ctx context.Context, node corev1.Node, drainEnabled bool) {
 	nextState := UpgradeStateFailed
 	if drainEnabled {
-		m.log.V(consts.LogLevelInfo).Info("Pod deletion failed but drain is enabled in spec. Will attempt a node drain", "node", node.Name)
-		logEvent(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(), "Pod deletion failed but drain is enabled in spec. Will attempt a node drain")
+		m.log.V(consts.LogLevelInfo).Info("Pod deletion failed but drain is enabled in spec. Will attempt a node drain",
+			"node", node.Name)
+		logEvent(m.eventRecorder, &node, corev1.EventTypeWarning, GetEventReason(),
+			"Pod deletion failed but drain is enabled in spec. Will attempt a node drain")
 		nextState = UpgradeStateDrainRequired
 	}
 	_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, &node, nextState)
-	return
 }
 
 // NewPodManager returns an instance of PodManager implementation
