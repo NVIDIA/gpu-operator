@@ -142,9 +142,6 @@ metadata:
             },
             "gds": {
               "enabled": false
-            },
-            "gdrcopy": {
-              "enabled": false
             }
           }
         },
@@ -186,8 +183,8 @@ metadata:
     capabilities: Deep Insights
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
-    createdAt: "Thu Jul 27 13:57:56 PDT 2023"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:3988b3b570cf65b0d338cb29bd24b0b9bf1885e1563fbb398ef23cba0b59e6bb
+    createdAt: "Wed Mar 6 16:43:36 PDT 2024"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
@@ -198,7 +195,7 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+      image: nvcr.io/nvidia/gpu-operator@sha256:3988b3b570cf65b0d338cb29bd24b0b9bf1885e1563fbb398ef23cba0b59e6bb
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:011fb450af3fa2e8fe5d28d590e4c653631447bc23d149591ced3d89089c4f2c
     - name: dcgm-image
@@ -212,15 +209,15 @@ spec:
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:56c79482582cdfbc58d3134e8672637c5bf05f328880f76898f526143d04c6af
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:2a1baf95eb414e6a451c7da2ac6c2992ff81ac95e407a4b254367f18ca9aa320
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:bb81ae8d034d1e1c6a342091a5f1dda5884dd43ab47e96624487a133d1edd4b3
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:2a1baf95eb414e6a451c7da2ac6c2992ff81ac95e407a4b254367f18ca9aa320
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:a67d8e92861a2dce5649105c07561e4422e9fe4ba81a6525dc0d70a7ef85f9c0
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:714547d54e5fe4191019a1e5f1daffc7fab7481b619b79c378541dafc76c9e5d
     - name: gpu-operator-validator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:9aefef081c3ab1123556374d2b15d0429f3990af2fbaccc3c9827801e1042703
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:27c44f4720a4abf780217bd5e7903e4a008ebdbcf71238c4f106a0c22654776c
     - name: vfio-manager-image
@@ -707,6 +704,16 @@ spec:
           - list
           - watch
         - apiGroups:
+          - policy
+          resources:
+          - podsecuritypolicies
+          verbs:
+          - create
+          - get
+          - update
+          - list
+          - delete
+        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
@@ -819,6 +826,16 @@ spec:
           verbs:
           - '*'
         - apiGroups:
+          - policy
+          resources:
+          - podsecuritypolicies
+          verbs:
+          - create
+          - get
+          - update
+          - list
+          - delete
+        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
@@ -848,7 +865,7 @@ spec:
                   - --leader-elect
                   - --leader-lease-renew-deadline
                   - "60s"
-                image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+                image: nvcr.io/nvidia/gpu-operator@sha256:3988b3b570cf65b0d338cb29bd24b0b9bf1885e1563fbb398ef23cba0b59e6bb
                 command:
                   - gpu-operator
                 livenessProbe:
@@ -886,9 +903,9 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:master-latest-ubi8"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:9aefef081c3ab1123556374d2b15d0429f3990af2fbaccc3c9827801e1042703"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:2a1baf95eb414e6a451c7da2ac6c2992ff81ac95e407a4b254367f18ca9aa320"
+                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:8d1ec78f2b1ddb7f0c47453d0427231190747bda411733a7dd0c8f5196f09e9c"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:59a3875e7a37eb370385e654184efa3a1b193c9ea352165818496b19cbe14aa4"
                   - name: "DCGM_IMAGE"
@@ -896,7 +913,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:011fb450af3fa2e8fe5d28d590e4c653631447bc23d149591ced3d89089c4f2c"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:2a1baf95eb414e6a451c7da2ac6c2992ff81ac95e407a4b254367f18ca9aa320"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:bb81ae8d034d1e1c6a342091a5f1dda5884dd43ab47e96624487a133d1edd4b3"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:7481a3697783dcdca9ae78e7b548a6900e86ea33ab49ec14f0ba55db2fdb1a2e"
                   - name: "DRIVER_IMAGE-535"
