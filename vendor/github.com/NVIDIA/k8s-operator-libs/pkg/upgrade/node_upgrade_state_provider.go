@@ -36,6 +36,7 @@ type NodeUpgradeStateProvider interface {
 	ChangeNodeUpgradeAnnotation(ctx context.Context, node *corev1.Node, key string, value string) error
 }
 
+// NodeUpgradeStateProviderImpl implements the NodeUpgradeStateProvider interface
 type NodeUpgradeStateProviderImpl struct {
 	K8sClient     client.Client
 	Log           logr.Logger
@@ -43,7 +44,9 @@ type NodeUpgradeStateProviderImpl struct {
 	eventRecorder record.EventRecorder
 }
 
-func NewNodeUpgradeStateProvider(k8sClient client.Client, log logr.Logger, eventRecorder record.EventRecorder) NodeUpgradeStateProvider {
+// NewNodeUpgradeStateProvider creates a NodeUpgradeStateProviderImpl
+func NewNodeUpgradeStateProvider(k8sClient client.Client, log logr.Logger,
+	eventRecorder record.EventRecorder) NodeUpgradeStateProvider {
 	return &NodeUpgradeStateProviderImpl{
 		K8sClient:     k8sClient,
 		Log:           log,
@@ -52,6 +55,7 @@ func NewNodeUpgradeStateProvider(k8sClient client.Client, log logr.Logger, event
 	}
 }
 
+// GetNode returns a corev1.Node according to name
 func (p *NodeUpgradeStateProviderImpl) GetNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
 	defer p.nodeMutex.Lock(nodeName)()
 
@@ -80,7 +84,8 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 		p.Log.V(consts.LogLevelError).Error(err, "Failed to patch node state label on a node object",
 			"node", node,
 			"state", newNodeState)
-		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(), "Failed to update node state label to %s, %s", newNodeState, err.Error())
+		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
+			"Failed to update node state label to %s, %s", newNodeState, err.Error())
 		return err
 	}
 
@@ -94,6 +99,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 	// will have the updated node object in the cache.
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
+	//nolint:staticcheck
 	err = wait.PollImmediateUntil(time.Second, func() (bool, error) {
 		p.Log.V(consts.LogLevelDebug).Info("Requesting node object to see if operator cache has updated",
 			"node", node.Name)
@@ -114,17 +120,21 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 		p.Log.V(consts.LogLevelError).Error(err, "Error while waiting on node label update",
 			"node", node,
 			"state", newNodeState)
-		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(), "Failed to update node state label to %s, %s", newNodeState, err.Error())
+		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
+			"Failed to update node state label to %s, %s", newNodeState, err.Error())
 	} else {
 		p.Log.V(consts.LogLevelInfo).Info("Successfully changed node upgrade state label",
 			"node", node.Name,
 			"new state", newNodeState)
-		logEventf(p.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(), "Successfully updated node state label to %s", newNodeState)
+		logEventf(p.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(),
+			"Successfully updated node state label to %s", newNodeState)
 	}
 
 	return err
 }
 
+// ChangeNodeUpgradeAnnotation patches a given corev1.Node object and updates an annotation with a given value
+// The function then waits for the operator cache to get updated
 func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	ctx context.Context, node *corev1.Node, key string, value string) error {
 	p.Log.V(consts.LogLevelInfo).Info("Updating node upgrade annotation",
@@ -135,7 +145,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	defer p.nodeMutex.Lock(node.Name)()
 
 	patchString := []byte(fmt.Sprintf(`{"metadata":{"annotations":{%q: %q}}}`, key, value))
-	if value == "null" {
+	if value == nullString {
 		patchString = []byte(fmt.Sprintf(`{"metadata":{"annotations":{%q: null}}}`, key))
 	}
 	patch := client.RawPatch(types.MergePatchType, patchString)
@@ -145,7 +155,8 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 			"node", node,
 			"annotationKey", key,
 			"annotationValue", value)
-		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(), "Failed to update node annotation %s=%s: %s", key, value, err.Error())
+		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
+			"Failed to update node annotation %s=%s: %s", key, value, err.Error())
 		return err
 	}
 
@@ -159,6 +170,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	// will have the updated node object in the cache.
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
+	//nolint:staticcheck
 	err = wait.PollImmediateUntil(time.Second, func() (bool, error) {
 		p.Log.V(consts.LogLevelDebug).Info("Requesting node object to see if operator cache has updated",
 			"node", node.Name)
@@ -167,7 +179,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 			return false, err
 		}
 		annotationValue, exists := node.Annotations[key]
-		if value == "null" {
+		if value == nullString {
 			// annotation key should be removed
 			if exists {
 				p.Log.V(consts.LogLevelDebug).Info("upgrade state annotation for node should be removed but it still exists",
@@ -189,13 +201,15 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 			"node", node,
 			"annotationKey", key,
 			"annotationValue", value)
-		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(), "Failed to update node annotation to %s=%s: %s", key, value, err.Error())
+		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
+			"Failed to update node annotation to %s=%s: %s", key, value, err.Error())
 	} else {
 		p.Log.V(consts.LogLevelInfo).Info("Successfully changed node upgrade state annotation",
 			"node", node.Name,
 			"annotationKey", key,
 			"annotationValue", value)
-		logEventf(p.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(), "Successfully updated node annotation to %s=%s", key, value)
+		logEventf(p.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(),
+			"Successfully updated node annotation to %s=%s", key, value)
 	}
 
 	return err

@@ -55,7 +55,8 @@ type WaitForCompletionSpec struct {
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	PodSelector string `json:"podSelector,omitempty"`
-	// TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means infinite
+	// TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+	// infinite
 	// +optional
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum:=0
@@ -68,7 +69,8 @@ type PodDeletionSpec struct {
 	// +optional
 	// +kubebuilder:default:=false
 	Force bool `json:"force,omitempty"`
-	// TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means infinite
+	// TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+	// infinite
 	// +optional
 	// +kubebuilder:default:=300
 	// +kubebuilder:validation:Minimum:=0
@@ -107,4 +109,5 @@ type DrainSpec struct {
 	DeleteEmptyDir bool `json:"deleteEmptyDir,omitempty"`
 }
 
+// GetObjectKind return ObjectKind
 func (obj *DriverUpgradePolicySpec) GetObjectKind() schema.ObjectKind { return nil }

@@ -19,16 +19,14 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/drain"
 )
 
 // CordonManagerImpl implements CordonManager interface and can
 // cordon / uncordon k8s nodes
 type CordonManagerImpl struct {
-	k8sInterface  kubernetes.Interface
-	log           logr.Logger
-	eventRecorder record.EventRecorder
+	k8sInterface kubernetes.Interface
+	log          logr.Logger
 }
 
 // CordonManager provides methods for cordoning / uncordoning nodes

@@ -20,14 +20,10 @@ package consts
   This package contains constants used throughout the projects and does not fall into a particular package
 */
 
+// Note: if a different logger is used than zap (operator-sdk default), these values would probably need to change.
 const (
-	// Note: if a different logger is used than zap (operator-sdk default), these values would probably need to change.
 	LogLevelError = iota - 2
 	LogLevelWarning
 	LogLevelInfo
 	LogLevelDebug
-)
-
-const (
-	NicClusterPolicyResourceName = "nic-cluster-policy"
 )
