@@ -14,8 +14,8 @@ require (
 	github.com/mittwald/go-helm-client v0.12.7
 	github.com/onsi/ginkgo/v2 v2.14.0
 	github.com/onsi/gomega v1.30.0
-	github.com/openshift/api v0.0.0-20230607151152-bdd886567621
-	github.com/openshift/client-go v0.0.0-20230607134213-3cd0021bbee3
+	github.com/openshift/api v0.0.0-20240306072808-610cbc77dbab
+	github.com/openshift/client-go v0.0.0-20240215090359-b71f6f2731f5
 	github.com/operator-framework/api v0.17.6
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.65.2
 	github.com/prometheus/client_golang v1.18.0
