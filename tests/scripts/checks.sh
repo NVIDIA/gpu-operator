@@ -2,6 +2,7 @@
 
 check_pod_ready() {
 	local pod_label=$1
+	local timeout_minutes=${2:-45}
 	local current_time=0
 	while :; do
 		echo "Checking $pod_label pod"
@@ -21,7 +22,7 @@ check_pod_ready() {
 			fi
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		if [[ "${current_time}" -gt $((60 * ${timeout_minutes})) ]]; then
 			echo "timeout reached"
 			exit 1;
 		fi

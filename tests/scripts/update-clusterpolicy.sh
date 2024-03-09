@@ -181,9 +181,9 @@ test_mps() {
     sleep 10
 
     # Wait for device-plugin, mps-daemon, and gfd to be ready
-    check_pod_ready "nvidia-device-plugin-daemonset"
-    check_pod_ready "nvidia-device-plugin-mps-control-daemon"
-    check_pod_ready "gpu-feature-discovery"
+    check_pod_ready "nvidia-device-plugin-daemonset" 5
+    check_pod_ready "nvidia-device-plugin-mps-control-daemon" 5
+    check_pod_ready "gpu-feature-discovery" 5
 
     echo "validating workloads on GPU using MPS"
 
