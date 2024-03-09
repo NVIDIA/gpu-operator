@@ -1,7 +1,25 @@
-version: v1
-sharing:
-  timeSlicing:
-    renameByDefault: false
-    resources:
-    - name: nvidia.com/gpu
-      replicas: 10
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-config
+data:
+  time-slicing: |-
+    version: v1
+    flags:
+      migStrategy: none
+    sharing:
+      timeSlicing:
+        renameByDefault: false
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 10
+  mps: |-
+    version: v1
+    flags:
+      migStrategy: none
+    sharing:
+      mps:
+        renameByDefault: false
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 4

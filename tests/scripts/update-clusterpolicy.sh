@@ -124,8 +124,8 @@ test_enable_dcgm() {
 test_gpu_sharing() {
     echo "updating device-plugin with custom config for enabling gpu sharing"
     # Apply device-plugin config for GPU sharing
-    kubectl create configmap plugin-config --from-file=${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
-    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "plugin-config.yaml"}}]'
+    kubectl apply -f ${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "time-slicing"}}]'
 
     # sleep for 10 seconds for operator to apply changes to plugin pods
     sleep 10
@@ -169,6 +169,52 @@ test_gpu_sharing() {
 
     # Cleanup plugin test pod.
     kubectl delete -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
+}
+
+test_mps() {
+    echo "updating device-plugin with custom config for enabling mps"
+    # Apply device-plugin config for MPS
+    kubectl apply -f ${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "mps"}}]'
+
+    # sleep for 10 seconds for operator to apply changes to plugin pods
+    sleep 10
+
+    # Wait for device-plugin, mps-daemon, and gfd to be ready
+    check_pod_ready "nvidia-device-plugin-daemonset"
+    check_pod_ready "nvidia-device-plugin-mps-control-daemon"
+    check_pod_ready "gpu-feature-discovery"
+
+    echo "validating workloads on GPU using MPS"
+
+    # set the operator validator image version in the plugin test spec
+    sed -i "s/image: nvcr.io\/nvidia\/cloud-native\/gpu-operator-validator:v1.10.1/image: ${VALIDATOR_IMAGE//\//\\/}:${VALIDATOR_VERSION}/g" ${TEST_DIR}/plugin-mps-test.yaml
+
+    # Deploy test-pod to validate GPU sharing using MPS
+    kubectl apply -f ${TEST_DIR}/plugin-mps-test.yaml -n $TEST_NAMESPACE
+
+    kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-mps-test -n $TEST_NAMESPACE
+    if [ $? -ne 0 ]; then
+        echo "cannot run parallel pods with MPS enabled"
+        kubectl get pods -l app=nvidia-plugin-mps-test -n $TEST_NAMESPACE
+        exit 1
+    fi
+
+    # Verify GFD labels
+    replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]' | tr -d '"')
+    if [ "$replica_count" != "4" ]; then
+        echo "Required label nvidia.com/gpu.replicas is incorrect when MPS is enabled - $replica_count"
+        exit 1
+    fi
+
+    mps_capable=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/mps.capable"]' | tr -d '"')
+    if [ "$mps_capable" != "true" ]; then
+        echo "Label nvidia.com/mps.capable is incorrect with MPS is enabled - $mps_capable"
+        exit 1
+    fi
+
+    # Cleanup plugin test pod.
+    kubectl delete -f ${TEST_DIR}/plugin-mps-test.yaml -n $TEST_NAMESPACE
 }
 
 test_disable_enable_dcgm_exporter() {
@@ -265,6 +311,7 @@ test_env_updates
 test_mig_strategy_updates
 test_enable_dcgm
 test_gpu_sharing
+test_mps
 test_disable_enable_gfd
 test_disable_enable_dcgm_exporter
 test_custom_labels_override
