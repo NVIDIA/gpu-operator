@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ${SCRIPT_DIR}/collect-logs.sh
+
 check_pod_ready() {
 	local pod_label=$1
 	local timeout_minutes=${2:-45}
@@ -24,6 +26,7 @@ check_pod_ready() {
 
 		if [[ "${current_time}" -gt $((60 * ${timeout_minutes})) ]]; then
 			echo "timeout reached"
+			collect_logs
 			exit 1;
 		fi
 
@@ -56,6 +59,7 @@ check_pod_deleted() {
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			collect_logs
 			exit 1;
 		fi
 
@@ -74,6 +78,7 @@ check_no_restarts() {
 	if [ $restartCount -gt 1 ]; then
 		echo "$pod_label restarted multiple times: $restartCount"
 		kubectl logs -p -lapp=$pod_label --all-containers -n ${TEST_NAMESPACE}
+		collect_logs
 		exit 1
 	fi
 	echo "Repeated restarts not observed for pod $pod_label"
@@ -108,20 +113,15 @@ test_restart_operator() {
 		fi
 	done
 
-	echo "Timeout reached, the GPU Operator is still not ready. See below for logs:"
-	kubectl logs -n gpu-operator "$(kubectl get pods -n "${ns}" -o json | jq -r '.items[0].metadata.name')"
+	echo "Timeout reached, the GPU Operator is still not ready."
+	collect_logs
 	exit 1
 }
 
 check_gpu_pod_ready() {
-	local log_dir=$1
 	local current_time=0
 
-	# Ensure the log directory exists
-	mkdir -p ${log_dir}
-
 	while :; do
-		pods="$(kubectl get --all-namespaces pods -o json | jq '.items[] | {name: .metadata.name, ns: .metadata.namespace}' | jq -s -c .)"
 		status=$(kubectl get pods gpu-operator-test -o json | jq -r .status.phase)
 		if [ "${status}" = "Succeeded" ]; then
 			echo "GPU pod terminated successfully"
@@ -131,23 +131,12 @@ check_gpu_pod_ready() {
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			collect_logs
 			exit 1
 		fi
 
-		# Echo useful information on stdout
-		kubectl get pods --all-namespaces
-
-		for pod in $(echo "$pods" | jq -r .[].name); do
-			ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
-			echo "Generating logs for pod: ${pod} ns: ${ns}"
-			echo "------------------------------------------------" >> "${log_dir}/${pod}.describe"
-			kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe"
-			kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${log_dir}/${pod}.logs" || true
-		done
-
-		echo "Generating cluster logs"
-		echo "------------------------------------------------" >> "${log_dir}/cluster.logs"
-		kubectl get --all-namespaces pods >> "${log_dir}/cluster.logs"
+    # Echo useful information on stdout
+    kubectl get pods --all-namespaces
 
 		echo "Sleeping 5 seconds"
 		current_time=$((${current_time} + 5))
@@ -178,6 +167,7 @@ check_nvidia_driver_pods_ready() {
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			collect_logs
 			exit 1;
 		fi
 
@@ -195,6 +185,7 @@ check_no_driver_pod_restarts() {
 	if [ $restartCount -gt 1 ]; then
 		echo "nvidia driver pod restarted multiple times: $restartCount"
 		kubectl logs -p -l "app.kubernetes.io/component=nvidia-driver" --all-containers -n ${TEST_NAMESPACE}
+		collect_logs
 		exit 1
 	fi
 	echo "Repeated restarts not observed for the nvidia driver pod"
@@ -222,6 +213,7 @@ wait_for_driver_upgrade_done() {
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			collect_logs
 			exit 1;
 		fi
 
@@ -235,3 +227,5 @@ wait_for_driver_upgrade_done() {
 		sleep 5
 	done
 }
+
+

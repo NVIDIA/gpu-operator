@@ -11,4 +11,4 @@ source ${SCRIPT_DIR}/.definitions.sh
 # Import the check definitions
 source ${SCRIPT_DIR}/checks.sh
 
-check_gpu_pod_ready ${LOG_DIR}
+check_gpu_pod_ready
