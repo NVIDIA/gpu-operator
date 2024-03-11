@@ -188,6 +188,9 @@ test_mps() {
     kubectl apply -f ${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "mps"}}]'
 
+    # Ensure the 'single' MIG strategy is configured as currently MPS support in the plugin does not support 'mixed' MIG strategy
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/mig/strategy", "value": '$MIG_STRATEGY'}]'
+
     # sleep for 10 seconds for operator to apply changes to plugin pods
     sleep 10
 
