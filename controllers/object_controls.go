@@ -3646,42 +3646,6 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	return true, nil
 }
 
-// serviceAccountHasDockerCfg returns True if obj ServiceAccount
-// exists and has its builder-dockercfg secret reference populated.
-//
-// With OpenShift DriverToolkit, we need to ensure that this secret is
-// populated, otherwise, the Pod won't have the credentials to access
-// the DriverToolkit image in the cluster registry.
-func serviceAccountHasDockerCfg(obj *corev1.ServiceAccount, n ClusterPolicyController) (bool, error) {
-	ctx := n.ctx
-	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name)
-
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: obj.Name}, obj)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Info("ServiceAccount not found",
-				"Namespace", n.operatorNamespace, "err", err)
-			return false, nil
-		}
-
-		logger.Info("Couldn't get the ServiceAccount",
-			"Name", obj.Name,
-			"Error", err)
-
-		return false, err
-	}
-
-	for _, secret := range obj.Secrets {
-		if strings.HasPrefix(secret.Name, obj.Name+"-dockercfg-") {
-			return true, nil
-		}
-	}
-
-	logger.Info("ServiceAccount doesn't have dockercfg secret", "Name", obj.Name)
-
-	return false, nil
-}
-
 func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context) error {
 	// Get all DaemonSets owned by ClusterPolicy
 	//
@@ -3795,17 +3759,6 @@ func (n ClusterPolicyController) ocpDriverToolkitDaemonSets(ctx context.Context)
 	err := n.ocpCleanupStaleDriverToolkitDaemonSets(ctx)
 	if err != nil {
 		return gpuv1.NotReady, err
-	}
-
-	state := n.idx
-	saObj := n.resources[state].ServiceAccount.DeepCopy()
-	saReady, err := serviceAccountHasDockerCfg(saObj, n)
-	if err != nil {
-		return gpuv1.NotReady, err
-	}
-	if !saReady {
-		n.rec.Log.Info("Driver ServiceAccount not ready, cannot create DriverToolkit DaemonSet")
-		return gpuv1.NotReady, nil
 	}
 
 	n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
