@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/NVIDIA/go-nvlib v0.0.0-20231116150931-9fd385bace0d
+	github.com/NVIDIA/go-nvlib v0.1.0
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240214071211-ea58a3ada15c
 	github.com/NVIDIA/nvidia-container-toolkit v1.14.6
@@ -21,7 +21,7 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/regclient/regclient v0.4.8
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.1
 	go.uber.org/zap v1.26.0
 	golang.org/x/mod v0.15.0
@@ -87,7 +87,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.5.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
