@@ -538,6 +538,15 @@ spec:
                     items:
                       type: string
                     type: array
+                  mps:
+                    description: 'Optional: MPS related configuration for the NVIDIA
+                      Device Plugin'
+                    properties:
+                      root:
+                        default: /run/nvidia/mps
+                        description: Root defines the MPS root path on the host
+                        type: string
+                    type: object
                   repository:
                     description: NVIDIA Device Plugin image repository
                     type: string
@@ -926,9 +935,9 @@ spec:
                             type: boolean
                           timeoutSeconds:
                             default: 300
-                            description: TimeoutSecond specifies the length of time
-                              in seconds to wait before giving up on pod termination,
-                              zero means infinite
+                            description: |-
+                              TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+                              infinite
                             minimum: 0
                             type: integer
                         type: object
@@ -944,9 +953,9 @@ spec:
                             type: string
                           timeoutSeconds:
                             default: 0
-                            description: TimeoutSecond specifies the length of time
-                              in seconds to wait before giving up on pod termination,
-                              zero means infinite
+                            description: |-
+                              TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+                              infinite
                             minimum: 0
                             type: integer
                         type: object

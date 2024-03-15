@@ -164,6 +164,10 @@ const (
 	DefaultCCModeEnvName = "DEFAULT_CC_MODE"
 	// OpenKernelModulesEnabledEnvName is the name of the driver-container envvar for enabling open GPU kernel module support
 	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
+	// MPSRootEnvName is the name of the envvar for configuring the MPS root
+	MPSRootEnvName = "MPS_ROOT"
+	// DefaultMPSRoot is the default MPS root path on the host
+	DefaultMPSRoot = "/run/nvidia/mps"
 )
 
 // ContainerProbe defines container probe types
@@ -1281,6 +1285,19 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
+	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
+	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
+		config.DevicePlugin.MPS.Root != DefaultMPSRoot {
+		for i, volume := range obj.Spec.Template.Spec.Volumes {
+			if volume.Name == "mps-root" {
+				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.DevicePlugin.MPS.Root
+			} else if volume.Name == "mps-shm" {
+				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
+			}
+		}
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
+	}
+
 	return nil
 }
 
@@ -1345,6 +1362,18 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	// update env required for MIG support
 	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
+
+	// update MPS volumes if a custom MPS root is configured
+	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
+		config.DevicePlugin.MPS.Root != DefaultMPSRoot {
+		for i, volume := range obj.Spec.Template.Spec.Volumes {
+			if volume.Name == "mps-root" {
+				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.DevicePlugin.MPS.Root
+			} else if volume.Name == "mps-shm" {
+				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
+			}
+		}
+	}
 
 	return nil
 }
