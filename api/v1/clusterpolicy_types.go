@@ -734,6 +734,11 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Configuration for the NVIDIA Device Plugin via the ConfigMap"
 	Config *DevicePluginConfig `json:"config,omitempty"`
+
+	// Optional: MPS related configuration for the NVIDIA Device Plugin
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="MPS related configuration for the NVIDIA Device Plugin"
+	MPS *MPSConfig `json:"mps,omitempty"`
 }
 
 // DevicePluginConfig defines ConfigMap name for NVIDIA Device Plugin config
@@ -750,6 +755,17 @@ type DevicePluginConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Default config name within the ConfigMap for the NVIDIA Device Plugin config"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Default string `json:"default,omitempty"`
+}
+
+// MPSConfig defines MPS related configuration for the NVIDIA Device Plugin
+type MPSConfig struct {
+	// Root defines the MPS root path on the host
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=/run/nvidia/mps
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="MPS root path on the host"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Root string `json:"root,omitempty"`
 }
 
 // SandboxDevicePluginSpec defines the properties for the NVIDIA Sandbox Device Plugin deployment

@@ -277,6 +277,10 @@ devicePlugin:
     default: ""
     # Data section for the ConfigMap to create (i.e only applies when create=true)
     data: {}
+  # MPS related configuration for the plugin
+  mps:
+    # MPS root path on the host
+    root: "/run/nvidia/mps"
 
 # standalone dcgm hostengine
 dcgm:
