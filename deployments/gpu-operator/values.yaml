@@ -284,7 +284,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 3.3.0-1-ubuntu22.04
+  version: 3.3.3-1-ubuntu22.04
   imagePullPolicy: IfNotPresent
   hostPort: 5555
   args: []
@@ -295,7 +295,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 3.3.0-3.2.0-ubuntu22.04
+  version: 3.3.5-3.4.0-ubuntu22.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
