@@ -101,6 +101,9 @@ metadata:
               "config": {
                 "name": "",
                 "default": ""
+              },
+              "mps": {
+                "root": "/run/nvidia/mps"
               }
             },
             "gfd": {
