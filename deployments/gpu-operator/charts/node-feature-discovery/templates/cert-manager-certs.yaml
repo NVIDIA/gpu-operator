@@ -1,4 +1,5 @@
 {{- if .Values.tls.certManager }}
+{{- if .Values.master.enable }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -17,14 +18,13 @@ spec:
   # first one is configured for use by the worker; below are for completeness
   - {{ include "node-feature-discovery.fullname" . }}-master.{{ include "node-feature-discovery.namespace" .  }}.svc
   - {{ include "node-feature-discovery.fullname" . }}-master.{{ include "node-feature-discovery.namespace" .  }}.svc.cluster.local
-  # localhost needed for grpc_health_probe
-  - localhost
   issuerRef:
     name: nfd-ca-issuer
     kind: Issuer
     group: cert-manager.io
-
+{{- end }}
 ---
+{{- if .Values.worker.enable }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -42,6 +42,7 @@ spec:
     name: nfd-ca-issuer
     kind: Issuer
     group: cert-manager.io
+{{- end }}
 
 {{- if .Values.topologyUpdater.enable }}
 ---
