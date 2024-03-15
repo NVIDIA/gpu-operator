@@ -58,6 +58,9 @@ spec:
             drop: [ "ALL" ]
           readOnlyRootFilesystem: true
           runAsNonRoot: true
+        ports:
+          - name: metrics
+            containerPort: {{ .Values.gc.metricsPort | default "8081"}}
 
     {{- with .Values.gc.nodeSelector }}
       nodeSelector:
