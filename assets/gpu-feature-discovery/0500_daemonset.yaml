@@ -106,7 +106,7 @@ spec:
           - name: SIGNAL
             value: "1" # SIGHUP
           - name: PROCESS_TO_SIGNAL
-            value: "/usr/bin/gpu-feature-discovery"
+            value: "gpu-feature-discovery"
       volumes:
         - name: output-dir
           hostPath:
