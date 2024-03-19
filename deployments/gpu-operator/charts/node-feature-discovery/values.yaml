@@ -13,8 +13,10 @@ namespaceOverride: ""
 enableNodeFeatureApi: true
 
 master:
+  enable: true
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
     # noPublish: false
+    # autoDefaultNs: true
     # extraLabelNs: ["added.ns.io","added.kubernets.io"]
     # denyLabelNs: ["denied.ns.io","denied.kubernetes.io"]
     # resourceLabels: ["vendor-1.com/feature-1","vendor-2.io/feature-2"]
@@ -45,6 +47,8 @@ master:
     # nfdApiParallelism: 10
   ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
   # The TCP port that nfd-master listens for incoming requests. Default: 8080
+  # Deprecated this parameter is related to the deprecated gRPC API and will
+  # be removed with it in a future release  
   port: 8080
   metricsPort: 8081
   instance:
@@ -130,6 +134,7 @@ master:
                 values: [""]
 
 worker:
+  enable: true
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
     #  labelWhiteList:
@@ -215,7 +220,7 @@ worker:
     #    # The following feature demonstrates the capabilities of the matchFeatures
     #    - name: "my custom rule"
     #      labels:
-    #        my-ng-feature: "true"
+    #        "vendor.io/my-ng-feature": "true"
     #      # matchFeatures implements a logical AND over all matcher terms in the
     #      # list (i.e. all of the terms, or per-feature matchers, must match)
     #      matchFeatures:
@@ -286,7 +291,7 @@ worker:
     #    # The following feature demonstrates the capabilities of the matchAny
     #    - name: "my matchAny rule"
     #      labels:
-    #        my-ng-feature-2: "my-value"
+    #        "vendor.io/my-ng-feature-2": "my-value"
     #      # matchAny implements a logical IF over all elements (sub-matchers) in
     #      # the list (i.e. at least one feature matcher must match)
     #      matchAny:
@@ -307,10 +312,17 @@ worker:
     #                vendor: {op: In, value: ["8086"]}
     #                class: {op: In, value: ["02"]}
     #
+    #    - name: "avx wildcard rule"
+    #      labels:
+    #        "my-avx-feature": "true"
+    #      matchFeatures:
+    #        - feature: cpu.cpuid
+    #          matchName: {op: InRegexp, value: ["^AVX512"]}
+    #
     #    # The following features demonstreate label templating capabilities
     #    - name: "my template rule"
     #      labelsTemplate: |
-    #        {{ range .system.osrelease }}my-system-feature.{{ .Name }}={{ .Value }}
+    #        {{ range .system.osrelease }}vendor.io/my-system-feature.{{ .Name }}={{ .Value }}
     #        {{ end }}
     #      matchFeatures:
     #        - feature: system.osrelease
@@ -320,7 +332,7 @@ worker:
     #
     #    - name: "my template rule 2"
     #      labelsTemplate: |
-    #        {{ range .pci.device }}my-pci-device.{{ .class }}-{{ .device }}=with-cpuid
+    #        {{ range .pci.device }}vendor.io/my-pci-device.{{ .class }}-{{ .device }}=with-cpuid
     #        {{ end }}
     #      matchFeatures:
     #        - feature: pci.device
@@ -335,7 +347,7 @@ worker:
     #    # previous labels and vars
     #    - name: "my dummy kernel rule"
     #      labels:
-    #        "my.kernel.feature": "true"
+    #        "vendor.io/my.kernel.feature": "true"
     #      matchFeatures:
     #        - feature: kernel.version
     #          matchExpressions:
@@ -350,13 +362,20 @@ worker:
     #
     #    - name: "my rule using backrefs"
     #      labels:
-    #        "my.backref.feature": "true"
+    #        "vendor.io/my.backref.feature": "true"
     #      matchFeatures:
     #        - feature: rule.matched
     #          matchExpressions:
-    #            my.kernel.feature: {op: IsTrue}
+    #            vendor.io/my.kernel.feature: {op: IsTrue}
     #            my.dummy.var: {op: Gt, value: ["0"]}
     #
+    #    - name: "kconfig template rule"
+    #      labelsTemplate: |
+    #        {{ range .kernel.config }}kconfig-{{ .Name }}={{ .Value }}
+    #        {{ end }}
+    #      matchFeatures:
+    #        - feature: kernel.config
+    #          matchName: {op: In, value: ["SWAP", "X86", "ARM"]}
 ### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
 
   metricsPort: 8081
@@ -492,6 +511,8 @@ gc:
     # requests:
     #   cpu: 100m
     #   memory: 128Mi
+
+  metricsPort: 8081
 
   nodeSelector: {}
   tolerations: []

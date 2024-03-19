@@ -1,3 +1,4 @@
+{{- if and (not .Values.enableNodeFeatureApi) .Values.master.enable }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -16,3 +17,4 @@ spec:
   selector:
     {{- include "node-feature-discovery.selectorLabels" . | nindent 4 }}
     role: master
+{{- end}}

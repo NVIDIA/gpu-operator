@@ -1,3 +1,4 @@
+{{- if .Values.worker.enable }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -44,13 +45,21 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
         resources:
         {{- toYaml .Values.worker.resources | nindent 12 }}
         command:
         - "nfd-worker"
         args:
-        - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
         {{- if not .Values.enableNodeFeatureApi }}
+        - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
         - "-enable-nodefeature-api=false"
         {{- end }}
 {{- if .Values.tls.enable }}
@@ -150,3 +159,4 @@ spec:
     {{- with .Values.worker.priorityClassName }}
       priorityClassName: {{ . | quote }}
     {{- end }}
+{{- end }}
