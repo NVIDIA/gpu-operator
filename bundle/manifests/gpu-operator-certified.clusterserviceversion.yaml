@@ -161,7 +161,7 @@ metadata:
             "driverType": "gpu",
             "repository": "nvcr.io/nvidia",
             "image": "driver",
-            "version": "sha256:7481a3697783dcdca9ae78e7b548a6900e86ea33ab49ec14f0ba55db2fdb1a2e",
+            "version": "sha256:96f25c67e5b1072d5981080e12d65ec37eb9ef2fc0494499416aa801b0a34da3",
             "nodeSelector": {},
             "manager": {},
             "repoConfig": {
@@ -209,9 +209,9 @@ spec:
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:59a3875e7a37eb370385e654184efa3a1b193c9ea352165818496b19cbe14aa4
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:7481a3697783dcdca9ae78e7b548a6900e86ea33ab49ec14f0ba55db2fdb1a2e
+      image: nvcr.io/nvidia/driver@sha256:96f25c67e5b1072d5981080e12d65ec37eb9ef2fc0494499416aa801b0a34da3
     - name: driver-image-535
-      image: nvcr.io/nvidia/driver@sha256:abda1ac56371d55917b96ff330109980f468e133c9d5705da0ef87429f14ccd7
+      image: nvcr.io/nvidia/driver@sha256:a836ccbe21da735aee1c39b81060ed5e2fdb4ffa339874baaf4634f1e9259f74
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:56c79482582cdfbc58d3134e8672637c5bf05f328880f76898f526143d04c6af
     - name: device-plugin-image
@@ -903,9 +903,9 @@ spec:
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:aa92e05ab0906de97ae211366d010560d2a38d9933d7532f667fa5b6f8b4abca"
                   - name: "DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/driver@sha256:7481a3697783dcdca9ae78e7b548a6900e86ea33ab49ec14f0ba55db2fdb1a2e"
+                    value: "nvcr.io/nvidia/driver@sha256:96f25c67e5b1072d5981080e12d65ec37eb9ef2fc0494499416aa801b0a34da3"
                   - name: "DRIVER_IMAGE-535"
-                    value: "nvcr.io/nvidia/driver@sha256:abda1ac56371d55917b96ff330109980f468e133c9d5705da0ef87429f14ccd7"
+                    value: "nvcr.io/nvidia/driver@sha256:a836ccbe21da735aee1c39b81060ed5e2fdb4ffa339874baaf4634f1e9259f74"
                   - name: "DRIVER_IMAGE-470"
                     value: "nvcr.io/nvidia/driver@sha256:56c79482582cdfbc58d3134e8672637c5bf05f328880f76898f526143d04c6af"
                   - name: "DRIVER_MANAGER_IMAGE"
