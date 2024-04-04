@@ -67,7 +67,6 @@ type testConfig struct {
 var (
 	cfg                     *testConfig
 	clusterPolicyController ClusterPolicyController
-	clusterPolicyReconciler ClusterPolicyReconciler
 	clusterPolicy           gpuv1.ClusterPolicy
 	boolTrue                *bool
 	boolFalse               *bool
@@ -201,16 +200,12 @@ func setup() error {
 	}
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	clusterPolicyReconciler = ClusterPolicyReconciler{
-		Client: client,
-		Log:    ctrl.Log.WithName("controller").WithName("ClusterPolicy"),
-		Scheme: s,
-	}
-
 	clusterPolicyController = ClusterPolicyController{
 		ctx:       ctx,
 		singleton: cp,
-		rec:       &clusterPolicyReconciler,
+		client:    client,
+		logger:    ctrl.Log.WithName("controller").WithName("ClusterPolicy"),
+		scheme:    s,
 	}
 
 	clusterPolicyController.operatorMetrics = initOperatorMetrics(&clusterPolicyController)
@@ -271,7 +266,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 // updateClusterPolicy updates an existing ClusterPolicy instance
 func updateClusterPolicy(n *ClusterPolicyController, cp *gpuv1.ClusterPolicy) error {
 	n.singleton = cp
-	err := n.rec.Client.Update(n.ctx, cp)
+	err := n.client.Update(n.ctx, cp)
 	if err != nil && !apierrors.IsConflict(err) {
 		return fmt.Errorf("failed to update ClusterPolicy: %v", err)
 	}
@@ -285,7 +280,7 @@ func removeState(n *ClusterPolicyController, idx int) error {
 	var err error
 	for _, res := range kubernetesResources {
 		// TODO: use n.operatorNamespace once MR is merged
-		err = n.rec.Client.DeleteAllOf(n.ctx, res)
+		err = n.client.DeleteAllOf(n.ctx, res)
 		if err != nil {
 			return fmt.Errorf("error deleting objects from k8s client: %v", err)
 		}
@@ -414,7 +409,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		client.MatchingLabels{"app": dsLabel},
 	}
 	list := &appsv1.DaemonSetList{}
-	err = clusterPolicyController.rec.Client.List(ctx, list, opts...)
+	err = clusterPolicyController.client.List(ctx, list, opts...)
 	if err != nil {
 		t.Fatalf("could not get DaemonSetList from client: %v", err)
 	}
