@@ -28,6 +28,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	apiconfigv1 "github.com/openshift/api/config/v1"
+	apiimagev1 "github.com/openshift/api/image/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,11 +60,13 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(clusterpolicyv1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(nvidiav1alpha1.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
+	utilruntime.Must(promv1.AddToScheme(scheme))
+	utilruntime.Must(secv1.Install(scheme))
+	utilruntime.Must(apiconfigv1.Install(scheme))
+	utilruntime.Must(apiimagev1.Install(scheme))
 }
 
 func main() {

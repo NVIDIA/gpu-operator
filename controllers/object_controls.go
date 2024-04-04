@@ -280,11 +280,11 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -292,11 +292,11 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, skipping update")
 			return gpuv1.Ready, nil
@@ -315,11 +315,11 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].Role.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -327,14 +327,14 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(ctx, obj)
+			err = n.client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -356,11 +356,11 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].RoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -378,14 +378,14 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(ctx, obj)
+			err = n.client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -407,11 +407,11 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ClusterRole.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -419,14 +419,14 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(ctx, obj)
+			err = n.client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -448,11 +448,11 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -464,14 +464,14 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(ctx, obj)
+			err = n.client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -494,11 +494,11 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 	obj := n.resources[state].ConfigMaps[configMapIdx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -540,18 +540,18 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		}
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
 		}
 
 		logger.Info("Found Resource, updating...")
-		err = n.rec.Client.Update(ctx, obj)
+		err = n.client.Update(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't update", "Error", err)
 			return gpuv1.NotReady, err
@@ -581,7 +581,7 @@ func ConfigMaps(n ClusterPolicyController) (gpuv1.State, error) {
 func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, error) {
 	kernelVersionMap := make(map[string]string)
 	ctx := n.ctx
-	logger := n.rec.Log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
+	logger := n.logger.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 
 	// Filter only GPU nodes
 	opts := []client.ListOption{
@@ -589,7 +589,7 @@ func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, erro
 	}
 
 	list := &corev1.NodeList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
 		return nil, err
@@ -629,14 +629,14 @@ func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, erro
 
 func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	ctx := n.ctx
-	logger := n.rec.Log.WithValues("Request.Namespace", "default", "Request.Name", "Node")
+	logger := n.logger.WithValues("Request.Namespace", "default", "Request.Name", "Node")
 	// We need the node labels to fetch the correct container
 	opts := []client.ListOption{
 		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
 	}
 
 	list := &corev1.NodeList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
 		logger.Info("Could not get NodeList", "ERROR", err)
 		return "", "", ""
@@ -678,7 +678,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
-	logger := n.rec.Log.WithValues("Daemonset", obj.Name)
+	logger := n.logger.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":                 TransformDriver,
 		"nvidia-vgpu-manager-daemonset":           TransformVGPUManager,
@@ -1020,17 +1020,17 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 	configMap.ObjectMeta.Labels = make(map[string]string)
 	configMap.ObjectMeta.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
 
-	logger := n.rec.Log.WithValues("ConfigMap", configMap.ObjectMeta.Name, "Namespace", configMap.ObjectMeta.Namespace)
+	logger := n.logger.WithValues("ConfigMap", configMap.ObjectMeta.Name, "Namespace", configMap.ObjectMeta.Namespace)
 
-	if err := controllerutil.SetControllerReference(n.singleton, configMap, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, configMap, n.scheme); err != nil {
 		return nil, err
 	}
 
 	found := &corev1.ConfigMap{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating")
-		err = n.rec.Client.Create(ctx, configMap)
+		err = n.client.Create(ctx, configMap)
 		if err != nil {
 			logger.Info("Couldn't create")
 			return nil, fmt.Errorf("failed to create trusted CA bundle config map %q: %s", name, err)
@@ -1983,7 +1983,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	if validatorErr != nil {
-		n.rec.Log.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
 	}
 
 	return nil
@@ -2012,7 +2012,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	if validatorErr != nil {
-		n.rec.Log.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
 	}
 
 	return nil
@@ -2575,7 +2575,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			continue
 		}
 		if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
-			n.rec.Log.Info("GPUDirect Storage is disabled")
+			n.logger.Info("GPUDirect Storage is disabled")
 			// remove nvidia-fs sidecar container from driver Daemonset if GDS is not enabled
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
@@ -2657,7 +2657,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			continue
 		}
 		if config.GDRCopy == nil || !config.GDRCopy.IsEnabled() {
-			n.rec.Log.Info("GDRCopy is disabled")
+			n.logger.Info("GDRCopy is disabled")
 			// remove nvidia-gdrcopy sidecar container from driver Daemonset if gdrcopy is not enabled
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
@@ -2781,7 +2781,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	if !n.ocpDriverToolkit.enabled {
 		if n.ocpDriverToolkit.requested {
-			n.rec.Log.Info("OpenShift DriverToolkit was requested but could not be enabled (dependencies missing)")
+			n.logger.Info("OpenShift DriverToolkit was requested but could not be enabled (dependencies missing)")
 		}
 
 		/* remove OpenShift Driver Toolkit side-car container from the Driver DaemonSet */
@@ -2821,18 +2821,18 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
 		setContainerEnv(driverToolkitContainer, "GDS_ENABLED", "true")
-		n.rec.Log.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDS_ENABLED", config.GPUDirectStorage.IsEnabled())
+		n.logger.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDS_ENABLED", config.GPUDirectStorage.IsEnabled())
 	}
 
 	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
 		setContainerEnv(driverToolkitContainer, "GDRCOPY_ENABLED", "true")
-		n.rec.Log.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDRCOPY_ENABLED", "true")
+		n.logger.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDRCOPY_ENABLED", "true")
 	}
 
 	image := n.ocpDriverToolkit.rhcosDriverToolkitImages[n.ocpDriverToolkit.currentRhcosVersion]
 	if image != "" {
 		driverToolkitContainer.Image = image
-		n.rec.Log.Info("DriverToolkit", "image", driverToolkitContainer.Image)
+		n.logger.Info("DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
 		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
 		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
@@ -2843,7 +2843,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
 		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
-		n.rec.Log.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+		n.logger.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
 
 	/* prepare the main container to start from the DriverToolkit entrypoint */
@@ -2998,7 +2998,7 @@ func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string
 	// get the ConfigMap
 	cm := &corev1.ConfigMap{}
 	opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: configMapName}
-	err := n.rec.Client.Get(ctx, opts, cm)
+	err := n.client.Get(ctx, opts, cm)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ERROR: could not get ConfigMap %s from client: %v", configMapName, err)
 	}
@@ -3233,7 +3233,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
-		n.rec.Log.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
+		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
 		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
@@ -3431,19 +3431,19 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
-	n.rec.Log.V(1).Info("Deployment", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.logger.V(1).Info("Deployment", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DeploymentList{}
-	err := n.rec.Client.List(n.ctx, list, opts...)
+	err := n.client.List(n.ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Info("Could not get DeploymentList", err)
+		n.logger.Info("Could not get DeploymentList", err)
 	}
-	n.rec.Log.V(1).Info("Deployment", "NumberOfDeployment", len(list.Items))
+	n.logger.V(1).Info("Deployment", "NumberOfDeployment", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	n.rec.Log.V(1).Info("Deployment", "NumberUnavailable", ds.Status.UnavailableReplicas)
+	n.logger.V(1).Info("Deployment", "NumberUnavailable", ds.Status.UnavailableReplicas)
 
 	if ds.Status.UnavailableReplicas != 0 {
 		return gpuv1.NotReady
@@ -3455,19 +3455,19 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	ctx := n.ctx
 	ds := &appsv1.DaemonSet{}
-	n.rec.Log.V(2).Info("checking daemonset for readiness", "name", name)
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, ds)
+	n.logger.V(2).Info("checking daemonset for readiness", "name", name)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, ds)
 	if err != nil {
-		n.rec.Log.Error(err, "could not get daemonset", "name", name)
+		n.logger.Error(err, "could not get daemonset", "name", name)
 	}
 
 	if ds.Status.DesiredNumberScheduled == 0 {
-		n.rec.Log.V(2).Info("Daemonset has desired pods of 0", "name", name)
+		n.logger.V(2).Info("Daemonset has desired pods of 0", "name", name)
 		return gpuv1.Ready
 	}
 
 	if ds.Status.NumberUnavailable != 0 {
-		n.rec.Log.Info("daemonset not ready", "name", name)
+		n.logger.Info("daemonset not ready", "name", name)
 		return gpuv1.NotReady
 	}
 
@@ -3478,14 +3478,14 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 
 	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Template.ObjectMeta.Labels)}
 
-	n.rec.Log.V(2).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.logger.V(2).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
-	err = n.rec.Client.List(ctx, list, opts...)
+	err = n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Info("Could not get PodList", err)
+		n.logger.Info("Could not get PodList", err)
 		return gpuv1.NotReady
 	}
-	n.rec.Log.V(2).Info("Pod", "NumberOfPods", len(list.Items))
+	n.logger.V(2).Info("Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
@@ -3493,21 +3493,21 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	dsPods := getPodsOwnedbyDaemonset(ds, list.Items, n)
 	daemonsetRevisionHash, err := getDaemonsetControllerRevisionHash(ctx, ds, n)
 	if err != nil {
-		n.rec.Log.Error(
+		n.logger.Error(
 			err, "Failed to get daemonset template revision hash", "daemonset", ds)
 		return gpuv1.NotReady
 	}
-	n.rec.Log.V(2).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
+	n.logger.V(2).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
 
 	for _, pod := range dsPods {
 		pod := pod
 		podRevisionHash, err := getPodControllerRevisionHash(ctx, &pod)
 		if err != nil {
-			n.rec.Log.Error(
+			n.logger.Error(
 				err, "Failed to get pod template revision hash", "pod", pod)
 			return gpuv1.NotReady
 		}
-		n.rec.Log.V(2).Info("pod template revision hash", "hash", podRevisionHash)
+		n.logger.V(2).Info("pod template revision hash", "hash", podRevisionHash)
 
 		// check if the revision hashes are matching and pod is in running state
 		if podRevisionHash != daemonsetRevisionHash || pod.Status.Phase != "Running" {
@@ -3534,13 +3534,13 @@ func getPodsOwnedbyDaemonset(ds *appsv1.DaemonSet, pods []corev1.Pod, n ClusterP
 	dsPodList := []corev1.Pod{}
 	for _, pod := range pods {
 		if pod.OwnerReferences == nil || len(pod.OwnerReferences) < 1 {
-			n.rec.Log.Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
+			n.logger.Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
 			continue
 		}
-		n.rec.Log.V(2).Info("Pod", "pod", pod.Name, "owner", pod.OwnerReferences[0].Name)
+		n.logger.V(2).Info("Pod", "pod", pod.Name, "owner", pod.OwnerReferences[0].Name)
 
 		if ds.UID != pod.OwnerReferences[0].UID {
-			n.rec.Log.Info("Driver Pod is not owned by a Driver DaemonSet",
+			n.logger.Info("Driver Pod is not owned by a Driver DaemonSet",
 				"pod", pod, "actual owner", pod.OwnerReferences[0])
 			continue
 		}
@@ -3564,12 +3564,12 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 		client.InNamespace(n.operatorNamespace),
 	}
 	list := &appsv1.ControllerRevisionList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
 		return "", fmt.Errorf("error getting controller revision list for daemonset %s: %v", daemonset.Name, err)
 	}
 
-	n.rec.Log.V(2).Info("obtained controller revisions", "Daemonset", daemonset.Name, "len", len(list.Items))
+	n.logger.V(2).Info("obtained controller revisions", "Daemonset", daemonset.Name, "len", len(list.Items))
 
 	var revisions []appsv1.ControllerRevision
 	for _, controllerRevision := range list.Items {
@@ -3598,11 +3598,11 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -3610,14 +3610,14 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.rec.Client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logger.Info("Found Resource, updating...")
-			err = n.rec.Client.Update(ctx, obj)
+			err = n.client.Update(ctx, obj)
 			if err != nil {
 				logger.Info("Couldn't update", "Error", err)
 				return gpuv1.NotReady, err
@@ -3637,21 +3637,21 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	found := &apiimagev1.ImageStream{}
 	name := "driver-toolkit"
 	namespace := "openshift"
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			n.rec.Log.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
+			n.logger.Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream not found",
 				"Name", name,
 				"Namespace", namespace)
 
 			return false, nil
 		}
 
-		n.rec.Log.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
+		n.logger.Info("Couldn't get the driver-toolkit imagestream", "Error", err)
 
 		return false, err
 	}
-	n.rec.Log.V(1).Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
+	n.logger.V(1).Info("ocpHasDriverToolkitImageStream: driver-toolkit imagestream found")
 	isBroken := false
 	for _, tag := range found.Spec.Tags {
 		if tag.Name == "" {
@@ -3661,11 +3661,11 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 		if tag.Name == "latest" || tag.From == nil {
 			continue
 		}
-		n.rec.Log.V(1).Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
+		n.logger.V(1).Info("ocpHasDriverToolkitImageStream: tag", tag.Name, tag.From.Name)
 		n.ocpDriverToolkit.rhcosDriverToolkitImages[tag.Name] = tag.From.Name
 	}
 	if isBroken {
-		n.rec.Log.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
+		n.logger.Info("WARNING: ocpHasDriverToolkitImageStream: driver-toolkit imagestream is broken, see RHBZ#2015024")
 
 		n.operatorMetrics.openshiftDriverToolkitIsBroken.Set(1)
 	} else {
@@ -3682,7 +3682,7 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 	// is allowed when specifying ListOptions or DeleteOptions.
 	// See GH issue: https://github.com/kubernetes-sigs/controller-runtime/issues/612
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(ctx, list, client.MatchingFields{clusterPolicyControllerIndexKey: n.singleton.Name})
+	err := n.client.List(ctx, list, client.MatchingFields{clusterPolicyControllerIndexKey: n.singleton.Name})
 	if err != nil {
 		return fmt.Errorf("failed to list all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 	}
@@ -3691,8 +3691,8 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 		ds := ds
 		// filter out DaemonSets which are not the NVIDIA driver/vgpu-manager
 		if strings.HasPrefix(ds.Name, commonDriverDaemonsetName) || strings.HasPrefix(ds.Name, commonVGPUManagerDaemonsetName) {
-			n.rec.Log.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
-			err = n.rec.Client.Delete(ctx, &ds)
+			n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
+			err = n.client.Delete(ctx, &ds)
 			if err != nil {
 				return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
 			}
@@ -3712,9 +3712,9 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 		},
 	}
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Error(err, "could not get daemonset list")
+		n.logger.Error(err, "could not get daemonset list")
 		return err
 	}
 
@@ -3722,21 +3722,21 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 		name := list.Items[idx].ObjectMeta.Name
 		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
 
-		n.rec.Log.V(1).Info("Driver DaemonSet found",
+		n.logger.V(1).Info("Driver DaemonSet found",
 			"Name", name,
 			"desiredNumberScheduled", desiredNumberScheduled)
 
 		if desiredNumberScheduled != 0 {
-			n.rec.Log.Info("Driver DaemonSet active, keep it.",
+			n.logger.Info("Driver DaemonSet active, keep it.",
 				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
 			continue
 		}
 
-		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
+		n.logger.Info("Delete Driver DaemonSet", "Name", name)
 
-		err = n.rec.Client.Delete(ctx, &list.Items[idx])
+		err = n.client.Delete(ctx, &list.Items[idx])
 		if err != nil {
-			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
+			n.logger.Info("ERROR: Could not get delete DaemonSet",
 				"Name", name, "Error", err)
 		}
 	}
@@ -3750,23 +3750,23 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 func precompiledDriverDaemonsets(ctx context.Context, n ClusterPolicyController) (gpuv1.State, []error) {
 	overallState := gpuv1.Ready
 	var errs []error
-	n.rec.Log.Info("cleaning any stale precompiled driver daemonsets")
+	n.logger.Info("cleaning any stale precompiled driver daemonsets")
 	err := n.cleanupStalePrecompiledDaemonsets(ctx)
 	if err != nil {
 		return gpuv1.NotReady, append(errs, err)
 	}
 
-	n.rec.Log.V(1).Info("preparing pre-compiled driver daemonsets")
+	n.logger.V(1).Info("preparing pre-compiled driver daemonsets")
 	for kernelVersion, os := range n.kernelVersionMap {
 		// set current kernel version
 		n.currentKernelVersion = kernelVersion
 
-		n.rec.Log.Info("preparing pre-compiled driver daemonset",
+		n.logger.Info("preparing pre-compiled driver daemonset",
 			"version", n.currentKernelVersion, "os", os)
 
 		state, err := DaemonSet(n)
 		if state != gpuv1.Ready {
-			n.rec.Log.Info("pre-compiled driver daemonset not ready",
+			n.logger.Info("pre-compiled driver daemonset not ready",
 				"version", n.currentKernelVersion, "state", state)
 			overallState = state
 		}
@@ -3790,7 +3790,7 @@ func (n ClusterPolicyController) ocpDriverToolkitDaemonSets(ctx context.Context)
 		return gpuv1.NotReady, err
 	}
 
-	n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
+	n.logger.V(1).Info("preparing DriverToolkit DaemonSet",
 		"rhcos", n.ocpDriverToolkit.rhcosVersions)
 
 	overallState := gpuv1.Ready
@@ -3799,12 +3799,12 @@ func (n ClusterPolicyController) ocpDriverToolkitDaemonSets(ctx context.Context)
 	for rhcosVersion := range n.ocpDriverToolkit.rhcosVersions {
 		n.ocpDriverToolkit.currentRhcosVersion = rhcosVersion
 
-		n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
+		n.logger.V(1).Info("preparing DriverToolkit DaemonSet",
 			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion)
 
 		state, err := DaemonSet(n)
 
-		n.rec.Log.V(1).Info("preparing DriverToolkit DaemonSet",
+		n.logger.V(1).Info("preparing DriverToolkit DaemonSet",
 			"rhcosVersion", n.ocpDriverToolkit.currentRhcosVersion, "state", state)
 		if state != gpuv1.Ready {
 			overallState = state
@@ -3825,7 +3825,7 @@ func (n ClusterPolicyController) ocpDriverToolkitDaemonSets(ctx context.Context)
 		if image != "" {
 			continue
 		}
-		n.rec.Log.Info("WARNINGs: RHCOS driver-toolkit image missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
+		n.logger.Info("WARNINGs: RHCOS driver-toolkit image missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 		tagsMissing = true
 	}
 	if tagsMissing {
@@ -3852,9 +3852,9 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 	}
 
 	list := &appsv1.DaemonSetList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Info("ERROR: Could not get DaemonSetList", "Error", err)
+		n.logger.Info("ERROR: Could not get DaemonSetList", "Error", err)
 		return err
 	}
 
@@ -3864,30 +3864,30 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 		clusterHasRhcosVersion, clusterOk := n.ocpDriverToolkit.rhcosVersions[dsRhcosVersion]
 		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
 
-		n.rec.Log.V(1).Info("Driver DaemonSet found",
+		n.logger.V(1).Info("Driver DaemonSet found",
 			"Name", name,
 			"dsRhcosVersion", dsRhcosVersion,
 			"clusterHasRhcosVersion", clusterHasRhcosVersion,
 			"desiredNumberScheduled", desiredNumberScheduled)
 
 		if desiredNumberScheduled != 0 {
-			n.rec.Log.Info("Driver DaemonSet active, keep it.",
+			n.logger.Info("Driver DaemonSet active, keep it.",
 				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
 			continue
 		}
 
 		if !versionOk {
-			n.rec.Log.Info("WARNING: Driver DaemonSet doesn't have DriverToolkit version label",
+			n.logger.Info("WARNING: Driver DaemonSet doesn't have DriverToolkit version label",
 				"Name", name, "Label", ocpDriverToolkitVersionLabel,
 			)
 		} else {
 			switch {
 			case !clusterOk:
-				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version NOT part of the cluster",
+				n.logger.V(1).Info("Driver DaemonSet RHCOS version NOT part of the cluster",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 			case clusterHasRhcosVersion:
-				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version is part of the cluster, keep it.",
+				n.logger.V(1).Info("Driver DaemonSet RHCOS version is part of the cluster, keep it.",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 
@@ -3897,16 +3897,16 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 				continue
 			default: /* clusterHasRhcosVersion == false */
 				// currently unexpected
-				n.rec.Log.V(1).Info("Driver DaemonSet RHCOS version marked for deletion",
+				n.logger.V(1).Info("Driver DaemonSet RHCOS version marked for deletion",
 					"Name", name, "RHCOS version", dsRhcosVersion,
 				)
 			}
 		}
 
-		n.rec.Log.Info("Delete Driver DaemonSet", "Name", name)
-		err = n.rec.Client.Delete(ctx, &list.Items[idx])
+		n.logger.Info("Delete Driver DaemonSet", "Name", name)
+		err = n.client.Delete(ctx, &list.Items[idx])
 		if err != nil {
-			n.rec.Log.Info("ERROR: Could not get delete DaemonSet",
+			n.logger.Info("ERROR: Could not get delete DaemonSet",
 				"Name", name, "Error", err)
 			return err
 		}
@@ -4035,22 +4035,22 @@ func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, se
 	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}}
 
 	dsList := &appsv1.DaemonSetList{}
-	if err := n.rec.Client.List(ctx, dsList, opts...); err != nil {
-		n.rec.Log.Error(err, "Could not get DaemonSetList")
+	if err := n.client.List(ctx, dsList, opts...); err != nil {
+		n.logger.Error(err, "Could not get DaemonSetList")
 		return 0, err
 	}
 
 	var lastErr error
 	for idx := range dsList.Items {
-		n.rec.Log.Info("Delete DaemonSet",
+		n.logger.Info("Delete DaemonSet",
 			"Name", dsList.Items[idx].ObjectMeta.Name,
 		)
 		// ignore daemonsets that doesn't match the required name
 		if !strings.HasPrefix(dsList.Items[idx].ObjectMeta.Name, namePrefix) {
 			continue
 		}
-		if err := n.rec.Client.Delete(ctx, &dsList.Items[idx]); err != nil {
-			n.rec.Log.Error(err, "Could not get delete DaemonSet",
+		if err := n.client.Delete(ctx, &dsList.Items[idx]); err != nil {
+			n.logger.Error(err, "Could not get delete DaemonSet",
 				"Name", dsList.Items[idx].ObjectMeta.Name)
 			lastErr = err
 		}
@@ -4062,8 +4062,8 @@ func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, se
 	}
 
 	podList := &corev1.PodList{}
-	if err := n.rec.Client.List(ctx, podList, opts...); err != nil {
-		n.rec.Log.Info("ERROR: Could not get PodList", "Error", err)
+	if err := n.client.List(ctx, podList, opts...); err != nil {
+		n.logger.Info("ERROR: Could not get PodList", "Error", err)
 		return 0, err
 	}
 
@@ -4085,11 +4085,11 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].DaemonSet.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -4163,7 +4163,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		logger.Info("SetControllerReference failed", "Error", err)
 		return gpuv1.NotReady, err
 	}
@@ -4186,7 +4186,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	found := &appsv1.DaemonSet{}
-	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("DaemonSet not found, creating",
 			"Name", obj.Name,
@@ -4195,7 +4195,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		hashStr := getDaemonsetHash(obj)
 		// add annotation to the Daemonset with hash value during creation
 		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create DaemonSet",
 				"Name", obj.Name,
@@ -4214,7 +4214,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	changed := isDaemonsetSpecChanged(found, obj)
 	if changed {
 		logger.Info("DaemonSet is different, updating", "name", obj.ObjectMeta.Name)
-		err = n.rec.Client.Update(ctx, obj)
+		err = n.client.Update(ctx, obj)
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
@@ -4277,13 +4277,13 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	ctx := n.ctx
 	opts := []client.ListOption{&client.MatchingLabels{"app": name}}
 
-	n.rec.Log.V(1).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
+	n.logger.V(1).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Info("Could not get PodList", err)
+		n.logger.Info("Could not get PodList", err)
 	}
-	n.rec.Log.V(1).Info("Pod", "NumberOfPods", len(list.Items))
+	n.logger.V(1).Info("Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
@@ -4291,10 +4291,10 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	pd := list.Items[0]
 
 	if pd.Status.Phase != phase {
-		n.rec.Log.V(1).Info("Pod", "Phase", pd.Status.Phase, "!=", phase)
+		n.logger.V(1).Info("Pod", "Phase", pd.Status.Phase, "!=", phase)
 		return gpuv1.NotReady
 	}
-	n.rec.Log.V(1).Info("Pod", "Phase", pd.Status.Phase, "==", phase)
+	n.logger.V(1).Info("Pod", "Phase", pd.Status.Phase, "==", phase)
 	return gpuv1.Ready
 }
 
@@ -4305,11 +4305,11 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
+	logger := n.logger.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -4329,15 +4329,15 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		obj.AllowHostNetwork = true
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &secv1.SecurityContextConstraints{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4350,7 +4350,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -4366,11 +4366,11 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -4378,15 +4378,15 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &corev1.Service{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4400,7 +4400,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	obj.ResourceVersion = found.ResourceVersion
 	obj.Spec.ClusterIP = found.Spec.ClusterIP
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -4410,7 +4410,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 func crdExists(n ClusterPolicyController, name string) (bool, error) {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
-	err := n.rec.Client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
+	err := n.client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
 	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -4427,7 +4427,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
+	logger := n.logger.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if ServiceMonitor is a valid kind
 	serviceMonitorCRDExists, err := crdExists(n, ServiceMonitorCRDName)
@@ -4440,7 +4440,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		if !serviceMonitorCRDExists {
 			return gpuv1.Ready, nil
 		}
-		err := n.rec.Client.Delete(ctx, obj)
+		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -4455,7 +4455,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			if !serviceMonitorCRDExists {
 				return gpuv1.Ready, nil
 			}
-			err := n.rec.Client.Delete(ctx, obj)
+			err := n.client.Delete(ctx, obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				logger.Info("Couldn't delete", "Error", err)
 				return gpuv1.NotReady, err
@@ -4503,15 +4503,15 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Spec.NamespaceSelector.MatchNames[idx] = obj.Namespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &promv1.ServiceMonitor{}
-	err = n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4524,7 +4524,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -4548,17 +4548,17 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	obj.Labels = spec.Labels
 
-	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
+	logger := n.logger.WithValues("RuntimeClass", obj.Name)
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &nodev1beta1.RuntimeClass{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4571,7 +4571,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -4595,17 +4595,17 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	obj.Labels = spec.Labels
 
-	logger := n.rec.Log.WithValues("RuntimeClass", obj.Name)
+	logger := n.logger.WithValues("RuntimeClass", obj.Name)
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &nodev1.RuntimeClass{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4618,7 +4618,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
@@ -4634,20 +4634,20 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	// Get all existing Kata RuntimeClasses
 	opts := []client.ListOption{&client.MatchingLabels{"nvidia.com/kata-runtime-class": "true"}}
 	list := &nodev1.RuntimeClassList{}
-	err := n.rec.Client.List(ctx, list, opts...)
+	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.rec.Log.Info("Could not get Kata RuntimeClassList", err)
+		n.logger.Info("Could not get Kata RuntimeClassList", err)
 		return gpuv1.NotReady, fmt.Errorf("error getting kata RuntimeClassList: %v", err)
 	}
-	n.rec.Log.V(1).Info("Kata RuntimeClasses", "Number", len(list.Items))
+	n.logger.V(1).Info("Kata RuntimeClasses", "Number", len(list.Items))
 
 	if !config.KataManager.IsEnabled() {
 		// Delete all Kata RuntimeClasses
-		n.rec.Log.Info("Kata Manager disabled, deleting all Kata RuntimeClasses")
+		n.logger.Info("Kata Manager disabled, deleting all Kata RuntimeClasses")
 		for _, rc := range list.Items {
 			rc := rc
-			n.rec.Log.V(1).Info("Deleting Kata RuntimeClass", "Name", rc.Name)
-			err := n.rec.Client.Delete(ctx, &rc)
+			n.logger.V(1).Info("Deleting Kata RuntimeClass", "Name", rc.Name)
+			err := n.client.Delete(ctx, &rc)
 			if err != nil {
 				return gpuv1.NotReady, fmt.Errorf("error deleting kata RuntimeClass '%s': %v", rc.Name, err)
 			}
@@ -4665,8 +4665,8 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	for _, rc := range list.Items {
 		if _, ok := rcNames[rc.Name]; !ok {
 			rc := rc
-			n.rec.Log.Info("Deleting Kata RuntimeClass", "Name", rc.Name)
-			err := n.rec.Client.Delete(ctx, &rc)
+			n.logger.Info("Deleting Kata RuntimeClass", "Name", rc.Name)
+			err := n.client.Delete(ctx, &rc)
 			if err != nil {
 				return gpuv1.NotReady, fmt.Errorf("error deleting kata RuntimeClass '%s': %v", rc.Name, err)
 			}
@@ -4676,7 +4676,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	// Using kata RuntimClass template, create / update RuntimeClass objects specified in KataManager configuration
 	template := n.resources[state].RuntimeClasses[0]
 	for _, rc := range config.KataManager.Config.RuntimeClasses {
-		logger := n.rec.Log.WithValues("RuntimeClass", rc.Name)
+		logger := n.logger.WithValues("RuntimeClass", rc.Name)
 
 		if rc.Name == config.Operator.RuntimeClass {
 			return gpuv1.NotReady, fmt.Errorf("error creating kata runtimeclass '%s' as it conflicts with the runtimeclass used for the gpu-operator operand pods itself", rc.Name)
@@ -4699,15 +4699,15 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 		}
 		obj.Scheduling.NodeSelector = nodeSelector
 
-		if err := controllerutil.SetControllerReference(n.singleton, &obj, n.rec.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(n.singleton, &obj, n.scheme); err != nil {
 			return gpuv1.NotReady, err
 		}
 
 		found := &nodev1.RuntimeClass{}
-		err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+		err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 		if err != nil && apierrors.IsNotFound(err) {
 			logger.Info("Not found, creating...")
-			err = n.rec.Client.Create(ctx, &obj)
+			err = n.client.Create(ctx, &obj)
 			if err != nil {
 				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
@@ -4720,7 +4720,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 		logger.Info("Found Resource, updating...")
 		obj.ResourceVersion = found.ResourceVersion
 
-		err = n.rec.Client.Update(ctx, &obj)
+		err = n.client.Update(ctx, &obj)
 		if err != nil {
 			logger.Info("Couldn't update", "Error", err)
 			return gpuv1.NotReady, err
@@ -4748,9 +4748,9 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
-			err := n.rec.Client.Delete(n.ctx, &obj)
+			err := n.client.Delete(n.ctx, &obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				n.rec.Log.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
+				n.logger.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
 				return gpuv1.NotReady, err
 			}
 			continue
@@ -4773,17 +4773,17 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].PrometheusRule.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.rec.Log.WithValues("PrometheusRule", obj.Name)
+	logger := n.logger.WithValues("PrometheusRule", obj.Name)
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	found := &promv1.PrometheusRule{}
-	err := n.rec.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.rec.Client.Create(ctx, obj)
+		err = n.client.Create(ctx, obj)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -4796,7 +4796,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	logger.Info("Found Resource, updating...")
 	obj.ResourceVersion = found.ResourceVersion
 
-	err = n.rec.Client.Update(ctx, obj)
+	err = n.client.Update(ctx, obj)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
