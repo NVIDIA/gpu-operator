@@ -67,7 +67,7 @@ func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) 
 	var files []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			n.rec.Log.V(1).Info("error in filepath.Walk on %s: %v", root, err)
+			n.logger.V(1).Info("error in filepath.Walk on %s: %v", root, err)
 			return nil
 		}
 		if !info.IsDir() {
@@ -103,7 +103,7 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 	res := Resources{}
 	ctrl := controlFunc{}
 
-	n.rec.Log.Info("Getting assets from: ", "path:", path)
+	n.logger.Info("Getting assets from: ", "path:", path)
 	manifests := getAssetsFrom(n, path, n.openshift)
 
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
@@ -115,7 +115,7 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 		slce := strings.Split(kind, ":")
 		kind = strings.TrimSpace(slce[1])
 
-		n.rec.Log.V(1).Info("Looking for ", "Kind", kind, "in path:", path)
+		n.logger.V(1).Info("Looking for ", "Kind", kind, "in path:", path)
 
 		switch kind {
 		case "ServiceAccount":
@@ -181,7 +181,7 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, PrometheusRule)
 		default:
-			n.rec.Log.Info("Unknown Resource", "Manifest", m, "Kind", kind)
+			n.logger.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}
 
 	}
