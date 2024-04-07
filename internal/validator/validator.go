@@ -51,21 +51,21 @@ func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alph
 		return err
 	}
 
-	names := []string{}
-	for _, driver := range drivers.Items {
-		driver := driver
-		nodeList, err := nsv.getNVIDIADriverSelectedNodes(ctx, &driver)
+	names := map[string]struct{}{}
+	for di := range drivers.Items {
+		nodeList, err := nsv.getNVIDIADriverSelectedNodes(ctx, &drivers.Items[di])
 		if err != nil {
 			return err
 		}
 
-		for _, n := range nodeList.Items {
-			names = append(names, n.Name)
-		}
-	}
+		for ni := range nodeList.Items {
+			if _, ok := names[nodeList.Items[ni].Name]; ok {
+				return fmt.Errorf("conflicting NVIDIADriver NodeSelectors found for resource: %s, nodeSelector: %q", cr.Name, cr.Spec.NodeSelector)
+			}
 
-	if containsDuplicates(names) {
-		return fmt.Errorf("conflicting NVIDIADriver NodeSelectors found for resource: %s, nodeSelector: %q", cr.Name, cr.Spec.NodeSelector)
+			names[nodeList.Items[ni].Name] = struct{}{}
+		}
+
 	}
 
 	return nil
@@ -87,15 +87,4 @@ func (nsv *nodeSelectorValidator) getNVIDIADriverSelectedNodes(ctx context.Conte
 	err := nsv.client.List(ctx, nodeList, opts...)
 
 	return nodeList, err
-}
-
-func containsDuplicates(arr []string) bool {
-	visited := make(map[string]bool, 0)
-	for _, e := range arr {
-		if _, exists := visited[e]; exists {
-			return true
-		}
-		visited[e] = true
-	}
-	return false
 }

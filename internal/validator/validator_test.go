@@ -128,17 +128,3 @@ func TestCheckNodeSelector(t *testing.T) {
 		}
 	}
 }
-
-func TestContainsDuplicates(t *testing.T) {
-	tests := []struct {
-		arr              []string
-		shouldReturnTrue bool
-	}{
-		{arr: []string{"foo", "bar"}, shouldReturnTrue: false},
-		{arr: []string{"foo", "foo"}, shouldReturnTrue: true},
-	}
-
-	for _, tc := range tests {
-		assert.Equal(t, tc.shouldReturnTrue, containsDuplicates(tc.arr))
-	}
-}
