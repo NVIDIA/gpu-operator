@@ -2,16 +2,29 @@
 
 ## Reporting security issues
 
-Please send security issues to git@bmitch.net.
+Please see [SECURITY.md](security.md) for the process to report security issues.
 
 ## Reporting other issues
 
 Please search for similar issues and if none are seen, report an issue at [github.com/regclient/regclient/issues](https://github.com/regclient/regclient/issues)
 
+## Code style
+
+This project attempts to follow these principles:
+
+- Code is canonical Go, following styles and patterns commonly used by the Go community.
+- Dependencies outside of the Go standard library should be minimized.
+- Dependencies should be pinned to a specific digest and tracked by Go or version-check.
+- Unit tests are strongly encouraged with a focus on test coverage of the successful path and common errors.
+- Linters and other style formatting tools are used, please run `make all` before committing any changes.
+
 ## Pull requests
 
-PR's are welcome.
-For anything beyond a minor fix, opening an issue is suggested to discuss possible solutions.
+PRs are welcome following the below guides:
+
+- For anything beyond a minor fix, opening an issue is suggested to discuss possible solutions.
+- Changes should be rebased on the main branch.
+- Changes should be squashed to a single commit per logical change.
 
 All changes must be signed (`git commit -s`) to indicate you agree to the [Developer Certificate or Origin](https://developercertificate.org/):
 

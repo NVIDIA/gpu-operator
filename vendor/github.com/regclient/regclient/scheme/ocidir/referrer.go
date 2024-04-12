@@ -6,8 +6,9 @@ import (
 	"fmt"
 
 	"github.com/regclient/regclient/scheme"
-	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
+	"github.com/regclient/regclient/types/mediatype"
 	v1 "github.com/regclient/regclient/types/oci/v1"
 	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
@@ -16,6 +17,12 @@ import (
 
 // ReferrerList returns a list of referrers to a given reference
 func (o *OCIDir) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.ReferrerOpts) (referrer.ReferrerList, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.referrerList(ctx, r, opts...)
+}
+
+func (o *OCIDir) referrerList(ctx context.Context, r ref.Ref, opts ...scheme.ReferrerOpts) (referrer.ReferrerList, error) {
 	config := scheme.ReferrerConfig{}
 	for _, opt := range opts {
 		opt(&config)
@@ -26,7 +33,7 @@ func (o *OCIDir) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Ref
 	}
 	// select a platform from a manifest list
 	if config.Platform != "" {
-		m, err := o.ManifestGet(ctx, r)
+		m, err := o.manifestGet(ctx, r)
 		if err != nil {
 			return rl, err
 		}
@@ -46,7 +53,7 @@ func (o *OCIDir) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Ref
 	}
 	// if ref is a tag, run a head request for the digest
 	if r.Digest == "" {
-		m, err := o.ManifestHead(ctx, r)
+		m, err := o.manifestGet(ctx, r)
 		if err != nil {
 			return rl, err
 		}
@@ -58,13 +65,13 @@ func (o *OCIDir) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Ref
 	if err != nil {
 		return rl, err
 	}
-	m, err := o.ManifestGet(ctx, rlTag)
+	m, err := o.manifestGet(ctx, rlTag)
 	if err != nil {
-		if errors.Is(err, types.ErrNotFound) {
+		if errors.Is(err, errs.ErrNotFound) {
 			// empty list, initialize a new manifest
 			rl.Manifest, err = manifest.New(manifest.WithOrig(v1.Index{
 				Versioned: v1.IndexSchemaVersion,
-				MediaType: types.MediaTypeOCI1ManifestList,
+				MediaType: mediatype.OCI1ManifestList,
 			}))
 			if err != nil {
 				return rl, err
@@ -92,7 +99,7 @@ func (o *OCIDir) referrerDelete(ctx context.Context, r ref.Ref, m manifest.Manif
 	// get refers field
 	mSubject, ok := m.(manifest.Subjecter)
 	if !ok {
-		return fmt.Errorf("manifest does not support subject: %w", types.ErrUnsupportedMediaType)
+		return fmt.Errorf("manifest does not support subject: %w", errs.ErrUnsupportedMediaType)
 	}
 	subject, err := mSubject.GetSubject()
 	if err != nil {
@@ -100,16 +107,14 @@ func (o *OCIDir) referrerDelete(ctx context.Context, r ref.Ref, m manifest.Manif
 	}
 	// validate/set subject descriptor
 	if subject == nil || subject.MediaType == "" || subject.Digest == "" || subject.Size <= 0 {
-		return fmt.Errorf("subject is not set%.0w", types.ErrNotFound)
+		return fmt.Errorf("subject is not set%.0w", errs.ErrNotFound)
 	}
 
 	// get descriptor for subject
-	rSubject := r
-	rSubject.Tag = ""
-	rSubject.Digest = subject.Digest.String()
+	rSubject := r.SetDigest(subject.Digest.String())
 
 	// pull existing referrer list
-	rl, err := o.ReferrerList(ctx, rSubject)
+	rl, err := o.referrerList(ctx, rSubject)
 	if err != nil {
 		return err
 	}
@@ -124,13 +129,13 @@ func (o *OCIDir) referrerDelete(ctx context.Context, r ref.Ref, m manifest.Manif
 		return err
 	}
 	if rl.IsEmpty() {
-		err = o.TagDelete(ctx, rlTag)
+		err = o.tagDelete(ctx, rlTag)
 		if err == nil {
 			return nil
 		}
 		// if delete is not supported, fall back to pushing empty list
 	}
-	return o.ManifestPut(ctx, rlTag, rl.Manifest)
+	return o.manifestPut(ctx, rlTag, rl.Manifest)
 }
 
 // referrerPut pushes a new referrer associated with a given reference
@@ -138,7 +143,7 @@ func (o *OCIDir) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	// get subject field
 	mSubject, ok := m.(manifest.Subjecter)
 	if !ok {
-		return fmt.Errorf("manifest does not support subject: %w", types.ErrUnsupportedMediaType)
+		return fmt.Errorf("manifest does not support subject: %w", errs.ErrUnsupportedMediaType)
 	}
 	subject, err := mSubject.GetSubject()
 	if err != nil {
@@ -146,16 +151,14 @@ func (o *OCIDir) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	}
 	// validate/set subject descriptor
 	if subject == nil || subject.MediaType == "" || subject.Digest == "" || subject.Size <= 0 {
-		return fmt.Errorf("subject is not set%.0w", types.ErrNotFound)
+		return fmt.Errorf("subject is not set%.0w", errs.ErrNotFound)
 	}
 
 	// get descriptor for subject
-	rSubject := r
-	rSubject.Tag = ""
-	rSubject.Digest = subject.Digest.String()
+	rSubject := r.SetDigest(subject.Digest.String())
 
 	// pull existing referrer list
-	rl, err := o.ReferrerList(ctx, rSubject)
+	rl, err := o.referrerList(ctx, rSubject)
 	if err != nil {
 		return err
 	}
@@ -169,5 +172,5 @@ func (o *OCIDir) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	if err != nil {
 		return err
 	}
-	return o.ManifestPut(ctx, rlTag, rl.Manifest)
+	return o.manifestPut(ctx, rlTag, rl.Manifest)
 }

@@ -9,20 +9,21 @@ import (
 
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
-	"github.com/regclient/regclient/types"
+
 	"github.com/regclient/regclient/types/docker"
+	"github.com/regclient/regclient/types/mediatype"
 )
 
 var (
 	// ManifestSchemaVersion provides a pre-initialized version structure schema1 manifests.
 	ManifestSchemaVersion = docker.Versioned{
 		SchemaVersion: 1,
-		MediaType:     types.MediaTypeDocker1Manifest,
+		MediaType:     mediatype.Docker1Manifest,
 	}
 	// ManifestSignedSchemaVersion provides a pre-initialized version structure schema1 signed manifests.
 	ManifestSignedSchemaVersion = docker.Versioned{
 		SchemaVersion: 1,
-		MediaType:     types.MediaTypeDocker1ManifestSigned,
+		MediaType:     mediatype.Docker1ManifestSigned,
 	}
 )
 
@@ -118,7 +119,7 @@ func (sm *SignedManifest) MarshalJSON() ([]byte, error) {
 
 // Payload returns the signed content of the signed manifest.
 func (sm SignedManifest) Payload() (string, []byte, error) {
-	return types.MediaTypeDocker1ManifestSigned, sm.all, nil
+	return mediatype.Docker1ManifestSigned, sm.all, nil
 }
 
 // Signatures returns the signatures as provided by (*libtrust.JSONSignature).Signatures.

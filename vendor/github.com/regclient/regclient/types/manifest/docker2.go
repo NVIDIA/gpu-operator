@@ -12,17 +12,20 @@ import (
 	_ "crypto/sha512"
 
 	digest "github.com/opencontainers/go-digest"
+
 	"github.com/regclient/regclient/internal/units"
-	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/docker/schema2"
+	"github.com/regclient/regclient/types/errs"
+	"github.com/regclient/regclient/types/mediatype"
 	"github.com/regclient/regclient/types/platform"
 )
 
 const (
 	// MediaTypeDocker2Manifest is the media type when pulling manifests from a v2 registry
-	MediaTypeDocker2Manifest = types.MediaTypeDocker2Manifest
+	MediaTypeDocker2Manifest = mediatype.Docker2Manifest
 	// MediaTypeDocker2ManifestList is the media type when pulling a manifest list from a v2 registry
-	MediaTypeDocker2ManifestList = types.MediaTypeDocker2ManifestList
+	MediaTypeDocker2ManifestList = mediatype.Docker2ManifestList
 )
 
 type docker2Manifest struct {
@@ -36,53 +39,53 @@ type docker2ManifestList struct {
 
 func (m *docker2Manifest) GetAnnotations() (map[string]string, error) {
 	if !m.manifSet {
-		return nil, types.ErrManifestNotSet
+		return nil, errs.ErrManifestNotSet
 	}
 	return m.Annotations, nil
 }
-func (m *docker2Manifest) GetConfig() (types.Descriptor, error) {
+func (m *docker2Manifest) GetConfig() (descriptor.Descriptor, error) {
 	if !m.manifSet {
-		return types.Descriptor{}, types.ErrManifestNotSet
+		return descriptor.Descriptor{}, errs.ErrManifestNotSet
 	}
 	return m.Config, nil
 }
 func (m *docker2Manifest) GetConfigDigest() (digest.Digest, error) {
 	if !m.manifSet {
-		return digest.Digest(""), types.ErrManifestNotSet
+		return digest.Digest(""), errs.ErrManifestNotSet
 	}
 	return m.Config.Digest, nil
 }
 func (m *docker2ManifestList) GetAnnotations() (map[string]string, error) {
 	if !m.manifSet {
-		return nil, types.ErrManifestNotSet
+		return nil, errs.ErrManifestNotSet
 	}
 	return m.Annotations, nil
 }
-func (m *docker2ManifestList) GetConfig() (types.Descriptor, error) {
-	return types.Descriptor{}, fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+func (m *docker2ManifestList) GetConfig() (descriptor.Descriptor, error) {
+	return descriptor.Descriptor{}, fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 func (m *docker2ManifestList) GetConfigDigest() (digest.Digest, error) {
-	return "", fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+	return "", fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 
-func (m *docker2Manifest) GetManifestList() ([]types.Descriptor, error) {
-	return []types.Descriptor{}, fmt.Errorf("platform descriptor list not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+func (m *docker2Manifest) GetManifestList() ([]descriptor.Descriptor, error) {
+	return []descriptor.Descriptor{}, fmt.Errorf("platform descriptor list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
-func (m *docker2ManifestList) GetManifestList() ([]types.Descriptor, error) {
+func (m *docker2ManifestList) GetManifestList() ([]descriptor.Descriptor, error) {
 	if !m.manifSet {
-		return []types.Descriptor{}, types.ErrManifestNotSet
+		return []descriptor.Descriptor{}, errs.ErrManifestNotSet
 	}
 	return m.Manifests, nil
 }
 
-func (m *docker2Manifest) GetLayers() ([]types.Descriptor, error) {
+func (m *docker2Manifest) GetLayers() ([]descriptor.Descriptor, error) {
 	if !m.manifSet {
-		return []types.Descriptor{}, types.ErrManifestNotSet
+		return []descriptor.Descriptor{}, errs.ErrManifestNotSet
 	}
 	return m.Layers, nil
 }
-func (m *docker2ManifestList) GetLayers() ([]types.Descriptor, error) {
-	return []types.Descriptor{}, fmt.Errorf("layers are not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+func (m *docker2ManifestList) GetLayers() ([]descriptor.Descriptor, error) {
+	return []descriptor.Descriptor{}, fmt.Errorf("layers are not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 
 func (m *docker2Manifest) GetOrig() interface{} {
@@ -92,15 +95,25 @@ func (m *docker2ManifestList) GetOrig() interface{} {
 	return m.ManifestList
 }
 
-func (m *docker2Manifest) GetPlatformDesc(p *platform.Platform) (*types.Descriptor, error) {
-	return nil, fmt.Errorf("platform lookup not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+func (m *docker2Manifest) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
+	return nil, fmt.Errorf("platform lookup not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
-func (m *docker2ManifestList) GetPlatformDesc(p *platform.Platform) (*types.Descriptor, error) {
-	return getPlatformDesc(p, m.Manifests)
+func (m *docker2ManifestList) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
+	if !m.manifSet {
+		return nil, errs.ErrManifestNotSet
+	}
+	if p == nil {
+		return nil, fmt.Errorf("invalid input, platform is nil%.0w", errs.ErrNotFound)
+	}
+	d, err := descriptor.DescriptorListSearch(m.Manifests, descriptor.MatchOpt{Platform: p})
+	if err != nil {
+		return nil, fmt.Errorf("platform not found: %s%.0w", *p, err)
+	}
+	return &d, nil
 }
 
 func (m *docker2Manifest) GetPlatformList() ([]*platform.Platform, error) {
-	return nil, fmt.Errorf("platform list not available for media type %s%.0w", m.desc.MediaType, types.ErrUnsupportedMediaType)
+	return nil, fmt.Errorf("platform list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 func (m *docker2ManifestList) GetPlatformList() ([]*platform.Platform, error) {
 	dl, err := m.GetManifestList()
@@ -110,9 +123,21 @@ func (m *docker2ManifestList) GetPlatformList() ([]*platform.Platform, error) {
 	return getPlatformList(dl)
 }
 
+// GetSize returns the size in bytes of all layers
+func (m *docker2Manifest) GetSize() (int64, error) {
+	if !m.manifSet {
+		return 0, errs.ErrManifestNotSet
+	}
+	var total int64
+	for _, d := range m.Layers {
+		total += d.Size
+	}
+	return total, nil
+}
+
 func (m *docker2Manifest) MarshalJSON() ([]byte, error) {
 	if !m.manifSet {
-		return []byte{}, types.ErrManifestNotSet
+		return []byte{}, errs.ErrManifestNotSet
 	}
 	if len(m.rawBody) > 0 {
 		return m.rawBody, nil
@@ -121,7 +146,7 @@ func (m *docker2Manifest) MarshalJSON() ([]byte, error) {
 }
 func (m *docker2ManifestList) MarshalJSON() ([]byte, error) {
 	if !m.manifSet {
-		return []byte{}, types.ErrManifestNotSet
+		return []byte{}, errs.ErrManifestNotSet
 	}
 	if len(m.rawBody) > 0 {
 		return m.rawBody, nil
@@ -172,8 +197,8 @@ func (m *docker2Manifest) MarshalPretty() ([]byte, error) {
 			return []byte{}, err
 		}
 	}
-	tw.Flush()
-	return buf.Bytes(), nil
+	err = tw.Flush()
+	return buf.Bytes(), err
 }
 func (m *docker2ManifestList) MarshalPretty() ([]byte, error) {
 	if m == nil {
@@ -212,50 +237,58 @@ func (m *docker2ManifestList) MarshalPretty() ([]byte, error) {
 			return []byte{}, err
 		}
 	}
-	tw.Flush()
-	return buf.Bytes(), nil
+	err := tw.Flush()
+	return buf.Bytes(), err
 }
 
 func (m *docker2Manifest) SetAnnotation(key, val string) error {
 	if !m.manifSet {
-		return types.ErrManifestNotSet
+		return errs.ErrManifestNotSet
 	}
 	if m.Annotations == nil {
 		m.Annotations = map[string]string{}
 	}
-	m.Annotations[key] = val
+	if val != "" {
+		m.Annotations[key] = val
+	} else {
+		delete(m.Annotations, key)
+	}
 	return m.updateDesc()
 }
 func (m *docker2ManifestList) SetAnnotation(key, val string) error {
 	if !m.manifSet {
-		return types.ErrManifestNotSet
+		return errs.ErrManifestNotSet
 	}
 	if m.Annotations == nil {
 		m.Annotations = map[string]string{}
 	}
-	m.Annotations[key] = val
+	if val != "" {
+		m.Annotations[key] = val
+	} else {
+		delete(m.Annotations, key)
+	}
 	return m.updateDesc()
 }
 
-func (m *docker2Manifest) SetConfig(d types.Descriptor) error {
+func (m *docker2Manifest) SetConfig(d descriptor.Descriptor) error {
 	if !m.manifSet {
-		return types.ErrManifestNotSet
+		return errs.ErrManifestNotSet
 	}
 	m.Config = d
 	return m.updateDesc()
 }
 
-func (m *docker2Manifest) SetLayers(dl []types.Descriptor) error {
+func (m *docker2Manifest) SetLayers(dl []descriptor.Descriptor) error {
 	if !m.manifSet {
-		return types.ErrManifestNotSet
+		return errs.ErrManifestNotSet
 	}
 	m.Layers = dl
 	return m.updateDesc()
 }
 
-func (m *docker2ManifestList) SetManifestList(dl []types.Descriptor) error {
+func (m *docker2ManifestList) SetManifestList(dl []descriptor.Descriptor) error {
 	if !m.manifSet {
-		return types.ErrManifestNotSet
+		return errs.ErrManifestNotSet
 	}
 	m.Manifests = dl
 	return m.updateDesc()
@@ -264,11 +297,11 @@ func (m *docker2ManifestList) SetManifestList(dl []types.Descriptor) error {
 func (m *docker2Manifest) SetOrig(origIn interface{}) error {
 	orig, ok := origIn.(schema2.Manifest)
 	if !ok {
-		return types.ErrUnsupportedMediaType
+		return errs.ErrUnsupportedMediaType
 	}
-	if orig.MediaType != types.MediaTypeDocker2Manifest {
+	if orig.MediaType != mediatype.Docker2Manifest {
 		// TODO: error?
-		orig.MediaType = types.MediaTypeDocker2Manifest
+		orig.MediaType = mediatype.Docker2Manifest
 	}
 	m.manifSet = true
 	m.Manifest = orig
@@ -278,11 +311,11 @@ func (m *docker2Manifest) SetOrig(origIn interface{}) error {
 func (m *docker2ManifestList) SetOrig(origIn interface{}) error {
 	orig, ok := origIn.(schema2.ManifestList)
 	if !ok {
-		return types.ErrUnsupportedMediaType
+		return errs.ErrUnsupportedMediaType
 	}
-	if orig.MediaType != types.MediaTypeDocker2ManifestList {
+	if orig.MediaType != mediatype.Docker2ManifestList {
 		// TODO: error?
-		orig.MediaType = types.MediaTypeDocker2ManifestList
+		orig.MediaType = mediatype.Docker2ManifestList
 	}
 	m.manifSet = true
 	m.ManifestList = orig
@@ -295,8 +328,8 @@ func (m *docker2Manifest) updateDesc() error {
 		return err
 	}
 	m.rawBody = mj
-	m.desc = types.Descriptor{
-		MediaType: types.MediaTypeDocker2Manifest,
+	m.desc = descriptor.Descriptor{
+		MediaType: mediatype.Docker2Manifest,
 		Digest:    digest.FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
@@ -308,8 +341,8 @@ func (m *docker2ManifestList) updateDesc() error {
 		return err
 	}
 	m.rawBody = mj
-	m.desc = types.Descriptor{
-		MediaType: types.MediaTypeDocker2ManifestList,
+	m.desc = descriptor.Descriptor{
+		MediaType: mediatype.Docker2ManifestList,
 		Digest:    digest.FromBytes(mj),
 		Size:      int64(len(mj)),
 	}

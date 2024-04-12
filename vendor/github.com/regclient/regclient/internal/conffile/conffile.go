@@ -106,15 +106,16 @@ func (f *File) Write(rdr io.Reader) error {
 	}
 	tmpName := tmpStat.Name()
 	tmpFullname := filepath.Join(dir, tmpName)
-	defer func() {
-		f.fs.Remove(tmpFullname)
-	}()
+	defer f.fs.Remove(tmpFullname)
 
 	// copy from rdr to temp file
 	_, err = io.Copy(tmp, rdr)
-	tmp.Close()
+	errC := tmp.Close()
 	if err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
+	}
+	if errC != nil {
+		return fmt.Errorf("failed to close config: %w", errC)
 	}
 
 	// adjust file ownership/permissions

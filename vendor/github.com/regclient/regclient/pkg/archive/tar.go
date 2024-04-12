@@ -50,7 +50,7 @@ func Tar(ctx context.Context, path string, w io.Writer, opts ...TarOpts) error {
 	defer tw.Close()
 
 	// walk the path performing a recursive tar
-	filepath.Walk(path, func(file string, fi os.FileInfo, err error) error {
+	err := filepath.Walk(path, func(file string, fi os.FileInfo, err error) error {
 		// return any errors filepath encounters accessing the file
 		if err != nil {
 			return err
@@ -83,6 +83,7 @@ func Tar(ctx context.Context, path string, w io.Writer, opts ...TarOpts) error {
 
 		// open file and copy contents into tar writer
 		if header.Typeflag == tar.TypeReg && header.Size > 0 {
+			//#nosec G304 filename is limited to provided path directory
 			f, err := os.Open(file)
 			if err != nil {
 				return err
@@ -90,12 +91,14 @@ func Tar(ctx context.Context, path string, w io.Writer, opts ...TarOpts) error {
 			if _, err = io.Copy(tw, f); err != nil {
 				return err
 			}
-			f.Close()
+			err = f.Close()
+			if err != nil {
+				return fmt.Errorf("failed to close file: %w", err)
+			}
 		}
-
 		return nil
 	})
-	return nil
+	return err
 }
 
 // Extract Tar
@@ -139,14 +142,18 @@ func Extract(ctx context.Context, path string, r io.Reader, opts ...TarOpts) err
 			}
 		case tar.TypeReg:
 			// TODO: configure file mode, creation timestamp, etc
+			//#nosec G304 filename is limited to provided path directory
 			fh, err := os.Create(fn)
 			if err != nil {
 				return err
 			}
-			n, err := io.Copy(fh, rt)
-			fh.Close()
+			n, err := io.CopyN(fh, rt, hdr.Size)
+			errC := fh.Close()
 			if err != nil {
 				return err
+			}
+			if errC != nil {
+				return fmt.Errorf("failed to close file: %w", errC)
 			}
 			if n != hdr.Size {
 				return fmt.Errorf("size mismatch extracting \"%s\", expected %d, extracted %d", hdr.Name, hdr.Size, n)

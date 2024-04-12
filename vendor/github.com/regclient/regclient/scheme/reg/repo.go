@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/regclient/regclient/internal/reghttp"
 	"github.com/regclient/regclient/scheme"
+	"github.com/regclient/regclient/types/mediatype"
 	"github.com/regclient/regclient/types/repo"
-	"github.com/sirupsen/logrus"
 )
 
 // RepoList returns a list of repositories on a registry
@@ -63,7 +65,7 @@ func (reg *Reg) RepoList(ctx context.Context, hostname string, opts ...scheme.Re
 		}).Warn("Failed to read repo list")
 		return nil, fmt.Errorf("failed to read repo list for %s: %w", hostname, err)
 	}
-	mt := resp.HTTPResponse().Header.Get("Content-Type")
+	mt := mediatype.Base(resp.HTTPResponse().Header.Get("Content-Type"))
 	rl, err := repo.New(
 		repo.WithMT(mt),
 		repo.WithRaw(respBody),

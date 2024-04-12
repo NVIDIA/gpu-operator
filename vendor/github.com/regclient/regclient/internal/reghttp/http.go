@@ -26,12 +26,13 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
+
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/auth"
-	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/warning"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/semaphore"
 )
 
 var defaultDelayInit, _ = time.ParseDuration("1s")
@@ -45,16 +46,17 @@ const (
 // Client is an HTTP client wrapper
 // It handles features like authentication, retries, backoff delays, TLS settings
 type Client struct {
-	host       map[string]*clientHost
-	httpClient *http.Client
-	rootCAPool [][]byte
-	rootCADirs []string
-	retryLimit int
-	delayInit  time.Duration
-	delayMax   time.Duration
-	log        *logrus.Logger
-	userAgent  string
-	mu         sync.Mutex
+	getConfigHost func(string) *config.Host
+	host          map[string]*clientHost
+	httpClient    *http.Client
+	rootCAPool    [][]byte
+	rootCADirs    []string
+	retryLimit    int
+	delayInit     time.Duration
+	delayMax      time.Duration
+	log           *logrus.Logger
+	userAgent     string
+	mu            sync.Mutex
 }
 
 type clientHost struct {
@@ -66,8 +68,7 @@ type clientHost struct {
 	auth         map[string]auth.Auth
 	newAuth      func() auth.Auth
 	mu           sync.Mutex
-	parallel     *semaphore.Weighted
-	throttle     *time.Ticker
+	ratelimit    *time.Ticker
 }
 
 // Req is a request to send to a registry
@@ -110,7 +111,7 @@ type clientResp struct {
 	digester         digest.Digester
 	reader           io.Reader
 	readCur, readMax int64
-	parallel         *semaphore.Weighted
+	throttle         *throttle.Throttle
 }
 
 // Opts is used to configure client options
@@ -152,6 +153,7 @@ func WithCertDirs(dirs []string) Opts {
 func WithCertFiles(files []string) Opts {
 	return func(c *Client) {
 		for _, f := range files {
+			//#nosec G304 command is run by a user accessing their own files
 			cert, err := os.ReadFile(f)
 			if err != nil {
 				c.log.WithFields(logrus.Fields{
@@ -165,18 +167,10 @@ func WithCertFiles(files []string) Opts {
 	}
 }
 
-// WithConfigHosts adds a list of config.Host entries to use for connection settings
-func WithConfigHosts(ch []*config.Host) Opts {
+// WithConfigHost adds the callback to request a config.Host struct
+func WithConfigHost(gch func(string) *config.Host) Opts {
 	return func(c *Client) {
-		for _, cur := range ch {
-			if cur.Name == "" {
-				continue
-			}
-			if _, ok := c.host[cur.Name]; !ok {
-				c.host[cur.Name] = &clientHost{}
-			}
-			c.host[cur.Name].config = cur
-		}
+		c.getConfigHost = gch
 	}
 }
 
@@ -272,7 +266,7 @@ func (resp *clientResp) Next() error {
 			if err != nil {
 				return err
 			}
-			return types.ErrAllRequestsFailed
+			return errs.ErrAllRequestsFailed
 		}
 		if curHost >= len(hosts) {
 			curHost = 0
@@ -280,33 +274,35 @@ func (resp *clientResp) Next() error {
 		h := hosts[curHost]
 		resp.mirror = h.config.Name
 
-		// check that context isn't canceled/done
-		ctxErr := resp.ctx.Err()
-		if ctxErr != nil {
-			return ctxErr
-		}
-
 		api, okAPI := req.APIs[h.config.API]
 		if !okAPI {
 			api, okAPI = req.APIs[""]
 		}
 
-		// try each host in a closure to handle all the backoff/dropHost from one place
-		if h.parallel != nil {
-			h.parallel.Acquire(resp.ctx, 1)
+		// check that context isn't canceled/done
+		ctxErr := resp.ctx.Err()
+		if ctxErr != nil {
+			return ctxErr
 		}
-		err = func() error {
+		// wait for other concurrent requests to this host
+		throttleErr := h.config.Throttle().Acquire(resp.ctx)
+		if throttleErr != nil {
+			return throttleErr
+		}
+
+		// try each host in a closure to handle all the backoff/dropHost from one place
+		loopErr := func() error {
 			var err error
 			if !okAPI {
 				dropHost = true
-				return fmt.Errorf("failed looking up api \"%s\" for host \"%s\": %w", h.config.API, h.config.Name, types.ErrAPINotFound)
+				return fmt.Errorf("failed looking up api \"%s\" for host \"%s\": %w", h.config.API, h.config.Name, errs.ErrAPINotFound)
 			}
 			if api.Method == "HEAD" && h.config.APIOpts != nil {
 				var disableHead bool
 				disableHead, err = strconv.ParseBool(h.config.APIOpts["disableHead"])
 				if err == nil && disableHead {
 					dropHost = true
-					return fmt.Errorf("head requests disabled for host \"%s\": %w", h.config.Name, types.ErrUnsupportedAPI)
+					return fmt.Errorf("head requests disabled for host \"%s\": %w", h.config.Name, errs.ErrUnsupportedAPI)
 				}
 			}
 
@@ -341,18 +337,19 @@ func (resp *clientResp) Next() error {
 			}
 			// close previous response
 			if resp.resp != nil && resp.resp.Body != nil {
-				resp.resp.Body.Close()
+				_ = resp.resp.Body.Close()
 			}
 			// delay for backoff if needed
-			if !h.backoffUntil.IsZero() && h.backoffUntil.After(time.Now()) {
-				sleepTime := time.Until(h.backoffUntil)
+			bu := resp.backoffUntil()
+			if !bu.IsZero() && bu.After(time.Now()) {
+				sleepTime := time.Until(bu)
 				c.log.WithFields(logrus.Fields{
 					"Host":    h.config.Name,
 					"Seconds": sleepTime.Seconds(),
 				}).Warn("Sleeping for backoff")
 				select {
 				case <-resp.ctx.Done():
-					return types.ErrCanceled
+					return errs.ErrCanceled
 				case <-time.After(sleepTime):
 				}
 			}
@@ -400,18 +397,23 @@ func (resp *clientResp) Next() error {
 					if api.Method != "HEAD" && api.Method != "GET" {
 						scope = scope + ",push"
 					}
-					hAuth.AddScope(h.config.Hostname, scope)
+					_ = hAuth.AddScope(h.config.Hostname, scope)
 				}
 				// add auth headers
 				err = hAuth.UpdateRequest(httpReq)
 				if err != nil {
-					backoff = true
+					if errors.Is(err, errs.ErrHTTPUnauthorized) {
+						dropHost = true
+					} else {
+						backoff = true
+					}
 					return err
 				}
 			}
 
-			if h.throttle != nil {
-				<-h.throttle.C
+			// delay for the rate limit
+			if h.ratelimit != nil {
+				<-h.ratelimit.C
 			}
 
 			// update http client for insecure requests and root certs
@@ -451,7 +453,7 @@ func (resp *clientResp) Next() error {
 						err = fmt.Errorf("authentication handler unavailable")
 					}
 					if err != nil {
-						if errors.Is(err, types.ErrEmptyChallenge) || errors.Is(err, types.ErrNoNewChallenge) || errors.Is(err, types.ErrHTTPUnauthorized) {
+						if errors.Is(err, errs.ErrEmptyChallenge) || errors.Is(err, errs.ErrNoNewChallenge) || errors.Is(err, errs.ErrHTTPUnauthorized) {
 							c.log.WithFields(logrus.Fields{
 								"URL": u.String(),
 								"Err": err,
@@ -462,7 +464,6 @@ func (resp *clientResp) Next() error {
 								"Err": err,
 							}).Warn("Failed to handle auth request")
 						}
-						backoff = true
 						dropHost = true
 					} else {
 						err = fmt.Errorf("authentication required")
@@ -475,7 +476,7 @@ func (resp *clientResp) Next() error {
 				case http.StatusRequestedRangeNotSatisfiable:
 					// if range request error (blob push), drop mirror for this req, but other requests don't need backoff
 					dropHost = true
-				case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusGatewayTimeout:
+				case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusGatewayTimeout, http.StatusInternalServerError:
 					// server is likely overloaded, backoff but still retry
 					backoff = true
 				default:
@@ -489,7 +490,7 @@ func (resp *clientResp) Next() error {
 				}).Debug("Request failed")
 				errHTTP := HTTPError(resp.resp.StatusCode)
 				errBody, _ := io.ReadAll(resp.resp.Body)
-				resp.resp.Body.Close()
+				_ = resp.resp.Body.Close()
 				return fmt.Errorf("request failed: %w: %s", errHTTP, errBody)
 			}
 
@@ -506,20 +507,20 @@ func (resp *clientResp) Next() error {
 			// verify Content-Range header when range request used, fail if missing
 			if httpReq.Header.Get("Range") != "" && resp.resp.Header.Get("Content-Range") == "" {
 				dropHost = true
-				resp.resp.Body.Close()
+				_ = resp.resp.Body.Close()
 				return fmt.Errorf("range request not supported by server")
 			}
 			return nil
 		}()
 		// return on success
-		if err == nil {
-			resp.parallel = h.parallel
-			resp.backoffClear()
+		if loopErr == nil {
+			resp.throttle = h.config.Throttle()
 			return nil
 		}
 		// backoff, dropHost, and/or go to next host in the list
-		if h.parallel != nil {
-			h.parallel.Release(1)
+		throttleErr = h.config.Throttle().Release(resp.ctx)
+		if throttleErr != nil {
+			return throttleErr
 		}
 		if backoff {
 			if api.IgnoreErr {
@@ -533,6 +534,11 @@ func (resp *clientResp) Next() error {
 				}
 			}
 		}
+		// when error does not allow retries, abort with the last known err value
+		if err != nil && errors.Is(loopErr, errs.ErrNotRetryable) {
+			return err
+		}
+		err = loopErr
 		if dropHost {
 			hosts = append(hosts[:curHost], hosts[curHost+1:]...)
 		} else if !retryHost {
@@ -550,13 +556,14 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 		return 0, io.EOF
 	}
 	if resp.resp == nil {
-		return 0, types.ErrNotFound
+		return 0, errs.ErrNotFound
 	}
 	// perform the read
 	i, err := resp.reader.Read(b)
 	resp.readCur += int64(i)
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		if resp.resp.Request.Method == "HEAD" || resp.readCur >= resp.readMax {
+			resp.backoffClear()
 			resp.done = true
 		} else {
 			// short read, retry?
@@ -565,8 +572,10 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 				"contentLen": resp.readMax,
 			}).Debug("EOF before reading all content, retrying")
 			// retry
-			resp.backoffSet()
-			respErr := resp.Next()
+			respErr := resp.backoffSet()
+			if respErr == nil {
+				respErr = resp.Next()
+			}
 			// unrecoverable EOF
 			if respErr != nil {
 				resp.client.log.WithFields(logrus.Fields{
@@ -584,8 +593,9 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 				"expected": resp.digest,
 				"computed": resp.digester.Digest(),
 			}).Warn("Digest mismatch")
+			_ = resp.backoffSet()
 			resp.done = true
-			return i, fmt.Errorf("%w, expected %s, computed %s", types.ErrDigestMismatch,
+			return i, fmt.Errorf("%w, expected %s, computed %s", errs.ErrDigestMismatch,
 				resp.digest.String(), resp.digester.Digest().String())
 		}
 	}
@@ -597,12 +607,15 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 }
 
 func (resp *clientResp) Close() error {
-	if resp.parallel != nil {
-		resp.parallel.Release(1)
-		resp.parallel = nil
+	if resp.throttle != nil {
+		_ = resp.throttle.Release(resp.ctx)
+		resp.throttle = nil
 	}
 	if resp.resp == nil {
-		return types.ErrNotFound
+		return errs.ErrNotFound
+	}
+	if !resp.done {
+		resp.backoffClear()
 	}
 	resp.done = true
 	return resp.resp.Body.Close()
@@ -682,10 +695,18 @@ func (resp *clientResp) backoffSet() error {
 	ch.backoffUntil = time.Now().Add(sleepTime)
 
 	if ch.backoffCur >= c.retryLimit {
-		return fmt.Errorf("%w: backoffs %d", types.ErrBackoffLimit, ch.backoffCur)
+		return fmt.Errorf("%w: backoffs %d", errs.ErrBackoffLimit, ch.backoffCur)
 	}
 
 	return nil
+}
+
+func (resp *clientResp) backoffUntil() time.Time {
+	c := resp.client
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ch := c.host[resp.mirror]
+	return ch.backoffUntil
 }
 
 func (c *Client) getHost(host string) *clientHost {
@@ -699,22 +720,31 @@ func (c *Client) getHost(host string) *clientHost {
 		h = &clientHost{}
 	}
 	if h.config == nil {
-		h.config = config.HostNewName(host)
+		if c.getConfigHost != nil {
+			h.config = c.getConfigHost(host)
+		} else {
+			h.config = config.HostNewName(host)
+		}
+		// check for normalized hostname
+		if h.config.Name != host {
+			host = h.config.Name
+			hNormal, ok := c.host[host]
+			if ok && hNormal.initialized {
+				return hNormal
+			}
+		}
 	}
 	if h.auth == nil {
 		h.auth = map[string]auth.Auth{}
 	}
-	if h.throttle == nil && h.config.ReqPerSec > 0 {
-		h.throttle = time.NewTicker(time.Duration(float64(time.Second) / h.config.ReqPerSec))
-	}
-	if h.parallel == nil && h.config.ReqConcurrent > 0 {
-		h.parallel = semaphore.NewWeighted(h.config.ReqConcurrent)
+	if h.ratelimit == nil && h.config.ReqPerSec > 0 {
+		h.ratelimit = time.NewTicker(time.Duration(float64(time.Second) / h.config.ReqPerSec))
 	}
 
 	if h.httpClient == nil {
 		h.httpClient = c.httpClient
 		// update http client for insecure requests and root certs
-		if h.config.TLS == config.TLSInsecure || len(c.rootCAPool) > 0 || len(c.rootCADirs) > 0 || h.config.RegCert != "" {
+		if h.config.TLS == config.TLSInsecure || len(c.rootCAPool) > 0 || len(c.rootCADirs) > 0 || h.config.RegCert != "" || (h.config.ClientCert != "" && h.config.ClientKey != "") {
 			// create a new client and modify the transport
 			httpClient := *c.httpClient
 			if httpClient.Transport == nil {
@@ -726,6 +756,7 @@ func (c *Client) getHost(host string) *clientHost {
 				if t.TLSClientConfig != nil {
 					tlsc = t.TLSClientConfig.Clone()
 				} else {
+					//#nosec G402 the default TLS 1.2 minimum version is allowed to support older registries
 					tlsc = &tls.Config{}
 				}
 				if h.config.TLS == config.TLSInsecure {
@@ -738,6 +769,16 @@ func (c *Client) getHost(host string) *clientHost {
 						}).Warn("failed to setup CA pool")
 					} else {
 						tlsc.RootCAs = rootPool
+					}
+				}
+				if h.config.ClientCert != "" && h.config.ClientKey != "" {
+					cert, err := tls.X509KeyPair([]byte(h.config.ClientCert), []byte(h.config.ClientKey))
+					if err != nil {
+						c.log.WithFields(logrus.Fields{
+							"err": err,
+						}).Warn("failed to configure client certs")
+					} else {
+						tlsc.Certificates = []tls.Certificate{cert}
 					}
 				}
 				t.TLSClientConfig = tlsc
@@ -790,15 +831,15 @@ func (ch *clientHost) AuthCreds() func(h string) auth.Cred {
 func HTTPError(statusCode int) error {
 	switch statusCode {
 	case 401:
-		return fmt.Errorf("%w [http %d]", types.ErrHTTPUnauthorized, statusCode)
+		return fmt.Errorf("%w [http %d]", errs.ErrHTTPUnauthorized, statusCode)
 	case 403:
-		return fmt.Errorf("%w [http %d]", types.ErrHTTPUnauthorized, statusCode)
+		return fmt.Errorf("%w [http %d]", errs.ErrHTTPUnauthorized, statusCode)
 	case 404:
-		return fmt.Errorf("%w [http %d]", types.ErrNotFound, statusCode)
+		return fmt.Errorf("%w [http %d]", errs.ErrNotFound, statusCode)
 	case 429:
-		return fmt.Errorf("%w [http %d]", types.ErrHTTPRateLimit, statusCode)
+		return fmt.Errorf("%w [http %d]", errs.ErrHTTPRateLimit, statusCode)
 	default:
-		return fmt.Errorf("%w: %s [http %d]", types.ErrHTTPStatus, http.StatusText(statusCode), statusCode)
+		return fmt.Errorf("%w: %s [http %d]", errs.ErrHTTPStatus, http.StatusText(statusCode), statusCode)
 	}
 }
 
@@ -817,7 +858,7 @@ func makeRootPool(rootCAPool [][]byte, rootCADirs []string, hostname string, hos
 		files, err := os.ReadDir(hostDir)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to read directory %s: %v", hostDir, err)
+				return nil, fmt.Errorf("failed to read directory %s: %w", hostDir, err)
 			}
 			continue
 		}
@@ -827,9 +868,10 @@ func makeRootPool(rootCAPool [][]byte, rootCADirs []string, hostname string, hos
 			}
 			if strings.HasSuffix(f.Name(), ".crt") {
 				f := filepath.Join(hostDir, f.Name())
+				//#nosec G304 file from a known directory and extension read by the user running the command on their own host
 				cert, err := os.ReadFile(f)
 				if err != nil {
-					return nil, fmt.Errorf("failed to read %s: %v", f, err)
+					return nil, fmt.Errorf("failed to read %s: %w", f, err)
 				}
 				if ok := pool.AppendCertsFromPEM(cert); !ok {
 					return nil, fmt.Errorf("failed to import cert from %s", f)
