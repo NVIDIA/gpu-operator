@@ -27,6 +27,6 @@ func (i Info) MarshalPretty() ([]byte, error) {
 	fmt.Fprintf(tw, "Platform:\t%s\n", i.Platform)
 	fmt.Fprintf(tw, "GoVer:\t%s\n", i.GoVer)
 	fmt.Fprintf(tw, "GoCompiler:\t%s\n", i.GoCompiler)
-	tw.Flush()
-	return buf.Bytes(), nil
+	err := tw.Flush()
+	return buf.Bytes(), err
 }

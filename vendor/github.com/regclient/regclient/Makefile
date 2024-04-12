@@ -9,12 +9,20 @@ VCS_REF?=$(shell git rev-list -1 HEAD)
 ifneq ($(shell git status --porcelain 2>/dev/null),)
   VCS_REF := $(VCS_REF)-dirty
 endif
-VCS_DATE?=$(shell date -d "@$(shell git log -1 --format=%at)" +%Y-%m-%dT%H:%M:%SZ --utc)
+VCS_VERSION?=$(shell vcs_describe="$$(git describe --all)"; \
+  vcs_version="(devel)"; \
+  if [ "$${vcs_describe}" != "$${vcs_describe#tags/}" ]; then \
+    vcs_version="$${vcs_describe#tags/}"; \
+  elif [ "$${vcs_describe}" != "$${vcs_describe#heads/}" ]; then \
+    vcs_version="$${vcs_describe#heads/}"; \
+    if [ "main" = "$${vcs_version}" ]; then vcs_version=edge; fi; \
+  fi; \
+  echo "$${vcs_version}" | sed -r 's#/+#-#g')
 VCS_TAG?=$(shell git describe --tags --abbrev=0 2>/dev/null || true)
 LD_FLAGS?=-s -w -extldflags -static -buildid= -X \"github.com/regclient/regclient/internal/version.vcsTag=$(VCS_TAG)\"
 GO_BUILD_FLAGS?=-trimpath -ldflags "$(LD_FLAGS)" -tags nolegacy
 DOCKERFILE_EXT?=$(shell if docker build --help 2>/dev/null | grep -q -- '--progress'; then echo ".buildkit"; fi)
-DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)"
+DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)" --build-arg "VCS_VERSION=$(VCS_VERSION)"
 GOPATH?=$(shell go env GOPATH)
 PWD:=$(shell pwd)
 VER_BUMP?=$(shell command -v version-bump 2>/dev/null)
@@ -25,75 +33,143 @@ ifeq "$(strip $(VER_BUMP))" ''
 		-u "$(shell id -u):$(shell id -g)" \
 		$(VER_BUMP_CONTAINER)
 endif
+MARKDOWN_LINT_VER?=v0.12.1
+GOMAJOR_VER?=v0.10.1
+GOSEC_VER?=v2.19.0
+GO_VULNCHECK_VER?=v1.0.4
+OSV_SCANNER_VER?=v1.7.1
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v0.77.0
-SYFT_CONTAINER?=anchore/syft:v0.77.0@sha256:0135d844712731b86fab20ea584e594ad25b9f5a7fd262b5feb490e865edef89
+SYFT_VERSION?=v1.0.1
+SYFT_CONTAINER?=anchore/syft:v1.0.1@sha256:d49defada853900861d55491ba549ab334148d51b11f23942abecb39ea83d4db
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
 		-u "$(shell id -u):$(shell id -g)" \
 		$(SYFT_CONTAINER)
 endif
-STATICCHECK_VER?=v0.4.3
+STATICCHECK_VER?=v0.4.7
+CI_DISTRIBUTION_VER?=2.8.3
+CI_ZOT_VER?=v2.0.2
 
-.PHONY: all fmt vet test lint lint-go lint-md vendor binaries docker artifacts artifact-pre plugin-user plugin-host .FORCE
-
+.PHONY: .FORCE
 .FORCE:
 
-all: fmt vet test lint binaries ## Full build of Go binaries (including fmt, vet, test, and lint)
+.PHONY: all
+all: fmt goimports vet test lint binaries ## Full build of Go binaries (including fmt, vet, test, and lint)
 
+.PHONY: fmt
 fmt: ## go fmt
 	go fmt ./...
 
+goimports: $(GOPATH)/bin/goimports
+	$(GOPATH)/bin/goimports -w -format-only -local github.com/regclient .
+
+.PHONY: vet
 vet: ## go vet
 	go vet ./...
 
+.PHONY: test
 test: ## go test
-	go test -cover ./...
+	go test -cover -race ./...
 
-lint: lint-go lint-md ## Run all linting
+.PHONY: lint
+lint: lint-go lint-goimports lint-md lint-gosec ## Run all linting
 
+.PHONY: lint-go
 lint-go: $(GOPATH)/bin/staticcheck .FORCE ## Run linting for Go
 	$(GOPATH)/bin/staticcheck -checks all ./...
 
-lint-md: .FORCE ## Run linting for markdown
-	docker run --rm -v "$(PWD):/workdir:ro" ghcr.io/igorshubovych/markdownlint-cli:latest \
-	  --ignore vendor .
+lint-goimports: $(GOPATH)/bin/goimports
+	@if [ -n "$$($(GOPATH)/bin/goimports -l -format-only -local github.com/regclient .)" ]; then \
+		echo $(GOPATH)/bin/goimports -d -format-only -local github.com/regclient .; \
+		$(GOPATH)/bin/goimports -d -format-only -local github.com/regclient .; \
+		exit 1; \
+	fi
 
+# excluding types/platform pending resultion to https://github.com/securego/gosec/issues/1116
+.PHONY: lint-gosec
+lint-gosec: $(GOPATH)/bin/gosec .FORCE ## Run gosec
+	$(GOPATH)/bin/gosec -terse -exclude-dir types/platform ./...
+
+.PHONY: lint-md
+lint-md: .FORCE ## Run linting for markdown
+	docker run --rm -v "$(PWD):/workdir:ro" davidanson/markdownlint-cli2:$(MARKDOWN_LINT_VER) \
+	  "**/*.md" "#vendor"
+
+.PHONY: vulnerability-scan
+vulnerability-scan: osv-scanner vulncheck-go ## Run all vulnerability scanners
+
+.PHONY: osv-scanner
+osv-scanner: $(GOPATH)/bin/osv-scanner .FORCE ## Run OSV Scanner
+	$(GOPATH)/bin/osv-scanner scan -r --experimental-licenses="Apache-2.0,BSD-3-Clause,MIT,CC-BY-SA-4.0,UNKNOWN" .
+
+.PHONY: vulncheck-go
+vulncheck-go: $(GOPATH)/bin/govulncheck .FORCE ## Run govulncheck
+	$(GOPATH)/bin/govulncheck ./...
+
+.PHONY: vendor
 vendor: ## Vendor Go modules
 	go mod vendor
 
-binaries: vendor $(BINARIES) ## Build Go binaries
+.PHONY: binaries
+binaries: $(BINARIES) ## Build Go binaries
 
 bin/%: .FORCE
 	CGO_ENABLED=0 go build ${GO_BUILD_FLAGS} -o bin/$* ./cmd/$*
 
+.PHONY: docker
 docker: $(IMAGES) ## Build Docker images
 
 docker-%: .FORCE
 	docker build -t regclient/$* -f build/Dockerfile.$*$(DOCKERFILE_EXT) $(DOCKER_ARGS) .
 	docker build -t regclient/$*:alpine -f build/Dockerfile.$*$(DOCKERFILE_EXT) --target release-alpine $(DOCKER_ARGS) .
 
+.PHONY: oci-image
 oci-image: $(addprefix oci-image-,$(COMMANDS)) ## Build reproducible images to an OCI Layout
 
 oci-image-%: bin/regctl .FORCE
-	build/oci-image.sh -r scratch -i "$*" -p "$(TEST_PLATFORMS)"
-	build/oci-image.sh -r alpine  -i "$*" -p "$(TEST_PLATFORMS)" -b "alpine:3"
+	PATH="$(PWD)/bin:$(PATH)" build/oci-image.sh -r scratch -i "$*" -p "$(TEST_PLATFORMS)"
+	PATH="$(PWD)/bin:$(PATH)" build/oci-image.sh -r alpine  -i "$*" -p "$(TEST_PLATFORMS)" -b "alpine:3"
 
+.PHONY: test-docker
 test-docker: $(addprefix test-docker-,$(COMMANDS)) ## Build multi-platform docker images (but do not tag)
 
 test-docker-%:
 	docker buildx build --platform="$(TEST_PLATFORMS)" -f build/Dockerfile.$*.buildkit .
 	docker buildx build --platform="$(TEST_PLATFORMS)" -f build/Dockerfile.$*.buildkit --target release-alpine .
 
+.PHONY: ci
+ci: ci-distribution ci-zot ## Run CI tests against self hosted registries
+
+.PHONY: ci-distribution
+ci-distribution:
+	docker run --rm -d -p 5000 \
+		--label regclient-ci=true --name regclient-ci-distribution \
+		-e "REGISTRY_STORAGE_DELETE_ENABLED=true" \
+		docker.io/library/registry:$(CI_DISTRIBUTION_VER)
+	./build/ci-test.sh -t localhost:$$(docker port regclient-ci-distribution 5000 | head -1 | cut -f2 -d:)/test-ci
+	docker stop regclient-ci-distribution
+
+.PHONY: ci-zot
+ci-zot:
+	docker run --rm -d -p 5000 \
+		--label regclient-ci=true --name regclient-ci-zot \
+		-v "$$(pwd)/build/zot-config.json:/etc/zot/config.json:ro" \
+		ghcr.io/project-zot/zot-linux-amd64:$(CI_ZOT_VER)
+	./build/ci-test.sh -t localhost:$$(docker port regclient-ci-zot 5000 | head -1 | cut -f2 -d:)/test-ci
+	docker stop regclient-ci-zot
+
+.PHONY: artifacts
 artifacts: $(ARTIFACTS) ## Generate artifacts
 
+.PHONY: artifact-pre
 artifact-pre:
 	mkdir -p artifacts
 
 artifacts/%: artifact-pre .FORCE
-	@target="$*"; \
+	@set -e; \
+	target="$*"; \
 	command="$${target%%-*}"; \
 	platform_ext="$${target#*-}"; \
 	platform="$${platform_ext%.*}"; \
@@ -103,31 +179,81 @@ artifacts/%: artifact-pre .FORCE
 	echo export GOARCH=$${GOARCH}; \
 	echo go build ${GO_BUILD_FLAGS} -o "$@" ./cmd/$${command}/; \
 	CGO_ENABLED=0 go build ${GO_BUILD_FLAGS} -o "$@" ./cmd/$${command}/; \
-	$(SYFT) packages -q "file:$@" --name "$${command}" -o cyclonedx-json >"artifacts/$${command}-$${platform}.cyclonedx.json"; \
-	$(SYFT) packages -q "file:$@" --name "$${command}" -o spdx-json >"artifacts/$${command}-$${platform}.spdx.json"
+	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o cyclonedx-json >"artifacts/$${command}-$${platform}.cyclonedx.json"; \
+	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o spdx-json >"artifacts/$${command}-$${platform}.spdx.json"
 
+.PHONY: plugin-user
 plugin-user:
 	mkdir -p ${HOME}/.docker/cli-plugins/
 	cp docker-plugin/docker-regclient ${HOME}/.docker/cli-plugins/docker-regctl
 
+.PHONY: plugin-host
 plugin-host:
 	sudo cp docker-plugin/docker-regclient /usr/libexec/docker/cli-plugins/docker-regctl
 
-util-golang-update:
-	go get -u
+.PHONY: util-golang-major
+util-golang-major: $(GOPATH)/bin/gomajor ## check for major dependency updates
+	$(GOPATH)/bin/gomajor list
+
+.PHONY: util-golang-update
+util-golang-update: ## update go module versions
+	go get -u -t ./...
 	go mod tidy
-	go mod vendor
-	
-util-version-check:
+	[ ! -d vendor ] || go mod vendor
+
+.PHONY: util-release-preview
+util-release-preview: $(GOPATH)/bin/gorelease ## preview changes for next release
+	git checkout main
+	./.github/release.sh -d
+	gorelease
+
+.PHONY: util-release-run
+util-release-run: ## generate a new release
+	git checkout main
+	./.github/release.sh
+
+.PHONY: util-version-check
+util-version-check: ## check all dependencies for updates
 	$(VER_BUMP) check
 
-util-version-update:
+.PHONY: util-version-update
+util-version-update: ## update versions on all dependencies
 	$(VER_BUMP) update
+
+$(GOPATH)/bin/gomajor: .FORCE
+	@[ -f "$(GOPATH)/bin/gomajor" ] \
+	&& [ "$$($(GOPATH)/bin/gomajor version | grep '^version' | cut -f 2 -d ' ')" = "$(GOMAJOR_VER)" ] \
+	|| go install github.com/icholy/gomajor@$(GOMAJOR_VER)
+
+$(GOPATH)/bin/goimports: .FORCE
+	@[ -f "$(GOPATH)/bin/goimports" ] \
+	||	go install golang.org/x/tools/cmd/goimports@latest
+
+$(GOPATH)/bin/gorelease: .FORCE
+	@[ -f "$(GOPATH)/bin/gorelease" ] \
+	|| go install golang.org/x/exp/cmd/gorelease@latest
+
+$(GOPATH)/bin/gosec: .FORCE
+	@[ -f $(GOPATH)/bin/gosec ] \
+	&& [ "$$($(GOPATH)/bin/gosec -version | grep '^Version' | cut -f 2 -d ' ')" = "$(GOSEC_VER)" ] \
+	|| go install -ldflags '-X main.Version=$(GOSEC_VER) -X main.GitTag=$(GOSEC_VER)' \
+	    github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VER)
 
 $(GOPATH)/bin/staticcheck: .FORCE
 	@[ -f $(GOPATH)/bin/staticcheck ] \
 	&& [ "$$($(GOPATH)/bin/staticcheck -version | cut -f 3 -d ' ' | tr -d '()')" = "$(STATICCHECK_VER)" ] \
 	|| go install "honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VER)"
 
+$(GOPATH)/bin/govulncheck: .FORCE
+	@[ $$(go version -m $(GOPATH)/bin/govulncheck | \
+		awk -F ' ' '{ if ($$1 == "mod" && $$2 == "golang.org/x/vuln") { printf "%s\n", $$3 } }') = "$(GO_VULNCHECK_VER)" ] \
+	|| CGO_ENABLED=0 go install "golang.org/x/vuln/cmd/govulncheck@$(GO_VULNCHECK_VER)"
+
+$(GOPATH)/bin/osv-scanner: .FORCE
+	@[ -f $(GOPATH)/bin/osv-scanner ] \
+	&& [ "$$(osv-scanner --version | awk -F ': ' '{ if ($$1 == "osv-scanner version") { printf "%s\n", $$2 } }')" = "$(OSV_SCANNER_VER)" ] \
+	|| CGO_ENABLED=0 go install "github.com/google/osv-scanner/cmd/osv-scanner@$(OSV_SCANNER_VER)"
+
+.PHONY: help
 help: # Display help
 	@awk -F ':|##' '/^[^\t].+?:.*?##/ { printf "\033[36m%-30s\033[0m %s\n", $$1, $$NF }' $(MAKEFILE_LIST)

@@ -1,6 +1,6 @@
-// Package ref is used to define references
-// References default to remote registry references (registry:port/repo:tag)
-// Schemes can be included in front of the reference for different reference types
+// Package ref is used to define references.
+// References default to remote registry references (registry:port/repo:tag).
+// Schemes can be included in front of the reference for different reference types.
 package ref
 
 import (
@@ -8,63 +8,61 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/regclient/regclient/types/errs"
 )
 
 const (
 	dockerLibrary = "library"
-	// DockerRegistry is the name resolved in docker images on Hub
+	// dockerRegistry is the name resolved in docker images on Hub.
 	dockerRegistry = "docker.io"
-	// DockerRegistryLegacy is the name resolved in docker images on Hub
+	// dockerRegistryLegacy is the name resolved in docker images on Hub.
 	dockerRegistryLegacy = "index.docker.io"
-	// DockerRegistryDNS is the host to connect to for Hub
+	// dockerRegistryDNS is the host to connect to for Hub.
 	dockerRegistryDNS = "registry-1.docker.io"
 )
 
 var (
-	hostPartS = `(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)`
-	// host with port allows a short name in addition to hostDomainS
-	hostPortS = `(?:` + hostPartS + `(?:` + regexp.QuoteMeta(`.`) + hostPartS + `)*` + regexp.QuoteMeta(`.`) + `?` + regexp.QuoteMeta(`:`) + `[0-9]+)`
-	// hostname may be ip, fqdn (example.com), or trailing dot (example.)
+	hostPartS   = `(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)`
+	hostPortS   = `(?:` + hostPartS + `(?:` + regexp.QuoteMeta(`.`) + hostPartS + `)*` + regexp.QuoteMeta(`.`) + `?` + regexp.QuoteMeta(`:`) + `[0-9]+)`
 	hostDomainS = `(?:` + hostPartS + `(?:(?:` + regexp.QuoteMeta(`.`) + hostPartS + `)+` + regexp.QuoteMeta(`.`) + `?|` + regexp.QuoteMeta(`.`) + `))`
 	hostUpperS  = `(?:[a-zA-Z0-9]*[A-Z][a-zA-Z0-9-]*[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[A-Z][a-zA-Z0-9]*)`
-	registryS   = `(?:` + hostDomainS + `|` + hostPortS + `|` + hostUpperS + `|localhost(?:` + regexp.QuoteMeta(`:`) + `[0-9]+))`
-	repoPartS   = `[a-z0-9]+(?:(?:[_.]|__|[-]*)[a-z0-9]+)*`
+	registryS   = `(?:` + hostDomainS + `|` + hostPortS + `|` + hostUpperS + `|localhost(?:` + regexp.QuoteMeta(`:`) + `[0-9]+)?)`
+	repoPartS   = `[a-z0-9]+(?:(?:\.|_|__|-+)[a-z0-9]+)*`
 	pathS       = `[/a-zA-Z0-9_\-. ]+`
-	tagS        = `[\w][\w.-]{0,127}`
+	tagS        = `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`
 	digestS     = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
+	schemeRE    = regexp.MustCompile(`^([a-z]+)://(.+)$`)
+	registryRE  = regexp.MustCompile(`^(` + registryS + `)$`)
 	refRE       = regexp.MustCompile(`^(?:(` + registryS + `)` + regexp.QuoteMeta(`/`) + `)?` +
 		`(` + repoPartS + `(?:` + regexp.QuoteMeta(`/`) + repoPartS + `)*)` +
 		`(?:` + regexp.QuoteMeta(`:`) + `(` + tagS + `))?` +
 		`(?:` + regexp.QuoteMeta(`@`) + `(` + digestS + `))?$`)
-	schemeRE = regexp.MustCompile(`^([a-z]+)://(.+)$`)
-	pathRE   = regexp.MustCompile(`^(` + pathS + `)` +
+	ocidirRE = regexp.MustCompile(`^(` + pathS + `)` +
 		`(?:` + regexp.QuoteMeta(`:`) + `(` + tagS + `))?` +
 		`(?:` + regexp.QuoteMeta(`@`) + `(` + digestS + `))?$`)
 )
 
-// Ref reference to a registry/repository
-// If the tag or digest is available, it's also included in the reference.
-// Reference itself is the unparsed string.
-// While this is currently a struct, that may change in the future and access
-// to contents should not be assumed/used.
+// Ref is a reference to a registry/repository.
+// Direct access to the contents of this struct should not be assumed.
 type Ref struct {
-	Scheme     string
-	Reference  string // unparsed string
-	Registry   string // server, host:port
-	Repository string // path on server
-	Tag        string
-	Digest     string
-	Path       string
+	Scheme     string // Scheme is the type of reference, "reg" or "ocidir".
+	Reference  string // Reference is the unparsed string or common name.
+	Registry   string // Registry is the server for the "reg" scheme.
+	Repository string // Repository is the path on the registry for the "reg" scheme.
+	Tag        string // Tag is a mutable tag for a reference.
+	Digest     string // Digest is an immutable hash for a reference.
+	Path       string // Path is the directory of the OCI Layout for "ocidir".
 }
 
-// New returns a reference based on the scheme, defaulting to a
+// New returns a reference based on the scheme (defaulting to "reg").
 func New(parse string) (Ref, error) {
 	scheme := ""
-	path := parse
+	tail := parse
 	matchScheme := schemeRE.FindStringSubmatch(parse)
 	if len(matchScheme) == 3 {
 		scheme = matchScheme[1]
-		path = matchScheme[2]
+		tail = matchScheme[2]
 	}
 	ret := Ref{
 		Scheme:    scheme,
@@ -73,12 +71,12 @@ func New(parse string) (Ref, error) {
 	switch scheme {
 	case "":
 		ret.Scheme = "reg"
-		matchRef := refRE.FindStringSubmatch(path)
+		matchRef := refRE.FindStringSubmatch(tail)
 		if matchRef == nil || len(matchRef) < 5 {
-			if refRE.FindStringSubmatch(strings.ToLower(path)) != nil {
-				return Ref{}, fmt.Errorf("invalid reference \"%s\", repo must be lowercase", path)
+			if refRE.FindStringSubmatch(strings.ToLower(tail)) != nil {
+				return Ref{}, fmt.Errorf("%w \"%s\", repo must be lowercase", errs.ErrInvalidReference, tail)
 			}
-			return Ref{}, fmt.Errorf("invalid reference \"%s\"", path)
+			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrInvalidReference, tail)
 		}
 		ret.Registry = matchRef[1]
 		ret.Repository = matchRef[2]
@@ -102,13 +100,13 @@ func New(parse string) (Ref, error) {
 			ret.Tag = "latest"
 		}
 		if ret.Repository == "" {
-			return Ref{}, fmt.Errorf("invalid reference \"%s\"", path)
+			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrInvalidReference, tail)
 		}
 
 	case "ocidir", "ocifile":
-		matchPath := pathRE.FindStringSubmatch(path)
+		matchPath := ocidirRE.FindStringSubmatch(tail)
 		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
-			return Ref{}, fmt.Errorf("invalid path for scheme \"%s\": %s", scheme, path)
+			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrInvalidReference, scheme, tail)
 		}
 		ret.Path = matchPath[1]
 		if len(matchPath) > 2 && matchPath[2] != "" {
@@ -119,12 +117,51 @@ func New(parse string) (Ref, error) {
 		}
 
 	default:
-		return Ref{}, fmt.Errorf("unhandled reference scheme \"%s\" in \"%s\"", scheme, parse)
+		return Ref{}, fmt.Errorf("%w, unknown scheme \"%s\" in \"%s\"", errs.ErrInvalidReference, scheme, parse)
 	}
 	return ret, nil
 }
 
-// CommonName outputs a parsable name from a reference
+// NewHost returns a Reg for a registry hostname or equivalent.
+// The ocidir schema equivalent is the path.
+func NewHost(parse string) (Ref, error) {
+	scheme := ""
+	tail := parse
+	matchScheme := schemeRE.FindStringSubmatch(parse)
+	if len(matchScheme) == 3 {
+		scheme = matchScheme[1]
+		tail = matchScheme[2]
+	}
+	ret := Ref{
+		Scheme: scheme,
+	}
+
+	switch scheme {
+	case "":
+		ret.Scheme = "reg"
+		matchReg := registryRE.FindStringSubmatch(tail)
+		if matchReg == nil || len(matchReg) < 2 {
+			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrParsingFailed, tail)
+		}
+		ret.Registry = matchReg[1]
+		if ret.Registry == "" {
+			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrParsingFailed, tail)
+		}
+
+	case "ocidir", "ocifile":
+		matchPath := ocidirRE.FindStringSubmatch(tail)
+		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
+			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrParsingFailed, scheme, tail)
+		}
+		ret.Path = matchPath[1]
+
+	default:
+		return Ref{}, fmt.Errorf("%w, unknown scheme \"%s\" in \"%s\"", errs.ErrParsingFailed, scheme, parse)
+	}
+	return ret, nil
+}
+
+// CommonName outputs a parsable name from a reference.
 func (r Ref) CommonName() string {
 	cn := ""
 	switch r.Scheme {
@@ -154,7 +191,34 @@ func (r Ref) CommonName() string {
 	return cn
 }
 
-// IsZero returns true if ref is unset
+// IsSet returns true if needed values are defined for a specific reference.
+func (r Ref) IsSet() bool {
+	if !r.IsSetRepo() {
+		return false
+	}
+	// Registry requires a tag or digest, OCI Layout doesn't require these.
+	if r.Scheme == "reg" && r.Tag == "" && r.Digest == "" {
+		return false
+	}
+	return true
+}
+
+// IsSetRepo returns true when the ref includes values for a specific repository.
+func (r Ref) IsSetRepo() bool {
+	switch r.Scheme {
+	case "reg":
+		if r.Registry != "" && r.Repository != "" {
+			return true
+		}
+	case "ocidir":
+		if r.Path != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// IsZero returns true if ref is unset.
 func (r Ref) IsZero() bool {
 	if r.Scheme == "" && r.Registry == "" && r.Repository == "" && r.Path == "" && r.Tag == "" && r.Digest == "" {
 		return true
@@ -162,7 +226,25 @@ func (r Ref) IsZero() bool {
 	return false
 }
 
-// ToReg converts a reference to a registry like syntax
+// SetDigest returns a ref with the requested digest set.
+// The tag will be unset and the reference value will be reset.
+func (r Ref) SetDigest(digest string) Ref {
+	r.Digest = digest
+	r.Tag = ""
+	r.Reference = r.CommonName()
+	return r
+}
+
+// SetTag returns a ref with the requested tag set.
+// The digest will be unset and the reference value will be reset.
+func (r Ref) SetTag(tag string) Ref {
+	r.Tag = tag
+	r.Digest = ""
+	r.Reference = r.CommonName()
+	return r
+}
+
+// ToReg converts a reference to a registry like syntax.
 func (r Ref) ToReg() Ref {
 	switch r.Scheme {
 	case "ocidir":
@@ -178,7 +260,7 @@ func (r Ref) ToReg() Ref {
 	return r
 }
 
-// EqualRegistry compares the registry between two references
+// EqualRegistry compares the registry between two references.
 func EqualRegistry(a, b Ref) bool {
 	if a.Scheme != b.Scheme {
 		return false
@@ -196,7 +278,7 @@ func EqualRegistry(a, b Ref) bool {
 	}
 }
 
-// EqualRepository compares the repository between two references
+// EqualRepository compares the repository between two references.
 func EqualRepository(a, b Ref) bool {
 	if a.Scheme != b.Scheme {
 		return false

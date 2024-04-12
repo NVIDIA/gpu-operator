@@ -14,19 +14,23 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/regclient/regclient/internal/rwfs"
-	"github.com/regclient/regclient/internal/wraperr"
-	"github.com/regclient/regclient/scheme"
-	"github.com/regclient/regclient/types"
-	"github.com/regclient/regclient/types/manifest"
-	"github.com/regclient/regclient/types/ref"
 	"github.com/sirupsen/logrus"
+
+	"github.com/regclient/regclient/internal/rwfs"
+	"github.com/regclient/regclient/scheme"
+	"github.com/regclient/regclient/types/errs"
+	"github.com/regclient/regclient/types/manifest"
+	"github.com/regclient/regclient/types/mediatype"
+	"github.com/regclient/regclient/types/ref"
 )
 
 // ManifestDelete removes a manifest, including all tags that point to that manifest
 func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.ManifestOpts) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
 	if r.Digest == "" {
-		return wraperr.New(fmt.Errorf("digest required to delete manifest, reference %s", r.CommonName()), types.ErrMissingDigest)
+		return fmt.Errorf("digest required to delete manifest, reference %s%.0w", r.CommonName(), errs.ErrMissingDigest)
 	}
 
 	mc := scheme.ManifestConfig{}
@@ -36,7 +40,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 
 	// always check for refers with ocidir
 	if mc.Manifest == nil {
-		m, err := o.ManifestGet(ctx, r)
+		m, err := o.manifestGet(ctx, r)
 		if err != nil {
 			return fmt.Errorf("failed to pull manifest for refers: %w", err)
 		}
@@ -48,7 +52,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 			if err == nil && sDesc != nil && sDesc.MediaType != "" && sDesc.Size > 0 {
 				// attempt to delete the referrer, but ignore if the referrer entry wasn't found
 				err = o.referrerDelete(ctx, r, mc.Manifest)
-				if err != nil && !errors.Is(err, types.ErrNotFound) {
+				if err != nil && !errors.Is(err, errs.ErrNotFound) && !errors.Is(err, fs.ErrNotExist) {
 					return err
 				}
 			}
@@ -57,7 +61,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 
 	// get index
 	changed := false
-	index, err := o.readIndex(r)
+	index, err := o.readIndex(r, true)
 	if err != nil {
 		return fmt.Errorf("failed to read index: %w", err)
 	}
@@ -70,7 +74,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 	}
 	// push manifest back out
 	if changed {
-		err = o.writeIndex(r, index)
+		err = o.writeIndex(r, index, true)
 		if err != nil {
 			return fmt.Errorf("failed to write index: %w", err)
 		}
@@ -89,7 +93,13 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 
 // ManifestGet retrieves a manifest from a repository
 func (o *OCIDir) ManifestGet(ctx context.Context, r ref.Ref) (manifest.Manifest, error) {
-	index, err := o.readIndex(r)
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.manifestGet(ctx, r)
+}
+
+func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, error) {
+	index, err := o.readIndex(r, true)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read oci index: %w", err)
 	}
@@ -105,7 +115,7 @@ func (o *OCIDir) ManifestGet(ctx context.Context, r ref.Ref) (manifest.Manifest,
 		}
 	}
 	if desc.Digest == "" {
-		return nil, types.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 	file := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
 	fd, err := o.fs.Open(file)
@@ -133,7 +143,7 @@ func (o *OCIDir) ManifestGet(ctx context.Context, r ref.Ref) (manifest.Manifest,
 
 // ManifestHead gets metadata about the manifest (existence, digest, mediatype, size)
 func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest, error) {
-	index, err := o.readIndex(r)
+	index, err := o.readIndex(r, false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read oci index: %w", err)
 	}
@@ -149,13 +159,13 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 		}
 	}
 	if desc.Digest == "" {
-		return nil, types.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 	// verify underlying file exists
 	file := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
 	fi, err := rwfs.Stat(o.fs, file)
 	if err != nil || fi.IsDir() {
-		return nil, types.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 	// if missing, set media type on desc
 	if desc.MediaType == "" {
@@ -176,9 +186,9 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 			desc.MediaType = mt.MediaType
 			desc.Size = int64(len(raw))
 		} else if mt.SchemaVersion == 1 && len(mt.Signatures) > 0 {
-			desc.MediaType = types.MediaTypeDocker1ManifestSigned
+			desc.MediaType = mediatype.Docker1ManifestSigned
 		} else if mt.SchemaVersion == 1 {
-			desc.MediaType = types.MediaTypeDocker1Manifest
+			desc.MediaType = mediatype.Docker1Manifest
 			desc.Size = int64(len(raw))
 		}
 	}
@@ -190,6 +200,12 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 
 // ManifestPut sends a manifest to the repository
 func (o *OCIDir) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest, opts ...scheme.ManifestOpts) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.manifestPut(ctx, r, m, opts...)
+}
+
+func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest, opts ...scheme.ManifestOpts) error {
 	config := scheme.ManifestConfig{}
 	for _, opt := range opts {
 		opt(&config)
@@ -197,12 +213,9 @@ func (o *OCIDir) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	if !config.Child && r.Digest == "" && r.Tag == "" {
 		r.Tag = "latest"
 	}
-
-	indexChanged := false
-	index, err := o.readIndex(r)
+	err := o.initIndex(r, true)
 	if err != nil {
-		index = indexCreate()
-		indexChanged = true
+		return err
 	}
 	desc := m.GetDescriptor()
 	b, err := m.RawBody()
@@ -224,30 +237,34 @@ func (o *OCIDir) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", dir, err)
 	}
+	// write to a tmp file, rename after validating
+	tmpFile, err := rwfs.CreateTemp(o.fs, dir, desc.Digest.Encoded()+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create manifest tmpfile: %w", err)
+	}
+	fi, err := tmpFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat manifest tmpfile: %w", err)
+	}
+	tmpName := fi.Name()
+	_, err = tmpFile.Write(b)
+	errC := tmpFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to write manifest tmpfile: %w", err)
+	}
+	if errC != nil {
+		return fmt.Errorf("failed to close manifest tmpfile: %w", errC)
+	}
 	file := path.Join(dir, desc.Digest.Encoded())
-	fd, err := o.fs.Create(file)
+	err = o.fs.Rename(path.Join(dir, tmpName), file)
 	if err != nil {
-		return fmt.Errorf("failed to create manifest: %w", err)
+		return fmt.Errorf("failed to write manifest (rename tmpfile): %w", err)
 	}
-	defer fd.Close()
-	_, err = fd.Write(b)
+
+	// verify/update index
+	err = o.updateIndex(r, desc, config.Child, true)
 	if err != nil {
-		return fmt.Errorf("failed to write manifest: %w", err)
-	}
-	// replace existing tag or create a new entry
-	if !config.Child {
-		err := indexSet(&index, r, desc)
-		if err != nil {
-			return fmt.Errorf("failed to update index: %w", err)
-		}
-		indexChanged = true
-	}
-	// write the index.json and oci-layout if it's been changed
-	if indexChanged {
-		err = o.writeIndex(r, index)
-		if err != nil {
-			return fmt.Errorf("failed to write index: %w", err)
-		}
+		return err
 	}
 	o.refMod(r)
 	o.log.WithFields(logrus.Fields{
@@ -268,6 +285,5 @@ func (o *OCIDir) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 			}
 		}
 	}
-
 	return nil
 }

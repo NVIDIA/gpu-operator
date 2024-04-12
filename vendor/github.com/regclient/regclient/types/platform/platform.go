@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"runtime"
 	"strings"
+
+	"github.com/regclient/regclient/internal/strparse"
+	"github.com/regclient/regclient/types/errs"
 )
 
 var (
 	partRE = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-	verRE  = regexp.MustCompile(`^[A-Za-z0-9\._-]+$`)
 )
 
 // Platform specifies a platform where a particular image manifest is applicable.
@@ -55,75 +56,20 @@ func (p Platform) String() string {
 	(&p).normalize()
 	if p.OS == "" {
 		return "unknown"
-	} else if p.OS == "windows" {
-		return path.Join(p.OS, p.Architecture, p.OSVersion)
 	} else {
 		return path.Join(p.OS, p.Architecture, p.Variant)
 	}
 }
 
-// Compatible indicates if a host can run a specified target platform image.
-// This accounts for Docker Desktop for Mac and Windows using a Linux VM.
-func Compatible(host, target Platform) bool {
-	(&host).normalize()
-	(&target).normalize()
-	if host.OS == "linux" {
-		return host.OS == target.OS && host.Architecture == target.Architecture && host.Variant == target.Variant
-	} else if host.OS == "windows" {
-		if target.OS == "windows" {
-			return host.Architecture == target.Architecture && host.Variant == target.Variant &&
-				prefix(host.OSVersion) == prefix(target.OSVersion)
-		} else if target.OS == "linux" {
-			return host.Architecture == target.Architecture && host.Variant == target.Variant
-		}
-		return false
-	} else if host.OS == "darwin" {
-		if target.OS == "darwin" || target.OS == "linux" {
-			return host.Architecture == target.Architecture && host.Variant == target.Variant
-		}
-		return false
-	} else {
-		return host.Architecture == target.Architecture &&
-			host.OSVersion == target.OSVersion &&
-			strSliceEq(host.OSFeatures, target.OSFeatures) &&
-			host.Variant == target.Variant &&
-			strSliceEq(host.Features, target.Features)
-	}
-}
-
-// Match indicates if two platforms are the same
-func Match(a, b Platform) bool {
-	(&a).normalize()
-	(&b).normalize()
-	if a.OS != b.OS {
-		return false
-	}
-	if a.OS == "linux" {
-		return a.Architecture == b.Architecture && a.Variant == b.Variant
-	} else if a.OS == "windows" {
-		return a.Architecture == b.Architecture &&
-			prefix(a.OSVersion) == prefix(b.OSVersion)
-	} else {
-		return a.Architecture == b.Architecture &&
-			a.OSVersion == b.OSVersion &&
-			strSliceEq(a.OSFeatures, b.OSFeatures) &&
-			a.Variant == b.Variant &&
-			strSliceEq(a.Features, b.Features)
-	}
-}
-
 // Parse converts a platform string into a struct
 func Parse(platStr string) (Platform, error) {
+	// args are a regclient specific way to extend the platform string
+	platArgs := strings.SplitN(platStr, ",", 2)
 	// split on slash, validate each component
-	platSplit := strings.Split(platStr, "/")
+	platSplit := strings.Split(platArgs[0], "/")
 	for i, part := range platSplit {
-		if i == 2 && platSplit[0] == "windows" {
-			// TODO: (bmitch) this may not be officially allowed, but I can't find a decent reference for what it should be
-			if !verRE.MatchString(part) {
-				return Platform{}, fmt.Errorf("invalid platform component %s in %s", part, platStr)
-			}
-		} else if !partRE.MatchString(part) {
-			return Platform{}, fmt.Errorf("invalid platform component %s in %s", part, platStr)
+		if !partRE.MatchString(part) {
+			return Platform{}, fmt.Errorf("invalid platform component %s in %s%.0w", part, platStr, errs.ErrParsingFailed)
 		}
 		platSplit[i] = strings.ToLower(part)
 	}
@@ -135,38 +81,55 @@ func Parse(platStr string) (Platform, error) {
 		plat.Architecture = platSplit[1]
 	}
 	if len(platSplit) >= 3 {
-		if plat.OS == "windows" {
-			plat.OSVersion = platSplit[2]
-		} else {
-			plat.Variant = platSplit[2]
+		plat.Variant = platSplit[2]
+	}
+	if len(platArgs) > 1 {
+		kvMap, err := strparse.SplitCSKV(platArgs[1])
+		if err != nil {
+			return Platform{}, fmt.Errorf("failed to split platform args in %s: %w", platStr, err)
+		}
+		for k, v := range kvMap {
+			k := strings.TrimSpace(k)
+			v := strings.TrimSpace(v)
+			switch strings.ToLower(k) {
+			case "osver", "osversion":
+				plat.OSVersion = v
+			default:
+				return Platform{}, fmt.Errorf("unsupported platform arg type, %s in %s%.0w", k, platStr, errs.ErrParsingFailed)
+			}
 		}
 	}
-	// extrapolate missing fields and normalize
+	// gather local platform details
 	platLocal := Local()
-	if plat.OS == "" || plat.OS == "local" {
-		// assume local OS
+	// normalize and extrapolate missing fields
+	switch plat.OS {
+	case "local", "":
 		plat.OS = platLocal.OS
 	}
-	switch plat.OS {
-	case "macos":
-		plat.OS = "darwin"
-	}
-	if len(platSplit) < 2 && plat.OS == runtime.GOOS {
+	plat.normalize()
+	if len(platSplit) < 2 && Compatible(Platform{OS: platLocal.OS}, Platform{OS: plat.OS}) {
+		// automatically expand local architecture with recognized OS
 		switch plat.OS {
 		case "linux", "darwin":
-			// automatically expand local architecture with recognized OS
 			plat.Architecture = platLocal.Architecture
+			plat.Variant = platLocal.Variant
 		case "windows":
 			plat.Architecture = platLocal.Architecture
-			plat.OSVersion = platLocal.OSVersion
+			plat.Variant = platLocal.Variant
 		}
 	}
-	plat.normalize()
+	if plat.OS == "windows" && plat.OS == platLocal.OS && plat.Architecture == platLocal.Architecture && plat.Variant == platLocal.Variant {
+		plat.OSVersion = platLocal.OSVersion
+	}
 
 	return *plat, nil
 }
 
 func (p *Platform) normalize() {
+	switch p.OS {
+	case "macos":
+		p.OS = "darwin"
+	}
 	switch p.Architecture {
 	case "i386":
 		p.Architecture = "386"
@@ -196,24 +159,4 @@ func (p *Platform) normalize() {
 			p.Variant = "v" + p.Variant
 		}
 	}
-}
-
-func prefix(platVer string) string {
-	verParts := strings.Split(platVer, ".")
-	if len(verParts) < 4 {
-		return platVer
-	}
-	return strings.Join(verParts[0:3], ".")
-}
-
-func strSliceEq(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

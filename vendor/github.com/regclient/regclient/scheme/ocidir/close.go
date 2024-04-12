@@ -6,9 +6,10 @@ import (
 	"io/fs"
 	"path"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/ref"
-	"github.com/sirupsen/logrus"
 )
 
 // Close triggers a garbage collection if the underlying path has been modified
@@ -19,8 +20,8 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if _, ok := o.modRefs[r.Path]; !ok {
-		// unmodified, no need to gc ref
+	if gc, ok := o.modRefs[r.Path]; !ok || !gc.mod || gc.locks > 0 {
+		// unmodified or locked, skip gc
 		return nil
 	}
 
@@ -30,7 +31,7 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 	}).Debug("running GC")
 	dl := map[string]bool{}
 	// recurse through index, manifests, and blob lists, generating a digest list
-	index, err := o.readIndex(r)
+	index, err := o.readIndex(r, true)
 	if err != nil {
 		return err
 	}
@@ -65,7 +66,10 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 					"digest": digest,
 				}).Debug("ocidir garbage collect")
 				// delete
-				o.fs.Remove(path.Join(blobsPath, blobDir.Name(), digestFile.Name()))
+				err = o.fs.Remove(path.Join(blobsPath, blobDir.Name(), digestFile.Name()))
+				if err != nil {
+					return fmt.Errorf("failed to delete %s: %w", path.Join(blobsPath, blobDir.Name(), digestFile.Name()), err)
+				}
 			}
 		}
 	}
@@ -81,11 +85,9 @@ func (o *OCIDir) closeProcManifest(ctx context.Context, r ref.Ref, m manifest.Ma
 			return err
 		}
 		for _, cur := range ml {
-			cr, _ := ref.New(r.CommonName())
-			cr.Tag = ""
-			cr.Digest = cur.Digest.String()
+			cr := r.SetDigest(cur.Digest.String())
 			(*dl)[cr.Digest] = true
-			cm, err := o.ManifestGet(ctx, cr)
+			cm, err := o.manifestGet(ctx, cr)
 			if err != nil {
 				// ignore errors in case a manifest has been deleted or sparse copy
 				o.log.WithFields(logrus.Fields{

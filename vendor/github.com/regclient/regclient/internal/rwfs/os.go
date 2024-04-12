@@ -49,6 +49,7 @@ func (o *OSFS) Create(name string) (WFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	// #nosec G304 rwfs/os.go is a pass through to the filesystem
 	fh, err := os.Create(file)
 	if err != nil {
 		return nil, err
@@ -88,6 +89,7 @@ func (o *OSFS) OpenFile(name string, flag int, perm fs.FileMode) (RWFile, error)
 	if err != nil {
 		return nil, err
 	}
+	// #nosec G304 rwfs/os.go is a pass through to the filesystem
 	fh, err := os.OpenFile(file, flag, perm)
 	if err != nil {
 		return nil, err
@@ -102,6 +104,7 @@ func (o *OSFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	// #nosec G304 rwfs/os.go is a pass through to the filesystem
 	fh, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -139,6 +142,16 @@ func (o *OSFS) Rename(oldName, newName string) error {
 	return os.Rename(oldFile, newFile)
 }
 
+// Stat returns a FileInfo describing the named file.
+func (o *OSFS) Stat(name string) (fs.FileInfo, error) {
+	full, err := o.join("stat", name)
+	if err != nil {
+		return nil, err
+	}
+	return os.Stat(full)
+}
+
+// Sub returns an FS corresponding to the subtree rooted at dir.
 func (o *OSFS) Sub(name string) (*OSFS, error) {
 	if name == "." {
 		return o, nil

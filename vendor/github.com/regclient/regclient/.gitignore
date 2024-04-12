@@ -1,6 +1,5 @@
-hack
-/regctl
 artifacts/
 bin/
 output/
 vendor/
+.regctl_conf_ci.json

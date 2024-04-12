@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/errs"
 )
 
 type Links []Link
@@ -75,7 +75,7 @@ func Parse(headers []string) (Links, error) {
 					// noop
 				} else {
 					// unknown character
-					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 				}
 			case "uri":
 				// parse tokens until space or comma
@@ -90,7 +90,7 @@ func Parse(headers []string) (Links, error) {
 					endLink()
 				} else {
 					// unknown character
-					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 				}
 			case "uriQuoted":
 				// parse tokens until quote
@@ -109,7 +109,7 @@ func Parse(headers []string) (Links, error) {
 					// noop
 				} else {
 					// unknown character
-					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 				}
 			case "parmName":
 				if len(pnb) > 0 && b == '=' {
@@ -122,14 +122,14 @@ func Parse(headers []string) (Links, error) {
 					// noop
 				} else {
 					// unknown character
-					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 				}
 			case "parmNameStar":
 				if b == '=' {
 					state = "parmValue"
 				} else {
 					// unknown character
-					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+					return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 				}
 			case "parmValue":
 				if len(pvb) == 0 {
@@ -139,7 +139,7 @@ func Parse(headers []string) (Links, error) {
 						state = "parmValueQuoted"
 					} else {
 						// unknown character
-						return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+						return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 					}
 				} else {
 					if charLUs[b]&isToken != 0 {
@@ -156,7 +156,7 @@ func Parse(headers []string) (Links, error) {
 						endLink()
 					} else {
 						// unknown character
-						return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, types.ErrParsingFailed)
+						return nil, fmt.Errorf("unknown character in position %d of %s: %w", i, h, errs.ErrParsingFailed)
 					}
 				}
 			case "parmValueQuoted":
@@ -178,7 +178,7 @@ func Parse(headers []string) (Links, error) {
 		case "init":
 			// noop
 		default:
-			return nil, fmt.Errorf("unexpected end state %s for header %s: %w", state, h, types.ErrParsingFailed)
+			return nil, fmt.Errorf("unexpected end state %s for header %s: %w", state, h, errs.ErrParsingFailed)
 		}
 	}
 
@@ -192,5 +192,5 @@ func (links Links) Get(parm, val string) (Link, error) {
 			return link, nil
 		}
 	}
-	return Link{}, types.ErrNotFound
+	return Link{}, errs.ErrNotFound
 }

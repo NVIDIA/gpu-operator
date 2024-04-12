@@ -1,9 +1,16 @@
 # regclient
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/regclient/regclient/Go?label=Go%20build)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/regclient/regclient/Docker?label=Docker%20build)
-![GitHub](https://img.shields.io/github/license/regclient/regclient)
+[![Go Workflow Status](https://img.shields.io/github/actions/workflow/status/regclient/regclient/go.yml?branch=main&label=Go%20build)](https://github.com/regclient/regclient/actions/workflows/go.yml)
+[![Docker Workflow Status](https://img.shields.io/github/actions/workflow/status/regclient/regclient/docker.yml?branch=main&label=Docker%20build)](https://github.com/regclient/regclient/actions/workflows/docker.yml)
+[![Dependency Workflow Status](https://img.shields.io/github/actions/workflow/status/regclient/regclient/version-check.yml?branch=main&label=Dependency%20check)](https://github.com/regclient/regclient/actions/workflows/version-check.yml)
+[![Vulnerability Workflow Status](https://img.shields.io/github/actions/workflow/status/regclient/regclient/vulnscans.yml?branch=main&label=Vulnerability%20check)](https://github.com/regclient/regclient/actions/workflows/vulnscans.yml)
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/regclient/regclient.svg)](https://pkg.go.dev/github.com/regclient/regclient)
+![License](https://img.shields.io/github/license/regclient/regclient)
+[![Go Report Card](https://goreportcard.com/badge/github.com/regclient/regclient)](https://goreportcard.com/report/github.com/regclient/regclient)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/regclient/regclient/badge)](https://securityscorecards.dev/viewer/?uri=github.com/regclient/regclient)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8088/badge)](https://www.bestpractices.dev/projects/8088)
+[![GitHub Downloads](https://img.shields.io/github/downloads/regclient/regclient/total?label=GitHub%20downloads)](https://github.com/regclient/regclient/releases)
 
 Client interface for the registry API.
 This includes `regctl` for a command line interface to manage registries.
