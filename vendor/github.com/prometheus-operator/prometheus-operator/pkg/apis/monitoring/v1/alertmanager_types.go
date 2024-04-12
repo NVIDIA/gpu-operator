@@ -60,7 +60,15 @@ func (l *Alertmanager) DeepCopyObject() runtime.Object {
 // https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 // +k8s:openapi-gen=true
 type AlertmanagerSpec struct {
-	// PodMetadata configures Labels and Annotations which are propagated to the alertmanager pods.
+	// PodMetadata configures labels and annotations which are propagated to the Alertmanager pods.
+	//
+	// The following items are reserved and cannot be overridden:
+	// * "alertmanager" label, set to the name of the Alertmanager instance.
+	// * "app.kubernetes.io/instance" label, set to the name of the Alertmanager instance.
+	// * "app.kubernetes.io/managed-by" label, set to "prometheus-operator".
+	// * "app.kubernetes.io/name" label, set to "alertmanager".
+	// * "app.kubernetes.io/version" label, set to the Alertmanager version.
+	// * "kubectl.kubernetes.io/default-container" annotation, set to "alertmanager".
 	PodMetadata *EmbeddedObjectMetadata `json:"podMetadata,omitempty"`
 	// Image if specified has precedence over baseImage, tag and sha
 	// combinations. Specifying the version is still necessary to ensure the
@@ -75,17 +83,15 @@ type AlertmanagerSpec struct {
 	Version string `json:"version,omitempty"`
 	// Tag of Alertmanager container image to be deployed. Defaults to the value of `version`.
 	// Version is ignored if Tag is set.
-	// Deprecated: use 'image' instead.  The image tag can be specified
-	// as part of the image URL.
+	// Deprecated: use 'image' instead. The image tag can be specified as part of the image URL.
 	Tag string `json:"tag,omitempty"`
 	// SHA of Alertmanager container image to be deployed. Defaults to the value of `version`.
 	// Similar to a tag, but the SHA explicitly deploys an immutable container image.
 	// Version and Tag are ignored if SHA is set.
-	// Deprecated: use 'image' instead.  The image digest can be specified
-	// as part of the image URL.
+	// Deprecated: use 'image' instead. The image digest can be specified as part of the image URL.
 	SHA string `json:"sha,omitempty"`
 	// Base image that is used to deploy pods, without tag.
-	// Deprecated: use 'image' instead
+	// Deprecated: use 'image' instead.
 	BaseImage string `json:"baseImage,omitempty"`
 	// An optional list of references to secrets in the same namespace
 	// to use for pulling prometheus and alertmanager images from registries
@@ -115,10 +121,10 @@ type AlertmanagerSpec struct {
 	// receiver (effectively dropping alert notifications).
 	ConfigSecret string `json:"configSecret,omitempty"`
 	// Log level for Alertmanager to be configured with.
-	//+kubebuilder:validation:Enum="";debug;info;warn;error
+	// +kubebuilder:validation:Enum="";debug;info;warn;error
 	LogLevel string `json:"logLevel,omitempty"`
 	// Log format for Alertmanager to be configured with.
-	//+kubebuilder:validation:Enum="";logfmt;json
+	// +kubebuilder:validation:Enum="";logfmt;json
 	LogFormat string `json:"logFormat,omitempty"`
 	// Size is the expected size of the alertmanager cluster. The controller will
 	// eventually make the size of the running cluster equal to the expected
@@ -200,6 +206,9 @@ type AlertmanagerSpec struct {
 	ClusterAdvertiseAddress string `json:"clusterAdvertiseAddress,omitempty"`
 	// Interval between gossip attempts.
 	ClusterGossipInterval GoDuration `json:"clusterGossipInterval,omitempty"`
+	// Defines the identifier that uniquely identifies the Alertmanager cluster.
+	// You should only set it when the Alertmanager cluster includes Alertmanager instances which are external to this Alertmanager resource. In practice, the addresses of the external instances are provided via the `.spec.additionalPeers` field.
+	ClusterLabel *string `json:"clusterLabel,omitempty"`
 	// Interval between pushpull attempts.
 	ClusterPushpullInterval GoDuration `json:"clusterPushpullInterval,omitempty"`
 	// Timeout for cluster peering.
@@ -231,10 +240,27 @@ type AlertmanagerSpec struct {
 	HostAliases []HostAlias `json:"hostAliases,omitempty"`
 	// Defines the web command line flags when starting Alertmanager.
 	Web *AlertmanagerWebSpec `json:"web,omitempty"`
-	// EXPERIMENTAL: alertmanagerConfiguration specifies the configuration of Alertmanager.
+	// alertmanagerConfiguration specifies the configuration of Alertmanager.
+	//
 	// If defined, it takes precedence over the `configSecret` field.
-	// This field may change in future releases.
+	//
+	// This is an *experimental feature*, it may change in any upcoming release
+	// in a breaking way.
+	//
+	//+optional
 	AlertmanagerConfiguration *AlertmanagerConfiguration `json:"alertmanagerConfiguration,omitempty"`
+	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted in the pod.
+	// If the service account has `automountServiceAccountToken: true`, set the field to `false` to opt out of automounting API credentials.
+	// +optional
+	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
+	// Enable access to Alertmanager feature flags. By default, no features are enabled.
+	// Enabling features which are disabled by default is entirely outside the
+	// scope of what the maintainers will support and by doing so, you accept
+	// that this behaviour may break at any time without notice.
+	//
+	// It requires Alertmanager >= 0.27.0.
+	// +optional
+	EnableFeatures []string `json:"enableFeatures,omitempty"`
 }
 
 // AlertmanagerConfigMatcherStrategy defines the strategy used by AlertmanagerConfig objects to match alerts.
@@ -266,6 +292,10 @@ type AlertmanagerConfiguration struct {
 // AlertmanagerGlobalConfig configures parameters that are valid in all other configuration contexts.
 // See https://prometheus.io/docs/alerting/latest/configuration/#configuration-file
 type AlertmanagerGlobalConfig struct {
+	// Configures global SMTP parameters.
+	// +optional
+	SMTPConfig *GlobalSMTPConfig `json:"smtp,omitempty"`
+
 	// ResolveTimeout is the default value used by alertmanager if the alert does
 	// not include EndsAt, after this time passes it can declare the alert as resolved if it has not been updated.
 	// This has no impact on alerts from Prometheus, as they always include EndsAt.
@@ -282,6 +312,9 @@ type AlertmanagerGlobalConfig struct {
 
 	// The default OpsGenie API Key.
 	OpsGenieAPIKey *v1.SecretKeySelector `json:"opsGenieApiKey,omitempty"`
+
+	// The default Pagerduty URL.
+	PagerdutyURL *string `json:"pagerdutyUrl,omitempty"`
 }
 
 // AlertmanagerStatus is the most recent observed status of the Alertmanager cluster. Read-only.
@@ -334,6 +367,53 @@ type AlertmanagerWebSpec struct {
 	// `--web.timeout` flag.
 	// +optional
 	Timeout *uint32 `json:"timeout,omitempty"`
+}
+
+// GlobalSMTPConfig configures global SMTP parameters.
+// See https://prometheus.io/docs/alerting/latest/configuration/#configuration-file
+type GlobalSMTPConfig struct {
+	// The default SMTP From header field.
+	// +optional
+	From *string `json:"from,omitempty"`
+
+	// The default SMTP smarthost used for sending emails.
+	// +optional
+	SmartHost *HostPort `json:"smartHost,omitempty"`
+
+	// The default hostname to identify to the SMTP server.
+	// +optional
+	Hello *string `json:"hello,omitempty"`
+
+	// SMTP Auth using CRAM-MD5, LOGIN and PLAIN. If empty, Alertmanager doesn't authenticate to the SMTP server.
+	// +optional
+	AuthUsername *string `json:"authUsername,omitempty"`
+
+	// SMTP Auth using LOGIN and PLAIN.
+	// +optional
+	AuthPassword *v1.SecretKeySelector `json:"authPassword,omitempty"`
+
+	// SMTP Auth using PLAIN
+	// +optional
+	AuthIdentity *string `json:"authIdentity,omitempty"`
+
+	// SMTP Auth using CRAM-MD5.
+	// +optional
+	AuthSecret *v1.SecretKeySelector `json:"authSecret,omitempty"`
+
+	// The default SMTP TLS requirement.
+	// Note that Go does not support unencrypted connections to remote SMTP endpoints.
+	// +optional
+	RequireTLS *bool `json:"requireTLS,omitempty"`
+}
+
+// HostPort represents a "host:port" network address.
+type HostPort struct {
+	// Defines the host's address, it can be a DNS name or a literal IP address.
+	// +kubebuilder:validation:MinLength=1
+	Host string `json:"host"`
+	// Defines the host's port, it can be a literal port number or a port name.
+	// +kubebuilder:validation:MinLength=1
+	Port string `json:"port"`
 }
 
 // HTTPConfig defines a client HTTP configuration.

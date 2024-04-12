@@ -90,6 +90,13 @@ type SubscriptionConfig struct {
 	// Use empty object ({}) to erase original sub-attribute values.
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty" protobuf:"bytes,18,opt,name=affinity"`
+
+	// Annotations is an unstructured key value map stored with each Deployment, Pod, APIService in the Operator.
+	// Typically, annotations may be set by external tools to store and retrieve arbitrary metadata.
+	// Use this field to pre-define annotations that OLM should add to each of the Subscription's
+	// deployments, pods, and apiservices.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 }
 
 // SubscriptionConditionType indicates an explicit state condition about a Subscription in "abnormal-true"
@@ -117,6 +124,19 @@ const (
 
 	// SubscriptionBundleUnpackFailed indicates that the unpack job failed
 	SubscriptionBundleUnpackFailed SubscriptionConditionType = "BundleUnpackFailed"
+
+	// SubscriptionDeprecated is a roll-up condition which indicates that the Operator currently installed with this Subscription
+	//has been deprecated. It will be present when any of the three deprecation types (Package, Channel, Bundle) are present.
+	SubscriptionDeprecated SubscriptionConditionType = "Deprecated"
+
+	// SubscriptionOperatorDeprecated indicates that the Package currently installed with this Subscription has been deprecated.
+	SubscriptionPackageDeprecated SubscriptionConditionType = "PackageDeprecated"
+
+	// SubscriptionOperatorDeprecated indicates that the Channel used with this Subscription has been deprecated.
+	SubscriptionChannelDeprecated SubscriptionConditionType = "ChannelDeprecated"
+
+	// SubscriptionOperatorDeprecated indicates that the Bundle currently installed with this Subscription has been deprecated.
+	SubscriptionBundleDeprecated SubscriptionConditionType = "BundleDeprecated"
 )
 
 const (
