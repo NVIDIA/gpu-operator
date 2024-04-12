@@ -9,9 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/errs"
 )
 
+// RepoList is the response for a repository listing.
 type RepoList struct {
 	repoCommon
 	RepoRegistryList
@@ -34,6 +35,7 @@ type repoConfig struct {
 
 type Opts func(*repoConfig)
 
+// New is used to create a repository listing.
 func New(opts ...Opts) (*RepoList, error) {
 	conf := repoConfig{
 		mt: "application/json",
@@ -57,7 +59,7 @@ func New(opts ...Opts) (*RepoList, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("%w: media type: %s, hostname: %s", types.ErrUnsupportedMediaType, conf.mt, conf.host)
+		return nil, fmt.Errorf("%w: media type: %s, hostname: %s", errs.ErrUnsupportedMediaType, conf.mt, conf.host)
 	}
 
 	rl.repoCommon = rc
@@ -102,7 +104,7 @@ func (r repoCommon) MarshalJSON() ([]byte, error) {
 	if r.orig != nil {
 		return json.Marshal((r.orig))
 	}
-	return []byte{}, fmt.Errorf("JSON marshalling failed: %w", types.ErrNotFound)
+	return []byte{}, fmt.Errorf("JSON marshalling failed: %w", errs.ErrNotFound)
 }
 
 func (r repoCommon) RawBody() ([]byte, error) {

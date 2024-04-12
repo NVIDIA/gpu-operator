@@ -10,13 +10,16 @@ import (
 	_ "crypto/sha512"
 
 	digest "github.com/opencontainers/go-digest"
+
 	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/descriptor"
+	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/ref"
 )
 
 type common struct {
 	r         ref.Ref
-	desc      types.Descriptor
+	desc      descriptor.Descriptor
 	manifSet  bool
 	ratelimit types.RateLimit
 	rawHeader http.Header
@@ -29,7 +32,7 @@ func (m *common) GetDigest() digest.Digest {
 }
 
 // GetDescriptor returns the descriptor
-func (m *common) GetDescriptor() types.Descriptor {
+func (m *common) GetDescriptor() descriptor.Descriptor {
 	return m.desc
 }
 
@@ -73,7 +76,7 @@ func (m *common) IsSet() bool {
 // RawBody returns the raw body from the manifest if available.
 func (m *common) RawBody() ([]byte, error) {
 	if len(m.rawBody) == 0 {
-		return m.rawBody, types.ErrManifestNotSet
+		return m.rawBody, errs.ErrManifestNotSet
 	}
 	return m.rawBody, nil
 }

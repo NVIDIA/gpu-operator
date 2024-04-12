@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// cred helper wraps a command
+// credHelper wraps a command that manages user credentials.
 type credHelper struct {
 	prog string
 	env  map[string]string
@@ -21,6 +21,7 @@ func newCredHelper(prog string, env map[string]string) *credHelper {
 }
 
 func (ch *credHelper) run(arg string, input io.Reader) ([]byte, error) {
+	//#nosec G204 only untrusted arg is a hostname which the executed command should not trust
 	cmd := exec.Command(ch.prog, arg)
 	cmd.Env = os.Environ()
 	if ch.env != nil {
@@ -39,6 +40,7 @@ type credStore struct {
 	Secret    string `json:"Secret"`
 }
 
+// get requests a credential from the helper for a given host.
 func (ch *credHelper) get(host *Host) error {
 	hostname := host.Hostname
 	if host.CredHost != "" {
@@ -52,7 +54,7 @@ func (ch *credHelper) get(host *Host) error {
 	outB, err := ch.run("get", hostIn)
 	if err != nil {
 		outS := strings.TrimSpace(string(outB))
-		return fmt.Errorf("error getting credentials, output: %s, error: %v", outS, err)
+		return fmt.Errorf("error getting credentials, output: %s, error: %w", outS, err)
 	}
 	err = json.NewDecoder(bytes.NewReader(outB)).Decode(&credOut)
 	if err != nil {
@@ -70,12 +72,13 @@ func (ch *credHelper) get(host *Host) error {
 	return nil
 }
 
+// list returns a list of hosts supported by the credential helper.
 func (ch *credHelper) list() ([]Host, error) {
 	credList := map[string]string{}
 	outB, err := ch.run("list", bytes.NewReader([]byte{}))
 	if err != nil {
 		outS := strings.TrimSpace(string(outB))
-		return nil, fmt.Errorf("error getting credential list, output: %s, error: %v", outS, err)
+		return nil, fmt.Errorf("error getting credential list, output: %s, error: %w", outS, err)
 	}
 	err = json.NewDecoder(bytes.NewReader(outB)).Decode(&credList)
 	if err != nil {
@@ -91,4 +94,4 @@ func (ch *credHelper) list() ([]Host, error) {
 	return hostList, nil
 }
 
-// store method not implemented
+// TODO: store method not implemented

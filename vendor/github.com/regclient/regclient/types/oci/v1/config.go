@@ -1,5 +1,8 @@
 package v1
 
+// Docker specific content in this file is included from
+// https://github.com/moby/moby/blob/master/api/types/container/config.go
+
 import (
 	"time"
 	// crypto libraries included for go-digest
@@ -7,6 +10,8 @@ import (
 	_ "crypto/sha512"
 
 	digest "github.com/opencontainers/go-digest"
+
+	"github.com/regclient/regclient/types/platform"
 )
 
 // ImageConfig defines the execution parameters which should be used as a base when running a container using an image.
@@ -38,6 +43,10 @@ type ImageConfig struct {
 	// StopSignal contains the system call signal that will be sent to the container to exit.
 	StopSignal string `json:"StopSignal,omitempty"`
 
+	// StopTimeout is the time in seconds to stop the container.
+	// This is a Docker specific extension to the config, and not part of the OCI spec.
+	StopTimeout *int `json:",omitempty"`
+
 	// ArgsEscaped `[Deprecated]` - This field is present only for legacy
 	// compatibility with Docker and should not be used by new image builders.
 	// It is used by Docker for Windows images to indicate that the `Entrypoint`
@@ -46,6 +55,18 @@ type ImageConfig struct {
 	// the value in `Entrypoint` or `Cmd` should be used as-is to avoid double
 	// escaping.
 	ArgsEscaped bool `json:"ArgsEscaped,omitempty"`
+
+	// Healthcheck describes how to check if the container is healthy.
+	// This is a Docker specific extension to the config, and not part of the OCI spec.
+	Healthcheck *HealthConfig `json:"Healthcheck,omitempty"`
+
+	// OnBuild lists any ONBUILD steps defined in the Dockerfile.
+	// This is a Docker specific extension to the config, and not part of the OCI spec.
+	OnBuild []string `json:"OnBuild,omitempty"`
+
+	// Shell for the shell-form of RUN, CMD, and ENTRYPOINT.
+	// This is a Docker specific extension to the config, and not part of the OCI spec.
+	Shell []string `json:"Shell,omitempty"`
 }
 
 // RootFS describes a layer content addresses
@@ -84,22 +105,8 @@ type Image struct {
 	// Author defines the name and/or email address of the person or entity which created and is responsible for maintaining the image.
 	Author string `json:"author,omitempty"`
 
-	// Architecture is the CPU architecture which the binaries in this image are built to run on.
-	Architecture string `json:"architecture"`
-
-	// Variant is the variant of the specified CPU architecture which image binaries are intended to run on.
-	Variant string `json:"variant,omitempty"`
-
-	// OS is the name of the operating system which the image is built to run on.
-	OS string `json:"os"`
-
-	// OSVersion is an optional field specifying the operating system
-	// version, for example on Windows `10.0.14393.1066`.
-	OSVersion string `json:"os.version,omitempty"`
-
-	// OSFeatures is an optional field specifying an array of strings,
-	// each listing a required OS feature (for example on Windows `win32k`).
-	OSFeatures []string `json:"os.features,omitempty"`
+	// Platform describes the platform which the image in the manifest runs on.
+	platform.Platform
 
 	// Config defines the execution parameters which should be used as a base when running a container using the image.
 	Config ImageConfig `json:"config,omitempty"`
@@ -109,4 +116,26 @@ type Image struct {
 
 	// History describes the history of each layer.
 	History []History `json:"history,omitempty"`
+}
+
+// HealthConfig holds configuration settings for the HEALTHCHECK feature.
+// This is a Docker specific extension to the config, and not part of the OCI spec.
+type HealthConfig struct {
+	// Test is the test to perform to check that the container is healthy.
+	// An empty slice means to inherit the default.
+	// The options are:
+	// {} : inherit healthcheck
+	// {"NONE"} : disable healthcheck
+	// {"CMD", args...} : exec arguments directly
+	// {"CMD-SHELL", command} : run command with system's default shell
+	Test []string `json:",omitempty"`
+
+	// Zero means to inherit. Durations are expressed as integer nanoseconds.
+	Interval    time.Duration `json:",omitempty"` // Interval is the time to wait between checks.
+	Timeout     time.Duration `json:",omitempty"` // Timeout is the time to wait before considering the check to have hung.
+	StartPeriod time.Duration `json:",omitempty"` // The start period for the container to initialize before the retries starts to count down.
+
+	// Retries is the number of consecutive failures needed to consider a container as unhealthy.
+	// Zero means inherit.
+	Retries int `json:",omitempty"`
 }

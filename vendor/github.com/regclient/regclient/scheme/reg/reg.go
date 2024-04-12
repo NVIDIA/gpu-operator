@@ -6,10 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/regclient/regclient/config"
-	"github.com/regclient/regclient/internal/reghttp"
-	"github.com/regclient/regclient/scheme"
 	"github.com/sirupsen/logrus"
+
+	"github.com/regclient/regclient/config"
+	"github.com/regclient/regclient/internal/cache"
+	"github.com/regclient/regclient/internal/reghttp"
+	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/types/manifest"
+	"github.com/regclient/regclient/types/ref"
+	"github.com/regclient/regclient/types/referrer"
 )
 
 const (
@@ -21,19 +26,41 @@ const (
 	defaultBlobChunkLimit = 1024 * 1024 * 1024
 	// defaultBlobMax is disabled to support registries without chunked upload support
 	defaultBlobMax = -1
+	// defaultManifestMaxPull limits the largest manifest that will be pulled
+	defaultManifestMaxPull = 1024 * 1024 * 8
+	// defaultManifestMaxPush limits the largest manifest that will be pushed
+	defaultManifestMaxPush = 1024 * 1024 * 4
 )
 
 // Reg is used for interacting with remote registry servers
 type Reg struct {
-	reghttp        *reghttp.Client
-	reghttpOpts    []reghttp.Opts
-	log            *logrus.Logger
-	hosts          map[string]*config.Host
-	blobChunkSize  int64
-	blobChunkLimit int64
-	blobMaxPut     int64
-	mu             sync.Mutex
+	reghttp         *reghttp.Client
+	reghttpOpts     []reghttp.Opts
+	log             *logrus.Logger
+	hosts           map[string]*config.Host
+	features        map[featureKey]*featureVal
+	blobChunkSize   int64
+	blobChunkLimit  int64
+	blobMaxPut      int64
+	manifestMaxPull int64
+	manifestMaxPush int64
+	cacheMan        *cache.Cache[ref.Ref, manifest.Manifest]
+	cacheRL         *cache.Cache[ref.Ref, referrer.ReferrerList]
+	muHost          sync.Mutex
+	muRefTag        sync.Mutex
 }
+
+type featureKey struct {
+	kind string
+	reg  string
+	repo string
+}
+type featureVal struct {
+	enabled bool
+	expire  time.Time
+}
+
+var featureExpire = time.Minute * time.Duration(5)
 
 // Opts provides options to access registries
 type Opts func(*Reg)
@@ -41,12 +68,16 @@ type Opts func(*Reg)
 // New returns a Reg pointer with any provided options
 func New(opts ...Opts) *Reg {
 	r := Reg{
-		reghttpOpts:    []reghttp.Opts{},
-		blobChunkSize:  defaultBlobChunk,
-		blobChunkLimit: defaultBlobChunkLimit,
-		blobMaxPut:     defaultBlobMax,
-		hosts:          map[string]*config.Host{},
+		reghttpOpts:     []reghttp.Opts{},
+		blobChunkSize:   defaultBlobChunk,
+		blobChunkLimit:  defaultBlobChunkLimit,
+		blobMaxPut:      defaultBlobMax,
+		manifestMaxPull: defaultManifestMaxPull,
+		manifestMaxPush: defaultManifestMaxPush,
+		hosts:           map[string]*config.Host{},
+		features:        map[featureKey]*featureVal{},
 	}
+	r.reghttpOpts = append(r.reghttpOpts, reghttp.WithConfigHost(r.hostGet))
 	for _, opt := range opts {
 		opt(&r)
 	}
@@ -54,18 +85,58 @@ func New(opts ...Opts) *Reg {
 	return &r
 }
 
-// Info is experimental and may be removed in the future
-func (reg *Reg) Info() scheme.Info {
-	return scheme.Info{}
+// Throttle is used to limit concurrency
+func (reg *Reg) Throttle(r ref.Ref, put bool) []*throttle.Throttle {
+	tList := []*throttle.Throttle{}
+	host := reg.hostGet(r.Registry)
+	t := host.Throttle()
+	if t != nil {
+		tList = append(tList, t)
+	}
+	if !put {
+		for _, mirror := range host.Mirrors {
+			t := reg.hostGet(mirror).Throttle()
+			if t != nil {
+				tList = append(tList, t)
+			}
+		}
+	}
+	return tList
 }
 
 func (reg *Reg) hostGet(hostname string) *config.Host {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
+	reg.muHost.Lock()
+	defer reg.muHost.Unlock()
 	if _, ok := reg.hosts[hostname]; !ok {
-		reg.hosts[hostname] = config.HostNewName(hostname)
+		newHost := config.HostNewName(hostname)
+		// check for normalized hostname
+		if newHost.Name != hostname {
+			hostname = newHost.Name
+			if h, ok := reg.hosts[hostname]; ok {
+				return h
+			}
+		}
+		reg.hosts[hostname] = newHost
 	}
 	return reg.hosts[hostname]
+}
+
+// featureGet returns enabled and ok
+func (reg *Reg) featureGet(kind, registry, repo string) (bool, bool) {
+	reg.muHost.Lock()
+	defer reg.muHost.Unlock()
+	if v, ok := reg.features[featureKey{kind: kind, reg: registry, repo: repo}]; ok {
+		if time.Now().Before(v.expire) {
+			return v.enabled, true
+		}
+	}
+	return false, false
+}
+
+func (reg *Reg) featureSet(kind, registry, repo string, enabled bool) {
+	reg.muHost.Lock()
+	reg.features[featureKey{kind: kind, reg: registry, repo: repo}] = &featureVal{enabled: enabled, expire: time.Now().Add(featureExpire)}
+	reg.muHost.Unlock()
 }
 
 // WithBlobSize overrides default blob sizes
@@ -89,6 +160,16 @@ func WithBlobLimit(limit int64) Opts {
 		if r.blobMaxPut > 0 && r.blobMaxPut < limit {
 			r.blobMaxPut = limit
 		}
+	}
+}
+
+// WithCache defines a cache used for various requests
+func WithCache(timeout time.Duration, count int) Opts {
+	return func(r *Reg) {
+		cm := cache.New[ref.Ref, manifest.Manifest](cache.WithAge(timeout), cache.WithCount(count))
+		r.cacheMan = &cm
+		crl := cache.New[ref.Ref, referrer.ReferrerList](cache.WithAge(timeout), cache.WithCount(count))
+		r.cacheRL = &crl
 	}
 }
 
@@ -122,7 +203,6 @@ func WithConfigHosts(configHosts []*config.Host) Opts {
 			}
 			r.hosts[host.Name] = host
 		}
-		r.reghttpOpts = append(r.reghttpOpts, reghttp.WithConfigHosts(configHosts))
 	}
 }
 
@@ -145,6 +225,14 @@ func WithLog(log *logrus.Logger) Opts {
 	return func(r *Reg) {
 		r.log = log
 		r.reghttpOpts = append(r.reghttpOpts, reghttp.WithLog(log))
+	}
+}
+
+// WithManifestMax sets the push and pull limits for manifests
+func WithManifestMax(push, pull int64) Opts {
+	return func(r *Reg) {
+		r.manifestMaxPush = push
+		r.manifestMaxPull = pull
 	}
 }
 

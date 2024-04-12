@@ -77,6 +77,6 @@ func Handle(ctx context.Context, log *logrus.Logger, msg string) {
 
 func logMsg(log *logrus.Logger, msg string) {
 	log.WithFields(logrus.Fields{
-		msg: msg,
+		"warning": msg,
 	}).Warn("Registry warning message")
 }

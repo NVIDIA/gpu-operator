@@ -7,7 +7,10 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/regclient/regclient/internal/muset"
 )
 
 // in memory implementation of rwfs
@@ -22,10 +25,12 @@ type MemChild interface{}
 type MemDir struct {
 	child map[string]MemChild
 	mod   time.Time
+	mu    sync.Mutex
 }
 type MemFile struct {
 	b   []byte
 	mod time.Time
+	mu  sync.Mutex
 }
 type MemDirFP struct {
 	f      *MemDir
@@ -68,6 +73,8 @@ func (o *MemFS) Mkdir(name string, perm fs.FileMode) error {
 			Err:  err,
 		}
 	}
+	memDir.mu.Lock()
+	defer memDir.mu.Unlock()
 	if _, ok := memDir.child[base]; ok {
 		return &fs.PathError{
 			Op:   "mkdir",
@@ -90,6 +97,8 @@ func (o *MemFS) OpenFile(name string, flags int, perm fs.FileMode) (RWFile, erro
 			Err:  err,
 		}
 	}
+	memDir.mu.Lock()
+	defer memDir.mu.Unlock()
 	var child MemChild
 	if file == "." || file == "" {
 		child = memDir
@@ -168,6 +177,8 @@ func (o *MemFS) Remove(name string) error {
 			Err:  err,
 		}
 	}
+	memDir.mu.Lock()
+	defer memDir.mu.Unlock()
 	if child, ok := memDir.child[file]; ok {
 		switch v := child.(type) {
 		case *MemFile:
@@ -221,6 +232,16 @@ func (o *MemFS) Rename(oldName, newName string) error {
 			Err:  err,
 		}
 	}
+	lockList := []*sync.Mutex{&(memDirOld.mu)}
+	if dirOld != dirNew {
+		lockList = append(lockList, &(memDirNew.mu))
+	}
+	muset.Lock(lockList...)
+	defer func() {
+		for _, l := range lockList {
+			l.Unlock()
+		}
+	}()
 	childOld, okOld := memDirOld.child[fileOld]
 	if !okOld {
 		return &fs.PathError{
@@ -299,6 +320,44 @@ func (o *MemFS) Rename(oldName, newName string) error {
 	return nil
 }
 
+func (o *MemFS) Stat(name string) (fs.FileInfo, error) {
+	dir, entry := path.Split(name)
+	memDir, err := o.getDir(dir)
+	if err != nil {
+		return nil, &fs.PathError{
+			Op:   "stat",
+			Path: name,
+			Err:  err,
+		}
+	}
+	memDir.mu.Lock()
+	defer memDir.mu.Unlock()
+	memEntry, ok := memDir.child[entry]
+	if !ok {
+		return nil, &fs.PathError{
+			Op:   "stat",
+			Path: name,
+			Err:  fs.ErrNotExist,
+		}
+	}
+	switch vEntry := memEntry.(type) {
+	case *MemFile:
+		vEntry.mu.Lock()
+		defer vEntry.mu.Unlock()
+		return NewFI(entry, int64(len(vEntry.b)), time.Time{}, 0), nil
+	case *MemDir:
+		vEntry.mu.Lock()
+		defer vEntry.mu.Unlock()
+		return NewFI(entry, 4096, vEntry.mod, fs.ModeDir), nil
+	default:
+		return nil, &fs.PathError{
+			Op:   "stat",
+			Path: name,
+			Err:  fs.ErrInvalid,
+		}
+	}
+}
+
 func (o *MemFS) Sub(name string) (*MemFS, error) {
 	if name == "." {
 		return o, nil
@@ -338,7 +397,9 @@ func (o *MemFS) getDir(dir string) (*MemDir, error) {
 		if el == "." || el == "" {
 			continue
 		}
+		cur.mu.Lock()
 		next, ok := cur.child[el]
+		cur.mu.Unlock()
 		if !ok {
 			return nil, fs.ErrNotExist
 		}
@@ -357,6 +418,8 @@ func (mfp *MemFileFP) Close() error {
 }
 
 func (mfp *MemFileFP) Read(b []byte) (int, error) {
+	mfp.f.mu.Lock()
+	defer mfp.f.mu.Unlock()
 	lc := copy(b, mfp.f.b[mfp.cur:])
 	mfp.cur += lc
 	if len(mfp.f.b) <= mfp.cur {
@@ -366,6 +429,8 @@ func (mfp *MemFileFP) Read(b []byte) (int, error) {
 }
 
 func (mfp *MemFileFP) Seek(offset int64, whence int) (int64, error) {
+	mfp.f.mu.Lock()
+	defer mfp.f.mu.Unlock()
 	switch whence {
 	case io.SeekStart:
 		mfp.cur = whence
@@ -380,6 +445,8 @@ func (mfp *MemFileFP) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (mfp *MemFileFP) Stat() (fs.FileInfo, error) {
+	mfp.f.mu.Lock()
+	defer mfp.f.mu.Unlock()
 	fi := NewFI(mfp.name, int64(len(mfp.f.b)), time.Time{}, 0)
 	return fi, nil
 }
@@ -388,6 +455,8 @@ func (mfp *MemFileFP) Write(b []byte) (n int, err error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
+	mfp.f.mu.Lock()
+	defer mfp.f.mu.Unlock()
 	// use copy to overwrite existing contents
 	if mfp.cur < len(mfp.f.b) {
 		l := copy(mfp.f.b[mfp.cur:], b)
@@ -418,6 +487,8 @@ func (mdp *MemDirFP) Read(b []byte) (int, error) {
 // TODO: implement func (mdp *MemDirFP) Seek
 
 func (mdp *MemDirFP) ReadDir(n int) ([]fs.DirEntry, error) {
+	mdp.f.mu.Lock()
+	defer mdp.f.mu.Unlock()
 	names := mdp.filenames(mdp.cur, n)
 	mdp.cur += len(names)
 	des := make([]fs.DirEntry, len(names))
@@ -453,6 +524,8 @@ func (mdp *MemDirFP) ReadDir(n int) ([]fs.DirEntry, error) {
 }
 
 func (mdp *MemDirFP) Stat() (fs.FileInfo, error) {
+	mdp.f.mu.Lock()
+	defer mdp.f.mu.Unlock()
 	fi := NewFI(mdp.name, 4096, mdp.f.mod, fs.ModeDir)
 	return fi, nil
 }

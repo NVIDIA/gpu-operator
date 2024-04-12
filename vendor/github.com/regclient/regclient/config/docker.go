@@ -13,13 +13,15 @@ import (
 )
 
 const (
-	dockerEnv       = "DOCKER_CONFIG"
-	dockerDir       = ".docker"
-	dockerConfFile  = "config.json"
+	// dockerEnv is the environment variable used to look for Docker's config.json.
+	dockerEnv = "DOCKER_CONFIG"
+	// dockerDir is the directory name for Docker's config (inside the users home directory).
+	dockerDir = ".docker"
+	// dockerConfFile is the name of Docker's config file.
+	dockerConfFile = "config.json"
+	// dockerHelperPre is the prefix of docker credential helpers.
 	dockerHelperPre = "docker-credential-"
 )
-
-// methods to parse user's docker config.json file
 
 // dockerConfig is used to parse the ~/.docker/config.json
 type dockerConfig struct {
@@ -56,12 +58,13 @@ type dockerAuthConfig struct {
 	RegistryToken string `json:"registrytoken,omitempty"`
 }
 
+// DockerLoad returns a slice of hosts from the users docker config.
 func DockerLoad() ([]Host, error) {
 	cf := conffile.New(conffile.WithDirName(dockerDir, dockerConfFile), conffile.WithEnvDir(dockerEnv, dockerConfFile))
 	return dockerParse(cf)
 }
 
-// parse from io.Reader to []Host
+// dockerParse parses a docker config into a slice of Hosts.
 func dockerParse(cf *conffile.File) ([]Host, error) {
 	rdr, err := cf.Open()
 	if err != nil && errors.Is(err, fs.ErrNotExist) {
@@ -102,6 +105,7 @@ func dockerParse(cf *conffile.File) ([]Host, error) {
 	return hosts, nil
 }
 
+// dockerAuthToHost parses an auth entry from a docker config into a Host.
 func dockerAuthToHost(name string, conf dockerConfig, auth dockerAuthConfig) (Host, error) {
 	helper := ""
 	if conf.CredentialHelpers != nil && conf.CredentialHelpers[name] != "" {
@@ -127,6 +131,7 @@ func dockerAuthToHost(name string, conf dockerConfig, auth dockerAuthConfig) (Ho
 	return *h, nil
 }
 
+// decodeAuth extracts a base64 encoded user:pass into the username and password.
 func decodeAuth(authStr string) (string, string, error) {
 	if authStr == "" {
 		return "", "", nil

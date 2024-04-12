@@ -6,6 +6,8 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"io"
+
+	"github.com/ulikunitz/xz"
 )
 
 // CompressType identifies the detected compression type
@@ -46,6 +48,9 @@ func Compress(r io.Reader, oComp CompressType) (io.Reader, error) {
 			return compressGzip(br)
 		case CompressBzip2:
 			return compressGzip(bzip2.NewReader(br))
+		case CompressXz:
+			cbr, _ := xz.NewReader(br)
+			return compressGzip(cbr)
 		}
 	}
 	// No other types currently supported
@@ -79,7 +84,7 @@ func Decompress(r io.Reader) (io.Reader, error) {
 	case CompressGzip:
 		return gzip.NewReader(br)
 	case CompressXz:
-		return br, ErrXzUnsupported
+		return xz.NewReader(br)
 	default:
 		return br, nil
 	}

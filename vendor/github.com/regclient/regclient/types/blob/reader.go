@@ -10,27 +10,26 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
+
+	"github.com/regclient/regclient/internal/limitread"
+	"github.com/regclient/regclient/types/errs"
+	"github.com/regclient/regclient/types/mediatype"
 )
 
-// Reader is an unprocessed Blob with an available ReadCloser for reading the Blob
-type Reader interface {
-	Blob
-	io.ReadCloser
-	ToOCIConfig() (OCIConfig, error)
-	ToTarReader() (TarReader, error)
-}
+// Reader was previously an interface. A type alias is provided for upgrading.
+type Reader = *BReader
 
-// reader is the internal struct implementing BlobReader
-type reader struct {
-	common
+// BReader is used to read blobs.
+type BReader struct {
+	BCommon
 	readBytes int64
 	reader    io.Reader
 	origRdr   io.Reader
 	digester  digest.Digester
 }
 
-// NewReader creates a new reader
-func NewReader(opts ...Opts) Reader {
+// NewReader creates a new BReader.
+func NewReader(opts ...Opts) *BReader {
 	bc := blobConfig{}
 	for _, opt := range opts {
 		opt(&bc)
@@ -47,7 +46,7 @@ func NewReader(opts ...Opts) Reader {
 	if bc.header != nil {
 		// extract fields from header if descriptor not passed
 		if bc.desc.MediaType == "" {
-			bc.desc.MediaType = bc.header.Get("Content-Type")
+			bc.desc.MediaType = mediatype.Base(bc.header.Get("Content-Type"))
 		}
 		if bc.desc.Size == 0 {
 			cl, _ := strconv.Atoi(bc.header.Get("Content-Length"))
@@ -57,125 +56,145 @@ func NewReader(opts ...Opts) Reader {
 			bc.desc.Digest, _ = digest.Parse(bc.header.Get("Docker-Content-Digest"))
 		}
 	}
-	c := common{
-		r:         bc.r,
-		desc:      bc.desc,
-		rawHeader: bc.header,
-		resp:      bc.resp,
-	}
-	br := reader{
-		common:  c,
+	br := BReader{
+		BCommon: BCommon{
+			r:         bc.r,
+			desc:      bc.desc,
+			rawHeader: bc.header,
+			resp:      bc.resp,
+		},
 		origRdr: bc.rdr,
 	}
 	if bc.rdr != nil {
 		br.blobSet = true
 		br.digester = digest.Canonical.Digester()
-		br.reader = io.TeeReader(bc.rdr, br.digester.Hash())
+		rdr := bc.rdr
+		if br.desc.Size > 0 {
+			rdr = &limitread.LimitRead{
+				Reader: rdr,
+				Limit:  br.desc.Size,
+			}
+		}
+		br.reader = io.TeeReader(rdr, br.digester.Hash())
 	}
 	return &br
 }
 
-func (b *reader) Close() error {
-	if b.origRdr == nil {
+// Close attempts to close the reader and populates/validates the digest.
+func (r *BReader) Close() error {
+	if r.origRdr == nil {
 		return nil
 	}
 	// attempt to close if available in original reader
-	bc, ok := b.origRdr.(io.Closer)
+	bc, ok := r.origRdr.(io.Closer)
 	if !ok {
 		return nil
 	}
 	return bc.Close()
 }
 
-// RawBody returns the original body from the request
-func (b *reader) RawBody() ([]byte, error) {
-	return io.ReadAll(b)
+// RawBody returns the original body from the request.
+func (r *BReader) RawBody() ([]byte, error) {
+	return io.ReadAll(r)
 }
 
-// Read passes through the read operation while computing the digest and tracking the size
-func (b *reader) Read(p []byte) (int, error) {
-	if b.reader == nil {
+// Read passes through the read operation while computing the digest and tracking the size.
+func (r *BReader) Read(p []byte) (int, error) {
+	if r.reader == nil {
 		return 0, fmt.Errorf("blob has no reader: %w", io.ErrUnexpectedEOF)
 	}
-	size, err := b.reader.Read(p)
-	b.readBytes = b.readBytes + int64(size)
+	size, err := r.reader.Read(p)
+	r.readBytes = r.readBytes + int64(size)
 	if err == io.EOF {
 		// check/save size
-		if b.desc.Size == 0 {
-			b.desc.Size = b.readBytes
-		} else if b.readBytes != b.desc.Size {
-			err = fmt.Errorf("expected size mismatch [expected %d, received %d]: %w", b.desc.Size, b.readBytes, err)
+		if r.desc.Size == 0 {
+			r.desc.Size = r.readBytes
+		} else if r.readBytes < r.desc.Size {
+			err = fmt.Errorf("%w [expected %d, received %d]: %w", errs.ErrShortRead, r.desc.Size, r.readBytes, err)
+		} else if r.readBytes > r.desc.Size {
+			err = fmt.Errorf("%w [expected %d, received %d]: %w", errs.ErrSizeLimitExceeded, r.desc.Size, r.readBytes, err)
 		}
 		// check/save digest
-		if b.desc.Digest == "" {
-			b.desc.Digest = b.digester.Digest()
-		} else if b.desc.Digest != b.digester.Digest() {
-			err = fmt.Errorf("expected digest mismatch [expected %s, calculated %s]: %w", b.desc.Digest.String(), b.digester.Digest().String(), err)
+		if r.desc.Digest == "" {
+			r.desc.Digest = r.digester.Digest()
+		} else if r.desc.Digest != r.digester.Digest() {
+			err = fmt.Errorf("%w [expected %s, calculated %s]: %w", errs.ErrDigestMismatch, r.desc.Digest.String(), r.digester.Digest().String(), err)
 		}
 	}
 	return size, err
 }
 
 // Seek passes through the seek operation, reseting or invalidating the digest
-func (b *reader) Seek(offset int64, whence int) (int64, error) {
+func (r *BReader) Seek(offset int64, whence int) (int64, error) {
 	if offset == 0 && whence == io.SeekCurrent {
-		return b.readBytes, nil
+		return r.readBytes, nil
 	}
 	// cannot do an arbitrary seek and still digest without a lot more complication
 	if offset != 0 || whence != io.SeekStart {
-		return b.readBytes, fmt.Errorf("unable to seek to arbitrary position")
+		return r.readBytes, fmt.Errorf("unable to seek to arbitrary position")
 	}
-	rdrSeek, ok := b.origRdr.(io.Seeker)
+	rdrSeek, ok := r.origRdr.(io.Seeker)
 	if !ok {
-		return b.readBytes, fmt.Errorf("Seek unsupported")
+		return r.readBytes, fmt.Errorf("Seek unsupported")
 	}
 	o, err := rdrSeek.Seek(offset, whence)
 	if err != nil || o != 0 {
-		return b.readBytes, err
+		return r.readBytes, err
 	}
 	// reset internal offset and digest calculation
+	rdr := r.origRdr
+	if r.desc.Size > 0 {
+		rdr = &limitread.LimitRead{
+			Reader: rdr,
+			Limit:  r.desc.Size,
+		}
+	}
 	digester := digest.Canonical.Digester()
-	digestRdr := io.TeeReader(b.origRdr, digester.Hash())
-	b.digester = digester
-	b.readBytes = 0
-	b.reader = digestRdr
+	r.reader = io.TeeReader(rdr, digester.Hash())
+	r.digester = digester
+	r.readBytes = 0
 
 	return 0, nil
 }
 
-// ToOCIConfig converts a blobReader to a BlobOCIConfig
-func (b *reader) ToOCIConfig() (OCIConfig, error) {
-	if !b.blobSet {
+// ToOCIConfig converts a BReader to a BOCIConfig.
+func (r *BReader) ToOCIConfig() (*BOCIConfig, error) {
+	if !r.blobSet {
 		return nil, fmt.Errorf("blob is not defined")
 	}
-	if b.readBytes != 0 {
+	if r.readBytes != 0 {
 		return nil, fmt.Errorf("unable to convert after read has been performed")
 	}
-	blobBody, err := io.ReadAll(b)
+	blobBody, err := io.ReadAll(r)
+	errC := r.Close()
 	if err != nil {
-		return nil, fmt.Errorf("error reading image config for %s: %w", b.r.CommonName(), err)
+		return nil, fmt.Errorf("error reading image config for %s: %w", r.r.CommonName(), err)
+	}
+	if errC != nil {
+		return nil, fmt.Errorf("error closing blob reader: %w", err)
 	}
 	return NewOCIConfig(
-		WithDesc(b.desc),
-		WithHeader(b.rawHeader),
+		WithDesc(r.desc),
+		WithHeader(r.rawHeader),
 		WithRawBody(blobBody),
-		WithRef(b.r),
-		WithResp(b.resp),
+		WithRef(r.r),
+		WithResp(r.resp),
 	), nil
 }
 
-func (b *reader) ToTarReader() (TarReader, error) {
-	if !b.blobSet {
+// ToTarReader converts a BReader to a BTarReader
+func (r *BReader) ToTarReader() (*BTarReader, error) {
+	if !r.blobSet {
 		return nil, fmt.Errorf("blob is not defined")
 	}
-	if b.readBytes != 0 {
+	if r.readBytes != 0 {
 		return nil, fmt.Errorf("unable to convert after read has been performed")
 	}
 	return NewTarReader(
-		WithDesc(b.desc),
-		WithHeader(b.rawHeader),
-		WithRef(b.r),
-		WithResp(b.resp),
-		WithReader(b.reader),
+		WithDesc(r.desc),
+		WithHeader(r.rawHeader),
+		WithRef(r.r),
+		WithResp(r.resp),
+		WithReader(r.reader),
 	), nil
 }
