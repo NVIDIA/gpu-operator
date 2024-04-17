@@ -1600,6 +1600,8 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 			obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = DCGMDefaultHostPort
 			if config.DCGM.HostPort != 0 {
 				obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = config.DCGM.HostPort
+				// We set the containerPort to the same value as the hostPort as hostNetwork is set to true
+				obj.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = config.DCGM.HostPort
 			}
 		}
 	}
