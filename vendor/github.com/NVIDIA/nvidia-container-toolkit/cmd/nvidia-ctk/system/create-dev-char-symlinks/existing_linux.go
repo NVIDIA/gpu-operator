@@ -1,5 +1,5 @@
-/*
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+/**
+# Copyright (c) NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-*/
+**/
 
-package lookup
+package devchar
 
-import "errors"
+import "golang.org/x/sys/unix"
 
-//go:generate moq -stub -out locator_mock.go . Locator
-
-// Locator defines the interface for locating files on a system.
-type Locator interface {
-	Locate(string) ([]string, error)
+func newDeviceNode(d string, stat unix.Stat_t) deviceNode {
+	deviceNode := deviceNode{
+		path:  d,
+		major: unix.Major(stat.Rdev),
+		minor: unix.Minor(stat.Rdev),
+	}
+	return deviceNode
 }
-
-// ErrNotFound indicates that a specified pattern or file could not be found.
-var ErrNotFound = errors.New("not found")

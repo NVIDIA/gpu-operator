@@ -42,7 +42,7 @@ github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
-# github.com/NVIDIA/nvidia-container-toolkit v1.14.6
+# github.com/NVIDIA/nvidia-container-toolkit v1.15.0
 ## explicit; go 1.20
 github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/info/proc/devices
@@ -581,12 +581,6 @@ github.com/xlab/treeprint
 # github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673
 ## explicit
 github.com/xrash/smetrics
-# gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884
-## explicit; go 1.20
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/bytes
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci/mmio
-gitlab.com/nvidia/cloud-native/go-nvlib/pkg/pciids
 # go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0
 ## explicit; go 1.20
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
@@ -676,7 +670,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.18.0
+# golang.org/x/sys v0.19.0
 ## explicit; go 1.18
 golang.org/x/sys/execabs
 golang.org/x/sys/plan9
