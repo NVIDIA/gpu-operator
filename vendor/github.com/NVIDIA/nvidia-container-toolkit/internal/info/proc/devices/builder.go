@@ -42,7 +42,6 @@ func New(opts ...Option) Devices {
 	return devices
 }
 
-// Option defines a functional option.
 type Option func(*builder)
 
 // WithDeviceToMajor specifies an explicit device name to major number map.
