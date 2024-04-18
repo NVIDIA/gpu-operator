@@ -20,9 +20,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/NVIDIA/nvidia-container-toolkit/internal/logger"
 	"github.com/NVIDIA/nvidia-container-toolkit/internal/lookup"
-	"golang.org/x/sys/unix"
 )
 
 type nodeLister interface {
@@ -63,20 +64,13 @@ func (m existing) DeviceNodes() ([]deviceNode, error) {
 		if m.nodeIsBlocked(d) {
 			continue
 		}
-
 		var stat unix.Stat_t
 		err := unix.Stat(d, &stat)
 		if err != nil {
 			m.logger.Warningf("Could not stat device: %v", err)
 			continue
 		}
-		deviceNode := deviceNode{
-			path:  d,
-			major: unix.Major(uint64(stat.Rdev)),
-			minor: unix.Minor(uint64(stat.Rdev)),
-		}
-
-		deviceNodes = append(deviceNodes, deviceNode)
+		deviceNodes = append(deviceNodes, newDeviceNode(d, stat))
 	}
 
 	return deviceNodes, nil

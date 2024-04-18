@@ -14,16 +14,24 @@
 # limitations under the License.
 **/
 
-package nvpci
+package ldcache
 
-import "log"
+import "github.com/NVIDIA/nvidia-container-toolkit/internal/logger"
 
-type logger interface {
-	Warningf(string, ...interface{})
+type empty struct {
+	logger logger.Interface
+	path   string
 }
 
-type simpleLogger struct{}
+var _ LDCache = (*empty)(nil)
 
-func (l simpleLogger) Warningf(format string, v ...interface{}) {
-	log.Printf("WARNING: "+format, v)
+// List always returns nil for an empty ldcache
+func (e *empty) List() ([]string, []string) {
+	return nil, nil
+}
+
+// Lookup logs a debug message and returns nil for an empty ldcache
+func (e *empty) Lookup(prefixes ...string) ([]string, []string) {
+	e.logger.Debugf("Calling Lookup(%v) on empty ldcache: %v", prefixes, e.path)
+	return nil, nil
 }

@@ -27,8 +27,8 @@ github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a h1:3nyTp1c
 github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a/go.mod h1:K7HCLTndSwBEZwBu6sU7daVeryV1Qt/DtKH8nONJj4o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20240214071211-ea58a3ada15c h1:nt9jPM6K7DCYydMKhlfMrZ9aFasdNU4WKUZvO4cN2us=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20240214071211-ea58a3ada15c/go.mod h1:m9Xr+fGiGWTxyCYnbby7a91cDF1GpMH4PSiDwoDp5FA=
-github.com/NVIDIA/nvidia-container-toolkit v1.14.6 h1:42PccGiwrz2K5KTEOOO3X023ToBqNdd0xnnJVCh+Mqs=
-github.com/NVIDIA/nvidia-container-toolkit v1.14.6/go.mod h1:SD4zQVx3nyNeh1JKewquKoGd5i+nzJwjRCTu9Xmh5H4=
+github.com/NVIDIA/nvidia-container-toolkit v1.15.0 h1:YmYZUKJzhz/lJSVH6k1mk5IUCHpt8HwRtwMrtBoCzhQ=
+github.com/NVIDIA/nvidia-container-toolkit v1.15.0/go.mod h1:SUwxfwi+dl1LtVlpAnJEolxuZfCtAVmOKRGWhJYsiJI=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d h1:UrqY+r/OJnIp5u0s1SbQ8dVfLCZJsnvazdBP5hS4iRs=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d/go.mod h1:HI8ITrYtUY+O+ZhtlqUnD8+KwNPOyugEhfP9fdUIaEQ=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
@@ -391,8 +391,6 @@ github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50 h1:hlE8//ciYMzt
 github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
 github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f h1:ERexzlUfuTvpE74urLSbIQW0Z/6hF9t8U4NsJLaioAY=
 github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884 h1:V0LUbfm4kVA1CPG8FgG9AGZqa3ykE5U12Gd3PZgoItA=
-gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884/go.mod h1:/x5Ky1ZJNyCjDkgSL1atII0EFKQF5WaIHKeP5nkaQfk=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
 go.opencensus.io v0.24.0/go.mod h1:vNK8G9p7aAivkbmorf4v+7Hgx+Zs0yY+0fOtgBfjQKo=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0 h1:doUP+ExOpH3spVTLS0FcWGLnQrPct/hD/bCPbDRUEAU=
@@ -463,8 +461,8 @@ golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.2.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.18.0 h1:DBdB3niSjOA/O0blCZBqDefyWNYveAYMNF1Wum0DYQ4=
-golang.org/x/sys v0.18.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
+golang.org/x/sys v0.19.0 h1:q5f1RH2jigJ1MoAWp2KTp3gm5zAGFUTarQZ5U386+4o=
+golang.org/x/sys v0.19.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/term v0.2.0/go.mod h1:TVmDHMZPmdnySmBfhjOoOdhjzdE1h4u1VwSiw2l1Nuc=

@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.2.0
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240214071211-ea58a3ada15c
-	github.com/NVIDIA/nvidia-container-toolkit v1.14.6
+	github.com/NVIDIA/nvidia-container-toolkit v1.15.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.1
 	github.com/mitchellh/hashstructure v1.1.0
@@ -142,7 +142,6 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	gitlab.com/nvidia/cloud-native/go-nvlib v0.0.0-20230818092907-09424fdc8884 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0 // indirect
 	go.opentelemetry.io/otel v1.23.1 // indirect
 	go.opentelemetry.io/otel/metric v1.23.1 // indirect
@@ -154,7 +153,7 @@ require (
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
