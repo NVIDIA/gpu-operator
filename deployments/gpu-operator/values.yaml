@@ -457,7 +457,7 @@ kataManager:
           pullSecret: ""
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-kata-manager
-  version: v0.1.2
+  version: v0.2.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
