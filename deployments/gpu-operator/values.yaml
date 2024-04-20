@@ -230,7 +230,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.15.0-rc.2-ubi8
+  version: v0.15.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -326,7 +326,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.15.0-rc.2-ubi8
+  version: v0.15.0-ubi8
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -409,7 +409,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: "v0.2.5"
+  version: "v0.2.6"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -457,7 +457,7 @@ kataManager:
           pullSecret: ""
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-kata-manager
-  version: v0.1.2
+  version: v0.2.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
