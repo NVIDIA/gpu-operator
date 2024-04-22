@@ -444,12 +444,12 @@ kataManager:
   config:
     artifactsDir: "/opt/nvidia-gpu-operator/artifacts/runtimeclasses"
     runtimeClasses:
-      - name: kata-qemu-nvidia-gpu
+      - name: kata-nvidia-gpu
         nodeSelector: {}
         artifacts:
           url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535.54.03
           pullSecret: ""
-      - name: kata-qemu-nvidia-gpu-snp
+      - name: kata-nvidia-gpu-snp
         nodeSelector:
           "nvidia.com/cc.capable": "true"
         artifacts:
