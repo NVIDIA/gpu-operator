@@ -158,7 +158,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := lint license-check validate-modules
+CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -243,6 +243,10 @@ validate-helm-values: cmds
 	helm template gpu-operator deployments/gpu-operator --show-only templates/clusterpolicy.yaml --set gds.enabled=true | \
 		sed '/^--/d' | \
 		./gpuop-cfg validate clusterpolicy --input="-"
+
+validate-generated-assets: manifests generate
+	@echo "- Verifying that the generated code and manifests are in-sync..."
+	@git diff --exit-code -- api config
 
 COVERAGE_FILE := coverage.out
 unit-test: build
