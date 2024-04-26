@@ -110,7 +110,7 @@ for node in $(echo "$gpu_pci_nodes"); do
 done
 
 echo "Get the GPU nodes (status)"
-$K get nodes -l nvidia.com/gpu.present=true > $ARTIFACT_DIR/gpu_nodes.status
+$K get nodes -l nvidia.com/gpu.present=true -o wide > $ARTIFACT_DIR/gpu_nodes.status
 
 echo "Get the GPU nodes (description)"
 $K describe nodes -l nvidia.com/gpu.present=true > $ARTIFACT_DIR/gpu_nodes.descr
