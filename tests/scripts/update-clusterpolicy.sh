@@ -112,6 +112,13 @@ test_enable_dcgm() {
     # Verify that standalone nvidia-dcgm and exporter pods are running successfully after update
     check_pod_ready "nvidia-dcgm"
     check_pod_ready "nvidia-dcgm-exporter"
+
+    # Test that nvidia-dcgm service is created with interalTrafficPolicy set to "local"
+    trafficPolicy=$(kubectl  get service nvidia-dcgm -n $TEST_NAMESPACE -o json | jq -r '.spec.internalTrafficPolicy')
+    if [ "$trafficPolicy" != "Local" ]; then
+        echo "service nvidia-dcgm is missing or internal traffic policy is not set to local"
+        exit 1
+    fi
 }
 
 test_gpu_sharing() {

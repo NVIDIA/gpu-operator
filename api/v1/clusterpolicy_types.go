@@ -980,7 +980,7 @@ type DCGMSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
-	// HostPort represents host port that needs to be bound for DCGM engine (Default: 5555)
+	// Deprecated: HostPort represents host port that needs to be bound for DCGM engine (Default: 5555)
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Host port to bind for DCGM engine"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:number"
 	HostPort int32 `json:"hostPort,omitempty"`

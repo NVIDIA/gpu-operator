@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nvidia-dcgm
+  name: nvidia-dcgm
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  internalTrafficPolicy: Local
+  ports:
+  - name: dcgm
+    port: 5555
+    protocol: TCP
+  selector:
+    app: nvidia-dcgm
+  type: ClusterIP
