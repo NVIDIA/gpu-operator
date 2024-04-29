@@ -248,8 +248,8 @@ spec:
                       type: object
                     type: array
                   hostPort:
-                    description: 'HostPort represents host port that needs to be bound
-                      for DCGM engine (Default: 5555)'
+                    description: 'Deprecated: HostPort represents host port that needs
+                      to be bound for DCGM engine (Default: 5555)'
                     format: int32
                     type: integer
                   image:

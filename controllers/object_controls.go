@@ -112,8 +112,8 @@ const (
 	MigDefaultGPUClientsConfigMapName = "default-gpu-clients"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
-	// DCGMDefaultHostPort indicates default host port bound to DCGM host engine
-	DCGMDefaultHostPort = 5555
+	// DCGMDefaultPort indicates default port bound to DCGM host engine
+	DCGMDefaultPort = 5555
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 	// UseHostMOFEDEnvName indicates if MOFED driver is pre-installed on the host
@@ -1461,14 +1461,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
-		// enable hostNetwork for communication with external DCGM using NODE_IP(localhost)
-		obj.Spec.Template.Spec.HostNetwork = true
-		// set DCGM host engine env. localhost will be substituted during pod runtime
-		dcgmHostPort := int32(DCGMDefaultHostPort)
-		if config.DCGM.HostPort != 0 {
-			dcgmHostPort = config.DCGM.HostPort
-		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("localhost:%d", dcgmHostPort))
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort))
 	} else {
 		// case for DCGM running on the host itself(DGX BaseOS)
 		remoteEngine := getContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName)
@@ -1477,6 +1470,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.HostNetwork = true
 		}
 	}
+
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
@@ -1591,18 +1585,6 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	if len(config.DCGM.Env) > 0 {
 		for _, env := range config.DCGM.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-
-	// set host port to bind for DCGM engine
-	for i, port := range obj.Spec.Template.Spec.Containers[0].Ports {
-		if port.Name == "dcgm" {
-			obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = DCGMDefaultHostPort
-			if config.DCGM.HostPort != 0 {
-				obj.Spec.Template.Spec.Containers[0].Ports[i].HostPort = config.DCGM.HostPort
-				// We set the containerPort to the same value as the hostPort as hostNetwork is set to true
-				obj.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = config.DCGM.HostPort
-			}
 		}
 	}
 
@@ -4324,11 +4306,6 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 			continue
 		}
 		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
-	}
-
-	// Allow hostNetwork only when a separate standalone DCGM engine is deployed for communication
-	if obj.Name == "nvidia-dcgm-exporter" && n.singleton.Spec.DCGM.IsEnabled() {
-		obj.AllowHostNetwork = true
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {

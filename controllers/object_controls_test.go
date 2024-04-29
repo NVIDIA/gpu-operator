@@ -34,6 +34,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,6 +56,7 @@ const (
 	vGPUManagerAssetsPath         = "assets/state-vgpu-manager/"
 	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
+	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
 	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
 	upgradedKernel                = "5.4.135-generic"
 )
@@ -163,6 +165,9 @@ func setup() error {
 	}
 	if err := promv1.AddToScheme(s); err != nil {
 		return fmt.Errorf("unable to add promv1 schema: %v", err)
+	}
+	if err := apiextensionsv1.AddToScheme(s); err != nil {
+		return fmt.Errorf("unable to add apiextensionsv1 schema: %v", err)
 	}
 	if err := secv1.Install(s); err != nil {
 		return fmt.Errorf("unable to add secv1 schema: %v", err)
@@ -385,6 +390,24 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.SandboxDevicePlugin)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for sandbox-device-plugin: %v", err)
+		}
+	case "DCGMExporter":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.DCGMExporter.Repository,
+			image:            cp.Spec.DCGMExporter.Image,
+			version:          cp.Spec.DCGMExporter.Version,
+			imagePullPolicy:  cp.Spec.DCGMExporter.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.DCGMExporter.ImagePullSecrets),
+			args:             cp.Spec.DCGMExporter.Args,
+			env:              cp.Spec.DCGMExporter.Env,
+			resources:        cp.Spec.DCGMExporter.Resources,
+		}
+		dsLabel = "nvidia-dcgm-exporter"
+		mainCtrName = "nvidia-dcgm-exporter"
+		manifestFile = filepath.Join(cfg.root, dcgmExporterAssetsPath)
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DCGMExporter)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for dcgm-exporter: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid component for testDaemonsetCommon(): %s", component)
@@ -993,6 +1016,120 @@ func TestIsOpenKernelModulesRequired(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			isOpenRMRequired := tc.gds.IsOpenKernelModulesRequired()
 			require.Equal(t, tc.output, isOpenRMRequired, "Incorrect status from IsOpenKernelModulesRequired() for GDS driver")
+		})
+	}
+}
+
+// getDCGMExporterTestInput return a ClusterPolicy instance for a particular
+// dcgm-exporter test case.
+func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Set some default values
+	cp.Spec.DCGMExporter.Repository = "nvcr.io/nvidia/k8s"
+	cp.Spec.DCGMExporter.Image = "dcgm-exporter"
+	cp.Spec.DCGMExporter.Version = "3.3.0-3.2.0-ubuntu22.04"
+	cp.Spec.DCGMExporter.ImagePullSecrets = []string{"ngc-secret"}
+
+	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Validator.Image = "gpu-operator-validator"
+	cp.Spec.Validator.Version = "v23.9.2"
+	cp.Spec.Validator.ImagePullSecrets = []string{"ngc-secret"}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	case "standalone-dcgm":
+		dcgmEnabled := true
+		cp.Spec.DCGM.Enabled = &dcgmEnabled
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getDCGMExporterTestOutput returns a map containing expected output for
+// dcgm-exporter test case.
+func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets":     1,
+		"dcgmExporterImage": "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu22.04",
+		"imagePullSecret":   "ngc-secret",
+	}
+
+	switch testCase {
+	case "default":
+		output["env"] = map[string]string{}
+	case "standalone-dcgm":
+		output["env"] = map[string]string{
+			"DCGM_REMOTE_HOSTENGINE_INFO": "nvidia-dcgm:5555",
+		}
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestDCGMExporter tests that the GPU Operator correctly deploys the dcgm-exporter daemonset
+// under various scenarios/config options
+func TestDCGMExporter(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getDCGMExporterTestInput("default"),
+			getDCGMExporterTestOutput("default"),
+		},
+		{
+			"StandalongDCGM",
+			getDCGMExporterTestInput("standalone-dcgm"),
+			getDCGMExporterTestOutput("standalone-dcgm"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "DCGMExporter", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			dcgmExporterImage := ""
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				if container.Name == "nvidia-dcgm-exporter" {
+					dcgmExporterImage = container.Image
+					break
+				}
+			}
+			for key, value := range tc.output["env"].(map[string]string) {
+				envFound := false
+				for _, envVar := range ds.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						envFound = true
+					}
+				}
+				if !envFound {
+					t.Fatalf("Expected env is not set for daemonset nvidia-dcgm-exporter %s->%s", key, value)
+				}
+			}
+
+			require.Equal(t, tc.output["dcgmExporterImage"], dcgmExporterImage, "Unexpected configuration for dcgm-exporter image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
 		})
 	}
 }

@@ -482,9 +482,6 @@ spec:
     {{- if .Values.dcgm.args }}
     args: {{ toYaml .Values.dcgm.args | nindent 6 }}
     {{- end }}
-    {{- if .Values.dcgm.hostPort }}
-    hostPort: {{ .Values.dcgm.hostPort }}
-    {{- end }}
   dcgmExporter:
     enabled: {{ .Values.dcgmExporter.enabled }}
     {{- if .Values.dcgmExporter.repository }}
