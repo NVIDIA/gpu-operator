@@ -290,7 +290,6 @@ dcgm:
   image: dcgm
   version: 3.3.5-1-ubuntu22.04
   imagePullPolicy: IfNotPresent
-  hostPort: 5555
   args: []
   env: []
   resources: {}

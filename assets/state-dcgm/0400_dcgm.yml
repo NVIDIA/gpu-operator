@@ -35,7 +35,6 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: HostToContainer
-      hostNetwork: true
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-dcgm-ctr
@@ -44,7 +43,6 @@ spec:
         ports:
         - name: "dcgm"
           containerPort: 5555
-          hostPort: 5555
       volumes:
         - name: run-nvidia
           hostPath:
