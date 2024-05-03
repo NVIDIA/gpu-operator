@@ -25,7 +25,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"sigs.k8s.io/yaml"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/v1"
+	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
 type command struct {

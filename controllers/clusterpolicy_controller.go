@@ -43,7 +43,7 @@ import (
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 )
 
@@ -395,7 +395,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 		if owner == nil {
 			return nil
 		}
-		if owner.APIVersion != gpuv1.GroupVersion.String() || owner.Kind != "ClusterPolicy" {
+		if owner.APIVersion != gpuv1.SchemeGroupVersion.String() || owner.Kind != "ClusterPolicy" {
 			return nil
 		}
 		return []string{owner.Name}
