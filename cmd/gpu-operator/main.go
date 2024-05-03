@@ -45,8 +45,8 @@ import (
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 
-	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	clusterpolicyv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/info"

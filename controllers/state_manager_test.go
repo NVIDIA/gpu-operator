@@ -21,7 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
 func TestGetRuntimeString(t *testing.T) {

@@ -42,8 +42,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
@@ -269,8 +269,8 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 		ownedByNVIDIA := false
 		for _, owner := range ownerRefs {
-			if (owner.APIVersion == gpuv1.GroupVersion.String() && owner.Kind == "ClusterPolicy") ||
-				(owner.APIVersion == nvidiav1alpha1.GroupVersion.String() && owner.Kind == "NVIDIADriver") {
+			if (owner.APIVersion == gpuv1.SchemeGroupVersion.String() && owner.Kind == "ClusterPolicy") ||
+				(owner.APIVersion == nvidiav1alpha1.SchemeGroupVersion.String() && owner.Kind == "NVIDIADriver") {
 				ownedByNVIDIA = true
 				break
 			}

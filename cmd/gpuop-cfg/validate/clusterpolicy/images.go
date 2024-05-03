@@ -23,7 +23,7 @@ import (
 	"github.com/regclient/regclient"
 	"github.com/regclient/regclient/types/ref"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/v1"
+	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
 var client = regclient.New()
