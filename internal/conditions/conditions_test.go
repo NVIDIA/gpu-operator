@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
 func TestConditionsUpdater_SetConditionsReady(t *testing.T) {

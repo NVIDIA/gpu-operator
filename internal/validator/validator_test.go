@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
 const (
@@ -51,7 +51,7 @@ func makeTestDriver(opts ...driverOptions) *nvidiav1alpha1.NVIDIADriver {
 
 	c.Kind = reflect.TypeOf(nvidiav1alpha1.NVIDIADriver{}).Name()
 
-	gvk := nvidiav1alpha1.GroupVersion.WithKind(c.Kind)
+	gvk := nvidiav1alpha1.SchemeGroupVersion.WithKind(c.Kind)
 
 	c.APIVersion = gvk.GroupVersion().String()
 

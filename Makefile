@@ -79,6 +79,7 @@ all: gpu-operator
 GOOS ?= linux
 VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
 
+CLIENT_GEN = $(shell pwd)/bin/client-gen
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 
@@ -118,6 +119,14 @@ manifests: install-tools
 # Generate code
 generate: install-tools
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+generate-clientset: install-tools
+	$(CLIENT_GEN) --go-header-file=$(CURDIR)/hack/boilerplate.go.txt \
+		--clientset-name "versioned" \
+		--output-dir $(CURDIR)/api \
+		--output-pkg $(MODULE)/api \
+		--input-base $(CURDIR)/api \
+		--input nvidia/v1,nvidia/v1alpha1
 
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
@@ -230,7 +239,7 @@ validate-helm-values: cmds
 		sed '/^--/d' | \
 		./gpuop-cfg validate clusterpolicy --input="-"
 
-validate-generated-assets: manifests generate
+validate-generated-assets: manifests generate generate-clientset
 	@echo "- Verifying that the generated code and manifests are in-sync..."
 	@git diff --exit-code -- api config
 

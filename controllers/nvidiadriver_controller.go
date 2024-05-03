@@ -39,8 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/v1alpha1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
@@ -369,7 +369,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		if owner == nil {
 			return nil
 		}
-		if owner.APIVersion != nvidiav1alpha1.GroupVersion.String() || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
+		if owner.APIVersion != nvidiav1alpha1.SchemeGroupVersion.String() || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
 			return nil
 		}
 		return []string{owner.Name}

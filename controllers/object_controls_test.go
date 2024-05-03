@@ -46,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/v1"
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
 const (
