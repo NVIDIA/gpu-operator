@@ -183,7 +183,10 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 
 	for _, ds := range list.Items {
 		ds := ds
-		if ds.Status.DesiredNumberScheduled == 0 {
+		// We consider a daemonset to be stale only if it has no desired number of pods and no pods currently mis-scheduled
+		// As per the Kubernetes docs, a daemonset pod is mis-scheduled when an already scheduled pod no longer satisfies
+		// node affinity constraints or has un-tolerated taints, for e.g. "node.kubernetes.io/unreachable:NoSchedule"
+		if ds.Status.DesiredNumberScheduled == 0 && ds.Status.NumberMisscheduled == 0 {
 			logger.V(consts.LogLevelInfo).Info("Deleting inactive driver DaemonSet", "Name", ds.Name)
 			err = s.client.Delete(ctx, &ds)
 			if err != nil {

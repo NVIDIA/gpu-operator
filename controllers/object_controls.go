@@ -3703,25 +3703,30 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 	}
 
 	for idx := range list.Items {
-		name := list.Items[idx].ObjectMeta.Name
-		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
+		ds := list.Items[idx]
+		name := ds.ObjectMeta.Name
+		desiredNumberScheduled := ds.Status.DesiredNumberScheduled
+		numberMisscheduled := ds.Status.NumberMisscheduled
 
 		n.logger.V(1).Info("Driver DaemonSet found",
 			"Name", name,
-			"desiredNumberScheduled", desiredNumberScheduled)
+			"Status.DesiredNumberScheduled", desiredNumberScheduled)
 
-		if desiredNumberScheduled != 0 {
+		// We consider a daemonset to be stale only if it has no desired number of pods and no pods currently mis-scheduled
+		// As per the Kubernetes docs, a daemonset pod is mis-scheduled when an already scheduled pod no longer satisfies
+		// node affinity constraints or has un-tolerated taints, for e.g. "node.kubernetes.io/unreachable:NoSchedule"
+		if desiredNumberScheduled == 0 && numberMisscheduled == 0 {
+			n.logger.Info("Delete Driver DaemonSet", "Name", name)
+
+			err = n.client.Delete(ctx, &ds)
+			if err != nil {
+				n.logger.Error(err, "Could not get delete DaemonSet",
+					"Name", name)
+			}
+		} else {
 			n.logger.Info("Driver DaemonSet active, keep it.",
-				"Name", name, "Status.DesiredNumberScheduled", desiredNumberScheduled)
-			continue
-		}
-
-		n.logger.Info("Delete Driver DaemonSet", "Name", name)
-
-		err = n.client.Delete(ctx, &list.Items[idx])
-		if err != nil {
-			n.logger.Info("ERROR: Could not get delete DaemonSet",
-				"Name", name, "Error", err)
+				"Name", name,
+				"Status.DesiredNumberScheduled", desiredNumberScheduled)
 		}
 	}
 	return nil
