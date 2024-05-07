@@ -9,17 +9,15 @@ data:
   entrypoint.sh: |-
     #!/bin/bash
 
-    set -e
+    until [[ -f /run/nvidia/validations/driver-ready ]]
+    do
+      echo "waiting for the driver validations to be ready..."
+      sleep 5
+    done
 
-    driver_root=/run/nvidia/driver
-    driver_root_ctr_path=$driver_root
-    if [[ -f /run/nvidia/validations/host-driver-ready ]]; then
-      driver_root=/
-      driver_root_ctr_path=/host
-    fi
-
-    export NVIDIA_DRIVER_ROOT=$driver_root
-    export DRIVER_ROOT_CTR_PATH=$driver_root_ctr_path
+    set -o allexport
+    cat /run/nvidia/validations/driver-ready
+    . /run/nvidia/validations/driver-ready
 
     #
     # The below delay is a workaround for an issue affecting some versions

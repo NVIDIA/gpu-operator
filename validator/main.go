@@ -140,8 +140,6 @@ const (
 	driverContainerRoot = "/run/nvidia/driver"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
-	// hostDriverStatusFile indicates status file for host driver readiness
-	hostDriverStatusFile = "host-driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
 	nvidiaFsStatusFile = "nvidia-fs-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
@@ -641,12 +639,6 @@ func (d *Driver) validate() error {
 		return err
 	}
 
-	// delete host driver status file is already present
-	err = deleteStatusFile(outputDirFlag + "/" + hostDriverStatusFile)
-	if err != nil {
-		return err
-	}
-
 	driverRoot, isHostDriver, err := d.runValidation(false)
 	if err != nil {
 		log.Error("driver is not ready")
@@ -675,17 +667,27 @@ func (d *Driver) validate() error {
 		}
 	}
 
-	statusFile := driverStatusFile
+	return d.createStatusFile(isHostDriver)
+}
+
+func (d *Driver) createStatusFile(isHostDriver bool) error {
+	var nvidiaDriverRoot, driverRootCtrPath string
 	if isHostDriver {
-		statusFile = hostDriverStatusFile
+		nvidiaDriverRoot = "/"
+		driverRootCtrPath = "/host"
+	} else {
+		nvidiaDriverRoot = "/run/nvidia/driver"
+		driverRootCtrPath = "/run/nvidia/driver"
 	}
 
+	statusFileContent := strings.Join([]string{
+		fmt.Sprintf("NVIDIA_DRIVER_ROOT=%s", nvidiaDriverRoot),
+		fmt.Sprintf("DRIVER_ROOT_CTR_PATH=%s", driverRootCtrPath),
+		fmt.Sprintf("IS_HOST_DRIVER=%v", isHostDriver),
+	}, "\n") + "\n"
+
 	// create driver status file
-	err = createStatusFile(outputDirFlag + "/" + statusFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return createStatusFileWithContent(outputDirFlag+"/"+driverStatusFile, statusFileContent)
 }
 
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
