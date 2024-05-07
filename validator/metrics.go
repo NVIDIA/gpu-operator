@@ -163,11 +163,6 @@ func (nm *NodeMetrics) watchStatusFile(statusFile *promcli.Gauge, statusFileFile
 	for {
 		_, err := os.Stat(outputDirFlag + "/" + statusFileFilename)
 		ready = !os.IsNotExist(err)
-		if !ready && statusFileFilename == driverStatusFile {
-			// check if the driver status file for pre-installed driver exists
-			_, err = os.Stat(outputDirFlag + "/" + hostDriverStatusFile)
-			ready = !os.IsNotExist(err)
-		}
 
 		if ready != prevReady {
 			prevReady = ready
