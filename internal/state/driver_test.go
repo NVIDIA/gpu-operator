@@ -18,7 +18,6 @@ package state
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,12 +26,10 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -105,6 +102,8 @@ func TestDriverRenderRDMA(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
+
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
 		Enabled: utils.BoolPtr(true),
 	}
@@ -115,50 +114,6 @@ func TestDriverRenderRDMA(t *testing.T) {
 		})
 	require.Nil(t, err)
 	require.NotEmpty(t, objs)
-
-	ds, err := getDaemonSetObj(objs)
-	require.Nil(t, err)
-	require.NotNil(t, ds)
-
-	nvidiaDriverCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
-	require.Nil(t, err, "nvidia-driver-ctr should be in the list of containers")
-
-	driverEnvars := []corev1.EnvVar{
-		{
-			Name:  "NVIDIA_VISIBLE_DEVICES",
-			Value: "void",
-		},
-		{
-			Name:  "GPU_DIRECT_RDMA_ENABLED",
-			Value: "true",
-		},
-	}
-	checkEnv(t, driverEnvars, nvidiaDriverCtr.Env)
-
-	nvidiaPeermemCtr, err := getContainerObj(ds.Spec.Template.Spec.Containers, "nvidia-peermem-ctr")
-	require.Nil(t, err, "nvidia-peermem-ctr should be in the list of containers")
-
-	peermemEnvars := []corev1.EnvVar{
-		{
-			Name:  "NVIDIA_VISIBLE_DEVICES",
-			Value: "void",
-		},
-	}
-
-	checkEnv(t, peermemEnvars, nvidiaPeermemCtr.Env)
-
-	expectedVolumes := getDriverVolumes()
-	expectedVolumes = append(expectedVolumes, corev1.Volume{
-		Name: "mlnx-ofed-usr-src",
-		VolumeSource: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{
-				Path: "/run/mellanox/drivers/usr/src",
-				Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-			},
-		},
-	})
-
-	checkVolumes(t, expectedVolumes, ds.Spec.Template.Spec.Volumes)
 
 	actual, err := getYAMLString(objs)
 	require.Nil(t, err)
@@ -179,6 +134,8 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
+
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
 		Enabled:      utils.BoolPtr(true),
@@ -300,6 +257,8 @@ func TestDriverGDS(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
+
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
 		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
@@ -335,6 +294,8 @@ func TestDriverGDRCopy(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
+
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
@@ -373,6 +334,7 @@ func TestDriverGDRCopyOpenShift(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 	renderData.Driver.Name = "nvidia-gpu-driver-openshift"
 	renderData.Driver.AppName = "nvidia-gpu-driver-openshift-79d6bd954f"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:525.85.03-rhel8.0"
@@ -428,61 +390,7 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 
-	renderData.AdditionalConfigs = &additionalConfigs{
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "test-cm",
-				ReadOnly:  true,
-				MountPath: "/opt/config/test-file",
-				SubPath:   "test-file",
-			},
-			{
-				Name:      "test-host-path",
-				MountPath: "/opt/config/test-host-path",
-			},
-			{
-				Name:      "test-host-path-ro",
-				MountPath: "/opt/config/test-host-path-ro",
-				ReadOnly:  true,
-			},
-		},
-		Volumes: []corev1.Volume{
-			{
-				Name: "test-cm",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "test-cm",
-						},
-						Items: []corev1.KeyToPath{
-							{
-								Key:  "test-file",
-								Path: "test-file",
-							},
-						},
-					},
-				},
-			},
-			{
-				Name: "test-host-path",
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/opt/config/test-host-path",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-					},
-				},
-			},
-			{
-				Name: "test-host-path-ro",
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/opt/config/test-host-path-ro",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-					},
-				},
-			},
-		},
-	}
+	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
@@ -668,31 +576,6 @@ func TestVGPUHostManagerDaemonset(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
-func getDaemonSetObj(objs []*unstructured.Unstructured) (*appsv1.DaemonSet, error) {
-	ds := &appsv1.DaemonSet{}
-
-	for _, obj := range objs {
-		if obj.GetKind() == "DaemonSet" {
-			err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ds)
-			if err != nil {
-				return nil, err
-			}
-			return ds, nil
-		}
-	}
-
-	return nil, fmt.Errorf("could not find object of kind 'DaemonSet'")
-}
-
-func getContainerObj(containers []corev1.Container, name string) (corev1.Container, error) {
-	for _, c := range containers {
-		if c.Name == name {
-			return c, nil
-		}
-	}
-	return corev1.Container{}, fmt.Errorf("failed to find container with name '%s'", name)
-}
-
 func getMinimalDriverRenderData() *driverRenderData {
 	return &driverRenderData{
 		Driver: &driverSpec{
@@ -725,150 +608,58 @@ func getDefaultContainerProbeSpec() *nvidiav1alpha1.ContainerProbeSpec {
 	}
 }
 
-func checkEnv(t *testing.T, input []corev1.EnvVar, output []corev1.EnvVar) {
-	inputMap := map[string]string{}
-	for _, env := range input {
-		inputMap[env.Name] = env.Value
-	}
-
-	outputMap := map[string]string{}
-	for _, env := range output {
-		outputMap[env.Name] = env.Value
-	}
-
-	for key, value := range inputMap {
-		outputValue, exists := outputMap[key]
-		require.True(t, exists)
-		require.Equal(t, value, outputValue)
-	}
-}
-
-func checkVolumes(t *testing.T, expected []corev1.Volume, actual []corev1.Volume) {
-	expectedMap := volumeSliceToMap(expected)
-	actualMap := volumeSliceToMap(actual)
-
-	require.Equal(t, len(expectedMap), len(actualMap))
-
-	for k, vol := range expectedMap {
-		expectedVol, exists := actualMap[k]
-		require.True(t, exists)
-		require.Equal(t, expectedVol.HostPath.Path, vol.HostPath.Path,
-			"Mismatch in Host Path value for volume %s", vol.Name)
-		require.Equal(t, expectedVol.HostPath.Type, vol.HostPath.Type,
-			"Mismatch in Host Path type for volume %s", vol.Name)
-	}
-}
-
-func volumeSliceToMap(volumes []corev1.Volume) map[string]corev1.Volume {
-	volumeMap := map[string]corev1.Volume{}
-	for _, v := range volumes {
-		volumeMap[v.Name] = v
-	}
-
-	return volumeMap
-}
-
-func getDriverVolumes() []corev1.Volume {
-	return []corev1.Volume{
-		{
-			Name: "run-nvidia",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/nvidia",
-					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-				},
+func getSampleAdditionalConfigs() *additionalConfigs {
+	return &additionalConfigs{
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "test-cm",
+				ReadOnly:  true,
+				MountPath: "/opt/config/test-file",
+				SubPath:   "test-file",
+			},
+			{
+				Name:      "test-host-path",
+				MountPath: "/opt/config/test-host-path",
+			},
+			{
+				Name:      "test-host-path-ro",
+				MountPath: "/opt/config/test-host-path-ro",
+				ReadOnly:  true,
 			},
 		},
-		{
-			Name: "var-log",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/log",
+		Volumes: []corev1.Volume{
+			{
+				Name: "test-cm",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cm",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "test-file",
+								Path: "test-file",
+							},
+						},
+					},
 				},
 			},
-		},
-		{
-			Name: "dev-log",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/dev/log",
+			{
+				Name: "test-host-path",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/opt/config/test-host-path",
+						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+					},
 				},
 			},
-		},
-		{
-			Name: "host-os-release",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/etc/os-release",
-				},
-			},
-		},
-		{
-			Name: "run-nvidia-topologyd",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/nvidia-topologyd",
-					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-				},
-			},
-		},
-		{
-			Name: "run-mellanox-drivers",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/mellanox/drivers",
-					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-				},
-			},
-		},
-		{
-			Name: "run-nvidia-validations",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/nvidia/validations",
-					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
-				},
-			},
-		},
-		{
-			Name: "host-root",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/",
-				},
-			},
-		},
-		{
-			Name: "host-sys",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/sys",
-					Type: newHostPathType(corev1.HostPathDirectory),
-				},
-			},
-		},
-		{
-			Name: "firmware-search-path",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/sys/module/firmware_class/parameters/path",
-				},
-			},
-		},
-		{
-			Name: "sysfs-memory-online",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/sys/devices/system/memory/auto_online_blocks",
-				},
-			},
-		},
-		{
-			Name: "nv-firmware",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/run/nvidia/driver/lib/firmware",
-					Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+			{
+				Name: "test-host-path-ro",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/opt/config/test-host-path-ro",
+						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+					},
 				},
 			},
 		},
