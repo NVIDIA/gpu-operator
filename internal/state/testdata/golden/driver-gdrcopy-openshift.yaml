@@ -272,6 +272,15 @@ spec:
           name: sysfs-memory-online
         - mountPath: /lib/firmware
           name: nv-firmware
+        - mountPath: /opt/config/test-file
+          name: test-cm
+          readOnly: true
+          subPath: test-file
+        - mountPath: /opt/config/test-host-path
+          name: test-host-path
+        - mountPath: /opt/config/test-host-path-ro
+          name: test-host-path-ro
+          readOnly: true
         - mountPath: /mnt/shared-nvidia-driver-toolkit
           name: shared-nvidia-driver-toolkit
         - mountPath: /etc/pki/ca-trust/extracted/pem
@@ -321,6 +330,15 @@ spec:
           readOnly: true
         - mountPath: /mnt/shared-nvidia-driver-toolkit
           name: shared-nvidia-driver-toolkit
+        - mountPath: /opt/config/test-file
+          name: test-cm
+          readOnly: true
+          subPath: test-file
+        - mountPath: /opt/config/test-host-path
+          name: test-host-path
+        - mountPath: /opt/config/test-host-path-ro
+          name: test-host-path-ro
+          readOnly: true
       - args:
         - until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting
           for nvidia-driver-ctr container to prepare the shared directory ...; sleep
@@ -458,6 +476,20 @@ spec:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate
         name: nv-firmware
+      - configMap:
+          items:
+          - key: test-file
+            path: test-file
+          name: test-cm
+        name: test-cm
+      - hostPath:
+          path: /opt/config/test-host-path
+          type: DirectoryOrCreate
+        name: test-host-path
+      - hostPath:
+          path: /opt/config/test-host-path-ro
+          type: DirectoryOrCreate
+        name: test-host-path-ro
       - emptyDir: {}
         name: shared-nvidia-driver-toolkit
       - configMap:
