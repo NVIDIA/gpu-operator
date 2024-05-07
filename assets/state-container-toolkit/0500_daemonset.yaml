@@ -36,6 +36,10 @@ spec:
             value: "true"
           - name: COMPONENT
             value: driver
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         securityContext:
           privileged: true
           seLinuxOptions:

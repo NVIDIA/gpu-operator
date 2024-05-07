@@ -44,6 +44,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 )
 
@@ -55,7 +57,9 @@ type Component interface {
 }
 
 // Driver component
-type Driver struct{}
+type Driver struct {
+	ctx context.Context
+}
 
 // NvidiaFs GDS Driver component
 type NvidiaFs struct{}
@@ -205,6 +209,8 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
 	CCCapableLabelKey = "nvidia.com/cc.capable"
+	// appComponentLabelKey indicates the label key of the component
+	appComponentLabelKey = "app.kubernetes.io/component"
 )
 
 func main() {
@@ -465,7 +471,9 @@ func start(c *cli.Context) error {
 
 	switch componentFlag {
 	case "driver":
-		driver := &Driver{}
+		driver := &Driver{
+			ctx: c.Context,
+		}
 		err := driver.validate()
 		if err != nil {
 			return fmt.Errorf("error validating driver installation: %s", err)
@@ -612,12 +620,52 @@ func assertDriverContainerReady(silent bool) error {
 	return runCommand(command, args, silent)
 }
 
+// isDriverManagedByOperator determines if the NVIDIA driver is managed by the GPU Operator.
+// We check if at least one driver DaemonSet exists in the operator namespace that is
+// owned by the ClusterPolicy or NVIDIADriver controllers.
+func isDriverManagedByOperator(ctx context.Context) (bool, error) {
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return false, fmt.Errorf("error getting cluster config: %w", err)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return false, fmt.Errorf("error getting k8s client: %w", err)
+	}
+
+	opts := meta_v1.ListOptions{LabelSelector: labels.Set{appComponentLabelKey: "nvidia-driver"}.AsSelector().String()}
+	dsList, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).List(ctx, opts)
+	if err != nil {
+		return false, fmt.Errorf("error listing daemonsets: %w", err)
+	}
+
+	for i := range dsList.Items {
+		ds := dsList.Items[i]
+		owner := meta_v1.GetControllerOf(&ds)
+		if owner == nil {
+			continue
+		}
+		if strings.HasPrefix(owner.APIVersion, "nvidia.com/") && (owner.Kind == nvidiav1.ClusterPolicyCRDName || owner.Kind == nvidiav1alpha1.NVIDIADriverCRDName) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (d *Driver) runValidation(silent bool) (string, bool, error) {
 	driverRoot, isHostDriver := getDriverRoot()
-	if !isHostDriver {
-		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
+
+	driverManagedByOperator, err := isDriverManagedByOperator(d.ctx)
+	if err != nil {
+		return "", false, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
+	}
+
+	if !isHostDriver && driverManagedByOperator {
+		log.Infof("Driver is not pre-installed on the host and is managed by GPU Operator. Checking driver container status.")
 		if err := assertDriverContainerReady(silent); err != nil {
-			return "", false, fmt.Errorf("error checking driver container status: %v", err)
+			return "", false, fmt.Errorf("error checking driver container status: %w", err)
 		}
 	}
 
