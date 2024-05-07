@@ -204,6 +204,15 @@ spec:
           name: sysfs-memory-online
         - mountPath: /lib/firmware
           name: nv-firmware
+        - mountPath: /opt/config/test-file
+          name: test-cm
+          readOnly: true
+          subPath: test-file
+        - mountPath: /opt/config/test-host-path
+          name: test-host-path
+        - mountPath: /opt/config/test-host-path-ro
+          name: test-host-path-ro
+          readOnly: true
       - args:
         - reload_nvidia_peermem
         command:
@@ -252,6 +261,15 @@ spec:
         - mountPath: /run/mellanox/drivers
           mountPropagation: HostToContainer
           name: run-mellanox-drivers
+        - mountPath: /opt/config/test-file
+          name: test-cm
+          readOnly: true
+          subPath: test-file
+        - mountPath: /opt/config/test-host-path
+          name: test-host-path
+        - mountPath: /opt/config/test-host-path-ro
+          name: test-host-path-ro
+          readOnly: true
       hostPID: true
       initContainers:
       - args:
@@ -356,6 +374,20 @@ spec:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate
         name: nv-firmware
+      - configMap:
+          items:
+          - key: test-file
+            path: test-file
+          name: test-cm
+        name: test-cm
+      - hostPath:
+          path: /opt/config/test-host-path
+          type: DirectoryOrCreate
+        name: test-host-path
+      - hostPath:
+          path: /opt/config/test-host-path-ro
+          type: DirectoryOrCreate
+        name: test-host-path-ro
   updateStrategy:
     type: OnDelete
 ---

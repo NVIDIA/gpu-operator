@@ -427,8 +427,12 @@ spec:
         {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
             mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
             subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
             readOnly: {{ .ReadOnly }}
+            {{- end}}
         {{- end }}
         {{- end }}
         startupProbe:
@@ -490,10 +494,14 @@ spec:
         {{- end}}
         {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
         {{- range .AdditionalConfigs.VolumeMounts }}
-        - name: {{ .Name }}
-          mountPath: {{ .MountPath }}
-          subPath: {{ .SubPath }}
-          readOnly: {{ .ReadOnly }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
+            subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
+            readOnly: {{ .ReadOnly }}
+            {{- end }}
         {{- end }}
         {{- end }}
         startupProbe:
