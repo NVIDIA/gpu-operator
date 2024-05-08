@@ -33,7 +33,6 @@ import (
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -597,14 +596,26 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 	}
 }
 
-func getDriverRoot() (string, bool) {
-	// check if driver is pre-installed on the host and use host path for validation
-	if fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
-		log.Infof("Detected pre-installed driver on the host")
-		return "/host", true
+// prependPathListEnvvar prepends a specified list of strings to a specified envvar and returns its value.
+func prependPathListEnvvar(envvar string, prepend ...string) string {
+	if len(prepend) == 0 {
+		return os.Getenv(envvar)
 	}
+	current := filepath.SplitList(os.Getenv(envvar))
+	return strings.Join(append(prepend, current...), string(filepath.ListSeparator))
+}
 
-	return driverContainerRoot, false
+// setEnvVar adds or updates an envar to the list of specified envvars and returns it.
+func setEnvVar(envvars []string, key, value string) []string {
+	var updated []string
+	for _, envvar := range envvars {
+		pair := strings.SplitN(envvar, "=", 2)
+		if pair[0] == key {
+			continue
+		}
+		updated = append(updated, envvar)
+	}
+	return append(updated, fmt.Sprintf("%s=%s", key, value))
 }
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
@@ -654,30 +665,72 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (d *Driver) runValidation(silent bool) (string, bool, error) {
-	driverRoot, isHostDriver := getDriverRoot()
+func validateHostDriver(silent bool) error {
+	log.Info("Attempting to validate a pre-installed driver on the host")
+	command := "chroot"
+	args := []string{"/host", "nvidia-smi"}
 
-	driverManagedByOperator, err := isDriverManagedByOperator(d.ctx)
+	return runCommand(command, args, silent)
+}
+
+func validateDriverContainer(silent bool, ctx context.Context) error {
+	driverManagedByOperator, err := isDriverManagedByOperator(ctx)
 	if err != nil {
-		return "", false, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
+		return fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
 	}
 
-	if !isHostDriver && driverManagedByOperator {
+	if driverManagedByOperator {
 		log.Infof("Driver is not pre-installed on the host and is managed by GPU Operator. Checking driver container status.")
 		if err := assertDriverContainerReady(silent); err != nil {
-			return "", false, fmt.Errorf("error checking driver container status: %w", err)
+			return fmt.Errorf("error checking driver container status: %w", err)
 		}
 	}
 
-	// invoke validation command
-	command := "chroot"
-	args := []string{driverRoot, "nvidia-smi"}
+	driverRoot := root(driverContainerRoot)
 
-	if withWaitFlag {
-		return driverRoot, isHostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	validateDriver := func(silent bool) error {
+		driverLibraryPath, err := driverRoot.getDriverLibraryPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate driver libraries: %w", err)
+		}
+
+		nvidiaSMIPath, err := driverRoot.getNvidiaSMIPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate nvidia-smi: %w", err)
+		}
+		cmd := exec.Command(nvidiaSMIPath)
+		// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
+		cmd.Env = setEnvVar(os.Environ(), "LD_PRELOAD", prependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
+		if !silent {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
+		return cmd.Run()
 	}
 
-	return driverRoot, isHostDriver, runCommand(command, args, silent)
+	for {
+		log.Info("Attempting to validate a driver container installation")
+		err := validateDriver(silent)
+		if err != nil {
+			if !withWaitFlag {
+				return fmt.Errorf("error validating driver: %w", err)
+			}
+			log.Warningf("failed to validate the driver, retrying after %d seconds\n", sleepIntervalSecondsFlag)
+			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
+			continue
+		}
+		return nil
+	}
+}
+
+func (d *Driver) runValidation(silent bool) (string, bool, error) {
+	err := validateHostDriver(silent)
+	if err == nil {
+		log.Info("Detected a pre-installed driver on the host")
+		return "/host", true, nil
+	}
+
+	return driverContainerRoot, false, validateDriverContainer(silent, d.ctx)
 }
 
 func (d *Driver) validate() error {
