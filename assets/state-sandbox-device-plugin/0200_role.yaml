@@ -12,11 +12,3 @@ rules:
   - use
   resourceNames:
   - privileged
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/eviction
-  - nodes
-  verbs:
-  - "get"

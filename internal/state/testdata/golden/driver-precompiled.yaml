@@ -18,23 +18,6 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/eviction
-  - nodes
-  verbs:
-  - '*'
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - daemonsets
-  - replicasets
-  - statefulsets
-  verbs:
-  - '*'
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
