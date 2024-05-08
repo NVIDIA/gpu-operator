@@ -12,9 +12,3 @@ rules:
   - use
   resourceNames:
   - privileged
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
