@@ -124,6 +124,7 @@ var (
 	metricsPort                   int
 	defaultGPUWorkloadConfigFlag  string
 	disableDevCharSymlinkCreation bool
+	hostRootFlag                  string
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -320,6 +321,13 @@ func main() {
 			Usage:       "disable creation of symlinks under /dev/char corresponding to NVIDIA character devices",
 			Destination: &disableDevCharSymlinkCreation,
 			EnvVars:     []string{"DISABLE_DEV_CHAR_SYMLINK_CREATION"},
+		},
+		&cli.StringFlag{
+			Name:        "host-root",
+			Value:       "/",
+			Usage:       "root path of the underlying host",
+			Destination: &hostRootFlag,
+			EnvVars:     []string{"HOST_ROOT"},
 		},
 	}
 
@@ -774,7 +782,7 @@ func (d *Driver) validate() error {
 func (d *Driver) createStatusFile(isHostDriver bool) error {
 	var nvidiaDriverRoot, driverRootCtrPath string
 	if isHostDriver {
-		nvidiaDriverRoot = "/"
+		nvidiaDriverRoot = hostRootFlag
 		driverRootCtrPath = "/host"
 	} else {
 		nvidiaDriverRoot = "/run/nvidia/driver"
