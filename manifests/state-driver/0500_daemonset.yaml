@@ -617,7 +617,7 @@ spec:
             type: DirectoryOrCreate
         - name: host-root
           hostPath:
-            path: "/"
+            path: {{ .HostRoot | default "/" }}
         - name: host-sys
           hostPath:
             path: /sys

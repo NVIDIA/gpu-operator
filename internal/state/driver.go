@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
@@ -90,6 +91,7 @@ type driverRenderData struct {
 	Openshift         *openshiftSpec
 	Precompiled       *precompiledSpec
 	AdditionalConfigs *additionalConfigs
+	HostRoot          string
 }
 
 func NewStateDriver(
@@ -121,23 +123,12 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateError, fmt.Errorf("NVIDIADriver CR not provided as input to Sync()")
 	}
 
-	info := infoCatalog.Get(InfoTypeClusterPolicyCR)
-	if info == nil {
-		return SyncStateError, fmt.Errorf("failed to get ClusterPolicy CR from info catalog")
-	}
-
-	info = infoCatalog.Get(InfoTypeClusterInfo)
-	if info == nil {
-		return SyncStateNotReady, fmt.Errorf("failed to get cluster info from info catalog")
-	}
-	clusterInfo := info.(clusterinfo.Interface)
-
 	err := s.cleanupStaleDriverDaemonsets(ctx, cr)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
 	}
 
-	objs, err := s.getManifestObjects(ctx, cr, clusterInfo)
+	objs, err := s.getManifestObjects(ctx, cr, infoCatalog)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
 	}
@@ -200,8 +191,20 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 	return nil
 }
 
-func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, clusterInfo clusterinfo.Interface) ([]*unstructured.Unstructured, error) {
+func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, infoCatalog InfoCatalog) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
+
+	info := infoCatalog.Get(InfoTypeClusterPolicyCR)
+	if info == nil {
+		return nil, fmt.Errorf("failed to get ClusterPolicy CR from info catalog")
+	}
+	clusterPolicy := info.(gpuv1.ClusterPolicy)
+
+	info = infoCatalog.Get(InfoTypeClusterInfo)
+	if info == nil {
+		return nil, fmt.Errorf("failed to get cluster info from info catalog")
+	}
+	clusterInfo := info.(clusterinfo.Interface)
 
 	runtimeSpec, err := getRuntimeSpec(ctx, s.client, clusterInfo, &cr.Spec)
 	if err != nil {
@@ -213,6 +216,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	renderData := &driverRenderData{
 		GPUDirectRDMA: gpuDirectRDMASpec,
 		Runtime:       runtimeSpec,
+		HostRoot:      clusterPolicy.Spec.HostPaths.RootFS,
 	}
 
 	if len(runtimeSpec.NodePools) == 0 {

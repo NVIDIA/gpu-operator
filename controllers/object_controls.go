@@ -168,6 +168,8 @@ const (
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
 	DefaultMPSRoot = "/run/nvidia/mps"
+	// HostRootEnvName is the name of the envvar representing the root path of the underlying host
+	HostRootEnvName = "HOST_ROOT"
 )
 
 // ContainerProbe defines container probe types
@@ -712,6 +714,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
+	// transform the host-root and host-dev-char volumes if a custom host root is configured with the operator
+	transformForHostRoot(obj, n.singleton.Spec.HostPaths.RootFS)
+
 	// apply per operand Daemonset config
 	err = t(obj, &n.singleton.Spec, n)
 	if err != nil {
@@ -771,6 +776,48 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	return nil
+}
+
+// apply necessary transforms if a custom host root path is configured
+func transformForHostRoot(obj *appsv1.DaemonSet, hostRoot string) {
+	if hostRoot == "" || hostRoot == "/" {
+		return
+	}
+
+	transformHostRootVolume(obj, hostRoot)
+	transformHostDevCharVolume(obj, hostRoot)
+}
+
+func transformHostRootVolume(obj *appsv1.DaemonSet, hostRoot string) {
+	containsHostRootVolume := false
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == "host-root" {
+			volume.HostPath.Path = hostRoot
+			containsHostRootVolume = true
+			break
+		}
+	}
+
+	if !containsHostRootVolume {
+		return
+	}
+
+	for index := range obj.Spec.Template.Spec.InitContainers {
+		setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[index]), HostRootEnvName, hostRoot)
+	}
+
+	for index := range obj.Spec.Template.Spec.Containers {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[index]), HostRootEnvName, hostRoot)
+	}
+}
+
+func transformHostDevCharVolume(obj *appsv1.DaemonSet, hostRoot string) {
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == "host-dev-char" {
+			volume.HostPath.Path = filepath.Join(hostRoot, "/dev/char")
+			break
+		}
+	}
 }
 
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy
