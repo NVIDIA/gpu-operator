@@ -786,7 +786,7 @@ func (d *Driver) createStatusFile(isHostDriver bool) error {
 		driverRootCtrPath = "/host"
 	} else {
 		nvidiaDriverRoot = "/run/nvidia/driver"
-		driverRootCtrPath = "/run/nvidia/driver"
+		driverRootCtrPath = "/driver-root"
 	}
 
 	statusFileContent := strings.Join([]string{
