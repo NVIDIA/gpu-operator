@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 )
 
@@ -58,6 +59,25 @@ func (r root) getNvidiaSMIPath() (string, error) {
 	}
 
 	return binaryPath, nil
+}
+
+// isDevRoot checks whether the specified root is a dev root.
+// A dev root is defined as a root containing a /dev folder.
+func (r root) isDevRoot() bool {
+	stat, err := os.Stat(filepath.Join(string(r), "dev"))
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
+}
+
+// getDevRoot returns the dev root associated with the root.
+// If the root is not a dev root, this defaults to "/".
+func (r root) getDevRoot() string {
+	if r.isDevRoot() {
+		return string(r)
+	}
+	return "/"
 }
 
 // findFile searches the root for a specified file.

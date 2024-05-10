@@ -158,6 +158,10 @@ type HostPathsSpec struct {
 	// Examples include the MIG Manager and Toolkit Container which may need to
 	// stop, start, or restart systemd services.
 	RootFS string `json:"rootFS,omitempty"`
+
+	// DriverInstallDir represents the root at which driver files including libraries,
+	// config files, and executables can be found.
+	DriverInstallDir string `json:"driverInstallDir,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.

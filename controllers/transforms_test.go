@@ -77,6 +77,11 @@ func (d Daemonset) WithEnvVar(name string, value string) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithInitContainer(container corev1.Container) Daemonset {
+	d.Spec.Template.Spec.InitContainers = append(d.Spec.Template.Spec.InitContainers, container)
+	return d
+}
+
 func TestTransformForHostRoot(t *testing.T) {
 	hostRootVolumeName := "host-root"
 	hostDevCharVolumeName := "host-dev-char"
@@ -135,6 +140,86 @@ func TestTransformForHostRoot(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			transformForHostRoot(tc.input.DaemonSet, tc.hostRoot)
+			require.EqualValues(t, tc.expectedOutput, tc.input)
+		})
+	}
+}
+
+func TestTransformForDriverInstallDir(t *testing.T) {
+	driverInstallDirVolumeName := "driver-install-dir"
+	testCases := []struct {
+		description      string
+		driverInstallDir string
+		input            Daemonset
+		expectedOutput   Daemonset
+	}{
+		{
+			description:      "no driver-install-dir volume in daemonset",
+			driverInstallDir: "/custom-root",
+			input:            NewDaemonset(),
+			expectedOutput:   NewDaemonset(),
+		},
+		{
+			description:      "empty driverInstallDir is a no-op",
+			driverInstallDir: "",
+			input: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver").
+				WithInitContainer(
+					corev1.Container{
+						Name: "driver-validation",
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia/driver"},
+						},
+					}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver").
+				WithInitContainer(
+					corev1.Container{
+						Name: "driver-validation",
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia/driver"},
+						},
+					}),
+		},
+		{
+			description:      "custom driverInstallDir with driver-install-dir volume",
+			driverInstallDir: "/custom-root",
+			input: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver"),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/custom-root"),
+		},
+		{
+			description:      "custom driverInstallDir with driver-install-dir volume and driver-validation initContainer",
+			driverInstallDir: "/custom-root",
+			input: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver").
+				WithInitContainer(
+					corev1.Container{
+						Name: "driver-validation",
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia/driver"},
+						},
+					}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(driverInstallDirVolumeName, "/custom-root").
+				WithInitContainer(
+					corev1.Container{
+						Name: "driver-validation",
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: driverInstallDirVolumeName, MountPath: "/custom-root"},
+						},
+						Env: []corev1.EnvVar{
+							{Name: DriverInstallDirEnvName, Value: "/custom-root"},
+							{Name: DriverInstallDirCtrPathEnvName, Value: "/custom-root"},
+						},
+					}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			transformForDriverInstallDir(tc.input.DaemonSet, tc.driverInstallDir)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
 		})
 	}
