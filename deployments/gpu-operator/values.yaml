@@ -28,6 +28,10 @@ hostPaths:
   # stop, start, or restart systemd services
   rootFS: "/"
 
+  # driverInstallDir represents the root at which driver files including libraries,
+  # config files, and executables can be found.
+  driverInstallDir: "/run/nvidia/driver"
+
 daemonsets:
   labels: {}
   annotations: {}

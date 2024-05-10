@@ -1179,6 +1179,11 @@ spec:
                 description: HostPaths defines various paths on the host needed by
                   GPU Operator components
                 properties:
+                  driverInstallDir:
+                    description: |-
+                      DriverInstallDir represents the root at which driver files including libraries,
+                      config files, and executables can be found.
+                    type: string
                   rootFS:
                     description: |-
                       RootFS represents the path to the root filesystem of the host.

@@ -125,6 +125,8 @@ var (
 	defaultGPUWorkloadConfigFlag  string
 	disableDevCharSymlinkCreation bool
 	hostRootFlag                  string
+	driverInstallDirFlag          string
+	driverInstallDirCtrPathFlag   string
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -140,8 +142,10 @@ const (
 	defaultMetricsPort = 0
 	// hostDevCharPath indicates the path in the container where the host '/dev/char' directory is mounted to
 	hostDevCharPath = "/host-dev-char"
-	// driverContainerRoot indicates the path on the host where driver container mounts it's root filesystem
-	driverContainerRoot = "/run/nvidia/driver"
+	// defaultDriverInstallDir indicates the default path on the host where the driver container installation is made available
+	defaultDriverInstallDir = "/run/nvidia/driver"
+	// defaultDriverInstallDirCtrPath indicates the default path where the NVIDIA driver install dir is mounted in the container
+	defaultDriverInstallDirCtrPath = "/run/nvidia/driver"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
@@ -328,6 +332,20 @@ func main() {
 			Usage:       "root path of the underlying host",
 			Destination: &hostRootFlag,
 			EnvVars:     []string{"HOST_ROOT"},
+		},
+		&cli.StringFlag{
+			Name:        "driver-install-dir",
+			Value:       defaultDriverInstallDir,
+			Usage:       "the path on the host where a containerized NVIDIA driver installation is made available",
+			Destination: &driverInstallDirFlag,
+			EnvVars:     []string{"DRIVER_INSTALL_DIR"},
+		},
+		&cli.StringFlag{
+			Name:        "driver-install-dir-ctr-path",
+			Value:       defaultDriverInstallDirCtrPath,
+			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
+			Destination: &driverInstallDirCtrPathFlag,
+			EnvVars:     []string{"DRIVER_INSTALL_DIR_CTR_PATH"},
 		},
 	}
 
@@ -694,7 +712,7 @@ func validateDriverContainer(silent bool, ctx context.Context) error {
 		}
 	}
 
-	driverRoot := root(driverContainerRoot)
+	driverRoot := root(driverInstallDirCtrPathFlag)
 
 	validateDriver := func(silent bool) error {
 		driverLibraryPath, err := driverRoot.getDriverLibraryPath()
@@ -731,14 +749,18 @@ func validateDriverContainer(silent bool, ctx context.Context) error {
 	}
 }
 
-func (d *Driver) runValidation(silent bool) (string, bool, error) {
+func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 	err := validateHostDriver(silent)
 	if err == nil {
 		log.Info("Detected a pre-installed driver on the host")
-		return "/host", true, nil
+		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
 	}
 
-	return driverContainerRoot, false, validateDriverContainer(silent, d.ctx)
+	err = validateDriverContainer(silent, d.ctx)
+	if err != nil {
+		return driverInfo{}, err
+	}
+	return getDriverInfo(false, hostRootFlag, driverInstallDirFlag, driverInstallDirCtrPathFlag), nil
 }
 
 func (d *Driver) validate() error {
@@ -748,51 +770,41 @@ func (d *Driver) validate() error {
 		return err
 	}
 
-	driverRoot, isHostDriver, err := d.runValidation(false)
+	driverInfo, err := d.runValidation(false)
 	if err != nil {
-		log.Error("driver is not ready")
+		log.Errorf("driver is not ready: %v", err)
 		return err
 	}
 
-	if !disableDevCharSymlinkCreation {
-		log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
-		err = createDevCharSymlinks(driverRoot, isHostDriver)
-		if err != nil {
-			msg := strings.Join([]string{
-				"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
-				"The existence of these symlinks is required to address the following bug:",
-				"",
-				"    https://github.com/NVIDIA/gpu-operator/issues/430",
-				"",
-				"This bug impacts container runtimes configured with systemd cgroup management enabled.",
-				"To disable the symlink creation, set the following envvar in ClusterPolicy:",
-				"",
-				"    validator:",
-				"      driver:",
-				"        env:",
-				"        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION",
-				"          value: \"true\""}, "\n")
-			return fmt.Errorf("%v\n\n%s", err, msg)
-		}
+	err = createDevCharSymlinks(driverInfo, disableDevCharSymlinkCreation)
+	if err != nil {
+		msg := strings.Join([]string{
+			"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
+			"The existence of these symlinks is required to address the following bug:",
+			"",
+			"    https://github.com/NVIDIA/gpu-operator/issues/430",
+			"",
+			"This bug impacts container runtimes configured with systemd cgroup management enabled.",
+			"To disable the symlink creation, set the following envvar in ClusterPolicy:",
+			"",
+			"    validator:",
+			"      driver:",
+			"        env:",
+			"        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION",
+			"          value: \"true\""}, "\n")
+		return fmt.Errorf("%w\n\n%s", err, msg)
 	}
 
-	return d.createStatusFile(isHostDriver)
+	return d.createStatusFile(driverInfo)
 }
 
-func (d *Driver) createStatusFile(isHostDriver bool) error {
-	var nvidiaDriverRoot, driverRootCtrPath string
-	if isHostDriver {
-		nvidiaDriverRoot = hostRootFlag
-		driverRootCtrPath = "/host"
-	} else {
-		nvidiaDriverRoot = "/run/nvidia/driver"
-		driverRootCtrPath = "/driver-root"
-	}
-
+func (d *Driver) createStatusFile(driverInfo driverInfo) error {
 	statusFileContent := strings.Join([]string{
-		fmt.Sprintf("NVIDIA_DRIVER_ROOT=%s", nvidiaDriverRoot),
-		fmt.Sprintf("DRIVER_ROOT_CTR_PATH=%s", driverRootCtrPath),
-		fmt.Sprintf("IS_HOST_DRIVER=%v", isHostDriver),
+		fmt.Sprintf("IS_HOST_DRIVER=%t", driverInfo.isHostDriver),
+		fmt.Sprintf("NVIDIA_DRIVER_ROOT=%s", driverInfo.driverRoot),
+		fmt.Sprintf("DRIVER_ROOT_CTR_PATH=%s", driverInfo.driverRootCtrPath),
+		fmt.Sprintf("NVIDIA_DEV_ROOT=%s", driverInfo.devRoot),
+		fmt.Sprintf("DEV_ROOT_CTR_PATH=%s", driverInfo.devRootCtrPath),
 	}, "\n") + "\n"
 
 	// create driver status file
@@ -800,21 +812,36 @@ func (d *Driver) createStatusFile(isHostDriver bool) error {
 }
 
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
-func createDevCharSymlinks(driverRoot string, isHostDriver bool) error {
-	// If the host driver is being used, we rely on the fact that we are running a privileged container and as such
-	// have access to /dev
-	devRoot := driverRoot
-	if isHostDriver {
-		devRoot = "/"
+func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation bool) error {
+	if disableDevCharSymlinkCreation {
+		log.WithField("disableDevCharSymlinkCreation", true).
+			Info("skipping the creation of symlinks under /dev/char that correspond to NVIDIA character devices")
+		return nil
 	}
+
+	log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
+
+	// Only attempt to load NVIDIA kernel modules when we can chroot into driverRoot
+	loadKernelModules := driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot)
+
+	// driverRootCtrPath is the path of the driver install dir in the container. This will either be
+	// driverInstallDirCtrPathFlag or '/host'.
+	// Note, if we always mounted the driver install dir to '/driver-root' in the validation container
+	// instead, then we could simplify to always use driverInfo.driverRootCtrPath -- which would be
+	// either '/host' or '/driver-root', both paths would exist in the validation container.
+	driverRootCtrPath := driverInstallDirCtrPathFlag
+	if driverInfo.isHostDriver {
+		driverRootCtrPath = "/host"
+	}
+
 	// We now create the symlinks in /dev/char.
 	creator, err := devchar.NewSymlinkCreator(
-		devchar.WithDriverRoot(driverRoot),
-		devchar.WithDevRoot(devRoot),
+		devchar.WithDriverRoot(driverRootCtrPath),
+		devchar.WithDevRoot(driverInfo.devRoot),
 		devchar.WithDevCharPath(hostDevCharPath),
 		devchar.WithCreateAll(true),
 		devchar.WithCreateDeviceNodes(true),
-		devchar.WithLoadKernelModules(true),
+		devchar.WithLoadKernelModules(loadKernelModules),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating symlink creator: %v", err)

@@ -14,6 +14,7 @@ metadata:
 spec:
   hostPaths:
     rootFS: {{ .Values.hostPaths.rootFS }}
+    driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
   operator:
     {{- if .Values.operator.defaultRuntime }}
     defaultRuntime: {{ .Values.operator.defaultRuntime }}

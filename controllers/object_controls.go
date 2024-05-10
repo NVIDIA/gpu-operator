@@ -170,6 +170,13 @@ const (
 	DefaultMPSRoot = "/run/nvidia/mps"
 	// HostRootEnvName is the name of the envvar representing the root path of the underlying host
 	HostRootEnvName = "HOST_ROOT"
+	// DefaultDriverInstallDir represents the default path of a driver container installation
+	DefaultDriverInstallDir = "/run/nvidia/driver"
+	// DriverInstallDirEnvName is the name of the envvar used by the driver-validator to represent the driver install dir
+	DriverInstallDirEnvName = "DRIVER_INSTALL_DIR"
+	// DriverInstallDirCtrPathEnvName is the name of the envvar used by the driver-validator to represent the path
+	// of the driver install dir mounted in the container
+	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
 )
 
 // ContainerProbe defines container probe types
@@ -717,6 +724,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	// transform the host-root and host-dev-char volumes if a custom host root is configured with the operator
 	transformForHostRoot(obj, n.singleton.Spec.HostPaths.RootFS)
 
+	// transform the driver-root volume if a custom driver install dir is configured with the operator
+	transformForDriverInstallDir(obj, n.singleton.Spec.HostPaths.DriverInstallDir)
+
 	// apply per operand Daemonset config
 	err = t(obj, &n.singleton.Spec, n)
 	if err != nil {
@@ -816,6 +826,39 @@ func transformHostDevCharVolume(obj *appsv1.DaemonSet, hostRoot string) {
 		if volume.Name == "host-dev-char" {
 			volume.HostPath.Path = filepath.Join(hostRoot, "/dev/char")
 			break
+		}
+	}
+}
+
+// apply necessary transforms if a custom driver install directory is configured
+func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string) {
+	if driverInstallDir == "" || driverInstallDir == DefaultDriverInstallDir {
+		return
+	}
+
+	containsDriverInstallDirVolume := false
+	podSpec := obj.Spec.Template.Spec
+	for _, volume := range podSpec.Volumes {
+		if volume.Name == "driver-install-dir" {
+			volume.HostPath.Path = driverInstallDir
+			containsDriverInstallDirVolume = true
+			break
+		}
+	}
+
+	if !containsDriverInstallDirVolume {
+		return
+	}
+
+	for i, ctr := range podSpec.InitContainers {
+		if ctr.Name == "driver-validation" {
+			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirEnvName, driverInstallDir)
+			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirCtrPathEnvName, driverInstallDir)
+			for j, volumeMount := range ctr.VolumeMounts {
+				if volumeMount.Name == "driver-install-dir" {
+					podSpec.InitContainers[i].VolumeMounts[j].MountPath = driverInstallDir
+				}
+			}
 		}
 	}
 }
