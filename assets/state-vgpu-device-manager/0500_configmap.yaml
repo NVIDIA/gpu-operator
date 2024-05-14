@@ -803,6 +803,94 @@ data:
             - devices: all
               vgpu-devices:
                 L40-48Q: 1
+        L40S-1Q:
+            - devices: all
+              vgpu-devices:
+                L40S-1Q: 32
+        L40S-1B:
+            - devices: all
+              vgpu-devices:
+                L40S-1B: 32
+        L40S-1A:
+            - devices: all
+              vgpu-devices:
+                L40S-1A: 32
+        L40S-2Q:
+            - devices: all
+              vgpu-devices:
+                L40S-2Q: 24
+        L40S-2B:
+            - devices: all
+              vgpu-devices:
+                L40S-2B: 24
+        L40S-2A:
+            - devices: all
+              vgpu-devices:
+                L40S-2A: 24
+        L40S-3Q:
+            - devices: all
+              vgpu-devices:
+                L40S-3Q: 16
+        L40S-3A:
+            - devices: all
+              vgpu-devices:
+                L40S-3A: 16
+        L40S-4A:
+            - devices: all
+              vgpu-devices:
+                L40S-4A: 12
+        L40S-4Q:
+            - devices: all
+              vgpu-devices:
+                L40S-4Q: 12
+        L40S-6A:
+            - devices: all
+              vgpu-devices:
+                L40S-6A: 8
+        L40S-6Q:
+            - devices: all
+              vgpu-devices:
+                L40S-6Q: 8
+        L40S-8A:
+            - devices: all
+              vgpu-devices:
+                L40S-8A: 6
+        L40S-8Q:
+            - devices: all
+              vgpu-devices:
+                L40S-8Q: 6
+        L40S-12A:
+            - devices: all
+              vgpu-devices:
+                L40S-12A: 4
+        L40S-12Q:
+            - devices: all
+              vgpu-devices:
+                L40S-12Q: 4
+        L40S-16A:
+            - devices: all
+              vgpu-devices:
+                L40S-16A: 3
+        L40S-16Q:
+            - devices: all
+              vgpu-devices:
+                L40S-16Q: 3
+        L40S-24A:
+            - devices: all
+              vgpu-devices:
+                L40S-24A: 2
+        L40S-24Q:
+            - devices: all
+              vgpu-devices:
+                L40S-24Q: 2
+        L40S-48A:
+            - devices: all
+              vgpu-devices:
+                L40S-48A: 1
+        L40S-48Q:
+            - devices: all
+              vgpu-devices:
+                L40S-48Q: 1
         M6-0Q:
             - devices: all
               vgpu-devices:
