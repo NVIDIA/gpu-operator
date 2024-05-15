@@ -603,7 +603,7 @@ func getDriverRoot() (string, bool) {
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
 // container has completed and is in Ready state.
-func assertDriverContainerReady(silent, withWaitFlag bool) error {
+func assertDriverContainerReady(silent bool) error {
 	command := "bash"
 	args := []string{"-c", "stat /run/nvidia/validations/.driver-ctr-ready"}
 
@@ -618,7 +618,7 @@ func (d *Driver) runValidation(silent bool) (string, bool, error) {
 	driverRoot, isHostDriver := getDriverRoot()
 	if !isHostDriver {
 		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
-		if err := assertDriverContainerReady(silent, withWaitFlag); err != nil {
+		if err := assertDriverContainerReady(silent); err != nil {
 			return "", false, fmt.Errorf("error checking driver container status: %v", err)
 		}
 	}
