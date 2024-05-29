@@ -67,6 +67,8 @@ spec:
           volumeMounts:
             - name: device-plugin
               mountPath: /var/lib/kubelet/device-plugins
+            - name: vfio
+              mountPath: /dev/vfio
       volumes:
         - name: device-plugin
           hostPath:
@@ -75,3 +77,6 @@ spec:
           hostPath:
             path: /run/nvidia/validations
             type: DirectoryOrCreate
+        - name: vfio
+          hostPath:
+            path: /dev/vfio
