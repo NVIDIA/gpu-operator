@@ -1,4 +1,4 @@
-{{- if .Values.tls.certManager }}
+{{- if and .Values.tls.certManager (not .Values.tls.certManagerCertificate.issuerName ) }}
 # See https://cert-manager.io/docs/configuration/selfsigned/#bootstrapping-ca-issuers
 # - Create a self signed issuer
 # - Use this to create a CA cert

@@ -28,6 +28,9 @@ spec:
     spec:
       serviceAccountName: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
       dnsPolicy: ClusterFirstWithHostNet
+    {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+    {{- end }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -38,6 +41,17 @@ spec:
       - name: topology-updater
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+        livenessProbe:
+          grpc:
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          grpc:
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 10
         env:
         - name: NODE_NAME
           valueFrom:
@@ -66,8 +80,8 @@ spec:
           - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
           - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
           {{- end }}
-          {{- if .Values.topologyUpdater.podSetFingerprint }}
-          - "-pods-fingerprint"
+          {{- if not .Values.topologyUpdater.podSetFingerprint }}
+          - "-pods-fingerprint=false"
           {{- end }}
           {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
           - "-kubelet-config-uri=file:///host-var/kubelet-config"
