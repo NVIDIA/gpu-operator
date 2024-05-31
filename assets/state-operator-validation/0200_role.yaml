@@ -16,7 +16,6 @@ rules:
   - ""
   resources:
   - pods
-  - nodes
   verbs:
   - '*'
 - apiGroups:
@@ -24,11 +23,5 @@ rules:
   resources:
   - deployments
   - daemonsets
-  verbs:
-  - '*'
-- apiGroups:
-  - nvidia.com
-  resources:
-  - clusterpolicies/finalizers
   verbs:
   - '*'
