@@ -17,11 +17,18 @@ rules:
   resources:
   - pods
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
 - apiGroups:
   - apps
   resources:
-  - deployments
   - daemonsets
   verbs:
-  - '*'
+  - get
+  - list
+  - watch
