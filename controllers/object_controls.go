@@ -813,7 +813,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	// set/append environment variables for exporter container
 	if len(config.GPUFeatureDiscovery.Env) > 0 {
 		for _, env := range config.GPUFeatureDiscovery.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1113,23 +1113,23 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// set/append environment variables for toolkit container
 	if len(config.Toolkit.Env) > 0 {
 		for _, env := range config.Toolkit.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: CDIEnabledEnvName, Value: "true"})
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"})
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: CrioConfigModeEnvName, Value: "config"})
 		if config.CDI.IsDefault() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"})
 		}
 	}
 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: ToolkitInstallDirEnvName, Value: config.Toolkit.InstallDir})
 
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
 			if volume.Name == "toolkit-install-dir" {
@@ -1148,11 +1148,11 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// configure runtime
 	runtime := n.runtime.String()
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "RUNTIME", runtime)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "RUNTIME", Value: runtime})
 
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "CONTAINERD_RUNTIME_CLASS", Value: getRuntimeClass(config)})
 	}
 
 	// setup mounts for runtime config file
@@ -1172,7 +1172,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		configEnvvarName = "CRIO_CONFIG"
 	}
 
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), configEnvvarName, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: configEnvvarName, Value: DefaultRuntimeConfigTargetDir + sourceConfigFileName})
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
 	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
@@ -1195,7 +1195,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		} else if runtime == gpuv1.Docker.String() {
 			socketEnvvarName = "DOCKER_SOCKET"
 		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: socketEnvvarName, Value: DefaultRuntimeSocketTargetDir + sourceSocketFileName})
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
@@ -1254,13 +1254,13 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set/append environment variables for device-plugin container
 	if len(config.DevicePlugin.Env) > 0 {
 		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MOFEDEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: GDSEnabledEnvName, Value: "true"})
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: MOFEDEnabledEnvName, Value: "true"})
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
@@ -1277,11 +1277,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: CDIEnabledEnvName, Value: "true"})
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: DeviceListStrategyEnvName, Value: "envvar,cdi-annotations"})
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: CDIAnnotationPrefixEnvName, Value: "nvidia.cdi.k8s.io/"})
 		if config.Toolkit.IsEnabled() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: NvidiaCTKPathEnvName, Value: filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk")})
 		}
 	}
 
@@ -1295,7 +1295,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: MPSRootEnvName, Value: config.DevicePlugin.MPS.Root})
 	}
 
 	return nil
@@ -1413,7 +1413,7 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	// set/append environment variables for device-plugin container
 	if len(config.SandboxDevicePlugin.Env) > 0 {
 		for _, env := range config.SandboxDevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 	return nil
@@ -1455,13 +1455,13 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set/append environment variables for exporter container
 	if len(config.DCGMExporter.Env) > 0 {
 		for _, env := range config.DCGMExporter.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort))
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: DCGMRemoteEngineEnvName, Value: fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort)})
 	} else {
 		// case for DCGM running on the host itself(DGX BaseOS)
 		remoteEngine := getContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName)
@@ -1495,7 +1495,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		metricsConfigVol := corev1.Volume{Name: "metrics-config", VolumeSource: metricsConfigVolumeSource}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, metricsConfigVol)
 
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "DCGM_EXPORTER_COLLECTORS", Value: MetricsConfigMountPath})
 	}
 
 	release, err := parseOSRelease()
@@ -1531,7 +1531,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	initContainer.SecurityContext = securityContext
 
 	// Disable all constraints on the configurations required by NVIDIA container toolkit
-	setContainerEnv(&initContainer, NvidiaDisableRequireEnvName, "true")
+	setContainerEnv(&initContainer, corev1.EnvVar{Name: NvidiaDisableRequireEnvName, Value: "true"})
 
 	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
 	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
@@ -1584,7 +1584,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 	// set/append environment variables for exporter container
 	if len(config.DCGM.Env) > 0 {
 		for _, env := range config.DCGM.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1634,7 +1634,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// set/append environment variables for mig-manager container
 	if len(config.MIGManager.Env) > 0 {
 		for _, env := range config.MIGManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1671,7 +1671,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: CDIEnabledEnvName, Value: "true"})
 	}
 
 	return nil
@@ -1711,7 +1711,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// set/append environment variables for mig-manager container
 	if len(config.KataManager.Env) > 0 {
 		for _, env := range config.KataManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1722,7 +1722,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	}
 
 	// set env used by readinessProbe to determine path to kata-manager pid file.
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "KATA_ARTIFACTS_DIR", artifactsDir)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "KATA_ARTIFACTS_DIR", Value: artifactsDir})
 
 	artifactsVolMount := corev1.VolumeMount{Name: "kata-artifacts", MountPath: artifactsDir}
 	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, artifactsVolMount)
@@ -1739,7 +1739,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		return fmt.Errorf("error getting path to runtime config file: %v", err)
 	}
 	sourceConfigFileName := path.Base(runtimeConfigFile)
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_CONFIG", filepath.Join(DefaultRuntimeConfigTargetDir, sourceConfigFileName))
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, sourceConfigFileName)})
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
 	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
@@ -1754,7 +1754,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		return fmt.Errorf("error getting path to runtime socket: %v", err)
 	}
 	sourceSocketFileName := path.Base(runtimeSocketFile)
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONTAINERD_SOCKET", filepath.Join(DefaultRuntimeSocketTargetDir, sourceSocketFileName))
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, sourceSocketFileName)})
 
 	volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 	volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
@@ -1819,7 +1819,7 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// set/append environment variables for mig-manager container
 	if len(config.VFIOManager.Env) > 0 {
 		for _, env := range config.VFIOManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1860,12 +1860,12 @@ func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	// set/append environment variables for cc-manager container
 	if len(config.CCManager.Env) > 0 {
 		for _, env := range config.CCManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 	// set default cc mode env
 	if config.CCManager.DefaultMode != "" {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DefaultCCModeEnvName, config.CCManager.DefaultMode)
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: DefaultCCModeEnvName, Value: config.CCManager.DefaultMode})
 	}
 
 	return nil
@@ -1911,7 +1911,7 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	// set/append environment variables for mig-manager container
 	if len(config.VGPUDeviceManager.Env) > 0 {
 		for _, env := range config.VGPUDeviceManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -1935,7 +1935,7 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Default != "" {
 		defaultConfig = config.VGPUDeviceManager.Config.Default
 	}
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", defaultConfig)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), corev1.EnvVar{Name: "DEFAULT_VGPU_CONFIG", Value: defaultConfig})
 
 	return nil
 }
@@ -2031,7 +2031,7 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	// set/append environment variables for validator container
 	if len(config.Validator.Env) > 0 {
 		for _, env := range config.Validator.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -2060,19 +2060,19 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			// set/append environment variables for cuda-validation container
 			if len(config.Validator.CUDA.Env) > 0 {
 				for _, env := range config.Validator.CUDA.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 			// set additional env to indicate image, pullSecrets to spin-off cuda validation workload pod.
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImageEnvName, Value: image})
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImagePullPolicyEnvName, Value: config.Validator.ImagePullPolicy})
 			var pullSecrets string
 			if len(config.Validator.ImagePullSecrets) > 0 {
 				pullSecrets = strings.Join(config.Validator.ImagePullSecrets, ",")
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullSecretsEnvName, pullSecrets)
+				setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImagePullSecretsEnvName, Value: pullSecrets})
 			}
 			if podSpec.RuntimeClassName != nil {
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
+				setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorRuntimeClassEnvName, Value: *podSpec.RuntimeClassName})
 			}
 		case "plugin":
 			// remove plugin init container from validator Daemonset if it is not enabled
@@ -2083,27 +2083,27 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			// set/append environment variables for plugin-validation container
 			if len(config.Validator.Plugin.Env) > 0 {
 				for _, env := range config.Validator.Plugin.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 			// set additional env to indicate image, pullSecrets to spin-off plugin validation workload pod.
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
-			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImageEnvName, Value: image})
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImagePullPolicyEnvName, Value: config.Validator.ImagePullPolicy})
 			var pullSecrets string
 			if len(config.Validator.ImagePullSecrets) > 0 {
 				pullSecrets = strings.Join(config.Validator.ImagePullSecrets, ",")
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullSecretsEnvName, pullSecrets)
+				setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorImagePullSecretsEnvName, Value: pullSecrets})
 			}
 			if podSpec.RuntimeClassName != nil {
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
+				setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: ValidatorRuntimeClassEnvName, Value: *podSpec.RuntimeClassName})
 			}
 			// apply mig-strategy env to spin off plugin-validation workload pod
-			setContainerEnv(&(podSpec.InitContainers[i]), MigStrategyEnvName, string(config.MIG.Strategy))
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: MigStrategyEnvName, Value: string(config.MIG.Strategy)})
 		case "driver":
 			// set/append environment variables for driver-validation container
 			if len(config.Validator.Driver.Env) > 0 {
 				for _, env := range config.Validator.Driver.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 		case "nvidia-fs":
@@ -2122,31 +2122,31 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 		case "vfio-pci":
 			// set/append environment variables for vfio-pci-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig})
 			if len(config.Validator.VFIOPCI.Env) > 0 {
 				for _, env := range config.Validator.VFIOPCI.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 		case "vgpu-manager":
 			// set/append environment variables for vgpu-manager-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig})
 			if len(config.Validator.VGPUManager.Env) > 0 {
 				for _, env := range config.Validator.VGPUManager.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 		case "vgpu-devices":
 			// set/append environment variables for vgpu-devices-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), corev1.EnvVar{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig})
 			if len(config.Validator.VGPUDevices.Env) > 0 {
 				for _, env := range config.Validator.VGPUDevices.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(podSpec.InitContainers[i]), env)
 				}
 			}
 		default:
@@ -2196,7 +2196,7 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	// set/append environment variables for exporter container
 	if len(config.NodeStatusExporter.Env) > 0 {
 		for _, env := range config.NodeStatusExporter.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env)
 		}
 	}
 
@@ -2261,16 +2261,17 @@ func getContainerEnv(c *corev1.Container, key string) string {
 	return ""
 }
 
-func setContainerEnv(c *corev1.Container, key, value string) {
+func setContainerEnv(c *corev1.Container, envVar corev1.EnvVar) {
 	for i, val := range c.Env {
-		if val.Name != key {
+		if val.Name != envVar.Name {
 			continue
 		}
 
-		c.Env[i].Value = value
+		c.Env[i].Value = envVar.Value
+		c.Env[i].ValueFrom = envVar.ValueFrom
 		return
 	}
-	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
+	c.Env = append(c.Env, envVar)
 }
 
 func getRuntimeClass(config *gpuv1.ClusterPolicySpec) string {
@@ -2324,13 +2325,13 @@ func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeS
 func applyMIGConfiguration(c *corev1.Container, strategy gpuv1.MIGStrategy) {
 	// if not set then let plugin decide this per node(default: none)
 	if strategy == "" {
-		setContainerEnv(c, "NVIDIA_MIG_MONITOR_DEVICES", "all")
+		setContainerEnv(c, corev1.EnvVar{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"})
 		return
 	}
 
-	setContainerEnv(c, "MIG_STRATEGY", string(strategy))
+	setContainerEnv(c, corev1.EnvVar{Name: "MIG_STRATEGY", Value: string(strategy)})
 	if strategy != gpuv1.MIGStrategyNone {
-		setContainerEnv(c, "NVIDIA_MIG_MONITOR_DEVICES", "all")
+		setContainerEnv(c, corev1.EnvVar{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"})
 	}
 }
 
@@ -2382,7 +2383,7 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			// skip if not the main container
 			continue
 		}
-		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], "CONFIG_FILE", "/config/config.yaml")
+		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], corev1.EnvVar{Name: "CONFIG_FILE", Value: "/config/config.yaml"})
 		// setup sharedvolume(emptydir) for main container
 		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i], config.DevicePlugin.Config)
 	}
@@ -2427,8 +2428,8 @@ func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 		initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 	}
 	// setup env
-	setContainerEnv(initContainer, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
-	setContainerEnv(initContainer, "FALLBACK_STRATEGIES", "empty")
+	setContainerEnv(initContainer, corev1.EnvVar{Name: "DEFAULT_CONFIG", Value: config.DevicePlugin.Config.Default})
+	setContainerEnv(initContainer, corev1.EnvVar{Name: "FALLBACK_STRATEGIES", Value: "empty"})
 
 	// setup volume mounts
 	addSharedMountsForPluginConfig(initContainer, config.DevicePlugin.Config)
@@ -2456,8 +2457,8 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 		container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 	}
 	// setup env
-	setContainerEnv(container, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
-	setContainerEnv(container, "FALLBACK_STRATEGIES", "empty")
+	setContainerEnv(container, corev1.EnvVar{Name: "DEFAULT_CONFIG", Value: config.DevicePlugin.Config.Default})
+	setContainerEnv(container, corev1.EnvVar{Name: "FALLBACK_STRATEGIES", Value: "empty"})
 
 	// setup volume mounts
 	addSharedMountsForPluginConfig(container, config.DevicePlugin.Config)
@@ -2488,16 +2489,16 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpe
 	}
 
 	if rdmaSpec != nil && rdmaSpec.IsEnabled() {
-		setContainerEnv(container, GPUDirectRDMAEnabledEnvName, "true")
+		setContainerEnv(container, corev1.EnvVar{Name: GPUDirectRDMAEnabledEnvName, Value: "true"})
 		if rdmaSpec.IsHostMOFED() {
-			setContainerEnv(container, UseHostMOFEDEnvName, "true")
+			setContainerEnv(container, corev1.EnvVar{Name: UseHostMOFEDEnvName, Value: "true"})
 		}
 	}
 
 	// set/append environment variables for driver-manager initContainer
 	if len(driverManagerSpec.Env) > 0 {
 		for _, env := range driverManagerSpec.Env {
-			setContainerEnv(container, env.Name, env.Value)
+			setContainerEnv(container, env)
 		}
 	}
 
@@ -2534,7 +2535,7 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		}
 		if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
 			// set env indicating host-mofed is enabled
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), UseHostMOFEDEnvName, "true")
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), corev1.EnvVar{Name: UseHostMOFEDEnvName, Value: "true"})
 		}
 		// mount any custom kernel module configuration parameters at /drivers
 		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
@@ -2593,7 +2594,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		// set/append environment variables for GDS container
 		if len(config.GPUDirectStorage.Env) > 0 {
 			for _, env := range config.GPUDirectStorage.Env {
-				setContainerEnv(gdsContainer, env.Name, env.Value)
+				setContainerEnv(gdsContainer, env)
 			}
 		}
 
@@ -2672,7 +2673,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		// set/append environment variables for gdrcopy container
 		if len(config.GDRCopy.Env) > 0 {
 			for _, env := range config.GDRCopy.Env {
-				setContainerEnv(gdrcopyContainer, env.Name, env.Value)
+				setContainerEnv(gdrcopyContainer, env)
 			}
 		}
 
@@ -2801,15 +2802,15 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	obj.Spec.Template.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
 
 	/* prepare the DriverToolkit container */
-	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
+	setContainerEnv(driverToolkitContainer, corev1.EnvVar{Name: "RHCOS_VERSION", Value: rhcosVersion})
 
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(driverToolkitContainer, "GDS_ENABLED", "true")
+		setContainerEnv(driverToolkitContainer, corev1.EnvVar{Name: "GDS_ENABLED", Value: "true"})
 		n.logger.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDS_ENABLED", config.GPUDirectStorage.IsEnabled())
 	}
 
 	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
-		setContainerEnv(driverToolkitContainer, "GDRCOPY_ENABLED", "true")
+		setContainerEnv(driverToolkitContainer, corev1.EnvVar{Name: "GDRCOPY_ENABLED", Value: "true"})
 		n.logger.V(2).Info("transformOpenShiftDriverToolkitContainer", "GDRCOPY_ENABLED", "true")
 	}
 
@@ -2823,9 +2824,9 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
 		driverToolkitContainer.Image = mainContainer.Image
-		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
-		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
-		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
+		setContainerEnv(mainContainer, corev1.EnvVar{Name: "RHCOS_IMAGE_MISSING", Value: "true"})
+		setContainerEnv(mainContainer, corev1.EnvVar{Name: "RHCOS_VERSION", Value: rhcosVersion})
+		setContainerEnv(driverToolkitContainer, corev1.EnvVar{Name: "RHCOS_IMAGE_MISSING", Value: "true"})
 
 		n.logger.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
@@ -3075,11 +3076,11 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	// set/append environment variables for driver container
 	if len(config.Driver.Env) > 0 {
 		for _, env := range config.Driver.Env {
-			setContainerEnv(driverContainer, env.Name, env.Value)
+			setContainerEnv(driverContainer, env)
 		}
 	}
 	if config.Driver.OpenKernelModulesEnabled() {
-		setContainerEnv(driverContainer, OpenKernelModulesEnabledEnvName, "true")
+		setContainerEnv(driverContainer, corev1.EnvVar{Name: OpenKernelModulesEnabledEnvName, Value: "true"})
 	}
 
 	// set container probe timeouts
@@ -3095,7 +3096,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
 		// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
-		setContainerEnv(driverContainer, GPUDirectRDMAEnabledEnvName, "true")
+		setContainerEnv(driverContainer, corev1.EnvVar{Name: GPUDirectRDMAEnabledEnvName, Value: "true"})
 		// check if MOFED drives are directly installed on host and update source path accordingly
 		// to build nvidia-peermem module
 		if config.Driver.GPUDirectRDMA.UseHostMOFED != nil && *config.Driver.GPUDirectRDMA.UseHostMOFED {
@@ -3106,7 +3107,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				}
 			}
 			// set env indicating host-mofed is enabled
-			setContainerEnv(driverContainer, UseHostMOFEDEnvName, "true")
+			setContainerEnv(driverContainer, corev1.EnvVar{Name: UseHostMOFEDEnvName, Value: "true"})
 		}
 	}
 
@@ -3302,7 +3303,7 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	// set/append environment variables for exporter container
 	if len(config.VGPUManager.Env) > 0 {
 		for _, env := range config.VGPUManager.Env {
-			setContainerEnv(container, env.Name, env.Value)
+			setContainerEnv(container, env)
 		}
 	}
 
@@ -3313,7 +3314,7 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 
 	// add env for OCP
 	if _, ok := release["OPENSHIFT_VERSION"]; ok {
-		setContainerEnv(container, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
+		setContainerEnv(container, corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]})
 	}
 
 	return nil
@@ -3362,7 +3363,7 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if strings.HasPrefix(initContainer.Name, "driver") {
 			if len(config.Validator.Driver.Env) > 0 {
 				for _, env := range config.Validator.Driver.Env {
-					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env)
 				}
 			}
 		}
@@ -3371,7 +3372,7 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if strings.HasPrefix(initContainer.Name, "toolkit") {
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {
-					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env)
 				}
 			}
 		}
