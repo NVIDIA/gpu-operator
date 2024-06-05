@@ -8,10 +8,6 @@ rules:
   resources:
   - nodes
   verbs:
-  - '*'
-- apiGroups:
-  - nvidia.com
-  resources:
-  - clusterpolicies/finalizers
-  verbs:
-  - '*'
+  - get
+  - list
+  - watch
