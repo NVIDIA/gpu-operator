@@ -20,21 +20,40 @@ rules:
   - clusterroles
   - clusterrolebindings
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:
   - pods
   - services
-  - endpoints
-  - persistentvolumeclaims
   - events
   - configmaps
   - secrets
   - serviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
   - nodes
   verbs:
-  - '*'
+  - get
+  - list
+  - watch
+  - update
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -51,18 +70,22 @@ rules:
   resources:
   - deployments
   - daemonsets
-  - replicasets
-  - statefulsets
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
 - apiGroups:
   - apps
   resources:
   - controllerrevisions
   verbs:
-  - 'get'
-  - 'list'
-  - 'watch'
+  - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -78,9 +101,19 @@ rules:
 - apiGroups:
   - nvidia.com
   resources:
-  - '*'
+  - clusterpolicies
+  - clusterpolicies/status
+  - nvidiadrivers
+  - nvidiadrivers/status
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+  - deletecollection
 - apiGroups:
   - scheduling.k8s.io
   resources:
@@ -95,7 +128,14 @@ rules:
   resources:
   - securitycontextconstraints
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+  - use
 - apiGroups:
   - config.openshift.io
   resources:
