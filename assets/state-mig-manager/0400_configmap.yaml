@@ -239,8 +239,8 @@ data:
             "1g.6gb": 2
             "2g.12gb": 1
 
-        # H100-96GB, PG506-96GB, GH200
-        - device-filter: ["0x234210DE", "0x233D10DE", "0x20B610DE"]
+        # H100-96GB, PG506-96GB, GH200, H20
+        - device-filter: ["0x234210DE", "0x233D10DE", "0x20B610DE", "0x232910DE"]
           devices: all
           mig-enabled: true
           mig-devices:
