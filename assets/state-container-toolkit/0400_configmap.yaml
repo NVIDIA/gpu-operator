@@ -13,13 +13,25 @@ data:
 
     driver_root=/run/nvidia/driver
     driver_root_ctr_path=$driver_root
+    firmware_search_paths=/lib/firmware
     if [[ -f /run/nvidia/validations/host-driver-ready ]]; then
       driver_root=/
       driver_root_ctr_path=/host
+      firmware_search_paths=
     fi
 
     export NVIDIA_DRIVER_ROOT=$driver_root
     export DRIVER_ROOT_CTR_PATH=$driver_root_ctr_path
+    
+    #
+    # When the driver container is deployed, we know that driver firmware
+    # will be located at /run/nvidia/driver/lib/firmware. To prevent the 
+    # possibility of finding multiple instances of the driver firmware,
+    # due to cyclic mounts of the driver container rootfs that show up on 
+    # the host, we configure the CDI generation code to only look for 
+    # firmware at /lib/firmware relative to the driver root.
+    # 
+    export CDI_FIRMWARE_SEARCH_PATHS=$firmware_search_paths
 
     #
     # The below delay is a workaround for an issue affecting some versions
