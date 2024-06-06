@@ -14,8 +14,8 @@ include:
     ref: "2023.10.09"
 
 variables:
-  # Release "devel"-tagged images off the master branch
-  RELEASE_DEVEL_BRANCH: "master"
+  # Release "devel"-tagged images off the main branch
+  RELEASE_DEVEL_BRANCH: "main"
   DEVEL_RELEASE_IMAGE_VERSION: "devel"
   # On the multi-arch builder we don't need the qemu setup.
   SKIP_QEMU_SETUP: "1"
@@ -284,7 +284,7 @@ e2e_tests_containerd_k8s1_27:
     - .e2e_defaults
     - .infra_setup_defaults
     - .schedule_defaults
-    
+
 .clean_infra:
   extends:
     - .cnt_kube_clean
@@ -308,7 +308,7 @@ cnt_kube_setup_containerd_k8s1_25:
   variables:
     TF_VAR_kubernetes_version: "1.25.11"
     TF_VAR_gpu_device_name: "NVIDIA-A100-PCIE-40GB"
-   
+
 cnt_kube_clean_containerd_k8s1_25:
   extends:
     - .clean_infra

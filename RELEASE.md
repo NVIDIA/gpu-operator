@@ -10,7 +10,7 @@ This repository follows Semantic Versioning 2.0.0
 The artifacts will be versioned as follows:
 - **nightly**: 1.0.0-nightly-shortSHA
     - The version names contain "nightly".
-    - Leading number of pre-release version tracked in master.
+    - Leading number of pre-release version tracked in main.
     - build meta data of SHA hash is appended to version string.
     - May be buggy
     - Features may be removed at any time.

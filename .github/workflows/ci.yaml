@@ -20,11 +20,11 @@ on:
       - opened
       - synchronize
     branches:
-      - master
+      - main
       - release-*
   push:
     branches:
-      - master
+      - main
       - release-*
 
 jobs:
@@ -236,12 +236,12 @@ jobs:
           echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
           LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
           echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
-          
-          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV 
+
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
           echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV
           echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
-          
+
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
       - name: Run e2e tests
@@ -289,7 +289,7 @@ jobs:
           LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
           echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
 
-          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV 
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
           echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}-ubi8" >> $GITHUB_ENV
           echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
