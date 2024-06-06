@@ -174,53 +174,72 @@ release:ngc-gpu-operator-validator:
 # Download the ngc cli binary for use in the sign steps
 .ngccli-setup:
   before_script:
-    - export NGCLI_VERSION=3.31.0
-    - apk add --no-cache curl
-    - curl -sSLo ngccli_linux.zip https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/${NGCLI_VERSION}/files/ngccli_linux.zip
+    - apt-get update && apt-get install -y curl unzip jq
+    - |
+      if [ -z "${NGCCLI_VERSION}" ]; then
+        NGC_VERSION_URL="https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions"
+        # Extract the latest version from the JSON data using jq
+        export NGCCLI_VERSION=$(curl -s $NGC_VERSION_URL | jq -r '.recipe.latestVersionIdStr')
+      fi
+      echo "NGCCLI_VERSION ${NGCCLI_VERSION}"
+    - curl -sSLo ngccli_linux.zip https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/${NGCCLI_VERSION}/files/ngccli_linux.zip
     - unzip ngccli_linux.zip
     - chmod u+x ngc-cli/ngc
-    - export PATH=$(pwd)/ngc-cli:${PATH}
-    - ngc config set --api_key=${NGC_REGISTRY_TOKEN} --org=nvidia
 
 # .sign forms the base of the deployment jobs which signs images in the CI registry.
 # This is extended with the image name and version to be deployed.
 .sign:ngc:
+  image: ubuntu:latest
   stage: sign
+  rules:
+    - if: $CI_COMMIT_TAG
   variables:
-    IMAGE_NAME: "${OUT_IMAGE_NAME}"
-    VERSION: "${OUT_IMAGE_VERSION}"
+    NGC_CLI_API_KEY: "${NGC_REGISTRY_TOKEN}"
+    IMAGE_NAME: "${NGC_REGISTRY_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_TAG}-${DIST}"
   retry:
     max: 2
   before_script:
     - !reference [.ngccli-setup, before_script]
-    # We ensure that the OUT_IMAGE_VERSION is set
-    - 'echo Version: ${IMAGE_NAME} ; [[ -n "${VERSION}" ]] || exit 1'
-    - apk add --no-cache bash
+    # We ensure that the IMAGE_NAME and IMAGE_TAG is set
+    - 'echo Image Name: ${IMAGE_NAME} && [[ -n "${IMAGE_NAME}" ]] || exit 1'
+    - 'echo Image Tag: ${IMAGE_TAG} && [[ -n "${IMAGE_TAG}" ]] || exit 1'
   script:
-    - 'echo "Signing the image ${IMAGE_NAME}:${VERSION}"'
-    - 'echo "ngc registry image publish --source ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:${VERSION} --public --discoverable --allow-guest --sign"'
+    - 'echo "Signing the image ${IMAGE_NAME}:${IMAGE_TAG}"'
+    - ngc-cli/ngc registry image publish --source ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG} --public --discoverable --allow-guest --sign --org nvidia
 
 sign:ngc-gpu-operator:
   extends:
     - .sign:ngc
   needs:
     - release:ngc-gpu-operator
-  rules:
-    - if: $CI_COMMIT_TAG
   variables:
-    OUT_IMAGE_VERSION: "${CI_COMMIT_TAG}"
-    OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
+
+sign:ngc-gpu-operator-ubi8:
+  extends:
+    - .sign:ngc
+    - .dist-ubi8
+  needs:
+    - release:ngc-gpu-operator
 
 sign:ngc-gpu-operator-validator:
   extends:
     - .sign:ngc
   needs:
     - release:ngc-gpu-operator-validator
-  rules:
-    - if: $CI_COMMIT_TAG
   variables:
-    OUT_IMAGE_VERSION: "${CI_COMMIT_TAG}"
-    OUT_IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
+    IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
+
+sign:ngc-gpu-operator-validator-ubi8:
+  extends:
+    - .sign:ngc
+    - .dist-ubi8
+  needs:
+    - release:ngc-gpu-operator-validator
+  variables:
+    IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
 
 .schedule_defaults:
   rules:
