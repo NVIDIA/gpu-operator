@@ -259,7 +259,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-logs
+          name: containerd-e2e-test-logs
           path: ./logs/
           retention-days: 15
 
@@ -311,6 +311,6 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-logs
+          name: nvidiadriver-e2e-test-logs
           path: ./logs/
           retention-days: 15
