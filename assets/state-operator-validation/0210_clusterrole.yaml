@@ -11,3 +11,16 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - nvidia.com
+  resources:
+  - clusterpolicies/finalizers
+  - nvidiadrivers/finalizers
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
