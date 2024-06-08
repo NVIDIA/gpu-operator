@@ -102,8 +102,10 @@ rules:
   - nvidia.com
   resources:
   - clusterpolicies
+  - clusterpolicies/finalizers
   - clusterpolicies/status
   - nvidiadrivers
+  - nvidiadrivers/finalizers
   - nvidiadrivers/status
   verbs:
   - create
