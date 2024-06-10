@@ -23,3 +23,4 @@ spec:
     install: true
     installer: kubeadm
     version: v1.28.5
+    crictlVersion: v1.28.0
