@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG CUDA_IMAGE=nvcr.io/nvidia/cuda
-ARG CUDA_VERSION=undefined
 ARG CUDA_SAMPLE_IMAGE=undefined
-
-ARG BASE_DIST=ubi8
 ARG GOLANG_VERSION=x.x.x
 
-FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST} as build
+FROM nvcr.io/nvidia/cuda:12.4.1-base-ubi8 as build
 
 RUN yum install -y wget make git gcc
 
@@ -55,7 +51,7 @@ FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 RUN mkdir /artifacts
 RUN cp /cuda-samples/vectorAdd /artifacts/vectorAdd
 
-FROM ${CUDA_IMAGE}:${CUDA_VERSION}-base-${BASE_DIST}
+FROM nvcr.io/nvidia/cuda:12.4.1-base-ubi8
 
 # Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
 RUN dnf remove -y cuda-*
