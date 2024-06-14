@@ -175,7 +175,7 @@ func TestDriverSpec(t *testing.T) {
 			Version:          "version",
 			ImagePullPolicy:  "Always",
 			ImagePullSecrets: []string{"manager-secret"},
-			Env: []nvidiav1alpha1.EnvVar{
+			Env: []corev1.EnvVar{
 				{Name: "FOO", Value: "foo"},
 				{Name: "BAR", Value: "bar"},
 			},
@@ -193,7 +193,7 @@ func TestDriverSpec(t *testing.T) {
 			},
 		},
 		Args: []string{"--foo", "--bar"},
-		Env: []nvidiav1alpha1.EnvVar{
+		Env: []corev1.EnvVar{
 			{Name: "FOO", Value: "foo"},
 			{Name: "BAR", Value: "bar"},
 		},

@@ -54,8 +54,10 @@ func (in *CCManagerSpec) DeepCopyInto(out *CCManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -99,8 +101,10 @@ func (in *CUDAValidatorSpec) DeepCopyInto(out *CUDAValidatorSpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -340,8 +344,10 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.MetricsConfig != nil {
 		in, out := &in.MetricsConfig, &out.MetricsConfig
@@ -390,8 +396,10 @@ func (in *DCGMSpec) DeepCopyInto(out *DCGMSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -486,8 +494,10 @@ func (in *DevicePluginSpec) DeepCopyInto(out *DevicePluginSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -556,8 +566,10 @@ func (in *DriverManagerSpec) DeepCopyInto(out *DriverManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -652,8 +664,10 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.RepoConfig != nil {
 		in, out := &in.RepoConfig, &out.RepoConfig
@@ -697,8 +711,10 @@ func (in *DriverValidatorSpec) DeepCopyInto(out *DriverValidatorSpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -747,8 +763,10 @@ func (in *GDRCopySpec) DeepCopyInto(out *GDRCopySpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -807,8 +825,10 @@ func (in *GPUDirectStorageSpec) DeepCopyInto(out *GPUDirectStorageSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -847,8 +867,10 @@ func (in *GPUFeatureDiscoverySpec) DeepCopyInto(out *GPUFeatureDiscoverySpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -912,8 +934,10 @@ func (in *KataManagerSpec) DeepCopyInto(out *KataManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -982,8 +1006,10 @@ func (in *MIGManagerSpec) DeepCopyInto(out *MIGManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -1077,8 +1103,10 @@ func (in *NodeStatusExporterSpec) DeepCopyInto(out *NodeStatusExporterSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1172,8 +1200,10 @@ func (in *PluginValidatorSpec) DeepCopyInto(out *PluginValidatorSpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1256,8 +1286,10 @@ func (in *SandboxDevicePluginSpec) DeepCopyInto(out *SandboxDevicePluginSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1316,8 +1348,10 @@ func (in *ToolkitSpec) DeepCopyInto(out *ToolkitSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1336,8 +1370,10 @@ func (in *ToolkitValidatorSpec) DeepCopyInto(out *ToolkitValidatorSpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1376,8 +1412,10 @@ func (in *VFIOManagerSpec) DeepCopyInto(out *VFIOManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	in.DriverManager.DeepCopyInto(&out.DriverManager)
 }
@@ -1397,8 +1435,10 @@ func (in *VFIOPCIValidatorSpec) DeepCopyInto(out *VFIOPCIValidatorSpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1437,8 +1477,10 @@ func (in *VGPUDeviceManagerSpec) DeepCopyInto(out *VGPUDeviceManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -1477,8 +1519,10 @@ func (in *VGPUDevicesValidatorSpec) DeepCopyInto(out *VGPUDevicesValidatorSpec) 
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1517,8 +1561,10 @@ func (in *VGPUManagerSpec) DeepCopyInto(out *VGPUManagerSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	in.DriverManager.DeepCopyInto(&out.DriverManager)
 }
@@ -1538,8 +1584,10 @@ func (in *VGPUManagerValidatorSpec) DeepCopyInto(out *VGPUManagerValidatorSpec) 
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -1580,8 +1628,10 @@ func (in *ValidatorSpec) DeepCopyInto(out *ValidatorSpec) {
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]EnvVar, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
