@@ -1,0 +1,36 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    target-branch: main
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    labels:
+      - dependencies
+    groups:
+      k8sio:
+        patterns:
+          - k8s.io/*
+        exclude-patterns:
+          - k8s.io/klog/*
+
+  # Update GPU Operator base images.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "daily"
+
+  # Update GPU Operator Validator base images.
+  - package-ecosystem: "docker"
+    directory: "/validator"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"

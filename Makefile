@@ -25,7 +25,6 @@ endif
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
-CUDA_IMAGE ?= nvcr.io/nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 DIST ?= ubi8
 
@@ -295,9 +294,6 @@ $(BUILD_TARGETS): build-%:
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
-		--build-arg BASE_DIST="$(DIST)" \
-		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
-		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \

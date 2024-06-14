@@ -22,7 +22,6 @@ endif
 ##### Global variables #####
 include $(CURDIR)/versions.mk
 
-CUDA_IMAGE ?= nvcr.io/nvidia/cuda
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 
 ifeq ($(IMAGE_NAME),)
@@ -85,9 +84,6 @@ $(BUILD_TARGETS): build-%:
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
-		--build-arg BASE_DIST="$(DIST)" \
-		--build-arg CUDA_IMAGE="$(CUDA_IMAGE)" \
-		--build-arg CUDA_VERSION="$(CUDA_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
