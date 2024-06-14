@@ -94,6 +94,12 @@ data:
 
         echo "unbinding device $gpu"
         unbind_from_driver $gpu
+        #for graphics mode, we need to unbind the auxiliary device as well
+        aux_dev=$(get_graphics_aux_dev "$gpu")
+        if [ "$aux_dev" != "NONE" ]; then
+          echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
+          unbind_from_driver "$aux_dev"
+        fi
     }
 
     unbind_all() {
@@ -106,12 +112,8 @@ data:
         done
     }
 
-    bind_device() {
+    bind_pci_device() {
         local gpu=$1
-
-        if ! is_nvidia_gpu_device $gpu; then
-            return 0
-        fi
 
         if ! is_bound_to_vfio $gpu; then
           unbind_from_other_driver $gpu
@@ -120,6 +122,35 @@ data:
           echo "$gpu" > /sys/bus/pci/drivers/vfio-pci/bind
         else
           echo "device $gpu already bound to vfio-pci"
+        fi
+    }
+
+    get_graphics_aux_dev() {
+        local gpu=$1
+        device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
+        device_class=$(cat "$device_class_file")
+        if [ "$device_class" == "0x030000" ]; then
+          aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
+          echo "$aux_dev"
+        else
+          echo "NONE"
+        fi
+    }
+
+    bind_device() {
+        local gpu=$1
+
+        if ! is_nvidia_gpu_device $gpu; then
+            echo "device $gpu is not a gpu!"
+            return 0
+        fi
+
+        bind_pci_device "$gpu"
+        #for graphics mode, we need to bind the auxiliary device as well
+        aux_dev=$(get_graphics_aux_dev "$gpu")
+        if [ "$aux_dev" != "NONE" ]; then
+          echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
+          bind_pci_device "$aux_dev"
         fi
     }
 
