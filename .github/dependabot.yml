@@ -18,6 +18,18 @@ updates:
         exclude-patterns:
           - k8s.io/klog/*
 
+  # Update GPU Operator base images.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "daily"
+
+  # Update GPU Operator Validator base images.
+  - package-ecosystem: "docker"
+    directory: "/validator"
+    schedule:
+      interval: "daily"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
