@@ -32,8 +32,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: /run/nvidia
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: HostToContainer
       containers:
       - name: nvidia-mig-manager
@@ -62,6 +62,8 @@ spec:
           readOnly: true
           mountPath: /bin/entrypoint.sh
           subPath: entrypoint.sh
+        - name: run-nvidia-validations
+          mountPath: /run/nvidia/validations
         - mountPath: /sys
           name: host-sys
         - mountPath: /mig-parted-config
@@ -71,8 +73,8 @@ spec:
           mountPropagation: HostToContainer
         - mountPath: /gpu-clients
           name: gpu-clients
-        - name: run-nvidia
-          mountPath: /run/nvidia
+        - name: driver-install-dir
+          mountPath: /driver-root
           mountPropagation: HostToContainer
         - name: cdi-root
           mountPath: /var/run/cdi
@@ -88,10 +90,14 @@ spec:
       - name: mig-parted-config
         configMap:
           name: "FILLED_BY_OPERATOR"
-      - name: run-nvidia
+      - name: run-nvidia-validations
         hostPath:
-          path: "/run/nvidia"
-          type: Directory
+          path: "/run/nvidia/validations"
+          type: DirectoryOrCreate
+      - name: driver-install-dir
+        hostPath:
+          path: "/run/nvidia/driver"
+          type: DirectoryOrCreate
       - name: host-root
         hostPath:
           path: "/"

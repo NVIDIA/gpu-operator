@@ -20,6 +20,18 @@ sandboxWorkloads:
   enabled: false
   defaultWorkload: "container"
 
+hostPaths:
+  # rootFS represents the path to the root filesystem of the host.
+  # This is used by components that need to interact with the host filesystem
+  # and as such this must be a chroot-able filesystem.
+  # Examples include the MIG Manager and Toolkit Container which may need to
+  # stop, start, or restart systemd services
+  rootFS: "/"
+
+  # driverInstallDir represents the root at which driver files including libraries,
+  # config files, and executables can be found.
+  driverInstallDir: "/run/nvidia/driver"
+
 daemonsets:
   labels: {}
   annotations: {}

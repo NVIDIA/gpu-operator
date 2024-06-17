@@ -33,7 +33,6 @@ import (
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +43,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 )
 
@@ -55,7 +56,9 @@ type Component interface {
 }
 
 // Driver component
-type Driver struct{}
+type Driver struct {
+	ctx context.Context
+}
 
 // NvidiaFs GDS Driver component
 type NvidiaFs struct{}
@@ -121,6 +124,9 @@ var (
 	metricsPort                   int
 	defaultGPUWorkloadConfigFlag  string
 	disableDevCharSymlinkCreation bool
+	hostRootFlag                  string
+	driverInstallDirFlag          string
+	driverInstallDirCtrPathFlag   string
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -136,12 +142,12 @@ const (
 	defaultMetricsPort = 0
 	// hostDevCharPath indicates the path in the container where the host '/dev/char' directory is mounted to
 	hostDevCharPath = "/host-dev-char"
-	// driverContainerRoot indicates the path on the host where driver container mounts it's root filesystem
-	driverContainerRoot = "/run/nvidia/driver"
+	// defaultDriverInstallDir indicates the default path on the host where the driver container installation is made available
+	defaultDriverInstallDir = "/run/nvidia/driver"
+	// defaultDriverInstallDirCtrPath indicates the default path where the NVIDIA driver install dir is mounted in the container
+	defaultDriverInstallDirCtrPath = "/run/nvidia/driver"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
-	// hostDriverStatusFile indicates status file for host driver readiness
-	hostDriverStatusFile = "host-driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
 	nvidiaFsStatusFile = "nvidia-fs-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
@@ -207,6 +213,8 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
 	CCCapableLabelKey = "nvidia.com/cc.capable"
+	// appComponentLabelKey indicates the label key of the component
+	appComponentLabelKey = "app.kubernetes.io/component"
 )
 
 func main() {
@@ -317,6 +325,27 @@ func main() {
 			Usage:       "disable creation of symlinks under /dev/char corresponding to NVIDIA character devices",
 			Destination: &disableDevCharSymlinkCreation,
 			EnvVars:     []string{"DISABLE_DEV_CHAR_SYMLINK_CREATION"},
+		},
+		&cli.StringFlag{
+			Name:        "host-root",
+			Value:       "/",
+			Usage:       "root path of the underlying host",
+			Destination: &hostRootFlag,
+			EnvVars:     []string{"HOST_ROOT"},
+		},
+		&cli.StringFlag{
+			Name:        "driver-install-dir",
+			Value:       defaultDriverInstallDir,
+			Usage:       "the path on the host where a containerized NVIDIA driver installation is made available",
+			Destination: &driverInstallDirFlag,
+			EnvVars:     []string{"DRIVER_INSTALL_DIR"},
+		},
+		&cli.StringFlag{
+			Name:        "driver-install-dir-ctr-path",
+			Value:       defaultDriverInstallDirCtrPath,
+			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
+			Destination: &driverInstallDirCtrPathFlag,
+			EnvVars:     []string{"DRIVER_INSTALL_DIR_CTR_PATH"},
 		},
 	}
 
@@ -467,7 +496,9 @@ func start(c *cli.Context) error {
 
 	switch componentFlag {
 	case "driver":
-		driver := &Driver{}
+		driver := &Driver{
+			ctx: c.Context,
+		}
 		err := driver.validate()
 		if err != nil {
 			return fmt.Errorf("error validating driver installation: %s", err)
@@ -591,14 +622,26 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 	}
 }
 
-func getDriverRoot() (string, bool) {
-	// check if driver is pre-installed on the host and use host path for validation
-	if fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil && fileInfo.Size() != 0 {
-		log.Infof("Detected pre-installed driver on the host")
-		return "/host", true
+// prependPathListEnvvar prepends a specified list of strings to a specified envvar and returns its value.
+func prependPathListEnvvar(envvar string, prepend ...string) string {
+	if len(prepend) == 0 {
+		return os.Getenv(envvar)
 	}
+	current := filepath.SplitList(os.Getenv(envvar))
+	return strings.Join(append(prepend, current...), string(filepath.ListSeparator))
+}
 
-	return driverContainerRoot, false
+// setEnvVar adds or updates an envar to the list of specified envvars and returns it.
+func setEnvVar(envvars []string, key, value string) []string {
+	var updated []string
+	for _, envvar := range envvars {
+		pair := strings.SplitN(envvar, "=", 2)
+		if pair[0] == key {
+			continue
+		}
+		updated = append(updated, envvar)
+	}
+	return append(updated, fmt.Sprintf("%s=%s", key, value))
 }
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
@@ -614,24 +657,110 @@ func assertDriverContainerReady(silent bool) error {
 	return runCommand(command, args, silent)
 }
 
-func (d *Driver) runValidation(silent bool) (string, bool, error) {
-	driverRoot, isHostDriver := getDriverRoot()
-	if !isHostDriver {
-		log.Infof("Driver is not pre-installed on the host. Checking driver container status.")
-		if err := assertDriverContainerReady(silent); err != nil {
-			return "", false, fmt.Errorf("error checking driver container status: %v", err)
+// isDriverManagedByOperator determines if the NVIDIA driver is managed by the GPU Operator.
+// We check if at least one driver DaemonSet exists in the operator namespace that is
+// owned by the ClusterPolicy or NVIDIADriver controllers.
+func isDriverManagedByOperator(ctx context.Context) (bool, error) {
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return false, fmt.Errorf("error getting cluster config: %w", err)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return false, fmt.Errorf("error getting k8s client: %w", err)
+	}
+
+	opts := meta_v1.ListOptions{LabelSelector: labels.Set{appComponentLabelKey: "nvidia-driver"}.AsSelector().String()}
+	dsList, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).List(ctx, opts)
+	if err != nil {
+		return false, fmt.Errorf("error listing daemonsets: %w", err)
+	}
+
+	for i := range dsList.Items {
+		ds := dsList.Items[i]
+		owner := meta_v1.GetControllerOf(&ds)
+		if owner == nil {
+			continue
+		}
+		if strings.HasPrefix(owner.APIVersion, "nvidia.com/") && (owner.Kind == nvidiav1.ClusterPolicyCRDName || owner.Kind == nvidiav1alpha1.NVIDIADriverCRDName) {
+			return true, nil
 		}
 	}
 
-	// invoke validation command
-	command := "chroot"
-	args := []string{driverRoot, "nvidia-smi"}
+	return false, nil
+}
 
-	if withWaitFlag {
-		return driverRoot, isHostDriver, runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+func validateHostDriver(silent bool) error {
+	log.Info("Attempting to validate a pre-installed driver on the host")
+	command := "chroot"
+	args := []string{"/host", "nvidia-smi"}
+
+	return runCommand(command, args, silent)
+}
+
+func validateDriverContainer(silent bool, ctx context.Context) error {
+	driverManagedByOperator, err := isDriverManagedByOperator(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
 	}
 
-	return driverRoot, isHostDriver, runCommand(command, args, silent)
+	if driverManagedByOperator {
+		log.Infof("Driver is not pre-installed on the host and is managed by GPU Operator. Checking driver container status.")
+		if err := assertDriverContainerReady(silent); err != nil {
+			return fmt.Errorf("error checking driver container status: %w", err)
+		}
+	}
+
+	driverRoot := root(driverInstallDirCtrPathFlag)
+
+	validateDriver := func(silent bool) error {
+		driverLibraryPath, err := driverRoot.getDriverLibraryPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate driver libraries: %w", err)
+		}
+
+		nvidiaSMIPath, err := driverRoot.getNvidiaSMIPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate nvidia-smi: %w", err)
+		}
+		cmd := exec.Command(nvidiaSMIPath)
+		// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
+		cmd.Env = setEnvVar(os.Environ(), "LD_PRELOAD", prependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
+		if !silent {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
+		return cmd.Run()
+	}
+
+	for {
+		log.Info("Attempting to validate a driver container installation")
+		err := validateDriver(silent)
+		if err != nil {
+			if !withWaitFlag {
+				return fmt.Errorf("error validating driver: %w", err)
+			}
+			log.Warningf("failed to validate the driver, retrying after %d seconds\n", sleepIntervalSecondsFlag)
+			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
+			continue
+		}
+		return nil
+	}
+}
+
+func (d *Driver) runValidation(silent bool) (driverInfo, error) {
+	err := validateHostDriver(silent)
+	if err == nil {
+		log.Info("Detected a pre-installed driver on the host")
+		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
+	}
+
+	err = validateDriverContainer(silent, d.ctx)
+	if err != nil {
+		return driverInfo{}, err
+	}
+	return getDriverInfo(false, hostRootFlag, driverInstallDirFlag, driverInstallDirCtrPathFlag), nil
 }
 
 func (d *Driver) validate() error {
@@ -641,69 +770,78 @@ func (d *Driver) validate() error {
 		return err
 	}
 
-	// delete host driver status file is already present
-	err = deleteStatusFile(outputDirFlag + "/" + hostDriverStatusFile)
+	driverInfo, err := d.runValidation(false)
 	if err != nil {
+		log.Errorf("driver is not ready: %v", err)
 		return err
 	}
 
-	driverRoot, isHostDriver, err := d.runValidation(false)
+	err = createDevCharSymlinks(driverInfo, disableDevCharSymlinkCreation)
 	if err != nil {
-		log.Error("driver is not ready")
-		return err
+		msg := strings.Join([]string{
+			"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
+			"The existence of these symlinks is required to address the following bug:",
+			"",
+			"    https://github.com/NVIDIA/gpu-operator/issues/430",
+			"",
+			"This bug impacts container runtimes configured with systemd cgroup management enabled.",
+			"To disable the symlink creation, set the following envvar in ClusterPolicy:",
+			"",
+			"    validator:",
+			"      driver:",
+			"        env:",
+			"        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION",
+			"          value: \"true\""}, "\n")
+		return fmt.Errorf("%w\n\n%s", err, msg)
 	}
 
-	if !disableDevCharSymlinkCreation {
-		log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
-		err = createDevCharSymlinks(driverRoot, isHostDriver)
-		if err != nil {
-			msg := strings.Join([]string{
-				"Failed to create symlinks under /dev/char that point to all possible NVIDIA character devices.",
-				"The existence of these symlinks is required to address the following bug:",
-				"",
-				"    https://github.com/NVIDIA/gpu-operator/issues/430",
-				"",
-				"This bug impacts container runtimes configured with systemd cgroup management enabled.",
-				"To disable the symlink creation, set the following envvar in ClusterPolicy:",
-				"",
-				"    validator:",
-				"      driver:",
-				"        env:",
-				"        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION",
-				"          value: \"true\""}, "\n")
-			return fmt.Errorf("%v\n\n%s", err, msg)
-		}
-	}
+	return d.createStatusFile(driverInfo)
+}
 
-	statusFile := driverStatusFile
-	if isHostDriver {
-		statusFile = hostDriverStatusFile
-	}
+func (d *Driver) createStatusFile(driverInfo driverInfo) error {
+	statusFileContent := strings.Join([]string{
+		fmt.Sprintf("IS_HOST_DRIVER=%t", driverInfo.isHostDriver),
+		fmt.Sprintf("NVIDIA_DRIVER_ROOT=%s", driverInfo.driverRoot),
+		fmt.Sprintf("DRIVER_ROOT_CTR_PATH=%s", driverInfo.driverRootCtrPath),
+		fmt.Sprintf("NVIDIA_DEV_ROOT=%s", driverInfo.devRoot),
+		fmt.Sprintf("DEV_ROOT_CTR_PATH=%s", driverInfo.devRootCtrPath),
+	}, "\n") + "\n"
 
 	// create driver status file
-	err = createStatusFile(outputDirFlag + "/" + statusFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return createStatusFileWithContent(outputDirFlag+"/"+driverStatusFile, statusFileContent)
 }
 
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
-func createDevCharSymlinks(driverRoot string, isHostDriver bool) error {
-	// If the host driver is being used, we rely on the fact that we are running a privileged container and as such
-	// have access to /dev
-	devRoot := driverRoot
-	if isHostDriver {
-		devRoot = "/"
+func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation bool) error {
+	if disableDevCharSymlinkCreation {
+		log.WithField("disableDevCharSymlinkCreation", true).
+			Info("skipping the creation of symlinks under /dev/char that correspond to NVIDIA character devices")
+		return nil
 	}
+
+	log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
+
+	// Only attempt to load NVIDIA kernel modules when we can chroot into driverRoot
+	loadKernelModules := driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot)
+
+	// driverRootCtrPath is the path of the driver install dir in the container. This will either be
+	// driverInstallDirCtrPathFlag or '/host'.
+	// Note, if we always mounted the driver install dir to '/driver-root' in the validation container
+	// instead, then we could simplify to always use driverInfo.driverRootCtrPath -- which would be
+	// either '/host' or '/driver-root', both paths would exist in the validation container.
+	driverRootCtrPath := driverInstallDirCtrPathFlag
+	if driverInfo.isHostDriver {
+		driverRootCtrPath = "/host"
+	}
+
 	// We now create the symlinks in /dev/char.
 	creator, err := devchar.NewSymlinkCreator(
-		devchar.WithDriverRoot(driverRoot),
-		devchar.WithDevRoot(devRoot),
+		devchar.WithDriverRoot(driverRootCtrPath),
+		devchar.WithDevRoot(driverInfo.devRoot),
 		devchar.WithDevCharPath(hostDevCharPath),
 		devchar.WithCreateAll(true),
 		devchar.WithCreateDeviceNodes(true),
-		devchar.WithLoadKernelModules(true),
+		devchar.WithLoadKernelModules(loadKernelModules),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating symlink creator: %v", err)

@@ -168,6 +168,15 @@ const (
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
 	DefaultMPSRoot = "/run/nvidia/mps"
+	// HostRootEnvName is the name of the envvar representing the root path of the underlying host
+	HostRootEnvName = "HOST_ROOT"
+	// DefaultDriverInstallDir represents the default path of a driver container installation
+	DefaultDriverInstallDir = "/run/nvidia/driver"
+	// DriverInstallDirEnvName is the name of the envvar used by the driver-validator to represent the driver install dir
+	DriverInstallDirEnvName = "DRIVER_INSTALL_DIR"
+	// DriverInstallDirCtrPathEnvName is the name of the envvar used by the driver-validator to represent the path
+	// of the driver install dir mounted in the container
+	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
 )
 
 // ContainerProbe defines container probe types
@@ -712,6 +721,12 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
+	// transform the host-root and host-dev-char volumes if a custom host root is configured with the operator
+	transformForHostRoot(obj, n.singleton.Spec.HostPaths.RootFS)
+
+	// transform the driver-root volume if a custom driver install dir is configured with the operator
+	transformForDriverInstallDir(obj, n.singleton.Spec.HostPaths.DriverInstallDir)
+
 	// apply per operand Daemonset config
 	err = t(obj, &n.singleton.Spec, n)
 	if err != nil {
@@ -771,6 +786,81 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 	return nil
+}
+
+// apply necessary transforms if a custom host root path is configured
+func transformForHostRoot(obj *appsv1.DaemonSet, hostRoot string) {
+	if hostRoot == "" || hostRoot == "/" {
+		return
+	}
+
+	transformHostRootVolume(obj, hostRoot)
+	transformHostDevCharVolume(obj, hostRoot)
+}
+
+func transformHostRootVolume(obj *appsv1.DaemonSet, hostRoot string) {
+	containsHostRootVolume := false
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == "host-root" {
+			volume.HostPath.Path = hostRoot
+			containsHostRootVolume = true
+			break
+		}
+	}
+
+	if !containsHostRootVolume {
+		return
+	}
+
+	for index := range obj.Spec.Template.Spec.InitContainers {
+		setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[index]), HostRootEnvName, hostRoot)
+	}
+
+	for index := range obj.Spec.Template.Spec.Containers {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[index]), HostRootEnvName, hostRoot)
+	}
+}
+
+func transformHostDevCharVolume(obj *appsv1.DaemonSet, hostRoot string) {
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == "host-dev-char" {
+			volume.HostPath.Path = filepath.Join(hostRoot, "/dev/char")
+			break
+		}
+	}
+}
+
+// apply necessary transforms if a custom driver install directory is configured
+func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string) {
+	if driverInstallDir == "" || driverInstallDir == DefaultDriverInstallDir {
+		return
+	}
+
+	containsDriverInstallDirVolume := false
+	podSpec := obj.Spec.Template.Spec
+	for _, volume := range podSpec.Volumes {
+		if volume.Name == "driver-install-dir" {
+			volume.HostPath.Path = driverInstallDir
+			containsDriverInstallDirVolume = true
+			break
+		}
+	}
+
+	if !containsDriverInstallDirVolume {
+		return
+	}
+
+	for i, ctr := range podSpec.InitContainers {
+		if ctr.Name == "driver-validation" {
+			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirEnvName, driverInstallDir)
+			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirCtrPathEnvName, driverInstallDir)
+			for j, volumeMount := range ctr.VolumeMounts {
+				if volumeMount.Name == "driver-install-dir" {
+					podSpec.InitContainers[i].VolumeMounts[j].MountPath = driverInstallDir
+				}
+			}
+		}
+	}
 }
 
 // TransformGPUDiscoveryPlugin transforms GPU discovery daemonset with required config as per ClusterPolicy

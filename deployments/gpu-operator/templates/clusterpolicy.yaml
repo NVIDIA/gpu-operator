@@ -12,6 +12,9 @@ metadata:
     "helm.sh/resource-policy": keep
   {{- end }}
 spec:
+  hostPaths:
+    rootFS: {{ .Values.hostPaths.rootFS }}
+    driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
   operator:
     {{- if .Values.operator.defaultRuntime }}
     defaultRuntime: {{ .Values.operator.defaultRuntime }}

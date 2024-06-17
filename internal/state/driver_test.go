@@ -595,6 +595,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 			Namespace:         "test-operator",
 			KubernetesVersion: "1.28.0",
 		},
+		HostRoot: "",
 	}
 }
 

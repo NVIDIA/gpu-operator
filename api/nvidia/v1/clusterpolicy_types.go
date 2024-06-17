@@ -34,6 +34,10 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	ClusterPolicyCRDName = "ClusterPolicy"
+)
+
 // ClusterPolicySpec defines the desired state of ClusterPolicy
 type ClusterPolicySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -88,6 +92,8 @@ type ClusterPolicySpec struct {
 	KataManager KataManagerSpec `json:"kataManager,omitempty"`
 	// CCManager component spec
 	CCManager CCManagerSpec `json:"ccManager,omitempty"`
+	// HostPaths defines various paths on the host needed by GPU Operator components
+	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -142,6 +148,20 @@ type OperatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="On OpenShift, enable DriverToolkit image to build and install driver modules"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UseOpenShiftDriverToolkit *bool `json:"use_ocp_driver_toolkit,omitempty"`
+}
+
+// HostPathsSpec defines various paths on the host needed by GPU Operator components
+type HostPathsSpec struct {
+	// RootFS represents the path to the root filesystem of the host.
+	// This is used by components that need to interact with the host filesystem
+	// and as such this must be a chroot-able filesystem.
+	// Examples include the MIG Manager and Toolkit Container which may need to
+	// stop, start, or restart systemd services.
+	RootFS string `json:"rootFS,omitempty"`
+
+	// DriverInstallDir represents the root at which driver files including libraries,
+	// config files, and executables can be found.
+	DriverInstallDir string `json:"driverInstallDir,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.

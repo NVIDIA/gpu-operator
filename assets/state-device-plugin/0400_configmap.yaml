@@ -9,28 +9,15 @@ data:
   entrypoint.sh: |-
     #!/bin/bash
 
-    driver_root=""
-    container_driver_root=""
-    while true; do
-      if [[ -f /run/nvidia/validations/host-driver-ready ]]; then
-        driver_root=/
-        container_driver_root=/host
-        break
-      elif [[ -f /run/nvidia/validations/driver-ready ]]; then
-        driver_root=/run/nvidia/driver
-        container_driver_root=$driver_root
-        break
-      else
-        echo "waiting for the driver validations to be ready..."
-        sleep 5
-      fi
+    until [[ -f /run/nvidia/validations/driver-ready ]]
+    do
+      echo "waiting for the driver validations to be ready..."
+      sleep 5
     done
-
-    export NVIDIA_DRIVER_ROOT=$driver_root
-    echo "NVIDIA_DRIVER_ROOT=$NVIDIA_DRIVER_ROOT"
-
-    export CONTAINER_DRIVER_ROOT=$container_driver_root
-    echo "CONTAINER_DRIVER_ROOT=$CONTAINER_DRIVER_ROOT"
+    
+    set -o allexport
+    cat /run/nvidia/validations/driver-ready
+    . /run/nvidia/validations/driver-ready
 
     echo "Starting nvidia-device-plugin"
     exec nvidia-device-plugin
