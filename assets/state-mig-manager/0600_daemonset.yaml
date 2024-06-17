@@ -66,6 +66,8 @@ spec:
           mountPath: /run/nvidia/validations
         - mountPath: /sys
           name: host-sys
+        - mountPath: /dev
+          name: host-dev
         - mountPath: /mig-parted-config
           name: mig-parted-config
         - mountPath: /host
@@ -86,6 +88,10 @@ spec:
       - name: host-sys
         hostPath:
           path: /sys
+          type: Directory
+      - name: host-dev
+        hostPath:
+          path: /dev
           type: Directory
       - name: mig-parted-config
         configMap:
