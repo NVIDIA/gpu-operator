@@ -601,6 +601,7 @@ spec:
           - patch
           - update
           - watch
+          - deletecollection
         - apiGroups:
           - config.openshift.io
           resources:
@@ -632,12 +633,30 @@ spec:
           resourceNames:
           - hostmount-anyuid
         - apiGroups:
+          - image.openshift.io
+          resources:
+          - imagestreams
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
+          - delete
+        - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - clusterroles
           - clusterrolebindings
-          - roles
-          - rolebindings
           verbs:
           - create
           - get
@@ -653,14 +672,7 @@ spec:
           - pods/eviction
           - services
           - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
           - events
-          - configmaps
-          - secrets
-          - nodes
-          - namespaces
-          - serviceaccounts
           verbs:
           - create
           - delete
@@ -670,17 +682,33 @@ spec:
           - update
           - watch
         - apiGroups:
-          - apps
+          - ""
           resources:
-          - deployments
-          - daemonsets
+          - namespaces
           verbs:
-          - create
-          - delete
           - get
           - list
-          - patch
+          - create
+          - watch
           - update
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - get
+          - list
           - watch
         - apiGroups:
           - apps
@@ -714,29 +742,52 @@ spec:
           - patch
           - delete
         - apiGroups:
-          - monitoring.coreos.com
-          resources:
-          - servicemonitors
-          - prometheusrules
-          verbs:
-          - get
-          - list
-          - create
-          - watch
-          - update
-          - delete
-        - apiGroups:
-          - image.openshift.io
-          resources:
-          - imagestreams
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      permissions:
+      - serviceAccountName: gpu-operator
+        rules:
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - endpoints
+          - secrets
+          - serviceaccounts
           verbs:
           - create
           - get
