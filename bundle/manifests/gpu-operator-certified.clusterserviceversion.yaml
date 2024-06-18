@@ -215,9 +215,9 @@ spec:
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:07e11f85d54d49ec9648fb06e148b8d832ee1f9c3549a915eee853c9ef2949c2
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:80674b19898ecf9ed6949e39674da769d6feeeb01bea54b914ef9ff502834f49
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:aba39d8a4c60443842c5164a0407e02b35405d146c5b6476008a79f840cd4547
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:80674b19898ecf9ed6949e39674da769d6feeeb01bea54b914ef9ff502834f49
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:aba39d8a4c60443842c5164a0407e02b35405d146c5b6476008a79f840cd4547
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:d8774d6afd37110199512636172823ae8749e5ea2e13760f57c255a74f47018c
     - name: init-container-image
@@ -858,7 +858,7 @@ spec:
                   - name: "VALIDATOR_IMAGE"
                     value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:main-latest-ubi8"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:80674b19898ecf9ed6949e39674da769d6feeeb01bea54b914ef9ff502834f49"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:aba39d8a4c60443842c5164a0407e02b35405d146c5b6476008a79f840cd4547"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:4bf086e08c05bd444780e28fa8b0b528552898481065b31b276f969a4f0631e1"
                   - name: "DCGM_IMAGE"
@@ -866,7 +866,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ecb867c5787e44f1889b257e6c03b07748689a7b293c8f1affb1d4cb449b235c"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:80674b19898ecf9ed6949e39674da769d6feeeb01bea54b914ef9ff502834f49"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:aba39d8a4c60443842c5164a0407e02b35405d146c5b6476008a79f840cd4547"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:858de27c152669f5a3cf4287406405b16dd5bb70c0373324eb735511997bb415"
                   - name: "DRIVER_IMAGE-535"
