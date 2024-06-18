@@ -1106,19 +1106,16 @@ func (p *Plugin) runWorkload() error {
 		pod.Spec.RuntimeClassName = &runtimeClass
 	}
 
+	validatorDaemonset, err := p.kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to retrieve the operator validator daemonset: %w", err)
+	}
+
 	// update owner reference
-	err = setOwnerReference(ctx, p.kubeClient, pod)
-	if err != nil {
-		return fmt.Errorf("unable to set ownerReference for validator pod: %s", err)
-	}
-
+	pod.SetOwnerReferences(validatorDaemonset.ObjectMeta.OwnerReferences)
 	// set pod tolerations
-	err = setTolerations(ctx, p.kubeClient, pod)
-	if err != nil {
-		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
-	}
-
-	// update podSpec with node name so it will just run on current node
+	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
+	// update podSpec with node name, so it will just run on current node
 	pod.Spec.NodeName = nodeNameFlag
 
 	resourceName, err := p.getGPUResourceName()
@@ -1162,30 +1159,6 @@ func (p *Plugin) runWorkload() error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func setOwnerReference(ctx context.Context, kubeClient kubernetes.Interface, pod *corev1.Pod) error {
-	// get owner of validator daemonset (which is ClusterPolicy)
-	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// update owner reference of plugin workload validation pod as ClusterPolicy for cleanup
-	pod.SetOwnerReferences(validatorDaemonset.ObjectMeta.OwnerReferences)
-	return nil
-}
-
-func setTolerations(ctx context.Context, kubeClient kubernetes.Interface, pod *corev1.Pod) error {
-	// get tolerations of validator daemonset
-	validatorDaemonset, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// set same tolerations for individual validator pods
-	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
 	return nil
 }
 
@@ -1397,19 +1370,16 @@ func (c *CUDA) runWorkload() error {
 		pod.Spec.RuntimeClassName = &runtimeClass
 	}
 
+	validatorDaemonset, err := c.kubeClient.AppsV1().DaemonSets(namespaceFlag).Get(ctx, "nvidia-operator-validator", meta_v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to retrieve the operator validator daemonset: %w", err)
+	}
+
 	// update owner reference
-	err = setOwnerReference(ctx, c.kubeClient, pod)
-	if err != nil {
-		return fmt.Errorf("unable to set owner reference for validator pod: %s", err)
-	}
-
+	pod.SetOwnerReferences(validatorDaemonset.ObjectMeta.OwnerReferences)
 	// set pod tolerations
-	err = setTolerations(ctx, c.kubeClient, pod)
-	if err != nil {
-		return fmt.Errorf("unable to set tolerations for validator pod: %s", err)
-	}
-
-	// update podSpec with node name so it will just run on current node
+	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
+	// update podSpec with node name, so it will just run on current node
 	pod.Spec.NodeName = nodeNameFlag
 
 	opts := meta_v1.ListOptions{LabelSelector: labels.Set{"app": cudaValidatorLabelValue}.AsSelector().String(),
