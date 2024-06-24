@@ -228,7 +228,9 @@ func (nm *NodeMetrics) watchDevicePluginValidation() {
 }
 
 func (nm *NodeMetrics) watchDriverValidation() {
-	driver := &Driver{}
+	driver := &Driver{
+		ctx: nm.ctx,
+	}
 
 	for {
 		_, err := driver.runValidation(true)
