@@ -29,12 +29,16 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -49,6 +53,11 @@ import (
 const (
 	nfdOSReleaseIDLabelKey = "feature.node.kubernetes.io/system-os_release.ID"
 	nfdOSVersionIDLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+
+	// AppComponentLabelKey indicates the label key of the component
+	AppComponentLabelKey = "app.kubernetes.io/component"
+	// AppComponentLabelValue indicates the label values of the nvidia-gpu-driver component
+	AppComponentLabelValue = "nvidia-driver"
 )
 
 type stateDriver struct {
@@ -154,9 +163,17 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 
 func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {
 	wr := make(map[string]SyncingSource)
+	nvDriverPredicate := predicate.NewTypedPredicateFuncs(func(ds *appsv1.DaemonSet) bool {
+		ls := metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}}
+		selector, _ := metav1.LabelSelectorAsSelector(&ls)
+		return selector.Matches(labels.Set(ds.GetLabels()))
+	})
 	wr["DaemonSet"] = source.Kind(
 		mgr.GetCache(),
 		&appsv1.DaemonSet{},
+		handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(),
+			&nvidiav1alpha1.NVIDIADriver{}, handler.OnlyControllerOwner()),
+		nvDriverPredicate,
 	)
 	return wr
 }

@@ -263,14 +263,47 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	}
 
 	// Watch for changes to the primary resource NVIDIaDriver
-	err = c.Watch(source.Kind(mgr.GetCache(), &nvidiav1alpha1.NVIDIADriver{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&nvidiav1alpha1.NVIDIADriver{},
+		&handler.TypedEnqueueRequestForObject[*nvidiav1alpha1.NVIDIADriver]{},
+		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.NVIDIADriver]{},
+	),
+	)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterPolicy. Whenever an event is generated for ClusterPolicy, enqueue
 	// a reconcile request for all NVIDIADriver instances.
-	mapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
+	mapFn := func(ctx context.Context, cp *gpuv1.ClusterPolicy) []reconcile.Request {
+		logger := log.FromContext(ctx)
+		opts := []client.ListOption{}
+		list := &nvidiav1alpha1.NVIDIADriverList{}
+
+		err := mgr.GetClient().List(ctx, list, opts...)
+		if err != nil {
+			logger.Error(err, "Unable to list NVIDIADriver resources")
+			return []reconcile.Request{}
+		}
+
+		reconcileRequests := []reconcile.Request{}
+		for _, nvidiaDriver := range list.Items {
+			reconcileRequests = append(reconcileRequests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      nvidiaDriver.ObjectMeta.GetName(),
+						Namespace: nvidiaDriver.ObjectMeta.GetNamespace(),
+					},
+				})
+		}
+
+		return reconcileRequests
+	}
+
+	// Watch for changes to the Nodes. Whenever an event is generated for ClusterPolicy, enqueue
+	// a reconcile request for all NVIDIADriver instances.
+	nodeMapFn := func(ctx context.Context, cp *corev1.Node) []reconcile.Request {
 		logger := log.FromContext(ctx)
 		opts := []client.ListOption{}
 		list := &nvidiav1alpha1.NVIDIADriverList{}
@@ -296,20 +329,23 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	}
 
 	err = c.Watch(
-		source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}),
-		handler.EnqueueRequestsFromMapFunc(mapFn),
-		predicate.GenerationChangedPredicate{},
+		source.Kind(
+			mgr.GetCache(),
+			&gpuv1.ClusterPolicy{},
+			handler.TypedEnqueueRequestsFromMapFunc[*gpuv1.ClusterPolicy](mapFn),
+			predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{},
+		),
 	)
 	if err != nil {
 		return err
 	}
 
-	nodePredicate := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
+	nodePredicate := predicate.TypedFuncs[*corev1.Node]{
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
 			return hasGPULabels(labels)
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
 			logger := log.FromContext(ctx)
 			newLabels := e.ObjectNew.GetLabels()
 			oldLabels := e.ObjectOld.GetLabels()
@@ -324,7 +360,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			}
 			return needsUpdate
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
 			return hasGPULabels(labels)
 		},
@@ -332,9 +368,11 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch for changes to node labels
 	err = c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		handler.EnqueueRequestsFromMapFunc(mapFn),
-		nodePredicate,
+		source.Kind(mgr.GetCache(),
+			&corev1.Node{},
+			handler.TypedEnqueueRequestsFromMapFunc[*corev1.Node](nodeMapFn),
+			nodePredicate,
+		),
 	)
 	if err != nil {
 		return err
@@ -342,20 +380,9 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch for changes to secondary resources which each state manager manages
 	watchSources := stateManager.GetWatchSources(mgr)
-	nvDriverPredicate, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}})
-	if err != nil {
-		return fmt.Errorf("failed to create labelSelector predicate: %w", err)
-	}
 	for _, watchSource := range watchSources {
 		err = c.Watch(
 			watchSource,
-			handler.EnqueueRequestForOwner(
-				mgr.GetScheme(),
-				mgr.GetRESTMapper(),
-				&nvidiav1alpha1.NVIDIADriver{},
-				handler.OnlyControllerOwner(),
-			),
-			nvDriverPredicate,
 		)
 		if err != nil {
 			return fmt.Errorf("error setting up Watch for source type %v: %w", watchSource, err)

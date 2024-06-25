@@ -1,19 +1,21 @@
 module github.com/NVIDIA/gpu-operator
 
-go 1.21
+go 1.22.0
+
+toolchain go1.22.4
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/NVIDIA/go-nvlib v0.2.0
 	github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240214071211-ea58a3ada15c
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240625163740-365c73d785db
 	github.com/NVIDIA/nvidia-container-toolkit v1.15.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mittwald/go-helm-client v0.12.9
-	github.com/onsi/ginkgo/v2 v2.17.1
-	github.com/onsi/gomega v1.32.0
+	github.com/onsi/ginkgo/v2 v2.17.2
+	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240412130237-e2b0b690b638
 	github.com/openshift/client-go v0.0.0-20240408153607-64bd6feb83ae
 	github.com/operator-framework/api v0.23.0
@@ -25,12 +27,12 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.17.0
-	k8s.io/api v0.29.3
-	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.29.3
-	k8s.io/client-go v0.29.3
+	k8s.io/api v0.30.2
+	k8s.io/apiextensions-apiserver v0.30.1
+	k8s.io/apimachinery v0.30.2
+	k8s.io/client-go v0.30.2
 	k8s.io/klog/v2 v2.120.1
-	sigs.k8s.io/controller-runtime v0.17.3
+	sigs.k8s.io/controller-runtime v0.18.4
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -64,7 +66,7 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
-	github.com/evanphx/json-patch/v5 v5.8.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -76,7 +78,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
 	github.com/go-openapi/swag v0.22.9 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -85,7 +87,7 @@ require (
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
+	github.com/google/pprof v0.0.0-20240424215950-a892ee059fd6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -148,16 +150,16 @@ require (
 	go.opentelemetry.io/otel/trace v1.23.1 // indirect
 	go.starlark.net v0.0.0-20231121155337-90ade8b19d09 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.18.0 // indirect
+	golang.org/x/tools v0.20.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240221002015-b0ce06bbee7c // indirect
@@ -168,11 +170,11 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.14.2 // indirect
-	k8s.io/apiserver v0.29.3 // indirect
-	k8s.io/cli-runtime v0.29.1 // indirect
-	k8s.io/component-base v0.29.3 // indirect
-	k8s.io/kube-openapi v0.0.0-20240221221325-2ac9dc51f3f1 // indirect
-	k8s.io/kubectl v0.29.1 // indirect
+	k8s.io/apiserver v0.30.1 // indirect
+	k8s.io/cli-runtime v0.30.2 // indirect
+	k8s.io/component-base v0.30.2 // indirect
+	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
+	k8s.io/kubectl v0.30.2 // indirect
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57 // indirect
 	oras.land/oras-go v1.2.4 // indirect
 	sigs.k8s.io/kustomize/api v0.16.0 // indirect
