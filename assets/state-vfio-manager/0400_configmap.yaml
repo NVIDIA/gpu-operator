@@ -127,14 +127,15 @@ data:
 
     get_graphics_aux_dev() {
         local gpu=$1
+        aux_dev="NONE"
         device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
         device_class=$(cat "$device_class_file")
         if [ "$device_class" == "0x030000" ]; then
-          aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
-          echo "$aux_dev"
-        else
-          echo "NONE"
+          if ls "/sys/bus/pci/devices/$gpu" | grep consumer >& /dev/null; then
+            aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
+          fi
         fi
+        echo "$aux_dev"
     }
 
     bind_device() {
