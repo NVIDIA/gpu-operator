@@ -253,10 +253,10 @@ func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedNa
 	}
 }
 
-func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
+func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
-	mapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
+	mapFn := func(ctx context.Context, n *corev1.Node) []reconcile.Request {
 		// find all the ClusterPolicy to trigger their reconciliation
 		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
 		list := &gpuv1.ClusterPolicyList{}
@@ -280,13 +280,13 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 		return cpToRec
 	}
 
-	p := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
+	p := predicate.TypedFuncs[*corev1.Node]{
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
 
 			return hasGPULabels(labels)
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
 			newLabels := e.ObjectNew.GetLabels()
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
@@ -324,7 +324,7 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 			}
 			return needsUpdate
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
 			// if an RHCOS GPU node is deleted, trigger a
 			// reconciliation to ensure that there is no dangling
 			// OpenShift Driver-Toolkit (RHCOS version-specific)
@@ -341,9 +341,12 @@ func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c contr
 	}
 
 	err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		handler.EnqueueRequestsFromMapFunc(mapFn),
-		p)
+		source.Kind(mgr.GetCache(),
+			&corev1.Node{},
+			handler.TypedEnqueueRequestsFromMapFunc[*corev1.Node](mapFn),
+			p,
+		),
+	)
 
 	return err
 }
@@ -360,20 +363,32 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	r.conditionUpdater = conditions.NewClusterPolicyUpdater(mgr.GetClient())
 
 	// Watch for changes to primary resource ClusterPolicy
-	err = c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&gpuv1.ClusterPolicy{},
+		&handler.TypedEnqueueRequestForObject[*gpuv1.ClusterPolicy]{},
+		predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{},
+	),
+	)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node labels and requeue the owner ClusterPolicy
-	err = addWatchNewGPUNode(ctx, r, c, mgr)
+	err = addWatchNewGPUNode(r, c, mgr)
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Daemonsets and requeue the owner ClusterPolicy
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{}, handler.OnlyControllerOwner()))
+	err = c.Watch(
+		source.Kind(mgr.GetCache(),
+			&appsv1.DaemonSet{},
+			handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{},
+				handler.OnlyControllerOwner()),
+		),
+	)
 	if err != nil {
 		return err
 	}
