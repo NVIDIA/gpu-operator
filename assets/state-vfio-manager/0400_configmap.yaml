@@ -129,20 +129,24 @@ data:
         local gpu=$1
         device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
         device_class=$(cat "$device_class_file")
-        if [ "$device_class" == "0x030000" ]; then
-          if ls "/sys/bus/pci/devices/$gpu" | grep consumer >& /dev/null; then
-            aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
-            if [ "$device_class" == "" ]; then
-              echo "NONE"
-              return
-            fi
+        if [ "$device_class" != "0x030000" ]; then
+          echo "NONE"
+          return
+        fi
 
-            if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
-              echo "$aux_dev"
-              return
-            fi
+        if ls "/sys/bus/pci/devices/$gpu" | grep consumer >& /dev/null; then
+          aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
+          if [ "$aux_dev" == "" ]; then
+            echo "NONE"
+            return
+          fi
+
+          if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
+            echo "$aux_dev"
+            return
           fi
         fi
+
         echo "NONE"
     }
 
