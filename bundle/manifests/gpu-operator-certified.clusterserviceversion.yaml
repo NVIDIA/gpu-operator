@@ -189,7 +189,7 @@ metadata:
     capabilities: Deep Insights
     categories: AI/Machine Learning, OpenShift Optional
     certified: "true"
-    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+    containerImage: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:main-latest-ubi8
     createdAt: "Thu Jul 27 13:57:56 PDT 2023"
     description: Automate the management and monitoring of NVIDIA GPUs.
     provider: NVIDIA
@@ -201,7 +201,7 @@ spec:
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
-      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:master-latest-ubi8
+      image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:main-latest-ubi8
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ecb867c5787e44f1889b257e6c03b07748689a7b293c8f1affb1d4cb449b235c
     - name: dcgm-image
