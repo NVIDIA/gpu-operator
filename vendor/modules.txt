@@ -34,8 +34,8 @@ github.com/NVIDIA/go-nvlib/pkg/nvpci
 github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
 github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
 github.com/NVIDIA/go-nvlib/pkg/pciids
-# github.com/NVIDIA/k8s-kata-manager v0.0.0-20230620232711-08b57feb9b5a
-## explicit; go 1.20
+# github.com/NVIDIA/k8s-kata-manager v0.2.0
+## explicit; go 1.21
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 # github.com/NVIDIA/k8s-operator-libs v0.0.0-20240625163740-365c73d785db
 ## explicit; go 1.22.0
@@ -409,7 +409,7 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/image-spec v1.1.0-rc6
+# github.com/opencontainers/image-spec v1.1.0
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
