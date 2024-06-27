@@ -18,7 +18,7 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240412130237-e2b0b690b638
 	github.com/openshift/client-go v0.0.0-20240408153607-64bd6feb83ae
-	github.com/operator-framework/api v0.23.0
+	github.com/operator-framework/api v0.26.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.73.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/regclient/regclient v0.6.0
