@@ -33,7 +33,7 @@ const (
 	mdevDevicesRoot = "/sys/bus/mdev/devices"
 )
 
-// Interface allows us to get a list of NVIDIA MDEV (vGPU) and parent devices
+// Interface allows us to get a list of NVIDIA MDEV (vGPU) and parent devices.
 type Interface interface {
 	GetAllDevices() ([]*Device, error)
 	GetAllParentDevices() ([]*ParentDevice, error)
@@ -46,13 +46,13 @@ type nvmdev struct {
 
 var _ Interface = (*nvmdev)(nil)
 
-// ParentDevice represents an NVIDIA parent PCI device
+// ParentDevice represents an NVIDIA parent PCI device.
 type ParentDevice struct {
 	*nvpci.NvidiaPCIDevice
 	mdevPaths map[string]string
 }
 
-// Device represents an NVIDIA MDEV (vGPU) device
+// Device represents an NVIDIA MDEV (vGPU) device.
 type Device struct {
 	Path       string
 	UUID       string
@@ -62,12 +62,12 @@ type Device struct {
 	Parent     *ParentDevice
 }
 
-// New interface that allows us to get a list of all NVIDIA parent and MDEV (vGPU) devices
+// New interface that allows us to get a list of all NVIDIA parent and MDEV (vGPU) devices.
 func New() Interface {
 	return &nvmdev{mdevParentsRoot, mdevDevicesRoot}
 }
 
-// GetAllParentDevices returns all NVIDIA Parent PCI devices on the system
+// GetAllParentDevices returns all NVIDIA Parent PCI devices on the system.
 func (m *nvmdev) GetAllParentDevices() ([]*ParentDevice, error) {
 	deviceDirs, err := os.ReadDir(m.mdevParentsRoot)
 	if err != nil {
@@ -101,7 +101,7 @@ func (m *nvmdev) GetAllParentDevices() ([]*ParentDevice, error) {
 	return nvdevices, nil
 }
 
-// GetAllDevices returns all NVIDIA mdev (vGPU) devices on the system
+// GetAllDevices returns all NVIDIA mdev (vGPU) devices on the system.
 func (m *nvmdev) GetAllDevices() ([]*Device, error) {
 	deviceDirs, err := os.ReadDir(m.mdevDevicesRoot)
 	if err != nil {
@@ -123,7 +123,7 @@ func (m *nvmdev) GetAllDevices() ([]*Device, error) {
 	return nvdevices, nil
 }
 
-// NewDevice constructs a Device, which represents an NVIDIA mdev (vGPU) device
+// NewDevice constructs a Device, which represents an NVIDIA mdev (vGPU) device.
 func NewDevice(root string, uuid string) (*Device, error) {
 	path := path.Join(root, uuid)
 
@@ -240,14 +240,14 @@ func (m mdev) iommuGroup() (int, error) {
 	return int(iommuGroup), nil
 }
 
-// NewParentDevice constructs a ParentDevice
+// NewParentDevice constructs a ParentDevice.
 func NewParentDevice(devicePath string) (*ParentDevice, error) {
 	nvdevice, err := newNvidiaPCIDeviceFromPath(devicePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct NVIDIA PCI device: %v", err)
 	}
 	if nvdevice == nil {
-		// not a NVIDIA device
+		// not a NVIDIA device.
 		return nil, err
 	}
 
@@ -275,7 +275,7 @@ func NewParentDevice(devicePath string) (*ParentDevice, error) {
 	return &ParentDevice{nvdevice, mdevTypesMap}, err
 }
 
-// CreateMDEVDevice creates a mediated device (vGPU) on the parent GPU
+// CreateMDEVDevice creates a mediated device (vGPU) on the parent GPU.
 func (p *ParentDevice) CreateMDEVDevice(mdevType string, id string) error {
 	mdevPath, ok := p.mdevPaths[mdevType]
 	if !ok {
@@ -292,7 +292,7 @@ func (p *ParentDevice) CreateMDEVDevice(mdevType string, id string) error {
 	return nil
 }
 
-// DeleteMDEVDevice deletes a mediated device (vGPU)
+// DeleteMDEVDevice deletes a mediated device (vGPU).
 func (p *ParentDevice) DeleteMDEVDevice(id string) error {
 	removeFile, err := os.OpenFile(filepath.Join(p.Path, id, "remove"), os.O_WRONLY|os.O_SYNC, 0200)
 	if err != nil {
@@ -306,7 +306,7 @@ func (p *ParentDevice) DeleteMDEVDevice(id string) error {
 	return nil
 }
 
-// Delete deletes a mediated device (vGPU)
+// Delete deletes a mediated device (vGPU).
 func (m *Device) Delete() error {
 	removeFile, err := os.OpenFile(filepath.Join(m.Path, "remove"), os.O_WRONLY|os.O_SYNC, 0200)
 	if err != nil {
@@ -320,32 +320,27 @@ func (m *Device) Delete() error {
 	return nil
 }
 
-// GetPhysicalFunction gets the physical PCI device backing a 'parent' device
-func (p *ParentDevice) GetPhysicalFunction() (*nvpci.NvidiaPCIDevice, error) {
-	if !p.IsVF {
-		return p.NvidiaPCIDevice, nil
+// GetPhysicalFunction gets the physical PCI device backing a 'parent' device.
+func (p *ParentDevice) GetPhysicalFunction() *nvpci.NvidiaPCIDevice {
+	if p.SriovInfo.IsVF() {
+		return p.SriovInfo.VirtualFunction.PhysicalFunction
 	}
-
-	physfnPath, err := filepath.EvalSymlinks(path.Join(p.Path, "physfn"))
-	if err != nil {
-		return nil, fmt.Errorf("unable to resolve %s: %v", path.Join(p.Path, "physfn"), err)
-	}
-
-	return newNvidiaPCIDeviceFromPath(physfnPath)
+	// Either it is an SRIOV physical function or a non-SRIOV device, so return the device itself
+	return p.NvidiaPCIDevice
 }
 
-// GetPhysicalFunction gets the physical PCI device that a vGPU is created on
-func (m *Device) GetPhysicalFunction() (*nvpci.NvidiaPCIDevice, error) {
+// GetPhysicalFunction gets the physical PCI device that a vGPU is created on.
+func (m *Device) GetPhysicalFunction() *nvpci.NvidiaPCIDevice {
 	return m.Parent.GetPhysicalFunction()
 }
 
-// IsMDEVTypeSupported checks if the mdevType is supported by the GPU
+// IsMDEVTypeSupported checks if the mdevType is supported by the GPU.
 func (p *ParentDevice) IsMDEVTypeSupported(mdevType string) bool {
 	_, found := p.mdevPaths[mdevType]
 	return found
 }
 
-// IsMDEVTypeAvailable checks if a vGPU instance of mdevType can be created on the parent GPU
+// IsMDEVTypeAvailable checks if a vGPU instance of mdevType can be created on the parent GPU.
 func (p *ParentDevice) IsMDEVTypeAvailable(mdevType string) (bool, error) {
 	availableInstances, err := p.GetAvailableMDEVInstances(mdevType)
 	if err != nil {
