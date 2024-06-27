@@ -864,16 +864,23 @@ func createStatusFile(statusFile string) error {
 }
 
 func createStatusFileWithContent(statusFile string, content string) error {
-	f, err := os.Create(statusFile)
+	dir := filepath.Dir(statusFile)
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(statusFile)+".*.tmp")
 	if err != nil {
-		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
+		return fmt.Errorf("failed to create temporary status file: %w", err)
 	}
-
-	_, err = f.WriteString(content)
+	_, err = tmpFile.WriteString(content)
+	tmpFile.Close()
 	if err != nil {
-		return fmt.Errorf("unable to write contents of status file %s: %s", statusFile, err)
+		return fmt.Errorf("failed to write temporary status file: %w", err)
 	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
+	if err := os.Rename(tmpFile.Name(), statusFile); err != nil {
+		return fmt.Errorf("error moving temporary file to '%s': %w", statusFile, err)
+	}
 	return nil
 }
 
