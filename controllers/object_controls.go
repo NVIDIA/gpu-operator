@@ -32,7 +32,6 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/mitchellh/hashstructure"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -53,6 +52,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -1856,15 +1856,12 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// Compute hash of kata manager config and add an annotation with the value.
 	// If the kata config changes, a new revision of the daemonset will be
 	// created and thus the kata-manager pods will restart with the updated config.
-	hash, err := hashstructure.Hash(config.KataManager.Config, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get hash of kata-manager config: %v", err)
-	}
+	hash := utils.GetObjectHash(config.KataManager.Config)
 
 	if obj.Spec.Template.Annotations == nil {
 		obj.Spec.Template.Annotations = make(map[string]string)
 	}
-	obj.Spec.Template.Annotations[KataManagerAnnotationHashKey] = strconv.FormatUint(hash, 16)
+	obj.Spec.Template.Annotations[KataManagerAnnotationHashKey] = hash
 
 	return nil
 }
