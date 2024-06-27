@@ -42,6 +42,9 @@ files:
   "go.mod":
     scans:
       - go-mod-golang-release
+  ".osv-scanner.toml":
+    scans:
+      - osv-golang-release
 
 scans:
   docker-arg-alpine-tag:
@@ -220,6 +223,12 @@ scans:
     source: "registry-digest-match"
     args:
       regexp: '^SYFT_CONTAINER\?=(?P<Image>[^:]*):(?P<Tag>v[0-9\.]+)@(?P<Version>sha256:[0-9a-f]+)\s*$'
+  osv-golang-release:
+    type: "regexp"
+    source: "registry-tag-arg-semver"
+    args:
+      regexp: '^GoVersionOverride = "(?P<Version>[0-9\.]+)"\s*$'
+      repo: "docker.io/library/golang"
   shell-alpine-tag:
     type: "regexp"
     source: "registry-tag-arg-semver-major"
