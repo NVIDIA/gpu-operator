@@ -100,9 +100,7 @@ func (reg *Reg) BlobGet(ctx context.Context, r ref.Ref, d descriptor.Descriptor)
 	b := blob.NewReader(
 		blob.WithRef(r),
 		blob.WithReader(resp),
-		blob.WithDesc(descriptor.Descriptor{
-			Digest: d.Digest,
-		}),
+		blob.WithDesc(d),
 		blob.WithResp(resp.HTTPResponse()),
 	)
 	return b, nil
@@ -157,9 +155,7 @@ func (reg *Reg) BlobHead(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 
 	b := blob.NewReader(
 		blob.WithRef(r),
-		blob.WithDesc(descriptor.Descriptor{
-			Digest: d.Digest,
-		}),
+		blob.WithDesc(d),
 		blob.WithResp(resp.HTTPResponse()),
 	)
 	return b, nil

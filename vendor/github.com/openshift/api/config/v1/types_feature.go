@@ -17,6 +17,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=featuregates,scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type FeatureGate struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -27,6 +28,7 @@ type FeatureGate struct {
 	// spec holds user settable values for configuration
 	// +kubebuilder:validation:Required
 	// +required
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.featureSet) ? has(self.featureSet) : true",message=".spec.featureSet cannot be removed"
 	Spec FeatureGateSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
 	// +optional
@@ -43,16 +45,17 @@ var (
 	// this feature set on CANNOT BE UNDONE and PREVENTS UPGRADES.
 	TechPreviewNoUpgrade FeatureSet = "TechPreviewNoUpgrade"
 
+	// DevPreviewNoUpgrade turns on dev preview features that are not part of the normal supported platform. Turning
+	// this feature set on CANNOT BE UNDONE and PREVENTS UPGRADES.
+	DevPreviewNoUpgrade FeatureSet = "DevPreviewNoUpgrade"
+
 	// CustomNoUpgrade allows the enabling or disabling of any feature. Turning this feature set on IS NOT SUPPORTED, CANNOT BE UNDONE, and PREVENTS UPGRADES.
 	// Because of its nature, this setting cannot be validated.  If you have any typos or accidentally apply invalid combinations
 	// your cluster may fail in an unrecoverable way.
 	CustomNoUpgrade FeatureSet = "CustomNoUpgrade"
 
-	// TopologyManager enables ToplogyManager support. Upgrades are enabled with this feature.
-	LatencySensitive FeatureSet = "LatencySensitive"
-
 	// AllFixedFeatureSets are the featuresets that have known featuregates.  Custom doesn't for instance.  LatencySensitive is dead
-	AllFixedFeatureSets = []FeatureSet{Default, TechPreviewNoUpgrade}
+	AllFixedFeatureSets = []FeatureSet{Default, TechPreviewNoUpgrade, DevPreviewNoUpgrade}
 )
 
 type FeatureGateSpec struct {
@@ -67,6 +70,7 @@ type FeatureGateSelection struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="oldSelf == 'CustomNoUpgrade' ? self == 'CustomNoUpgrade' : true",message="CustomNoUpgrade may not be changed"
 	// +kubebuilder:validation:XValidation:rule="oldSelf == 'TechPreviewNoUpgrade' ? self == 'TechPreviewNoUpgrade' : true",message="TechPreviewNoUpgrade may not be changed"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == 'DevPreviewNoUpgrade' ? self == 'DevPreviewNoUpgrade' : true",message="DevPreviewNoUpgrade may not be changed"
 	FeatureSet FeatureSet `json:"featureSet,omitempty"`
 
 	// customNoUpgrade allows the enabling or disabling of any feature. Turning this feature set on IS NOT SUPPORTED, CANNOT BE UNDONE, and PREVENTS UPGRADES.
@@ -145,9 +149,4 @@ type FeatureGateList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []FeatureGate `json:"items"`
-}
-
-type FeatureGateEnabledDisabled struct {
-	Enabled  []FeatureGateDescription
-	Disabled []FeatureGateDescription
 }

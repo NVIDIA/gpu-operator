@@ -1,7 +1,10 @@
 // Package mediatype defines well known media types.
 package mediatype
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 const (
 	// Docker1Manifest deprecated media type for docker schema1 manifests.
@@ -22,8 +25,12 @@ const (
 	OCI1ManifestList = "application/vnd.oci.image.index.v1+json"
 	// OCI1ImageConfig OCI v1 configuration json object media type.
 	OCI1ImageConfig = "application/vnd.oci.image.config.v1+json"
+	// Docker2Layer is the uncompressed layer for docker schema2.
+	Docker2Layer = "application/vnd.docker.image.rootfs.diff.tar"
 	// Docker2LayerGzip is the default compressed layer for docker schema2.
 	Docker2LayerGzip = "application/vnd.docker.image.rootfs.diff.tar.gzip"
+	// Docker2LayerZstd is the default compressed layer for docker schema2.
+	Docker2LayerZstd = "application/vnd.docker.image.rootfs.diff.tar.zstd"
 	// Docker2ForeignLayer is the default compressed layer for foreign layers in docker schema2.
 	Docker2ForeignLayer = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
 	// OCI1Layer is the uncompressed layer for OCIv1.
@@ -49,3 +56,10 @@ func Base(orig string) string {
 	base, _, _ := strings.Cut(orig, ";")
 	return strings.TrimSpace(strings.ToLower(base))
 }
+
+// Valid returns true if the media type matches the rfc6838 4.2 naming requirements.
+func Valid(mt string) bool {
+	return validateRegexp.MatchString(mt)
+}
+
+var validateRegexp = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$`)

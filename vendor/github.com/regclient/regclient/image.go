@@ -24,6 +24,7 @@ import (
 	"github.com/regclient/regclient/pkg/archive"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types"
+	"github.com/regclient/regclient/types/blob"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/docker/schema2"
 	"github.com/regclient/regclient/types/errs"
@@ -436,6 +437,55 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 	return nil
 }
 
+// ImageConfig returns the OCI config of a given image.
+// Use [ImageWithPlatform] to select a platform from an Index or Manifest List.
+func (rc *RegClient) ImageConfig(ctx context.Context, r ref.Ref, opts ...ImageOpts) (*blob.BOCIConfig, error) {
+	opt := imageOpt{
+		platform: "local",
+	}
+	for _, optFn := range opts {
+		optFn(&opt)
+	}
+	m, err := rc.ManifestGet(ctx, r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manifest: %w", err)
+	}
+	for m.IsList() {
+		mi, ok := m.(manifest.Indexer)
+		if !ok {
+			return nil, fmt.Errorf("unsupported manifest type: %s", m.GetDescriptor().MediaType)
+		}
+		ml, err := mi.GetManifestList()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get manifest list: %w", err)
+		}
+		p, err := platform.Parse(opt.platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse platform %s: %w", opt.platform, err)
+		}
+		d, err := descriptor.DescriptorListSearch(ml, descriptor.MatchOpt{Platform: &p})
+		if err != nil {
+			return nil, fmt.Errorf("failed to find platform in manifest list: %w", err)
+		}
+		m, err = rc.ManifestGet(ctx, r, WithManifestDesc(d))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get manifest: %w", err)
+		}
+	}
+	mi, ok := m.(manifest.Imager)
+	if !ok {
+		return nil, fmt.Errorf("unsupported manifest type: %s", m.GetDescriptor().MediaType)
+	}
+	d, err := mi.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image config: %w", err)
+	}
+	if d.MediaType != mediatype.OCI1ImageConfig && d.MediaType != mediatype.Docker2ImageConfig {
+		return nil, fmt.Errorf("unsupported config media type %s: %w", d.MediaType, errs.ErrUnsupportedMediaType)
+	}
+	return rc.BlobGetOCIConfig(ctx, r, d)
+}
+
 // ImageCopy copies an image.
 // This will retag an image in the same repository, only pushing and pulling the top level manifest.
 // On the same registry, it will attempt to use cross-repository blob mounts to avoid pulling blobs.
@@ -604,7 +654,8 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 					// known manifest media type
 					err = rc.imageCopyOpt(ctx, entrySrc, entryTgt, dEntry, true, parentsNew, opt)
 				case mediatype.Docker2ImageConfig, mediatype.OCI1ImageConfig,
-					mediatype.Docker2LayerGzip, mediatype.OCI1Layer, mediatype.OCI1LayerGzip,
+					mediatype.Docker2Layer, mediatype.Docker2LayerGzip, mediatype.Docker2LayerZstd,
+					mediatype.OCI1Layer, mediatype.OCI1LayerGzip, mediatype.OCI1LayerZstd,
 					mediatype.BuildkitCacheConfig:
 					// known blob media type
 					err = rc.imageCopyBlob(ctx, entrySrc, entryTgt, dEntry, opt, bOpt...)
@@ -1340,11 +1391,16 @@ func (rc *RegClient) imageImportDockerAddLayerHandlers(ctx context.Context, r re
 	for i, layerFile := range trd.dockerManifestList[index].Layers {
 		func(i int) {
 			trd.handlers[filepath.Clean(layerFile)] = func(header *tar.Header, trd *tarReadData) error {
-				// ensure blob is compressed with gzip to match media type
-				gzipR, err := archive.Compress(trd.tr, archive.CompressGzip)
+				// ensure blob is compressed
+				rdrUC, err := archive.Decompress(trd.tr)
 				if err != nil {
 					return err
 				}
+				gzipR, err := archive.Compress(rdrUC, archive.CompressGzip)
+				if err != nil {
+					return err
+				}
+				defer gzipR.Close()
 				// upload blob, digest and size is unknown
 				d, err := rc.BlobPut(ctx, r, descriptor.Descriptor{}, gzipR)
 				if err != nil {
@@ -1449,7 +1505,8 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 					}
 					return rc.imageImportOCIHandleManifest(ctx, r, md, trd, true, child)
 				case mediatype.Docker2ImageConfig, mediatype.OCI1ImageConfig,
-					mediatype.Docker2LayerGzip, mediatype.OCI1Layer, mediatype.OCI1LayerGzip,
+					mediatype.Docker2Layer, mediatype.Docker2LayerGzip, mediatype.Docker2LayerZstd,
+					mediatype.OCI1Layer, mediatype.OCI1LayerGzip, mediatype.OCI1LayerZstd,
 					mediatype.BuildkitCacheConfig:
 					// known blob media types
 					return rc.imageImportBlob(ctx, r, d, trd)

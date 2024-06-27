@@ -63,11 +63,15 @@ func init() {
 		mediatype.Docker2ManifestList: mediatype.OCI1ManifestList,
 		mediatype.Docker2Manifest:     mediatype.OCI1Manifest,
 		mediatype.Docker2ImageConfig:  mediatype.OCI1ImageConfig,
+		mediatype.Docker2Layer:        mediatype.OCI1Layer,
 		mediatype.Docker2LayerGzip:    mediatype.OCI1LayerGzip,
+		mediatype.Docker2LayerZstd:    mediatype.OCI1LayerZstd,
 		mediatype.OCI1ManifestList:    mediatype.OCI1ManifestList,
 		mediatype.OCI1Manifest:        mediatype.OCI1Manifest,
 		mediatype.OCI1ImageConfig:     mediatype.OCI1ImageConfig,
+		mediatype.OCI1Layer:           mediatype.OCI1Layer,
 		mediatype.OCI1LayerGzip:       mediatype.OCI1LayerGzip,
+		mediatype.OCI1LayerZstd:       mediatype.OCI1LayerZstd,
 	}
 }
 
@@ -143,12 +147,8 @@ func (d Descriptor) Same(d2 Descriptor) bool {
 		return false
 	}
 	// loosen the check on media type since this can be converted from a build
-	if d.MediaType != d2.MediaType {
-		if _, ok := mtToOCI[d.MediaType]; !ok {
-			return false
-		} else if mtToOCI[d.MediaType] != mtToOCI[d2.MediaType] {
-			return false
-		}
+	if d.MediaType != d2.MediaType && (mtToOCI[d.MediaType] != mtToOCI[d2.MediaType] || mtToOCI[d.MediaType] == "") {
+		return false
 	}
 	return true
 }
