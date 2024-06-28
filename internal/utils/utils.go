@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
@@ -64,7 +63,7 @@ func BoolPtr(v bool) *bool {
 }
 
 // GetObjectHash invokes Sum32 Hash function to return hash value of an unstructured Object
-func GetObjectHash(obj *unstructured.Unstructured) string {
+func GetObjectHash(obj interface{}) string {
 	hasher := fnv.New32a()
 	printer := spew.ConfigState{
 		Indent:         " ",
