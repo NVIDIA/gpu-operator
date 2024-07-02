@@ -283,7 +283,7 @@ devicePlugin:
   config:
     # Create a ConfigMap (default: false)
     create: false
-    # ConfigMap name (either exiting or to create a new one with create=true above)
+    # ConfigMap name (either existing or to create a new one with create=true above)
     name: ""
     # Default config name within the ConfigMap
     default: ""
@@ -358,9 +358,42 @@ migManager:
     - name: WITH_REBOOT
       value: "false"
   resources: {}
+  # MIG configuration
+  # Use "name" to either point to an existing ConfigMap or to create a new one with a list of configurations(i.e with create=true).
+  # Use "data" to build an integrated ConfigMap from a set of configurations as
+  # part of this helm chart. An example of setting "data" might be:
+  # config:
+  #   name: custom-mig-parted-configs
+  #   create: true
+  #   data: |-
+  #     all-disabled:
+  #       - devices: all
+  #         mig-enabled: false
+  #     custom-mig:
+  #       - devices: [0]
+  #         mig-enabled: false
+  #       - devices: [1]
+  #          mig-enabled: true
+  #          mig-devices:
+  #            "1g.10gb": 7
+  #       - devices: [2]
+  #         mig-enabled: true
+  #         mig-devices:
+  #           "2g.20gb": 2
+  #           "3g.40gb": 1
+  #       - devices: [3]
+  #         mig-enabled: true
+  #         mig-devices:
+  #           "3g.40gb": 1
+  #           "4g.40gb": 1
   config:
-    name: "default-mig-parted-config"
     default: "all-disabled"
+    # Create a ConfigMap (default: false)
+    create: false
+    # ConfigMap name (either existing or to create a new one with create=true above)
+    name: "default-mig-parted-config"
+    # Data section for the ConfigMap to create (i.e only applies when create=true)
+    data: {}
   gpuClientsConfig:
     name: ""
 
