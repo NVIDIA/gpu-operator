@@ -19,8 +19,12 @@ spec:
   - {{ include "node-feature-discovery.fullname" . }}-master.{{ include "node-feature-discovery.namespace" .  }}.svc
   - {{ include "node-feature-discovery.fullname" . }}-master.{{ include "node-feature-discovery.namespace" .  }}.svc.cluster.local
   issuerRef:
-    name: nfd-ca-issuer
+    name: {{ default "nfd-ca-issuer" .Values.tls.certManagerCertificate.issuerName }}
+    {{- if and .Values.tls.certManagerCertificate.issuerName .Values.tls.certManagerCertificate.issuerKind }}
+    kind: {{ .Values.tls.certManagerCertificate.issuerKind }}
+    {{- else }}
     kind: Issuer
+    {{- end }}
     group: cert-manager.io
 {{- end }}
 ---
@@ -39,8 +43,12 @@ spec:
   dnsNames:
   - {{ include "node-feature-discovery.fullname" . }}-worker.{{ include "node-feature-discovery.namespace" .  }}.svc.cluster.local
   issuerRef:
-    name: nfd-ca-issuer
+    name: {{ default "nfd-ca-issuer" .Values.tls.certManagerCertificate.issuerName }}
+    {{- if and .Values.tls.certManagerCertificate.issuerName .Values.tls.certManagerCertificate.issuerKind }}
+    kind: {{ .Values.tls.certManagerCertificate.issuerKind }}
+    {{- else }}
     kind: Issuer
+    {{- end }}
     group: cert-manager.io
 {{- end }}
 
@@ -60,8 +68,12 @@ spec:
   dnsNames:
   - {{ include "node-feature-discovery.fullname" . }}-topology-updater.{{ include "node-feature-discovery.namespace" .  }}.svc.cluster.local
   issuerRef:
-    name: nfd-ca-issuer
+    name: {{ default "nfd-ca-issuer" .Values.tls.certManagerCertificate.issuerName }}
+    {{- if and .Values.tls.certManagerCertificate.issuerName .Values.tls.certManagerCertificate.issuerKind }}
+    kind: {{ .Values.tls.certManagerCertificate.issuerKind }}
+    {{- else }}
     kind: Issuer
+    {{- end }}
     group: cert-manager.io
 {{- end }}
 

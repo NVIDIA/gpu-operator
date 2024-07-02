@@ -1,4 +1,4 @@
-{{- if and (not .Values.enableNodeFeatureApi) .Values.master.enable }}
+{{- if and (not (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi)) .Values.master.enable }}
 apiVersion: v1
 kind: Service
 metadata:

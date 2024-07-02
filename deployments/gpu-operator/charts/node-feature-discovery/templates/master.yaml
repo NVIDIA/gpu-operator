@@ -27,6 +27,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+    {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+    {{- end }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -43,12 +46,12 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           livenessProbe:
             grpc:
-              port: 8080
+              port: 8082
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             grpc:
-              port: 8080
+              port: 8082
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 10
@@ -70,9 +73,8 @@ spec:
             {{- if .Values.master.instance | empty | not }}
             - "-instance={{ .Values.master.instance }}"
             {{- end }}
-            {{- if not .Values.enableNodeFeatureApi }}
+            {{- if not (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi) }}
             - "-port={{ .Values.master.port | default "8080" }}"
-            - "-enable-nodefeature-api=false"
             {{- else if gt (int .Values.master.replicaCount) 1 }}
             - "-enable-leader-election"
             {{- end }}
@@ -107,6 +109,10 @@ spec:
             - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
             - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
             - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+            {{- end }}
+            # Go over featureGates and add the feature-gate flag
+            {{- range $key, $value := .Values.featureGates }}
+            - "-feature-gates={{ $key }}={{ $value }}"
             {{- end }}
             - "-metrics={{ .Values.master.metricsPort  | default "8081" }}"
           volumeMounts:

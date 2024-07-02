@@ -1,3 +1,4 @@
+{{- if .Values.topologyUpdater.enable -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,3 +9,4 @@ metadata:
 data:
   nfd-topology-updater.conf: |-
     {{- .Values.topologyUpdater.config | toYaml | nindent 4 }}
+{{- end }}

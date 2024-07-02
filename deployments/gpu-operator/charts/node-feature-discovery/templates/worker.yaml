@@ -27,6 +27,9 @@ spec:
       {{- end }}
     spec:
       dnsPolicy: ClusterFirstWithHostNet
+    {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+    {{- end }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -40,6 +43,17 @@ spec:
           {{- toYaml .Values.worker.securityContext | nindent 12 }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          grpc:
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          grpc:
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 10
         env:
         - name: NODE_NAME
           valueFrom:
@@ -58,14 +72,17 @@ spec:
         command:
         - "nfd-worker"
         args:
-        {{- if not .Values.enableNodeFeatureApi }}
+{{- if not (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi)   }}
         - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
-        - "-enable-nodefeature-api=false"
-        {{- end }}
+{{- end }}
 {{- if .Values.tls.enable }}
         - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
         - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
         - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
+{{- end }}
+# Go over featureGate and add the feature-gate flag
+{{- range $key, $value := .Values.featureGates }}
+        - "-feature-gates={{ $key }}={{ $value }}"
 {{- end }}
         - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
         ports:
@@ -86,6 +103,9 @@ spec:
           readOnly: true
         - name: host-lib
           mountPath: "/host-lib"
+          readOnly: true
+        - name: host-proc-swaps
+          mountPath: "/host-proc/swaps"
           readOnly: true
         {{- if .Values.worker.mountUsrSrc }}
         - name: host-usr-src
@@ -122,6 +142,9 @@ spec:
         - name: host-lib
           hostPath:
             path: "/lib"
+        - name: host-proc-swaps
+          hostPath:
+            path: "/proc/swaps"
         {{- if .Values.worker.mountUsrSrc }}
         - name: host-usr-src
           hostPath:

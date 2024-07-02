@@ -21,10 +21,18 @@ rules:
   resources:
   - nodefeatures
   - nodefeaturerules
+  - nodefeaturegroups
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - nfd.k8s-sigs.io
+  resources:
+  - nodefeaturegroups/status
+  verbs:
+  - patch
+  - update
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -59,6 +67,12 @@ rules:
   - get
   - list
 - apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
     - ""
   resources:
     - nodes/proxy
@@ -80,7 +94,7 @@ rules:
   - update
 {{- end }}
 
-{{- if and .Values.gc.enable .Values.gc.rbac.create (or .Values.enableNodeFeatureApi .Values.topologyUpdater.enable) }}
+{{- if and .Values.gc.enable .Values.gc.rbac.create (or (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi) .Values.topologyUpdater.enable) }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
