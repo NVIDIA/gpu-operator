@@ -3,7 +3,7 @@
 This repository outputs two artifacts:
 - The GPU Operator container.
 - The GPU Operator helm chart.
- 
+  
 # Versioning
 
 This repository follows Semantic Versioning 2.0.0
