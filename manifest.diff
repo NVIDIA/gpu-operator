@@ -1,0 +1,51 @@
+diff --git a/manifests/state-driver/0500_daemonset.yaml b/manifests/state-driver/0500_daemonset.yaml
+index 8ceb7820c..8716d147d 100644
+--- a/manifests/state-driver/0500_daemonset.yaml
++++ b/manifests/state-driver/0500_daemonset.yaml
+@@ -205,6 +205,12 @@ spec:
+         # always use runc for driver containers
+         - name: NVIDIA_VISIBLE_DEVICES
+           value: void
++      {{- if .Driver.Spec.PersistDriver }}
++        - name: RESTARTS_ENABLED
++          value: "true"
++        - name: INSTALL_DIR
++          value: {{ .Driver.Spec.InstallDirectory | default "/opt/nvidia/driver" }}
++      {{- end }}
+       {{- if deref .Driver.Spec.UseOpenKernelModules }}
+         - name: OPEN_KERNEL_MODULES_ENABLED
+           value: "true"
+@@ -254,6 +260,14 @@ spec:
+         {{- end }}
+       {{- end }}
+         volumeMounts:
++          {{- if .Driver.Spec.PersistDriver }}
++          - name: install-dir
++            mountPath: {{ .Driver.Spec.InstallDirectory | default "/opt/nvidia/driver" }}
++          - name: lib-modules
++            mountPath: /lib/modules
++          - name: dev
++            mountPath: /dev
++          {{- end }}
+           - name: run-nvidia
+             mountPath: /run/nvidia
+             mountPropagation: Bidirectional
+@@ -574,6 +588,18 @@ spec:
+             readOnly: true
+       {{- end }}
+       volumes:
++        {{- if .Driver.Spec.PersistDriver }}
++        - name: install-dir
++          hostPath:
++            path: {{ .Driver.Spec.InstallDirectory | default "/opt/nvidia/driver" }}
++            type: DirectoryOrCreate
++        - name: lib-modules
++          hostPath:
++            path: /lib/modules
++        - name: dev
++          hostPath:
++            path: /dev
++        {{- end }}
+         - name: run-nvidia
+           hostPath:
+             path: /run/nvidia
