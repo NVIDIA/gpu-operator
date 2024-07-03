@@ -148,6 +148,8 @@ const (
 	CDIEnabledEnvName = "CDI_ENABLED"
 	// NvidiaCTKPathEnvName is the name of the envvar specifying the path to the 'nvidia-ctk' binary
 	NvidiaCTKPathEnvName = "NVIDIA_CTK_PATH"
+	// NvidiaCDIHookPathEnvName is the name of the envvar specifying the path to the 'nvidia-cdi-hook' binary
+	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
 	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
 	CrioConfigModeEnvName = "CRIO_CONFIG_MODE"
 	// DeviceListStrategyEnvName is the name of the envvar for configuring the device-list-strategy in the device-plugin
@@ -1762,6 +1764,9 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
+		if config.Toolkit.IsEnabled() {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
+		}
 	}
 
 	return nil
