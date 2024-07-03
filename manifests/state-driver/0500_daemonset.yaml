@@ -206,7 +206,7 @@ spec:
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
       {{- if .Driver.Spec.PersistDriver }}
-        - name: RESTARTS_ENABLED
+        - name: PERSIST_DRIVER
           value: "true"
         - name: INSTALL_DIR
           value: {{ .Driver.Spec.InstallDirectory | default "/opt/nvidia/driver" }}

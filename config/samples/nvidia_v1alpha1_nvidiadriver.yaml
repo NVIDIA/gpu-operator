@@ -6,9 +6,9 @@ spec:
   # use pre-compiled packages for NVIDIA driver installation.
   usePrecompiled: false
   driverType: gpu
-  repository: "1837582943" #nvcr.io/nvidia
+  repository: nvcr.io/nvidia
   image: driver
-  version: "550.54.17"
+  version: "550.90.07"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   nodeSelector: {}
@@ -18,7 +18,7 @@ spec:
     useHostMofed: false
   gds:
     enabled: false
-  persist: true
+  persist: false
   installDirectory: '/opt/nvidia/driver'
   # Private mirror repository configuration
   repoConfig:
