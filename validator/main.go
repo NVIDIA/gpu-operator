@@ -693,6 +693,13 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 
 func validateHostDriver(silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
+	fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi")
+	if err != nil {
+		return fmt.Errorf("no 'nvidia-smi' file present on the host: %w", err)
+	}
+	if fileInfo.Size() == 0 {
+		return fmt.Errorf("empty 'nvidia-smi' file found on the host")
+	}
 	command := "chroot"
 	args := []string{"/host", "nvidia-smi"}
 
