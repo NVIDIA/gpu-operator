@@ -71,7 +71,7 @@ trigger-pipeline:
 
 .buildx-setup:
   before_script:
-    -  export BUILDX_VERSION=v0.6.3
+    -  export BUILDX_VERSION=v0.15.1
     -  apk add --no-cache curl
     -  mkdir -p ~/.docker/cli-plugins
     -  curl -sSLo ~/.docker/cli-plugins/docker-buildx "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64"
