@@ -18,6 +18,14 @@ updates:
         exclude-patterns:
           - k8s.io/klog/*
 
+  - package-ecosystem: "gomod"
+    target-branch: main
+    directory: "/tools"
+    schedule:
+      interval: "daily"
+    labels:
+      - toolchain-dependencies
+
   # Update GPU Operator base images.
   - package-ecosystem: "docker"
     directory: "/docker"
