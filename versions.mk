@@ -19,6 +19,6 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= v24.3.0
 
-GOLANG_VERSION ?= 1.22.2
+GOLANG_VERSION ?= 1.22.5
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
