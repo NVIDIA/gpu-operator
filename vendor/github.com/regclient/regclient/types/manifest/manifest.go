@@ -182,12 +182,16 @@ func GetMediaType(m Manifest) string {
 
 // GetPlatformDesc returns the descriptor for a specific platform from an index.
 func GetPlatformDesc(m Manifest, p *platform.Platform) (*descriptor.Descriptor, error) {
-	dl, err := m.GetManifestList()
-	if err != nil {
-		return nil, err
-	}
 	if p == nil {
 		return nil, fmt.Errorf("invalid input, platform is nil%.0w", errs.ErrNotFound)
+	}
+	mi, ok := m.(Indexer)
+	if !ok {
+		return nil, fmt.Errorf("unsupported manifest type: %s", m.GetDescriptor().MediaType)
+	}
+	dl, err := mi.GetManifestList()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manifest list: %w", err)
 	}
 	d, err := descriptor.DescriptorListSearch(dl, descriptor.MatchOpt{Platform: p})
 	if err != nil {
@@ -198,17 +202,15 @@ func GetPlatformDesc(m Manifest, p *platform.Platform) (*descriptor.Descriptor, 
 
 // GetPlatformList returns the list of platforms from an index.
 func GetPlatformList(m Manifest) ([]*platform.Platform, error) {
-	dl, err := m.GetManifestList()
+	mi, ok := m.(Indexer)
+	if !ok {
+		return nil, fmt.Errorf("unsupported manifest type: %s", m.GetDescriptor().MediaType)
+	}
+	dl, err := mi.GetManifestList()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get manifest list: %w", err)
 	}
-	var l []*platform.Platform
-	for _, d := range dl {
-		if d.Platform != nil {
-			l = append(l, d.Platform)
-		}
-	}
-	return l, nil
+	return getPlatformList(dl)
 }
 
 // GetRateLimit returns the current rate limit seen in headers.
@@ -376,7 +378,7 @@ func fromOrig(c common, orig interface{}) (Manifest, error) {
 		c.rawBody = mj
 	}
 	if _, ok := orig.(schema1.SignedManifest); !ok {
-		c.desc.Digest = digest.FromBytes(mj)
+		c.desc.Digest = c.desc.DigestAlgo().FromBytes(mj)
 	}
 	if c.desc.Size == 0 {
 		c.desc.Size = int64(len(mj))
@@ -394,7 +396,7 @@ func fromOrig(c common, orig interface{}) (Manifest, error) {
 		mt = mOrig.MediaType
 		c.desc.MediaType = mediatype.Docker1ManifestSigned
 		// recompute digest on the canonical data
-		c.desc.Digest = digest.FromBytes(mOrig.Canonical)
+		c.desc.Digest = c.desc.DigestAlgo().FromBytes(mOrig.Canonical)
 		m = &docker1SignedManifest{
 			common:         c,
 			SignedManifest: mOrig,
@@ -490,7 +492,7 @@ func fromCommon(c common) (Manifest, error) {
 		}
 		// compute digest
 		if c.desc.MediaType != mediatype.Docker1ManifestSigned {
-			d := digest.FromBytes(c.rawBody)
+			d := c.desc.DigestAlgo().FromBytes(c.rawBody)
 			c.desc.Digest = d
 			c.desc.Size = int64(len(c.rawBody))
 		}
@@ -508,7 +510,7 @@ func fromCommon(c common) (Manifest, error) {
 		if len(c.rawBody) > 0 {
 			err = json.Unmarshal(c.rawBody, &mOrig)
 			mt = mOrig.MediaType
-			d := digest.FromBytes(mOrig.Canonical)
+			d := c.desc.DigestAlgo().FromBytes(mOrig.Canonical)
 			c.desc.Digest = d
 			c.desc.Size = int64(len(mOrig.Canonical))
 		}

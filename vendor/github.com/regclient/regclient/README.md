@@ -87,3 +87,11 @@ See the [installation options](docs/install.md).
 ## Usage
 
 See the [project documentation](docs/README.md).
+
+## Contributors
+
+<a href="https://github.com/regclient/regclient/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=regclient/regclient" alt="contributor list"/>
+</a>
+
+<!-- markdownlint-disable-file MD033 -->

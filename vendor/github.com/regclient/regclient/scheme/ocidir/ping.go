@@ -3,6 +3,7 @@ package ocidir
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/regclient/regclient/types/ping"
 	"github.com/regclient/regclient/types/ref"
@@ -11,7 +12,7 @@ import (
 // Ping for an ocidir verifies access to read the path.
 func (o *OCIDir) Ping(ctx context.Context, r ref.Ref) (ping.Result, error) {
 	ret := ping.Result{}
-	fd, err := o.fs.Open(r.Path)
+	fd, err := os.Open(r.Path)
 	if err != nil {
 		return ret, err
 	}

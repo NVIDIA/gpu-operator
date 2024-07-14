@@ -203,7 +203,7 @@ func (m *docker1Manifest) SetOrig(origIn interface{}) error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.Docker1Manifest,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	m.Manifest = orig
@@ -228,8 +228,8 @@ func (m *docker1SignedManifest) SetOrig(origIn interface{}) error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.Docker1ManifestSigned,
-		Digest:    digest.FromBytes(mj),
-		Size:      int64(len(mj)),
+		Digest:    m.desc.DigestAlgo().FromBytes(orig.Canonical),
+		Size:      int64(len(orig.Canonical)),
 	}
 	m.SignedManifest = orig
 

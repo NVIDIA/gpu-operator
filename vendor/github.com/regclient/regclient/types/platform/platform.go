@@ -74,7 +74,10 @@ func Parse(platStr string) (Platform, error) {
 		platSplit[i] = strings.ToLower(part)
 	}
 	plat := &Platform{}
-	if len(platSplit) >= 1 {
+	if len(platSplit) == 1 && knownArch(platSplit[0]) {
+		// special case of architecture only
+		plat.Architecture = platSplit[0]
+	} else if len(platSplit) >= 1 {
 		plat.OS = platSplit[0]
 	}
 	if len(platSplit) >= 2 {
@@ -107,7 +110,7 @@ func Parse(platStr string) (Platform, error) {
 		plat.OS = platLocal.OS
 	}
 	plat.normalize()
-	if len(platSplit) < 2 && Compatible(Platform{OS: platLocal.OS}, Platform{OS: plat.OS}) {
+	if len(platSplit) < 2 && plat.Architecture == "" && plat.Variant == "" && Compatible(Platform{OS: platLocal.OS}, Platform{OS: plat.OS}) {
 		// automatically expand local architecture with recognized OS
 		switch plat.OS {
 		case "linux", "darwin":
@@ -123,6 +126,24 @@ func Parse(platStr string) (Platform, error) {
 	}
 
 	return *plat, nil
+}
+
+// knownArch is a list of known architectures that can be parsed without the OS field.
+// Otherwise the OS is required.
+func knownArch(arch string) bool {
+	switch arch {
+	case "386", "amd64", "i386", "x86_64", "x86-64",
+		"arm", "armhf", "armel", "arm64", "aarch64",
+		"mips", "mips64", "mips64le",
+		"ppc", "ppc64", "ppc64le",
+		"loong64",
+		"riscv", "riscv64",
+		"s390", "s390x",
+		"sparc", "sparc64",
+		"wasm":
+		return true
+	}
+	return false
 }
 
 func (p *Platform) normalize() {

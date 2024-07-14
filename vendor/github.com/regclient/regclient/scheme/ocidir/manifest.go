@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path"
 
 	// crypto libraries included for go-digest
@@ -16,7 +17,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 
-	"github.com/regclient/regclient/internal/rwfs"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
@@ -83,7 +83,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 	// delete from filesystem like a registry would do
 	d := digest.Digest(r.Digest)
 	file := path.Join(r.Path, "blobs", d.Algorithm().String(), d.Encoded())
-	err = o.fs.Remove(file)
+	err = os.Remove(file)
 	if err != nil {
 		return fmt.Errorf("failed to delete manifest: %w", err)
 	}
@@ -117,8 +117,12 @@ func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, e
 	if desc.Digest == "" {
 		return nil, errs.ErrNotFound
 	}
+	if err = desc.Digest.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid digest in index: %s: %w", string(desc.Digest), err)
+	}
 	file := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
-	fd, err := o.fs.Open(file)
+	//#nosec G304 users should validate references they attempt to open
+	fd, err := os.Open(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open manifest: %w", err)
 	}
@@ -161,15 +165,19 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 	if desc.Digest == "" {
 		return nil, errs.ErrNotFound
 	}
+	if err = desc.Digest.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid digest in index: %s: %w", string(desc.Digest), err)
+	}
 	// verify underlying file exists
 	file := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
-	fi, err := rwfs.Stat(o.fs, file)
+	fi, err := os.Stat(file)
 	if err != nil || fi.IsDir() {
 		return nil, errs.ErrNotFound
 	}
 	// if missing, set media type on desc
 	if desc.MediaType == "" {
-		raw, err := rwfs.ReadFile(o.fs, file)
+		//#nosec G304 users should validate references they attempt to open
+		raw, err := os.ReadFile(file)
 		if err != nil {
 			return nil, err
 		}
@@ -218,6 +226,9 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 		return err
 	}
 	desc := m.GetDescriptor()
+	if err = desc.Digest.Validate(); err != nil {
+		return fmt.Errorf("invalid digest for manifest: %s: %w", string(desc.Digest), err)
+	}
 	b, err := m.RawBody()
 	if err != nil {
 		return fmt.Errorf("could not serialize manifest: %w", err)
@@ -233,12 +244,13 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	}
 	// create manifest CAS file
 	dir := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String())
-	err = rwfs.MkdirAll(o.fs, dir, 0777)
+	//#nosec G301 defer to user umask settings
+	err = os.MkdirAll(dir, 0777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", dir, err)
 	}
 	// write to a tmp file, rename after validating
-	tmpFile, err := rwfs.CreateTemp(o.fs, dir, desc.Digest.Encoded()+".*.tmp")
+	tmpFile, err := os.CreateTemp(dir, desc.Digest.Encoded()+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create manifest tmpfile: %w", err)
 	}
@@ -256,7 +268,7 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 		return fmt.Errorf("failed to close manifest tmpfile: %w", errC)
 	}
 	file := path.Join(dir, desc.Digest.Encoded())
-	err = o.fs.Rename(path.Join(dir, tmpName), file)
+	err = os.Rename(path.Join(dir, tmpName), file)
 	if err != nil {
 		return fmt.Errorf("failed to write manifest (rename tmpfile): %w", err)
 	}
