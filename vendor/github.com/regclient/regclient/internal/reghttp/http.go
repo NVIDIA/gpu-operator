@@ -231,10 +231,9 @@ func WithUserAgent(ua string) Opts {
 // Do runs a request, returning the response result
 func (c *Client) Do(ctx context.Context, req *Req) (Resp, error) {
 	resp := &clientResp{
-		ctx:      ctx,
-		client:   c,
-		req:      req,
-		digester: digest.Canonical.Digester(),
+		ctx:    ctx,
+		client: c,
+		req:    req,
 	}
 	err := resp.Next()
 	return resp, err
@@ -306,8 +305,11 @@ func (resp *clientResp) Next() error {
 				}
 			}
 
-			// store the desired digest
+			// store the desired digest and setup digester at first byte
 			resp.digest = api.Digest
+			if resp.readCur == 0 && resp.digest.Validate() == nil {
+				resp.digester = resp.digest.Algorithm().Digester()
+			}
 
 			// build the url
 			var u url.URL
@@ -494,8 +496,12 @@ func (resp *clientResp) Next() error {
 				return fmt.Errorf("request failed: %w: %s", errHTTP, errBody)
 			}
 
-			// update digester
-			resp.reader = io.TeeReader(resp.resp.Body, resp.digester.Hash())
+			// setup reader, with a digester if configured
+			if resp.digester == nil {
+				resp.reader = resp.resp.Body
+			} else {
+				resp.reader = io.TeeReader(resp.resp.Body, resp.digester.Hash())
+			}
 			resp.done = false
 			// set variables from headers if found
 			if resp.readCur == 0 && resp.readMax == 0 && resp.resp.Header.Get("Content-Length") != "" {
@@ -588,7 +594,7 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 			return i, nil
 		}
 		// validate the digest if specified
-		if resp.resp.Request.Method != "HEAD" && resp.digest != "" && resp.digest != resp.digester.Digest() {
+		if resp.resp.Request.Method != "HEAD" && resp.digester != nil && resp.digest.Validate() == nil && resp.digest != resp.digester.Digest() {
 			resp.client.log.WithFields(logrus.Fields{
 				"expected": resp.digest,
 				"computed": resp.digester.Digest(),
@@ -639,8 +645,6 @@ func (resp *clientResp) Seek(offset int64, whence int) (int64, error) {
 		return resp.readCur, fmt.Errorf("unknown value of whence: %d", whence)
 	}
 	if newOffset == 0 {
-		// reset digester
-		resp.digester = digest.Canonical.Digester()
 		resp.readCur = 0
 		// rerun the request to restart
 		err := resp.Next()

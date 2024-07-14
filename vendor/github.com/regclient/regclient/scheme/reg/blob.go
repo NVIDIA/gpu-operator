@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	zeroDig = digest.Canonical.FromBytes([]byte{})
+	zeroDig = digest.SHA256.FromBytes([]byte{})
 )
 
 // BlobDelete removes a blob from the repository
@@ -181,7 +181,7 @@ func (reg *Reg) BlobMount(ctx context.Context, rSrc ref.Ref, rTgt ref.Ref, d des
 func (reg *Reg) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor, rdr io.Reader) (descriptor.Descriptor, error) {
 	var putURL *url.URL
 	var err error
-	validDesc := (d.Digest != "" && d.Size > 0) || (d.Size == 0 && d.Digest == zeroDig)
+	validDesc := (d.Size > 0 && d.Digest.Validate() == nil) || (d.Size == 0 && d.Digest == zeroDig)
 
 	// attempt an anonymous blob mount
 	if validDesc {
@@ -195,7 +195,7 @@ func (reg *Reg) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor,
 	}
 	// fallback to requesting upload URL
 	if putURL == nil {
-		putURL, err = reg.blobGetUploadURL(ctx, r)
+		putURL, err = reg.blobGetUploadURL(ctx, r, d)
 		if err != nil {
 			return d, err
 		}
@@ -237,7 +237,12 @@ func (reg *Reg) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor,
 	return d, err
 }
 
-func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref) (*url.URL, error) {
+func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref, d descriptor.Descriptor) (*url.URL, error) {
+	q := url.Values{}
+	if d.DigestAlgo() != digest.Canonical {
+		// TODO(bmitch): EXPERIMENTAL parameter, registry support and OCI spec change needed
+		q.Add(paramBlobDigestAlgo, d.DigestAlgo().String())
+	}
 	// request an upload location
 	req := &reghttp.Req{
 		Host:      r.Registry,
@@ -247,6 +252,7 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref) (*url.URL, erro
 				Method:     "POST",
 				Repository: r.Repository,
 				Path:       "blobs/uploads/",
+				Query:      q,
 			},
 		},
 	}
@@ -345,6 +351,7 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d descriptor.Descri
 		} else {
 			host := reg.hostGet(rTgt.Registry)
 			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
+				// TODO(bmitch): potential race condition, may need a lock before setting/using values in host
 				if minSize > reg.blobChunkLimit {
 					host.BlobChunk = reg.blobChunkLimit
 				} else {
@@ -454,7 +461,7 @@ func (reg *Reg) blobPutUploadChunked(ctx context.Context, r ref.Ref, d descripto
 	bufChange := false
 
 	// setup buffer and digest pipe
-	digester := digest.Canonical.Digester()
+	digester := d.DigestAlgo().Digester()
 	digestRdr := io.TeeReader(rdr, digester.Hash())
 	finalChunk := false
 	chunkStart := int64(0)
@@ -592,7 +599,7 @@ func (reg *Reg) blobPutUploadChunked(ctx context.Context, r ref.Ref, d descripto
 
 	// compute digest
 	dOut := digester.Digest()
-	if d.Digest != "" && dOut != d.Digest {
+	if d.Digest.Validate() == nil && dOut != d.Digest {
 		return d, fmt.Errorf("%w, expected %s, computed %s", errs.ErrDigestMismatch, d.Digest.String(), dOut.String())
 	}
 	if d.Size != 0 && chunkStart != d.Size {

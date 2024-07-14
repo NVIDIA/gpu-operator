@@ -330,7 +330,7 @@ func (m *docker2Manifest) updateDesc() error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.Docker2Manifest,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	return nil
@@ -343,7 +343,7 @@ func (m *docker2ManifestList) updateDesc() error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.Docker2ManifestList,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	return nil

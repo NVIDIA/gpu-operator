@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
+	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/limitread"
@@ -240,6 +242,11 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 	headers := http.Header{
 		"Content-Type": []string{manifest.GetMediaType(m)},
 	}
+	q := url.Values{}
+	if tagOrDigest == r.Tag && m.GetDescriptor().Digest.Algorithm() != digest.Canonical {
+		// TODO(bmitch): EXPERIMENTAL parameter, registry support and OCI spec change needed
+		q.Add(paramManifestDigest, m.GetDescriptor().Digest.String())
+	}
 	req := &reghttp.Req{
 		Host:      r.Registry,
 		NoMirrors: true,
@@ -248,6 +255,7 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 				Method:     "PUT",
 				Repository: r.Repository,
 				Path:       "manifests/" + tagOrDigest,
+				Query:      q,
 				Headers:    headers,
 				BodyLen:    int64(len(mj)),
 				BodyBytes:  mj,

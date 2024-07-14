@@ -30,6 +30,12 @@ const (
 	defaultManifestMaxPull = 1024 * 1024 * 8
 	// defaultManifestMaxPush limits the largest manifest that will be pushed
 	defaultManifestMaxPush = 1024 * 1024 * 4
+	// paramBlobDigestAlgo specifies the query parameter to request a specific digest algorithm.
+	// TODO(bmitch): EXPERIMENTAL field, registry support and OCI spec update needed
+	paramBlobDigestAlgo = "digest-algorithm"
+	// paramManifestDigest specifies the query parameter to specify the digest of a manifest pushed by tag.
+	// TODO(bmitch): EXPERIMENTAL field, registry support and OCI spec update needed
+	paramManifestDigest = "digest"
 )
 
 // Reg is used for interacting with remote registry servers

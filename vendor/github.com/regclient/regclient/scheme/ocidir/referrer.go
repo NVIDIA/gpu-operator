@@ -28,28 +28,29 @@ func (o *OCIDir) referrerList(ctx context.Context, r ref.Ref, opts ...scheme.Ref
 		opt(&config)
 	}
 	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
+		Tags: []string{},
 	}
 	// select a platform from a manifest list
 	if config.Platform != "" {
+		p, err := platform.Parse(config.Platform)
+		if err != nil {
+			return rl, err
+		}
 		m, err := o.manifestGet(ctx, r)
 		if err != nil {
 			return rl, err
 		}
-		if m.IsList() {
-			plat, err := platform.Parse(config.Platform)
+		for m.IsList() {
+			d, err := manifest.GetPlatformDesc(m, &p)
 			if err != nil {
 				return rl, err
 			}
-			d, err := manifest.GetPlatformDesc(m, &plat)
+			m, err = o.manifestGet(ctx, r.SetDigest(d.Digest.String()))
 			if err != nil {
 				return rl, err
 			}
-			r.Digest = d.Digest.String()
-		} else {
-			r.Digest = m.GetDescriptor().Digest.String()
 		}
+		r = r.SetDigest(m.GetDescriptor().Digest.String())
 	}
 	// if ref is a tag, run a head request for the digest
 	if r.Digest == "" {
@@ -57,8 +58,9 @@ func (o *OCIDir) referrerList(ctx context.Context, r ref.Ref, opts ...scheme.Ref
 		if err != nil {
 			return rl, err
 		}
-		r.Digest = m.GetDescriptor().Digest.String()
+		r = r.SetDigest(m.GetDescriptor().Digest.String())
 	}
+	rl.Subject = r
 
 	// pull referrer list by tag
 	rlTag, err := referrer.FallbackTag(r)

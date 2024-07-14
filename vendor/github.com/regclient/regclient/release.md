@@ -1,52 +1,54 @@
-# Release v0.6.1
+# Release v0.7.0
 
 CVEs:
 
-- Go update fixes CVE-2024-24788. ([PR 739][pr-739])
+- CVE-2024-24790 fix included with Go 1.22.4 upgrade. ([PR 762][pr-762])
+- CVE-2024-24791 fix included with Go 1.22.5 upgrade. ([PR 777][pr-777])
 
 Breaking:
 
-- pkg/archive.Compress no longer decompresses the input. ([PR 732][pr-732])
+- `regctl registry set` and `regctl registry login` will return a non-zero if the ping fails. ([PR 751][pr-751])
+- Removed `WithFS` which required access to an internal interface to use. ([PR 772][pr-772])
 
 Features:
 
-- Add the `regclient.ImageConfig` method. ([PR 706][pr-706])
-- Add ability to modify the layer compression. ([PR 730][pr-730])
-- Add support for zstd compressed layers. ([PR 732][pr-732])
-- Add image mod ability to append layers to an image. ([PR 736][pr-736])
-- `regctl image mod` add layer from directory. ([PR 740][pr-740])
+- Add an experimental `regctl ref` command. ([PR 765][pr-765])
+- Support digest algorithms beyond sha256. ([PR 776][pr-776])
+- Support modifying the digest algorithm on an image. ([PR 776][pr-776])
+- Experimental support for pushing tagged manifests with different digest algorithms. ([PR 778][pr-778])
 
 Fixes:
 
-- Override the Go version used by the OSV Scanner. ([PR 691][pr-691])
-- Validate media types on `regctl artifact put`. ([PR 707][pr-707])
-- Use the provided descriptor in the BlobGet/Head to a registry. ([PR 724][pr-724])
-- Replace "whitelist" with "known list" for inclusivity. ([PR 725][pr-725])
-- Handle nil pointer when config file is a directory. ([PR 738][pr-738])
+- Prevent panic on interrupted image mod. ([PR 746][pr-746])
+- Enable deletion on olareg tests. ([PR 758][pr-758])
+- Allow `~` (tilde) in ocidir reference paths. ([PR 763][pr-763])
+- Allow well known architectures as a platform. ([PR 771][pr-771])
+- Validate digests before calling methods that could panic. ([PR 776][pr-776])
 
-Chores:
+Other changes:
 
-- Limit token permission on the coverage action. ([PR 705][pr-705])
-- Clarify `regctl manifest head --platform` will trigger a get request. ([PR 713][pr-713])
-- Reenable OSV Scanner weekly check in GitHub Actions. ([PR 715][pr-715])
-- Add fuzzing tests for compression. ([PR 741][pr-741])
+- Refactor pulling manifests by platform. ([PR 768][pr-768])
+- Cleanup Dockerfile linter warnings. ([PR 770][pr-770])
+- Enable docker caching of GHA builds. ([PR 773][pr-773])
+- Include a contributor list in the readme. ([PR 774][pr-774])
 
 Contributors:
 
 - @sudo-bmitch
+- @thesayyn
 
-[pr-691]: https://github.com/regclient/regclient/pull/691
-[pr-705]: https://github.com/regclient/regclient/pull/705
-[pr-706]: https://github.com/regclient/regclient/pull/706
-[pr-707]: https://github.com/regclient/regclient/pull/707
-[pr-713]: https://github.com/regclient/regclient/pull/713
-[pr-715]: https://github.com/regclient/regclient/pull/715
-[pr-724]: https://github.com/regclient/regclient/pull/724
-[pr-725]: https://github.com/regclient/regclient/pull/725
-[pr-730]: https://github.com/regclient/regclient/pull/730
-[pr-732]: https://github.com/regclient/regclient/pull/732
-[pr-736]: https://github.com/regclient/regclient/pull/736
-[pr-738]: https://github.com/regclient/regclient/pull/738
-[pr-739]: https://github.com/regclient/regclient/pull/739
-[pr-740]: https://github.com/regclient/regclient/pull/740
-[pr-741]: https://github.com/regclient/regclient/pull/741
+[pr-746]: https://github.com/regclient/regclient/pull/746
+[pr-751]: https://github.com/regclient/regclient/pull/751
+[pr-758]: https://github.com/regclient/regclient/pull/758
+[pr-762]: https://github.com/regclient/regclient/pull/762
+[pr-763]: https://github.com/regclient/regclient/pull/763
+[pr-765]: https://github.com/regclient/regclient/pull/765
+[pr-768]: https://github.com/regclient/regclient/pull/768
+[pr-770]: https://github.com/regclient/regclient/pull/770
+[pr-771]: https://github.com/regclient/regclient/pull/771
+[pr-772]: https://github.com/regclient/regclient/pull/772
+[pr-773]: https://github.com/regclient/regclient/pull/773
+[pr-774]: https://github.com/regclient/regclient/pull/774
+[pr-776]: https://github.com/regclient/regclient/pull/776
+[pr-777]: https://github.com/regclient/regclient/pull/777
+[pr-778]: https://github.com/regclient/regclient/pull/778

@@ -8,11 +8,13 @@ import (
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
+	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
 )
 
 type manifestOpt struct {
 	d             descriptor.Descriptor
+	platform      *platform.Platform
 	schemeOpts    []scheme.ManifestOpts
 	requireDigest bool
 }
@@ -48,6 +50,15 @@ func WithManifestChild() ManifestOpts {
 func WithManifestDesc(d descriptor.Descriptor) ManifestOpts {
 	return func(opts *manifestOpt) {
 		opts.d = d
+	}
+}
+
+// WithManifestPlatform resolves the platform specific manifest on Get and Head requests.
+// This causes an additional GET query to a registry when an Index or Manifest List is encountered.
+// This option is ignored if the retrieved manifest is not an Index or Manifest List.
+func WithManifestPlatform(p platform.Platform) ManifestOpts {
+	return func(opts *manifestOpt) {
+		opts.platform = &p
 	}
 }
 
@@ -100,7 +111,26 @@ func (rc *RegClient) ManifestGet(ctx context.Context, r ref.Ref, opts ...Manifes
 	if err != nil {
 		return nil, err
 	}
-	return schemeAPI.ManifestGet(ctx, r)
+	m, err := schemeAPI.ManifestGet(ctx, r)
+	if err != nil {
+		return m, err
+	}
+	if opt.platform != nil && !m.IsList() {
+		rc.log.Debugf("ignoring platform option %s, %s is not an index", opt.platform.String(), r.CommonName())
+	}
+	// this will loop to handle a nested index
+	for opt.platform != nil && m.IsList() {
+		d, err := manifest.GetPlatformDesc(m, opt.platform)
+		if err != nil {
+			return m, err
+		}
+		r = r.SetDigest(d.Digest.String())
+		m, err = schemeAPI.ManifestGet(ctx, r)
+		if err != nil {
+			return m, err
+		}
+	}
+	return m, err
 }
 
 // ManifestHead queries for the existence of a manifest and returns metadata (digest, media-type, size).
@@ -119,6 +149,24 @@ func (rc *RegClient) ManifestHead(ctx context.Context, r ref.Ref, opts ...Manife
 	m, err := schemeAPI.ManifestHead(ctx, r)
 	if err != nil {
 		return m, err
+	}
+	if opt.platform != nil && !m.IsList() {
+		rc.log.Debugf("ignoring platform option %s, %s is not an index", opt.platform.String(), r.CommonName())
+	}
+	// this will loop to handle a nested index
+	for opt.platform != nil && m.IsList() {
+		if !m.IsSet() {
+			m, err = schemeAPI.ManifestGet(ctx, r)
+		}
+		d, err := manifest.GetPlatformDesc(m, opt.platform)
+		if err != nil {
+			return m, err
+		}
+		r = r.SetDigest(d.Digest.String())
+		m, err = schemeAPI.ManifestHead(ctx, r)
+		if err != nil {
+			return m, err
+		}
 	}
 	if opt.requireDigest && m.GetDescriptor().Digest.String() == "" {
 		m, err = schemeAPI.ManifestGet(ctx, r)

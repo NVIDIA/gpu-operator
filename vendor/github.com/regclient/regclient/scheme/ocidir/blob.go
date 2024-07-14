@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path"
 
-	// crypto libraries included for go-digest
-	_ "crypto/sha256"
-	_ "crypto/sha512"
-
-	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 
-	"github.com/regclient/regclient/internal/rwfs"
 	"github.com/regclient/regclient/types/blob"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
@@ -26,14 +21,23 @@ import (
 // This method does not verify that blobs are unused.
 // Calling the [OCIDir.Close] method to trigger the garbage collection is preferred.
 func (o *OCIDir) BlobDelete(ctx context.Context, r ref.Ref, d descriptor.Descriptor) error {
+	err := d.Digest.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate digest %s: %w", d.Digest.String(), err)
+	}
 	file := path.Join(r.Path, "blobs", d.Digest.Algorithm().String(), d.Digest.Encoded())
-	return o.fs.Remove(file)
+	return os.Remove(file)
 }
 
 // BlobGet retrieves a blob, returning a reader
 func (o *OCIDir) BlobGet(ctx context.Context, r ref.Ref, d descriptor.Descriptor) (blob.Reader, error) {
+	err := d.Digest.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate digest %s: %w", d.Digest.String(), err)
+	}
 	file := path.Join(r.Path, "blobs", d.Digest.Algorithm().String(), d.Digest.Encoded())
-	fd, err := o.fs.Open(file)
+	//#nosec G304 users should validate references they attempt to open
+	fd, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +63,13 @@ func (o *OCIDir) BlobGet(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 
 // BlobHead verifies the existence of a blob, the reader contains the headers but no body to read
 func (o *OCIDir) BlobHead(ctx context.Context, r ref.Ref, d descriptor.Descriptor) (blob.Reader, error) {
+	err := d.Digest.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate digest %s: %w", d.Digest.String(), err)
+	}
 	file := path.Join(r.Path, "blobs", d.Digest.Algorithm().String(), d.Digest.Encoded())
-	fd, err := o.fs.Open(file)
+	//#nosec G304 users should validate references they attempt to open
+	fd, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -97,22 +106,17 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 	if err != nil {
 		return d, err
 	}
-	digester := digest.Canonical.Digester()
+	digester := d.DigestAlgo().Digester()
 	rdr = io.TeeReader(rdr, digester.Hash())
 	// write the blob to a tmp file
-	var dir, tmpPattern string
-	if d.Digest != "" && d.Size > 0 {
-		dir = path.Join(r.Path, "blobs", d.Digest.Algorithm().String())
-		tmpPattern = d.Digest.Encoded() + ".*.tmp"
-	} else {
-		dir = path.Join(r.Path, "blobs", digest.Canonical.String())
-		tmpPattern = "*.tmp"
-	}
-	err = rwfs.MkdirAll(o.fs, dir, 0777)
+	dir := path.Join(r.Path, "blobs", d.DigestAlgo().String())
+	tmpPattern := "*.tmp"
+	//#nosec G301 defer to user umask settings
+	err = os.MkdirAll(dir, 0777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return d, fmt.Errorf("failed creating %s: %w", dir, err)
 	}
-	tmpFile, err := rwfs.CreateTemp(o.fs, dir, tmpPattern)
+	tmpFile, err := os.CreateTemp(dir, tmpPattern)
 	if err != nil {
 		return d, fmt.Errorf("failed creating blob tmp file: %w", err)
 	}
@@ -130,7 +134,7 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 		return d, errC
 	}
 	// validate result matches descriptor, or update descriptor if it wasn't defined
-	if d.Digest == "" || d.Size <= 0 {
+	if d.Digest.Validate() != nil {
 		d.Digest = digester.Digest()
 	} else if d.Digest != digester.Digest() {
 		return d, fmt.Errorf("unexpected digest, expected %s, computed %s", d.Digest, digester.Digest())
@@ -141,7 +145,7 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 		return d, fmt.Errorf("unexpected blob length, expected %d, received %d", d.Size, i)
 	}
 	file := path.Join(r.Path, "blobs", d.Digest.Algorithm().String(), d.Digest.Encoded())
-	err = o.fs.Rename(path.Join(dir, tmpName), file)
+	err = os.Rename(path.Join(dir, tmpName), file)
 	if err != nil {
 		return d, fmt.Errorf("failed to write blob (rename tmp file %s to %s): %w", path.Join(dir, tmpName), file, err)
 	}

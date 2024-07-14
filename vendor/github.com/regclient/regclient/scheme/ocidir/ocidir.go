@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path"
 	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/regclient/regclient/internal/rwfs"
 	"github.com/regclient/regclient/internal/throttle"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
@@ -31,7 +31,6 @@ const (
 
 // OCIDir is used for accessing OCI Image Layouts defined as a directory
 type OCIDir struct {
-	fs          rwfs.RWFS
 	log         *logrus.Logger
 	gc          bool
 	modRefs     map[string]*ociGC
@@ -46,7 +45,6 @@ type ociGC struct {
 }
 
 type ociConf struct {
-	fs       rwfs.RWFS
 	gc       bool
 	log      *logrus.Logger
 	throttle int
@@ -66,21 +64,11 @@ func New(opts ...Opts) *OCIDir {
 		opt(&conf)
 	}
 	return &OCIDir{
-		fs:          conf.fs,
 		log:         conf.log,
 		gc:          conf.gc,
 		modRefs:     map[string]*ociGC{},
 		throttle:    map[string]*throttle.Throttle{},
 		throttleDef: conf.throttle,
-	}
-}
-
-// WithFS allows the rwfs to be replaced
-// The default is to use the OS, this can be used to sandbox within a folder
-// This can also be used to pass an in-memory filesystem for testing or special use cases
-func WithFS(fs rwfs.RWFS) Opts {
-	return func(c *ociConf) {
-		c.fs = fs
 	}
 }
 
@@ -156,11 +144,12 @@ func (o *OCIDir) initIndex(r ref.Ref, locked bool) error {
 		defer o.mu.Unlock()
 	}
 	layoutFile := path.Join(r.Path, imageLayoutFile)
-	_, err := rwfs.Stat(o.fs, layoutFile)
+	_, err := os.Stat(layoutFile)
 	if err == nil {
 		return nil
 	}
-	err = rwfs.MkdirAll(o.fs, r.Path, 0777)
+	//#nosec G301 defer to user umask settings
+	err = os.MkdirAll(r.Path, 0777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
@@ -172,7 +161,8 @@ func (o *OCIDir) initIndex(r ref.Ref, locked bool) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal layout: %w", err)
 	}
-	lfh, err := o.fs.Create(layoutFile)
+	//#nosec G304 users should validate references they attempt to open
+	lfh, err := os.Create(layoutFile)
 	if err != nil {
 		return fmt.Errorf("cannot create %s: %w", imageLayoutFile, err)
 	}
@@ -196,7 +186,8 @@ func (o *OCIDir) readIndex(r ref.Ref, locked bool) (v1.Index, error) {
 		return index, err
 	}
 	indexFile := path.Join(r.Path, "index.json")
-	fh, err := o.fs.Open(indexFile)
+	//#nosec G304 users should validate references they attempt to open
+	fh, err := os.Open(indexFile)
 	if err != nil {
 		return index, fmt.Errorf("%s cannot be open: %w", indexFile, err)
 	}
@@ -244,7 +235,8 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		o.mu.Lock()
 		defer o.mu.Unlock()
 	}
-	err := rwfs.MkdirAll(o.fs, r.Path, 0777)
+	//#nosec G301 defer to user umask settings
+	err := os.MkdirAll(r.Path, 0777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
@@ -256,7 +248,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal layout: %w", err)
 	}
-	lfh, err := o.fs.Create(path.Join(r.Path, imageLayoutFile))
+	lfh, err := os.Create(path.Join(r.Path, imageLayoutFile))
 	if err != nil {
 		return fmt.Errorf("cannot create %s: %w", imageLayoutFile, err)
 	}
@@ -266,7 +258,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		return fmt.Errorf("cannot write %s: %w", imageLayoutFile, err)
 	}
 	// create/replace index.json file
-	tmpFile, err := rwfs.CreateTemp(o.fs, r.Path, "index.json.*.tmp")
+	tmpFile, err := os.CreateTemp(r.Path, "index.json.*.tmp")
 	if err != nil {
 		return fmt.Errorf("cannot create index tmpfile: %w", err)
 	}
@@ -288,7 +280,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		return fmt.Errorf("cannot close index: %w", errC)
 	}
 	indexFile := path.Join(r.Path, "index.json")
-	err = o.fs.Rename(path.Join(r.Path, tmpName), indexFile)
+	err = os.Rename(path.Join(r.Path, tmpName), indexFile)
 	if err != nil {
 		return fmt.Errorf("cannot rename tmpfile to index: %w", err)
 	}
@@ -303,7 +295,8 @@ func (o *OCIDir) valid(dir string, locked bool) error {
 	}
 	layout := v1.ImageLayout{}
 	reqVer := "1.0.0"
-	fh, err := o.fs.Open(path.Join(dir, imageLayoutFile))
+	//#nosec G304 users should validate references they attempt to open
+	fh, err := os.Open(path.Join(dir, imageLayoutFile))
 	if err != nil {
 		return fmt.Errorf("%s cannot be open: %w", imageLayoutFile, err)
 	}

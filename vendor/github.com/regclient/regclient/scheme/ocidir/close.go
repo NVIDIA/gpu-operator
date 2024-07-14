@@ -3,7 +3,7 @@ package ocidir
 import (
 	"context"
 	"fmt"
-	"io/fs"
+	"os"
 	"path"
 
 	"github.com/sirupsen/logrus"
@@ -46,7 +46,7 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 
 	// go through filesystem digest list, removing entries not seen in recursive pass
 	blobsPath := path.Join(r.Path, "blobs")
-	blobDirs, err := fs.ReadDir(o.fs, blobsPath)
+	blobDirs, err := os.ReadDir(blobsPath)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 			// should this warn or delete unexpected files in the blobs folder?
 			continue
 		}
-		digestFiles, err := fs.ReadDir(o.fs, path.Join(blobsPath, blobDir.Name()))
+		digestFiles, err := os.ReadDir(path.Join(blobsPath, blobDir.Name()))
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 					"digest": digest,
 				}).Debug("ocidir garbage collect")
 				// delete
-				err = o.fs.Remove(path.Join(blobsPath, blobDir.Name(), digestFile.Name()))
+				err = os.Remove(path.Join(blobsPath, blobDir.Name(), digestFile.Name()))
 				if err != nil {
 					return fmt.Errorf("failed to delete %s: %w", path.Join(blobsPath, blobDir.Name(), digestFile.Name()), err)
 				}
