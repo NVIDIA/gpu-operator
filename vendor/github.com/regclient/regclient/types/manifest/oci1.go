@@ -548,7 +548,7 @@ func (m *oci1Manifest) updateDesc() error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.OCI1Manifest,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	return nil
@@ -561,7 +561,7 @@ func (m *oci1Index) updateDesc() error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.OCI1ManifestList,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	return nil
@@ -574,7 +574,7 @@ func (m *oci1Artifact) updateDesc() error {
 	m.rawBody = mj
 	m.desc = descriptor.Descriptor{
 		MediaType: mediatype.OCI1Artifact,
-		Digest:    digest.FromBytes(mj),
+		Digest:    m.desc.DigestAlgo().FromBytes(mj),
 		Size:      int64(len(mj)),
 	}
 	return nil

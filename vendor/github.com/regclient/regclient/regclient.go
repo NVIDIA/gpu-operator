@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/config"
-	"github.com/regclient/regclient/internal/rwfs"
 	"github.com/regclient/regclient/internal/version"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/scheme/ocidir"
@@ -38,7 +37,6 @@ type RegClient struct {
 	regOpts   []reg.Opts
 	schemes   map[string]scheme.API
 	userAgent string
-	fs        rwfs.RWFS
 }
 
 // Opt functions are used by [New] to create a [*RegClient].
@@ -53,7 +51,6 @@ func New(opts ...Opt) *RegClient {
 		log:     &logrus.Logger{Out: io.Discard},
 		regOpts: []reg.Opts{},
 		schemes: map[string]scheme.API{},
-		fs:      rwfs.OSNew(""),
 	}
 
 	info := version.GetInfo()
@@ -85,7 +82,6 @@ func New(opts ...Opt) *RegClient {
 	rc.schemes["reg"] = reg.New(rc.regOpts...)
 	rc.schemes["ocidir"] = ocidir.New(
 		ocidir.WithLog(rc.log),
-		ocidir.WithFS(rc.fs),
 	)
 
 	rc.log.WithFields(logrus.Fields{
@@ -154,13 +150,6 @@ func WithDockerCreds() Opt {
 			return
 		}
 		rc.hostLoad("docker", configHosts)
-	}
-}
-
-// WithFS overrides the backing filesystem (used by ocidir).
-func WithFS(fs rwfs.RWFS) Opt {
-	return func(rc *RegClient) {
-		rc.fs = fs
 	}
 }
 

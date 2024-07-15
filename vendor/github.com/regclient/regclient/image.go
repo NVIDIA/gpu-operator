@@ -446,7 +446,11 @@ func (rc *RegClient) ImageConfig(ctx context.Context, r ref.Ref, opts ...ImageOp
 	for _, optFn := range opts {
 		optFn(&opt)
 	}
-	m, err := rc.ManifestGet(ctx, r)
+	p, err := platform.Parse(opt.platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse platform %s: %w", opt.platform, err)
+	}
+	m, err := rc.ManifestGet(ctx, r, WithManifestPlatform(p))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get manifest: %w", err)
 	}
@@ -458,10 +462,6 @@ func (rc *RegClient) ImageConfig(ctx context.Context, r ref.Ref, opts ...ImageOp
 		ml, err := mi.GetManifestList()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get manifest list: %w", err)
-		}
-		p, err := platform.Parse(opt.platform)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse platform %s: %w", opt.platform, err)
 		}
 		d, err := descriptor.DescriptorListSearch(ml, descriptor.MatchOpt{Platform: &p})
 		if err != nil {
@@ -1092,6 +1092,9 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 		if err != nil {
 			return err
 		}
+		if err = conf.Digest.Validate(); err != nil {
+			return err
+		}
 		refTag := opt.exportRef.ToReg()
 		if refTag.Digest != "" {
 			refTag.Digest = ""
@@ -1110,6 +1113,9 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 			return err
 		}
 		for _, d := range dl {
+			if err = d.Digest.Validate(); err != nil {
+				return err
+			}
 			dockerManifest.Layers = append(dockerManifest.Layers, tarOCILayoutDescPath(d))
 			dockerManifest.LayerSources[d.Digest] = d
 		}
@@ -1132,6 +1138,9 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 
 // imageExportDescriptor pulls a manifest or blob, outputs to a tar file, and recursively processes any nested manifests or blobs
 func (rc *RegClient) imageExportDescriptor(ctx context.Context, r ref.Ref, desc descriptor.Descriptor, twd *tarWriteData) error {
+	if err := desc.Digest.Validate(); err != nil {
+		return err
+	}
 	tarFilename := tarOCILayoutDescPath(desc)
 	if twd.files[tarFilename] {
 		// blob has already been imported into tar, skip
@@ -1486,7 +1495,10 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 	// cache the manifest to avoid needing to pull again later, this is used if index.json is a wrapper around some other manifest
 	trd.manifests[m.GetDescriptor().Digest] = m
 
-	handleManifest := func(d descriptor.Descriptor, child bool) {
+	handleManifest := func(d descriptor.Descriptor, child bool) error {
+		if err := d.Digest.Validate(); err != nil {
+			return err
+		}
 		filename := tarOCILayoutDescPath(d)
 		if !trd.processed[filename] && trd.handlers[filename] == nil {
 			trd.handlers[filename] = func(header *tar.Header, trd *tarReadData) error {
@@ -1520,6 +1532,7 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 				}
 			}
 		}
+		return nil
 	}
 
 	if !push {
@@ -1563,7 +1576,10 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 				return fmt.Errorf("could not find requested tag in index.json, %s", r.Tag)
 			}
 		}
-		handleManifest(d, false)
+		err = handleManifest(d, false)
+		if err != nil {
+			return err
+		}
 		// add a finish step to tag the selected digest
 		trd.finish = append(trd.finish, func() error {
 			mRef, ok := trd.manifests[d.Digest]
@@ -1583,7 +1599,10 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 			return err
 		}
 		for _, d := range dl {
-			handleManifest(d, true)
+			err = handleManifest(d, true)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		// else if a single image/manifest
@@ -1594,6 +1613,9 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 		// add handler for the config descriptor if it's defined
 		cd, err := mi.GetConfig()
 		if err == nil {
+			if err = cd.Digest.Validate(); err != nil {
+				return err
+			}
 			filename := tarOCILayoutDescPath(cd)
 			if !trd.processed[filename] && trd.handlers[filename] == nil {
 				func(cd descriptor.Descriptor) {
@@ -1609,6 +1631,9 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 			return err
 		}
 		for _, d := range layers {
+			if err = d.Digest.Validate(); err != nil {
+				return err
+			}
 			filename := tarOCILayoutDescPath(d)
 			if !trd.processed[filename] && trd.handlers[filename] == nil {
 				func(d descriptor.Descriptor) {

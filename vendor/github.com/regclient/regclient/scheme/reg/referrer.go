@@ -28,32 +28,45 @@ func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Refe
 		opt(&config)
 	}
 	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
+		Tags: []string{},
 	}
 	// select a platform from a manifest list
 	if config.Platform != "" {
+		p, err := platform.Parse(config.Platform)
+		if err != nil {
+			return rl, err
+		}
 		m, err := reg.ManifestHead(ctx, r)
 		if err != nil {
 			return rl, err
 		}
-		if m.IsList() {
+		if m.GetDescriptor().Digest.String() == "" {
 			m, err = reg.ManifestGet(ctx, r)
 			if err != nil {
 				return rl, err
 			}
-			plat, err := platform.Parse(config.Platform)
-			if err != nil {
-				return rl, err
-			}
-			d, err := manifest.GetPlatformDesc(m, &plat)
-			if err != nil {
-				return rl, err
-			}
-			r.Digest = d.Digest.String()
-		} else {
-			r.Digest = m.GetDescriptor().Digest.String()
 		}
+		for m.IsList() {
+			m, err = reg.ManifestGet(ctx, r)
+			if err != nil {
+				return rl, err
+			}
+			d, err := manifest.GetPlatformDesc(m, &p)
+			if err != nil {
+				return rl, err
+			}
+			m, err = reg.ManifestHead(ctx, r.SetDigest(d.Digest.String()))
+			if err != nil {
+				return rl, err
+			}
+			if m.GetDescriptor().Digest.String() == "" {
+				m, err = reg.ManifestGet(ctx, r.SetDigest(d.Digest.String()))
+				if err != nil {
+					return rl, err
+				}
+			}
+		}
+		r = r.SetDigest(m.GetDescriptor().Digest.String())
 	}
 	// if ref is a tag, run a head request for the digest
 	if r.Digest == "" {
@@ -61,8 +74,9 @@ func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Refe
 		if err != nil {
 			return rl, err
 		}
-		r.Digest = m.GetDescriptor().Digest.String()
+		r = r.SetDigest(m.GetDescriptor().Digest.String())
 	}
+	rl.Subject = r
 
 	found := false
 	// try cache

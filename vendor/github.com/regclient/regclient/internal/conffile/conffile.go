@@ -8,22 +8,18 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
-	"github.com/regclient/regclient/internal/rwfs"
 )
 
 type File struct {
-	// dir, name string
 	perms    int
 	fullname string
-	fs       rwfs.RWFS
 }
 
 type Opt func(*File)
 
 // New returns a new File
 func New(opts ...Opt) *File {
-	f := File{perms: 0600, fs: rwfs.OSNew("")}
+	f := File{perms: 0600}
 	for _, fn := range opts {
 		fn(&f)
 	}
@@ -68,13 +64,6 @@ func WithFullname(fullname string) Opt {
 	}
 }
 
-// WithFS overrides the default OS filesystem
-func WithFS(fs rwfs.RWFS) Opt {
-	return func(f *File) {
-		f.fs = fs
-	}
-}
-
 // WithPerms specifies the permissions to create a file with (default 0600)
 func WithPerms(perms int) Opt {
 	return func(f *File) {
@@ -87,16 +76,16 @@ func (f *File) Name() string {
 }
 
 func (f *File) Open() (io.ReadCloser, error) {
-	return f.fs.Open(f.fullname)
+	return os.Open(f.fullname)
 }
 
 func (f *File) Write(rdr io.Reader) error {
 	// create temp file/open
 	dir := filepath.Dir(f.fullname)
-	if err := rwfs.MkdirAll(f.fs, dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
-	tmp, err := rwfs.CreateTemp(f.fs, dir, filepath.Base(f.fullname))
+	tmp, err := os.CreateTemp(dir, filepath.Base(f.fullname))
 	if err != nil {
 		return err
 	}
@@ -106,7 +95,7 @@ func (f *File) Write(rdr io.Reader) error {
 	}
 	tmpName := tmpStat.Name()
 	tmpFullname := filepath.Join(dir, tmpName)
-	defer f.fs.Remove(tmpFullname)
+	defer os.Remove(tmpFullname)
 
 	// copy from rdr to temp file
 	_, err = io.Copy(tmp, rdr)
@@ -123,7 +112,7 @@ func (f *File) Write(rdr io.Reader) error {
 	uid := os.Getuid()
 	gid := os.Getgid()
 	// adjust defaults based on existing file if available
-	stat, err := rwfs.Stat(f.fs, f.fullname)
+	stat, err := os.Stat(f.fullname)
 	if err == nil {
 		// adjust mode to existing file
 		if stat.Mode().IsRegular() {
@@ -135,15 +124,12 @@ func (f *File) Write(rdr io.Reader) error {
 	}
 
 	// update mode and owner of temp file
-	fPerm, ok := f.fs.(rwfs.RWPerms)
-	if ok {
-		if err := fPerm.Chmod(tmpFullname, mode); err != nil {
-			return err
-		}
-		if uid > 0 && gid > 0 {
-			_ = fPerm.Chown(tmpFullname, uid, gid)
-		}
+	if err := os.Chmod(tmpFullname, mode); err != nil {
+		return err
+	}
+	if uid > 0 && gid > 0 {
+		_ = os.Chown(tmpFullname, uid, gid)
 	}
 	// move temp file to target filename
-	return f.fs.Rename(tmpFullname, f.fullname)
+	return os.Rename(tmpFullname, f.fullname)
 }

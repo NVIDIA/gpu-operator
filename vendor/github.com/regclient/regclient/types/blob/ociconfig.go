@@ -8,8 +8,6 @@ import (
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 
-	"github.com/opencontainers/go-digest"
-
 	"github.com/regclient/regclient/types/mediatype"
 	v1 "github.com/regclient/regclient/types/oci/v1"
 )
@@ -47,7 +45,7 @@ func NewOCIConfig(opts ...Opts) *BOCIConfig {
 			}
 		}
 		// force descriptor to match raw body, even if we generated the raw body
-		bc.desc.Digest = digest.FromBytes(bc.rawBody)
+		bc.desc.Digest = bc.desc.DigestAlgo().FromBytes(bc.rawBody)
 		bc.desc.Size = int64(len(bc.rawBody))
 		if bc.desc.MediaType == "" {
 			bc.desc.MediaType = mediatype.OCI1ImageConfig
@@ -93,7 +91,7 @@ func (oc *BOCIConfig) SetConfig(image v1.Image) {
 	if oc.desc.MediaType == "" {
 		oc.desc.MediaType = mediatype.OCI1ImageConfig
 	}
-	oc.desc.Digest = digest.FromBytes(oc.rawBody)
+	oc.desc.Digest = oc.desc.DigestAlgo().FromBytes(oc.rawBody)
 	oc.desc.Size = int64(len(oc.rawBody))
 	oc.blobSet = true
 }
@@ -116,12 +114,13 @@ func (oc *BOCIConfig) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+	oc.image = image
 	oc.rawBody = make([]byte, len(data))
 	copy(oc.rawBody, data)
 	if oc.desc.MediaType == "" {
 		oc.desc.MediaType = mediatype.OCI1ImageConfig
 	}
-	oc.desc.Digest = digest.FromBytes(oc.rawBody)
+	oc.desc.Digest = oc.desc.DigestAlgo().FromBytes(oc.rawBody)
 	oc.desc.Size = int64(len(oc.rawBody))
 	oc.blobSet = true
 	return nil

@@ -45,7 +45,7 @@ func NewTarReader(opts ...Opts) *BTarReader {
 	}
 	if bc.rdr != nil {
 		tr.blobSet = true
-		tr.digester = digest.Canonical.Digester()
+		tr.digester = tr.desc.DigestAlgo().Digester()
 		rdr := bc.rdr
 		if tr.desc.Size > 0 {
 			rdr = &limitread.LimitRead{

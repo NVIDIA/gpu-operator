@@ -67,7 +67,7 @@ func NewReader(opts ...Opts) *BReader {
 	}
 	if bc.rdr != nil {
 		br.blobSet = true
-		br.digester = digest.Canonical.Digester()
+		br.digester = br.desc.DigestAlgo().Digester()
 		rdr := bc.rdr
 		if br.desc.Size > 0 {
 			rdr = &limitread.LimitRead{
@@ -82,7 +82,7 @@ func NewReader(opts ...Opts) *BReader {
 
 // Close attempts to close the reader and populates/validates the digest.
 func (r *BReader) Close() error {
-	if r.origRdr == nil {
+	if r == nil || r.origRdr == nil {
 		return nil
 	}
 	// attempt to close if available in original reader
@@ -100,7 +100,7 @@ func (r *BReader) RawBody() ([]byte, error) {
 
 // Read passes through the read operation while computing the digest and tracking the size.
 func (r *BReader) Read(p []byte) (int, error) {
-	if r.reader == nil {
+	if r == nil || r.reader == nil {
 		return 0, fmt.Errorf("blob has no reader: %w", io.ErrUnexpectedEOF)
 	}
 	size, err := r.reader.Read(p)
@@ -115,7 +115,7 @@ func (r *BReader) Read(p []byte) (int, error) {
 			err = fmt.Errorf("%w [expected %d, received %d]: %w", errs.ErrSizeLimitExceeded, r.desc.Size, r.readBytes, err)
 		}
 		// check/save digest
-		if r.desc.Digest == "" {
+		if r.desc.Digest.Validate() != nil {
 			r.desc.Digest = r.digester.Digest()
 		} else if r.desc.Digest != r.digester.Digest() {
 			err = fmt.Errorf("%w [expected %s, calculated %s]: %w", errs.ErrDigestMismatch, r.desc.Digest.String(), r.digester.Digest().String(), err)
@@ -133,6 +133,9 @@ func (r *BReader) Seek(offset int64, whence int) (int64, error) {
 	if offset != 0 || whence != io.SeekStart {
 		return r.readBytes, fmt.Errorf("unable to seek to arbitrary position")
 	}
+	if r == nil || r.origRdr == nil {
+		return 0, fmt.Errorf("blob has no reader")
+	}
 	rdrSeek, ok := r.origRdr.(io.Seeker)
 	if !ok {
 		return r.readBytes, fmt.Errorf("Seek unsupported")
@@ -149,9 +152,8 @@ func (r *BReader) Seek(offset int64, whence int) (int64, error) {
 			Limit:  r.desc.Size,
 		}
 	}
-	digester := digest.Canonical.Digester()
-	r.reader = io.TeeReader(rdr, digester.Hash())
-	r.digester = digester
+	r.digester = r.desc.DigestAlgo().Digester()
+	r.reader = io.TeeReader(rdr, r.digester.Hash())
 	r.readBytes = 0
 
 	return 0, nil
@@ -159,7 +161,7 @@ func (r *BReader) Seek(offset int64, whence int) (int64, error) {
 
 // ToOCIConfig converts a BReader to a BOCIConfig.
 func (r *BReader) ToOCIConfig() (*BOCIConfig, error) {
-	if !r.blobSet {
+	if r == nil || !r.blobSet {
 		return nil, fmt.Errorf("blob is not defined")
 	}
 	if r.readBytes != 0 {
@@ -184,7 +186,7 @@ func (r *BReader) ToOCIConfig() (*BOCIConfig, error) {
 
 // ToTarReader converts a BReader to a BTarReader
 func (r *BReader) ToTarReader() (*BTarReader, error) {
-	if !r.blobSet {
+	if r == nil || !r.blobSet {
 		return nil, fmt.Errorf("blob is not defined")
 	}
 	if r.readBytes != 0 {
