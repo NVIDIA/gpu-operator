@@ -14,7 +14,7 @@
 
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.5.0-base-ubi8 as builder
+FROM nvcr.io/nvidia/cuda:12.5.1-base-ubi8 as builder
 
 RUN yum install -y wget make git gcc
 
@@ -55,7 +55,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make gpu-operator
 
-FROM nvcr.io/nvidia/cuda:12.5.0-base-ubi8
+FROM nvcr.io/nvidia/cuda:12.5.1-base-ubi8
 
 # Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
 RUN dnf remove -y cuda-*
