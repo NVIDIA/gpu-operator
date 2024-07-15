@@ -9,7 +9,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.6.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.0
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240627150410-078e3039ecf7
-	github.com/NVIDIA/nvidia-container-toolkit v1.15.0
+	github.com/NVIDIA/nvidia-container-toolkit v1.16.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.2
 	github.com/mittwald/go-helm-client v0.12.10
@@ -140,7 +140,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0 // indirect
 	go.opentelemetry.io/otel v1.23.1 // indirect
 	go.opentelemetry.io/otel/metric v1.23.1 // indirect
