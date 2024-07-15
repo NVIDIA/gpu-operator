@@ -211,7 +211,7 @@ spec:
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:858de27c152669f5a3cf4287406405b16dd5bb70c0373324eb735511997bb415
     - name: driver-image-535
-      image: nvcr.io/nvidia/driver@sha256:068f5c8b9f7ab68f9597ca43d6d9935ce84d627142e36cefd811e14f2808d3f9
+      image: nvcr.io/nvidia/driver@sha256:a6d12fb5753f267dda25dfd38910f972bc632c006a24107fa50e20bba3642d7c
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:07e11f85d54d49ec9648fb06e148b8d832ee1f9c3549a915eee853c9ef2949c2
     - name: device-plugin-image
@@ -870,7 +870,7 @@ spec:
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:858de27c152669f5a3cf4287406405b16dd5bb70c0373324eb735511997bb415"
                   - name: "DRIVER_IMAGE-535"
-                    value: "nvcr.io/nvidia/driver@sha256:068f5c8b9f7ab68f9597ca43d6d9935ce84d627142e36cefd811e14f2808d3f9"
+                    value: "nvcr.io/nvidia/driver@sha256:a6d12fb5753f267dda25dfd38910f972bc632c006a24107fa50e20bba3642d7c"
                   - name: "DRIVER_IMAGE-470"
                     value: "nvcr.io/nvidia/driver@sha256:07e11f85d54d49ec9648fb06e148b8d832ee1f9c3549a915eee853c9ef2949c2"
                   - name: "DRIVER_MANAGER_IMAGE"
