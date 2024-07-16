@@ -225,7 +225,7 @@ spec:
     - name: gpu-operator-validator-image
       image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:main-latest-ubi8
     - name: k8s-driver-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:fdfb9da929a9be5f13fd77e3abb0cdecfc08f29c9fc6c5db6f11f9c010ddd277
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:740abc3ff657545c10effd5354f09af525200ed9a1b7623f0c2e8c7bd9e4a4e2
     - name: vfio-manager-image
       image: nvcr.io/nvidia/cuda@sha256:b0b6c9286f20432ba9becb711aff2d1c1bd56e47b33e6d1cab04aba926c067fe
     - name: sandbox-device-plugin-image
@@ -874,7 +874,7 @@ spec:
                   - name: "DRIVER_IMAGE-470"
                     value: "nvcr.io/nvidia/driver@sha256:07e11f85d54d49ec9648fb06e148b8d832ee1f9c3549a915eee853c9ef2949c2"
                   - name: "DRIVER_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:fdfb9da929a9be5f13fd77e3abb0cdecfc08f29c9fc6c5db6f11f9c010ddd277"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:740abc3ff657545c10effd5354f09af525200ed9a1b7623f0c2e8c7bd9e4a4e2"
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:781fb47e264d9e0fbc8da5bd046e5e678316c866bc36ddd4b56d4eb0de682d5b"
                   - name: "CUDA_BASE_IMAGE"
