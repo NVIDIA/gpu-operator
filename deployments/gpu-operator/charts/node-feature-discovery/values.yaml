@@ -89,6 +89,9 @@ master:
     # The name of the service account to use.
     # If not set and create is true, a name is generated using the fullname template
     name:
+  
+  # specify how many old ReplicaSets for the Deployment to retain.
+  revisionHistoryLimit: 
 
   rbac:
     create: true
@@ -539,6 +542,9 @@ gc:
   annotations: {}
   deploymentAnnotations: {}
   affinity: {}
+
+  # specify how many old ReplicaSets for the Deployment to retain.
+  revisionHistoryLimit: 
 
 # Optionally use encryption for worker <--> master comms
 # TODO: verify hostname is not yet supported
