@@ -13,6 +13,7 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.gc.replicaCount | default 1 }}
+  revisionHistoryLimit: {{ .Values.gc.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
