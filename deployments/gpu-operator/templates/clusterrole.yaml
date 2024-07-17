@@ -24,6 +24,19 @@ rules:
   - list
   - watch
 - apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+  - use
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
