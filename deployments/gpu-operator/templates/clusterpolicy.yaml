@@ -570,7 +570,9 @@ spec:
     args: {{ toYaml .Values.migManager.args | nindent 6 }}
     {{- end }}
     {{- if .Values.migManager.config }}
-    config: {{ toYaml .Values.migManager.config | nindent 6 }}
+    config:
+      name: {{ .Values.migManager.config.name }}
+      default: {{ .Values.migManager.config.default }}
     {{- end }}
     {{- if .Values.migManager.gpuClientsConfig }}
     gpuClientsConfig: {{ toYaml .Values.migManager.gpuClientsConfig | nindent 6 }}
