@@ -15,34 +15,41 @@ The NVIDIA GPU Operator is an open-source product built and maintained by NVIDIA
 ## Architecture
 The GPU Operator is made up of the following software components - each of the components runs as a container, including NVIDIA drivers. The associated code is linked to each of the components below:
 
-* [gpu-operator](https://gitlab.com/nvidia/kubernetes/gpu-operator)
+* [gpu-operator](https://github.com/NVIDIA/gpu-operator)
 * [k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin)
-* [driver](https://gitlab.com/nvidia/container-images/driver)
-* [container-toolkit](https://gitlab.com/nvidia/container-toolkit/container-config)
+* [driver](https://github.com/NVIDIA/gpu-driver-container)
+* [container-toolkit](https://github.com/NVIDIA/nvidia-container-toolkit)
 * [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter)
-* [gpu-feature-discovery](https://gitlab.com/nvidia/kubernetes/gpu-feature-discovery)
-* [mig-manager](https://gitlab.com/nvidia/cloud-native/mig-parted)
-* [samples](https://gitlab.com/nvidia/container-images/samples/-/tree/main/cuda/archive/rhel-ubi8/vector-add)
+* [gpu-feature-discovery](https://github.com/NVIDIA/k8s-device-plugin)
+* [mig-manager](https://github.com/NVIDIA/mig-parted)
+* [sandbox-device-plugin](https://github.com/NVIDIA/kubevirt-gpu-device-plugin)
+* [vgpu-device-manager](https://github.com/NVIDIA/vgpu-device-manager)
+* [kata-manager](https://github.com/NVIDIA/k8s-kata-manager)
+* [samples](https://github.com/NVIDIA/k8s-samples)
 
 ```
-gitlab.com/
-├── nvidia/
-│   ├── gpu-operator          (CRD and controller logic that implements the reconciliation)
-│   ├── k8s-device-plugin     (NVIDIA Device Plugin for Kubernetes)
-│   ├── driver                (NVIDIA Driver qualified for data center GPUs)
-│   ├── container-toolkit     (NVIDIA Container Toolkit, runtime for Docker)
-│   ├── dcgm-exporter         (NVIDIA DCGM for monitoring and telemetry)
-│   ├── gpu-feature-discovery (NVIDIA GPU Feature Discovery for Kubernetes)
-│   ├── mig-manager           (NVIDIA Multi-Instance GPU Manager for Kubernetes)
-│   ├── samples               (CUDA VectorAdd sample used for validation steps)
+github.com/
+├── NVIDIA/
+│   ├── gpu-operator                 (CRD and controller logic that implements the reconciliation)
+│   ├── k8s-device-plugin            (NVIDIA Device Plugin for Kubernetes)
+│   ├── gpu-driver-container         (NVIDIA Driver qualified for data center GPUs)
+│   ├── nvidia-container-toolkit     (NVIDIA Container Toolkit, runtime for Docker)
+│   ├── dcgm-exporter                (NVIDIA DCGM for monitoring and telemetry)
+│   ├── gpu-feature-discovery        (NVIDIA GPU Feature Discovery for Kubernetes)
+│   ├── mig-manager                  (NVIDIA Multi-Instance GPU Manager for Kubernetes)
+│   ├── sandbox-device-plugin        (NVIDIA Device Plugin for sandboxed environments)
+│   ├── vgpu-device-manager          (NVIDIA vGPU Device Manager for Kubernetes)
+│   ├── kata-manager                 (NVIDIA Kata Manager for Kubernetes)
+│   ├── samples                      (CUDA VectorAdd sample used for validation steps)
 ```
 
 ## License
 The NVIDIA GPU Operator is open-source and its components are licensed under the permissive Apache 2.0 license.
 
 ## Artifacts
-The NVIDIA GPU Operator has three artifacts as part of the product release:
+The NVIDIA GPU Operator has the following artifacts as part of the product release:
 1. [Source Code](#source-code)
+1. [Documentation](#documentation)
 1. [Container Images](#container-images)
 1. [Helm Charts](#helm-charts)
 
@@ -50,53 +57,27 @@ The GPU Operator releases follow [calendar versioning](https://calver.org/).
 
 ### <a name="source-code"></a> Source Code
 
-The NVIDIA GPU Operator is available on two external source code repositories:
-* GitHub: https://github.com/NVIDIA/gpu-operator
-* GitLab: https://gitlab.com/nvidia/kubernetes/gpu-operator
+The NVIDIA GPU Operator source code is available on GitHub at https://github.com/NVIDIA/gpu-operator
 
-The product page of the GPU Operator is available on NVIDIA’s official repository on GitHub. GitHub is where we interact primarily with users for issues related to the operator. GitHub is a mirror of the source code repository on GitLab - no development happens on GitHub.
+### <a name="source-code"></a> Documentation
 
-GitLab is where the GPU Operator is actively developed - we leverage GitLab’s CI/CD infrastructure for build, test, package and release of the Operator. GitLab is where we expect users and partners to contribute patches (“Merge Requests” or “MRs”) against the source code repository. MRs do not require explicit contributor license agreements (CLA), but we expect contributors to sign their work.
+The official NVIDIA GPU Operator documentation is available at https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html
 
 ### <a name="container-images"></a> Container Images
 
-Releases of the GPU Operator include container images that are currently available on NVIDIA’s Docker Hub [repository](https://hub.docker.com/u/nvidia). In the future, the operator will be available on [NVIDIA NGC Catalog](https://ngc.nvidia.com/).
-
-The following are the container images (and tag format) that are released:
-```
-├── nvidia/
-│   ├── gpu-operator          (<version-number>)
-│   ├── k8s-device-plugin     (<version-number><os-base-image>)
-│   ├── driver                (<driver-branch><version-number><kernel-version><operating-system>)
-│   ├── container-toolkit     (<version-number><os-base-image>)
-│   ├── dcgm-exporter         (<dcgm-version><version-number><os-base-image>)
-│   ├── gpu-feature-discovery (<version-number><os-base-image>)
-│   ├── mig-manager           (<version-number><operating-system>)
-│   ├── samples               (<version-number><sample-name>)
-```
+Releases of the GPU Operator include container images that are currently available on [NVIDIA NGC Catalog](https://ngc.nvidia.com/).
 
 ### <a name="helm-charts"></a> Helm Charts
 To simplify the deployment, the Operator can be installed using a Helm chart (note only Helm v3 is supported). The documentation for helm installation
 can be viewed [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html#install-helm).
 
-Continuous (‘nightly’) releases of the operator are available. Release milestones are available under ‘stable’.
-```
-├── nightly/index.yaml
-├── stable/index.yaml	(default when installing the operator)
-```
+
 ## Contributions
 NVIDIA is willing to work with partners for adding platform support for the GPU Operator. The GPU Operator is open-source and permissively licensed under the Apache 2.0 license with only minimal requirements for source code [contributions](#signing).
 
-To get started with building the GPU Operator, follow these steps:
+To file feature requests, bugs, or questions, submit an issue at https://github.com/NVIDIA/gpu-operator/issues
 
-```shell
-$ git clone https://gitlab.com/nvidia/kubernetes/gpu-operator.git
-$ cd gpu-operator
-$ make .build-image
-```
-We also use a CI infrastructure on AWS for nightly and per-change testing on the GPU Operator. This infrastructure is available here: https://gitlab.com/nvidia/container-infrastructure/aws-kube-ci
-
-To ensure that the GPU Operator releases can be effectively validated on new platforms, it would be ideal for contributions to make available CI infrastructure (e.g. runners) and associated changes to the CI scripts.
+To contribute to the project, file a Pull Request at https://github.com/NVIDIA/gpu-operator/pulls. Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to sign their work.
 
 ## <a name="signing"></a>Signing your work
 
