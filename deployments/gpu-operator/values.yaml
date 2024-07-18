@@ -366,26 +366,29 @@ migManager:
   #   name: custom-mig-parted-configs
   #   create: true
   #   data: |-
-  #     all-disabled:
-  #       - devices: all
-  #         mig-enabled: false
-  #     custom-mig:
-  #       - devices: [0]
-  #         mig-enabled: false
-  #       - devices: [1]
-  #          mig-enabled: true
-  #          mig-devices:
-  #            "1g.10gb": 7
-  #       - devices: [2]
-  #         mig-enabled: true
-  #         mig-devices:
-  #           "2g.20gb": 2
-  #           "3g.40gb": 1
-  #       - devices: [3]
-  #         mig-enabled: true
-  #         mig-devices:
-  #           "3g.40gb": 1
-  #           "4g.40gb": 1
+  #     config.yaml: |-
+  #       version: v1
+  #       mig-configs:
+  #         all-disabled:
+  #           - devices: all
+  #             mig-enabled: false
+  #         custom-mig:
+  #           - devices: [0]
+  #             mig-enabled: false
+  #           - devices: [1]
+  #              mig-enabled: true
+  #              mig-devices:
+  #                "1g.10gb": 7
+  #           - devices: [2]
+  #             mig-enabled: true
+  #             mig-devices:
+  #               "2g.20gb": 2
+  #               "3g.40gb": 1
+  #           - devices: [3]
+  #             mig-enabled: true
+  #             mig-devices:
+  #               "3g.40gb": 1
+  #               "4g.40gb": 1
   config:
     default: "all-disabled"
     # Create a ConfigMap (default: false)

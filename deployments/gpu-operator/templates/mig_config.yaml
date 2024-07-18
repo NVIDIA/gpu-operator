@@ -6,9 +6,5 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "gpu-operator.labels" . | nindent 4 }}
-data:
-  config.yaml: |
-    version: v1
-    mig-configs:
-{{- .Values.migManager.config.data | nindent 6 }}
+data: {{ toYaml .Values.migManager.config.data | nindent 2 }}
 {{- end }}
