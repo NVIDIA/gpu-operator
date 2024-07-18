@@ -391,7 +391,7 @@ migManager:
     # Create a ConfigMap (default: false)
     create: false
     # ConfigMap name (either existing or to create a new one with create=true above)
-    name: "default-mig-parted-config"
+    name: ""
     # Data section for the ConfigMap to create (i.e only applies when create=true)
     data: {}
   gpuClientsConfig:
