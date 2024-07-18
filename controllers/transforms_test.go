@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -120,6 +121,36 @@ func (d Daemonset) WithEnvVarForCtr(name string, value string, containerName str
 
 func (d Daemonset) WithInitContainer(container corev1.Container) Daemonset {
 	d.Spec.Template.Spec.InitContainers = append(d.Spec.Template.Spec.InitContainers, container)
+	return d
+}
+
+func (d Daemonset) WithName(name string) Daemonset {
+	d.Name = name
+	return d
+}
+
+func (d Daemonset) WithUpdateStrategy(strategy appsv1.DaemonSetUpdateStrategy) Daemonset {
+	d.Spec.UpdateStrategy = strategy
+	return d
+}
+
+func (d Daemonset) WithPriorityClass(name string) Daemonset {
+	d.Spec.Template.Spec.PriorityClassName = name
+	return d
+}
+
+func (d Daemonset) WithTolerations(tolerations []corev1.Toleration) Daemonset {
+	d.Spec.Template.Spec.Tolerations = tolerations
+	return d
+}
+
+func (d Daemonset) WithPodLabels(labels map[string]string) Daemonset {
+	d.Spec.Template.Labels = labels
+	return d
+}
+
+func (d Daemonset) WithPodAnnotations(annotations map[string]string) Daemonset {
+	d.Spec.Template.Annotations = annotations
 	return d
 }
 
@@ -305,6 +336,226 @@ func TestTransformForRuntime(t *testing.T) {
 			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "mainCtr")
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
+		})
+	}
+}
+
+func TestApplyUpdateStrategyConfig(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		dsSpec        gpuv1.DaemonsetsSpec
+		errorExpected bool
+		expectedDs    Daemonset
+	}{
+		{
+			description:   "empty daemonset spec configuration",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description:   "invalid update strategy string, no rolling update fields configured",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "invalid"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description:   "RollingUpdate update strategy string, no rolling update fields configured",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "RollingUpdate"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description: "RollingUpdate update strategy string, daemonset is driver pod",
+			ds:          NewDaemonset().WithName(commonDriverDaemonsetName),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "1",
+				}},
+			errorExpected: false,
+			expectedDs:    NewDaemonset().WithName(commonDriverDaemonsetName),
+		},
+		{
+			description: "RollingUpdate update strategy string, integer maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "1",
+				}},
+			errorExpected: false,
+			expectedDs: NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+			}),
+		},
+		{
+			description: "RollingUpdate update strategy string, percentage maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%",
+				}},
+			errorExpected: false,
+			expectedDs: NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"}},
+			}),
+		},
+		{
+			description: "RollingUpdate update strategy string, invalid maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%abc",
+				}},
+			errorExpected: true,
+		},
+		{
+			description:   "OnDelete update strategy",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "OnDelete"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{Type: appsv1.OnDeleteDaemonSetStrategyType}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				Daemonsets: tc.dsSpec,
+			}
+			err := applyUpdateStrategyConfig(tc.ds.DaemonSet, cpSpec)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestApplyCommonDaemonSetConfig(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		dsSpec        gpuv1.DaemonsetsSpec
+		errorExpected bool
+		expectedDs    Daemonset
+	}{
+		{
+			description: "empty daemonset spec configuration",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{},
+			expectedDs:  NewDaemonset(),
+		},
+		{
+			description: "priorityclass configured",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{PriorityClassName: "test-priority-class"},
+			expectedDs:  NewDaemonset().WithPriorityClass("test-priority-class"),
+		},
+		{
+			description: "toleration configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "test-key",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithTolerations([]corev1.Toleration{
+				{
+					Key:      "test-key",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			}),
+		},
+		{
+			description: "invalid updatestrategy configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%abc",
+				}},
+			errorExpected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				Daemonsets: tc.dsSpec,
+			}
+			err := applyCommonDaemonsetConfig(tc.ds.DaemonSet, cpSpec)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestApplyCommonDaemonsetMetadata(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		dsSpec      gpuv1.DaemonsetsSpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "empty daemonset spec configuration",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{},
+			expectedDs:  NewDaemonset(),
+		},
+		{
+			description: "common daemonset labels configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{Labels: map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}},
+			expectedDs: NewDaemonset().WithPodLabels(map[string]string{
+				"key": "value",
+			}),
+		},
+		{
+			description: "common daemonset annotations configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{Annotations: map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}},
+			expectedDs: NewDaemonset().WithPodAnnotations(map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			applyCommonDaemonsetMetadata(tc.ds.DaemonSet, &tc.dsSpec)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
 }
