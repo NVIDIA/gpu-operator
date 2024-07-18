@@ -366,32 +366,35 @@ migManager:
   #   name: custom-mig-parted-configs
   #   create: true
   #   data: |-
-  #     all-disabled:
-  #       - devices: all
-  #         mig-enabled: false
-  #     custom-mig:
-  #       - devices: [0]
-  #         mig-enabled: false
-  #       - devices: [1]
-  #          mig-enabled: true
-  #          mig-devices:
-  #            "1g.10gb": 7
-  #       - devices: [2]
-  #         mig-enabled: true
-  #         mig-devices:
-  #           "2g.20gb": 2
-  #           "3g.40gb": 1
-  #       - devices: [3]
-  #         mig-enabled: true
-  #         mig-devices:
-  #           "3g.40gb": 1
-  #           "4g.40gb": 1
+  #     config.yaml: |-
+  #       version: v1
+  #       mig-configs:
+  #         all-disabled:
+  #           - devices: all
+  #             mig-enabled: false
+  #         custom-mig:
+  #           - devices: [0]
+  #             mig-enabled: false
+  #           - devices: [1]
+  #              mig-enabled: true
+  #              mig-devices:
+  #                "1g.10gb": 7
+  #           - devices: [2]
+  #             mig-enabled: true
+  #             mig-devices:
+  #               "2g.20gb": 2
+  #               "3g.40gb": 1
+  #           - devices: [3]
+  #             mig-enabled: true
+  #             mig-devices:
+  #               "3g.40gb": 1
+  #               "4g.40gb": 1
   config:
     default: "all-disabled"
     # Create a ConfigMap (default: false)
     create: false
     # ConfigMap name (either existing or to create a new one with create=true above)
-    name: "default-mig-parted-config"
+    name: ""
     # Data section for the ConfigMap to create (i.e only applies when create=true)
     data: {}
   gpuClientsConfig:
