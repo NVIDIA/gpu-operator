@@ -1,0 +1,14 @@
+{{- if and (.Values.migManager.config.create) (not (empty .Values.migManager.config.data)) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.migManager.config.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    version: v1
+    mig-configs:
+{{- .Values.migManager.config.data | nindent 6 }}
+{{- end }}
