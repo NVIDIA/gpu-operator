@@ -154,6 +154,11 @@ func (d Daemonset) WithPodAnnotations(annotations map[string]string) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithPullSecret(secret string) Daemonset {
+	d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: secret}}
+	return d
+}
+
 func TestTransformForHostRoot(t *testing.T) {
 	hostRootVolumeName := "host-root"
 	hostDevCharVolumeName := "host-dev-char"
@@ -555,6 +560,113 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			applyCommonDaemonsetMetadata(tc.ds.DaemonSet, &tc.dsSpec)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidationInitContainer(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform both driver and toolkit validation initContainers",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Driver: gpuv1.DriverValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
+				Name:            "driver-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := transformValidationInitContainer(tc.ds.DaemonSet, tc.cpSpec)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func newBoolPtr(b bool) *bool {
+	boolPtr := new(bool)
+	*boolPtr = b
+	return boolPtr
+}
+
+func TestTransformDriverManagerInitContainer(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform k8s-driver-manager initContainer",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:       "nvcr.io/nvidia/cloud-native",
+						Image:            "k8s-driver-manager",
+						Version:          "v1.0.0",
+						ImagePullPolicy:  "IfNotPresent",
+						ImagePullSecrets: []string{"pull-secret"},
+						Env:              []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+					GPUDirectRDMA: &gpuv1.GPUDirectRDMASpec{
+						Enabled:      newBoolPtr(true),
+						UseHostMOFED: newBoolPtr(true),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: GPUDirectRDMAEnabledEnvName, Value: "true"},
+					{Name: UseHostMOFEDEnvName, Value: "true"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA)
+			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
