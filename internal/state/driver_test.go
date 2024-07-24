@@ -576,6 +576,45 @@ func TestVGPUHostManagerDaemonset(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestVGPUHostManagerDaemonsetOpenShift(t *testing.T) {
+	const (
+		testName     = "driver-vgpu-host-manager-openshift"
+		rhcosVersion = "413.92.202304252344-0"
+		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
+	)
+	state, err := NewStateDriver(nil, nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.DriverType = nvidiav1alpha1.VGPUHostManager
+	renderData.Driver.Name = "nvidia-vgpu-manager-openshift"
+	renderData.Driver.AppName = "nvidia-vgpu-manager-openshift-7c6d7bd86b"
+	renderData.Driver.ImagePath = "nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0"
+	renderData.Driver.OSVersion = "rhel8.0"
+	renderData.Openshift = &openshiftSpec{
+		ToolkitImage: toolkitImage,
+		RHCOSVersion: rhcosVersion,
+	}
+	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
+	renderData.Runtime.OpenshiftVersion = "4.13"
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}
+
 func getMinimalDriverRenderData() *driverRenderData {
 	return &driverRenderData{
 		Driver: &driverSpec{

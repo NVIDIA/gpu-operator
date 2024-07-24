@@ -84,6 +84,10 @@ spec:
               mountPath: /var/log
             - name: dev-log
               mountPath: /dev/log
+            - name: firmware-search-path
+              mountPath: /sys/module/firmware_class/parameters/path
+            - name: nv-firmware
+              mountPath: /lib/firmware
         # Only kept when OpenShift DriverToolkit side-car is enabled.
         - image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
@@ -114,6 +118,10 @@ spec:
               mountPath: /var/log
             - name: dev-log
               mountPath: /dev/log
+            - name: firmware-search-path
+              mountPath: /sys/module/firmware_class/parameters/path
+            - name: nv-firmware
+              mountPath: /lib/firmware
       volumes:
         - name: run-nvidia
           hostPath:
@@ -144,3 +152,10 @@ spec:
         - name: dev-log
           hostPath:
             path: /dev/log
+        - name: firmware-search-path
+          hostPath:
+            path: /sys/module/firmware_class/parameters/path
+        - name: nv-firmware
+          hostPath:
+            path: /run/nvidia/driver/lib/firmware
+            type: DirectoryOrCreate

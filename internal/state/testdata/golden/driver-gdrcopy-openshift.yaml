@@ -351,6 +351,10 @@ spec:
         - mountPath: /host-etc/os-release
           name: host-os-release
           readOnly: true
+        - mountPath: /sys/module/firmware_class/parameters/path
+          name: firmware-search-path
+        - mountPath: /lib/firmware
+          name: nv-firmware
       hostPID: true
       imagePullSecrets:
       - name: ngc-secret
