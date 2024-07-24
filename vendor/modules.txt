@@ -27,7 +27,7 @@ github.com/Masterminds/squirrel
 # github.com/Microsoft/hcsshim v0.11.4
 ## explicit; go 1.18
 github.com/Microsoft/hcsshim/osversion
-# github.com/NVIDIA/go-nvlib v0.6.0
+# github.com/NVIDIA/go-nvlib v0.6.1
 ## explicit; go 1.20
 github.com/NVIDIA/go-nvlib/pkg/nvmdev
 github.com/NVIDIA/go-nvlib/pkg/nvpci
