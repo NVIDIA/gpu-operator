@@ -572,6 +572,10 @@ spec:
           - name: host-os-release
             mountPath: /host-etc/os-release
             readOnly: true
+          - name: firmware-search-path
+            mountPath: /sys/module/firmware_class/parameters/path
+          - name: nv-firmware
+            mountPath: /lib/firmware
       {{- end }}
       volumes:
         - name: run-nvidia

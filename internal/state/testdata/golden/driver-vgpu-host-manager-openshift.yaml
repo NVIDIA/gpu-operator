@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 rules:
 - apiGroups:
@@ -22,7 +22,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
 rules:
 - apiGroups:
   - config.openshift.io
@@ -63,28 +63,28 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
 subjects:
 - kind: ServiceAccount
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 ---
 allowHostDirVolumePlugin: true
@@ -113,7 +113,7 @@ metadata:
       features and the ability to run as any user, any group, any fsGroup, and with
       any SELinux context.  WARNING: this is the most relaxed SCC and should be used
       only for cluster administration. Grant with caution.'
-  name: nvidia-gpu-driver-openshift
+  name: nvidia-vgpu-manager-openshift
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities: null
@@ -126,45 +126,35 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:test-operator:nvidia-gpu-driver-openshift
+- system:serviceaccount:test-operator:nvidia-vgpu-manager-openshift
 volumes:
 - '*'
----
-apiVersion: v1
-data:
-  ca-bundle.crt: ""
-kind: ConfigMap
-metadata:
-  labels:
-    config.openshift.io/inject-trusted-cabundle: "true"
-  name: gpu-operator-trusted-ca
-  namespace: test-operator
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    openshift.io/scc: nvidia-gpu-driver-openshift
+    openshift.io/scc: nvidia-vgpu-manager-openshift
   labels:
-    app: nvidia-gpu-driver-openshift-79d6bd954f
-    app.kubernetes.io/component: nvidia-driver
+    app: nvidia-vgpu-manager-openshift-7c6d7bd86b
+    app.kubernetes.io/component: nvidia-vgpu-host-manager
     nvidia.com/node.os-version: rhel8.0
     nvidia.com/precompiled: "false"
     openshift.driver-toolkit: "true"
     openshift.driver-toolkit.rhcos: 413.92.202304252344-0
-  name: nvidia-gpu-driver-openshift-79d6bd954f
+  name: nvidia-vgpu-manager-openshift-7c6d7bd86b
   namespace: test-operator
 spec:
   selector:
     matchLabels:
-      app: nvidia-gpu-driver-openshift-79d6bd954f
+      app: nvidia-vgpu-manager-openshift-7c6d7bd86b
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: nvidia-driver-ctr
       labels:
-        app: nvidia-gpu-driver-openshift-79d6bd954f
-        app.kubernetes.io/component: nvidia-driver
+        app: nvidia-vgpu-manager-openshift-7c6d7bd86b
+        app.kubernetes.io/component: nvidia-vgpu-host-manager
         nvidia.com/node.os-version: rhel8.0
         nvidia.com/precompiled: "false"
         openshift.driver-toolkit: "true"
@@ -190,43 +180,13 @@ spec:
           value: void
         - name: OPENSHIFT_VERSION
           value: "4.13"
-        - name: HTTP_PROXY
-          value: http://user:pass@example:8080
-        - name: http_proxy
-          value: http://user:pass@example:8080
-        - name: HTTPS_PROXY
-          value: https://user:pass@example:8085
-        - name: https_proxy
-          value: https://user:pass@example:8085
-        - name: NO_PROXY
-          value: internal.example.com
-        - name: no_proxy
-          value: internal.example.com
-        image: nvcr.io/nvidia/driver:525.85.03-rhel8.0
+        image: nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - rm -f /run/nvidia/validations/.driver-ctr-ready
         name: nvidia-driver-ctr
         securityContext:
           privileged: true
           seLinuxOptions:
             level: s0
-        startupProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready
-          failureThreshold: 120
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 60
         volumeMounts:
         - mountPath: /run/nvidia
           mountPropagation: Bidirectional
@@ -240,6 +200,10 @@ spec:
         - mountPath: /host-etc/os-release
           name: host-os-release
           readOnly: true
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - mountPath: /dev/vfio
+          name: vfio
         - mountPath: /run/mellanox/drivers/usr/src
           mountPropagation: HostToContainer
           name: mlnx-ofed-usr-src
@@ -254,9 +218,6 @@ spec:
           name: nv-firmware
         - mountPath: /mnt/shared-nvidia-driver-toolkit
           name: shared-nvidia-driver-toolkit
-        - mountPath: /etc/pki/ca-trust/extracted/pem
-          name: gpu-operator-trusted-ca
-          readOnly: true
       - args:
         - until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting
           for nvidia-driver-ctr container to prepare the shared directory ...; sleep
@@ -307,7 +268,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL
@@ -340,9 +301,9 @@ spec:
           name: run-mellanox-drivers
       nodeSelector:
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
-        nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-gpu-driver-openshift
+      serviceAccountName: nvidia-vgpu-manager-openshift
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu
@@ -361,6 +322,12 @@ spec:
       - hostPath:
           path: /etc/os-release
         name: host-os-release
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /dev/vfio
+        name: vfio
       - hostPath:
           path: /run/nvidia-topologyd
           type: DirectoryOrCreate
@@ -396,12 +363,6 @@ spec:
         name: nv-firmware
       - emptyDir: {}
         name: shared-nvidia-driver-toolkit
-      - configMap:
-          items:
-          - key: ca-bundle.crt
-            path: tls-ca-bundle.pem
-          name: gpu-operator-trusted-ca
-        name: gpu-operator-trusted-ca
   updateStrategy:
     type: OnDelete
 ---
