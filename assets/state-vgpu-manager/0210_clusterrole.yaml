@@ -14,7 +14,6 @@ rules:
   - ""
   resources:
   - nodes
-  - pods
   verbs:
   - get
   - list
@@ -23,6 +22,18 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods
   - pods/eviction
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
   verbs:
   - get
