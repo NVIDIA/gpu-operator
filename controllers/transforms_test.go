@@ -109,6 +109,28 @@ func (d Daemonset) WithPullSecret(secret string) Daemonset {
 	return d
 }
 
+// Pod is a Pod wrapper used for testing
+type Pod struct {
+	*corev1.Pod
+}
+
+func NewPod() Pod {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{},
+	}
+	return Pod{pod}
+}
+
+func (p Pod) WithInitContainer(container corev1.Container) Pod {
+	p.Spec.InitContainers = append(p.Spec.InitContainers, container)
+	return p
+}
+
+func (p Pod) WithRuntimeClassName(name string) Pod {
+	p.Spec.RuntimeClassName = &name
+	return p
+}
+
 func TestTransformForHostRoot(t *testing.T) {
 	hostRootVolumeName := "host-root"
 	hostDevCharVolumeName := "host-dev-char"
@@ -695,6 +717,325 @@ func TestTransformValidatorShared(t *testing.T) {
 			err := TransformValidatorShared(tc.ds.DaemonSet, tc.cpSpec)
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidatorComponent(t *testing.T) {
+	testCases := []struct {
+		description   string
+		pod           Pod
+		cpSpec        *gpuv1.ClusterPolicySpec
+		component     string
+		expectedPod   Pod
+		errorExpected bool
+	}{
+		{
+			description: "no validation init container is a no-op",
+			pod:         NewPod(),
+			cpSpec:      nil,
+			component:   "driver",
+			expectedPod: NewPod(),
+		},
+		{
+			description: "invalid component",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "invalid-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			component:     "invalid",
+			expectedPod:   NewPod(),
+			errorExpected: true,
+		},
+		{
+			description: "cuda validation",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "cuda-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret1", "pull-secret2"},
+					CUDA: gpuv1.CUDAValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "cuda",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "cuda-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret1", "pull-secret2"},
+					Plugin: gpuv1.PluginValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+				MIG: gpuv1.MIGSpec{
+					Strategy: gpuv1.MIGStrategySingle,
+				},
+			},
+			component: "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "plugin-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation removed when plugin is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				DevicePlugin: gpuv1.DevicePluginSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "driver validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "driver-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Driver: gpuv1.DriverValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "driver",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "driver-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "nvidia-fs validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(true)},
+			},
+			component: "nvidia-fs",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "nvidia-fs-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}),
+		},
+		{
+			description: "nvidia-fs validation is removed when gds is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "nvidia-fs",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "cc-manager validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "cc-manager-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				CCManager: gpuv1.CCManagerSpec{Enabled: newBoolPtr(true)},
+			},
+			component: "cc-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "cc-manager-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}),
+		},
+		{
+			description: "cc-manager validation is removed when cc-manager is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "cc-manager-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				CCManager: gpuv1.CCManagerSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "cc-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "toolkit validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vfio-pci validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vfio-pci-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VFIOPCI: gpuv1.VFIOPCIValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vfio-pci",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vfio-pci-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vgpu-manager validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vgpu-manager-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VGPUManager: gpuv1.VGPUManagerValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vgpu-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vgpu-manager-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vgpu-devices validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vgpu-devices-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VGPUDevices: gpuv1.VGPUDevicesValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vgpu-devices",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vgpu-devices-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidatorComponent(tc.cpSpec, &tc.pod.Pod.Spec, tc.component)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedPod, tc.pod)
 		})
 	}
 }
