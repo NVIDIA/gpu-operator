@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -42,14 +43,7 @@ func NewDaemonset() Daemonset {
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						{Name: "initCtr", Image: "initCtrImage"},
-					},
-					Containers: []corev1.Container{
-						{Name: "mainCtr", Image: "mainCtrImage"},
-					},
-				},
+				Spec: corev1.PodSpec{},
 			},
 		},
 	}
@@ -70,57 +64,13 @@ func (d Daemonset) WithHostPathVolume(name string, path string, hostPathType *co
 	return d
 }
 
-func (d Daemonset) WithVolumeMount(name string, path string, containerName string) Daemonset {
-	var ctr *corev1.Container
-	for i, c := range d.Spec.Template.Spec.InitContainers {
-		if c.Name == containerName {
-			ctr = &d.Spec.Template.Spec.InitContainers[i]
-			break
-		}
-	}
-	for i, c := range d.Spec.Template.Spec.Containers {
-		if c.Name == containerName {
-			ctr = &d.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
-
-	if ctr == nil {
-		return d
-	}
-
-	volumeMount := corev1.VolumeMount{
-		Name:      name,
-		MountPath: path,
-	}
-	ctr.VolumeMounts = append(ctr.VolumeMounts, volumeMount)
-	return d
-}
-
-func (d Daemonset) WithEnvVar(name string, value string) Daemonset {
-	for index := range d.Spec.Template.Spec.InitContainers {
-		ctr := &d.Spec.Template.Spec.InitContainers[index]
-		ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-	}
-	for index := range d.Spec.Template.Spec.Containers {
-		ctr := &d.Spec.Template.Spec.Containers[index]
-		ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-	}
-	return d
-}
-
-func (d Daemonset) WithEnvVarForCtr(name string, value string, containerName string) Daemonset {
-	for index, c := range d.Spec.Template.Spec.Containers {
-		if c.Name == containerName {
-			ctr := &d.Spec.Template.Spec.Containers[index]
-			ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-		}
-	}
-	return d
-}
-
 func (d Daemonset) WithInitContainer(container corev1.Container) Daemonset {
 	d.Spec.Template.Spec.InitContainers = append(d.Spec.Template.Spec.InitContainers, container)
+	return d
+}
+
+func (d Daemonset) WithContainer(container corev1.Container) Daemonset {
+	d.Spec.Template.Spec.Containers = append(d.Spec.Template.Spec.Containers, container)
 	return d
 }
 
@@ -189,20 +139,22 @@ func TestTransformForHostRoot(t *testing.T) {
 			hostRoot:    "/custom-root",
 			input: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/", nil).
-				WithHostPathVolume(hostDevCharVolumeName, "/", nil),
+				WithHostPathVolume(hostDevCharVolumeName, "/", nil).
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/custom-root", nil).
 				WithHostPathVolume(hostDevCharVolumeName, "/custom-root/dev/char", nil).
-				WithEnvVar(HostRootEnvName, "/custom-root"),
+				WithContainer(corev1.Container{Name: "test-ctr", Env: []corev1.EnvVar{{Name: HostRootEnvName, Value: "/custom-root"}}}),
 		},
 		{
 			description: "custom host root with host-root volume",
 			hostRoot:    "/custom-root",
 			input: NewDaemonset().
-				WithHostPathVolume(hostRootVolumeName, "/", nil),
+				WithHostPathVolume(hostRootVolumeName, "/", nil).
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/custom-root", nil).
-				WithEnvVar(HostRootEnvName, "/custom-root"),
+				WithContainer(corev1.Container{Name: "test-ctr", Env: []corev1.EnvVar{{Name: HostRootEnvName, Value: "/custom-root"}}}),
 		},
 		{
 			description: "custom host root with host-dev-char volume",
@@ -312,33 +264,48 @@ func TestTransformForRuntime(t *testing.T) {
 		{
 			description: "containerd",
 			runtime:     gpuv1.Containerd,
-			input:       NewDaemonset(),
+			input: NewDaemonset().
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
-				WithVolumeMount("containerd-config", DefaultRuntimeConfigTargetDir, "mainCtr").
-				WithVolumeMount("containerd-socket", DefaultRuntimeSocketTargetDir, "mainCtr").
-				WithEnvVarForCtr("RUNTIME", gpuv1.Containerd.String(), "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_RUNTIME_CLASS", DefaultRuntimeClass, "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_CONFIG", filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile)), "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_SOCKET", filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile)), "mainCtr"),
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
 		},
 		{
 			description: "crio",
 			runtime:     gpuv1.CRIO,
-			input:       NewDaemonset(),
+			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("crio-config", filepath.Dir(DefaultCRIOConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithVolumeMount("crio-config", DefaultRuntimeConfigTargetDir, "mainCtr").
-				WithEnvVarForCtr("RUNTIME", gpuv1.CRIO.String(), "mainCtr").
-				WithEnvVarForCtr("CRIO_CONFIG", filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile)), "mainCtr"),
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+					},
+				}),
 		},
 	}
 
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "mainCtr")
+			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "test-ctr")
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
 		})
@@ -666,6 +633,66 @@ func TestTransformDriverManagerInitContainer(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidatorShared(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform validator daemonset's main container",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("500m"),
+							"memory":           resource.MustParse("200Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("500m"),
+							"memory":           resource.MustParse("200Mi"),
+						},
+					},
+					Args: []string{"--test-flag"},
+					Env:  []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "test-ctr",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("500m"),
+						"memory":           resource.MustParse("200Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("500m"),
+						"memory":           resource.MustParse("200Mi"),
+					},
+				},
+				Args: []string{"--test-flag"},
+				Env:  []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidatorShared(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{})
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
