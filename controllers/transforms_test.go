@@ -692,7 +692,7 @@ func TestTransformValidatorShared(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformValidatorShared(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{})
+			err := TransformValidatorShared(tc.ds.DaemonSet, tc.cpSpec)
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})

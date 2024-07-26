@@ -2027,7 +2027,7 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	err := TransformValidatorShared(obj, config, n)
+	err := TransformValidatorShared(obj, config)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
@@ -2060,7 +2060,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 // TransformSandboxValidator transforms nvidia-sandbox-validator daemonset with required config as per ClusterPolicy
 func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	err := TransformValidatorShared(obj, config, n)
+	err := TransformValidatorShared(obj, config)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
@@ -2088,7 +2088,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 }
 
 // TransformValidatorShared applies general transformations to the validator daemonset with required config as per ClusterPolicy
-func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
 	// update image
 	image, err := gpuv1.ImagePath(&config.Validator)
 	if err != nil {
