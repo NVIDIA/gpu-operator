@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -106,6 +107,11 @@ func (d Daemonset) WithPodAnnotations(annotations map[string]string) Daemonset {
 
 func (d Daemonset) WithPullSecret(secret string) Daemonset {
 	d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: secret}}
+	return d
+}
+
+func (d Daemonset) WithRuntimeClassName(name string) Daemonset {
+	d.Spec.Template.Spec.RuntimeClassName = &name
 	return d
 }
 
@@ -1036,6 +1042,121 @@ func TestTransformValidatorComponent(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedPod, tc.pod)
+		})
+	}
+}
+
+func TestTransformValidator(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "valid validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformSandboxValidator(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "valid validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformSandboxValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
 }
