@@ -39,10 +39,10 @@ _Detailed steps to reproduce the issue._
 Collecting full debug bundle (optional):
 
 ```
-curl -o must-gather.sh -L https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/hack/must-gather.sh 
+curl -o must-gather.sh -L https://raw.githubusercontent.com/NVIDIA/gpu-operator/main/hack/must-gather.sh
 chmod +x must-gather.sh
 ./must-gather.sh
 ```
-**NOTE**: please refer to the [must-gather](https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/hack/must-gather.sh) script for debug data collected.
+**NOTE**: please refer to the [must-gather](https://raw.githubusercontent.com/NVIDIA/gpu-operator/main/hack/must-gather.sh) script for debug data collected.
 
 This bundle can be submitted to us via email: **operator_feedback@nvidia.com**
