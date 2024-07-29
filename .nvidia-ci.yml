@@ -64,6 +64,7 @@ image:gpu-operator-validator:
     - .dist-ubi8
     - .target-gpu-operator-validator
   variables:
+    IN_REGISTRY: "${STAGING_REGISTRY}/gpu-operator"
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
 
 # We skip the integration tests for the internal CI:
