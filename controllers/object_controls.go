@@ -4551,9 +4551,14 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 				obj.ObjectMeta.Labels[key] = value
 			}
 		}
-
 		if serviceMonitor.Relabelings != nil {
-			obj.Spec.Endpoints[0].RelabelConfigs = serviceMonitor.Relabelings
+			relabelConfigs := make([]promv1.RelabelConfig, len(serviceMonitor.Relabelings))
+			for i, relabel := range serviceMonitor.Relabelings {
+				if relabel != nil {
+					relabelConfigs[i] = *relabel
+				}
+			}
+			obj.Spec.Endpoints[0].RelabelConfigs = relabelConfigs
 		}
 	}
 	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
