@@ -23,7 +23,10 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -41,14 +44,7 @@ func NewDaemonset() Daemonset {
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						{Name: "initCtr", Image: "initCtrImage"},
-					},
-					Containers: []corev1.Container{
-						{Name: "mainCtr", Image: "mainCtrImage"},
-					},
-				},
+				Spec: corev1.PodSpec{},
 			},
 		},
 	}
@@ -69,58 +65,76 @@ func (d Daemonset) WithHostPathVolume(name string, path string, hostPathType *co
 	return d
 }
 
-func (d Daemonset) WithVolumeMount(name string, path string, containerName string) Daemonset {
-	var ctr *corev1.Container
-	for i, c := range d.Spec.Template.Spec.InitContainers {
-		if c.Name == containerName {
-			ctr = &d.Spec.Template.Spec.InitContainers[i]
-			break
-		}
-	}
-	for i, c := range d.Spec.Template.Spec.Containers {
-		if c.Name == containerName {
-			ctr = &d.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
-
-	if ctr == nil {
-		return d
-	}
-
-	volumeMount := corev1.VolumeMount{
-		Name:      name,
-		MountPath: path,
-	}
-	ctr.VolumeMounts = append(ctr.VolumeMounts, volumeMount)
-	return d
-}
-
-func (d Daemonset) WithEnvVar(name string, value string) Daemonset {
-	for index := range d.Spec.Template.Spec.InitContainers {
-		ctr := &d.Spec.Template.Spec.InitContainers[index]
-		ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-	}
-	for index := range d.Spec.Template.Spec.Containers {
-		ctr := &d.Spec.Template.Spec.Containers[index]
-		ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-	}
-	return d
-}
-
-func (d Daemonset) WithEnvVarForCtr(name string, value string, containerName string) Daemonset {
-	for index, c := range d.Spec.Template.Spec.Containers {
-		if c.Name == containerName {
-			ctr := &d.Spec.Template.Spec.Containers[index]
-			ctr.Env = append(ctr.Env, corev1.EnvVar{Name: name, Value: value})
-		}
-	}
-	return d
-}
-
 func (d Daemonset) WithInitContainer(container corev1.Container) Daemonset {
 	d.Spec.Template.Spec.InitContainers = append(d.Spec.Template.Spec.InitContainers, container)
 	return d
+}
+
+func (d Daemonset) WithContainer(container corev1.Container) Daemonset {
+	d.Spec.Template.Spec.Containers = append(d.Spec.Template.Spec.Containers, container)
+	return d
+}
+
+func (d Daemonset) WithName(name string) Daemonset {
+	d.Name = name
+	return d
+}
+
+func (d Daemonset) WithUpdateStrategy(strategy appsv1.DaemonSetUpdateStrategy) Daemonset {
+	d.Spec.UpdateStrategy = strategy
+	return d
+}
+
+func (d Daemonset) WithPriorityClass(name string) Daemonset {
+	d.Spec.Template.Spec.PriorityClassName = name
+	return d
+}
+
+func (d Daemonset) WithTolerations(tolerations []corev1.Toleration) Daemonset {
+	d.Spec.Template.Spec.Tolerations = tolerations
+	return d
+}
+
+func (d Daemonset) WithPodLabels(labels map[string]string) Daemonset {
+	d.Spec.Template.Labels = labels
+	return d
+}
+
+func (d Daemonset) WithPodAnnotations(annotations map[string]string) Daemonset {
+	d.Spec.Template.Annotations = annotations
+	return d
+}
+
+func (d Daemonset) WithPullSecret(secret string) Daemonset {
+	d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: secret}}
+	return d
+}
+
+func (d Daemonset) WithRuntimeClassName(name string) Daemonset {
+	d.Spec.Template.Spec.RuntimeClassName = &name
+	return d
+}
+
+// Pod is a Pod wrapper used for testing
+type Pod struct {
+	*corev1.Pod
+}
+
+func NewPod() Pod {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{},
+	}
+	return Pod{pod}
+}
+
+func (p Pod) WithInitContainer(container corev1.Container) Pod {
+	p.Spec.InitContainers = append(p.Spec.InitContainers, container)
+	return p
+}
+
+func (p Pod) WithRuntimeClassName(name string) Pod {
+	p.Spec.RuntimeClassName = &name
+	return p
 }
 
 func TestTransformForHostRoot(t *testing.T) {
@@ -153,20 +167,22 @@ func TestTransformForHostRoot(t *testing.T) {
 			hostRoot:    "/custom-root",
 			input: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/", nil).
-				WithHostPathVolume(hostDevCharVolumeName, "/", nil),
+				WithHostPathVolume(hostDevCharVolumeName, "/", nil).
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/custom-root", nil).
 				WithHostPathVolume(hostDevCharVolumeName, "/custom-root/dev/char", nil).
-				WithEnvVar(HostRootEnvName, "/custom-root"),
+				WithContainer(corev1.Container{Name: "test-ctr", Env: []corev1.EnvVar{{Name: HostRootEnvName, Value: "/custom-root"}}}),
 		},
 		{
 			description: "custom host root with host-root volume",
 			hostRoot:    "/custom-root",
 			input: NewDaemonset().
-				WithHostPathVolume(hostRootVolumeName, "/", nil),
+				WithHostPathVolume(hostRootVolumeName, "/", nil).
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume(hostRootVolumeName, "/custom-root", nil).
-				WithEnvVar(HostRootEnvName, "/custom-root"),
+				WithContainer(corev1.Container{Name: "test-ctr", Env: []corev1.EnvVar{{Name: HostRootEnvName, Value: "/custom-root"}}}),
 		},
 		{
 			description: "custom host root with host-dev-char volume",
@@ -276,35 +292,871 @@ func TestTransformForRuntime(t *testing.T) {
 		{
 			description: "containerd",
 			runtime:     gpuv1.Containerd,
-			input:       NewDaemonset(),
+			input: NewDaemonset().
+				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
-				WithVolumeMount("containerd-config", DefaultRuntimeConfigTargetDir, "mainCtr").
-				WithVolumeMount("containerd-socket", DefaultRuntimeSocketTargetDir, "mainCtr").
-				WithEnvVarForCtr("RUNTIME", gpuv1.Containerd.String(), "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_RUNTIME_CLASS", DefaultRuntimeClass, "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_CONFIG", filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile)), "mainCtr").
-				WithEnvVarForCtr("CONTAINERD_SOCKET", filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile)), "mainCtr"),
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
 		},
 		{
 			description: "crio",
 			runtime:     gpuv1.CRIO,
-			input:       NewDaemonset(),
+			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("crio-config", filepath.Dir(DefaultCRIOConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithVolumeMount("crio-config", DefaultRuntimeConfigTargetDir, "mainCtr").
-				WithEnvVarForCtr("RUNTIME", gpuv1.CRIO.String(), "mainCtr").
-				WithEnvVarForCtr("CRIO_CONFIG", filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile)), "mainCtr"),
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+					},
+				}),
 		},
 	}
 
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "mainCtr")
+			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "test-ctr")
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
+		})
+	}
+}
+
+func TestApplyUpdateStrategyConfig(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		dsSpec        gpuv1.DaemonsetsSpec
+		errorExpected bool
+		expectedDs    Daemonset
+	}{
+		{
+			description:   "empty daemonset spec configuration",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description:   "invalid update strategy string, no rolling update fields configured",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "invalid"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description:   "RollingUpdate update strategy string, no rolling update fields configured",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "RollingUpdate"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description: "RollingUpdate update strategy string, daemonset is driver pod",
+			ds:          NewDaemonset().WithName(commonDriverDaemonsetName),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "1",
+				}},
+			errorExpected: false,
+			expectedDs:    NewDaemonset().WithName(commonDriverDaemonsetName),
+		},
+		{
+			description: "RollingUpdate update strategy string, integer maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "1",
+				}},
+			errorExpected: false,
+			expectedDs: NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+			}),
+		},
+		{
+			description: "RollingUpdate update strategy string, percentage maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%",
+				}},
+			errorExpected: false,
+			expectedDs: NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{
+				Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"}},
+			}),
+		},
+		{
+			description: "RollingUpdate update strategy string, invalid maxUnavailable",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%abc",
+				}},
+			errorExpected: true,
+		},
+		{
+			description:   "OnDelete update strategy",
+			ds:            NewDaemonset(),
+			dsSpec:        gpuv1.DaemonsetsSpec{UpdateStrategy: "OnDelete"},
+			errorExpected: false,
+			expectedDs:    NewDaemonset().WithUpdateStrategy(appsv1.DaemonSetUpdateStrategy{Type: appsv1.OnDeleteDaemonSetStrategyType}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				Daemonsets: tc.dsSpec,
+			}
+			err := applyUpdateStrategyConfig(tc.ds.DaemonSet, cpSpec)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestApplyCommonDaemonSetConfig(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		dsSpec        gpuv1.DaemonsetsSpec
+		errorExpected bool
+		expectedDs    Daemonset
+	}{
+		{
+			description: "empty daemonset spec configuration",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{},
+			expectedDs:  NewDaemonset(),
+		},
+		{
+			description: "priorityclass configured",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{PriorityClassName: "test-priority-class"},
+			expectedDs:  NewDaemonset().WithPriorityClass("test-priority-class"),
+		},
+		{
+			description: "toleration configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "test-key",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithTolerations([]corev1.Toleration{
+				{
+					Key:      "test-key",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			}),
+		},
+		{
+			description: "invalid updatestrategy configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				UpdateStrategy: "RollingUpdate",
+				RollingUpdate: &gpuv1.RollingUpdateSpec{
+					MaxUnavailable: "10%abc",
+				}},
+			errorExpected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				Daemonsets: tc.dsSpec,
+			}
+			err := applyCommonDaemonsetConfig(tc.ds.DaemonSet, cpSpec)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestApplyCommonDaemonsetMetadata(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		dsSpec      gpuv1.DaemonsetsSpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "empty daemonset spec configuration",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{},
+			expectedDs:  NewDaemonset(),
+		},
+		{
+			description: "common daemonset labels configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{Labels: map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}},
+			expectedDs: NewDaemonset().WithPodLabels(map[string]string{
+				"key": "value",
+			}),
+		},
+		{
+			description: "common daemonset annotations configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{Annotations: map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}},
+			expectedDs: NewDaemonset().WithPodAnnotations(map[string]string{
+				"key":                       "value",
+				"app":                       "value",
+				"app.kubernetes.io/part-of": "value",
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			applyCommonDaemonsetMetadata(tc.ds.DaemonSet, &tc.dsSpec)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidationInitContainer(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform both driver and toolkit validation initContainers",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Driver: gpuv1.DriverValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
+				Name:            "driver-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := transformValidationInitContainer(tc.ds.DaemonSet, tc.cpSpec)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func newBoolPtr(b bool) *bool {
+	boolPtr := new(bool)
+	*boolPtr = b
+	return boolPtr
+}
+
+func TestTransformDriverManagerInitContainer(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform k8s-driver-manager initContainer",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:       "nvcr.io/nvidia/cloud-native",
+						Image:            "k8s-driver-manager",
+						Version:          "v1.0.0",
+						ImagePullPolicy:  "IfNotPresent",
+						ImagePullSecrets: []string{"pull-secret"},
+						Env:              []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+					GPUDirectRDMA: &gpuv1.GPUDirectRDMASpec{
+						Enabled:      newBoolPtr(true),
+						UseHostMOFED: newBoolPtr(true),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: GPUDirectRDMAEnabledEnvName, Value: "true"},
+					{Name: UseHostMOFEDEnvName, Value: "true"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidatorShared(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform validator daemonset's main container",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("500m"),
+							"memory":           resource.MustParse("200Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("500m"),
+							"memory":           resource.MustParse("200Mi"),
+						},
+					},
+					Args: []string{"--test-flag"},
+					Env:  []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "test-ctr",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("500m"),
+						"memory":           resource.MustParse("200Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("500m"),
+						"memory":           resource.MustParse("200Mi"),
+					},
+				},
+				Args: []string{"--test-flag"},
+				Env:  []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+			}).WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidatorShared(tc.ds.DaemonSet, tc.cpSpec)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformValidatorComponent(t *testing.T) {
+	testCases := []struct {
+		description   string
+		pod           Pod
+		cpSpec        *gpuv1.ClusterPolicySpec
+		component     string
+		expectedPod   Pod
+		errorExpected bool
+	}{
+		{
+			description: "no validation init container is a no-op",
+			pod:         NewPod(),
+			cpSpec:      nil,
+			component:   "driver",
+			expectedPod: NewPod(),
+		},
+		{
+			description: "invalid component",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "invalid-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			component:     "invalid",
+			expectedPod:   NewPod(),
+			errorExpected: true,
+		},
+		{
+			description: "cuda validation",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "cuda-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret1", "pull-secret2"},
+					CUDA: gpuv1.CUDAValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "cuda",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "cuda-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret1", "pull-secret2"},
+					Plugin: gpuv1.PluginValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+				MIG: gpuv1.MIGSpec{
+					Strategy: gpuv1.MIGStrategySingle,
+				},
+			},
+			component: "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "plugin-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation removed when plugin is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				DevicePlugin: gpuv1.DevicePluginSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "driver validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "driver-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Driver: gpuv1.DriverValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "driver",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "driver-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "nvidia-fs validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(true)},
+			},
+			component: "nvidia-fs",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "nvidia-fs-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}),
+		},
+		{
+			description: "nvidia-fs validation is removed when gds is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "nvidia-fs",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "cc-manager validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "cc-manager-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				CCManager: gpuv1.CCManagerSpec{Enabled: newBoolPtr(true)},
+			},
+			component: "cc-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "cc-manager-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}),
+		},
+		{
+			description: "cc-manager validation is removed when cc-manager is disabled",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "cc-manager-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				CCManager: gpuv1.CCManagerSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "cc-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "toolkit validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vfio-pci validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vfio-pci-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VFIOPCI: gpuv1.VFIOPCIValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vfio-pci",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vfio-pci-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vgpu-manager validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vgpu-manager-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VGPUManager: gpuv1.VGPUManagerValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vgpu-manager",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vgpu-manager-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+		{
+			description: "vgpu-devices validation",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vgpu-devices-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					VGPUDevices: gpuv1.VGPUDevicesValidatorSpec{
+						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "vgpu-devices",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "vgpu-devices-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "foo", Value: "bar"},
+				},
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidatorComponent(tc.cpSpec, &tc.pod.Pod.Spec, tc.component)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedPod, tc.pod)
+		})
+	}
+}
+
+func TestTransformValidator(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "valid validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformSandboxValidator(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "valid validator spec",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformSandboxValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
 }
