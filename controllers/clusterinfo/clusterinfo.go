@@ -341,7 +341,7 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 	logger := log.FromContext(ctx)
 
 	name := "driver-toolkit"
-	namespace := "openshift"
+	namespace := consts.OpenshiftNamespace
 
 	ocpImageClient, err := imagesv1.NewForConfig(c)
 	if err != nil {
