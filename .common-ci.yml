@@ -99,6 +99,7 @@ trigger-pipeline:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
     IN_IMAGE_NAME: "gpu-operator-validator"
     IMAGE_ARCHIVE: "gpu-operator-validator.tar"
+    IN_REGISTRY: "${STAGING_REGISTRY}/gpu-operator"
 
 # .release forms the base of the deployment jobs which push images to the CI registry.
 # This is extended with the version to be deployed (e.g. the SHA or TAG) and the
