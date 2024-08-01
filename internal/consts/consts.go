@@ -39,6 +39,9 @@ const (
 	// Containerd runtime
 	Containerd = "containerd"
 
+	// OpenshiftNamespace indicates the main namespace of an  Openshift cluster
+	OpenshiftNamespace = "openshift"
+
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
