@@ -238,6 +238,7 @@ func (nm *NodeMetrics) watchDriverValidation() {
 			nm.driverValidation.Set(1)
 			nm.driverValidationLastSuccess.Set(float64(time.Now().Unix()))
 		} else {
+			log.Errorf("failed to validate driver: %v", err)
 			nm.driverValidation.Set(0)
 		}
 		time.Sleep(driverValidationCheckDelaySeconds * time.Second)
