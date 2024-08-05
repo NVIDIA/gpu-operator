@@ -105,23 +105,25 @@ func Parse(platStr string) (Platform, error) {
 	// gather local platform details
 	platLocal := Local()
 	// normalize and extrapolate missing fields
-	switch plat.OS {
-	case "local", "":
+	if platStr == "local" {
+		*plat = platLocal
+	} else if plat.OS == "local" || plat.OS == "" {
 		plat.OS = platLocal.OS
 	}
 	plat.normalize()
-	if len(platSplit) < 2 && plat.Architecture == "" && plat.Variant == "" && Compatible(Platform{OS: platLocal.OS}, Platform{OS: plat.OS}) {
-		// automatically expand local architecture with recognized OS
-		switch plat.OS {
-		case "linux", "darwin":
-			plat.Architecture = platLocal.Architecture
-			plat.Variant = platLocal.Variant
-		case "windows":
-			plat.Architecture = platLocal.Architecture
-			plat.Variant = platLocal.Variant
+	switch plat.OS {
+	case "linux", "darwin", "windows":
+		// expand short references to local platform with architecture and variant
+		if Compatible(Platform{OS: platLocal.OS}, Platform{OS: plat.OS}) && len(platSplit) < 2 {
+			if plat.Architecture == "" {
+				plat.Architecture = platLocal.Architecture
+			}
+			if plat.Architecture == platLocal.Architecture && plat.Variant == "" {
+				plat.Variant = platLocal.Variant
+			}
 		}
 	}
-	if plat.OS == "windows" && plat.OS == platLocal.OS && plat.Architecture == platLocal.Architecture && plat.Variant == platLocal.Variant {
+	if plat.OS == "windows" && plat.OS == platLocal.OS && plat.Architecture == platLocal.Architecture && variantCompatible(platLocal.Variant, plat.Variant) && plat.OSVersion == "" {
 		plat.OSVersion = platLocal.OSVersion
 	}
 

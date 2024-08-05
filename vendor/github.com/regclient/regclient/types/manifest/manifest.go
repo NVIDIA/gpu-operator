@@ -102,6 +102,7 @@ type manifestConfig struct {
 type Opts func(*manifestConfig)
 
 // New creates a new manifest based on provided options.
+// The digest for the manifest will be checked against the descriptor, reference, or headers, depending on which is available first (later digests will be ignored).
 func New(opts ...Opts) (Manifest, error) {
 	mc := manifestConfig{}
 	for _, opt := range opts {
@@ -112,6 +113,13 @@ func New(opts ...Opts) (Manifest, error) {
 		desc:      mc.desc,
 		rawBody:   mc.raw,
 		rawHeader: mc.header,
+	}
+	if c.r.Digest != "" && c.desc.Digest == "" {
+		dig, err := digest.Parse(c.r.Digest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse digest from ref: %w", err)
+		}
+		c.desc.Digest = dig
 	}
 	// extract fields from header where available
 	if mc.header != nil {
@@ -446,7 +454,7 @@ func fromOrig(c common, orig interface{}) (Manifest, error) {
 	}
 	// verify digest didn't change
 	if origDigest != "" && origDigest != c.desc.Digest {
-		return nil, fmt.Errorf("manifest digest mismatch, expected %s, computed %s", origDigest, c.desc.Digest)
+		return nil, fmt.Errorf("manifest digest mismatch, expected %s, computed %s%.0w", origDigest, c.desc.Digest, errs.ErrDigestMismatch)
 	}
 	return m, nil
 }
@@ -563,7 +571,7 @@ func fromCommon(c common) (Manifest, error) {
 	}
 	// verify digest didn't change
 	if origDigest != "" && origDigest != c.desc.Digest {
-		return nil, fmt.Errorf("manifest digest mismatch, expected %s, computed %s", origDigest, c.desc.Digest)
+		return nil, fmt.Errorf("manifest digest mismatch, expected %s, computed %s%.0w", origDigest, c.desc.Digest, errs.ErrDigestMismatch)
 	}
 	return m, nil
 }

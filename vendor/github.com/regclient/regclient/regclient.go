@@ -153,6 +153,21 @@ func WithDockerCreds() Opt {
 	}
 }
 
+// WithDockerCredsFile adds configuration from a named docker config file with registry logins.
+// This changes the default value from the config file, and should be added after the config file is loaded.
+func WithDockerCredsFile(fname string) Opt {
+	return func(rc *RegClient) {
+		configHosts, err := config.DockerLoadFile(fname)
+		if err != nil {
+			rc.log.WithFields(logrus.Fields{
+				"err": err,
+			}).Warn("Failed to load docker creds")
+			return
+		}
+		rc.hostLoad("docker-file", configHosts)
+	}
+}
+
 // WithLog overrides default logrus Logger.
 func WithLog(log *logrus.Logger) Opt {
 	return func(rc *RegClient) {

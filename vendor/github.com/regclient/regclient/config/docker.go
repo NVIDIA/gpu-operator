@@ -64,6 +64,12 @@ func DockerLoad() ([]Host, error) {
 	return dockerParse(cf)
 }
 
+// DockerLoadFile returns a slice of hosts from a named docker config file.
+func DockerLoadFile(fname string) ([]Host, error) {
+	cf := conffile.New(conffile.WithFullname(fname))
+	return dockerParse(cf)
+}
+
 // dockerParse parses a docker config into a slice of Hosts.
 func dockerParse(cf *conffile.File) ([]Host, error) {
 	rdr, err := cf.Open()

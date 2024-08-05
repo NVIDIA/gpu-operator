@@ -1381,7 +1381,7 @@ func (rc *RegClient) imageImportDockerAddLayerHandlers(ctx context.Context, r re
 	trd.dockerManifest.Layers = make([]descriptor.Descriptor, len(trd.dockerManifestList[index].Layers))
 
 	// add handler for config
-	trd.handlers[filepath.Clean(trd.dockerManifestList[index].Config)] = func(header *tar.Header, trd *tarReadData) error {
+	trd.handlers[filepath.ToSlash(filepath.Clean(trd.dockerManifestList[index].Config))] = func(header *tar.Header, trd *tarReadData) error {
 		// upload blob, digest is unknown
 		d, err := rc.BlobPut(ctx, r, descriptor.Descriptor{Size: header.Size}, trd.tr)
 		if err != nil {
@@ -1399,7 +1399,7 @@ func (rc *RegClient) imageImportDockerAddLayerHandlers(ctx context.Context, r re
 	// add handlers for each layer
 	for i, layerFile := range trd.dockerManifestList[index].Layers {
 		func(i int) {
-			trd.handlers[filepath.Clean(layerFile)] = func(header *tar.Header, trd *tarReadData) error {
+			trd.handlers[filepath.ToSlash(filepath.Clean(layerFile))] = func(header *tar.Header, trd *tarReadData) error {
 				// ensure blob is compressed
 				rdrUC, err := archive.Decompress(trd.tr)
 				if err != nil {
@@ -1728,7 +1728,7 @@ func (trd *tarReadData) tarReadAll(rs io.ReadSeeker) error {
 			} else if err != nil {
 				return err
 			}
-			name := filepath.Clean(header.Name)
+			name := filepath.ToSlash(filepath.Clean(header.Name))
 			// track symlinks
 			if header.Typeflag == tar.TypeSymlink || header.Typeflag == tar.TypeLink {
 				// normalize target relative to root of tar
@@ -1739,7 +1739,7 @@ func (trd *tarReadData) tarReadAll(rs io.ReadSeeker) error {
 						return err
 					}
 				}
-				target = filepath.Clean("/" + target)[1:]
+				target = filepath.ToSlash(filepath.Clean("/" + target)[1:])
 				// track and set handleAdded if an existing handler points to the target
 				if trd.linkAdd(name, target) && !trd.handleAdded {
 					list, err := trd.linkList(target)
@@ -1827,23 +1827,29 @@ func (trd *tarReadData) tarReadFileJSON(data interface{}) error {
 var errTarFileExists = errors.New("tar file already exists")
 
 func (td *tarWriteData) tarWriteHeader(filename string, size int64) error {
-	dirname := filepath.Dir(filename)
-	if !td.dirs[dirname] && dirname != "." {
-		header := tar.Header{
-			Format:     tar.FormatPAX,
-			Typeflag:   tar.TypeDir,
-			Name:       dirname,
-			Size:       0,
-			Mode:       td.mode | 0511,
-			ModTime:    td.timestamp,
-			AccessTime: td.timestamp,
-			ChangeTime: td.timestamp,
+	dirName := filepath.ToSlash(filepath.Dir(filename))
+	if !td.dirs[dirName] && dirName != "." {
+		dirSplit := strings.Split(dirName, "/")
+		for i := range dirSplit {
+			dirJoin := strings.Join(dirSplit[:i+1], "/")
+			if !td.dirs[dirJoin] && dirJoin != "" {
+				header := tar.Header{
+					Format:     tar.FormatPAX,
+					Typeflag:   tar.TypeDir,
+					Name:       dirJoin + "/",
+					Size:       0,
+					Mode:       td.mode | 0511,
+					ModTime:    td.timestamp,
+					AccessTime: td.timestamp,
+					ChangeTime: td.timestamp,
+				}
+				err := td.tw.WriteHeader(&header)
+				if err != nil {
+					return err
+				}
+				td.dirs[dirJoin] = true
+			}
 		}
-		err := td.tw.WriteHeader(&header)
-		if err != nil {
-			return err
-		}
-		td.dirs[dirname] = true
 	}
 	if td.files[filename] {
 		return fmt.Errorf("%w: %s", errTarFileExists, filename)
@@ -1879,5 +1885,5 @@ func (td *tarWriteData) tarWriteFileJSON(filename string, data interface{}) erro
 }
 
 func tarOCILayoutDescPath(d descriptor.Descriptor) string {
-	return filepath.Clean(fmt.Sprintf("blobs/%s/%s", d.Digest.Algorithm(), d.Digest.Encoded()))
+	return fmt.Sprintf("blobs/%s/%s", d.Digest.Algorithm(), d.Digest.Encoded())
 }
