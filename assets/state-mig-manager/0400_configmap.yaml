@@ -217,7 +217,7 @@ data:
           devices: all
           mig-enabled: true
           mig-devices:
-            "1g.12gb": 1
+            "1g.12gb": 2
             "2g.24gb": 1
             "3g.47gb": 1
 
