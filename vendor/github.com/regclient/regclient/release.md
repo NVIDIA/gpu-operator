@@ -1,54 +1,37 @@
-# Release v0.7.0
+# Release v0.7.1
 
-CVEs:
+[PR 798][pr-798] fixes an issue where a malicious registry could return a pinned manifest different from the request.
+Commands like `regctl manifest get $image@$digest` will now verify the digest of the returned manifest matches the request rather than the registry headers.
 
-- CVE-2024-24790 fix included with Go 1.22.4 upgrade. ([PR 762][pr-762])
-- CVE-2024-24791 fix included with Go 1.22.5 upgrade. ([PR 777][pr-777])
+Security updates:
 
-Breaking:
-
-- `regctl registry set` and `regctl registry login` will return a non-zero if the ping fails. ([PR 751][pr-751])
-- Removed `WithFS` which required access to an internal interface to use. ([PR 772][pr-772])
+- Validate the digest of the ref when provided. ([PR 798][pr-798])
 
 Features:
 
-- Add an experimental `regctl ref` command. ([PR 765][pr-765])
-- Support digest algorithms beyond sha256. ([PR 776][pr-776])
-- Support modifying the digest algorithm on an image. ([PR 776][pr-776])
-- Experimental support for pushing tagged manifests with different digest algorithms. ([PR 778][pr-778])
+- Add a `WithDockerCredsFile() regclient.Opt`. ([PR 784][pr-784])
+- Add `regctl artifact get --config` option to only return the config. ([PR 795][pr-795])
 
 Fixes:
 
-- Prevent panic on interrupted image mod. ([PR 746][pr-746])
-- Enable deletion on olareg tests. ([PR 758][pr-758])
-- Allow `~` (tilde) in ocidir reference paths. ([PR 763][pr-763])
-- Allow well known architectures as a platform. ([PR 771][pr-771])
-- Validate digests before calling methods that could panic. ([PR 776][pr-776])
+- Detect `amd64` variants for `--platform local`. ([PR 782][pr-782])
+- Mod tracking of changed manifests. ([PR 783][pr-783])
+- Tar path separator should always be a `/`. ([PR 788][pr-788])
 
-Other changes:
+Other Changes:
 
-- Refactor pulling manifests by platform. ([PR 768][pr-768])
-- Cleanup Dockerfile linter warnings. ([PR 770][pr-770])
-- Enable docker caching of GHA builds. ([PR 773][pr-773])
-- Include a contributor list in the readme. ([PR 774][pr-774])
+- Remove docker build cache in GHA. ([PR 780][pr-780])
 
 Contributors:
 
+- @mmonaco
+- @stormyyd
 - @sudo-bmitch
-- @thesayyn
 
-[pr-746]: https://github.com/regclient/regclient/pull/746
-[pr-751]: https://github.com/regclient/regclient/pull/751
-[pr-758]: https://github.com/regclient/regclient/pull/758
-[pr-762]: https://github.com/regclient/regclient/pull/762
-[pr-763]: https://github.com/regclient/regclient/pull/763
-[pr-765]: https://github.com/regclient/regclient/pull/765
-[pr-768]: https://github.com/regclient/regclient/pull/768
-[pr-770]: https://github.com/regclient/regclient/pull/770
-[pr-771]: https://github.com/regclient/regclient/pull/771
-[pr-772]: https://github.com/regclient/regclient/pull/772
-[pr-773]: https://github.com/regclient/regclient/pull/773
-[pr-774]: https://github.com/regclient/regclient/pull/774
-[pr-776]: https://github.com/regclient/regclient/pull/776
-[pr-777]: https://github.com/regclient/regclient/pull/777
-[pr-778]: https://github.com/regclient/regclient/pull/778
+[pr-780]: https://github.com/regclient/regclient/pull/780
+[pr-782]: https://github.com/regclient/regclient/pull/782
+[pr-783]: https://github.com/regclient/regclient/pull/783
+[pr-784]: https://github.com/regclient/regclient/pull/784
+[pr-788]: https://github.com/regclient/regclient/pull/788
+[pr-795]: https://github.com/regclient/regclient/pull/795
+[pr-798]: https://github.com/regclient/regclient/pull/798

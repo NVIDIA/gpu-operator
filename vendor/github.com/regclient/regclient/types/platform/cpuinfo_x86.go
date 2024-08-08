@@ -96,5 +96,5 @@ func bitSet(bitpos uint) uint32 {
 	return 1 << bitpos
 }
 func bitIsSet(bits, value uint32) bool {
-	return (value & bits) == value
+	return (value & bits) == bits
 }
