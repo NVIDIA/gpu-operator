@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
-    olm.skipRange: '>=1.9.0 <24.6.0'
+    olm.skipRange: '>=1.9.0 <24.6.1'
     alm-examples: |-
       [
         {
@@ -195,7 +195,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v24.6.0
+  name: gpu-operator-certified.v24.6.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -215,9 +215,9 @@ spec:
     - name: driver-image-470
       image: nvcr.io/nvidia/driver@sha256:07e11f85d54d49ec9648fb06e148b8d832ee1f9c3549a915eee853c9ef2949c2
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:f85fd6e328e36d4737bf394bf8bd69bec793656af686ca0491f28730d9b96d1a
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:7ad2c9f71fe06f9f7745ac8635f46740fbdff4f11edd468addfab81afcdfa534
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:f85fd6e328e36d4737bf394bf8bd69bec793656af686ca0491f28730d9b96d1a
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:7ad2c9f71fe06f9f7745ac8635f46740fbdff4f11edd468addfab81afcdfa534
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:781fb47e264d9e0fbc8da5bd046e5e678316c866bc36ddd4b56d4eb0de682d5b
     - name: init-container-image
@@ -858,7 +858,7 @@ spec:
                   - name: "VALIDATOR_IMAGE"
                     value: "registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:main-latest-ubi8"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:f85fd6e328e36d4737bf394bf8bd69bec793656af686ca0491f28730d9b96d1a"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:7ad2c9f71fe06f9f7745ac8635f46740fbdff4f11edd468addfab81afcdfa534"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:f95ef6a0c377e011bc0561c7d2c2bf32e45106fb0ba91ae9a10f97236ded0581"
                   - name: "DCGM_IMAGE"
@@ -866,7 +866,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:21f4c8b88716e8e6f732f9fb4c2efaef937c227491a8631c5e55036f80f39a4d"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:f85fd6e328e36d4737bf394bf8bd69bec793656af686ca0491f28730d9b96d1a"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:7ad2c9f71fe06f9f7745ac8635f46740fbdff4f11edd468addfab81afcdfa534"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:858de27c152669f5a3cf4287406405b16dd5bb70c0373324eb735511997bb415"
                   - name: "DRIVER_IMAGE-535"
@@ -917,5 +917,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 24.6.0
-  replaces: gpu-operator-certified.v24.3.0
+  version: 24.6.1
+  replaces: gpu-operator-certified.v24.6.0
