@@ -204,6 +204,9 @@ spec:
                 items:
                   type: string
                 type: array
+              installDirectory:
+                description: InstallDirectory is the install location for the driver
+                type: string
               kernelModuleConfig:
                 description: 'Optional: Kernel module configuration parameters for
                   the NVIDIA Driver'
@@ -511,6 +514,10 @@ spec:
                 description: NodeSelector specifies a selector for installation of
                   NVIDIA driver
                 type: object
+              persist:
+                description: PersistDriver indicates if the driver install should
+                  be persisted across restarts
+                type: boolean
               priorityClassName:
                 description: 'Optional: Set priorityClassName'
                 type: string

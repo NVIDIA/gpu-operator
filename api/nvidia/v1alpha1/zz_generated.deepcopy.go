@@ -313,6 +313,11 @@ func (in *NVIDIADriverSpec) DeepCopyInto(out *NVIDIADriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PersistDriver != nil {
+		in, out := &in.PersistDriver, &out.PersistDriver
+		*out = new(bool)
+		**out = **in
+	}
 	if in.StartupProbe != nil {
 		in, out := &in.StartupProbe, &out.StartupProbe
 		*out = new(ContainerProbeSpec)
