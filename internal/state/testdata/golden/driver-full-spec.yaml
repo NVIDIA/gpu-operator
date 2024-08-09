@@ -254,9 +254,8 @@ spec:
           mountPropagation: HostToContainer
           name: run-mellanox-drivers
       nodeSelector:
-        example.com/bar: bar
-        example.com/foo: foo
         nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.driver.managed-by: test-cr
       priorityClassName: custom-priority-class-name
       serviceAccountName: nvidia-gpu-driver-ubuntu22.04
       tolerations:

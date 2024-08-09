@@ -407,6 +407,7 @@ spec:
       nodeSelector:
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: 413.92.202304252344-0
         nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.driver.managed-by: test-cr
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-gpu-driver-openshift
       tolerations:

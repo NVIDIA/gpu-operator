@@ -234,6 +234,7 @@ spec:
       nodeSelector:
         feature.node.kubernetes.io/kernel-version.full: 5.4.0-150-generic
         nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.driver.managed-by: test-cr
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-gpu-driver-ubuntu22.04
       tolerations:

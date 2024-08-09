@@ -93,6 +93,7 @@ func makeTestNode(opts ...nodeOptions) *corev1.Node {
 	return n
 }
 
+// TODO: update this test function
 func TestCheckNodeSelector(t *testing.T) {
 	node := makeTestNode(labelled(map[string]string{"os-version": "ubuntu20.04"}))
 	driver := makeTestDriver(nodeSelector(node.Labels))

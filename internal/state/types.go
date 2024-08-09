@@ -30,6 +30,7 @@ type SyncingSource source.SyncingSource
 // which is to be populated with the fully-qualified image path.
 type driverSpec struct {
 	Spec              *nvidiav1alpha1.NVIDIADriverSpec
+	CRName            string
 	AppName           string
 	Name              string
 	ImagePath         string
