@@ -88,7 +88,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.60.1
           args: -v --timeout 5m
           skip-cache: true
       - run: make check
