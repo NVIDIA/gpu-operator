@@ -1031,7 +1031,7 @@ func (m *MOFED) validate() error {
 
 	present, err := m.isMellanoxDevicePresent()
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Errorf("Error trying to retrieve Mellanox device - %s\n", err.Error())
 		return err
 	}
 	if !present {
