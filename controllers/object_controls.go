@@ -2846,7 +2846,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf(fmt.Sprintf("could not find the '%s' container", name))
+		return nil, fmt.Errorf("could not find the '%s' container", name)
 	}
 
 	if !n.ocpDriverToolkit.enabled {
