@@ -209,7 +209,7 @@ func (reg *Reg) referrerListByAPIPage(ctx context.Context, r ref.Ref, config sch
 	}
 
 	m, err := manifest.New(
-		manifest.WithRef(r),
+		manifest.WithRef(r.SetDigest("")),
 		manifest.WithHeader(resp.HTTPResponse().Header),
 		manifest.WithRaw(rawBody),
 	)
