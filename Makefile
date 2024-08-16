@@ -26,7 +26,7 @@ include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-DIST ?= ubi8
+DIST ?= ubi9
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
@@ -252,8 +252,8 @@ coverage: unit-test
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi8
-DEFAULT_PUSH_TARGET := ubi8
+DISTRIBUTIONS := ubi9
+DEFAULT_PUSH_TARGET := ubi9
 
 PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
 BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
