@@ -332,7 +332,11 @@ dcgmExporter:
     #   target_label: instance
     #   replacement: $1
     #   action: replace
-
+  # Point to a ConfigMap with a customized list of metrics for DCGM Exporter to emit.
+  # The ConfigMap must exist in the same namespace as the release.
+  # The metrics are expected to be listed under a key called `dcgm-metrics.csv`.
+  config:
+    name: ""
 gfd:
   enabled: true
   repository: nvcr.io/nvidia
