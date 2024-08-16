@@ -41,8 +41,8 @@ OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi8 ubuntu20.04
-DEFAULT_PUSH_TARGET := ubi8
+DISTRIBUTIONS := ubi9
+DEFAULT_PUSH_TARGET := ubi9
 
 PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
 BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
@@ -87,7 +87,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-$(*) \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-ubi8 \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--file $(DOCKERFILE) $(BUILD_DIR)
