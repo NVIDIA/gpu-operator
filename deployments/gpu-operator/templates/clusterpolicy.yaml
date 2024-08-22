@@ -511,8 +511,9 @@ spec:
     {{- if .Values.dcgmExporter.args }}
     args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
     {{- end }}
-    {{- if .Values.dcgmExporter.config }}
-    config: {{ toYaml .Values.dcgmExporter.config | nindent 6 }}
+    {{- if and (.Values.dcgmExporter.config) (.Values.dcgmExporter.config.name) }}
+    config:
+      name: {{ .Values.dcgmExporter.config.name }}
     {{- end }}
     {{- if .Values.dcgmExporter.serviceMonitor }}
     serviceMonitor: {{ toYaml .Values.dcgmExporter.serviceMonitor | nindent 6 }}
