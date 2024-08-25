@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
@@ -31,14 +20,6 @@ const (
 
 // Server HTTP metrics.
 const (
-	// Deprecated: This field is unused.
-	RequestCount = "http.server.request_count" // Incoming request count total
-	// Deprecated: Use of this field has been migrated to serverRequestSize. It will be removed in a future version.
-	RequestContentLength = "http.server.request_content_length" // Incoming request bytes total
-	// Deprecated: Use of this field has been migrated to serverResponseSize. It will be removed in a future version.
-	ResponseContentLength = "http.server.response_content_length" // Incoming response bytes total
-	// Deprecated: Use of this field has been migrated to serverDuration. It will be removed in a future version.
-	ServerLatency      = "http.server.duration"      // Incoming end to end duration, milliseconds
 	serverRequestSize  = "http.server.request.size"  // Incoming request bytes total
 	serverResponseSize = "http.server.response.size" // Incoming response bytes total
 	serverDuration     = "http.server.duration"      // Incoming end to end duration, milliseconds
