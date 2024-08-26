@@ -14,9 +14,9 @@
 
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.6.0-base-ubi8 as builder
+FROM nvcr.io/nvidia/cuda:12.6.0-base-ubi9 as builder
 
-RUN yum install -y wget make git gcc
+RUN dnf install -y wget make git gcc
 
 ARG GOLANG_VERSION=0.0.0
 RUN set -eux; \
@@ -25,7 +25,7 @@ RUN set -eux; \
     case "${arch##*-}" in \
         x86_64 | amd64) ARCH='amd64' ;; \
         ppc64el | ppc64le) ARCH='ppc64le' ;; \
-        aarch64) ARCH='arm64' ;; \
+        aarch64 | arm64) ARCH='arm64' ;; \
         *) echo "unsupported architecture" ; exit 1 ;; \
     esac; \
     wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
@@ -55,7 +55,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make gpu-operator
 
-FROM nvcr.io/nvidia/cuda:12.6.0-base-ubi8
+FROM nvcr.io/nvidia/cuda:12.6.0-base-ubi9
 
 # Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
 RUN dnf remove -y cuda-*
@@ -97,7 +97,7 @@ COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.ya
 # Install / upgrade packages here that are required to resolve CVEs
 ARG CVE_UPDATES
 RUN if [ -n "${CVE_UPDATES}" ]; then \
-        yum update -y ${CVE_UPDATES} && \
+        dnf update -y ${CVE_UPDATES} && \
         rm -rf /var/cache/yum/*; \
     fi
 
