@@ -8,25 +8,14 @@ rules:
   - ""
   resources:
   - configmaps
+  - endpoints
   - events
+  - namespaces
   - nodes
   - persistentvolumeclaims
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  - namespaces
   - pods
   - pods/eviction
+  - secrets
   - serviceaccounts
   - services
   - services/finalizers
@@ -38,22 +27,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - list
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -159,17 +132,6 @@ rules:
   - nvidia.com
   resources:
   - '*'
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - nvidia.com
-  resources:
   - nvidiadrivers
   verbs:
   - create

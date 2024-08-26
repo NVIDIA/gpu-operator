@@ -40,20 +40,22 @@ var clusterpoliciesKind = v1.SchemeGroupVersion.WithKind("ClusterPolicy")
 
 // Get takes name of the clusterPolicy, and returns the corresponding clusterPolicy object, and an error if there is any.
 func (c *FakeClusterPolicies) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterPolicy, err error) {
+	emptyResult := &v1.ClusterPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterpoliciesResource, name), &v1.ClusterPolicy{})
+		Invokes(testing.NewRootGetActionWithOptions(clusterpoliciesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterPolicies that match those selectors.
 func (c *FakeClusterPolicies) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterPolicyList, err error) {
+	emptyResult := &v1.ClusterPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterpoliciesResource, clusterpoliciesKind, opts), &v1.ClusterPolicyList{})
+		Invokes(testing.NewRootListActionWithOptions(clusterpoliciesResource, clusterpoliciesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -72,36 +74,39 @@ func (c *FakeClusterPolicies) List(ctx context.Context, opts metav1.ListOptions)
 // Watch returns a watch.Interface that watches the requested clusterPolicies.
 func (c *FakeClusterPolicies) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clusterpoliciesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(clusterpoliciesResource, opts))
 }
 
 // Create takes the representation of a clusterPolicy and creates it.  Returns the server's representation of the clusterPolicy, and an error, if there is any.
 func (c *FakeClusterPolicies) Create(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.CreateOptions) (result *v1.ClusterPolicy, err error) {
+	emptyResult := &v1.ClusterPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterpoliciesResource, clusterPolicy), &v1.ClusterPolicy{})
+		Invokes(testing.NewRootCreateActionWithOptions(clusterpoliciesResource, clusterPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterPolicy), err
 }
 
 // Update takes the representation of a clusterPolicy and updates it. Returns the server's representation of the clusterPolicy, and an error, if there is any.
 func (c *FakeClusterPolicies) Update(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.UpdateOptions) (result *v1.ClusterPolicy, err error) {
+	emptyResult := &v1.ClusterPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterpoliciesResource, clusterPolicy), &v1.ClusterPolicy{})
+		Invokes(testing.NewRootUpdateActionWithOptions(clusterpoliciesResource, clusterPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterPolicy), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterPolicies) UpdateStatus(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.UpdateOptions) (*v1.ClusterPolicy, error) {
+func (c *FakeClusterPolicies) UpdateStatus(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.UpdateOptions) (result *v1.ClusterPolicy, err error) {
+	emptyResult := &v1.ClusterPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clusterpoliciesResource, "status", clusterPolicy), &v1.ClusterPolicy{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clusterpoliciesResource, "status", clusterPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterPolicy), err
 }
@@ -115,7 +120,7 @@ func (c *FakeClusterPolicies) Delete(ctx context.Context, name string, opts meta
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterPolicies) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterpoliciesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(clusterpoliciesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ClusterPolicyList{})
 	return err
@@ -123,10 +128,11 @@ func (c *FakeClusterPolicies) DeleteCollection(ctx context.Context, opts metav1.
 
 // Patch applies the patch and returns the patched clusterPolicy.
 func (c *FakeClusterPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterPolicy, err error) {
+	emptyResult := &v1.ClusterPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterpoliciesResource, name, pt, data, subresources...), &v1.ClusterPolicy{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterpoliciesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterPolicy), err
 }
