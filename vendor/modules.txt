@@ -540,7 +540,7 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# github.com/urfave/cli/v2 v2.27.2
+# github.com/urfave/cli/v2 v2.27.4
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/x448/float16 v0.8.4
