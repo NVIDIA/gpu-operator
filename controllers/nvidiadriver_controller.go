@@ -256,7 +256,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{
 		Reconciler:              r,
 		MaxConcurrentReconciles: 1,
-		RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(minDelayCR, maxDelayCR),
+		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})
 	if err != nil {
 		return err
