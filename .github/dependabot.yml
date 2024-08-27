@@ -7,8 +7,7 @@ updates:
     target-branch: main
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "sunday"
+      interval: "daily"
     labels:
       - dependencies
     groups:
@@ -24,7 +23,7 @@ updates:
     schedule:
       interval: "daily"
     labels:
-      - toolchain-dependencies
+      - dependencies
 
   # Update GPU Operator base images.
   - package-ecosystem: "docker"
