@@ -95,13 +95,13 @@ unit-tests:
 build:gpu-operator:
   extends:
     - .image-build
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator
 
 build:gpu-operator-validator:
   extends:
     - .image-build
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator-validator
 
 .e2e_defaults:
@@ -117,7 +117,7 @@ build:gpu-operator-validator:
     VALIDATOR_IMAGE: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
     GPU_PRODUCT_NAME: "Tesla-T4"
   extends:
-    - .dist-ubi8
+    - .dist-ubi9
   except:
     variables:
       - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/

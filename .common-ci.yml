@@ -82,9 +82,9 @@ trigger-pipeline:
     -  '[[ -n "${SKIP_QEMU_SETUP}" ]] || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes'
 
 # Define targets for the gpu-operator and gpu-operator-validator images
-.dist-ubi8:
+.dist-ubi9:
   variables:
-    DIST: ubi8
+    DIST: ubi9
     CVE_UPDATES: "cyrus-sasl-lib"
 
 .target-gpu-operator:
@@ -182,7 +182,7 @@ trigger-pipeline:
 release:staging-gpu-operator:
   extends:
     - .release:staging
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
@@ -190,7 +190,7 @@ release:staging-gpu-operator:
 release:staging-gpu-operator-validator:
   extends:
     - .release:staging
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
@@ -198,7 +198,7 @@ release:staging-gpu-operator-validator:
 release:staging-latest-gpu-operator:
   extends:
     - .release:staging
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
@@ -209,7 +209,7 @@ release:staging-latest-gpu-operator:
 release:staging-latest-gpu-operator-validator:
   extends:
     - .release:staging
-    - .dist-ubi8
+    - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
