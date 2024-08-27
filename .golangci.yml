@@ -22,3 +22,4 @@ linters-settings:
     excludes:
       - G101
       - G404
+      - G115
