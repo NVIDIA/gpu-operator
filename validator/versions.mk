@@ -15,5 +15,5 @@
 # Include global variables from gpu-operator project root
 include $(CURDIR)/../versions.mk
 
-CUDA_SAMPLES_VERSION ?= 11.7.1
+CUDA_SAMPLES_VERSION ?= 12.5.0
 GOLANG_VERSION ?= 1.22.5
