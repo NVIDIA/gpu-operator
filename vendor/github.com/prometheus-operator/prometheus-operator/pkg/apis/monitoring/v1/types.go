@@ -17,6 +17,7 @@ package v1
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -531,8 +532,11 @@ type Endpoint struct {
 }
 
 type AttachMetadata struct {
-	// When set to true, Prometheus must have the `get` permission on the
-	// `Nodes` objects.
+	// When set to true, Prometheus attaches node metadata to the discovered
+	// targets.
+	//
+	// The Prometheus service account must have the `list` and `watch`
+	// permissions on the `Nodes` objects.
 	//
 	// +optional
 	Node *bool `json:"node,omitempty"`
@@ -565,6 +569,19 @@ type OAuth2 struct {
 	//
 	// +optional
 	EndpointParams map[string]string `json:"endpointParams,omitempty"`
+
+	// TLS configuration to use when connecting to the OAuth2 server.
+	// It requires Prometheus >= v2.43.0.
+	//
+	// +optional
+	TLSConfig *SafeTLSConfig `json:"tlsConfig,omitempty"`
+
+	// Proxy configuration to use when connecting to the OAuth2 server.
+	// It requires Prometheus >= v2.43.0.
+	// It is not supported yet for Alertmanager.
+	//
+	// +optional
+	ProxyConfig `json:",inline"`
 }
 
 type OAuth2ValidationError struct {
@@ -587,6 +604,12 @@ func (o *OAuth2) Validate() error {
 	if err := o.ClientID.Validate(); err != nil {
 		return &OAuth2ValidationError{
 			err: fmt.Sprintf("invalid OAuth2 client id: %s", err.Error()),
+		}
+	}
+
+	if err := o.TLSConfig.Validate(); err != nil {
+		return &OAuth2ValidationError{
+			err: fmt.Sprintf("invalid OAuth2 tlsConfig: %s", err.Error()),
 		}
 	}
 
@@ -642,6 +665,16 @@ func (c *SecretOrConfigMap) String() string {
 	return "<empty>"
 }
 
+// +kubebuilder:validation:Enum=TLS10;TLS11;TLS12;TLS13
+type TLSVersion string
+
+const (
+	TLSVersion10 TLSVersion = "TLS10"
+	TLSVersion11 TLSVersion = "TLS11"
+	TLSVersion12 TLSVersion = "TLS12"
+	TLSVersion13 TLSVersion = "TLS13"
+)
+
 // SafeTLSConfig specifies safe TLS configuration parameters.
 // +k8s:openapi-gen=true
 type SafeTLSConfig struct {
@@ -655,12 +688,24 @@ type SafeTLSConfig struct {
 	KeySecret *v1.SecretKeySelector `json:"keySecret,omitempty"`
 
 	// Used to verify the hostname for the targets.
-	//+optional
+	// +optional
 	ServerName *string `json:"serverName,omitempty"`
 
 	// Disable target certificate validation.
-	//+optional
+	// +optional
 	InsecureSkipVerify *bool `json:"insecureSkipVerify,omitempty"`
+
+	// Minimum acceptable TLS version.
+	//
+	// It requires Prometheus >= v2.35.0.
+	// +optional
+	MinVersion *TLSVersion `json:"minVersion,omitempty"`
+
+	// Maximum acceptable TLS version.
+	//
+	// It requires Prometheus >= v2.41.0.
+	// +optional
+	MaxVersion *TLSVersion `json:"maxVersion,omitempty"`
 }
 
 // Validate semantically validates the given SafeTLSConfig.
@@ -683,6 +728,10 @@ func (c *SafeTLSConfig) Validate() error {
 
 	if c.KeySecret != nil && c.Cert == (SecretOrConfigMap{}) {
 		return fmt.Errorf("client key specified without client cert")
+	}
+
+	if c.MaxVersion != nil && c.MinVersion != nil && strings.Compare(string(*c.MaxVersion), string(*c.MinVersion)) == -1 {
+		return fmt.Errorf("maxVersion must more than or equal to minVersion")
 	}
 
 	return nil
@@ -733,6 +782,10 @@ func (c *TLSConfig) Validate() error {
 
 	if hasKey && !hasCert {
 		return fmt.Errorf("cannot specify client key without client cert")
+	}
+
+	if c.MaxVersion != nil && c.MinVersion != nil && strings.Compare(string(*c.MaxVersion), string(*c.MinVersion)) == -1 {
+		return fmt.Errorf("maxVersion must more than or equal to minVersion")
 	}
 
 	return nil
