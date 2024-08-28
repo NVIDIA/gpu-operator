@@ -37,7 +37,7 @@ github.com/NVIDIA/go-nvlib/pkg/pciids
 # github.com/NVIDIA/k8s-kata-manager v0.2.0
 ## explicit; go 1.21
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
-# github.com/NVIDIA/k8s-operator-libs v0.0.0-20240627150410-078e3039ecf7
+# github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
 ## explicit; go 1.22.0
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
@@ -748,9 +748,6 @@ google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/evanphx/json-patch.v4 v4.12.0
 ## explicit
 gopkg.in/evanphx/json-patch.v4
-# gopkg.in/evanphx/json-patch.v5 v5.7.0
-## explicit
-gopkg.in/evanphx/json-patch.v5
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
@@ -941,7 +938,7 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.31.0
 ## explicit; go 1.22.0
 k8s.io/apiserver/pkg/endpoints/deprecation
-# k8s.io/cli-runtime v0.30.3
+# k8s.io/cli-runtime v0.31.0
 ## explicit; go 1.22.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
@@ -1261,7 +1258,7 @@ k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/validation
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kubectl v0.30.3
+# k8s.io/kubectl v0.31.0
 ## explicit; go 1.22.0
 k8s.io/kubectl/pkg/cmd/util
 k8s.io/kubectl/pkg/drain
@@ -1349,8 +1346,8 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/kustomize/api v0.16.0
-## explicit; go 1.20
+# sigs.k8s.io/kustomize/api v0.17.2
+## explicit; go 1.21
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
 sigs.k8s.io/kustomize/api/filters/filtersutil
@@ -1395,8 +1392,8 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kyaml v0.16.0
-## explicit; go 1.20
+# sigs.k8s.io/kustomize/kyaml v0.17.1
+## explicit; go 1.21
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
