@@ -332,7 +332,26 @@ dcgmExporter:
     #   target_label: instance
     #   replacement: $1
     #   action: replace
+  # DCGM Exporter configuration
+  # This block is used to configure DCGM Exporter to emit a customized list of metrics.
+  # Use "name" to either point to an existing ConfigMap or to create a new one with a
+  # list of configurations (i.e with create=true).
+  # When pointing to an existing ConfigMap, the ConfigMap must exist in the same namespace as the release.
+  # The metrics are expected to be listed under a key called `dcgm-metrics.csv`.
+  # Use "data" to build an integrated ConfigMap from a set of custom metrics as
+  # part of the chart. An example of some custom metrics are shown below. Note that
+  # the contents of "data" must be in CSV format and be valid DCGM Exporter metric configurations.
+  # config:
+    # name: custom-dcgm-exporter-metrics
+    # create: true
+    # data: |-
+      # Format
+      # If line starts with a '#' it is considered a comment
+      # DCGM FIELD, Prometheus metric type, help message
 
+      # Clocks
+      # DCGM_FI_DEV_SM_CLOCK,  gauge, SM clock frequency (in MHz).
+      # DCGM_FI_DEV_MEM_CLOCK, gauge, Memory clock frequency (in MHz).
 gfd:
   enabled: true
   repository: nvcr.io/nvidia
