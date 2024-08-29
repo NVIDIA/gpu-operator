@@ -22,8 +22,3 @@ $(PUSH_TARGETS): push-%:
 	$(REGCTL) \
 	        image copy \
 	        $(IMAGE) $(OUT_IMAGE)
-
-push-short:
-	$(REGCTL) \
-	        image copy \
-	        $(IMAGE) $(OUT_IMAGE_NAME):$(OUT_IMAGE_VERSION)

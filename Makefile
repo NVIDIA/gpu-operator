@@ -26,21 +26,18 @@ include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-DIST ?= ubi9
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
 IMAGE_NAME := $(REGISTRY)/gpu-operator
 endif
 
-IMAGE_VERSION := $(VERSION)
-IMAGE_TAG ?= $(IMAGE_VERSION)-$(DIST)
+IMAGE_TAG ?= $(VERSION)
 IMAGE = $(IMAGE_NAME):$(IMAGE_TAG)
 BUILDIMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)-build
 
 OUT_IMAGE_NAME ?= $(IMAGE_NAME)
-OUT_IMAGE_VERSION ?= $(VERSION)
-OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
+OUT_IMAGE_TAG = $(VERSION)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -78,9 +75,10 @@ all: gpu-operator
 GOOS ?= linux
 VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
 
-CLIENT_GEN = $(shell pwd)/bin/client-gen
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+PWD = $(shell pwd)
+CLIENT_GEN = $(PWD)/bin/client-gen
+CONTROLLER_GEN = $(PWD)/bin/controller-gen
+KUSTOMIZE = $(PWD)/bin/kustomize
 
 # Build gpu-operator binary
 gpu-operator:
@@ -280,17 +278,6 @@ $(ALL_TARGETS): %:
 	make -C $(SUBCOMPONENT) $(*)
 else
 
-# For the default push target we also push a short tag equal to the version.
-# We skip this for the development release
-DEVEL_RELEASE_IMAGE_VERSION ?= devel
-ifneq ($(strip $(VERSION)),$(DEVEL_RELEASE_IMAGE_VERSION))
-push-$(DEFAULT_PUSH_TARGET): push-short
-endif
-
-push-%: DIST = $(*)
-push-short: DIST = $(DEFAULT_PUSH_TARGET)
-
-build-%: DIST = $(*)
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
 $(DISTRIBUTIONS): %: build-%

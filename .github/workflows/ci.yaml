@@ -237,9 +237,9 @@ jobs:
           LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
           echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
 
-          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi9" >> $GITHUB_ENV
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
-          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}-ubi9" >> $GITHUB_ENV
+          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
 
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
@@ -289,9 +289,9 @@ jobs:
           LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
           echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
 
-          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}-ubi9" >> $GITHUB_ENV
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
-          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}-ubi9" >> $GITHUB_ENV
+          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
 
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
