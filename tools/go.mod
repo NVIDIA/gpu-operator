@@ -6,7 +6,7 @@ toolchain go1.22.1
 
 require (
 	k8s.io/code-generator v0.31.0
-	sigs.k8s.io/controller-tools v0.16.1
+	sigs.k8s.io/controller-tools v0.16.2
 	sigs.k8s.io/kustomize/kustomize/v5 v5.4.3
 )
 
