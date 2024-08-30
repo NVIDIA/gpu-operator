@@ -113,6 +113,7 @@ undeploy:
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: install-tools
+	@echo "- Generating CRDs from the codebase"
 	$(CONTROLLER_GEN) rbac:roleName=gpu-operator-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
@@ -220,6 +221,11 @@ $(CMD_TARGETS): cmd-%:
 build:
 	go build ./...
 
+sync-crds:
+	@echo "- Syncing CRDs into Helm and OLM packages..."
+	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/deployments/gpu-operator/crds
+	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/bundle/manifests
+
 validate-modules:
 	@echo "- Verifying that the dependencies have expected content..."
 	go mod verify
@@ -238,7 +244,7 @@ validate-helm-values: cmds
 		sed '/^--/d' | \
 		./gpuop-cfg validate clusterpolicy --input="-"
 
-validate-generated-assets: manifests generate generate-clientset
+validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
 	@git diff --exit-code -- api config
 
