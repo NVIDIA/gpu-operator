@@ -35,8 +35,6 @@ spec:
           env:
             - name: NVIDIA_VISIBLE_DEVICES
               value: void
-          securityContext:
-            privileged: true
           volumeMounts:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
