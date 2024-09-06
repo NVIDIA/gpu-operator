@@ -30,8 +30,6 @@ spec:
           name: toolkit-validation
           command: ['sh', '-c']
           args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
-          securityContext:
-            privileged: true
           volumeMounts:
             - name: run-nvidia
               mountPath: /run/nvidia
