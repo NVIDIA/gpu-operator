@@ -22,5 +22,5 @@ spec:
   kubernetes:
     install: true
     installer: kubeadm
-    version: v1.28.5
-    crictlVersion: v1.28.0
+    version: v1.31.0
+    crictlVersion: v1.31.1
