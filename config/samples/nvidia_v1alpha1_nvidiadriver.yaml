@@ -18,6 +18,8 @@ spec:
     useHostMofed: false
   gds:
     enabled: false
+  persist: false
+  installDirectory: '/opt/nvidia/driver'
   # Private mirror repository configuration
   repoConfig:
     name: ""

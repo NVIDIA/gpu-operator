@@ -59,6 +59,12 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UseOpenKernelModules *bool `json:"useOpenKernelModules,omitempty"`
 
+	// PersistDriver indicates if the driver install should be persisted across restarts
+	PersistDriver *bool `json:"persist,omitempty"`
+
+	// InstallDirectory is the install location for the driver
+	InstallDirectory string `json:"installDirectory,omitempty"`
+
 	// NVIDIA Driver container startup probe settings
 	StartupProbe *ContainerProbeSpec `json:"startupProbe,omitempty"`
 
