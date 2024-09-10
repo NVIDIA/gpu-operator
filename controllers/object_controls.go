@@ -143,6 +143,8 @@ const (
 	VgpuDMDefaultConfigName = "default"
 	// NvidiaCtrRuntimeModeEnvName is the name of the toolkit container env for configuring the NVIDIA Container Runtime mode
 	NvidiaCtrRuntimeModeEnvName = "NVIDIA_CONTAINER_RUNTIME_MODE"
+	// NvidiaCtrRuntimeRuntimesEnvName is the name of the toolkit container env for configuring the NVIDIA Container Runtime mode
+	NvidiaCtrRuntimeRuntimesEnvName = "NVIDIA_CONTAINER_RUNTIME_RUNTIMES"
 	// NvidiaCtrRuntimeCDIPrefixesEnvName is the name of toolkit container env for configuring the CDI annotation prefixes
 	NvidiaCtrRuntimeCDIPrefixesEnvName = "NVIDIA_CONTAINER_RUNTIME_MODES_CDI_ANNOTATION_PREFIXES"
 	// CDIEnabledEnvName is the name of the envvar used to enable CDI in the operands
@@ -1208,6 +1210,8 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
+	runtime := n.runtime.String()
+
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
@@ -1216,6 +1220,14 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		if config.CDI.IsDefault() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 		}
+	}
+
+	// As crun is the default low-level-runtime of CRI-O, we configure the toolkit to favour crun when running the
+	// toolkit setup and initialising the nvidia-container-runtime wrapper binary.
+	// Specify the full paths of the crun and runc executables as the CRI-O installed binaries are not available in the PATH
+	if runtime == gpuv1.CRIO.String() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeRuntimesEnvName,
+			"/usr/libexec/crio/crun,/usr/libexec/crio/runc,crun,runc")
 	}
 
 	// set install directory for the toolkit
@@ -1238,7 +1250,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	}
 
 	// configure runtime
-	runtime := n.runtime.String()
 	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
