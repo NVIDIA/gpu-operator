@@ -22,6 +22,14 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - controllerrevisions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
   - daemonsets
   verbs:
   - create
@@ -35,7 +43,13 @@ rules:
   - ""
   resources:
   - configmaps
+  - endpoints
+  - events
+  - pods
+  - pods/eviction
   - secrets
+  - services
+  - services/finalizers
   - serviceaccounts
   verbs:
   - create
@@ -44,4 +58,28 @@ rules:
   - watch
   - update
   - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  - prometheusrules
+  verbs:
+  - get
+  - list
+  - create
+  - watch
+  - update
   - delete
