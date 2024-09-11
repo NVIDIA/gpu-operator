@@ -31,13 +31,11 @@ endif
 
 BUILD_DIR ?= ../
 
-IMAGE_VERSION := $(VERSION)
-IMAGE_TAG ?= $(IMAGE_VERSION)-$(DIST)
+IMAGE_TAG ?= $(VERSION)
 IMAGE = $(IMAGE_NAME):$(IMAGE_TAG)
 
 OUT_IMAGE_NAME ?= $(IMAGE_NAME)
-OUT_IMAGE_VERSION ?= $(VERSION)
-OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)-$(DIST)
+OUT_IMAGE_TAG = $(VERSION)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
 ##### Public rules #####
@@ -64,17 +62,6 @@ validator:
 	CGO_ENABLED=0 GOOS=$(GOOS) \
 		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o validator .
 
-# For the default push target we also push a short tag equal to the version.
-# We skip this for the development release
-DEVEL_RELEASE_IMAGE_VERSION ?= devel
-ifneq ($(strip $(VERSION)),$(DEVEL_RELEASE_IMAGE_VERSION))
-push-$(DEFAULT_PUSH_TARGET): push-short
-endif
-
-push-%: DIST = $(*)
-push-short: DIST = $(DEFAULT_PUSH_TARGET)
-
-build-%: DIST = $(*)
 build-%: DOCKERFILE = $(CURDIR)/Dockerfile
 
 $(DISTRIBUTIONS): %: build-%:
@@ -97,4 +84,3 @@ $(BUILD_TARGETS): build-%:
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 docker-image: $(DEFAULT_PUSH_TARGET)
 	$(DOCKER) tag $(IMAGE_NAME):$(IMAGE_TAG) $(OUT_IMAGE)
-
