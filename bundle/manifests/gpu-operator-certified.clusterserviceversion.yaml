@@ -641,18 +641,6 @@ spec:
           - list
           - watch
         - apiGroups:
-          - monitoring.coreos.com
-          resources:
-          - servicemonitors
-          - prometheusrules
-          verbs:
-          - get
-          - list
-          - create
-          - watch
-          - update
-          - delete
-        - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - clusterroles
@@ -665,22 +653,6 @@ spec:
           - update
           - patch
           - delete
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          - pods/eviction
-          - services
-          - services/finalizers
-          - events
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - ""
           resources:
@@ -703,17 +675,22 @@ spec:
           - update
           - patch
         - apiGroups:
-          - apps
+          - ""
           resources:
-          - daemonsets
+          - pods
+          - pods/eviction
           verbs:
+          - create
           - get
           - list
           - watch
+          - update
+          - patch
+          - delete
         - apiGroups:
           - apps
           resources:
-          - controllerrevisions
+          - daemonsets
           verbs:
           - get
           - list
@@ -728,18 +705,6 @@ spec:
           - create
           - update
           - watch
-          - delete
-        - apiGroups:
-          - coordination.k8s.io
-          resources:
-          - leases
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-          - update
-          - patch
           - delete
         - apiGroups:
           - apiextensions.k8s.io
@@ -772,6 +737,14 @@ spec:
         - apiGroups:
           - apps
           resources:
+          - controllerrevisions
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
           - daemonsets
           verbs:
           - create
@@ -786,7 +759,10 @@ spec:
           resources:
           - configmaps
           - endpoints
+          - events
           - secrets
+          - services
+          - services/finalizers
           - serviceaccounts
           verbs:
           - create
@@ -795,6 +771,30 @@ spec:
           - watch
           - update
           - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
           - delete
       deployments:
       - name: gpu-operator

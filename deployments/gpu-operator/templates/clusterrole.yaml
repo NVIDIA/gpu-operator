@@ -52,21 +52,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
-  - pods
-  - pods/eviction
-  - services
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - get
@@ -86,6 +71,19 @@ rules:
   - update
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+- apiGroups:
   - apps
   resources:
   - daemonsets
@@ -93,26 +91,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - controllerrevisions
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - monitoring.coreos.com
-  resources:
-  - servicemonitors
-  - prometheusrules
-  verbs:
-  - get
-  - list
-  - create
-  - watch
-  - update
-  - delete
 - apiGroups:
   - nvidia.com
   resources:
@@ -140,18 +118,6 @@ rules:
   - list
   - watch
   - create
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
   - node.k8s.io
   resources:
