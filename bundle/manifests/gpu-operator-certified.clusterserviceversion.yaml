@@ -203,9 +203,9 @@ spec:
     - name: gpu-operator-image
       image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator:main-latest
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:21f4c8b88716e8e6f732f9fb4c2efaef937c227491a8631c5e55036f80f39a4d
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:10ff95e83bc137796f5be76278a6b38fd31c7360e62c7e72011b428f8848c791
     - name: dcgm-image
-      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:15dab1273345df4a5844c4c761d064dbc4b592101251dc39174e597137123027
+      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:7b0ebd6c40a11b6484dc4385605372511e4e93132a44d2a3d6ec2e36c24e6783
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:f95ef6a0c377e011bc0561c7d2c2bf32e45106fb0ba91ae9a10f97236ded0581
     - name: driver-image
@@ -862,9 +862,9 @@ spec:
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:f95ef6a0c377e011bc0561c7d2c2bf32e45106fb0ba91ae9a10f97236ded0581"
                   - name: "DCGM_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:15dab1273345df4a5844c4c761d064dbc4b592101251dc39174e597137123027"
+                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:7b0ebd6c40a11b6484dc4385605372511e4e93132a44d2a3d6ec2e36c24e6783"
                   - name: "DCGM_EXPORTER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:21f4c8b88716e8e6f732f9fb4c2efaef937c227491a8631c5e55036f80f39a4d"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:10ff95e83bc137796f5be76278a6b38fd31c7360e62c7e72011b428f8848c791"
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:7ad2c9f71fe06f9f7745ac8635f46740fbdff4f11edd468addfab81afcdfa534"
                   - name: "DRIVER_IMAGE"
