@@ -266,6 +266,7 @@ sign:ngc-gpu-operator-validator-ubi9:
   before_script:
     - apk add --no-cache openssh-client rsync bash sshpass curl
   script:
+    - echo "SHIVA == "
     - source cnt-ci/infrastructure-info
     - chmod 400 ${VSPHERE_SSH_PRIVATE_KEY}
     - export private_key="${VSPHERE_SSH_PRIVATE_KEY}"
