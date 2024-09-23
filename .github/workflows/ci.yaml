@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: CI
+name: CI-vsphere
 
 on:
   pull_request:
@@ -20,12 +20,15 @@ on:
       - opened
       - synchronize
     branches:
-      - main
-      - release-*
+      # SHIVA
+      # - main
+      # - release-*
+      - vspeheree2etest
   push:
     branches:
-      - main
-      - release-*
+      # - main
+      # - release-*
+      - vspeheree2etest
 
 jobs:
   ### Configuration checks ###
