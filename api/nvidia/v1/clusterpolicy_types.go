@@ -148,6 +148,9 @@ type OperatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="On OpenShift, enable DriverToolkit image to build and install driver modules"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UseOpenShiftDriverToolkit *bool `json:"use_ocp_driver_toolkit,omitempty"`
+
+	// UseDevicePluginCDIDevicesFeature indicates if the device plug-in should be configured to use the CDI devices feature
+	UseDevicePluginCDIDevicesFeature *bool `json:"useDevicePluginCDIDevicesFeature,omitempty"`
 }
 
 // HostPathsSpec defines various paths on the host needed by GPU Operator components
@@ -1825,6 +1828,15 @@ func ImagePullPolicy(pullPolicy string) corev1.PullPolicy {
 		imagePullPolicy = corev1.PullIfNotPresent
 	}
 	return imagePullPolicy
+}
+
+// DevicePluginCDIDevicesFeatureEnabled returns true if use DevicePluginCDIDevices feature is enabled
+func (s *OperatorSpec) DevicePluginCDIDevicesFeatureEnabled() bool {
+	if s.UseDevicePluginCDIDevicesFeature == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *s.UseDevicePluginCDIDevicesFeature
 }
 
 // IsEnabled returns true if driver install is enabled(default) through gpu-operator

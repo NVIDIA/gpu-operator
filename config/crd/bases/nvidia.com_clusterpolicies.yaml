@@ -1558,6 +1558,10 @@ spec:
                       image should be used on OpenShift to build and install driver
                       modules
                     type: boolean
+                  useDevicePluginCDIDevicesFeature:
+                    description: UseDevicePluginCDIDevicesFeature indicates if the
+                      device plug-in should be configured to use the CDI devices feature
+                    type: boolean
                 required:
                 - defaultRuntime
                 type: object
