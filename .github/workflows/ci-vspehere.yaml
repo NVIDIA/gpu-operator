@@ -221,12 +221,12 @@ jobs:
       - uses: actions/checkout@v4
         name: Check out code
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.1
+        uses: NVIDIA/holodeck@v0.2.3
         with:
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_ssh_key: ${{ secrets.AWS_SSH_KEY }}
-          holodeck_config: "tests/holodeck.yaml"
+          vsphere_username: ${{ secrets.VSPHERE_USERNAME }}
+          vsphere_password: ${{ secrets.VSPHERE_PASSWORD }}
+          vsphere_ssh_key: ${{ secrets.VSPHERE_SSH_KEY }}
+          holodeck_config: "tests/holodeck_vsphere.yaml"
       - name: Get public dns name
         id: get_public_dns_name
         uses: mikefarah/yq@master
@@ -254,7 +254,7 @@ jobs:
           CONTAINER_RUNTIME: "containerd"
           TEST_CASE: "./tests/cases/defaults.sh"
         run: |
-          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+          echo "${{ secrets.VSPHERE_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
           ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
           ./tests/scripts/pull.sh /tmp/logs logs
           exit $rc
@@ -273,12 +273,12 @@ jobs:
       - uses: actions/checkout@v4
         name: Check out code
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.1
+        uses: NVIDIA/holodeck@v0.2.3
         with:
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_ssh_key: ${{ secrets.AWS_SSH_KEY }}
-          holodeck_config: "tests/holodeck.yaml"
+          vsphere_username: ${{ secrets.VSPHERE_USERNAME }}
+          vsphere_password: ${{ secrets.VSPHERE_PASSWORD }}
+          vsphere_ssh_key: ${{ secrets.VSPHERE_SSH_KEY }}
+          holodeck_config: "tests/holodeck_vsphere.yaml"
       - name: Get public dns name
         id: get_public_dns_name
         uses: mikefarah/yq@master
@@ -306,7 +306,7 @@ jobs:
           CONTAINER_RUNTIME: "containerd"
           TEST_CASE: "./tests/cases/nvidia-driver.sh"
         run: |
-          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+          echo "${{ secrets.VSPHERE_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
           ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
           ./tests/scripts/pull.sh /tmp/logs logs
           exit $rc
