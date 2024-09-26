@@ -30,8 +30,8 @@ github.com/NVIDIA/k8s-kata-manager v0.2.0 h1:K+BFkXTOvXXj/kmbNfxFCXM+GkdOVZj2WTH
 github.com/NVIDIA/k8s-kata-manager v0.2.0/go.mod h1:fVUz0DLzwW9RQBE59cLNTi3LrzVwSXWIogr9y5FocPM=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35 h1:w9DXPTJCq9k2PVpdBQJrWE4vAmZcFaSHKLpM/xos9WI=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35/go.mod h1:sw6XRI5wq0Q+nSgaWa1Pyo/ZKxQebc70x6VIznDAxtM=
-github.com/NVIDIA/nvidia-container-toolkit v1.16.1 h1:PkY6RqYD1wIt1izCvYZ7kr7IitxK8e9+k/prO6b3vD0=
-github.com/NVIDIA/nvidia-container-toolkit v1.16.1/go.mod h1:jJXYvHEdqqpDcRXvolaiFCBsgLxvCwmJWSBZM3zQPY8=
+github.com/NVIDIA/nvidia-container-toolkit v1.16.2 h1:udrrtB8JrAs2KkKQ4njgSb/anUOC1b9tP5LjUtbjE+k=
+github.com/NVIDIA/nvidia-container-toolkit v1.16.2/go.mod h1:2heVmOldqyMBVXMn0A1Cpjze7VwQTQAGzP8AJ12/HLs=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d h1:UrqY+r/OJnIp5u0s1SbQ8dVfLCZJsnvazdBP5hS4iRs=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d/go.mod h1:HI8ITrYtUY+O+ZhtlqUnD8+KwNPOyugEhfP9fdUIaEQ=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
