@@ -302,7 +302,9 @@ func TestTransformForRuntime(t *testing.T) {
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
 						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
@@ -321,6 +323,7 @@ func TestTransformForRuntime(t *testing.T) {
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
