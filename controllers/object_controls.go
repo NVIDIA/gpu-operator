@@ -1291,6 +1291,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		configEnvvarName = "CRIO_CONFIG"
 	}
 
+	setContainerEnv(mainContainer, "RUNTIME_CONFIG", DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 	setContainerEnv(mainContainer, configEnvvarName, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
 
 	volMountConfigName := fmt.Sprintf("%s-config", runtime)
@@ -1314,6 +1315,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		} else if runtime == gpuv1.Docker.String() {
 			socketEnvvarName = "DOCKER_SOCKET"
 		}
+		setContainerEnv(mainContainer, "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 		setContainerEnv(mainContainer, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
