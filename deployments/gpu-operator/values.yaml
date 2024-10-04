@@ -79,7 +79,7 @@ operator:
   cleanupCRD: false
   # upgrade CRD on chart upgrade, requires --disable-openapi-validation flag
   # to be passed during helm upgrade.
-  upgradeCRD: false
+  upgradeCRD: true
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
