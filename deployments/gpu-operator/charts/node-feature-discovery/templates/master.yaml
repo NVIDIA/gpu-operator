@@ -46,16 +46,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           livenessProbe:
-            grpc:
-              port: 8082
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            {{- toYaml .Values.master.livenessProbe | nindent 12 }}
           readinessProbe:
-            grpc:
-              port: 8082
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            failureThreshold: 10
+            {{- toYaml .Values.master.readinessProbe | nindent 12 }}
           ports:
           - containerPort: {{ .Values.master.port | default "8080" }}
             name: grpc

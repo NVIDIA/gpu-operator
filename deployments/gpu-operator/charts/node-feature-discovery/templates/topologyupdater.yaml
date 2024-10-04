@@ -12,6 +12,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  revisionHistoryLimit: {{ .Values.topologyUpdater.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
@@ -42,16 +43,9 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
         livenessProbe:
-          grpc:
-            port: 8082
-          initialDelaySeconds: 10
-          periodSeconds: 10
+          {{- toYaml .Values.topologyUpdater.livenessProbe | nindent 10 }}
         readinessProbe:
-          grpc:
-            port: 8082
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          failureThreshold: 10
+          {{- toYaml .Values.topologyUpdater.readinessProbe | nindent 10 }}
         env:
         - name: NODE_NAME
           valueFrom:

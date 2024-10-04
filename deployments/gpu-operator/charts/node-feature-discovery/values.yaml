@@ -141,6 +141,19 @@ master:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
+                
+  livenessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 10
+    # failureThreshold: 3
+    # periodSeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 5
+    failureThreshold: 10
+    # periodSeconds: 10
 
 worker:
   enable: true
@@ -401,19 +414,18 @@ worker:
     runAsNonRoot: true
     # runAsUser: 1000
 
-  # livenessProbe: {}
-    ## NOTE: Currently not configurable, defaults are provided for the sake of extra documentation.
-    # grpc:
-    #   port: 8082
-    # initialDelaySeconds: 10
+  livenessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 10
+    # failureThreshold: 3
     # periodSeconds: 10
-  # readinessProbe: {}
-    ## NOTE: Currently not configurable, defaults are provided for the sake of extra documentation.
-    # grpc:
-    #   port: 8082
-    # initialDelaySeconds: 5
+  readinessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 5
+    failureThreshold: 10
     # periodSeconds: 10
-    # failureThreshold: 10
 
   serviceAccount:
     # Specifies whether a service account should be created.
@@ -424,6 +436,9 @@ worker:
     # The name of the service account to use.
     # If not set and create is true, a name is generated using the fullname template
     name:
+
+  # specify how many old ControllerRevisions for the DaemonSet to retain.
+  revisionHistoryLimit:
 
   rbac:
     create: true
@@ -467,6 +482,10 @@ topologyUpdater:
     create: true
     annotations: {}
     name:
+
+  # specify how many old ControllerRevisions for the DaemonSet to retain.
+  revisionHistoryLimit:
+
   rbac:
     create: true
 
@@ -484,20 +503,19 @@ topologyUpdater:
       drop: [ "ALL" ]
     readOnlyRootFilesystem: true
     runAsUser: 0
-
-  # livenessProbe: {}
-    ## NOTE: Currently not configurable, defaults are provided for the sake of extra documentation.
-    # grpc:
-    #   port: 8082
-    # initialDelaySeconds: 10
+  
+  livenessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 10
+    # failureThreshold: 3
     # periodSeconds: 10
-  # readinessProbe: {}
-    ## NOTE: Currently not configurable, defaults are provided for the sake of extra documentation.
-    # grpc:
-    #   port: 8082
-    # initialDelaySeconds: 5
+  readinessProbe:
+    grpc:
+      port: 8082
+    initialDelaySeconds: 5
+    failureThreshold: 10
     # periodSeconds: 10
-    # failureThreshold: 10
 
   resources:
     limits:
