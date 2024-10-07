@@ -178,6 +178,14 @@ spec:
         env:
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: OPENSHIFT_VERSION
           value: "4.13"
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0
