@@ -205,6 +205,14 @@ spec:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
       {{- if deref .Driver.Spec.UseOpenKernelModules }}
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
