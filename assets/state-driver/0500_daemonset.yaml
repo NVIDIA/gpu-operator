@@ -94,6 +94,15 @@ spec:
         name: nvidia-driver-ctr
         command: ["nvidia-driver"]
         args: ["init"]
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
         securityContext:
           privileged: true
           seLinuxOptions:
