@@ -6,7 +6,7 @@ toolchain go1.22.4
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/NVIDIA/go-nvlib v0.6.1
+	github.com/NVIDIA/go-nvlib v0.7.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.0
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
 	github.com/NVIDIA/nvidia-container-toolkit v1.16.2
