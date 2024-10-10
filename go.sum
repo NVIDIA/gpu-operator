@@ -24,8 +24,8 @@ github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migc
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Microsoft/hcsshim v0.11.4 h1:68vKo2VN8DE9AdN4tnkWnmdhqdbpUFM8OF3Airm7fz8=
 github.com/Microsoft/hcsshim v0.11.4/go.mod h1:smjE4dvqPX9Zldna+t5FG3rnoHhaB7QYxPRqGcpAD9w=
-github.com/NVIDIA/go-nvlib v0.6.1 h1:0/5FvaKvDJoJeJ+LFlh+NDQMxMlVw9wOXrOVrGXttfE=
-github.com/NVIDIA/go-nvlib v0.6.1/go.mod h1:9UrsLGx/q1OrENygXjOuM5Ey5KCtiZhbvBlbUIxtGWY=
+github.com/NVIDIA/go-nvlib v0.7.0 h1:Z/J7skMdLbTiHvomKVsGYsttfQMZj5FwNYIFXhZ4i/c=
+github.com/NVIDIA/go-nvlib v0.7.0/go.mod h1:9UrsLGx/q1OrENygXjOuM5Ey5KCtiZhbvBlbUIxtGWY=
 github.com/NVIDIA/k8s-kata-manager v0.2.0 h1:K+BFkXTOvXXj/kmbNfxFCXM+GkdOVZj2WTHQ7b2uQA0=
 github.com/NVIDIA/k8s-kata-manager v0.2.0/go.mod h1:fVUz0DLzwW9RQBE59cLNTi3LrzVwSXWIogr9y5FocPM=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35 h1:w9DXPTJCq9k2PVpdBQJrWE4vAmZcFaSHKLpM/xos9WI=
