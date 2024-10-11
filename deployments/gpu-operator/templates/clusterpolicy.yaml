@@ -173,17 +173,17 @@ spec:
       enabled: {{ .Values.driver.rdma.enabled }}
       useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
     manager:
-      {{- if .Values.driver.manager.repository }}
-      repository: {{ .Values.driver.manager.repository }}
+      {{- if .Values.driverManager.repository }}
+      repository: {{ .Values.driverManager.repository }}
       {{- end }}
-      {{- if .Values.driver.manager.image }}
-      image: {{ .Values.driver.manager.image }}
+      {{- if .Values.driverManager.image }}
+      image: {{ .Values.driverManager.image }}
       {{- end }}
-      {{- if .Values.driver.manager.version }}
-      version: {{ .Values.driver.manager.version | quote }}
+      {{- if .Values.driverManager.version }}
+      version: {{ .Values.driverManager.version | quote }}
       {{- end }}
-      {{- if .Values.driver.manager.imagePullPolicy }}
-      imagePullPolicy: {{ .Values.driver.manager.imagePullPolicy }}
+      {{- if .Values.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.driverManager.imagePullPolicy }}
       {{- end }}
       {{- if .Values.driver.manager.env }}
       env: {{ toYaml .Values.driver.manager.env | nindent 8 }}
@@ -262,17 +262,17 @@ spec:
     args: {{ toYaml .Values.vgpuManager.args | nindent 6 }}
     {{- end }}
     driverManager:
-      {{- if .Values.vgpuManager.driverManager.repository }}
-      repository: {{ .Values.vgpuManager.driverManager.repository }}
+      {{- if .Values.driverManager.repository }}
+      repository: {{ .Values.driverManager.repository }}
       {{- end }}
-      {{- if .Values.vgpuManager.driverManager.image }}
-      image: {{ .Values.vgpuManager.driverManager.image }}
+      {{- if .Values.driverManager.image }}
+      image: {{ .Values.driverManager.image }}
       {{- end }}
-      {{- if .Values.vgpuManager.driverManager.version }}
-      version: {{ .Values.vgpuManager.driverManager.version | quote }}
+      {{- if .Values.driverManager.version }}
+      version: {{ .Values.driverManager.version | quote }}
       {{- end }}
-      {{- if .Values.vgpuManager.driverManager.imagePullPolicy }}
-      imagePullPolicy: {{ .Values.vgpuManager.driverManager.imagePullPolicy }}
+      {{- if .Values.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.driverManager.imagePullPolicy }}
       {{- end }}
       {{- if .Values.vgpuManager.driverManager.env }}
       env: {{ toYaml .Values.vgpuManager.driverManager.env | nindent 8 }}
@@ -331,17 +331,17 @@ spec:
     args: {{ toYaml .Values.vfioManager.args | nindent 6 }}
     {{- end }}
     driverManager:
-      {{- if .Values.vfioManager.driverManager.repository }}
-      repository: {{ .Values.vfioManager.driverManager.repository }}
+      {{- if .Values.driverManager.repository }}
+      repository: {{ .Values.driverManager.repository }}
       {{- end }}
-      {{- if .Values.vfioManager.driverManager.image }}
-      image: {{ .Values.vfioManager.driverManager.image }}
+      {{- if .Values.driverManager.image }}
+      image: {{ .Values.driverManager.image }}
       {{- end }}
-      {{- if .Values.vfioManager.driverManager.version }}
-      version: {{ .Values.vfioManager.driverManager.version | quote }}
+      {{- if .Values.driverManager.version }}
+      version: {{ .Values.driverManager.version | quote }}
       {{- end }}
-      {{- if .Values.vfioManager.driverManager.imagePullPolicy }}
-      imagePullPolicy: {{ .Values.vfioManager.driverManager.imagePullPolicy }}
+      {{- if .Values.driverManager.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.driverManager.imagePullPolicy }}
       {{- end }}
       {{- if .Values.vfioManager.driverManager.env }}
       env: {{ toYaml .Values.vfioManager.driverManager.env | nindent 8 }}
