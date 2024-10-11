@@ -455,12 +455,12 @@ func getWorkloadConfig(ctx context.Context) (string, error) {
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return "", fmt.Errorf("Error getting k8s client - %s", err.Error())
+		return "", fmt.Errorf("error getting k8s client - %w", err)
 	}
 
 	node, err := getNode(ctx, kubeClient)
 	if err != nil {
-		return "", fmt.Errorf("Error getting node labels - %s", err.Error())
+		return "", fmt.Errorf("error getting node labels - %w", err)
 	}
 
 	labels := node.GetLabels()
@@ -501,21 +501,21 @@ func start(c *cli.Context) error {
 		}
 		err := driver.validate()
 		if err != nil {
-			return fmt.Errorf("error validating driver installation: %s", err)
+			return fmt.Errorf("error validating driver installation: %w", err)
 		}
 		return nil
 	case "nvidia-fs":
 		nvidiaFs := &NvidiaFs{}
 		err := nvidiaFs.validate()
 		if err != nil {
-			return fmt.Errorf("error validating nvidia-fs driver installation: %s", err)
+			return fmt.Errorf("error validating nvidia-fs driver installation: %w", err)
 		}
 		return nil
 	case "toolkit":
 		toolkit := &Toolkit{}
 		err := toolkit.validate()
 		if err != nil {
-			return fmt.Errorf("error validating toolkit installation: %s", err)
+			return fmt.Errorf("error validating toolkit installation: %w", err)
 		}
 		return nil
 	case "cuda":
@@ -524,7 +524,7 @@ func start(c *cli.Context) error {
 		}
 		err := cuda.validate()
 		if err != nil {
-			return fmt.Errorf("error validating cuda workload: %s", err)
+			return fmt.Errorf("error validating cuda workload: %w", err)
 		}
 		return nil
 	case "plugin":
@@ -533,7 +533,7 @@ func start(c *cli.Context) error {
 		}
 		err := plugin.validate()
 		if err != nil {
-			return fmt.Errorf("error validating plugin installation: %s", err)
+			return fmt.Errorf("error validating plugin installation: %w", err)
 		}
 		return nil
 	case "mofed":
@@ -560,7 +560,7 @@ func start(c *cli.Context) error {
 		}
 		err := vfioPCI.validate()
 		if err != nil {
-			return fmt.Errorf("error validating vfio-pci driver installation: %s", err)
+			return fmt.Errorf("error validating vfio-pci driver installation: %w", err)
 		}
 		return nil
 	case "vgpu-manager":
@@ -569,7 +569,7 @@ func start(c *cli.Context) error {
 		}
 		err := vGPUManager.validate()
 		if err != nil {
-			return fmt.Errorf("error validating vGPU Manager installation: %s", err)
+			return fmt.Errorf("error validating vGPU Manager installation: %w", err)
 		}
 		return nil
 	case "vgpu-devices":
@@ -587,7 +587,7 @@ func start(c *cli.Context) error {
 		}
 		err := CCManager.validate()
 		if err != nil {
-			return fmt.Errorf("error validating CC Manager installation: %s", err)
+			return fmt.Errorf("error validating CC Manager installation: %w", err)
 		}
 		return nil
 	default:
@@ -851,12 +851,12 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 		devchar.WithLoadKernelModules(loadKernelModules),
 	)
 	if err != nil {
-		return fmt.Errorf("error creating symlink creator: %v", err)
+		return fmt.Errorf("error creating symlink creator: %w", err)
 	}
 
 	err = creator.CreateLinks()
 	if err != nil {
-		return fmt.Errorf("error creating symlinks: %v", err)
+		return fmt.Errorf("error creating symlinks: %w", err)
 	}
 
 	return nil
@@ -895,7 +895,7 @@ func deleteStatusFile(statusFile string) error {
 	err := os.Remove(statusFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("unable to remove driver status file %s: %s", statusFile, err)
+			return fmt.Errorf("unable to remove driver status file %s: %w", statusFile, err)
 		}
 		// status file already removed
 	}
@@ -1149,7 +1149,7 @@ func (p *Plugin) runWorkload() error {
 	// check if plugin validation pod is already running and cleanup.
 	podList, err := p.kubeClient.CoreV1().Pods(namespaceFlag).List(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("cannot list existing validation pods: %s", err)
+		return fmt.Errorf("cannot list existing validation pods: %w", err)
 	}
 
 	if podList != nil && len(podList.Items) > 0 {
@@ -1158,14 +1158,14 @@ func (p *Plugin) runWorkload() error {
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
 		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].ObjectMeta.Name, options)
 		if err != nil {
-			return fmt.Errorf("cannot delete previous validation pod: %s", err)
+			return fmt.Errorf("cannot delete previous validation pod: %w", err)
 		}
 	}
 
 	// wait for plugin validation pod to be ready.
 	newPod, err := p.kubeClient.CoreV1().Pods(namespaceFlag).Create(ctx, pod, meta_v1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create plugin validation pod %s, err %+v", pod.ObjectMeta.Name, err)
+		return fmt.Errorf("failed to create plugin validation pod %s, err %w", pod.ObjectMeta.Name, err)
 	}
 
 	// make sure its available
@@ -1182,7 +1182,7 @@ func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name strin
 		// check for the existence of the resource
 		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, name, meta_v1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get pod %s, err %+v", name, err)
+			return fmt.Errorf("failed to get pod %s, err %w", name, err)
 		}
 		if pod.Status.Phase != "Succeeded" {
 			log.Infof("pod %s is curently in %s phase", name, pod.Status.Phase)
@@ -1222,7 +1222,7 @@ func (p *Plugin) countGPUResources() (int64, error) {
 	// get node info to check discovered GPU resources
 	node, err := getNode(p.ctx, p.kubeClient)
 	if err != nil {
-		return -1, fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
+		return -1, fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %w", nodeNameFlag, err)
 	}
 
 	count := int64(0)
@@ -1295,7 +1295,7 @@ func (p *Plugin) getGPUResourceName() (corev1.ResourceName, error) {
 		return resourceName, nil
 	}
 
-	return "", fmt.Errorf("Unable to find any allocatable GPU resource")
+	return "", fmt.Errorf("unable to find any allocatable GPU resource")
 }
 
 func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
@@ -1305,7 +1305,7 @@ func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
 func getNode(ctx context.Context, kubeClient kubernetes.Interface) (*corev1.Node, error) {
 	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeNameFlag, meta_v1.GetOptions{})
 	if err != nil {
-		log.Errorf("unable to get node with name %s, err %s", nodeNameFlag, err.Error())
+		log.Errorf("unable to get node with name %s, err %v", nodeNameFlag, err)
 		return nil, err
 	}
 	return node, nil
@@ -1421,7 +1421,7 @@ func (c *CUDA) runWorkload() error {
 		return fmt.Errorf("failed to create cuda validation pod %s, err %+v", pod.ObjectMeta.Name, err)
 	}
 
-	// make sure its available
+	// make sure it's available
 	err = waitForPod(ctx, c.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
 	if err != nil {
 		return err
@@ -1440,13 +1440,13 @@ func (v *VfioPCI) validate() error {
 
 	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
 	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
-		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
 
 	if gpuWorkloadConfig != gpuWorkloadConfigVMPassthrough {
@@ -1462,7 +1462,7 @@ func (v *VfioPCI) validate() error {
 		return err
 	}
 
-	err = v.runValidation(false)
+	err = v.runValidation()
 	if err != nil {
 		return err
 	}
@@ -1476,11 +1476,11 @@ func (v *VfioPCI) validate() error {
 	return nil
 }
 
-func (v *VfioPCI) runValidation(silent bool) error {
+func (v *VfioPCI) runValidation() error {
 	nvpci := nvpci.New()
 	nvdevices, err := nvpci.GetGPUs()
 	if err != nil {
-		return fmt.Errorf("error getting NVIDIA PCI devices: %v", err)
+		return fmt.Errorf("error getting NVIDIA PCI devices: %w", err)
 	}
 
 	for _, dev := range nvdevices {
@@ -1497,13 +1497,13 @@ func (v *VGPUManager) validate() error {
 
 	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
 	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
-		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
 
 	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
@@ -1571,12 +1571,12 @@ func (c *CCManager) validate() error {
 
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("Error getting cluster config - %s", err.Error())
+		return fmt.Errorf("error getting cluster config - %w", err)
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		log.Errorf("Error getting k8s client - %s\n", err.Error())
+		log.Errorf("Error getting k8s client - %v\n", err)
 		return err
 	}
 
@@ -1600,7 +1600,8 @@ func (c *CCManager) validate() error {
 func (c *CCManager) runValidation(silent bool) error {
 	node, err := getNode(c.ctx, c.kubeClient)
 	if err != nil {
-		return fmt.Errorf("unable to fetch node by name %s to check for %s label: %s", nodeNameFlag, CCCapableLabelKey, err)
+		return fmt.Errorf("unable to fetch node by name %s to check for %s label: %w",
+			nodeNameFlag, CCCapableLabelKey, err)
 	}
 
 	// make sure this is a CC capable node
@@ -1639,13 +1640,13 @@ func (v *VGPUDevices) validate() error {
 
 	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("Error getting gpu workload config: %s", err.Error())
+		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
 	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
-		return fmt.Errorf("Error updating %s status file: %v", workloadTypeStatusFile, err)
+		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
 
 	if gpuWorkloadConfig != gpuWorkloadConfigVMVgpu {
@@ -1661,7 +1662,7 @@ func (v *VGPUDevices) validate() error {
 		return err
 	}
 
-	err = v.runValidation(false)
+	err = v.runValidation()
 	if err != nil {
 		return err
 	}
@@ -1676,17 +1677,17 @@ func (v *VGPUDevices) validate() error {
 	return nil
 }
 
-func (v *VGPUDevices) runValidation(silent bool) error {
+func (v *VGPUDevices) runValidation() error {
 	nvmdev := nvmdev.New()
 	vGPUDevices, err := nvmdev.GetAllDevices()
 	if err != nil {
-		return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
+		return fmt.Errorf("error checking for vGPU devices on the host: %w", err)
 	}
 
 	if !withWaitFlag {
 		numDevices := len(vGPUDevices)
 		if numDevices == 0 {
-			return fmt.Errorf("No vGPU devices found")
+			return fmt.Errorf("no vGPU devices found")
 		}
 
 		log.Infof("Found %d vGPU devices", numDevices)
@@ -1704,7 +1705,7 @@ func (v *VGPUDevices) runValidation(silent bool) error {
 
 		vGPUDevices, err = nvmdev.GetAllDevices()
 		if err != nil {
-			return fmt.Errorf("Error checking for vGPU devices on the host: %v", err)
+			return fmt.Errorf("error checking for vGPU devices on the host: %w", err)
 		}
 	}
 }
