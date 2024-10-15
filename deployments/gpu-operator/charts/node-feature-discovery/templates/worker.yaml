@@ -38,6 +38,7 @@ spec:
       serviceAccountName: {{ include "node-feature-discovery.worker.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      hostNetwork: {{ .Values.worker.hostNetwork }}
       containers:
       - name: worker
         securityContext:
@@ -61,6 +62,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.uid
+      {{- with .Values.worker.extraEnvs }}
+        {{- toYaml . | nindent 8 }}
+      {{- end}}
         resources:
         {{- toYaml .Values.worker.resources | nindent 12 }}
         command:
@@ -79,9 +83,12 @@ spec:
         - "-feature-gates={{ $key }}={{ $value }}"
 {{- end }}
         - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
+        - "-grpc-health={{ .Values.worker.healthPort  | default "8082" }}"
         ports:
-          - name: metrics
-            containerPort: {{ .Values.worker.metricsPort | default "8081"}}
+          - containerPort: {{ .Values.worker.metricsPort | default "8081"}}
+            name: metrics
+          - containerPort: {{ .Values.worker.healthPort  | default "8082" }}
+            name: health
         volumeMounts:
         - name: host-boot
           mountPath: "/host-boot"

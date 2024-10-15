@@ -39,6 +39,7 @@ spec:
     {{- end }}
       securityContext:
         {{- toYaml .Values.gc.podSecurityContext | nindent 8 }}
+      hostNetwork: {{ .Values.gc.hostNetwork }}
       containers:
       - name: gc
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -48,6 +49,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+      {{- with .Values.gc.extraEnvs }}
+        {{- toYaml . | nindent 8 }}
+      {{- end}}
         command:
           - "nfd-gc"
         args:
