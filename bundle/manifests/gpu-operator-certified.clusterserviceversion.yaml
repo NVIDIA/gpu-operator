@@ -225,15 +225,15 @@ spec:
     - name: gpu-operator-validator-image
       image: registry.gitlab.com/nvidia/kubernetes/gpu-operator/staging/gpu-operator-validator:main-latest
     - name: k8s-driver-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:740abc3ff657545c10effd5354f09af525200ed9a1b7623f0c2e8c7bd9e4a4e2
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:b072c5793be65eee556eaff1b9cbbd115a1ef29982be95b2959adfcb4bc72382
     - name: vfio-manager-image
       image: nvcr.io/nvidia/cuda@sha256:748a2c5178e5c5811b66183bd0ce87d9fdccf992c0ad9b1a5076841e45533190
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:969147c01d63be5d1fe458f32f1cc0c7408cf3062531db91408e2fc57b4d8a67
     - name: vgpu-device-manager-image
-      image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:ae63fac9a4057a7646f0cf0ee0566e8928529adde05c4c0a017cda0599e381b2
+      image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:7edd7a0413dcb39b6e3bcefaf06812f3293c8e480ca10783e821a561ed686200
     - name: gdrcopy-image
-      image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:33de74eb590f071403c17b6c210c02963245851971168bc0c07c06c100a9f376
+      image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:cf39d78ced7fb5727a9668ee2cd44b14bb7a23a95b83d5464b7d755740e02121
   customresourcedefinitions:
     owned:
     - name: nvidiadrivers.nvidia.com
@@ -874,7 +874,7 @@ spec:
                   - name: "DRIVER_IMAGE-560"
                     value: "nvcr.io/nvidia/driver@sha256:38b66a8d44cab9e2c62da9e101f32cd9dbcb5e02d8e57b47671284d374ca3695"
                   - name: "DRIVER_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:740abc3ff657545c10effd5354f09af525200ed9a1b7623f0c2e8c7bd9e4a4e2"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:b072c5793be65eee556eaff1b9cbbd115a1ef29982be95b2959adfcb4bc72382"
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:781fb47e264d9e0fbc8da5bd046e5e678316c866bc36ddd4b56d4eb0de682d5b"
                   - name: "CUDA_BASE_IMAGE"
@@ -884,9 +884,9 @@ spec:
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:969147c01d63be5d1fe458f32f1cc0c7408cf3062531db91408e2fc57b4d8a67"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:ae63fac9a4057a7646f0cf0ee0566e8928529adde05c4c0a017cda0599e381b2"
+                    value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:7edd7a0413dcb39b6e3bcefaf06812f3293c8e480ca10783e821a561ed686200"
                   - name: "GDRCOPY_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:33de74eb590f071403c17b6c210c02963245851971168bc0c07c06c100a9f376"
+                    value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:cf39d78ced7fb5727a9668ee2cd44b14bb7a23a95b83d5464b7d755740e02121"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
