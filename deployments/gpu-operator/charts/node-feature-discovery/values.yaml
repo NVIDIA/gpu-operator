@@ -20,6 +20,8 @@ priorityClassName: ""
 
 master:
   enable: true
+  extraEnvs: []
+  hostNetwork: false
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
     # noPublish: false
     # autoDefaultNs: true
@@ -57,6 +59,7 @@ master:
   # be removed with it in a future release
   port: 8080
   metricsPort: 8081
+  healthPort: 8082
   instance:
   featureApi:
   resyncPeriod:
@@ -157,6 +160,8 @@ master:
 
 worker:
   enable: true
+  extraEnvs: []
+  hostNetwork: false
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
     #  labelWhiteList:
@@ -402,6 +407,7 @@ worker:
 ### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
 
   metricsPort: 8081
+  healthPort: 8082
   daemonsetAnnotations: {}
   podSecurityContext: {}
     # fsGroup: 2000
@@ -477,6 +483,8 @@ topologyUpdater:
 
   enable: false
   createCRDs: false
+  extraEnvs: []
+  hostNetwork: false
 
   serviceAccount:
     create: true
@@ -490,6 +498,7 @@ topologyUpdater:
     create: true
 
   metricsPort: 8081
+  healthPort: 8082
   kubeletConfigPath:
   kubeletPodResourcesSockPath:
   updateInterval: 60s
@@ -533,6 +542,8 @@ topologyUpdater:
 
 gc:
   enable: true
+  extraEnvs: []
+  hostNetwork: false
   replicaCount: 1
 
   serviceAccount:
