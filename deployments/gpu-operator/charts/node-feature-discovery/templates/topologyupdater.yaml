@@ -38,6 +38,7 @@ spec:
     {{- end }}
       securityContext:
         {{- toYaml .Values.topologyUpdater.podSecurityContext | nindent 8 }}
+      hostNetwork: {{ .Values.topologyUpdater.hostNetwork }}
       containers:
       - name: topology-updater
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -55,6 +56,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+      {{- with .Values.topologyUpdater.extraEnvs }}
+        {{- toYaml . | nindent 8 }}
+      {{- end}}
         command:
           - "nfd-topology-updater"
         args:
@@ -85,9 +89,12 @@ spec:
           - "-kubelet-state-dir="
           {{- end }}
           - -metrics={{ .Values.topologyUpdater.metricsPort | default "8081"}}
+          - "-grpc-health={{ .Values.topologyUpdater.healthPort  | default "8082" }}"
         ports:
-          - name: metrics
-            containerPort: {{ .Values.topologyUpdater.metricsPort | default "8081"}}
+          - containerPort: {{ .Values.topologyUpdater.metricsPort | default "8081"}}
+            name: metrics
+          - containerPort: {{ .Values.topologyUpdater.healthPort  | default "8082" }}
+            name: health
         volumeMounts:
         {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
         - name: kubelet-config
