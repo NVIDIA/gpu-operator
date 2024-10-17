@@ -46,6 +46,9 @@ spec:
     {{- if .Values.operator.use_ocp_driver_toolkit }}
     use_ocp_driver_toolkit: {{ .Values.operator.use_ocp_driver_toolkit }}
     {{- end }}
+    {{- if .Values.operator.serviceMonitor }}
+    serviceMonitor: {{ toYaml .Values.operator.serviceMonitor | nindent 6 }}
+    {{- end }}
   daemonsets:
     labels:
       {{- include "gpu-operator.operand-labels" . | nindent 6 }}
