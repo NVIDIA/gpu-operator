@@ -34,6 +34,7 @@ func (r root) getDriverLibraryPath() (string, error) {
 		"/lib64",
 		"/lib/x86_64-linux-gnu",
 		"/lib/aarch64-linux-gnu",
+		"/glibc/lib",
 	}
 
 	libraryPath, err := r.findFile("libnvidia-ml.so.1", librarySearchPaths...)
