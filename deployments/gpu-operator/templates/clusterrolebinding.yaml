@@ -9,6 +9,7 @@ subjects:
 - kind: ServiceAccount
   name: gpu-operator
   namespace: {{ $.Release.Namespace }}
+{{- if .Values.nfd.enabled }}
 - kind: ServiceAccount
   name: node-feature-discovery
   namespace: {{ $.Release.Namespace }}
