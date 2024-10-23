@@ -194,10 +194,11 @@ const (
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
-	"centos": "/etc/yum.repos.d",
-	"ubuntu": "/etc/apt/sources.list.d",
-	"rhcos":  "/etc/yum.repos.d",
-	"rhel":   "/etc/yum.repos.d",
+	"centos":   "/etc/yum.repos.d",
+	"ubuntu":   "/etc/apt/sources.list.d",
+	"rhcos":    "/etc/yum.repos.d",
+	"rhel":     "/etc/yum.repos.d",
+	"amzn2023": "/etc/yum.repos.d",
 }
 
 // CertConfigPathMap indicates standard OS specific paths for ssl keys/certificates.
@@ -205,10 +206,11 @@ var RepoConfigPathMap = map[string]string{
 // Where OCP mounts proxy certs on RHCOS nodes:
 // https://access.redhat.com/documentation/en-us/openshift_container_platform/4.3/html/authentication/ocp-certificates#proxy-certificates_ocp-certificates
 var CertConfigPathMap = map[string]string{
-	"centos": "/etc/pki/ca-trust/extracted/pem",
-	"ubuntu": "/usr/local/share/ca-certificates",
-	"rhcos":  "/etc/pki/ca-trust/extracted/pem",
-	"rhel":   "/etc/pki/ca-trust/extracted/pem",
+	"centos":   "/etc/pki/ca-trust/extracted/pem",
+	"ubuntu":   "/usr/local/share/ca-certificates",
+	"rhcos":    "/etc/pki/ca-trust/extracted/pem",
+	"rhel":     "/etc/pki/ca-trust/extracted/pem",
+	"amzn2023": "/etc/pki/ca-trust/extracted/pem",
 }
 
 func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
@@ -276,6 +278,26 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
 				Type: newHostPathType(corev1.HostPathFileOrCreate),
+			},
+		},
+	},
+	"amzn2023": {
+		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/pki/entitlement",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/run/secrets/amazonlinux.repo.repo": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/yum.repos.d/amazonlinux.repo.repo",
+				Type: newHostPathType(corev1.HostPathFile),
+			},
+		},
+		"/run/secrets/rhsm": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/rhsm",
+				Type: newHostPathType(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -3305,6 +3327,36 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
+		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
+		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
+		}
+
+		// sort host path volumes to ensure ordering is preserved when adding to pod spec
+		mountPaths := make([]string, 0, len(pathToVolumeSource))
+		for k := range pathToVolumeSource {
+			mountPaths = append(mountPaths, k)
+		}
+		sort.Strings(mountPaths)
+
+		for num, mountPath := range mountPaths {
+			volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+
+			volMountSubscription := corev1.VolumeMount{
+				Name:      volMountSubscriptionName,
+				MountPath: mountPath,
+				ReadOnly:  true,
+			}
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volMountSubscription)
+
+			subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
+			podSpec.Volumes = append(podSpec.Volumes, subscriptionVol)
+		}
+	}
+
+	// set up subscription entitlements for amzn2023(using K8s with a non-CRIO runtime) and SLES
+	if (release["ID"] == "amzn2023" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
 		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
 		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
 		if err != nil {
