@@ -310,6 +310,12 @@ data:
             "7g.141gb": 1
 
       # GH200 144G HBM3e
+      all-1g.36gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.36gb": 4
+
       all-2g.36gb:
         - devices: all
           mig-enabled: true
