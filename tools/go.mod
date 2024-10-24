@@ -5,7 +5,7 @@ go 1.22.7
 toolchain go1.23.2
 
 require (
-	k8s.io/code-generator v0.31.1
+	k8s.io/code-generator v0.31.2
 	sigs.k8s.io/controller-tools v0.16.4
 	sigs.k8s.io/kustomize/kustomize/v5 v5.5.0
 )
@@ -54,7 +54,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.31.1 // indirect
 	k8s.io/apiextensions-apiserver v0.31.1 // indirect
-	k8s.io/apimachinery v0.31.1 // indirect
+	k8s.io/apimachinery v0.31.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
