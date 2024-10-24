@@ -213,7 +213,7 @@ jobs:
   ### e2e tests ###
   e2e-tests-containerd:
     needs: [build-gpu-operator, build-gpu-operator-validator]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -265,7 +265,7 @@ jobs:
 
   e2e-tests-nvidiadriver:
     needs: [build-gpu-operator, build-gpu-operator-validator]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
