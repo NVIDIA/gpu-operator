@@ -15,9 +15,15 @@
 name: CI
 
 on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - main
+      - release-*
   push:
     branches:
-      - "pull-request/[0-9]+"
       - main
       - release-*
 
@@ -207,7 +213,7 @@ jobs:
   ### e2e tests ###
   e2e-tests-containerd:
     needs: [build-gpu-operator, build-gpu-operator-validator]
-    runs-on: linux-amd64-cpu4
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -259,7 +265,7 @@ jobs:
 
   e2e-tests-nvidiadriver:
     needs: [build-gpu-operator, build-gpu-operator-validator]
-    runs-on: linux-amd64-cpu4
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         name: Check out code
