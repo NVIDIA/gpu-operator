@@ -16,6 +16,25 @@
 
 package config
 
+// Runtime defines container runtime type
+type Runtime string
+
 const (
 	DefaultKataArtifactsDir = "/opt/nvidia-gpu-operator/artifacts/runtimeclasses"
+	DefaultCrioRuntime      = "crun"
+	// CRIO runtime
+	CRIO Runtime = "crio"
+	// Containerd runtime
+	Containerd Runtime = "containerd"
 )
+
+func (r Runtime) String() string {
+	switch r {
+	case CRIO:
+		return "crio"
+	case Containerd:
+		return "containerd"
+	default:
+		return ""
+	}
+}

@@ -7,7 +7,7 @@ toolchain go1.22.4
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.7.0
-	github.com/NVIDIA/k8s-kata-manager v0.2.0
+	github.com/NVIDIA/k8s-kata-manager v0.2.2
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
 	github.com/NVIDIA/nvidia-container-toolkit v1.16.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -155,7 +155,7 @@ require (
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.5.0 // indirect

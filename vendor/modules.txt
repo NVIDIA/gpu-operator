@@ -37,8 +37,8 @@ github.com/NVIDIA/go-nvlib/pkg/nvpci
 github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
 github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
 github.com/NVIDIA/go-nvlib/pkg/pciids
-# github.com/NVIDIA/k8s-kata-manager v0.2.0
-## explicit; go 1.21
+# github.com/NVIDIA/k8s-kata-manager v0.2.2
+## explicit; go 1.22.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 # github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
 ## explicit; go 1.22.0
@@ -656,7 +656,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.25.0
+# golang.org/x/sys v0.26.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
