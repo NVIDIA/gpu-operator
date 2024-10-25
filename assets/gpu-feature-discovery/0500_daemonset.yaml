@@ -33,9 +33,9 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: /run/nvidia
-              mountPropagation: Bidirectional
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
         - name: gpu-feature-discovery-imex-init
           image: "FILLED BY THE OPERATOR"
           command: ["/bin/bash", "-c"]
@@ -67,10 +67,9 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-            - name: run-nvidia
-              mountPath: /run/nvidia
-              readOnly: true
-              mountPropagation: Bidirectional
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
             - name: host-root
               mountPath: /host/etc
               subPath: etc
@@ -165,10 +164,10 @@ spec:
         - name: dmi-info-dir
           hostPath:
             path: "/sys/class/dmi/id"
-        - name: run-nvidia
+        - name: run-nvidia-validations
           hostPath:
-            path: "/run/nvidia"
-            type: Directory
+            path: "/run/nvidia/validations"
+            type: DirectoryOrCreate
         - name: host-root
           hostPath:
             path: /
