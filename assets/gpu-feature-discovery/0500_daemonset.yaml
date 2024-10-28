@@ -33,9 +33,51 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: /run/nvidia
-              mountPropagation: Bidirectional
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
+        - name: gpu-feature-discovery-imex-init
+          image: "FILLED BY THE OPERATOR"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              until [[ -f /run/nvidia/validations/driver-ready ]]
+              do
+                echo "waiting for the driver validations to be ready..."
+                sleep 5
+              done
+              set -o allexport
+              cat /run/nvidia/validations/driver-ready
+              . /run/nvidia/validations/driver-ready
+              
+              IMEX_NODES_CONFIG_FILE=/etc/nvidia-imex/nodes_config.cfg
+              if [[ -f /config/${IMEX_NODES_CONFIG_FILE} ]]; then
+                echo "Removing cached IMEX nodes config"
+                rm -f /config/${IMEX_NODES_CONFIG_FILE}
+              fi
+              if [[ ! -f ${DRIVER_ROOT_CTR_PATH}/${IMEX_NODES_CONFIG_FILE} ]]; then
+                echo "No IMEX nodes config path detected; Skipping"
+                exit 0
+              fi
+              echo "Copying IMEX nodes config"
+              mkdir -p $(dirname /config/${IMEX_NODES_CONFIG_FILE})
+              cp ${DRIVER_ROOT_CTR_PATH}/${IMEX_NODES_CONFIG_FILE} /config/${IMEX_NODES_CONFIG_FILE}
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
+            - name: host-root
+              mountPath: /host/etc
+              subPath: etc
+              readOnly: true
+            - name: driver-install-dir
+              mountPath: /driver-root/etc
+              subPath: etc
+              readOnly: true
         - name: config-manager-init
           image: "FILLED BY THE OPERATOR"
           command: ["config-manager"]
@@ -62,12 +104,13 @@ spec:
             value: ""
           - name: PROCESS_TO_SIGNAL
             value: ""
+          volumeMounts:
+            - name: config
+              mountPath: /config
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
-          command: [ "/bin/bash", "-c" ]
-          args:
-            - /bin/entrypoint.sh
+          command: ["gpu-feature-discovery"]
           env:
             - name: GFD_SLEEP_INTERVAL
               value: 60s
@@ -82,24 +125,13 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-            - name: gpu-feature-discovery-entrypoint
-              readOnly: true
-              mountPath: /bin/entrypoint.sh
-              subPath: entrypoint.sh
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
             - name: dmi-info-dir
               mountPath: "/sys/class/dmi/id"
               readOnly: true
-            - name: run-nvidia-validations
-              mountPath: /run/nvidia/validations
-            - name: driver-install-dir
-              mountPath: /driver-root
-              mountPropagation: HostToContainer
-            - name: host-root
-              mountPath: /host
-              readOnly: true
-              mountPropagation: HostToContainer
+            - name: config
+              mountPath: /config
           securityContext:
             privileged: true
         - image: "FILLED BY THE OPERATOR"
@@ -130,24 +162,19 @@ spec:
             value: "1" # SIGHUP
           - name: PROCESS_TO_SIGNAL
             value: "gpu-feature-discovery"
+          volumeMounts:
+            - name: config
+              mountPath: /config
       volumes:
-        - name: gpu-feature-discovery-entrypoint
-          configMap:
-            name: gpu-feature-discovery-entrypoint
-            defaultMode: 448
         - name: output-dir
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/features.d"
         - name: dmi-info-dir
           hostPath:
             path: "/sys/class/dmi/id"
-        - name: run-nvidia
-          hostPath:
-            path: "/run/nvidia"
-            type: Directory
         - name: run-nvidia-validations
           hostPath:
-            path: /run/nvidia/validations
+            path: "/run/nvidia/validations"
             type: DirectoryOrCreate
         - name: host-root
           hostPath:
@@ -156,3 +183,5 @@ spec:
           hostPath:
             path: /run/nvidia/driver
             type: DirectoryOrCreate
+        - name: config
+          emptyDir: {}

@@ -61,6 +61,9 @@ spec:
           value: ""
         - name: PROCESS_TO_SIGNAL
           value: ""
+        volumeMounts:
+          - name: config
+            mountPath: /config
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin
@@ -107,6 +110,8 @@ spec:
             mountPath: /dev/shm
           - name: mps-root
             mountPath: /mps
+          - name: config
+            mountPath: /config
       - image: "FILLED BY THE OPERATOR"
         name: config-manager
         command: ["config-manager"]
@@ -135,6 +140,9 @@ spec:
           value: "1" # SIGHUP
         - name: PROCESS_TO_SIGNAL
           value: "nvidia-device-plugin"
+        volumeMounts:
+          - name: config
+            mountPath: /config
       volumes:
         - name: nvidia-device-plugin-entrypoint
           configMap:
@@ -165,3 +173,5 @@ spec:
         - name: mps-shm
           hostPath:
             path: /run/nvidia/mps/shm
+        - name: config
+          emptyDir: {}

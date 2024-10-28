@@ -879,6 +879,14 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
+	// update image for IMEX init container
+	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
+		if initCtr.Name == "gpu-feature-discovery-imex-init" {
+			obj.Spec.Template.Spec.InitContainers[i].Image = img
+			break
+		}
+	}
+
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUFeatureDiscovery.ImagePullPolicy)
 
@@ -2432,10 +2440,7 @@ func isCustomPluginConfigSet(pluginConfig *gpuv1.DevicePluginConfig) bool {
 
 // adds shared volume mounts required for custom plugin config provided via a ConfigMap
 func addSharedMountsForPluginConfig(container *corev1.Container, config *gpuv1.DevicePluginConfig) {
-	emptyDirMount := corev1.VolumeMount{Name: "config", MountPath: "/config"}
 	configVolMount := corev1.VolumeMount{Name: config.Name, MountPath: "/available-configs"}
-
-	container.VolumeMounts = append(container.VolumeMounts, emptyDirMount)
 	container.VolumeMounts = append(container.VolumeMounts, configVolMount)
 }
 
@@ -2471,15 +2476,14 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			continue
 		}
 		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], "CONFIG_FILE", "/config/config.yaml")
-		// setup sharedvolume(emptydir) for main container
+		// add configmap volume mount
 		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i], config.DevicePlugin.Config)
 	}
 	// Enable process ns sharing for PID access
 	shareProcessNamespace := true
 	obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
-	// setup volumes from configmap and shared emptyDir
+	// add configmap volume
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.DevicePlugin.Config.Name, nil))
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createEmptyDirVolume("config"))
 
 	// apply env/volume changes to initContainer
 	err := transformConfigManagerInitContainer(obj, config)
@@ -3105,15 +3109,6 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 		},
 	}
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
-}
-
-func createEmptyDirVolume(volumeName string) corev1.Volume {
-	return corev1.Volume{
-		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	}
 }
 
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
