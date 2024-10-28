@@ -231,7 +231,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.16.2-ubuntu20.04
+  version: v1.17.0-rc.2-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -242,7 +242,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.16.2-ubi8
+  version: v0.17.0-rc.1-ubi9
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -356,7 +356,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.16.2-ubi8
+  version: v0.17.0-rc.1-ubi9
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
