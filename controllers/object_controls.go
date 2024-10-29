@@ -3139,6 +3139,14 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		driverContainer.Image = image
 	}
 
+	// update image for driver IMEX init container
+	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
+		if initCtr.Name == "check-imex-config" {
+			obj.Spec.Template.Spec.InitContainers[i].Image = image
+			break
+		}
+	}
+
 	// update image pull policy
 	driverContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 

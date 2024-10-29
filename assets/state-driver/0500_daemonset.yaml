@@ -88,6 +88,25 @@ spec:
             - name: run-mellanox-drivers
               mountPath: /run/mellanox/drivers
               mountPropagation: HostToContainer
+        - name: check-imex-config
+          image: "FILLED BY THE OPERATOR"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              IMEX_NODES_CONFIG_FILE=/etc/nvidia-imex/nodes_config.cfg
+              if [[ -f /host/${IMEX_NODES_CONFIG_FILE} ]]; then
+                echo "Copying host IMEX nodes config"
+                cp /host/${IMEX_NODES_CONFIG_FILE} ${IMEX_NODES_CONFIG_FILE}
+              fi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-etc
+              mountPath: /host/etc
+              subPath: etc
+              readOnly: true
+            - name: imex-config
+              mountPath: /etc/nvidia-imex
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
@@ -132,6 +151,8 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+          - name: imex-config
+            mountPath: /etc/nvidia-imex
         startupProbe:
           exec:
             command:
@@ -335,3 +356,9 @@ spec:
           hostPath:
             path: /run/nvidia/driver/lib/firmware
             type: DirectoryOrCreate
+        - name: host-etc
+          hostPath:
+            path: /etc
+            type: Directory
+        - name: imex-config
+          emptyDir: {}
