@@ -11,7 +11,7 @@ Running the command:
 will perform the following steps:
 1. Launch an AWS instance using the `aws-kube-ci` subrepo
 1. Sync the project folder to the newly created instance.
-1. Install additional prerequsites (see `scripts/prerequisites.sh`)
+1. Install additional prerequisites (see `scripts/prerequisites.sh`)
 1. Execute the default test case (`cases/defaults.sh`) on the remote instance
 
 If an instance has already been launched with terraform and the launch phase is to be skipped, the following can be used:
