@@ -679,6 +679,7 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - events
           - pods
           - pods/eviction
           verbs:
@@ -761,7 +762,6 @@ spec:
           resources:
           - configmaps
           - endpoints
-          - events
           - secrets
           - services
           - services/finalizers

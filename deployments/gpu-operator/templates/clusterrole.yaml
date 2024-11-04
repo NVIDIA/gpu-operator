@@ -73,6 +73,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
   - pods
   - pods/eviction
   verbs:
