@@ -216,13 +216,6 @@ sign:ngc-gpu-operator:
   variables:
     IMAGE_TAG: "${CI_COMMIT_TAG}"
 
-sign:ngc-gpu-operator-ubi9:
-  extends:
-    - .sign:ngc
-    - .dist-ubi9
-  needs:
-    - release:ngc-gpu-operator
-
 sign:ngc-gpu-operator-validator:
   extends:
     - .sign:ngc
@@ -231,15 +224,6 @@ sign:ngc-gpu-operator-validator:
   variables:
     IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
     IMAGE_TAG: "${CI_COMMIT_TAG}"
-
-sign:ngc-gpu-operator-validator-ubi9:
-  extends:
-    - .sign:ngc
-    - .dist-ubi9
-  needs:
-    - release:ngc-gpu-operator-validator
-  variables:
-    IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
 
 .schedule_defaults:
   rules:
