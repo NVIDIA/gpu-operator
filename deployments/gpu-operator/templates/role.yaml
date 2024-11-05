@@ -44,7 +44,6 @@ rules:
   resources:
   - configmaps
   - endpoints
-  - events
   - pods
   - pods/eviction
   - secrets
