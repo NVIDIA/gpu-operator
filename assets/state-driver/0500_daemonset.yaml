@@ -97,13 +97,14 @@ spec:
               if [[ -f /host/${IMEX_NODES_CONFIG_FILE} ]]; then
                 echo "Copying host IMEX nodes config"
                 cp /host/${IMEX_NODES_CONFIG_FILE} ${IMEX_NODES_CONFIG_FILE}
+              else
+                echo "No IMEX nodes config found on the host."
               fi
           securityContext:
             privileged: true
           volumeMounts:
             - name: host-etc
               mountPath: /host/etc
-              subPath: etc
               readOnly: true
             - name: imex-config
               mountPath: /etc/nvidia-imex
