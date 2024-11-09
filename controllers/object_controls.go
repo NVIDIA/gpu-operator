@@ -2479,9 +2479,14 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		// add configmap volume mount
 		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i], config.DevicePlugin.Config)
 	}
-	// Enable process ns sharing for PID access
-	shareProcessNamespace := true
-	obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
+
+	// if hostPID is already set, we skip setting the shareProcessNamespace field
+	// for context, go to https://github.com/kubernetes-client/go/blob/master/kubernetes/docs/V1PodSpec.md
+	if !obj.Spec.Template.Spec.HostPID {
+		// Enable process ns sharing for PID access
+		shareProcessNamespace := true
+		obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
+	}
 	// add configmap volume
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.DevicePlugin.Config.Name, nil))
 
