@@ -93,7 +93,7 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              IMEX_NODES_CONFIG_FILE=/etc/nvidia-imex/nodes_config.cfg
+              IMEX_NODES_CONFIG_FILE=/imex/nodes_config.cfg
               if [[ -f /host/${IMEX_NODES_CONFIG_FILE} ]]; then
                 echo "Copying host IMEX nodes config"
                 cp /host/${IMEX_NODES_CONFIG_FILE} ${IMEX_NODES_CONFIG_FILE}
@@ -103,11 +103,11 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: host-etc
-              mountPath: /host/etc
+            - name: host-imex
+              mountPath: /host/imex
               readOnly: true
             - name: imex-config
-              mountPath: /etc/nvidia-imex
+              mountPath: /imex
       containers:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
@@ -153,7 +153,7 @@ spec:
           - name: nv-firmware
             mountPath: /lib/firmware
           - name: imex-config
-            mountPath: /etc/nvidia-imex
+            mountPath: /imex
         startupProbe:
           exec:
             command:
@@ -357,9 +357,9 @@ spec:
           hostPath:
             path: /run/nvidia/driver/lib/firmware
             type: DirectoryOrCreate
-        - name: host-etc
+        - name: host-imex
           hostPath:
-            path: /etc
+            path: /imex
             type: Directory
         - name: imex-config
           emptyDir: {}
