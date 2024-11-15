@@ -201,7 +201,7 @@ data:
           mig-devices:
             "7g.96gb": 1
 
-      # GH200 144G HBM3e, H200-141GB, H100-96GB, GH200, H100 NVL, H800 NVL, H100-80GB, H800-80GB, A800-40GB, A800-80GB, A100-40GB, A100-80GB, A30-24GB, PG506-96GB
+      # GH200 144G HBM3e, H200-141GB, H200 NVL, H100-96GB, GH200, H100 NVL, H800 NVL, H100-80GB, H800-80GB, A800-40GB, A800-80GB, A100-40GB, A100-80GB, A30-24GB, PG506-96GB
       all-balanced:
         # GH200 144G HBM3e
         - device-filter: ["0x234810DE"]
@@ -212,8 +212,8 @@ data:
             "2g.36gb": 1
             "3g.72gb": 1
 
-        # H200 141GB
-        - device-filter: ["0x233510DE"]
+        # H200 141GB, H200 NVL
+        - device-filter: ["0x233510DE", "0x233B10DE"]
           devices: all
           mig-enabled: true
           mig-devices:
