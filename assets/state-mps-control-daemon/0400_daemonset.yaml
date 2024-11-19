@@ -25,6 +25,7 @@ spec:
           effect: NoSchedule
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-device-plugin
+      hostPID: true
       initContainers:
         - image: "FILLED BY THE OPERATOR"
           name: toolkit-validation
