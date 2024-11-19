@@ -111,6 +111,20 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 			},
 		},
 	},
+	"sl-micro": {
+		"/etc/zypp/credentials.d": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/zypp/credentials.d",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/etc/SUSEConnect": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/SUSEConnect",
+				Type: newHostPathType(corev1.HostPathFileOrCreate),
+			},
+		},
+	},
 }
 
 // TODO: make this a public utils method
@@ -171,7 +185,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 		}
 
 		// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
-		if (pool.osRelease == "rhel" && openshiftVersion == "" && runtime != consts.CRIO) || pool.osRelease == "sles" {
+		if (pool.osRelease == "rhel" && openshiftVersion == "" && runtime != consts.CRIO) || pool.osRelease == "sles" || pool.osRelease == "sl-micro" {
 			logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
 			pathToVolumeSource, err := getSubscriptionPathsToVolumeSources(pool.osRelease)
 			if err != nil {

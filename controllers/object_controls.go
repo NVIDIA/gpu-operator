@@ -279,6 +279,20 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 			},
 		},
 	},
+	"sl-micro": {
+		"/etc/zypp/credentials.d": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/zypp/credentials.d",
+				Type: newHostPathType(corev1.HostPathDirectory),
+			},
+		},
+		"/etc/SUSEConnect": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/SUSEConnect",
+				Type: newHostPathType(corev1.HostPathFileOrCreate),
+			},
+		},
+	},
 }
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
@@ -3304,7 +3318,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
-	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" {
+	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" || release["ID"] == "sl-micro" {
 		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
 		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
 		if err != nil {
