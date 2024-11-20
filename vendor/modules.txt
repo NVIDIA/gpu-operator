@@ -299,8 +299,8 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/klauspost/compress v1.17.9
-## explicit; go 1.20
+# github.com/klauspost/compress v1.17.11
+## explicit; go 1.21
 github.com/klauspost/compress
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
@@ -473,8 +473,8 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/regclient/regclient v0.7.1
-## explicit; go 1.20
+# github.com/regclient/regclient v0.7.2
+## explicit; go 1.21
 github.com/regclient/regclient
 github.com/regclient/regclient/config
 github.com/regclient/regclient/internal/auth
@@ -482,9 +482,10 @@ github.com/regclient/regclient/internal/cache
 github.com/regclient/regclient/internal/conffile
 github.com/regclient/regclient/internal/httplink
 github.com/regclient/regclient/internal/limitread
+github.com/regclient/regclient/internal/pqueue
 github.com/regclient/regclient/internal/reghttp
+github.com/regclient/regclient/internal/reqmeta
 github.com/regclient/regclient/internal/strparse
-github.com/regclient/regclient/internal/throttle
 github.com/regclient/regclient/internal/timejson
 github.com/regclient/regclient/internal/units
 github.com/regclient/regclient/internal/version

@@ -165,7 +165,7 @@ func (m *docker2Manifest) MarshalPretty() ([]byte, error) {
 	}
 	fmt.Fprintf(tw, "MediaType:\t%s\n", m.desc.MediaType)
 	fmt.Fprintf(tw, "Digest:\t%s\n", m.desc.Digest.String())
-	if m.Annotations != nil && len(m.Annotations) > 0 {
+	if len(m.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(m.Annotations))
 		for k := range m.Annotations {
@@ -211,7 +211,7 @@ func (m *docker2ManifestList) MarshalPretty() ([]byte, error) {
 	}
 	fmt.Fprintf(tw, "MediaType:\t%s\n", m.desc.MediaType)
 	fmt.Fprintf(tw, "Digest:\t%s\n", m.desc.Digest.String())
-	if m.Annotations != nil && len(m.Annotations) > 0 {
+	if len(m.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(m.Annotations))
 		for k := range m.Annotations {

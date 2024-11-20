@@ -14,7 +14,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/internal/pqueue"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/mediatype"
@@ -34,7 +35,7 @@ type OCIDir struct {
 	log         *logrus.Logger
 	gc          bool
 	modRefs     map[string]*ociGC
-	throttle    map[string]*throttle.Throttle
+	throttle    map[string]*pqueue.Queue[reqmeta.Data]
 	throttleDef int
 	mu          sync.Mutex
 }
@@ -67,7 +68,7 @@ func New(opts ...Opts) *OCIDir {
 		log:         conf.log,
 		gc:          conf.gc,
 		modRefs:     map[string]*ociGC{},
-		throttle:    map[string]*throttle.Throttle{},
+		throttle:    map[string]*pqueue.Queue[reqmeta.Data]{},
 		throttleDef: conf.throttle,
 	}
 }
@@ -116,16 +117,16 @@ func (o *OCIDir) GCUnlock(r ref.Ref) {
 }
 
 // Throttle is used to limit concurrency
-func (o *OCIDir) Throttle(r ref.Ref, put bool) []*throttle.Throttle {
-	tList := []*throttle.Throttle{}
+func (o *OCIDir) Throttle(r ref.Ref, put bool) []*pqueue.Queue[reqmeta.Data] {
+	tList := []*pqueue.Queue[reqmeta.Data]{}
 	// throttle only applies to put requests
 	if !put || o.throttleDef <= 0 {
 		return tList
 	}
-	return []*throttle.Throttle{o.throttleGet(r, false)}
+	return []*pqueue.Queue[reqmeta.Data]{o.throttleGet(r, false)}
 }
 
-func (o *OCIDir) throttleGet(r ref.Ref, locked bool) *throttle.Throttle {
+func (o *OCIDir) throttleGet(r ref.Ref, locked bool) *pqueue.Queue[reqmeta.Data] {
 	if !locked {
 		o.mu.Lock()
 		defer o.mu.Unlock()
@@ -134,7 +135,7 @@ func (o *OCIDir) throttleGet(r ref.Ref, locked bool) *throttle.Throttle {
 		return t
 	}
 	// init a new throttle
-	o.throttle[r.Path] = throttle.New(o.throttleDef)
+	o.throttle[r.Path] = pqueue.New(pqueue.Opts[reqmeta.Data]{Max: o.throttleDef})
 	return o.throttle[r.Path]
 }
 

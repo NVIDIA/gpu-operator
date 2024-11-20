@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/reghttp"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/mediatype"
 	"github.com/regclient/regclient/types/repo"
@@ -36,17 +37,14 @@ func (reg *Reg) RepoList(ctx context.Context, hostname string, opts ...scheme.Re
 		"Accept": []string{"application/json"},
 	}
 	req := &reghttp.Req{
+		MetaKind:  reqmeta.Query,
 		Host:      hostname,
 		NoMirrors: true,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:   "GET",
-				Path:     "_catalog",
-				NoPrefix: true,
-				Query:    query,
-				Headers:  headers,
-			},
-		},
+		Method:    "GET",
+		Path:      "_catalog",
+		NoPrefix:  true,
+		Query:     query,
+		Headers:   headers,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {

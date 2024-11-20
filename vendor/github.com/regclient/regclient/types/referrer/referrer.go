@@ -128,7 +128,7 @@ func (rl ReferrerList) MarshalPretty() ([]byte, error) {
 			return []byte{}, err
 		}
 	}
-	if rl.Annotations != nil && len(rl.Annotations) > 0 {
+	if len(rl.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(rl.Annotations))
 		for k := range rl.Annotations {

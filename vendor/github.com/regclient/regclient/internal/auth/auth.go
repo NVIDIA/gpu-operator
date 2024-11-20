@@ -49,58 +49,56 @@ func init() {
 }
 
 // CredsFn is passed to lookup credentials for a given hostname, response is a username and password or empty strings
-type CredsFn func(string) Cred
+type CredsFn func(host string) Cred
 
-// Cred is returned by the CredsFn
+// Cred is returned by the CredsFn.
+// If Token is provided and auth method is bearer, it will attempt to use it as a refresh token.
+// Else if user and password are provided, they are attempted with all auth methods.
+// Else if neither are provided and auth method is bearer, an anonymous login is attempted.
 type Cred struct {
-	User, Password, Token string
+	User, Password string // clear text username and password
+	Token          string // refresh token only used for bearer auth
 }
 
-// Auth manages authorization requests/responses for http requests
-type Auth interface {
-	AddScope(host, scope string) error
-	HandleResponse(*http.Response) error
-	UpdateRequest(*http.Request) error
-}
-
-// Challenge is the extracted contents of the WWW-Authenticate header
-type Challenge struct {
+// challenge is the extracted contents of the WWW-Authenticate header.
+type challenge struct {
 	authType string
 	params   map[string]string
 }
 
-// Handler handles a challenge for a host to return an auth header
-type Handler interface {
+// handler handles a challenge for a host to return an auth header
+type handler interface {
 	AddScope(scope string) error
-	ProcessChallenge(Challenge) error
+	ProcessChallenge(challenge) error
 	GenerateAuth() (string, error)
 }
 
-// HandlerBuild is used to make a new handler for a specific authType and URL
-type HandlerBuild func(client *http.Client, clientID, host string, credFn CredsFn, log *logrus.Logger) Handler
+// handlerBuild is used to make a new handler for a specific authType and URL
+type handlerBuild func(client *http.Client, clientID, host string, credFn CredsFn, log *logrus.Logger) handler
 
 // Opts configures options for NewAuth
-type Opts func(*auth)
+type Opts func(*Auth)
 
-type auth struct {
+// Auth is used to handle authentication requests.
+type Auth struct {
 	httpClient *http.Client
 	clientID   string
 	credsFn    CredsFn
-	hbs        map[string]HandlerBuild       // handler builders based on authType
-	hs         map[string]map[string]Handler // handlers based on url and authType
+	hbs        map[string]handlerBuild       // handler builders based on authType
+	hs         map[string]map[string]handler // handlers based on url and authType
 	authTypes  []string
 	log        *logrus.Logger
 	mu         sync.Mutex
 }
 
 // NewAuth creates a new Auth
-func NewAuth(opts ...Opts) Auth {
-	a := &auth{
+func NewAuth(opts ...Opts) *Auth {
+	a := &Auth{
 		httpClient: &http.Client{},
 		clientID:   defaultClientID,
 		credsFn:    DefaultCredsFn,
-		hbs:        map[string]HandlerBuild{},
-		hs:         map[string]map[string]Handler{},
+		hbs:        map[string]handlerBuild{},
+		hs:         map[string]map[string]handler{},
 		authTypes:  []string{},
 	}
 	a.log = &logrus.Logger{
@@ -123,7 +121,7 @@ func NewAuth(opts ...Opts) Auth {
 
 // WithCreds provides a user/pass lookup for a url
 func WithCreds(f CredsFn) Opts {
-	return func(a *auth) {
+	return func(a *Auth) {
 		if f != nil {
 			a.credsFn = f
 		}
@@ -132,7 +130,7 @@ func WithCreds(f CredsFn) Opts {
 
 // WithHTTPClient uses a specific http client with requests
 func WithHTTPClient(h *http.Client) Opts {
-	return func(a *auth) {
+	return func(a *Auth) {
 		if h != nil {
 			a.httpClient = h
 		}
@@ -141,14 +139,14 @@ func WithHTTPClient(h *http.Client) Opts {
 
 // WithClientID uses a client ID with request headers
 func WithClientID(clientID string) Opts {
-	return func(a *auth) {
+	return func(a *Auth) {
 		a.clientID = clientID
 	}
 }
 
 // WithHandler includes a handler for a specific auth type
-func WithHandler(authType string, hb HandlerBuild) Opts {
-	return func(a *auth) {
+func WithHandler(authType string, hb handlerBuild) Opts {
+	return func(a *Auth) {
 		lcat := strings.ToLower(authType)
 		a.hbs[lcat] = hb
 		a.authTypes = append(a.authTypes, lcat)
@@ -157,14 +155,14 @@ func WithHandler(authType string, hb HandlerBuild) Opts {
 
 // WithDefaultHandlers includes a Basic and Bearer handler, this is automatically added with "WithHandler" is not called
 func WithDefaultHandlers() Opts {
-	return func(a *auth) {
+	return func(a *Auth) {
 		a.addDefaultHandlers()
 	}
 }
 
 // WithLog injects a logrus Logger
 func WithLog(log *logrus.Logger) Opts {
-	return func(a *auth) {
+	return func(a *Auth) {
 		a.log = log
 	}
 }
@@ -172,7 +170,7 @@ func WithLog(log *logrus.Logger) Opts {
 // AddScope extends an existing auth with additional scopes.
 // This is used to pre-populate scopes with the Docker convention rather than
 // depend on the registry to respond with the correct http status and headers.
-func (a *auth) AddScope(host, scope string) error {
+func (a *Auth) AddScope(host, scope string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	success := false
@@ -202,7 +200,7 @@ func (a *auth) AddScope(host, scope string) error {
 // HandleResponse parses the 401 response, extracting the WWW-Authenticate
 // header and verifying the requirement is different from what was included in
 // the last request
-func (a *auth) HandleResponse(resp *http.Response) error {
+func (a *Auth) HandleResponse(resp *http.Response) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	// verify response is an access denied
@@ -233,7 +231,7 @@ func (a *auth) HandleResponse(resp *http.Response) error {
 		}
 		// setup a handler for the host and auth type
 		if _, ok := a.hs[host]; !ok {
-			a.hs[host] = map[string]Handler{}
+			a.hs[host] = map[string]handler{}
 		}
 		if _, ok := a.hs[host][c.authType]; !ok {
 			h := a.hbs[c.authType](a.httpClient, a.clientID, host, a.credsFn, a.log)
@@ -266,7 +264,7 @@ func (a *auth) HandleResponse(resp *http.Response) error {
 }
 
 // UpdateRequest adds Authorization headers to a request
-func (a *auth) UpdateRequest(req *http.Request) error {
+func (a *Auth) UpdateRequest(req *http.Request) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	host := req.URL.Host
@@ -296,7 +294,7 @@ func (a *auth) UpdateRequest(req *http.Request) error {
 	return nil
 }
 
-func (a *auth) addDefaultHandlers() {
+func (a *Auth) addDefaultHandlers() {
 	if _, ok := a.hbs["basic"]; !ok {
 		a.hbs["basic"] = NewBasicHandler
 		a.authTypes = append(a.authTypes, "basic")
@@ -304,11 +302,6 @@ func (a *auth) addDefaultHandlers() {
 	if _, ok := a.hbs["bearer"]; !ok {
 		a.hbs["bearer"] = NewBearerHandler
 		a.authTypes = append(a.authTypes, "bearer")
-	}
-	// jwt is considered experimental, used for some Hub specific API's
-	if _, ok := a.hbs["jwt"]; !ok {
-		a.hbs["jwt"] = NewJWTHandler
-		a.authTypes = append(a.authTypes, "jwt")
 	}
 }
 
@@ -319,10 +312,10 @@ func DefaultCredsFn(h string) Cred {
 }
 
 // ParseAuthHeaders extracts the scheme and realm from WWW-Authenticate headers
-func ParseAuthHeaders(ahl []string) ([]Challenge, error) {
-	var cl []Challenge
+func ParseAuthHeaders(ahl []string) ([]challenge, error) {
+	var cl []challenge
 	for _, ah := range ahl {
-		c, err := ParseAuthHeader(ah)
+		c, err := parseAuthHeader(ah)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse challenge header: %s, %w", ah, err)
 		}
@@ -331,13 +324,13 @@ func ParseAuthHeaders(ahl []string) ([]Challenge, error) {
 	return cl, nil
 }
 
-// ParseAuthHeader parses a single header line for WWW-Authenticate
+// parseAuthHeader parses a single header line for WWW-Authenticate
 // Example values:
 // Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:samalba/my-app:pull,push"
 // Basic realm="GitHub Package Registry"
-func ParseAuthHeader(ah string) ([]Challenge, error) {
-	var cl []Challenge
-	var c *Challenge
+func parseAuthHeader(ah string) ([]challenge, error) {
+	var cl []challenge
+	var c *challenge
 	var eb, atb, kb, vb []byte // eb is element bytes, atb auth type, kb key, vb value
 	state := "string"
 
@@ -370,7 +363,7 @@ func ParseAuthHeader(ah string) ([]Challenge, error) {
 					// space ends the element
 					atb = eb
 					eb = []byte{}
-					c = &Challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
+					c = &challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
 					cl = append(cl, *c)
 				} else {
 					// unknown char
@@ -439,7 +432,7 @@ func ParseAuthHeader(ah string) ([]Challenge, error) {
 	case "string":
 		if len(eb) != 0 {
 			atb = eb
-			c = &Challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
+			c = &challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
 			cl = append(cl, *c)
 		}
 	case "value":
@@ -453,16 +446,16 @@ func ParseAuthHeader(ah string) ([]Challenge, error) {
 	return cl, nil
 }
 
-// BasicHandler supports Basic auth type requests
-type BasicHandler struct {
+// basicHandler supports Basic auth type requests
+type basicHandler struct {
 	realm   string
 	host    string
 	credsFn CredsFn
 }
 
 // NewBasicHandler creates a new BasicHandler
-func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) Handler {
-	return &BasicHandler{
+func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
+	return &basicHandler{
 		realm:   "",
 		host:    host,
 		credsFn: credsFn,
@@ -470,12 +463,12 @@ func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn
 }
 
 // AddScope is not valid for BasicHandler
-func (b *BasicHandler) AddScope(scope string) error {
+func (b *basicHandler) AddScope(scope string) error {
 	return ErrNoNewChallenge
 }
 
 // ProcessChallenge for BasicHandler is a noop
-func (b *BasicHandler) ProcessChallenge(c Challenge) error {
+func (b *basicHandler) ProcessChallenge(c challenge) error {
 	if _, ok := c.params["realm"]; !ok {
 		return ErrInvalidChallenge
 	}
@@ -487,7 +480,7 @@ func (b *BasicHandler) ProcessChallenge(c Challenge) error {
 }
 
 // GenerateAuth for BasicHandler generates base64 encoded user/pass for a host
-func (b *BasicHandler) GenerateAuth() (string, error) {
+func (b *basicHandler) GenerateAuth() (string, error) {
 	cred := b.credsFn(b.host)
 	if cred.User == "" || cred.Password == "" {
 		return "", fmt.Errorf("no credentials available: %w", errs.ErrHTTPUnauthorized)
@@ -496,20 +489,20 @@ func (b *BasicHandler) GenerateAuth() (string, error) {
 	return fmt.Sprintf("Basic %s", auth), nil
 }
 
-// BearerHandler supports Bearer auth type requests
-type BearerHandler struct {
+// bearerHandler supports Bearer auth type requests
+type bearerHandler struct {
 	client         *http.Client
 	clientID       string
 	realm, service string
 	host           string
 	credsFn        CredsFn
 	scopes         []string
-	token          BearerToken
+	token          bearerToken
 	log            *logrus.Logger
 }
 
-// BearerToken is the json response to the Bearer request
-type BearerToken struct {
+// bearerToken is the json response to the Bearer request
+type bearerToken struct {
 	Token        string    `json:"token"`
 	AccessToken  string    `json:"access_token"`
 	ExpiresIn    int       `json:"expires_in"`
@@ -519,8 +512,8 @@ type BearerToken struct {
 }
 
 // NewBearerHandler creates a new BearerHandler
-func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) Handler {
-	return &BearerHandler{
+func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
+	return &bearerHandler{
 		client:   client,
 		clientID: clientID,
 		host:     host,
@@ -533,7 +526,7 @@ func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsF
 }
 
 // AddScope appends a new scope if it doesn't already exist
-func (b *BearerHandler) AddScope(scope string) error {
+func (b *bearerHandler) AddScope(scope string) error {
 	if b.scopeExists(scope) {
 		if b.token.Token == "" || !b.isExpired() {
 			return ErrNoNewChallenge
@@ -543,7 +536,7 @@ func (b *BearerHandler) AddScope(scope string) error {
 	return b.addScope(scope)
 }
 
-func (b *BearerHandler) addScope(scope string) error {
+func (b *bearerHandler) addScope(scope string) error {
 	replaced := false
 	for i, cur := range b.scopes {
 		// extend an existing scope with more actions
@@ -564,7 +557,7 @@ func (b *BearerHandler) addScope(scope string) error {
 
 // ProcessChallenge handles WWW-Authenticate header for bearer tokens
 // Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:samalba/my-app:pull,push"
-func (b *BearerHandler) ProcessChallenge(c Challenge) error {
+func (b *bearerHandler) ProcessChallenge(c challenge) error {
 	if _, ok := c.params["realm"]; !ok {
 		return ErrInvalidChallenge
 	}
@@ -598,7 +591,7 @@ func (b *BearerHandler) ProcessChallenge(c Challenge) error {
 }
 
 // GenerateAuth for BasicHandler generates base64 encoded user/pass for a host
-func (b *BearerHandler) GenerateAuth() (string, error) {
+func (b *bearerHandler) GenerateAuth() (string, error) {
 	// if unexpired token already exists, return it
 	if b.token.Token != "" && !b.isExpired() {
 		return fmt.Sprintf("Bearer %s", b.token.Token), nil
@@ -623,7 +616,7 @@ func (b *BearerHandler) GenerateAuth() (string, error) {
 
 // isExpired returns true when token issue date is either 0, token has expired,
 // or will expire within buffer time
-func (b *BearerHandler) isExpired() bool {
+func (b *bearerHandler) isExpired() bool {
 	if b.token.IssuedAt.IsZero() {
 		return true
 	}
@@ -633,7 +626,7 @@ func (b *BearerHandler) isExpired() bool {
 }
 
 // tryGet requests a new token with a GET request
-func (b *BearerHandler) tryGet() error {
+func (b *bearerHandler) tryGet() error {
 	cred := b.credsFn(b.host)
 	req, err := http.NewRequest("GET", b.realm, nil)
 	if err != nil {
@@ -669,7 +662,7 @@ func (b *BearerHandler) tryGet() error {
 }
 
 // tryPost requests a new token via a POST request
-func (b *BearerHandler) tryPost() error {
+func (b *bearerHandler) tryPost() error {
 	cred := b.credsFn(b.host)
 	form := url.Values{}
 	if len(b.scopes) > 0 {
@@ -708,7 +701,7 @@ func (b *BearerHandler) tryPost() error {
 }
 
 // scopeExists check if the scope already exists within the list of scopes
-func (b *BearerHandler) scopeExists(search string) bool {
+func (b *bearerHandler) scopeExists(search string) bool {
 	if search == "" {
 		return true
 	}
@@ -722,14 +715,14 @@ func (b *BearerHandler) scopeExists(search string) bool {
 }
 
 // validateResponse extracts the returned token
-func (b *BearerHandler) validateResponse(resp *http.Response) error {
+func (b *bearerHandler) validateResponse(resp *http.Response) error {
 	if resp.StatusCode != 200 {
 		return ErrUnauthorized
 	}
 
 	// decode response and if successful, update token
 	decoder := json.NewDecoder(resp.Body)
-	decoded := BearerToken{}
+	decoded := bearerToken{}
 	if err := decoder.Decode(&decoded); err != nil {
 		return err
 	}
@@ -756,8 +749,8 @@ func (b *BearerHandler) validateResponse(resp *http.Response) error {
 	return nil
 }
 
-// JWTHubHandler supports JWT auth type requests
-type JWTHubHandler struct {
+// jwtHubHandler supports JWT auth type requests.
+type jwtHubHandler struct {
 	client   *http.Client
 	clientID string
 	realm    string
@@ -776,11 +769,11 @@ type jwtHubResp struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// NewJWTHandler creates a new JWTHandler
-func NewJWTHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) Handler {
+// NewJWTHubHandler creates a new JWTHandler for Docker Hub.
+func NewJWTHubHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
 	// JWT handler is only tested against Hub, and the API is Hub specific
 	if host == "hub.docker.com" {
-		return &JWTHubHandler{
+		return &jwtHubHandler{
 			client:   client,
 			clientID: clientID,
 			host:     host,
@@ -792,12 +785,12 @@ func NewJWTHandler(client *http.Client, clientID, host string, credsFn CredsFn, 
 }
 
 // AddScope is not valid for JWTHubHandler
-func (j *JWTHubHandler) AddScope(scope string) error {
+func (j *jwtHubHandler) AddScope(scope string) error {
 	return ErrNoNewChallenge
 }
 
 // ProcessChallenge handles WWW-Authenticate header for JWT auth on Docker Hub
-func (j *JWTHubHandler) ProcessChallenge(c Challenge) error {
+func (j *jwtHubHandler) ProcessChallenge(c challenge) error {
 	cred := j.credsFn(j.host)
 	// use token if provided
 	if cred.Token != "" {
@@ -844,7 +837,7 @@ func (j *JWTHubHandler) ProcessChallenge(c Challenge) error {
 }
 
 // GenerateAuth for JWTHubHandler adds JWT header
-func (j *JWTHubHandler) GenerateAuth() (string, error) {
+func (j *jwtHubHandler) GenerateAuth() (string, error) {
 	if len(j.jwt) > 0 {
 		return fmt.Sprintf("JWT %s", j.jwt), nil
 	}

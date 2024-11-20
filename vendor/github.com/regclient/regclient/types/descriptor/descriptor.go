@@ -225,7 +225,7 @@ func (d Descriptor) Match(opt MatchOpt) bool {
 	if opt.ArtifactType != "" && d.ArtifactType != opt.ArtifactType {
 		return false
 	}
-	if opt.Annotations != nil && len(opt.Annotations) > 0 {
+	if len(opt.Annotations) > 0 {
 		if d.Annotations == nil {
 			return false
 		}
