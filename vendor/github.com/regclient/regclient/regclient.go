@@ -31,12 +31,12 @@ const (
 
 // RegClient is used to access OCI distribution-spec registries.
 type RegClient struct {
-	hosts map[string]*config.Host
-	log   *logrus.Logger
-	// mu        sync.Mutex
-	regOpts   []reg.Opts
-	schemes   map[string]scheme.API
-	userAgent string
+	hosts       map[string]*config.Host
+	hostDefault *config.Host
+	log         *logrus.Logger
+	regOpts     []reg.Opts
+	schemes     map[string]scheme.API
+	userAgent   string
 }
 
 // Opt functions are used by [New] to create a [*RegClient].
@@ -47,10 +47,9 @@ func New(opts ...Opt) *RegClient {
 	var rc = RegClient{
 		hosts:     map[string]*config.Host{},
 		userAgent: DefaultUserAgent,
-		// logging is disabled by default
-		log:     &logrus.Logger{Out: io.Discard},
-		regOpts: []reg.Opts{},
-		schemes: map[string]scheme.API{},
+		log:       &logrus.Logger{Out: io.Discard},
+		regOpts:   []reg.Opts{},
+		schemes:   map[string]scheme.API{},
 	}
 
 	info := version.GetInfo()
@@ -74,6 +73,7 @@ func New(opts ...Opt) *RegClient {
 	}
 	rc.regOpts = append(rc.regOpts,
 		reg.WithConfigHosts(hostList),
+		reg.WithConfigHostDefault(rc.hostDefault),
 		reg.WithLog(rc.log),
 		reg.WithUserAgent(rc.userAgent),
 	)
@@ -123,6 +123,13 @@ func WithCertDir(path ...string) Opt {
 func WithConfigHost(configHost ...config.Host) Opt {
 	return func(rc *RegClient) {
 		rc.hostLoad("host", configHost)
+	}
+}
+
+// WithConfigHostDefault adds default settings for new hosts.
+func WithConfigHostDefault(configHost config.Host) Opt {
+	return func(rc *RegClient) {
+		rc.hostDefault = &configHost
 	}
 }
 
@@ -232,7 +239,6 @@ func (rc *RegClient) hostLoad(src string, hosts []config.Host) {
 			"tls":        string(tls),
 			"pathPrefix": configHost.PathPrefix,
 			"mirrors":    configHost.Mirrors,
-			"api":        configHost.API,
 			"blobMax":    configHost.BlobMax,
 			"blobChunk":  configHost.BlobChunk,
 		}).Debugf("Loading %s config", src)
@@ -250,12 +256,9 @@ func (rc *RegClient) hostLoad(src string, hosts []config.Host) {
 func (rc *RegClient) hostSet(newHost config.Host) error {
 	name := newHost.Name
 	var err error
-	// hostSet should only run on New, which single threaded
-	// rc.mu.Lock()
-	// defer rc.mu.Unlock()
 	if _, ok := rc.hosts[name]; !ok {
 		// merge newHost with default host settings
-		rc.hosts[name] = config.HostNewName(name)
+		rc.hosts[name] = config.HostNewDefName(rc.hostDefault, name)
 		err = rc.hosts[name].Merge(newHost, nil)
 	} else {
 		// merge newHost with existing settings

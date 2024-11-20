@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 
 	// crypto libraries included for go-digest
 	_ "crypto/sha256"
@@ -26,6 +27,7 @@ type BReader struct {
 	reader    io.Reader
 	origRdr   io.Reader
 	digester  digest.Digester
+	mu        sync.Mutex
 }
 
 // NewReader creates a new BReader.
@@ -103,6 +105,8 @@ func (r *BReader) Read(p []byte) (int, error) {
 	if r == nil || r.reader == nil {
 		return 0, fmt.Errorf("blob has no reader: %w", io.ErrUnexpectedEOF)
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	size, err := r.reader.Read(p)
 	r.readBytes = r.readBytes + int64(size)
 	if err == io.EOF {
@@ -126,15 +130,17 @@ func (r *BReader) Read(p []byte) (int, error) {
 
 // Seek passes through the seek operation, reseting or invalidating the digest
 func (r *BReader) Seek(offset int64, whence int) (int64, error) {
+	if r == nil || r.origRdr == nil {
+		return 0, fmt.Errorf("blob has no reader")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if offset == 0 && whence == io.SeekCurrent {
 		return r.readBytes, nil
 	}
 	// cannot do an arbitrary seek and still digest without a lot more complication
 	if offset != 0 || whence != io.SeekStart {
 		return r.readBytes, fmt.Errorf("unable to seek to arbitrary position")
-	}
-	if r == nil || r.origRdr == nil {
-		return 0, fmt.Errorf("blob has no reader")
 	}
 	rdrSeek, ok := r.origRdr.(io.Seeker)
 	if !ok {
@@ -189,6 +195,8 @@ func (r *BReader) ToTarReader() (*BTarReader, error) {
 	if r == nil || !r.blobSet {
 		return nil, fmt.Errorf("blob is not defined")
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.readBytes != 0 {
 		return nil, fmt.Errorf("unable to convert after read has been performed")
 	}

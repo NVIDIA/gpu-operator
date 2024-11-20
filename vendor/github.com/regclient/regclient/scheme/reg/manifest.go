@@ -14,16 +14,22 @@ import (
 
 	"github.com/regclient/regclient/internal/limitread"
 	"github.com/regclient/regclient/internal/reghttp"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/mediatype"
 	"github.com/regclient/regclient/types/ref"
+	"github.com/regclient/regclient/types/warning"
 )
 
 // ManifestDelete removes a manifest by reference (digest) from a registry.
 // This will implicitly delete all tags pointing to that manifest.
 func (reg *Reg) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.ManifestOpts) error {
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
+	}
 	if r.Digest == "" {
 		return fmt.Errorf("digest required to delete manifest, reference %s%.0w", r.CommonName(), errs.ErrMissingDigest)
 	}
@@ -57,15 +63,12 @@ func (reg *Reg) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.Ma
 
 	// build/send request
 	req := &reghttp.Req{
-		Host:      r.Registry,
-		NoMirrors: true,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "DELETE",
-				Repository: r.Repository,
-				Path:       "manifests/" + r.Digest,
-			},
-		},
+		MetaKind:   reqmeta.Query,
+		Host:       r.Registry,
+		NoMirrors:  true,
+		Method:     "DELETE",
+		Repository: r.Repository,
+		Path:       "manifests/" + r.Digest,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {
@@ -107,15 +110,12 @@ func (reg *Reg) ManifestGet(ctx context.Context, r ref.Ref) (manifest.Manifest, 
 		},
 	}
 	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "GET",
-				Repository: r.Repository,
-				Path:       "manifests/" + tagOrDigest,
-				Headers:    headers,
-			},
-		},
+		MetaKind:   reqmeta.Manifest,
+		Host:       r.Registry,
+		Method:     "GET",
+		Repository: r.Repository,
+		Path:       "manifests/" + tagOrDigest,
+		Headers:    headers,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {
@@ -184,15 +184,12 @@ func (reg *Reg) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest,
 		},
 	}
 	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "HEAD",
-				Repository: r.Repository,
-				Path:       "manifests/" + tagOrDigest,
-				Headers:    headers,
-			},
-		},
+		MetaKind:   reqmeta.Head,
+		Host:       r.Registry,
+		Method:     "HEAD",
+		Repository: r.Repository,
+		Path:       "manifests/" + tagOrDigest,
+		Headers:    headers,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {
@@ -222,6 +219,10 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 		}).Warn("Manifest put requires a tag")
 		return errs.ErrMissingTag
 	}
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
+	}
 
 	// create the request body
 	mj, err := m.MarshalJSON()
@@ -248,19 +249,16 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 		q.Add(paramManifestDigest, m.GetDescriptor().Digest.String())
 	}
 	req := &reghttp.Req{
-		Host:      r.Registry,
-		NoMirrors: true,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "PUT",
-				Repository: r.Repository,
-				Path:       "manifests/" + tagOrDigest,
-				Query:      q,
-				Headers:    headers,
-				BodyLen:    int64(len(mj)),
-				BodyBytes:  mj,
-			},
-		},
+		MetaKind:   reqmeta.Manifest,
+		Host:       r.Registry,
+		NoMirrors:  true,
+		Method:     "PUT",
+		Repository: r.Repository,
+		Path:       "manifests/" + tagOrDigest,
+		Query:      q,
+		Headers:    headers,
+		BodyLen:    int64(len(mj)),
+		BodyBytes:  mj,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {

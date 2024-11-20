@@ -10,8 +10,9 @@ import (
 
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/cache"
+	"github.com/regclient/regclient/internal/pqueue"
 	"github.com/regclient/regclient/internal/reghttp"
-	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/ref"
 	"github.com/regclient/regclient/types/referrer"
@@ -44,6 +45,7 @@ type Reg struct {
 	reghttpOpts     []reghttp.Opts
 	log             *logrus.Logger
 	hosts           map[string]*config.Host
+	hostDefault     *config.Host
 	features        map[featureKey]*featureVal
 	blobChunkSize   int64
 	blobChunkLimit  int64
@@ -83,7 +85,7 @@ func New(opts ...Opts) *Reg {
 		hosts:           map[string]*config.Host{},
 		features:        map[featureKey]*featureVal{},
 	}
-	r.reghttpOpts = append(r.reghttpOpts, reghttp.WithConfigHost(r.hostGet))
+	r.reghttpOpts = append(r.reghttpOpts, reghttp.WithConfigHostFn(r.hostGet))
 	for _, opt := range opts {
 		opt(&r)
 	}
@@ -92,16 +94,16 @@ func New(opts ...Opts) *Reg {
 }
 
 // Throttle is used to limit concurrency
-func (reg *Reg) Throttle(r ref.Ref, put bool) []*throttle.Throttle {
-	tList := []*throttle.Throttle{}
+func (reg *Reg) Throttle(r ref.Ref, put bool) []*pqueue.Queue[reqmeta.Data] {
+	tList := []*pqueue.Queue[reqmeta.Data]{}
 	host := reg.hostGet(r.Registry)
-	t := host.Throttle()
+	t := reg.reghttp.GetThrottle(r.Registry)
 	if t != nil {
 		tList = append(tList, t)
 	}
 	if !put {
 		for _, mirror := range host.Mirrors {
-			t := reg.hostGet(mirror).Throttle()
+			t := reg.reghttp.GetThrottle(mirror)
 			if t != nil {
 				tList = append(tList, t)
 			}
@@ -114,7 +116,7 @@ func (reg *Reg) hostGet(hostname string) *config.Host {
 	reg.muHost.Lock()
 	defer reg.muHost.Unlock()
 	if _, ok := reg.hosts[hostname]; !ok {
-		newHost := config.HostNewName(hostname)
+		newHost := config.HostNewDefName(reg.hostDefault, hostname)
 		// check for normalized hostname
 		if newHost.Name != hostname {
 			hostname = newHost.Name
@@ -197,6 +199,13 @@ func WithCertDirs(dirs []string) Opts {
 func WithCertFiles(files []string) Opts {
 	return func(r *Reg) {
 		r.reghttpOpts = append(r.reghttpOpts, reghttp.WithCertFiles(files))
+	}
+}
+
+// WithConfigHostDefault provides default settings for hosts.
+func WithConfigHostDefault(ch *config.Host) Opts {
+	return func(r *Reg) {
+		r.hostDefault = ch
 	}
 }
 

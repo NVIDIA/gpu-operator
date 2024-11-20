@@ -5,7 +5,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/internal/pqueue"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/blob"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/manifest"
@@ -65,7 +66,7 @@ type GCLocker interface {
 
 // Throttler is used to indicate the scheme implements Throttle.
 type Throttler interface {
-	Throttle(r ref.Ref, put bool) []*throttle.Throttle
+	Throttle(r ref.Ref, put bool) []*pqueue.Queue[reqmeta.Data]
 }
 
 // ManifestConfig is used by schemes to import [ManifestOpts].

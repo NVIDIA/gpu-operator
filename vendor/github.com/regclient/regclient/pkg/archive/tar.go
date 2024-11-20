@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -136,6 +137,9 @@ func Extract(ctx context.Context, path string, r io.Reader, opts ...TarOpts) err
 		fn := filepath.Join(path, filepath.Clean("/"+hdr.Name))
 		switch hdr.Typeflag {
 		case tar.TypeDir:
+			if hdr.Mode < 0 || hdr.Mode > math.MaxUint32 {
+				return fmt.Errorf("integer conversion overflow/underflow (file mode = %d)", hdr.Mode)
+			}
 			err = os.MkdirAll(fn, fs.FileMode(hdr.Mode))
 			if err != nil {
 				return err
