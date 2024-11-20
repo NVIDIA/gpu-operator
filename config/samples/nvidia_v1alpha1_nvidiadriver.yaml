@@ -8,7 +8,7 @@ spec:
   driverType: gpu
   repository: nvcr.io/nvidia
   image: driver
-  version: "550.127.05"
+  version: "550.127.08"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   nodeSelector: {}
