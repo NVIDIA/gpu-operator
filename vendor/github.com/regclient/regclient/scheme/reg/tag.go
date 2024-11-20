@@ -21,6 +21,7 @@ import (
 
 	"github.com/regclient/regclient/internal/httplink"
 	"github.com/regclient/regclient/internal/reghttp"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/docker/schema2"
@@ -31,6 +32,7 @@ import (
 	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
 	"github.com/regclient/regclient/types/tag"
+	"github.com/regclient/regclient/types/warning"
 )
 
 // TagDelete removes a tag from a repository.
@@ -41,30 +43,26 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 	if r.Tag == "" {
 		return errs.ErrMissingTag
 	}
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
+	}
 
 	// attempt to delete the tag directly, available in OCI distribution-spec, and Hub API
 	req := &reghttp.Req{
-		Host:      r.Registry,
-		NoMirrors: true,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "DELETE",
-				Repository: r.Repository,
-				Path:       "manifests/" + r.Tag,
-				IgnoreErr:  true, // do not trigger backoffs if this fails
-			},
-			"hub": {
-				Method: "DELETE",
-				Path:   "repositories/" + r.Repository + "/tags/" + r.Tag + "/",
-			},
-		},
+		MetaKind:   reqmeta.Query,
+		Host:       r.Registry,
+		NoMirrors:  true,
+		Method:     "DELETE",
+		Repository: r.Repository,
+		Path:       "manifests/" + r.Tag,
+		IgnoreErr:  true, // do not trigger backoffs if this fails
 	}
 
 	resp, err := reg.reghttp.Do(ctx, req)
 	if resp != nil {
 		defer resp.Close()
 	}
-	// TODO: Hub may return a different status
 	if err == nil && resp != nil && resp.HTTPResponse().StatusCode == 202 {
 		return nil
 	}
@@ -265,16 +263,13 @@ func (reg *Reg) tagListOCI(ctx context.Context, r ref.Ref, config scheme.TagConf
 		"Accept": []string{"application/json"},
 	}
 	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "GET",
-				Repository: r.Repository,
-				Path:       "tags/list",
-				Query:      query,
-				Headers:    headers,
-			},
-		},
+		MetaKind:   reqmeta.Query,
+		Host:       r.Registry,
+		Method:     "GET",
+		Repository: r.Repository,
+		Path:       "tags/list",
+		Query:      query,
+		Headers:    headers,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {
@@ -314,15 +309,12 @@ func (reg *Reg) tagListLink(ctx context.Context, r ref.Ref, _ scheme.TagConfig, 
 		"Accept": []string{"application/json"},
 	}
 	req := &reghttp.Req{
-		Host: r.Registry,
-		APIs: map[string]reghttp.ReqAPI{
-			"": {
-				Method:     "GET",
-				DirectURL:  link,
-				Repository: r.Repository,
-				Headers:    headers,
-			},
-		},
+		MetaKind:   reqmeta.Query,
+		Host:       r.Registry,
+		Method:     "GET",
+		DirectURL:  link,
+		Repository: r.Repository,
+		Headers:    headers,
 	}
 	resp, err := reg.reghttp.Do(ctx, req)
 	if err != nil {

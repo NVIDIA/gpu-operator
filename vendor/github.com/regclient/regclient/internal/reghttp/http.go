@@ -25,99 +25,94 @@ import (
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 
-	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/auth"
-	"github.com/regclient/regclient/internal/throttle"
+	"github.com/regclient/regclient/internal/pqueue"
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/warning"
 )
 
-var defaultDelayInit, _ = time.ParseDuration("1s")
+var defaultDelayInit, _ = time.ParseDuration("0.1s")
 var defaultDelayMax, _ = time.ParseDuration("30s")
 var warnRegexp = regexp.MustCompile(`^299\s+-\s+"([^"]+)"`)
 
 const (
-	DefaultRetryLimit = 3
+	DefaultRetryLimit = 5 // number of times a request will be retried
+	backoffResetCount = 5 // number of successful requests needed to reduce the backoff
 )
 
-// Client is an HTTP client wrapper
-// It handles features like authentication, retries, backoff delays, TLS settings
+// Client is an HTTP client wrapper.
+// It handles features like authentication, retries, backoff delays, TLS settings.
 type Client struct {
-	getConfigHost func(string) *config.Host
-	host          map[string]*clientHost
-	httpClient    *http.Client
-	rootCAPool    [][]byte
-	rootCADirs    []string
-	retryLimit    int
-	delayInit     time.Duration
-	delayMax      time.Duration
-	log           *logrus.Logger
-	userAgent     string
-	mu            sync.Mutex
+	httpClient    *http.Client              // upstream [http.Client], this is wrapped per repository for an auth handler on redirects
+	getConfigHost func(string) *config.Host // call-back to get the [config.Host] for a specific registry
+	host          map[string]*clientHost    // host specific settings, wrap access with a mutex lock
+	rootCAPool    [][]byte                  // list of root CAs for configuring the http.Client transport
+	rootCADirs    []string                  // list of directories for additional root CAs
+	retryLimit    int                       // number of retries before failing a request, this applies to each host, and each request
+	delayInit     time.Duration             // how long to initially delay requests on a failure
+	delayMax      time.Duration             // maximum time to delay a request
+	log           *logrus.Logger            // logging for tracing and failures
+	userAgent     string                    // user agent to specify in http request headers
+	mu            sync.Mutex                // mutex to prevent data races
 }
 
 type clientHost struct {
-	initialized  bool
-	backoffCur   int
-	backoffUntil time.Time
-	config       *config.Host
-	httpClient   *http.Client
-	auth         map[string]auth.Auth
-	newAuth      func() auth.Auth
-	mu           sync.Mutex
-	ratelimit    *time.Ticker
+	config       *config.Host                // config entry
+	httpClient   *http.Client                // modified http client for registry specific settings
+	userAgent    string                      // user agent to specify in http request headers
+	log          *logrus.Logger              // logging for tracing and failures
+	auth         map[string]*auth.Auth       // map of auth handlers by repository
+	backoffCur   int                         // current count of backoffs for this host
+	backoffLast  time.Time                   // time the last request was released, this may be in the future if there is a queue, or zero if no delay is needed
+	backoffReset int                         // count of successful requests when a backoff is experienced, once [backoffResetCount] is reached, [backoffCur] is reduced by one and this is reset to 0
+	reqFreq      time.Duration               // how long between submitting requests for this host
+	reqNext      time.Time                   // time to release the next request
+	throttle     *pqueue.Queue[reqmeta.Data] // limit concurrent requests to the host
+	mu           sync.Mutex                  // mutex to prevent data races
 }
 
-// Req is a request to send to a registry
+// Req is a request to send to a registry.
 type Req struct {
-	Host      string
-	NoMirrors bool
-	APIs      map[string]ReqAPI // allow different types of registries (registry/2.0, OCI, default to empty string)
+	MetaKind    reqmeta.Kind                  // kind of request for the priority queue
+	Host        string                        // registry name, hostname and mirrors will be looked up from host configuration
+	Method      string                        // http method to call
+	DirectURL   *url.URL                      // url to query, overrides repository, path, and query
+	Repository  string                        // repository to scope the request
+	Path        string                        // path of the request within a repository
+	Query       url.Values                    // url query parameters
+	BodyLen     int64                         // length of body to send
+	BodyBytes   []byte                        // bytes of the body, overridden by BodyFunc
+	BodyFunc    func() (io.ReadCloser, error) // function to return a new body
+	Headers     http.Header                   // headers to send in the request
+	NoPrefix    bool                          // do not include the repository prefix
+	NoMirrors   bool                          // do not send request to a mirror
+	ExpectLen   int64                         // expected size of the returned body
+	TransactLen int64                         // size of an overall transaction for the priority queue
+	IgnoreErr   bool                          // ignore http errors and do not trigger backoffs
 }
 
-// ReqAPI handles API specific settings in a request
-type ReqAPI struct {
-	Method     string
-	DirectURL  *url.URL
-	NoPrefix   bool
-	Repository string
-	Path       string
-	Query      url.Values
-	BodyLen    int64
-	BodyBytes  []byte
-	BodyFunc   func() (io.ReadCloser, error)
-	Headers    http.Header
-	Digest     digest.Digest
-	IgnoreErr  bool
-}
-
-// Resp is used to handle the result of a request
-type Resp interface {
-	io.ReadSeekCloser
-	HTTPResponse() *http.Response
-}
-
-type clientResp struct {
+// Resp is used to handle the result of a request.
+type Resp struct {
 	ctx              context.Context
 	client           *Client
 	req              *Req
 	resp             *http.Response
 	mirror           string
 	done             bool
-	digest           digest.Digest
-	digester         digest.Digester
 	reader           io.Reader
 	readCur, readMax int64
-	throttle         *throttle.Throttle
+	retryCount       int
+	throttleDone     func()
 }
 
-// Opts is used to configure client options
+// Opts is used to configure client options.
 type Opts func(*Client)
 
-// NewClient returns a client for handling requests
+// NewClient returns a client for handling requests.
 func NewClient(opts ...Opts) *Client {
 	c := Client{
 		httpClient: &http.Client{},
@@ -135,21 +130,21 @@ func NewClient(opts ...Opts) *Client {
 	return &c
 }
 
-// WithCerts adds certificates
+// WithCerts adds certificates.
 func WithCerts(certs [][]byte) Opts {
 	return func(c *Client) {
 		c.rootCAPool = append(c.rootCAPool, certs...)
 	}
 }
 
-// WithCertDirs adds directories to check for host specific certs
+// WithCertDirs adds directories to check for host specific certs.
 func WithCertDirs(dirs []string) Opts {
 	return func(c *Client) {
 		c.rootCADirs = append(c.rootCADirs, dirs...)
 	}
 }
 
-// WithCertFiles adds certificates by filename
+// WithCertFiles adds certificates by filename.
 func WithCertFiles(files []string) Opts {
 	return func(c *Client) {
 		for _, f := range files {
@@ -167,14 +162,15 @@ func WithCertFiles(files []string) Opts {
 	}
 }
 
-// WithConfigHost adds the callback to request a config.Host struct
-func WithConfigHost(gch func(string) *config.Host) Opts {
+// WithConfigHostFn adds the callback to request a [config.Host] struct.
+// The function must normalize the hostname for Docker Hub support.
+func WithConfigHostFn(gch func(string) *config.Host) Opts {
 	return func(c *Client) {
 		c.getConfigHost = gch
 	}
 }
 
-// WithDelay initial time to wait between retries (increased with exponential backoff)
+// WithDelay initial time to wait between retries (increased with exponential backoff).
 func WithDelay(delayInit time.Duration, delayMax time.Duration) Opts {
 	return func(c *Client) {
 		if delayInit > 0 {
@@ -191,14 +187,14 @@ func WithDelay(delayInit time.Duration, delayMax time.Duration) Opts {
 	}
 }
 
-// WithHTTPClient uses a specific http client with retryable requests
+// WithHTTPClient uses a specific http client with retryable requests.
 func WithHTTPClient(hc *http.Client) Opts {
 	return func(c *Client) {
 		c.httpClient = hc
 	}
 }
 
-// WithRetryLimit restricts the number of retries (defaults to 5)
+// WithRetryLimit restricts the number of retries (defaults to 5).
 func WithRetryLimit(rl int) Opts {
 	return func(c *Client) {
 		if rl > 0 {
@@ -207,40 +203,42 @@ func WithRetryLimit(rl int) Opts {
 	}
 }
 
-// WithLog injects a logrus Logger configuration
+// WithLog injects a logrus Logger configuration.
 func WithLog(log *logrus.Logger) Opts {
 	return func(c *Client) {
 		c.log = log
 	}
 }
 
-// WithTransport uses a specific http transport with retryable requests
+// WithTransport uses a specific http transport with retryable requests.
 func WithTransport(t *http.Transport) Opts {
 	return func(c *Client) {
 		c.httpClient = &http.Client{Transport: t}
 	}
 }
 
-// WithUserAgent sets a user agent header
+// WithUserAgent sets a user agent header.
 func WithUserAgent(ua string) Opts {
 	return func(c *Client) {
 		c.userAgent = ua
 	}
 }
 
-// Do runs a request, returning the response result
-func (c *Client) Do(ctx context.Context, req *Req) (Resp, error) {
-	resp := &clientResp{
-		ctx:    ctx,
-		client: c,
-		req:    req,
+// Do runs a request, returning the response result.
+func (c *Client) Do(ctx context.Context, req *Req) (*Resp, error) {
+	resp := &Resp{
+		ctx:     ctx,
+		client:  c,
+		req:     req,
+		readCur: 0,
+		readMax: req.ExpectLen,
 	}
-	err := resp.Next()
+	err := resp.next()
 	return resp, err
 }
 
-// Next sends requests until a mirror responds or all requests fail
-func (resp *clientResp) Next() error {
+// next sends requests until a mirror responds or all requests fail.
+func (resp *Resp) next() error {
 	var err error
 	c := resp.client
 	req := resp.req
@@ -272,11 +270,11 @@ func (resp *clientResp) Next() error {
 		}
 		h := hosts[curHost]
 		resp.mirror = h.config.Name
-
-		api, okAPI := req.APIs[h.config.API]
-		if !okAPI {
-			api, okAPI = req.APIs[""]
+		// there is an intentional extra retry in this check to allow for auth requests
+		if resp.retryCount > c.retryLimit {
+			return errs.ErrRetryLimitExceeded
 		}
+		resp.retryCount++
 
 		// check that context isn't canceled/done
 		ctxErr := resp.ctx.Err()
@@ -284,7 +282,10 @@ func (resp *clientResp) Next() error {
 			return ctxErr
 		}
 		// wait for other concurrent requests to this host
-		throttleErr := h.config.Throttle().Acquire(resp.ctx)
+		throttleDone, throttleErr := h.throttle.Acquire(resp.ctx, reqmeta.Data{
+			Kind: req.MetaKind,
+			Size: req.BodyLen + req.ExpectLen + req.TransactLen,
+		})
 		if throttleErr != nil {
 			return throttleErr
 		}
@@ -292,11 +293,7 @@ func (resp *clientResp) Next() error {
 		// try each host in a closure to handle all the backoff/dropHost from one place
 		loopErr := func() error {
 			var err error
-			if !okAPI {
-				dropHost = true
-				return fmt.Errorf("failed looking up api \"%s\" for host \"%s\": %w", h.config.API, h.config.Name, errs.ErrAPINotFound)
-			}
-			if api.Method == "HEAD" && h.config.APIOpts != nil {
+			if req.Method == "HEAD" && h.config.APIOpts != nil {
 				var disableHead bool
 				disableHead, err = strconv.ParseBool(h.config.APIOpts["disableHead"])
 				if err == nil && disableHead {
@@ -305,16 +302,10 @@ func (resp *clientResp) Next() error {
 				}
 			}
 
-			// store the desired digest and setup digester at first byte
-			resp.digest = api.Digest
-			if resp.readCur == 0 && resp.digest.Validate() == nil {
-				resp.digester = resp.digest.Algorithm().Digester()
-			}
-
 			// build the url
 			var u url.URL
-			if api.DirectURL != nil {
-				u = *api.DirectURL
+			if req.DirectURL != nil {
+				u = *req.DirectURL
 			} else {
 				u = url.URL{
 					Host:   h.config.Hostname,
@@ -322,19 +313,19 @@ func (resp *clientResp) Next() error {
 				}
 				path := strings.Builder{}
 				path.WriteString("/v2")
-				if h.config.PathPrefix != "" && !api.NoPrefix {
+				if h.config.PathPrefix != "" && !req.NoPrefix {
 					path.WriteString("/" + h.config.PathPrefix)
 				}
-				if api.Repository != "" {
-					path.WriteString("/" + api.Repository)
+				if req.Repository != "" {
+					path.WriteString("/" + req.Repository)
 				}
-				path.WriteString("/" + api.Path)
+				path.WriteString("/" + req.Path)
 				u.Path = path.String()
 				if h.config.TLS == config.TLSDisabled {
 					u.Scheme = "http"
 				}
-				if api.Query != nil {
-					u.RawQuery = api.Query.Encode()
+				if req.Query != nil {
+					u.RawQuery = req.Query.Encode()
 				}
 			}
 			// close previous response
@@ -342,13 +333,13 @@ func (resp *clientResp) Next() error {
 				_ = resp.resp.Body.Close()
 			}
 			// delay for backoff if needed
-			bu := resp.backoffUntil()
+			bu := resp.backoffGet()
 			if !bu.IsZero() && bu.After(time.Now()) {
 				sleepTime := time.Until(bu)
 				c.log.WithFields(logrus.Fields{
 					"Host":    h.config.Name,
 					"Seconds": sleepTime.Seconds(),
-				}).Warn("Sleeping for backoff")
+				}).Debug("Sleeping for backoff")
 				select {
 				case <-resp.ctx.Done():
 					return errs.ErrCanceled
@@ -356,47 +347,48 @@ func (resp *clientResp) Next() error {
 				}
 			}
 			var httpReq *http.Request
-			httpReq, err = http.NewRequestWithContext(resp.ctx, api.Method, u.String(), nil)
+			httpReq, err = http.NewRequestWithContext(resp.ctx, req.Method, u.String(), nil)
 			if err != nil {
 				dropHost = true
 				return err
 			}
-			if api.BodyFunc != nil {
-				body, err := api.BodyFunc()
+			if req.BodyFunc != nil {
+				body, err := req.BodyFunc()
 				if err != nil {
 					dropHost = true
 					return err
 				}
 				httpReq.Body = body
-				httpReq.GetBody = api.BodyFunc
-				httpReq.ContentLength = api.BodyLen
-			} else if len(api.BodyBytes) > 0 {
-				body := io.NopCloser(bytes.NewReader(api.BodyBytes))
+				httpReq.GetBody = req.BodyFunc
+				httpReq.ContentLength = req.BodyLen
+			} else if len(req.BodyBytes) > 0 {
+				body := io.NopCloser(bytes.NewReader(req.BodyBytes))
 				httpReq.Body = body
 				httpReq.GetBody = func() (io.ReadCloser, error) { return body, nil }
-				httpReq.ContentLength = api.BodyLen
+				httpReq.ContentLength = req.BodyLen
 			}
-			if len(api.Headers) > 0 {
-				httpReq.Header = api.Headers.Clone()
+			if len(req.Headers) > 0 {
+				httpReq.Header = req.Headers.Clone()
 			}
 			if c.userAgent != "" && httpReq.Header.Get("User-Agent") == "" {
 				httpReq.Header.Add("User-Agent", c.userAgent)
 			}
 			if resp.readCur > 0 && resp.readMax > 0 {
-				if httpReq.Header.Get("Range") == "" {
+				if req.Headers.Get("Range") == "" {
 					httpReq.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", resp.readCur, resp.readMax))
 				} else {
+					// TODO: support Seek within a range request
 					dropHost = true
 					return fmt.Errorf("unable to resume a connection within a range request")
 				}
 			}
 
-			hAuth := h.getAuth(api.Repository)
+			hAuth := h.getAuth(req.Repository)
 			if hAuth != nil {
 				// include docker generated scope to emulate docker clients
-				if api.Repository != "" {
-					scope := "repository:" + api.Repository + ":pull"
-					if api.Method != "HEAD" && api.Method != "GET" {
+				if req.Repository != "" {
+					scope := "repository:" + req.Repository + ":pull"
+					if req.Method != "HEAD" && req.Method != "GET" {
 						scope = scope + ",push"
 					}
 					_ = hAuth.AddScope(h.config.Hostname, scope)
@@ -414,20 +406,24 @@ func (resp *clientResp) Next() error {
 			}
 
 			// delay for the rate limit
-			if h.ratelimit != nil {
-				<-h.ratelimit.C
+			if h.reqFreq > 0 {
+				sleep := time.Duration(0)
+				h.mu.Lock()
+				if time.Now().Before(h.reqNext) {
+					sleep = time.Until(h.reqNext)
+					h.reqNext = h.reqNext.Add(h.reqFreq)
+				} else {
+					h.reqNext = time.Now().Add(h.reqFreq)
+				}
+				h.mu.Unlock()
+				if sleep > 0 {
+					time.Sleep(sleep)
+				}
 			}
 
-			// update http client for insecure requests and root certs
-			httpClient := *h.httpClient
-
 			// send request
-			resp.client.log.WithFields(logrus.Fields{
-				"url":      httpReq.URL.String(),
-				"method":   httpReq.Method,
-				"withAuth": (len(httpReq.Header.Values("Authorization")) > 0),
-			}).Debug("http req")
-			resp.resp, err = httpClient.Do(httpReq)
+			hc := h.getHTTPClient(req.Repository)
+			resp.resp, err = hc.Do(httpReq)
 
 			if err != nil {
 				c.log.WithFields(logrus.Fields{
@@ -437,13 +433,7 @@ func (resp *clientResp) Next() error {
 				backoff = true
 				return err
 			}
-			// extract any warnings
-			for _, wh := range resp.resp.Header.Values("Warning") {
-				if match := warnRegexp.FindStringSubmatch(wh); len(match) == 2 {
-					// TODO: pass other fields (registry hostname) with structured logging
-					warning.Handle(resp.ctx, resp.client.log, match[1])
-				}
-			}
+
 			statusCode := resp.resp.StatusCode
 			if statusCode < 200 || statusCode >= 300 {
 				switch statusCode {
@@ -478,7 +468,7 @@ func (resp *clientResp) Next() error {
 				case http.StatusRequestedRangeNotSatisfiable:
 					// if range request error (blob push), drop mirror for this req, but other requests don't need backoff
 					dropHost = true
-				case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusGatewayTimeout, http.StatusInternalServerError:
+				case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusGatewayTimeout, http.StatusBadGateway, http.StatusInternalServerError:
 					// server is likely overloaded, backoff but still retry
 					backoff = true
 				default:
@@ -486,27 +476,28 @@ func (resp *clientResp) Next() error {
 					backoff = true
 					dropHost = true
 				}
-				c.log.WithFields(logrus.Fields{
-					"URL":    u.String(),
-					"Status": http.StatusText(statusCode),
-				}).Debug("Request failed")
 				errHTTP := HTTPError(resp.resp.StatusCode)
 				errBody, _ := io.ReadAll(resp.resp.Body)
 				_ = resp.resp.Body.Close()
 				return fmt.Errorf("request failed: %w: %s", errHTTP, errBody)
 			}
 
-			// setup reader, with a digester if configured
-			if resp.digester == nil {
-				resp.reader = resp.resp.Body
-			} else {
-				resp.reader = io.TeeReader(resp.resp.Body, resp.digester.Hash())
-			}
+			resp.reader = resp.resp.Body
 			resp.done = false
 			// set variables from headers if found
-			if resp.readCur == 0 && resp.readMax == 0 && resp.resp.Header.Get("Content-Length") != "" {
-				cl, parseErr := strconv.ParseInt(resp.resp.Header.Get("Content-Length"), 10, 64)
-				if parseErr == nil {
+			clHeader := resp.resp.Header.Get("Content-Length")
+			if resp.readCur == 0 && clHeader != "" {
+				cl, parseErr := strconv.ParseInt(clHeader, 10, 64)
+				if parseErr != nil {
+					c.log.WithFields(logrus.Fields{
+						"err":    err,
+						"header": clHeader,
+					}).Debug("failed to parse content-length header")
+				} else if resp.readMax > 0 {
+					if resp.readMax != cl {
+						return fmt.Errorf("unexpected content-length, expected %d, received %d", resp.readMax, cl)
+					}
+				} else {
 					resp.readMax = cl
 				}
 			}
@@ -520,16 +511,12 @@ func (resp *clientResp) Next() error {
 		}()
 		// return on success
 		if loopErr == nil {
-			resp.throttle = h.config.Throttle()
+			resp.throttleDone = throttleDone
 			return nil
 		}
 		// backoff, dropHost, and/or go to next host in the list
-		throttleErr = h.config.Throttle().Release(resp.ctx)
-		if throttleErr != nil {
-			return throttleErr
-		}
 		if backoff {
-			if api.IgnoreErr {
+			if req.IgnoreErr {
 				// don't set a backoff, immediately drop the host when errors ignored
 				dropHost = true
 			} else {
@@ -540,6 +527,7 @@ func (resp *clientResp) Next() error {
 				}
 			}
 		}
+		throttleDone()
 		// when error does not allow retries, abort with the last known err value
 		if err != nil && errors.Is(loopErr, errs.ErrNotRetryable) {
 			return err
@@ -553,11 +541,20 @@ func (resp *clientResp) Next() error {
 	}
 }
 
-func (resp *clientResp) HTTPResponse() *http.Response {
+// GetThrottle returns the current [pqueue.Queue] for a host used to throttle connections.
+// This can be used to acquire multiple throttles before performing a request across multiple hosts.
+func (c *Client) GetThrottle(host string) *pqueue.Queue[reqmeta.Data] {
+	ch := c.getHost(host)
+	return ch.throttle
+}
+
+// HTTPResponse returns the [http.Response] from the last request.
+func (resp *Resp) HTTPResponse() *http.Response {
 	return resp.resp
 }
 
-func (resp *clientResp) Read(b []byte) (int, error) {
+// Read provides a retryable read from the body of the response.
+func (resp *Resp) Read(b []byte) (int, error) {
 	if resp.done {
 		return 0, io.EOF
 	}
@@ -569,7 +566,7 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 	resp.readCur += int64(i)
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		if resp.resp.Request.Method == "HEAD" || resp.readCur >= resp.readMax {
-			resp.backoffClear()
+			resp.backoffReset()
 			resp.done = true
 		} else {
 			// short read, retry?
@@ -580,7 +577,7 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 			// retry
 			respErr := resp.backoffSet()
 			if respErr == nil {
-				respErr = resp.Next()
+				respErr = resp.next()
 			}
 			// unrecoverable EOF
 			if respErr != nil {
@@ -593,17 +590,6 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 			// retry successful, no EOF
 			return i, nil
 		}
-		// validate the digest if specified
-		if resp.resp.Request.Method != "HEAD" && resp.digester != nil && resp.digest.Validate() == nil && resp.digest != resp.digester.Digest() {
-			resp.client.log.WithFields(logrus.Fields{
-				"expected": resp.digest,
-				"computed": resp.digester.Digest(),
-			}).Warn("Digest mismatch")
-			_ = resp.backoffSet()
-			resp.done = true
-			return i, fmt.Errorf("%w, expected %s, computed %s", errs.ErrDigestMismatch,
-				resp.digest.String(), resp.digester.Digest().String())
-		}
 	}
 
 	if err == nil {
@@ -612,22 +598,24 @@ func (resp *clientResp) Read(b []byte) (int, error) {
 	return i, err
 }
 
-func (resp *clientResp) Close() error {
-	if resp.throttle != nil {
-		_ = resp.throttle.Release(resp.ctx)
-		resp.throttle = nil
+// Close frees up resources from the request.
+func (resp *Resp) Close() error {
+	if resp.throttleDone != nil {
+		resp.throttleDone()
+		resp.throttleDone = nil
 	}
 	if resp.resp == nil {
 		return errs.ErrNotFound
 	}
 	if !resp.done {
-		resp.backoffClear()
+		resp.backoffReset()
 	}
 	resp.done = true
 	return resp.resp.Body.Close()
 }
 
-func (resp *clientResp) Seek(offset int64, whence int) (int64, error) {
+// Seek provides a limited ability seek within the request response.
+func (resp *Resp) Seek(offset int64, whence int) (int64, error) {
 	newOffset := resp.readCur
 	switch whence {
 	case io.SeekStart:
@@ -644,60 +632,66 @@ func (resp *clientResp) Seek(offset int64, whence int) (int64, error) {
 	default:
 		return resp.readCur, fmt.Errorf("unknown value of whence: %d", whence)
 	}
-	if newOffset == 0 {
-		resp.readCur = 0
+	if newOffset != resp.readCur {
+		resp.readCur = newOffset
 		// rerun the request to restart
-		err := resp.Next()
+		resp.retryCount-- // do not count a seek as a retry
+		err := resp.next()
 		if err != nil {
 			return resp.readCur, err
 		}
-	} else if newOffset != resp.readCur {
-		return resp.readCur, fmt.Errorf("seek to arbitrary position is not supported")
 	}
 	return resp.readCur, nil
 }
 
-func (resp *clientResp) backoffClear() {
+func (resp *Resp) backoffGet() time.Time {
 	c := resp.client
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ch := c.host[resp.mirror]
-	if ch.backoffCur > c.retryLimit {
-		ch.backoffCur = c.retryLimit
-	}
+	ch := c.getHost(resp.mirror)
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
 	if ch.backoffCur > 0 {
-		ch.backoffCur--
-		if ch.backoffCur == 0 {
-			ch.backoffUntil = time.Time{}
+		delay := c.delayInit << ch.backoffCur
+		if delay > c.delayMax {
+			delay = c.delayMax
 		}
+		next := ch.backoffLast.Add(delay)
+		now := time.Now()
+		if now.After(next) {
+			next = now
+		}
+		ch.backoffLast = next
+		return next
 	}
+	// reset a stale "retry-after" time
+	if !ch.backoffLast.IsZero() && ch.backoffLast.Before(time.Now()) {
+		ch.backoffLast = time.Time{}
+	}
+	return ch.backoffLast
 }
 
-func (resp *clientResp) backoffSet() error {
+func (resp *Resp) backoffSet() error {
 	c := resp.client
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ch := c.host[resp.mirror]
-	ch.backoffCur++
-	// sleep for backoff time
-	sleepTime := c.delayInit << ch.backoffCur
-	// limit to max delay
-	if sleepTime > c.delayMax {
-		sleepTime = c.delayMax
-	}
-	// check rate limit header
+	ch := c.getHost(resp.mirror)
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	// check rate limit header and use that directly if possible
 	if resp.resp != nil && resp.resp.Header.Get("Retry-After") != "" {
 		ras := resp.resp.Header.Get("Retry-After")
 		ra, _ := time.ParseDuration(ras + "s")
-		if ra > c.delayMax {
-			sleepTime = c.delayMax
-		} else if ra > sleepTime {
-			sleepTime = ra
+		if ra > 0 {
+			next := time.Now().Add(ra)
+			if ch.backoffLast.Before(next) {
+				ch.backoffLast = next
+			}
+			return nil
 		}
 	}
-
-	ch.backoffUntil = time.Now().Add(sleepTime)
-
+	// Else track the number of backoffs and fail when the limit is exceeded.
+	// New requests always get at least one try, but fail fast if the server has been throwing errors.
+	ch.backoffCur++
+	if ch.backoffLast.IsZero() {
+		ch.backoffLast = time.Now()
+	}
 	if ch.backoffCur >= c.retryLimit {
 		return fmt.Errorf("%w: backoffs %d", errs.ErrBackoffLimit, ch.backoffCur)
 	}
@@ -705,118 +699,153 @@ func (resp *clientResp) backoffSet() error {
 	return nil
 }
 
-func (resp *clientResp) backoffUntil() time.Time {
+func (resp *Resp) backoffReset() {
 	c := resp.client
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ch := c.host[resp.mirror]
-	return ch.backoffUntil
+	ch := c.getHost(resp.mirror)
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	if ch.backoffCur > 0 {
+		ch.backoffReset++
+		// If enough successful requests are seen, lower the backoffCur count.
+		// This requires multiple successful requests of a flaky server, but quickly drops when above the retry limit.
+		if ch.backoffReset > backoffResetCount || ch.backoffCur > c.retryLimit {
+			ch.backoffReset = 0
+			ch.backoffCur--
+			if ch.backoffCur == 0 {
+				// reset the last time to the zero value
+				ch.backoffLast = time.Time{}
+			}
+		}
+	}
 }
 
+// getHost looks up or creates a clientHost for a given registry.
 func (c *Client) getHost(host string) *clientHost {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	h, ok := c.host[host]
-	if ok && h.initialized {
+	if h, ok := c.host[host]; ok {
 		return h
 	}
-	if !ok {
-		h = &clientHost{}
+	var conf *config.Host
+	if c.getConfigHost != nil {
+		conf = c.getConfigHost(host)
+	} else {
+		conf = config.HostNewName(host)
 	}
-	if h.config == nil {
-		if c.getConfigHost != nil {
-			h.config = c.getConfigHost(host)
-		} else {
-			h.config = config.HostNewName(host)
-		}
-		// check for normalized hostname
-		if h.config.Name != host {
-			host = h.config.Name
-			hNormal, ok := c.host[host]
-			if ok && hNormal.initialized {
-				return hNormal
-			}
+	if conf.Name != host {
+		if h, ok := c.host[conf.Name]; ok {
+			return h
 		}
 	}
-	if h.auth == nil {
-		h.auth = map[string]auth.Auth{}
+	h := &clientHost{
+		config:    conf,
+		userAgent: c.userAgent,
+		log:       c.log,
+		auth:      map[string]*auth.Auth{},
 	}
-	if h.ratelimit == nil && h.config.ReqPerSec > 0 {
-		h.ratelimit = time.NewTicker(time.Duration(float64(time.Second) / h.config.ReqPerSec))
+	if h.config.ReqPerSec > 0 {
+		h.reqFreq = time.Duration(float64(time.Second) / h.config.ReqPerSec)
 	}
-
-	if h.httpClient == nil {
-		h.httpClient = c.httpClient
-		// update http client for insecure requests and root certs
-		if h.config.TLS == config.TLSInsecure || len(c.rootCAPool) > 0 || len(c.rootCADirs) > 0 || h.config.RegCert != "" || (h.config.ClientCert != "" && h.config.ClientKey != "") {
-			// create a new client and modify the transport
-			httpClient := *c.httpClient
-			if httpClient.Transport == nil {
-				httpClient.Transport = http.DefaultTransport.(*http.Transport).Clone()
+	if h.config.ReqConcurrent > 0 {
+		h.throttle = pqueue.New(pqueue.Opts[reqmeta.Data]{Max: int(h.config.ReqConcurrent), Next: reqmeta.DataNext})
+	}
+	// copy the http client and configure registry specific settings
+	hc := *c.httpClient
+	h.httpClient = &hc
+	if h.httpClient.Transport == nil {
+		h.httpClient.Transport = http.DefaultTransport.(*http.Transport).Clone()
+	}
+	// configure transport for insecure requests and root certs
+	if h.config.TLS == config.TLSInsecure || len(c.rootCAPool) > 0 || len(c.rootCADirs) > 0 || h.config.RegCert != "" || (h.config.ClientCert != "" && h.config.ClientKey != "") {
+		t, ok := h.httpClient.Transport.(*http.Transport)
+		if ok {
+			var tlsc *tls.Config
+			if t.TLSClientConfig != nil {
+				tlsc = t.TLSClientConfig.Clone()
+			} else {
+				//#nosec G402 the default TLS 1.2 minimum version is allowed to support older registries
+				tlsc = &tls.Config{}
 			}
-			t, ok := httpClient.Transport.(*http.Transport)
-			if ok {
-				var tlsc *tls.Config
-				if t.TLSClientConfig != nil {
-					tlsc = t.TLSClientConfig.Clone()
+			if h.config.TLS == config.TLSInsecure {
+				tlsc.InsecureSkipVerify = true
+			} else {
+				rootPool, err := makeRootPool(c.rootCAPool, c.rootCADirs, h.config.Hostname, h.config.RegCert)
+				if err != nil {
+					c.log.WithFields(logrus.Fields{
+						"err": err,
+					}).Warn("failed to setup CA pool")
 				} else {
-					//#nosec G402 the default TLS 1.2 minimum version is allowed to support older registries
-					tlsc = &tls.Config{}
+					tlsc.RootCAs = rootPool
 				}
-				if h.config.TLS == config.TLSInsecure {
-					tlsc.InsecureSkipVerify = true
-				} else {
-					rootPool, err := makeRootPool(c.rootCAPool, c.rootCADirs, h.config.Hostname, h.config.RegCert)
-					if err != nil {
-						c.log.WithFields(logrus.Fields{
-							"err": err,
-						}).Warn("failed to setup CA pool")
-					} else {
-						tlsc.RootCAs = rootPool
-					}
-				}
-				if h.config.ClientCert != "" && h.config.ClientKey != "" {
-					cert, err := tls.X509KeyPair([]byte(h.config.ClientCert), []byte(h.config.ClientKey))
-					if err != nil {
-						c.log.WithFields(logrus.Fields{
-							"err": err,
-						}).Warn("failed to configure client certs")
-					} else {
-						tlsc.Certificates = []tls.Certificate{cert}
-					}
-				}
-				t.TLSClientConfig = tlsc
-				httpClient.Transport = t
 			}
-			h.httpClient = &httpClient
+			if h.config.ClientCert != "" && h.config.ClientKey != "" {
+				cert, err := tls.X509KeyPair([]byte(h.config.ClientCert), []byte(h.config.ClientKey))
+				if err != nil {
+					c.log.WithFields(logrus.Fields{
+						"err": err,
+					}).Warn("failed to configure client certs")
+				} else {
+					tlsc.Certificates = []tls.Certificate{cert}
+				}
+			}
+			t.TLSClientConfig = tlsc
+			h.httpClient.Transport = t
 		}
 	}
+	// wrap the transport for logging and to handle warning headers
+	h.httpClient.Transport = &wrapTransport{c: c, orig: h.httpClient.Transport}
 
-	if h.newAuth == nil {
-		h.newAuth = func() auth.Auth {
-			return auth.NewAuth(
-				auth.WithLog(c.log),
-				auth.WithHTTPClient(h.httpClient),
-				auth.WithCreds(h.AuthCreds()),
-				auth.WithClientID(c.userAgent),
-			)
-		}
+	c.host[conf.Name] = h
+	if conf.Name != host {
+		// save another reference for faster lookups
+		c.host[host] = h
 	}
-
-	h.initialized = true
-	c.host[host] = h
 	return h
 }
 
-// getAuth returns an auth, which may be repository specific
-func (ch *clientHost) getAuth(repo string) auth.Auth {
+// getHTTPClient returns a client specific to the repo being queried.
+// Repository specific authentication needs a dedicated CheckRedirect handler.
+func (ch *clientHost) getHTTPClient(repo string) *http.Client {
+	hc := *ch.httpClient
+	hc.CheckRedirect = ch.checkRedirect(repo, hc.CheckRedirect)
+	return &hc
+}
+
+// checkRedirect wraps http.CheckRedirect to inject auth headers to specific hosts in the redirect chain
+func (ch *clientHost) checkRedirect(repo string, orig func(req *http.Request, via []*http.Request) error) func(req *http.Request, via []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		// fail on too many redirects
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		// add auth headers if appropriate for the target host
+		hAuth := ch.getAuth(repo)
+		err := hAuth.UpdateRequest(req)
+		if err != nil {
+			return err
+		}
+		// wrap original redirect check
+		if orig != nil {
+			return orig(req, via)
+		}
+		return nil
+	}
+}
+
+// getAuth returns an auth, which may be repository specific.
+func (ch *clientHost) getAuth(repo string) *auth.Auth {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if !ch.config.RepoAuth {
 		repo = "" // without RepoAuth, unset the provided repo
 	}
 	if _, ok := ch.auth[repo]; !ok {
-		ch.auth[repo] = ch.newAuth()
+		ch.auth[repo] = auth.NewAuth(
+			auth.WithLog(ch.log),
+			auth.WithHTTPClient(ch.httpClient),
+			auth.WithCreds(ch.AuthCreds()),
+			auth.WithClientID(ch.userAgent),
+		)
 	}
 	return ch.auth[repo]
 }
@@ -831,7 +860,45 @@ func (ch *clientHost) AuthCreds() func(h string) auth.Cred {
 	}
 }
 
-// HTTPError returns an error based on the status code
+type wrapTransport struct {
+	c    *Client
+	orig http.RoundTripper
+}
+
+func (wt *wrapTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := wt.orig.RoundTrip(req)
+	// copy headers to censor auth field
+	reqHead := req.Header.Clone()
+	if reqHead.Get("Authorization") != "" {
+		reqHead.Set("Authorization", "[censored]")
+	}
+	if err != nil {
+		wt.c.log.WithFields(logrus.Fields{
+			"req-method":  req.Method,
+			"req-url":     req.URL.String(),
+			"req-headers": reqHead,
+			"err":         err,
+		}).Debug("reg http request")
+	} else {
+		// extract any warnings
+		for _, wh := range resp.Header.Values("Warning") {
+			if match := warnRegexp.FindStringSubmatch(wh); len(match) == 2 {
+				// TODO(bmitch): pass other fields (registry hostname) with structured logging
+				warning.Handle(req.Context(), wt.c.log, match[1])
+			}
+		}
+		wt.c.log.WithFields(logrus.Fields{
+			"req-method":   req.Method,
+			"req-url":      req.URL.String(),
+			"req-headers":  reqHead,
+			"resp-status":  resp.Status,
+			"resp-headers": resp.Header,
+		}).Trace("reg http request")
+	}
+	return resp, err
+}
+
+// HTTPError returns an error based on the status code.
 func HTTPError(statusCode int) error {
 	switch statusCode {
 	case 401:
@@ -898,13 +965,13 @@ func makeRootPool(rootCAPool [][]byte, rootCADirs []string, hostname string, hos
 	return pool, nil
 }
 
-// sortHostCmp to sort host list of mirrors
+// sortHostCmp to sort host list of mirrors.
 func sortHostsCmp(hosts []*clientHost, upstream string) func(i, j int) bool {
 	now := time.Now()
 	// sort by backoff first, then priority decending, then upstream name last
 	return func(i, j int) bool {
-		if now.Before(hosts[i].backoffUntil) || now.Before(hosts[j].backoffUntil) {
-			return hosts[i].backoffUntil.Before(hosts[j].backoffUntil)
+		if now.Before(hosts[i].backoffLast) || now.Before(hosts[j].backoffLast) {
+			return hosts[i].backoffLast.Before(hosts[j].backoffLast)
 		}
 		if hosts[i].config.Priority != hosts[j].config.Priority {
 			return hosts[i].config.Priority < hosts[j].config.Priority

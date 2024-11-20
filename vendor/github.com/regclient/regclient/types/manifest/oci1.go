@@ -226,7 +226,7 @@ func (m *oci1Manifest) MarshalPretty() ([]byte, error) {
 		fmt.Fprintf(tw, "ArtifactType:\t%s\n", m.ArtifactType)
 	}
 	fmt.Fprintf(tw, "Digest:\t%s\n", m.desc.Digest.String())
-	if m.Annotations != nil && len(m.Annotations) > 0 {
+	if len(m.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(m.Annotations))
 		for k := range m.Annotations {
@@ -283,7 +283,7 @@ func (m *oci1Index) MarshalPretty() ([]byte, error) {
 		fmt.Fprintf(tw, "ArtifactType:\t%s\n", m.ArtifactType)
 	}
 	fmt.Fprintf(tw, "Digest:\t%s\n", m.desc.Digest.String())
-	if m.Annotations != nil && len(m.Annotations) > 0 {
+	if len(m.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(m.Annotations))
 		for k := range m.Annotations {
@@ -332,7 +332,7 @@ func (m *oci1Artifact) MarshalPretty() ([]byte, error) {
 	fmt.Fprintf(tw, "MediaType:\t%s\n", m.desc.MediaType)
 	fmt.Fprintf(tw, "ArtifactType:\t%s\n", m.ArtifactType)
 	fmt.Fprintf(tw, "Digest:\t%s\n", m.desc.Digest.String())
-	if m.Annotations != nil && len(m.Annotations) > 0 {
+	if len(m.Annotations) > 0 {
 		fmt.Fprintf(tw, "Annotations:\t\n")
 		keys := make([]string, 0, len(m.Annotations))
 		for k := range m.Annotations {

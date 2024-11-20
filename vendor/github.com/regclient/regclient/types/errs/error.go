@@ -62,6 +62,8 @@ var (
 	ErrParsingFailed = errors.New("parsing failed")
 	// ErrRetryNeeded indicates a request needs to be retried
 	ErrRetryNeeded = errors.New("retry needed")
+	// ErrRetryLimitExceeded indicates too many retries have occurred
+	ErrRetryLimitExceeded = errors.New("retry limit exceeded")
 	// ErrShortRead if contents are less than expected the size
 	ErrShortRead = errors.New("short read")
 	// ErrSizeLimitExceeded if contents exceed the size limit

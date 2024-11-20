@@ -10,6 +10,7 @@ import (
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
+	"github.com/regclient/regclient/types/warning"
 )
 
 type manifestOpt struct {
@@ -107,6 +108,10 @@ func (rc *RegClient) ManifestGet(ctx context.Context, r ref.Ref, opts ...Manifes
 			)
 		}
 	}
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
+	}
 	schemeAPI, err := rc.schemeGet(r.Scheme)
 	if err != nil {
 		return nil, err
@@ -141,6 +146,10 @@ func (rc *RegClient) ManifestHead(ctx context.Context, r ref.Ref, opts ...Manife
 	opt := manifestOpt{schemeOpts: []scheme.ManifestOpts{}}
 	for _, fn := range opts {
 		fn(&opt)
+	}
+	// dedup warnings
+	if w := warning.FromContext(ctx); w == nil {
+		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
 	}
 	schemeAPI, err := rc.schemeGet(r.Scheme)
 	if err != nil {

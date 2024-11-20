@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/blob"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
@@ -96,11 +97,11 @@ func (o *OCIDir) BlobMount(ctx context.Context, refSrc ref.Ref, refTgt ref.Ref, 
 // BlobPut sends a blob to the repository, returns the digest and size when successful
 func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor, rdr io.Reader) (descriptor.Descriptor, error) {
 	t := o.throttleGet(r, false)
-	err := t.Acquire(ctx)
+	done, err := t.Acquire(ctx, reqmeta.Data{Kind: reqmeta.Blob, Size: d.Size})
 	if err != nil {
 		return d, err
 	}
-	defer t.Release(ctx)
+	defer done()
 
 	err = o.initIndex(r, false)
 	if err != nil {
