@@ -41,9 +41,7 @@ jobs:
         id: vars
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
-          GOLANGCI_LINT_VERSION=$( grep "GOLANGCI_LINT_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
-          echo "GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION##GOLANGCI_LINT_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
         uses: actions/setup-go@v5
         with:
@@ -76,7 +74,9 @@ jobs:
         id: vars
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          GOLANGCI_LINT_VERSION=$( grep "GOLANGCI_LINT_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
+          echo "GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION##GOLANGCI_LINT_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
         uses: actions/setup-go@v5
         with:
