@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"sigs.k8s.io/json"
+	"k8s.io/apimachinery/pkg/util/json"
 
 	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -28,7 +28,7 @@ import (
 func validateALMExample(csv *v1alpha1.ClusterServiceVersion) error {
 	cpList := []v1.ClusterPolicy{}
 	example := csv.Annotations["alm-examples"]
-	err := json.UnmarshalCaseSensitivePreserveInts([]byte(example), &cpList)
+	err := json.Unmarshal([]byte(example), &cpList)
 	if err != nil {
 		return err
 	}
