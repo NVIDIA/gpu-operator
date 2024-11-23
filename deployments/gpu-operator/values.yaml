@@ -189,12 +189,6 @@ driver:
       timeoutSeconds: 300
       deleteEmptyDir: false
   manager:
-    image: k8s-driver-manager
-    repository: nvcr.io/nvidia/cloud-native
-    # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
-    # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.7.0
-    imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
         value: "true"
@@ -459,12 +453,6 @@ vgpuManager:
   env: []
   resources: {}
   driverManager:
-    image: k8s-driver-manager
-    repository: nvcr.io/nvidia/cloud-native
-    # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
-    # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.7.0
-    imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
         value: "false"
@@ -493,12 +481,6 @@ vfioManager:
   env: []
   resources: {}
   driverManager:
-    image: k8s-driver-manager
-    repository: nvcr.io/nvidia/cloud-native
-    # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
-    # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.7.0
-    imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
         value: "false"
@@ -600,3 +582,10 @@ node-feature-discovery:
       # resourceLabels: ["nvidia.com/feature-1","nvidia.com/feature-2"]
       # enableTaints: false
       # labelWhiteList: "nvidia.com/gpu"
+
+# all use driver manager components from the same image version
+driverManager:
+  image: k8s-driver-manager
+  repository: nvcr.io/nvidia/cloud-native
+  version: v0.7.0
+  imagePullPolicy: IfNotPresent
