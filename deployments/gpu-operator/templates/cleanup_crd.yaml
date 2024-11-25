@@ -32,11 +32,12 @@ spec:
       {{- end }}
       containers:
         - name: cleanup-crd
-          image: {{ include "gpu-operator.fullimage" . }}
+          image: {{ .Values.operator.imageCleanupCRD }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
           command:
           - /bin/sh
           - -c
+          args:
           - >
               kubectl delete clusterpolicy cluster-policy;
               kubectl delete crd clusterpolicies.nvidia.com;

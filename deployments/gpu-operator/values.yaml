@@ -77,6 +77,7 @@ operator:
   use_ocp_driver_toolkit: false
   # cleanup CRD on chart un-install
   cleanupCRD: false
+  imageCleanupCRD: bitnami/kubectl:1.31
   # upgrade CRD on chart upgrade, requires --disable-openapi-validation flag
   # to be passed during helm upgrade.
   upgradeCRD: true

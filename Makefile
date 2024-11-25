@@ -86,6 +86,11 @@ gpu-operator:
 	CGO_ENABLED=0 GOOS=$(GOOS) \
 		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator ./cmd/gpu-operator/...
 
+# Build apply-crds binary
+apply-crds:
+	CGO_ENABLED=0 GOOS=$(GOOS) \
+		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o apply-crds ./cmd/apply-crds/...
+
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate check manifests
 	go run ./cmd/gpu-operator/...
