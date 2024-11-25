@@ -53,7 +53,7 @@ COPY *.mk .
 # Build
 ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
-RUN make gpu-operator
+RUN make gpu-operator apply-crds
 
 FROM nvcr.io/nvidia/cuda:12.6.2-base-ubi9
 
@@ -76,18 +76,13 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/apply-crds /usr/bin/
 
 RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
 RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
-
-# Install must-gather dependency: `kubectl`
-ARG TARGETARCH
-RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
-RUN chmod +x ./kubectl
-RUN mv ./kubectl /usr/local/bin
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml

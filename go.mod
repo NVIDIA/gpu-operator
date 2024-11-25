@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.7.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.2
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20241120073822-1ad8938d7274
 	github.com/NVIDIA/nvidia-container-toolkit v1.17.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.2
@@ -169,10 +169,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.16.1 // indirect
 	k8s.io/apiserver v0.31.2 // indirect
-	k8s.io/cli-runtime v0.31.1 // indirect
+	k8s.io/cli-runtime v0.31.2 // indirect
 	k8s.io/component-base v0.31.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
-	k8s.io/kubectl v0.31.0 // indirect
+	k8s.io/kubectl v0.31.2 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
@@ -180,3 +180,8 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+// DROP BEFORE MERGE!
+// Implements https://github.com/NVIDIA/k8s-operator-libs/pull/58
+// This is only for testing.
+replace github.com/NVIDIA/k8s-operator-libs => github.com/tobiasgiese/k8s-operator-libs v0.0.0-20241125092837-e8a080621717
