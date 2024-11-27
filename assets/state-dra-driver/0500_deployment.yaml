@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nvidia-dra-driver-controller
+  name: nvidia-dra-driver-controller
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nvidia-dra-driver-controller
+  template:
+    metadata:
+      labels:
+        app: nvidia-dra-driver-controller
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dra-driver
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+      - name: controller
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        command: ["nvidia-dra-controller", "-v", "6"]
+        env:
+        - name: DEVICE_CLASSES
+          value: imex
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace

@@ -294,6 +294,17 @@ devicePlugin:
     # MPS root path on the host
     root: "/run/nvidia/mps"
 
+draDriver:
+  enabled: true
+  repository: ghcr.io/nvidia
+  image: k8s-dra-driver
+  version: 32805fec-ubi8
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  args: []
+  env: []
+  resources: {}
+
 # standalone dcgm hostengine
 dcgm:
   # disabled by default to use embedded nv-hostengine by exporter
