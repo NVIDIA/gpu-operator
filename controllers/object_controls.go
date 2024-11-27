@@ -41,6 +41,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	drav1 "k8s.io/api/resource/v1alpha3"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -147,6 +148,8 @@ const (
 	NvidiaCtrRuntimeCDIPrefixesEnvName = "NVIDIA_CONTAINER_RUNTIME_MODES_CDI_ANNOTATION_PREFIXES"
 	// CDIEnabledEnvName is the name of the envvar used to enable CDI in the operands
 	CDIEnabledEnvName = "CDI_ENABLED"
+	// NvidiaCTKPathEnvName is the name of the envvar specifying the path to the 'nvidia-ctk' binary
+	NvidiaCTKPathEnvName = "NVIDIA_CTK_PATH"
 	// NvidiaCDIHookPathEnvName is the name of the envvar specifying the path to the 'nvidia-cdi-hook' binary
 	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
 	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
@@ -695,6 +698,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-vgpu-device-manager":              TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                     TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset":      TransformToolkit,
+		"nvidia-imex-kubelet-plugin":              TransformIMEXDRADriverPlugin,
 		"nvidia-device-plugin-daemonset":          TransformDevicePlugin,
 		"nvidia-device-plugin-mps-control-daemon": TransformMPSControlDaemon,
 		"nvidia-sandbox-device-plugin-daemonset":  TransformSandboxDevicePlugin,
@@ -1536,6 +1540,36 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	return nil
+}
+
+// TransformIMEXDRADriverPlugin transforms nvidia-imex-dra-driver-kubelet-plugin daemonset with required config as per ClusterPolicy
+func TransformIMEXDRADriverPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation container
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+
+	// update image
+	image, err := gpuv1.ImagePath(&config.DRADriver)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DRADriver.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.DRADriver.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.DRADriver.ImagePullSecrets)
+	}
+
+	if config.Toolkit.IsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
+	}
+
 	return nil
 }
 
@@ -3663,23 +3697,61 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 	return hash, nil
 }
 
+// TransformIMEXDRADriverController transforms nvidia-imex-dra-driver-controller deployment with required config as per ClusterPolicy
+func TransformIMEXDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPolicySpec) error {
+	config := spec.DRADriver
+	// update image
+	image, err := gpuv1.ImagePath(&config)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	// update image pull policy
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.ImagePullPolicy)
+
+	// set image pull secrets
+	if len(config.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.ImagePullSecrets)
+	}
+
+	return nil
+}
+
+func transformDeployment(obj *appsv1.Deployment, n ClusterPolicyController) error {
+	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
+	switch obj.Name {
+	case "nvidia-imex-dra-driver-controller":
+		return TransformIMEXDRADriverController(obj, &n.singleton.Spec)
+	default:
+		logger.Info("No transformation for object")
+		return nil
+	}
+}
+
 // Deployment creates Deployment resource
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
+	stateName := n.stateNames[state]
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
+	if !n.isStateEnabled(stateName) || (obj.Name == "nvidia-imex-dra-driver-controller" && !n.isDRADeviceClassEnabled("imex")) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
+	}
+
+	if err := transformDeployment(obj, n); err != nil {
+		logger.Info("Failed to transform Deployment", "Error", err)
+		return gpuv1.NotReady, err
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
@@ -4165,7 +4237,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	logger := n.logger.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
+	if !n.isStateEnabled(n.stateNames[n.idx]) || (obj.Name == "nvidia-imex-dra-driver-kubelet-plugin" && !n.isDRADeviceClassEnabled("imex")) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
@@ -4879,4 +4951,68 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 	return gpuv1.Ready, nil
+}
+
+func createDeviceClass(n ClusterPolicyController, spec drav1.DeviceClass) (gpuv1.State, error) {
+	ctx := n.ctx
+	state := n.idx
+	obj := spec.DeepCopy()
+
+	logger := n.logger.WithValues("DeviceClass", obj.Name)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[state]) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	found := &drav1.DeviceClass{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && apierrors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.client.Create(ctx, obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
+	} else if err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
+	return gpuv1.Ready, nil
+}
+
+// DeviceClasses creates DeviceClass objects
+func DeviceClasses(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+
+	for _, obj := range n.resources[state].DeviceClasses {
+		obj := obj
+		stat, err := createDeviceClass(n, obj)
+		if err != nil {
+			return stat, err
+		}
+		if stat != gpuv1.Ready {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }

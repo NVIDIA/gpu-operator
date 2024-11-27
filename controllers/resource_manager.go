@@ -23,14 +23,14 @@ import (
 	"sort"
 	"strings"
 
+	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	drav1 "k8s.io/api/resource/v1alpha3"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
-
-	secv1 "github.com/openshift/api/security/v1"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -61,6 +61,7 @@ type Resources struct {
 	SecurityContextConstraints secv1.SecurityContextConstraints
 	RuntimeClasses             []nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
+	DeviceClasses              []drav1.DeviceClass
 }
 
 func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) {
@@ -180,6 +181,15 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			_, _, err := s.Decode(m, nil, &res.PrometheusRule)
 			panicIfError(err)
 			ctrl = append(ctrl, PrometheusRule)
+		case "DeviceClass":
+			deviceClass := drav1.DeviceClass{}
+			_, _, err := s.Decode(m, nil, &deviceClass)
+			panicIfError(err)
+			res.DeviceClasses = append(res.DeviceClasses, deviceClass)
+			// only add the ctrl function when the first DeviceClass is added
+			if len(res.DeviceClasses) == 1 {
+				ctrl = append(ctrl, DeviceClasses)
+			}
 		default:
 			n.logger.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}

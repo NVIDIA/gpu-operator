@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -794,6 +795,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-dra-driver")
 		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
@@ -1027,8 +1029,14 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return true
 	case "state-operator-metrics":
 		return true
+	case "state-dra-driver":
+		return clusterPolicySpec.DRADriver.IsEnabled()
 	default:
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false
 	}
+}
+
+func (n ClusterPolicyController) isDRADeviceClassEnabled(deviceClass string) bool {
+	return slices.Contains(n.singleton.Spec.DRADriver.DeviceClasses, deviceClass)
 }

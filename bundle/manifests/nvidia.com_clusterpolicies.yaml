@@ -596,6 +596,38 @@ spec:
                     description: NVIDIA Device Plugin image tag
                     type: string
                 type: object
+              draDriver:
+                description: DRADriver component spec
+                properties:
+                  deviceClasses:
+                    description: DeviceClasses indicates which device classes are
+                      enabled in the DRA driver
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled indicates if the deployment of NVIDIA DRA
+                      Driver through the operator is enabled
+                    type: boolean
+                  image:
+                    description: NVIDIA DRA Driver image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: NVIDIA DRA Driver image repository
+                    type: string
+                  version:
+                    description: NVIDIA DRA Driver image tag
+                    type: string
+                type: object
               driver:
                 description: Driver component spec
                 properties:
@@ -2296,6 +2328,7 @@ spec:
             - dcgm
             - dcgmExporter
             - devicePlugin
+            - draDriver
             - driver
             - gfd
             - nodeStatusExporter

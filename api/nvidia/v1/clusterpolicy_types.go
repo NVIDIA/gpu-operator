@@ -53,6 +53,8 @@ type ClusterPolicySpec struct {
 	Toolkit ToolkitSpec `json:"toolkit"`
 	// DevicePlugin component spec
 	DevicePlugin DevicePluginSpec `json:"devicePlugin"`
+	// DRADriver component spec
+	DRADriver DRADriverSpec `json:"draDriver"`
 	// DCGMExporter spec
 	DCGMExporter DCGMExporterSpec `json:"dcgmExporter"`
 	// DCGM component spec
@@ -839,6 +841,45 @@ type SandboxDevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+}
+
+// DRADriverSpec defines the properties for the NVIDIA DRA Driver deployment
+type DRADriverSpec struct {
+	// Enabled indicates if the deployment of NVIDIA DRA Driver through the operator is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA DRA Driver deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// NVIDIA DRA Driver image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// NVIDIA DRA Driver image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// NVIDIA DRA Driver image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// DeviceClasses indicates which device classes are enabled in the DRA driver
+	// +kubebuilder:validation:Optional
+	DeviceClasses []string `json:"deviceClasses,omitempty"`
 }
 
 // DCGMExporterSpec defines the properties for NVIDIA DCGM Exporter deployment
@@ -1764,6 +1805,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *SandboxDevicePluginSpec:
 		config := spec.(*SandboxDevicePluginSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "SANDBOX_DEVICE_PLUGIN_IMAGE")
+	case *DRADriverSpec:
+		config := spec.(*DRADriverSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "DRA_DRIVER_IMAGE")
 	case *DCGMExporterSpec:
 		config := spec.(*DCGMExporterSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DCGM_EXPORTER_IMAGE")
@@ -1870,6 +1914,15 @@ func (p *DevicePluginSpec) IsEnabled() bool {
 		return true
 	}
 	return *p.Enabled
+}
+
+// IsEnabled returns true if draDriver is enabled through gpu-operator
+func (d *DRADriverSpec) IsEnabled() bool {
+	if d.Enabled == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *d.Enabled
 }
 
 // IsEnabled returns true if dcgm-exporter is enabled(default) through gpu-operator
