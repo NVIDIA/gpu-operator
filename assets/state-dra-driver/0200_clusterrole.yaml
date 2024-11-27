@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-dra-driver
+rules:
+# TODO: restrict RBAC for DRA driver
+- apiGroups:
+  - ""
+  - apps
+  - resource.k8s.io
+  - gpu.nvidia.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
