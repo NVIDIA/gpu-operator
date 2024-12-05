@@ -459,6 +459,32 @@ spec:
       name: {{ .Values.devicePlugin.config.name }}
       default: {{ .Values.devicePlugin.config.default }}
     {{- end }}
+  draDriver:
+    enabled: {{ .Values.draDriver.enabled }}
+    {{- if .Values.draDriver.repository }}
+    repository: {{ .Values.draDriver.repository }}
+    {{- end }}
+    {{- if .Values.draDriver.image }}
+    image: {{ .Values.draDriver.image }}
+    {{- end }}
+    {{- if .Values.draDriver.version }}
+    version: {{ .Values.draDriver.version | quote }}
+    {{- end }}
+    {{- if .Values.draDriver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.draDriver.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.draDriver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.draDriver.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.draDriver.resources }}
+    resources: {{ toYaml .Values.draDriver.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.draDriver.env }}
+    env: {{ toYaml .Values.draDriver.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.draDriver.args }}
+    args: {{ toYaml .Values.draDriver.args | nindent 6 }}
+    {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
     {{- if .Values.dcgm.repository }}
