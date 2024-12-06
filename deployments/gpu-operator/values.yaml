@@ -330,10 +330,10 @@ dcgmExporter:
     honorLabels: false
     additionalLabels: {}
     relabelings: []
-    # - source_labels:
+    # - sourceLabels:
     #     - __meta_kubernetes_pod_node_name
     #   regex: (.*)
-    #   target_label: instance
+    #   targetLabel: instance
     #   replacement: $1
     #   action: replace
   # DCGM Exporter configuration
