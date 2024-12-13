@@ -200,7 +200,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, "Reconciled", "All resources have been successfully reconciled"); condErr != nil {
+	if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.Reconciled, "All resources have been successfully reconciled"); condErr != nil {
 		return ctrl.Result{}, condErr
 	}
 	return reconcile.Result{}, nil
