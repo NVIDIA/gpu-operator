@@ -18,6 +18,7 @@ package conditions
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,16 +46,22 @@ func NewNvDriverUpdater(client client.Client) Updater {
 }
 
 func (u *nvDriverUpdater) SetConditionsReady(ctx context.Context, cr any, reason, message string) error {
-	nvDriverCr, _ := cr.(*nvidiav1alpha1.NVIDIADriver)
-	return u.setConditionsReady(ctx, nvDriverCr, reason, message)
+	nvDriverCr, ok := cr.(*nvidiav1alpha1.NVIDIADriver)
+	if !ok {
+		return fmt.Errorf("provided object is not a *nvidiav1alpha1.NVIDIADriver")
+	}
+	return u.setConditions(ctx, nvDriverCr, Ready, reason, message)
 }
 
 func (u *nvDriverUpdater) SetConditionsError(ctx context.Context, cr any, reason, message string) error {
-	nvDriverCr, _ := cr.(*nvidiav1alpha1.NVIDIADriver)
-	return u.setConditionsError(ctx, nvDriverCr, reason, message)
+	nvDriverCr, ok := cr.(*nvidiav1alpha1.NVIDIADriver)
+	if !ok {
+		return fmt.Errorf("provided object is not a *nvidiav1alpha1.NVIDIADriver")
+	}
+	return u.setConditions(ctx, nvDriverCr, Error, reason, message)
 }
 
-func (u *nvDriverUpdater) setConditionsReady(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, reason, message string) error {
+func (u *nvDriverUpdater) setConditions(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, statusType, reason, message string) error {
 	reqLogger := log.FromContext(ctx)
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1alpha1.NVIDIADriver{}
@@ -64,50 +71,44 @@ func (u *nvDriverUpdater) setConditionsReady(ctx context.Context, cr *nvidiav1al
 		return err
 	}
 
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
+	switch statusType {
+	case Ready:
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:    Ready,
+			Status:  metav1.ConditionTrue,
+			Reason:  reason,
+			Message: message,
+		})
 
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:   Error,
-		Status: metav1.ConditionFalse,
-		Reason: Ready,
-	})
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:   Error,
+			Status: metav1.ConditionFalse,
+			Reason: Ready,
+		})
+	case Error:
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:   Ready,
+			Status: metav1.ConditionFalse,
+			Reason: Error,
+		})
 
-	return u.client.Status().Update(ctx, instance)
-}
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:    Error,
+			Status:  metav1.ConditionTrue,
+			Reason:  reason,
+			Message: message,
+		})
 
-func (u *nvDriverUpdater) setConditionsError(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, reason, message string) error {
-	reqLogger := log.FromContext(ctx)
-	// Fetch latest instance and update state to avoid version mismatch
-	instance := &nvidiav1alpha1.NVIDIADriver{}
-	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update", "name", cr.Name)
-	}
-
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:   Ready,
-		Status: metav1.ConditionFalse,
-		Reason: Error,
-	})
-
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    Error,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	// Ensure status.state is not empty when updating the CR status.
-	// The caller should set the state appropriately in the CR
-	// depending on the error condition.
-	instance.Status.State = cr.Status.State
-	if instance.Status.State == "" {
-		instance.Status.State = nvidiav1alpha1.NotReady
+		// Ensure status.state is not empty when updating the CR status.
+		// The caller should set the state appropriately in the CR
+		// depending on the error condition.
+		instance.Status.State = cr.Status.State
+		if instance.Status.State == "" {
+			instance.Status.State = nvidiav1alpha1.NotReady
+		}
+	default:
+		reqLogger.Error(nil, "Unknown status type provided", "statusType", statusType)
+		return fmt.Errorf("unknown status type provided: %s", statusType)
 	}
 
 	return u.client.Status().Update(ctx, instance)
