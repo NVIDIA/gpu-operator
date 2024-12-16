@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	drav1 "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -61,7 +61,7 @@ type Resources struct {
 	SecurityContextConstraints secv1.SecurityContextConstraints
 	RuntimeClasses             []nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
-	DeviceClasses              []drav1.DeviceClass
+	DeviceClasses              []resourceapi.DeviceClass
 }
 
 func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) {
@@ -182,7 +182,7 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, PrometheusRule)
 		case "DeviceClass":
-			deviceClass := drav1.DeviceClass{}
+			deviceClass := resourceapi.DeviceClass{}
 			_, _, err := s.Decode(m, nil, &deviceClass)
 			panicIfError(err)
 			res.DeviceClasses = append(res.DeviceClasses, deviceClass)
