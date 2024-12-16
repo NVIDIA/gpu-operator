@@ -41,7 +41,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
-	drav1 "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4953,7 +4953,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func createDeviceClass(n ClusterPolicyController, spec drav1.DeviceClass) (gpuv1.State, error) {
+func createDeviceClass(n ClusterPolicyController, spec resourceapi.DeviceClass) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
 	obj := spec.DeepCopy()
@@ -4974,7 +4974,7 @@ func createDeviceClass(n ClusterPolicyController, spec drav1.DeviceClass) (gpuv1
 		return gpuv1.NotReady, err
 	}
 
-	found := &drav1.DeviceClass{}
+	found := &resourceapi.DeviceClass{}
 	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
