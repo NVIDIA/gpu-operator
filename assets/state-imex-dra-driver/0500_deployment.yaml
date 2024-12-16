@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: nvidia-dra-driver-controller
-  name: nvidia-dra-driver-controller
+    app: nvidia-imex-dra-driver-controller
+  name: nvidia-imex-dra-driver-controller
   namespace: "FILLED BY THE OPERATOR"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nvidia-dra-driver-controller
+      app: nvidia-imex-dra-driver-controller
   template:
     metadata:
       labels:
-        app: nvidia-dra-driver-controller
+        app: nvidia-imex-dra-driver-controller
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-dra-driver
+      serviceAccountName: nvidia-imex-dra-driver
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master

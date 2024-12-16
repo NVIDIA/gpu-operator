@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nvidia-dra-driver
+  name: nvidia-imex-dra-driver
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nvidia-dra-driver
+  name: nvidia-imex-dra-driver
 subjects:
 - kind: ServiceAccount
-  name: nvidia-dra-driver
+  name: nvidia-imex-dra-driver
   namespace: "FILLED BY THE OPERATOR"

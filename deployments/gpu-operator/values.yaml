@@ -294,7 +294,7 @@ devicePlugin:
     # MPS root path on the host
     root: "/run/nvidia/mps"
 
-draDriver:
+imexDRADriver:
   enabled: true
   repository: ghcr.io/nvidia
   image: k8s-dra-driver

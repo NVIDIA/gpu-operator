@@ -459,31 +459,31 @@ spec:
       name: {{ .Values.devicePlugin.config.name }}
       default: {{ .Values.devicePlugin.config.default }}
     {{- end }}
-  draDriver:
-    enabled: {{ .Values.draDriver.enabled }}
-    {{- if .Values.draDriver.repository }}
-    repository: {{ .Values.draDriver.repository }}
+  imexDRADriver:
+    enabled: {{ .Values.imexDRADriver.enabled }}
+    {{- if .Values.imexDRADriver.repository }}
+    repository: {{ .Values.imexDRADriver.repository }}
     {{- end }}
-    {{- if .Values.draDriver.image }}
-    image: {{ .Values.draDriver.image }}
+    {{- if .Values.imexDRADriver.image }}
+    image: {{ .Values.imexDRADriver.image }}
     {{- end }}
-    {{- if .Values.draDriver.version }}
-    version: {{ .Values.draDriver.version | quote }}
+    {{- if .Values.imexDRADriver.version }}
+    version: {{ .Values.imexDRADriver.version | quote }}
     {{- end }}
-    {{- if .Values.draDriver.imagePullPolicy }}
-    imagePullPolicy: {{ .Values.draDriver.imagePullPolicy }}
+    {{- if .Values.imexDRADriver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.imexDRADriver.imagePullPolicy }}
     {{- end }}
-    {{- if .Values.draDriver.imagePullSecrets }}
-    imagePullSecrets: {{ toYaml .Values.draDriver.imagePullSecrets | nindent 6 }}
+    {{- if .Values.imexDRADriver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.imexDRADriver.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.draDriver.resources }}
-    resources: {{ toYaml .Values.draDriver.resources | nindent 6 }}
+    {{- if .Values.imexDRADriver.resources }}
+    resources: {{ toYaml .Values.imexDRADriver.resources | nindent 6 }}
     {{- end }}
-    {{- if .Values.draDriver.env }}
-    env: {{ toYaml .Values.draDriver.env | nindent 6 }}
+    {{- if .Values.imexDRADriver.env }}
+    env: {{ toYaml .Values.imexDRADriver.env | nindent 6 }}
     {{- end }}
-    {{- if .Values.draDriver.args }}
-    args: {{ toYaml .Values.draDriver.args | nindent 6 }}
+    {{- if .Values.imexDRADriver.args }}
+    args: {{ toYaml .Values.imexDRADriver.args | nindent 6 }}
     {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}

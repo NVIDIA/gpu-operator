@@ -2,13 +2,13 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    app: nvidia-dra-driver-kubelet-plugin
-  name: nvidia-dra-driver-kubelet-plugin
+    app: nvidia-imex-dra-driver-kubelet-plugin
+  name: nvidia-imex-dra-driver-kubelet-plugin
   namespace: "FILLED BY THE OPERATOR"
 spec:
   selector:
     matchLabels:
-      app: nvidia-dra-driver-kubelet-plugin
+      app: nvidia-imex-dra-driver-kubelet-plugin
   updateStrategy:
     rollingUpdate:
       maxSurge: 0
@@ -17,30 +17,17 @@ spec:
   template:
     metadata:
       labels:
-        app: nvidia-dra-driver-kubelet-plugin
+        app: nvidia-imex-dra-driver-kubelet-plugin
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-dra-driver
-      # TODO: revisit the affinity / nodeSelector for this daemonset
+      serviceAccountName: nvidia-imex-dra-driver
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: feature.node.kubernetes.io/pci-10de.present
-                operator: In
-                values:
-                - "true"
-            - matchExpressions:
-              - key: feature.node.kubernetes.io/cpu-model.vendor_id
-                operator: In
-                values:
-                - NVIDIA
-            - matchExpressions:
-              - key: nvidia.com/gpu.present
-                operator: In
-                values:
-                - "true"
+              - key: nvidia.com/gpu.imex-domain
+                operator: Exists
       initContainers:
       - image: "FILLED BY THE OPERATOR"
         name: driver-validation
@@ -83,7 +70,7 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - name: nvidia-dra-driver-kubelet-plugin-entrypoint
+        - name: nvidia-imex-dra-driver-kubelet-plugin-entrypoint
           readOnly: true
           mountPath: /bin/entrypoint.sh
           subPath: entrypoint.sh
@@ -104,9 +91,9 @@ spec:
         - mountPath: /var/run/cdi
           name: cdi
       volumes:
-      - name: nvidia-dra-driver-kubelet-plugin-entrypoint
+      - name: nvidia-imex-dra-driver-kubelet-plugin-entrypoint
         configMap:
-          name: nvidia-dra-driver-kubelet-plugin-entrypoint
+          name: nvidia-imex-dra-driver-kubelet-plugin-entrypoint
           defaultMode: 448
       - name: run-nvidia-validations
         hostPath:

@@ -1194,7 +1194,7 @@ func TestTransformSandboxValidator(t *testing.T) {
 	}
 }
 
-func TestTransformDRADriverPlugin(t *testing.T) {
+func TestTransformIMEXDRADriverPlugin(t *testing.T) {
 	testCases := []struct {
 		description   string
 		ds            Daemonset
@@ -1203,23 +1203,23 @@ func TestTransformDRADriverPlugin(t *testing.T) {
 		errorExpected bool
 	}{
 		{
-			description: "empty draDriver spec",
+			description: "empty imexDRADriver spec",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
-				DRADriver: gpuv1.DRADriverSpec{},
+				IMEXDRADriver: gpuv1.IMEXDRADriverSpec{},
 			},
 			expectedDs:    NewDaemonset(),
 			errorExpected: true,
 		},
 		{
-			description: "valid draDriver spec, toolkit disabled",
+			description: "valid imexDRADriver spec, toolkit disabled",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
-				DRADriver: gpuv1.DRADriverSpec{
+				IMEXDRADriver: gpuv1.IMEXDRADriverSpec{
 					Repository: "nvcr.io/nvidia/cloud-native",
 					Image:      "k8s-dra-driver",
 					Version:    "v1.0.0",
@@ -1237,12 +1237,12 @@ func TestTransformDRADriverPlugin(t *testing.T) {
 				}),
 		},
 		{
-			description: "valid draDriver spec, toolkit enabled",
+			description: "valid imexDRADriver spec, toolkit enabled",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
-				DRADriver: gpuv1.DRADriverSpec{
+				IMEXDRADriver: gpuv1.IMEXDRADriverSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
 					Image:            "k8s-dra-driver",
 					Version:          "v1.0.0",
@@ -1294,7 +1294,7 @@ func TestTransformDRADriverPlugin(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformDRADriverPlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			err := TransformIMEXDRADriverPlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -1305,7 +1305,7 @@ func TestTransformDRADriverPlugin(t *testing.T) {
 	}
 }
 
-func TestTransformDRADriverController(t *testing.T) {
+func TestTransformIMEXDRADriverController(t *testing.T) {
 	testCases := []struct {
 		description        string
 		deployment         deployment
@@ -1314,21 +1314,21 @@ func TestTransformDRADriverController(t *testing.T) {
 		errorExpected      bool
 	}{
 		{
-			description: "empty draDriver spec",
+			description: "empty imexDRADriver spec",
 			deployment: NewDeployment().
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
-				DRADriver: gpuv1.DRADriverSpec{},
+				IMEXDRADriver: gpuv1.IMEXDRADriverSpec{},
 			},
 			expectedDeployment: NewDeployment(),
 			errorExpected:      true,
 		},
 		{
-			description: "valid draDriver spec",
+			description: "valid imexDRADriver spec",
 			deployment: NewDeployment().
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
-				DRADriver: gpuv1.DRADriverSpec{
+				IMEXDRADriver: gpuv1.IMEXDRADriverSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
 					Image:            "k8s-dra-driver",
 					Version:          "v1.0.0",
@@ -1348,7 +1348,7 @@ func TestTransformDRADriverController(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformDRADriverController(tc.deployment.Deployment, tc.cpSpec)
+			err := TransformIMEXDRADriverController(tc.deployment.Deployment, tc.cpSpec)
 			if tc.errorExpected {
 				require.Error(t, err)
 				return

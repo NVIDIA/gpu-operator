@@ -596,82 +596,6 @@ spec:
                     description: NVIDIA Device Plugin image tag
                     type: string
                 type: object
-              draDriver:
-                description: DRADriver component spec
-                properties:
-                  args:
-                    description: 'Optional: List of arguments'
-                    items:
-                      type: string
-                    type: array
-                  enabled:
-                    description: Enabled indicates if the deployment of NVIDIA DRA
-                      Driver through the operator is enabled
-                    type: boolean
-                  env:
-                    description: 'Optional: List of environment variables'
-                    items:
-                      description: EnvVar represents an environment variable present
-                        in a Container.
-                      properties:
-                        name:
-                          description: Name of the environment variable.
-                          type: string
-                        value:
-                          description: Value of the environment variable.
-                          type: string
-                      required:
-                      - name
-                      type: object
-                    type: array
-                  image:
-                    description: NVIDIA DRA Driver image name
-                    pattern: '[a-zA-Z0-9\-]+'
-                    type: string
-                  imagePullPolicy:
-                    description: Image pull policy
-                    type: string
-                  imagePullSecrets:
-                    description: Image pull secrets
-                    items:
-                      type: string
-                    type: array
-                  repository:
-                    description: NVIDIA DRA Driver image repository
-                    type: string
-                  resources:
-                    description: 'Optional: Define resources requests and limits for
-                      each pod'
-                    properties:
-                      limits:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: |-
-                          Limits describes the maximum amount of compute resources allowed.
-                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-                        type: object
-                      requests:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: |-
-                          Requests describes the minimum amount of compute resources required.
-                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
-                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
-                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-                        type: object
-                    type: object
-                  version:
-                    description: NVIDIA DRA Driver image tag
-                    type: string
-                type: object
               driver:
                 description: Driver component spec
                 properties:
@@ -1260,6 +1184,82 @@ spec:
                       and as such this must be a chroot-able filesystem.
                       Examples include the MIG Manager and Toolkit Container which may need to
                       stop, start, or restart systemd services.
+                    type: string
+                type: object
+              imexDRADriver:
+                description: DRADriver component spec
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled indicates if the deployment of NVIDIA IMEX
+                      DRA Driver through the operator is enabled
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: NVIDIA IMEX DRA Driver image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: NVIDIA IMEX DRA Driver image repository
+                    type: string
+                  resources:
+                    description: 'Optional: Define resources requests and limits for
+                      each pod'
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  version:
+                    description: NVIDIA IMEX DRA Driver image tag
                     type: string
                 type: object
               kataManager:
@@ -2372,9 +2372,9 @@ spec:
             - dcgm
             - dcgmExporter
             - devicePlugin
-            - draDriver
             - driver
             - gfd
+            - imexDRADriver
             - nodeStatusExporter
             - operator
             - toolkit

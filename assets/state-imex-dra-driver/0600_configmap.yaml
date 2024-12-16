@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nvidia-dra-driver-kubelet-plugin-entrypoint
+  name: nvidia-imex-dra-driver-kubelet-plugin-entrypoint
   namespace: "FILLED BY THE OPERATOR"
   labels:
-    app: nvidia-dra-driver-kubelet-plugin
+    app: nvidia-imex-dra-driver-kubelet-plugin
 data:
   entrypoint.sh: |-
     #!/bin/bash

@@ -698,7 +698,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-vgpu-device-manager":              TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                     TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset":      TransformToolkit,
-		"nvidia-dra-driver-kubelet-plugin":        TransformDRADriverPlugin,
+		"nvidia-imex-dra-driver-kubelet-plugin":   TransformIMEXDRADriverPlugin,
 		"nvidia-device-plugin-daemonset":          TransformDevicePlugin,
 		"nvidia-device-plugin-mps-control-daemon": TransformMPSControlDaemon,
 		"nvidia-sandbox-device-plugin-daemonset":  TransformSandboxDevicePlugin,
@@ -1543,8 +1543,8 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	return nil
 }
 
-// TransformDRADriverPlugin transforms nvidia-dra-driver-plugin daemonset with required config as per ClusterPolicy
-func TransformDRADriverPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+// TransformIMEXDRADriverPlugin transforms nvidia-imex-dra-driver-plugin daemonset with required config as per ClusterPolicy
+func TransformIMEXDRADriverPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
 	if err != nil {
@@ -1552,35 +1552,35 @@ func TransformDRADriverPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// update image
-	image, err := gpuv1.ImagePath(&config.DRADriver)
+	image, err := gpuv1.ImagePath(&config.IMEXDRADriver)
 	if err != nil {
 		return err
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = image
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DRADriver.ImagePullPolicy)
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.IMEXDRADriver.ImagePullPolicy)
 
 	// set image pull secrets
-	if len(config.DRADriver.ImagePullSecrets) > 0 {
-		addPullSecrets(&obj.Spec.Template.Spec, config.DRADriver.ImagePullSecrets)
+	if len(config.IMEXDRADriver.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.IMEXDRADriver.ImagePullSecrets)
 	}
 
 	// set resource limits
-	if config.DRADriver.Resources != nil {
+	if config.IMEXDRADriver.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DRADriver.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DRADriver.Resources.Limits
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.IMEXDRADriver.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.IMEXDRADriver.Resources.Limits
 		}
 	}
 	// set arguments if specified for device-plugin container
-	if len(config.DRADriver.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.DRADriver.Args
+	if len(config.IMEXDRADriver.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.IMEXDRADriver.Args
 	}
 	// set/append environment variables for device-plugin container
-	if len(config.DRADriver.Env) > 0 {
-		for _, env := range config.DRADriver.Env {
+	if len(config.IMEXDRADriver.Env) > 0 {
+		for _, env := range config.IMEXDRADriver.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
@@ -3716,8 +3716,8 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 	return hash, nil
 }
 
-func TransformDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPolicySpec) error {
-	config := spec.DRADriver
+func TransformIMEXDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPolicySpec) error {
+	config := spec.IMEXDRADriver
 	// update image
 	image, err := gpuv1.ImagePath(&config)
 	if err != nil {
@@ -3739,8 +3739,8 @@ func TransformDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPol
 func transformDeployment(obj *appsv1.Deployment, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 	switch obj.Name {
-	case "nvidia-dra-driver-controller":
-		return TransformDRADriverController(obj, &n.singleton.Spec)
+	case "nvidia-imex-dra-driver-controller":
+		return TransformIMEXDRADriverController(obj, &n.singleton.Spec)
 	default:
 		logger.Info("No transformation for object")
 		return nil
