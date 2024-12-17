@@ -6,9 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/pqueue"
 	"github.com/regclient/regclient/internal/reqmeta"
@@ -65,11 +64,10 @@ func (rc *RegClient) BlobCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.Re
 		if opt.callback != nil {
 			opt.callback(types.CallbackBlob, d.Digest.String(), types.CallbackSkipped, 0, d.Size)
 		}
-		rc.log.WithFields(logrus.Fields{
-			"src":    refTgt.Reference,
-			"tgt":    refTgt.Reference,
-			"digest": d.Digest,
-		}).Debug("Blob copy skipped, same repo")
+		rc.slog.Debug("Blob copy skipped, same repo",
+			slog.String("src", refSrc.Reference),
+			slog.String("tgt", refTgt.Reference),
+			slog.String("digest", string(d.Digest)))
 		return nil
 	}
 	// check if layer already exists
@@ -77,10 +75,10 @@ func (rc *RegClient) BlobCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.Re
 		if opt.callback != nil {
 			opt.callback(types.CallbackBlob, d.Digest.String(), types.CallbackSkipped, 0, d.Size)
 		}
-		rc.log.WithFields(logrus.Fields{
-			"tgt":    refTgt.Reference,
-			"digest": d,
-		}).Debug("Blob copy skipped, already exists")
+		rc.slog.Debug("Blob copy skipped, already exists",
+			slog.String("src", refSrc.Reference),
+			slog.String("tgt", refTgt.Reference),
+			slog.String("digest", string(d.Digest)))
 		return nil
 	}
 	// acquire throttle for both src and tgt to avoid deadlocks
@@ -117,28 +115,25 @@ func (rc *RegClient) BlobCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.Re
 			if opt.callback != nil {
 				opt.callback(types.CallbackBlob, d.Digest.String(), types.CallbackSkipped, 0, d.Size)
 			}
-			rc.log.WithFields(logrus.Fields{
-				"src":    refTgt.Reference,
-				"tgt":    refTgt.Reference,
-				"digest": d.Digest,
-			}).Debug("Blob copy performed server side with registry mount")
+			rc.slog.Debug("Blob copy performed server side with registry mount",
+				slog.String("src", refSrc.Reference),
+				slog.String("tgt", refTgt.Reference),
+				slog.String("digest", string(d.Digest)))
 			return nil
 		}
-		rc.log.WithFields(logrus.Fields{
-			"err": err,
-			"src": refSrc.Reference,
-			"tgt": refTgt.Reference,
-		}).Warn("Failed to mount blob")
+		rc.slog.Warn("Failed to mount blob",
+			slog.String("src", refSrc.Reference),
+			slog.String("tgt", refTgt.Reference),
+			slog.String("err", err.Error()))
 	}
 	// fast options failed, download layer from source and push to target
 	blobIO, err := rc.BlobGet(ctx, refSrc, d)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			rc.log.WithFields(logrus.Fields{
-				"err":    err,
-				"src":    refSrc.Reference,
-				"digest": d.Digest,
-			}).Warn("Failed to retrieve blob")
+			rc.slog.Warn("Failed to retrieve blob",
+				slog.String("src", refSrc.Reference),
+				slog.String("digest", string(d.Digest)),
+				slog.String("err", err.Error()))
 		}
 		return err
 	}
@@ -170,11 +165,10 @@ func (rc *RegClient) BlobCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.Re
 	defer blobIO.Close()
 	if _, err := rc.BlobPut(ctx, refTgt, blobIO.GetDescriptor(), blobIO); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			rc.log.WithFields(logrus.Fields{
-				"err": err,
-				"src": refSrc.Reference,
-				"tgt": refTgt.Reference,
-			}).Warn("Failed to push blob")
+			rc.slog.Warn("Failed to push blob",
+				slog.String("src", refSrc.Reference),
+				slog.String("tgt", refTgt.Reference),
+				slog.String("err", err.Error()))
 		}
 		return err
 	}

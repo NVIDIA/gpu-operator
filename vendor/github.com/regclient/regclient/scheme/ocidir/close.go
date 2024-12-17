@@ -3,10 +3,9 @@ package ocidir
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/ref"
@@ -26,9 +25,8 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 	}
 
 	// perform GC
-	o.log.WithFields(logrus.Fields{
-		"ref": r.CommonName(),
-	}).Debug("running GC")
+	o.slog.Debug("running GC",
+		slog.String("ref", r.CommonName()))
 	dl := map[string]bool{}
 	// recurse through index, manifests, and blob lists, generating a digest list
 	index, err := o.readIndex(r, true)
@@ -62,9 +60,8 @@ func (o *OCIDir) Close(ctx context.Context, r ref.Ref) error {
 		for _, digestFile := range digestFiles {
 			digest := fmt.Sprintf("%s:%s", blobDir.Name(), digestFile.Name())
 			if !dl[digest] {
-				o.log.WithFields(logrus.Fields{
-					"digest": digest,
-				}).Debug("ocidir garbage collect")
+				o.slog.Debug("ocidir garbage collect",
+					slog.String("digest", digest))
 				// delete
 				err = os.Remove(path.Join(blobsPath, blobDir.Name(), digestFile.Name()))
 				if err != nil {
@@ -90,10 +87,9 @@ func (o *OCIDir) closeProcManifest(ctx context.Context, r ref.Ref, m manifest.Ma
 			cm, err := o.manifestGet(ctx, cr)
 			if err != nil {
 				// ignore errors in case a manifest has been deleted or sparse copy
-				o.log.WithFields(logrus.Fields{
-					"ref": cr.CommonName(),
-					"err": err,
-				}).Debug("could not retrieve manifest")
+				o.slog.Debug("could not retrieve manifest",
+					slog.String("ref", cr.CommonName()),
+					slog.String("err", err.Error()))
 				continue
 			}
 			err = o.closeProcManifest(ctx, cr, cm, dl)

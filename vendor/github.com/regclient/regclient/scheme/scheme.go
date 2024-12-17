@@ -108,6 +108,7 @@ func WithManifest(m manifest.Manifest) ManifestOpts {
 type ReferrerConfig struct {
 	MatchOpt descriptor.MatchOpt // filter/sort results
 	Platform string              // get referrers for a specific platform
+	SrcRepo  ref.Ref             // repo used to query referrers
 }
 
 // ReferrerOpts is used to set options on referrer APIs.
@@ -121,9 +122,18 @@ func WithReferrerMatchOpt(mo descriptor.MatchOpt) ReferrerOpts {
 }
 
 // WithReferrerPlatform gets referrers for a single platform from a multi-platform manifest.
+// Note that this is implemented by [regclient.ReferrerList] and not the individual scheme implementations.
 func WithReferrerPlatform(p string) ReferrerOpts {
 	return func(config *ReferrerConfig) {
 		config.Platform = p
+	}
+}
+
+// WithReferrerSource pulls referrers from a separate source.
+// Note that this is implemented by [regclient.ReferrerList] and not the individual scheme implementations.
+func WithReferrerSource(r ref.Ref) ReferrerOpts {
+	return func(config *ReferrerConfig) {
+		config.SrcRepo = r
 	}
 }
 
@@ -165,6 +175,7 @@ func WithReferrerSort(annotation string, desc bool) ReferrerOpts {
 func ReferrerFilter(config ReferrerConfig, rlIn referrer.ReferrerList) referrer.ReferrerList {
 	return referrer.ReferrerList{
 		Subject:     rlIn.Subject,
+		Source:      rlIn.Source,
 		Manifest:    rlIn.Manifest,
 		Annotations: rlIn.Annotations,
 		Tags:        rlIn.Tags,

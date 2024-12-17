@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/reghttp"
 	"github.com/regclient/regclient/internal/reqmeta"
@@ -57,10 +56,9 @@ func (reg *Reg) RepoList(ctx context.Context, hostname string, opts ...scheme.Re
 
 	respBody, err := io.ReadAll(resp)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err":  err,
-			"host": hostname,
-		}).Warn("Failed to read repo list")
+		reg.slog.Warn("Failed to read repo list",
+			slog.String("err", err.Error()),
+			slog.String("host", hostname))
 		return nil, fmt.Errorf("failed to read repo list for %s: %w", hostname, err)
 	}
 	mt := mediatype.Base(resp.HTTPResponse().Header.Get("Content-Type"))
@@ -71,11 +69,10 @@ func (reg *Reg) RepoList(ctx context.Context, hostname string, opts ...scheme.Re
 		repo.WithHeaders(resp.HTTPResponse().Header),
 	)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err":  err,
-			"body": string(respBody),
-			"host": hostname,
-		}).Warn("Failed to unmarshal repo list")
+		reg.slog.Warn("Failed to unmarshal repo list",
+			slog.String("err", err.Error()),
+			slog.String("body", string(respBody)),
+			slog.String("host", hostname))
 		return nil, fmt.Errorf("failed to parse repo list for %s: %w", hostname, err)
 	}
 	return rl, nil

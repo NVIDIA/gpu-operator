@@ -3,6 +3,7 @@ package regclient
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/descriptor"
@@ -121,7 +122,9 @@ func (rc *RegClient) ManifestGet(ctx context.Context, r ref.Ref, opts ...Manifes
 		return m, err
 	}
 	if opt.platform != nil && !m.IsList() {
-		rc.log.Debugf("ignoring platform option %s, %s is not an index", opt.platform.String(), r.CommonName())
+		rc.slog.Debug("ignoring platform option, image is not an index",
+			slog.String("platform", opt.platform.String()),
+			slog.String("ref", r.CommonName()))
 	}
 	// this will loop to handle a nested index
 	for opt.platform != nil && m.IsList() {
@@ -160,7 +163,9 @@ func (rc *RegClient) ManifestHead(ctx context.Context, r ref.Ref, opts ...Manife
 		return m, err
 	}
 	if opt.platform != nil && !m.IsList() {
-		rc.log.Debugf("ignoring platform option %s, %s is not an index", opt.platform.String(), r.CommonName())
+		rc.slog.Debug("ignoring platform option, image is not an index",
+			slog.String("platform", opt.platform.String()),
+			slog.String("ref", r.CommonName()))
 	}
 	// this will loop to handle a nested index
 	for opt.platform != nil && m.IsList() {
