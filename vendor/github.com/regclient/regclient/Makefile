@@ -20,7 +20,7 @@ VCS_VERSION?=$(shell vcs_describe="$$(git describe --all)"; \
   echo "$${vcs_version}" | sed -r 's#/+#-#g')
 VCS_TAG?=$(shell git describe --tags --abbrev=0 2>/dev/null || true)
 LD_FLAGS?=-s -w -extldflags -static -buildid= -X \"github.com/regclient/regclient/internal/version.vcsTag=$(VCS_TAG)\"
-GO_BUILD_FLAGS?=-trimpath -ldflags "$(LD_FLAGS)" -tags nolegacy
+GO_BUILD_FLAGS?=-trimpath -ldflags "$(LD_FLAGS)"
 DOCKERFILE_EXT?=$(shell if docker build --help 2>/dev/null | grep -q -- '--progress'; then echo ".buildkit"; fi)
 DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)" --build-arg "VCS_VERSION=$(VCS_VERSION)"
 GOPATH?=$(shell go env GOPATH)
@@ -33,15 +33,15 @@ ifeq "$(strip $(VER_BUMP))" ''
 		-u "$(shell id -u):$(shell id -g)" \
 		$(VER_BUMP_CONTAINER)
 endif
-MARKDOWN_LINT_VER?=v0.14.0
+MARKDOWN_LINT_VER?=v0.15.0
 GOMAJOR_VER?=v0.14.0
 GOSEC_VER?=v2.21.4
 GO_VULNCHECK_VER?=v1.1.3
 OSV_SCANNER_VER?=v1.9.1
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v1.15.0
-SYFT_CONTAINER?=anchore/syft:v1.15.0@sha256:92b229ac1d84cd9627624a951e26a78333b26a5f34c9999629ba96e90751c971
+SYFT_VERSION?=v1.17.0
+SYFT_CONTAINER?=anchore/syft:v1.17.0@sha256:f1099806495b4d2300adf03887bdfb69230c36a5e077061a12ee292bcd9bfd62
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \

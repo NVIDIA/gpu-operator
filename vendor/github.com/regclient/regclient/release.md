@@ -1,74 +1,74 @@
-# Release v0.7.2
+# Release v0.8.0
 
-Breaking Changes:
+## Highlights
 
-The breaking changes are to internal methods and undocumented features that should not be encountered by users.
+There are three headline changes in this release: slog support, external referrers, and deprecating legacy packages.
 
-- Update scheme to use pqueue instead of throttle. ([PR 803][pr-803])
-- Removes an undocumented API for deleting images from Hub. ([PR 803][pr-803])
-- `config.Host.Throttle()` has been removed. Use `scheme.Throttler` instead. ([PR 813][pr-813])
+This release switches from logrus to slog.
+Migration methods are included to minimize the impact on existing users.
+Anyone parsing the logging output from regctl, regsync, and regbot will notice the format has changed.
 
-Features:
+External referrers allow referrers to be pushed and pulled from a separate repository from the subject image.
+This feature requires users to provide the external repository themselves since a registry has no way to communicate this to the user.
+An example use case of this feature are third parties, like security scanners, providing attestations of images they do not control.
 
-- Significant refactor of http APIs to speed up image copies. ([PR 803][pr-803])
-- Add a priority queue for network requests. ([PR 803][pr-803])
-- Move logging into transport and rework backoff. ([PR 803][pr-803])
-- Remove default rate limit. ([PR 803][pr-803])
-- Add priority queue algorithm and reorder image copy steps. ([PR 803][pr-803])
-- Consolidate warnings. ([PR 810][pr-810])
-- Limit number of retries for a request. ([PR 812][pr-812])
-- Add default host config. ([PR 821][pr-821])
+Legacy packages have been disabled by default and will eventually be removed.
+To continue using legacy packages until their removal, you may compile with `-tags legacy`.
 
-Fixes:
+## Breaking
 
-- Update GHA output generating steps. ([PR 800][pr-800])
-- Lookup referrers when registry does not give digest with head. ([PR 801][pr-801])
-- Support auth on redirect. ([PR 805][pr-805])
-- Prevent data race when reading blob and seeking. ([PR 814][pr-814])
-- Detect integer overflows on type conversion. ([PR 830][pr-830])
-- Add a warning if syft is not installed. ([PR 841][pr-841])
-- Race condition in the pqueue tests. ([PR 843][pr-843])
-- Dedup warnings on image mod. ([PR 846][pr-846])
+- Breaking: Warning handlers switched from `logrus` to `slog` which will only impact those with a custom warning handler. ([PR 847][pr-847])
+- Breaking: Disable legacy packages by default. ([PR 852][pr-852])
 
-Chores:
+## Features
 
-- Update staticcheck and fix linter warnings for Go 1.23. ([PR 804][pr-804])
-- Remove digest calculation from reghttp. ([PR 803][pr-803])
-- Remove `ReqPerSec` in tests. ([PR 806][pr-806])
-- Move throttle from `config` to `reghttp`. ([PR 813][pr-813])
-- Refactoring to remove globals in regsync. ([PR 815][pr-815])
-- Refactor to remove globals in regbot. ([PR 816][pr-816])
-- Remove throttle package. ([PR 817][pr-817])
-- Update version-bump config for processors. ([PR 828][pr-828])
-- Update config to use yaml anchors and aliases ([PR 829][pr-829])
-- Do not automatically assign myself to GitHub issues. ([PR 831][pr-831])
-- Remove OpenSSF scorecard and best practices. ([PR 832][pr-832])
-- Update docker image base filesystem. ([PR 837][pr-837])
+- Feat: Refactor logging to use log/slog. ([PR 847][pr-847])
+- Feat: Switch regbot to slog. ([PR 849][pr-849])
+- Feat: Switch regctl to slog. ([PR 850][pr-850])
+- Feat: Switch regsync to slog. ([PR 851][pr-851])
+- Feat: Move logrus calls into files excluded by wasm. ([PR 853][pr-853])
+- Feat: Allow plus in ocidir path. ([PR 856][pr-856])
+- Feat: Support referrers in an external repository. ([PR 866][pr-866])
+- Feat: Image mod environment variables. ([PR 867][pr-867])
+- Feat: Include source in referrers response. ([PR 870][pr-870])
+- Feat: Add external flag to regctl artifact put. ([PR 873][pr-873])
+- Feat: Copy image with external referrers. ([PR 874][pr-874])
+- Feat: Document community maintained packages. ([PR 878][pr-878])
+- Feat: Support external referrers in regsync. ([PR 881][pr-881])
+- Feat: Support incomplete subject descriptor. ([PR 885][pr-885])
 
-Contributors:
+## Fixes
+
+- Fix: Inject release notes by file. ([PR 854][pr-854])
+- Fix: Platform test for darwin/macos should not add variant. ([PR 879][pr-879])
+- Fix: Handle repeated digest in copy with external referrers. ([PR 882][pr-882])
+
+## Chores
+
+- Chore: Improve error message when inspecting artifacts. ([PR 862][pr-862])
+- Chore: Remove unused short arg parameters. ([PR 877][pr-877])
+
+## Contributors
 
 - @sudo-bmitch
 
-[pr-800]: https://github.com/regclient/regclient/pull/800
-[pr-801]: https://github.com/regclient/regclient/pull/801
-[pr-804]: https://github.com/regclient/regclient/pull/804
-[pr-803]: https://github.com/regclient/regclient/pull/803
-[pr-805]: https://github.com/regclient/regclient/pull/805
-[pr-806]: https://github.com/regclient/regclient/pull/806
-[pr-810]: https://github.com/regclient/regclient/pull/810
-[pr-812]: https://github.com/regclient/regclient/pull/812
-[pr-813]: https://github.com/regclient/regclient/pull/813
-[pr-814]: https://github.com/regclient/regclient/pull/814
-[pr-815]: https://github.com/regclient/regclient/pull/815
-[pr-816]: https://github.com/regclient/regclient/pull/816
-[pr-817]: https://github.com/regclient/regclient/pull/817
-[pr-821]: https://github.com/regclient/regclient/pull/821
-[pr-828]: https://github.com/regclient/regclient/pull/828
-[pr-829]: https://github.com/regclient/regclient/pull/829
-[pr-830]: https://github.com/regclient/regclient/pull/830
-[pr-831]: https://github.com/regclient/regclient/pull/831
-[pr-832]: https://github.com/regclient/regclient/pull/832
-[pr-837]: https://github.com/regclient/regclient/pull/837
-[pr-841]: https://github.com/regclient/regclient/pull/841
-[pr-843]: https://github.com/regclient/regclient/pull/843
-[pr-846]: https://github.com/regclient/regclient/pull/846
+[pr-847]: https://github.com/regclient/regclient/pull/847
+[pr-849]: https://github.com/regclient/regclient/pull/849
+[pr-850]: https://github.com/regclient/regclient/pull/850
+[pr-851]: https://github.com/regclient/regclient/pull/851
+[pr-852]: https://github.com/regclient/regclient/pull/852
+[pr-853]: https://github.com/regclient/regclient/pull/853
+[pr-854]: https://github.com/regclient/regclient/pull/854
+[pr-856]: https://github.com/regclient/regclient/pull/856
+[pr-862]: https://github.com/regclient/regclient/pull/862
+[pr-866]: https://github.com/regclient/regclient/pull/866
+[pr-867]: https://github.com/regclient/regclient/pull/867
+[pr-870]: https://github.com/regclient/regclient/pull/870
+[pr-873]: https://github.com/regclient/regclient/pull/873
+[pr-874]: https://github.com/regclient/regclient/pull/874
+[pr-877]: https://github.com/regclient/regclient/pull/877
+[pr-878]: https://github.com/regclient/regclient/pull/878
+[pr-879]: https://github.com/regclient/regclient/pull/879
+[pr-881]: https://github.com/regclient/regclient/pull/881
+[pr-882]: https://github.com/regclient/regclient/pull/882
+[pr-885]: https://github.com/regclient/regclient/pull/885

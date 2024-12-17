@@ -7,14 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/types/errs"
 )
@@ -74,7 +72,7 @@ type handler interface {
 }
 
 // handlerBuild is used to make a new handler for a specific authType and URL
-type handlerBuild func(client *http.Client, clientID, host string, credFn CredsFn, log *logrus.Logger) handler
+type handlerBuild func(client *http.Client, clientID, host string, credFn CredsFn, slog *slog.Logger) handler
 
 // Opts configures options for NewAuth
 type Opts func(*Auth)
@@ -87,7 +85,7 @@ type Auth struct {
 	hbs        map[string]handlerBuild       // handler builders based on authType
 	hs         map[string]map[string]handler // handlers based on url and authType
 	authTypes  []string
-	log        *logrus.Logger
+	slog       *slog.Logger
 	mu         sync.Mutex
 }
 
@@ -100,12 +98,7 @@ func NewAuth(opts ...Opts) *Auth {
 		hbs:        map[string]handlerBuild{},
 		hs:         map[string]map[string]handler{},
 		authTypes:  []string{},
-	}
-	a.log = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.WarnLevel,
+		slog:       slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
 
 	for _, opt := range opts {
@@ -160,10 +153,10 @@ func WithDefaultHandlers() Opts {
 	}
 }
 
-// WithLog injects a logrus Logger
-func WithLog(log *logrus.Logger) Opts {
+// WithLog injects a Logger
+func WithLog(slog *slog.Logger) Opts {
 	return func(a *Auth) {
-		a.log = log
+		a.slog = slog
 	}
 }
 
@@ -190,10 +183,9 @@ func (a *Auth) AddScope(host, scope string) error {
 	if !success {
 		return ErrNoNewChallenge
 	}
-	a.log.WithFields(logrus.Fields{
-		"host":  host,
-		"scope": scope,
-	}).Debug("Auth scope added")
+	a.slog.Debug("Auth scope added",
+		slog.String("host", host),
+		slog.String("scope", scope))
 	return nil
 }
 
@@ -214,9 +206,8 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 	if err != nil {
 		return err
 	}
-	a.log.WithFields(logrus.Fields{
-		"challenge": cl,
-	}).Debug("Auth request parsed")
+	a.slog.Debug("Auth request parsed",
+		slog.Any("challenge", cl))
 	if len(cl) < 1 {
 		return ErrEmptyChallenge
 	}
@@ -224,9 +215,8 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 	// loop over the received challenge(s)
 	for _, c := range cl {
 		if _, ok := a.hbs[c.authType]; !ok {
-			a.log.WithFields(logrus.Fields{
-				"authtype": c.authType,
-			}).Warn("Unsupported auth type")
+			a.slog.Warn("Unsupported auth type",
+				slog.String("authtype", c.authType))
 			continue
 		}
 		// setup a handler for the host and auth type
@@ -234,7 +224,7 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 			a.hs[host] = map[string]handler{}
 		}
 		if _, ok := a.hs[host][c.authType]; !ok {
-			h := a.hbs[c.authType](a.httpClient, a.clientID, host, a.credsFn, a.log)
+			h := a.hbs[c.authType](a.httpClient, a.clientID, host, a.credsFn, a.slog)
 			if h == nil {
 				continue
 			}
@@ -277,11 +267,10 @@ func (a *Auth) UpdateRequest(req *http.Request) error {
 		if a.hs[host][at] != nil {
 			ah, err = a.hs[host][at].GenerateAuth()
 			if err != nil {
-				a.log.WithFields(logrus.Fields{
-					"err":      err,
-					"host":     host,
-					"authtype": at,
-				}).Debug("Failed to generate auth")
+				a.slog.Debug("Failed to generate auth",
+					slog.String("err", err.Error()),
+					slog.String("host", host),
+					slog.String("authtype", at))
 				continue
 			}
 			req.Header.Set("Authorization", ah)
@@ -454,7 +443,7 @@ type basicHandler struct {
 }
 
 // NewBasicHandler creates a new BasicHandler
-func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
+func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn, slog *slog.Logger) handler {
 	return &basicHandler{
 		realm:   "",
 		host:    host,
@@ -498,7 +487,7 @@ type bearerHandler struct {
 	credsFn        CredsFn
 	scopes         []string
 	token          bearerToken
-	log            *logrus.Logger
+	slog           *slog.Logger
 }
 
 // bearerToken is the json response to the Bearer request
@@ -512,7 +501,7 @@ type bearerToken struct {
 }
 
 // NewBearerHandler creates a new BearerHandler
-func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
+func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsFn, slog *slog.Logger) handler {
 	return &bearerHandler{
 		client:   client,
 		clientID: clientID,
@@ -521,7 +510,7 @@ func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsF
 		realm:    "",
 		service:  "",
 		scopes:   []string{},
-		log:      log,
+		slog:     slog,
 	}
 }
 
@@ -770,7 +759,7 @@ type jwtHubResp struct {
 }
 
 // NewJWTHubHandler creates a new JWTHandler for Docker Hub.
-func NewJWTHubHandler(client *http.Client, clientID, host string, credsFn CredsFn, log *logrus.Logger) handler {
+func NewJWTHubHandler(client *http.Client, clientID, host string, credsFn CredsFn, slog *slog.Logger) handler {
 	// JWT handler is only tested against Hub, and the API is Hub specific
 	if host == "hub.docker.com" {
 		return &jwtHubHandler{

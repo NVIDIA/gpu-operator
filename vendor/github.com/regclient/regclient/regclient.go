@@ -3,11 +3,10 @@ package regclient
 
 import (
 	"io"
+	"log/slog"
 	"time"
 
 	"fmt"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/version"
@@ -33,9 +32,9 @@ const (
 type RegClient struct {
 	hosts       map[string]*config.Host
 	hostDefault *config.Host
-	log         *logrus.Logger
 	regOpts     []reg.Opts
 	schemes     map[string]scheme.API
+	slog        *slog.Logger
 	userAgent   string
 }
 
@@ -47,9 +46,9 @@ func New(opts ...Opt) *RegClient {
 	var rc = RegClient{
 		hosts:     map[string]*config.Host{},
 		userAgent: DefaultUserAgent,
-		log:       &logrus.Logger{Out: io.Discard},
 		regOpts:   []reg.Opts{},
 		schemes:   map[string]scheme.API{},
+		slog:      slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
 
 	info := version.GetInfo()
@@ -74,20 +73,19 @@ func New(opts ...Opt) *RegClient {
 	rc.regOpts = append(rc.regOpts,
 		reg.WithConfigHosts(hostList),
 		reg.WithConfigHostDefault(rc.hostDefault),
-		reg.WithLog(rc.log),
+		reg.WithSlog(rc.slog),
 		reg.WithUserAgent(rc.userAgent),
 	)
 
 	// setup scheme's
 	rc.schemes["reg"] = reg.New(rc.regOpts...)
 	rc.schemes["ocidir"] = ocidir.New(
-		ocidir.WithLog(rc.log),
+		ocidir.WithSlog(rc.slog),
 	)
 
-	rc.log.WithFields(logrus.Fields{
-		"VCSRef": info.VCSRef,
-		"VCSTag": info.VCSTag,
-	}).Debug("regclient initialized")
+	rc.slog.Debug("regclient initialized",
+		slog.String("VCSRef", info.VCSRef),
+		slog.String("VCSTag", info.VCSTag))
 
 	return &rc
 }
@@ -151,9 +149,8 @@ func WithDockerCreds() Opt {
 	return func(rc *RegClient) {
 		configHosts, err := config.DockerLoad()
 		if err != nil {
-			rc.log.WithFields(logrus.Fields{
-				"err": err,
-			}).Warn("Failed to load docker creds")
+			rc.slog.Warn("Failed to load docker creds",
+				slog.String("err", err.Error()))
 			return
 		}
 		rc.hostLoad("docker", configHosts)
@@ -166,19 +163,11 @@ func WithDockerCredsFile(fname string) Opt {
 	return func(rc *RegClient) {
 		configHosts, err := config.DockerLoadFile(fname)
 		if err != nil {
-			rc.log.WithFields(logrus.Fields{
-				"err": err,
-			}).Warn("Failed to load docker creds")
+			rc.slog.Warn("Failed to load docker creds",
+				slog.String("err", err.Error()))
 			return
 		}
 		rc.hostLoad("docker-file", configHosts)
-	}
-}
-
-// WithLog overrides default logrus Logger.
-func WithLog(log *logrus.Logger) Opt {
-	return func(rc *RegClient) {
-		rc.log = log
 	}
 }
 
@@ -210,6 +199,13 @@ func WithRetryLimit(retryLimit int) Opt {
 	}
 }
 
+// WithSlog configures the slog Logger.
+func WithSlog(slog *slog.Logger) Opt {
+	return func(rc *RegClient) {
+		rc.slog = slog
+	}
+}
+
 // WithUserAgent specifies the User-Agent http header.
 func WithUserAgent(ua string) Opt {
 	return func(rc *RegClient) {
@@ -220,7 +216,14 @@ func WithUserAgent(ua string) Opt {
 func (rc *RegClient) hostLoad(src string, hosts []config.Host) {
 	for _, configHost := range hosts {
 		if configHost.Name == "" {
-			// TODO: should this error, warn, or fall back to hostname?
+			if configHost.Pass != "" {
+				configHost.Pass = "***"
+			}
+			if configHost.Token != "" {
+				configHost.Token = "***"
+			}
+			rc.slog.Warn("Ignoring registry config without a name",
+				slog.Any("entry", configHost))
 			continue
 		}
 		if configHost.Name == DockerRegistry || configHost.Name == DockerRegistryDNS || configHost.Name == DockerRegistryAuth {
@@ -230,25 +233,24 @@ func (rc *RegClient) hostLoad(src string, hosts []config.Host) {
 			}
 		}
 		tls, _ := configHost.TLS.MarshalText()
-		rc.log.WithFields(logrus.Fields{
-			"name":       configHost.Name,
-			"user":       configHost.User,
-			"hostname":   configHost.Hostname,
-			"helper":     configHost.CredHelper,
-			"repoAuth":   configHost.RepoAuth,
-			"tls":        string(tls),
-			"pathPrefix": configHost.PathPrefix,
-			"mirrors":    configHost.Mirrors,
-			"blobMax":    configHost.BlobMax,
-			"blobChunk":  configHost.BlobChunk,
-		}).Debugf("Loading %s config", src)
+		rc.slog.Debug("Loading config",
+			slog.Int64("blobChunk", configHost.BlobChunk),
+			slog.Int64("blobMax", configHost.BlobMax),
+			slog.String("helper", configHost.CredHelper),
+			slog.String("hostname", configHost.Hostname),
+			slog.Any("mirrors", configHost.Mirrors),
+			slog.String("name", configHost.Name),
+			slog.String("pathPrefix", configHost.PathPrefix),
+			slog.Bool("repoAuth", configHost.RepoAuth),
+			slog.String("source", src),
+			slog.String("tls", string(tls)),
+			slog.String("user", configHost.User))
 		err := rc.hostSet(configHost)
 		if err != nil {
-			rc.log.WithFields(logrus.Fields{
-				"host":  configHost.Name,
-				"user":  configHost.User,
-				"error": err,
-			}).Warn("Failed to update host config")
+			rc.slog.Warn("Failed to update host config",
+				slog.String("host", configHost.Name),
+				slog.String("user", configHost.User),
+				slog.String("error", err.Error()))
 		}
 	}
 }
@@ -262,7 +264,7 @@ func (rc *RegClient) hostSet(newHost config.Host) error {
 		err = rc.hosts[name].Merge(newHost, nil)
 	} else {
 		// merge newHost with existing settings
-		err = rc.hosts[name].Merge(newHost, rc.log)
+		err = rc.hosts[name].Merge(newHost, rc.slog)
 	}
 	if err != nil {
 		return err
