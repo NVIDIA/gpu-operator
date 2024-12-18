@@ -19,9 +19,9 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	scheme "github.com/NVIDIA/gpu-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type NVIDIADriversGetter interface {
 
 // NVIDIADriverInterface has methods to work with NVIDIADriver resources.
 type NVIDIADriverInterface interface {
-	Create(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.CreateOptions) (*v1alpha1.NVIDIADriver, error)
-	Update(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.UpdateOptions) (*v1alpha1.NVIDIADriver, error)
+	Create(ctx context.Context, nVIDIADriver *nvidiav1alpha1.NVIDIADriver, opts v1.CreateOptions) (*nvidiav1alpha1.NVIDIADriver, error)
+	Update(ctx context.Context, nVIDIADriver *nvidiav1alpha1.NVIDIADriver, opts v1.UpdateOptions) (*nvidiav1alpha1.NVIDIADriver, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.UpdateOptions) (*v1alpha1.NVIDIADriver, error)
+	UpdateStatus(ctx context.Context, nVIDIADriver *nvidiav1alpha1.NVIDIADriver, opts v1.UpdateOptions) (*nvidiav1alpha1.NVIDIADriver, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NVIDIADriver, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NVIDIADriverList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*nvidiav1alpha1.NVIDIADriver, error)
+	List(ctx context.Context, opts v1.ListOptions) (*nvidiav1alpha1.NVIDIADriverList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NVIDIADriver, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *nvidiav1alpha1.NVIDIADriver, err error)
 	NVIDIADriverExpansion
 }
 
 // nVIDIADrivers implements NVIDIADriverInterface
 type nVIDIADrivers struct {
-	*gentype.ClientWithList[*v1alpha1.NVIDIADriver, *v1alpha1.NVIDIADriverList]
+	*gentype.ClientWithList[*nvidiav1alpha1.NVIDIADriver, *nvidiav1alpha1.NVIDIADriverList]
 }
 
 // newNVIDIADrivers returns a NVIDIADrivers
 func newNVIDIADrivers(c *NvidiaV1alpha1Client) *nVIDIADrivers {
 	return &nVIDIADrivers{
-		gentype.NewClientWithList[*v1alpha1.NVIDIADriver, *v1alpha1.NVIDIADriverList](
+		gentype.NewClientWithList[*nvidiav1alpha1.NVIDIADriver, *nvidiav1alpha1.NVIDIADriverList](
 			"nvidiadrivers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.NVIDIADriver { return &v1alpha1.NVIDIADriver{} },
-			func() *v1alpha1.NVIDIADriverList { return &v1alpha1.NVIDIADriverList{} }),
+			func() *nvidiav1alpha1.NVIDIADriver { return &nvidiav1alpha1.NVIDIADriver{} },
+			func() *nvidiav1alpha1.NVIDIADriverList { return &nvidiav1alpha1.NVIDIADriverList{} },
+		),
 	}
 }

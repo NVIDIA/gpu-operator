@@ -29,7 +29,7 @@ type FakeNvidiaV1alpha1 struct {
 }
 
 func (c *FakeNvidiaV1alpha1) NVIDIADrivers() v1alpha1.NVIDIADriverInterface {
-	return &FakeNVIDIADrivers{c}
+	return newFakeNVIDIADrivers(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

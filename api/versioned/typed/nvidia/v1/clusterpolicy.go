@@ -19,9 +19,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	scheme "github.com/NVIDIA/gpu-operator/api/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type ClusterPoliciesGetter interface {
 
 // ClusterPolicyInterface has methods to work with ClusterPolicy resources.
 type ClusterPolicyInterface interface {
-	Create(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.CreateOptions) (*v1.ClusterPolicy, error)
-	Update(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.UpdateOptions) (*v1.ClusterPolicy, error)
+	Create(ctx context.Context, clusterPolicy *nvidiav1.ClusterPolicy, opts metav1.CreateOptions) (*nvidiav1.ClusterPolicy, error)
+	Update(ctx context.Context, clusterPolicy *nvidiav1.ClusterPolicy, opts metav1.UpdateOptions) (*nvidiav1.ClusterPolicy, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, clusterPolicy *v1.ClusterPolicy, opts metav1.UpdateOptions) (*v1.ClusterPolicy, error)
+	UpdateStatus(ctx context.Context, clusterPolicy *nvidiav1.ClusterPolicy, opts metav1.UpdateOptions) (*nvidiav1.ClusterPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterPolicy, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterPolicyList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*nvidiav1.ClusterPolicy, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*nvidiav1.ClusterPolicyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *nvidiav1.ClusterPolicy, err error)
 	ClusterPolicyExpansion
 }
 
 // clusterPolicies implements ClusterPolicyInterface
 type clusterPolicies struct {
-	*gentype.ClientWithList[*v1.ClusterPolicy, *v1.ClusterPolicyList]
+	*gentype.ClientWithList[*nvidiav1.ClusterPolicy, *nvidiav1.ClusterPolicyList]
 }
 
 // newClusterPolicies returns a ClusterPolicies
 func newClusterPolicies(c *NvidiaV1Client) *clusterPolicies {
 	return &clusterPolicies{
-		gentype.NewClientWithList[*v1.ClusterPolicy, *v1.ClusterPolicyList](
+		gentype.NewClientWithList[*nvidiav1.ClusterPolicy, *nvidiav1.ClusterPolicyList](
 			"clusterpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterPolicy { return &v1.ClusterPolicy{} },
-			func() *v1.ClusterPolicyList { return &v1.ClusterPolicyList{} }),
+			func() *nvidiav1.ClusterPolicy { return &nvidiav1.ClusterPolicy{} },
+			func() *nvidiav1.ClusterPolicyList { return &nvidiav1.ClusterPolicyList{} },
+		),
 	}
 }

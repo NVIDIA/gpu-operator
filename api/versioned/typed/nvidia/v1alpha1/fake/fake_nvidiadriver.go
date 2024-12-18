@@ -19,120 +19,34 @@
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/versioned/typed/nvidia/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNVIDIADrivers implements NVIDIADriverInterface
-type FakeNVIDIADrivers struct {
+// fakeNVIDIADrivers implements NVIDIADriverInterface
+type fakeNVIDIADrivers struct {
+	*gentype.FakeClientWithList[*v1alpha1.NVIDIADriver, *v1alpha1.NVIDIADriverList]
 	Fake *FakeNvidiaV1alpha1
 }
 
-var nvidiadriversResource = v1alpha1.SchemeGroupVersion.WithResource("nvidiadrivers")
-
-var nvidiadriversKind = v1alpha1.SchemeGroupVersion.WithKind("NVIDIADriver")
-
-// Get takes name of the nVIDIADriver, and returns the corresponding nVIDIADriver object, and an error if there is any.
-func (c *FakeNVIDIADrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NVIDIADriver, err error) {
-	emptyResult := &v1alpha1.NVIDIADriver{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(nvidiadriversResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeNVIDIADrivers(fake *FakeNvidiaV1alpha1) nvidiav1alpha1.NVIDIADriverInterface {
+	return &fakeNVIDIADrivers{
+		gentype.NewFakeClientWithList[*v1alpha1.NVIDIADriver, *v1alpha1.NVIDIADriverList](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("nvidiadrivers"),
+			v1alpha1.SchemeGroupVersion.WithKind("NVIDIADriver"),
+			func() *v1alpha1.NVIDIADriver { return &v1alpha1.NVIDIADriver{} },
+			func() *v1alpha1.NVIDIADriverList { return &v1alpha1.NVIDIADriverList{} },
+			func(dst, src *v1alpha1.NVIDIADriverList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NVIDIADriverList) []*v1alpha1.NVIDIADriver {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.NVIDIADriverList, items []*v1alpha1.NVIDIADriver) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NVIDIADriver), err
-}
-
-// List takes label and field selectors, and returns the list of NVIDIADrivers that match those selectors.
-func (c *FakeNVIDIADrivers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NVIDIADriverList, err error) {
-	emptyResult := &v1alpha1.NVIDIADriverList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(nvidiadriversResource, nvidiadriversKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NVIDIADriverList{ListMeta: obj.(*v1alpha1.NVIDIADriverList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NVIDIADriverList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nVIDIADrivers.
-func (c *FakeNVIDIADrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(nvidiadriversResource, opts))
-}
-
-// Create takes the representation of a nVIDIADriver and creates it.  Returns the server's representation of the nVIDIADriver, and an error, if there is any.
-func (c *FakeNVIDIADrivers) Create(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.CreateOptions) (result *v1alpha1.NVIDIADriver, err error) {
-	emptyResult := &v1alpha1.NVIDIADriver{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(nvidiadriversResource, nVIDIADriver, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NVIDIADriver), err
-}
-
-// Update takes the representation of a nVIDIADriver and updates it. Returns the server's representation of the nVIDIADriver, and an error, if there is any.
-func (c *FakeNVIDIADrivers) Update(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.UpdateOptions) (result *v1alpha1.NVIDIADriver, err error) {
-	emptyResult := &v1alpha1.NVIDIADriver{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(nvidiadriversResource, nVIDIADriver, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NVIDIADriver), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNVIDIADrivers) UpdateStatus(ctx context.Context, nVIDIADriver *v1alpha1.NVIDIADriver, opts v1.UpdateOptions) (result *v1alpha1.NVIDIADriver, err error) {
-	emptyResult := &v1alpha1.NVIDIADriver{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(nvidiadriversResource, "status", nVIDIADriver, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NVIDIADriver), err
-}
-
-// Delete takes name of the nVIDIADriver and deletes it. Returns an error if one occurs.
-func (c *FakeNVIDIADrivers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(nvidiadriversResource, name, opts), &v1alpha1.NVIDIADriver{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNVIDIADrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(nvidiadriversResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NVIDIADriverList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nVIDIADriver.
-func (c *FakeNVIDIADrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NVIDIADriver, err error) {
-	emptyResult := &v1alpha1.NVIDIADriver{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(nvidiadriversResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NVIDIADriver), err
 }
