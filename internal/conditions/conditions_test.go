@@ -53,7 +53,7 @@ func TestConditionsUpdater_SetConditionsReady(t *testing.T) {
 		Reason: "Ready",
 	}
 
-	err := u.SetConditionsReady(context.Background(), driver, "Reconciled", "All resources are successfully reconciled")
+	err := u.SetConditionsReady(context.Background(), driver, Reconciled, "All resources are successfully reconciled")
 	assert.NoError(t, err)
 
 	instance := &nvidiav1alpha1.NVIDIADriver{}
