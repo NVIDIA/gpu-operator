@@ -29,7 +29,7 @@ type FakeNvidiaV1 struct {
 }
 
 func (c *FakeNvidiaV1) ClusterPolicies() v1.ClusterPolicyInterface {
-	return &FakeClusterPolicies{c}
+	return newFakeClusterPolicies(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

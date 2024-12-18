@@ -19,10 +19,10 @@
 package v1
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
-	"github.com/NVIDIA/gpu-operator/api/versioned/scheme"
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	scheme "github.com/NVIDIA/gpu-operator/api/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -85,10 +85,10 @@ func New(c rest.Interface) *NvidiaV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+	gv := nvidiav1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

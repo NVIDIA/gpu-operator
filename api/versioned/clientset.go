@@ -19,8 +19,8 @@
 package versioned
 
 import (
-	"fmt"
-	"net/http"
+	fmt "fmt"
+	http "net/http"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/versioned/typed/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/versioned/typed/nvidia/v1alpha1"
