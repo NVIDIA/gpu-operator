@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/reghttp"
 	"github.com/regclient/regclient/internal/reqmeta"
@@ -261,10 +261,9 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref, d descriptor.De
 	if minSizeStr != "" {
 		minSize, err := strconv.ParseInt(minSizeStr, 10, 64)
 		if err != nil {
-			reg.log.WithFields(logrus.Fields{
-				"size": minSizeStr,
-				"err":  err,
-			}).Warn("Failed to parse chunk size header")
+			reg.slog.Warn("Failed to parse chunk size header",
+				slog.String("size", minSizeStr),
+				slog.String("err", err.Error()))
 		} else {
 			host := reg.hostGet(r.Registry)
 			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
@@ -273,10 +272,9 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref, d descriptor.De
 				} else {
 					host.BlobChunk = minSize
 				}
-				reg.log.WithFields(logrus.Fields{
-					"size": host.BlobChunk,
-					"host": host.Name,
-				}).Debug("Registry requested min chunk size")
+				reg.slog.Debug("Registry requested min chunk size",
+					slog.Int64("size", host.BlobChunk),
+					slog.String("host", host.Name))
 			}
 		}
 	}
@@ -285,17 +283,16 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref, d descriptor.De
 	if location == "" {
 		return nil, fmt.Errorf("failed to send blob post, ref %s: %w", r.CommonName(), errs.ErrMissingLocation)
 	}
-	reg.log.WithFields(logrus.Fields{
-		"location": location,
-	}).Debug("Upload location received")
+	reg.slog.Debug("Upload location received",
+		slog.String("location", location))
+
 	// put url may be relative to the above post URL, so parse in that context
 	postURL := resp.HTTPResponse().Request.URL
 	putURL, err := postURL.Parse(location)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"location": location,
-			"err":      err,
-		}).Warn("Location url failed to parse")
+		reg.slog.Warn("Location url failed to parse",
+			slog.String("location", location),
+			slog.String("err", err.Error()))
 		return nil, fmt.Errorf("blob upload url invalid, ref %s: %w", r.CommonName(), err)
 	}
 	return putURL, nil
@@ -333,10 +330,9 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d descriptor.Descri
 	if minSizeStr != "" {
 		minSize, err := strconv.ParseInt(minSizeStr, 10, 64)
 		if err != nil {
-			reg.log.WithFields(logrus.Fields{
-				"size": minSizeStr,
-				"err":  err,
-			}).Warn("Failed to parse chunk size header")
+			reg.slog.Warn("Failed to parse chunk size header",
+				slog.String("size", minSizeStr),
+				slog.String("err", err.Error()))
 		} else {
 			host := reg.hostGet(rTgt.Registry)
 			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
@@ -346,10 +342,9 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d descriptor.Descri
 				} else {
 					host.BlobChunk = minSize
 				}
-				reg.log.WithFields(logrus.Fields{
-					"size": host.BlobChunk,
-					"host": host.Name,
-				}).Debug("Registry requested min chunk size")
+				reg.slog.Debug("Registry requested min chunk size",
+					slog.Int64("size", host.BlobChunk),
+					slog.String("host", host.Name))
 			}
 		}
 	}
@@ -364,12 +359,11 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d descriptor.Descri
 		postURL := resp.HTTPResponse().Request.URL
 		putURL, err := postURL.Parse(location)
 		if err != nil {
-			reg.log.WithFields(logrus.Fields{
-				"digest":   d,
-				"target":   rTgt.CommonName(),
-				"location": location,
-				"err":      err,
-			}).Warn("Mount location header failed to parse")
+			reg.slog.Warn("Mount location header failed to parse",
+				slog.String("digest", d.Digest.String()),
+				slog.String("target", rTgt.CommonName()),
+				slog.String("location", location),
+				slog.String("err", err.Error()))
 		} else {
 			return putURL, uuid, errs.ErrMountReturnedLocation
 		}
@@ -532,21 +526,19 @@ func (reg *Reg) blobPutUploadChunked(ctx context.Context, r ref.Ref, d descripto
 			httpResp := resp.HTTPResponse()
 			// distribution-spec is 202, AWS ECR returns a 201 and rejects the put
 			if resp.HTTPResponse().StatusCode == 201 {
-				reg.log.WithFields(logrus.Fields{
-					"ref":        r.CommonName(),
-					"chunkStart": chunkStart,
-					"chunkSize":  chunkSize,
-				}).Debug("Early accept of chunk in PATCH before PUT request")
+				reg.slog.Debug("Early accept of chunk in PATCH before PUT request",
+					slog.String("ref", r.CommonName()),
+					slog.Int64("chunkStart", chunkStart),
+					slog.Int("chunkSize", chunkSize))
 			} else if resp.HTTPResponse().StatusCode >= 400 && resp.HTTPResponse().StatusCode < 500 &&
 				resp.HTTPResponse().Header.Get("Location") != "" &&
 				resp.HTTPResponse().Header.Get("Range") != "" {
 				retryCur++
-				reg.log.WithFields(logrus.Fields{
-					"ref":        r.CommonName(),
-					"chunkStart": chunkStart,
-					"chunkSize":  chunkSize,
-					"range":      resp.HTTPResponse().Header.Get("Range"),
-				}).Debug("Recoverable chunk upload error")
+				reg.slog.Debug("Recoverable chunk upload error",
+					slog.String("ref", r.CommonName()),
+					slog.Int64("chunkStart", chunkStart),
+					slog.Int("chunkSize", chunkSize),
+					slog.String("range", resp.HTTPResponse().Header.Get("Range")))
 			} else if resp.HTTPResponse().StatusCode != 202 {
 				retryCur++
 				statusResp, statusErr := reg.blobUploadStatus(ctx, r, &chunkURL)
@@ -568,9 +560,8 @@ func (reg *Reg) blobPutUploadChunked(ctx context.Context, r ref.Ref, d descripto
 			}
 			location := httpResp.Header.Get("Location")
 			if location != "" {
-				reg.log.WithFields(logrus.Fields{
-					"location": location,
-				}).Debug("Next chunk upload location received")
+				reg.slog.Debug("Next chunk upload location received",
+					slog.String("location", location))
 				prevURL := httpResp.Request.URL
 				parseURL, err := prevURL.Parse(location)
 				if err != nil {

@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/limitread"
 	"github.com/regclient/regclient/internal/reghttp"
@@ -49,7 +49,7 @@ func (reg *Reg) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.Ma
 	if mc.Manifest != nil {
 		if mr, ok := mc.Manifest.(manifest.Subjecter); ok {
 			sDesc, err := mr.GetSubject()
-			if err == nil && sDesc != nil && sDesc.MediaType != "" && sDesc.Size > 0 {
+			if err == nil && sDesc != nil && sDesc.Digest != "" {
 				// attempt to delete the referrer, but ignore if the referrer entry wasn't found
 				err = reg.referrerDelete(ctx, r, mc.Manifest)
 				if err != nil && !errors.Is(err, errs.ErrNotFound) {
@@ -214,9 +214,8 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 	} else if r.Tag != "" {
 		tagOrDigest = r.Tag
 	} else {
-		reg.log.WithFields(logrus.Fields{
-			"ref": r.Reference,
-		}).Warn("Manifest put requires a tag")
+		reg.slog.Warn("Manifest put requires a tag",
+			slog.String("ref", r.Reference))
 		return errs.ErrMissingTag
 	}
 	// dedup warnings
@@ -227,10 +226,9 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 	// create the request body
 	mj, err := m.MarshalJSON()
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"ref": r.Reference,
-			"err": err,
-		}).Warn("Error marshaling manifest")
+		reg.slog.Warn("Error marshaling manifest",
+			slog.String("ref", r.Reference),
+			slog.String("err", err.Error()))
 		return fmt.Errorf("error marshalling manifest for %s: %w", r.CommonName(), err)
 	}
 
@@ -281,7 +279,7 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 		if err != nil {
 			return err
 		}
-		if mDesc != nil && mDesc.MediaType != "" && mDesc.Size > 0 && mDesc.Digest.String() != "" {
+		if mDesc != nil && mDesc.Digest.String() != "" {
 			rSubj := r.SetDigest(mDesc.Digest.String())
 			reg.cacheRL.Delete(rSubj)
 			if mDesc.Digest.String() != resp.HTTPResponse().Header.Get(OCISubjectHeader) {

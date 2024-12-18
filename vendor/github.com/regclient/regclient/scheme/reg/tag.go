@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,7 +18,6 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/httplink"
 	"github.com/regclient/regclient/internal/reghttp"
@@ -160,9 +160,8 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 			return err
 		}
 	}
-	reg.log.WithFields(logrus.Fields{
-		"ref": r.Reference,
-	}).Debug("Sending dummy manifest to replace tag")
+	reg.slog.Debug("Sending dummy manifest to replace tag",
+		slog.String("ref", r.Reference))
 
 	// push empty layer
 	_, err = reg.BlobPut(ctx, r, descriptor.Descriptor{Digest: descriptor.EmptyDigest, Size: int64(len(descriptor.EmptyData))}, bytes.NewReader(descriptor.EmptyData))
@@ -185,10 +184,9 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 	r.Digest = tempManifest.GetDescriptor().Digest.String()
 
 	// delete manifest by digest
-	reg.log.WithFields(logrus.Fields{
-		"ref":    r.Reference,
-		"digest": r.Digest,
-	}).Debug("Deleting dummy manifest")
+	reg.slog.Debug("Deleting dummy manifest",
+		slog.String("ref", r.Reference),
+		slog.String("digest", r.Digest))
 	err = reg.ManifestDelete(ctx, r)
 	if err != nil {
 		return fmt.Errorf("failed deleting dummy manifest for %s: %w", r.CommonName(), err)
@@ -281,10 +279,9 @@ func (reg *Reg) tagListOCI(ctx context.Context, r ref.Ref, config scheme.TagConf
 	}
 	respBody, err := io.ReadAll(resp)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err": err,
-			"ref": r.CommonName(),
-		}).Warn("Failed to read tag list")
+		reg.slog.Warn("Failed to read tag list",
+			slog.String("err", err.Error()),
+			slog.String("ref", r.CommonName()))
 		return nil, fmt.Errorf("failed to read tags for %s: %w", r.CommonName(), err)
 	}
 	tl, err := tag.New(
@@ -293,11 +290,10 @@ func (reg *Reg) tagListOCI(ctx context.Context, r ref.Ref, config scheme.TagConf
 		tag.WithResp(resp.HTTPResponse()),
 	)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err":  err,
-			"body": respBody,
-			"ref":  r.CommonName(),
-		}).Warn("Failed to unmarshal tag list")
+		reg.slog.Warn("Failed to unmarshal tag list",
+			slog.String("err", err.Error()),
+			slog.String("body", string(respBody)),
+			slog.String("ref", r.CommonName()))
 		return tl, fmt.Errorf("failed to unmarshal tag list for %s: %w", r.CommonName(), err)
 	}
 
@@ -326,10 +322,9 @@ func (reg *Reg) tagListLink(ctx context.Context, r ref.Ref, _ scheme.TagConfig, 
 	}
 	respBody, err := io.ReadAll(resp)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err": err,
-			"ref": r.CommonName(),
-		}).Warn("Failed to read tag list")
+		reg.slog.Warn("Failed to read tag list",
+			slog.String("err", err.Error()),
+			slog.String("ref", r.CommonName()))
 		return nil, fmt.Errorf("failed to read tags for %s: %w", r.CommonName(), err)
 	}
 	tl, err := tag.New(
@@ -338,11 +333,10 @@ func (reg *Reg) tagListLink(ctx context.Context, r ref.Ref, _ scheme.TagConfig, 
 		tag.WithResp(resp.HTTPResponse()),
 	)
 	if err != nil {
-		reg.log.WithFields(logrus.Fields{
-			"err":  err,
-			"body": respBody,
-			"ref":  r.CommonName(),
-		}).Warn("Failed to unmarshal tag list")
+		reg.slog.Warn("Failed to unmarshal tag list",
+			slog.String("err", err.Error()),
+			slog.String("body", string(respBody)),
+			slog.String("ref", r.CommonName()))
 		return tl, fmt.Errorf("failed to unmarshal tag list for %s: %w", r.CommonName(), err)
 	}
 

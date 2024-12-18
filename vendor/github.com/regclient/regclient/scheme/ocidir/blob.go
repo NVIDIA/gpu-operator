@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/blob"
@@ -55,10 +54,9 @@ func (o *OCIDir) BlobGet(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 		blob.WithReader(fd),
 		blob.WithDesc(d),
 	)
-	o.log.WithFields(logrus.Fields{
-		"ref":  r.CommonName(),
-		"file": file,
-	}).Debug("retrieved blob")
+	o.slog.Debug("retrieved blob",
+		slog.String("ref", r.CommonName()),
+		slog.String("file", file))
 	return br, nil
 }
 
@@ -150,10 +148,9 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 	if err != nil {
 		return d, fmt.Errorf("failed to write blob (rename tmp file %s to %s): %w", path.Join(dir, tmpName), file, err)
 	}
-	o.log.WithFields(logrus.Fields{
-		"ref":  r.CommonName(),
-		"file": file,
-	}).Debug("pushed blob")
+	o.slog.Debug("pushed blob",
+		slog.String("ref", r.CommonName()),
+		slog.String("file", file))
 
 	o.mu.Lock()
 	o.refMod(r)

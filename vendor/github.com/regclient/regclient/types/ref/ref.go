@@ -29,7 +29,7 @@ var (
 	hostUpperS  = `(?:[a-zA-Z0-9]*[A-Z][a-zA-Z0-9-]*[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[A-Z][a-zA-Z0-9]*)`
 	registryS   = `(?:` + hostDomainS + `|` + hostPortS + `|` + hostUpperS + `|localhost(?:` + regexp.QuoteMeta(`:`) + `[0-9]+)?)`
 	repoPartS   = `[a-z0-9]+(?:(?:\.|_|__|-+)[a-z0-9]+)*`
-	pathS       = `[/a-zA-Z0-9_\-. ~]+`
+	pathS       = `[/a-zA-Z0-9_\-. ~\+]+`
 	tagS        = `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`
 	digestS     = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
 	schemeRE    = regexp.MustCompile(`^([a-z]+)://(.+)$`)
