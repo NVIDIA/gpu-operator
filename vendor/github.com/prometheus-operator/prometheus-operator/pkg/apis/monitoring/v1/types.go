@@ -233,6 +233,7 @@ type Condition struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// +kubebuilder:validation:MinLength=1
 type ConditionType string
 
 const (
@@ -253,6 +254,7 @@ const (
 	Reconciled ConditionType = "Reconciled"
 )
 
+// +kubebuilder:validation:MinLength=1
 type ConditionStatus string
 
 const (
@@ -930,3 +932,11 @@ type NativeHistogramConfig struct {
 	// +optional
 	NativeHistogramMinBucketFactor *resource.Quantity `json:"nativeHistogramMinBucketFactor,omitempty"`
 }
+
+// +kubebuilder:validation:Enum=RelabelConfig;RoleSelector
+type SelectorMechanism string
+
+const (
+	SelectorMechanismRelabel SelectorMechanism = "RelabelConfig"
+	SelectorMechanismRole    SelectorMechanism = "RoleSelector"
+)
