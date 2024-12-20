@@ -127,8 +127,8 @@ spec:
           volumeMounts:
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
-            - name: dmi-info-dir
-              mountPath: "/sys/class/dmi/id"
+            - name: host-sys
+              mountPath: /sys
               readOnly: true
             - name: config
               mountPath: /config
@@ -169,9 +169,9 @@ spec:
         - name: output-dir
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/features.d"
-        - name: dmi-info-dir
+        - name: host-sys
           hostPath:
-            path: "/sys/class/dmi/id"
+            path: /sys
         - name: run-nvidia-validations
           hostPath:
             path: "/run/nvidia/validations"
