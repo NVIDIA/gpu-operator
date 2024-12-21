@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/timejson"
 )
@@ -267,13 +266,13 @@ func (host Host) IsZero() bool {
 }
 
 // Merge adds fields from a new config host entry.
-func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
+func (host *Host) Merge(newHost Host, log *slog.Logger) error {
 	name := newHost.Name
 	if name == "" {
 		name = host.Name
 	}
 	if log == nil {
-		log = &logrus.Logger{Out: io.Discard}
+		log = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 	}
 
 	// merge the existing and new config host
@@ -296,62 +295,56 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 
 	if newHost.User != "" {
 		if host.User != "" && host.User != newHost.User {
-			log.WithFields(logrus.Fields{
-				"orig": host.User,
-				"new":  newHost.User,
-				"host": name,
-			}).Warn("Changing login user for registry")
+			log.Warn("Changing login user for registry",
+				slog.String("orig", host.User),
+				slog.String("new", newHost.User),
+				slog.String("host", name))
 		}
 		host.User = newHost.User
 	}
 
 	if newHost.Pass != "" {
 		if host.Pass != "" && host.Pass != newHost.Pass {
-			log.WithFields(logrus.Fields{
-				"host": name,
-			}).Warn("Changing login password for registry")
+			log.Warn("Changing login password for registry",
+				slog.String("host", name))
 		}
 		host.Pass = newHost.Pass
 	}
 
 	if newHost.Token != "" {
 		if host.Token != "" && host.Token != newHost.Token {
-			log.WithFields(logrus.Fields{
-				"host": name,
-			}).Warn("Changing login token for registry")
+			log.Warn("Changing login token for registry",
+				slog.String("host", name))
 		}
 		host.Token = newHost.Token
 	}
 
 	if newHost.CredHelper != "" {
 		if host.CredHelper != "" && host.CredHelper != newHost.CredHelper {
-			log.WithFields(logrus.Fields{
-				"host": name,
-				"orig": host.CredHelper,
-				"new":  newHost.CredHelper,
-			}).Warn("Changing credential helper for registry")
+			log.Warn("Changing credential helper for registry",
+				slog.String("host", name),
+				slog.String("orig", host.CredHelper),
+				slog.String("new", newHost.CredHelper))
 		}
 		host.CredHelper = newHost.CredHelper
 	}
 
 	if newHost.CredExpire != 0 {
 		if host.CredExpire != 0 && host.CredExpire != newHost.CredExpire {
-			log.WithFields(logrus.Fields{
-				"host": name,
-				"orig": host.CredExpire,
-				"new":  newHost.CredExpire,
-			}).Warn("Changing credential expire for registry")
+			log.Warn("Changing credential expire for registry",
+				slog.String("host", name),
+				slog.Any("orig", host.CredExpire),
+				slog.Any("new", newHost.CredExpire))
 		}
 		host.CredExpire = newHost.CredExpire
 	}
 
 	if newHost.CredHost != "" {
 		if host.CredHost != "" && host.CredHost != newHost.CredHost {
-			log.WithFields(logrus.Fields{
-				"host": name,
-				"orig": host.CredHost,
-				"new":  newHost.CredHost,
-			}).Warn("Changing credential host for registry")
+			log.Warn("Changing credential host for registry",
+				slog.String("host", name),
+				slog.String("orig", host.CredHost),
+				slog.String("new", newHost.CredHost))
 		}
 		host.CredHost = newHost.CredHost
 	}
@@ -360,53 +353,48 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 		if host.TLS != TLSUndefined && host.TLS != newHost.TLS {
 			tlsOrig, _ := host.TLS.MarshalText()
 			tlsNew, _ := newHost.TLS.MarshalText()
-			log.WithFields(logrus.Fields{
-				"orig": string(tlsOrig),
-				"new":  string(tlsNew),
-				"host": name,
-			}).Warn("Changing TLS settings for registry")
+			log.Warn("Changing TLS settings for registry",
+				slog.String("orig", string(tlsOrig)),
+				slog.String("new", string(tlsNew)),
+				slog.String("host", name))
 		}
 		host.TLS = newHost.TLS
 	}
 
 	if newHost.RegCert != "" {
 		if host.RegCert != "" && host.RegCert != newHost.RegCert {
-			log.WithFields(logrus.Fields{
-				"orig": host.RegCert,
-				"new":  newHost.RegCert,
-				"host": name,
-			}).Warn("Changing certificate settings for registry")
+			log.Warn("Changing certificate settings for registry",
+				slog.String("orig", host.RegCert),
+				slog.String("new", newHost.RegCert),
+				slog.String("host", name))
 		}
 		host.RegCert = newHost.RegCert
 	}
 
 	if newHost.ClientCert != "" {
 		if host.ClientCert != "" && host.ClientCert != newHost.ClientCert {
-			log.WithFields(logrus.Fields{
-				"orig": host.ClientCert,
-				"new":  newHost.ClientCert,
-				"host": name,
-			}).Warn("Changing client certificate settings for registry")
+			log.Warn("Changing client certificate settings for registry",
+				slog.String("orig", host.ClientCert),
+				slog.String("new", newHost.ClientCert),
+				slog.String("host", name))
 		}
 		host.ClientCert = newHost.ClientCert
 	}
 
 	if newHost.ClientKey != "" {
 		if host.ClientKey != "" && host.ClientKey != newHost.ClientKey {
-			log.WithFields(logrus.Fields{
-				"host": name,
-			}).Warn("Changing client certificate key settings for registry")
+			log.Warn("Changing client certificate key settings for registry",
+				slog.String("host", name))
 		}
 		host.ClientKey = newHost.ClientKey
 	}
 
 	if newHost.Hostname != "" {
 		if host.Hostname != "" && host.Hostname != newHost.Hostname {
-			log.WithFields(logrus.Fields{
-				"orig": host.Hostname,
-				"new":  newHost.Hostname,
-				"host": name,
-			}).Warn("Changing hostname settings for registry")
+			log.Warn("Changing hostname settings for registry",
+				slog.String("orig", host.Hostname),
+				slog.String("new", newHost.Hostname),
+				slog.String("host", name))
 		}
 		host.Hostname = newHost.Hostname
 	}
@@ -414,33 +402,30 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 	if newHost.PathPrefix != "" {
 		newHost.PathPrefix = strings.Trim(newHost.PathPrefix, "/") // leading and trailing / are not needed
 		if host.PathPrefix != "" && host.PathPrefix != newHost.PathPrefix {
-			log.WithFields(logrus.Fields{
-				"orig": host.PathPrefix,
-				"new":  newHost.PathPrefix,
-				"host": name,
-			}).Warn("Changing path prefix settings for registry")
+			log.Warn("Changing path prefix settings for registry",
+				slog.String("orig", host.PathPrefix),
+				slog.String("new", newHost.PathPrefix),
+				slog.String("host", name))
 		}
 		host.PathPrefix = newHost.PathPrefix
 	}
 
 	if len(newHost.Mirrors) > 0 {
 		if len(host.Mirrors) > 0 && !stringSliceEq(host.Mirrors, newHost.Mirrors) {
-			log.WithFields(logrus.Fields{
-				"orig": host.Mirrors,
-				"new":  newHost.Mirrors,
-				"host": name,
-			}).Warn("Changing mirror settings for registry")
+			log.Warn("Changing mirror settings for registry",
+				slog.Any("orig", host.Mirrors),
+				slog.Any("new", newHost.Mirrors),
+				slog.String("host", name))
 		}
 		host.Mirrors = newHost.Mirrors
 	}
 
 	if newHost.Priority != 0 {
 		if host.Priority != 0 && host.Priority != newHost.Priority {
-			log.WithFields(logrus.Fields{
-				"orig": host.Priority,
-				"new":  newHost.Priority,
-				"host": name,
-			}).Warn("Changing priority settings for registry")
+			log.Warn("Changing priority settings for registry",
+				slog.Uint64("orig", uint64(host.Priority)),
+				slog.Uint64("new", uint64(newHost.Priority)),
+				slog.String("host", name))
 		}
 		host.Priority = newHost.Priority
 	}
@@ -451,10 +436,9 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 
 	// TODO: eventually delete
 	if newHost.API != "" {
-		log.WithFields(logrus.Fields{
-			"api":  newHost.API,
-			"host": name,
-		}).Warn("API field has been deprecated")
+		log.Warn("API field has been deprecated",
+			slog.String("api", newHost.API),
+			slog.String("host", name))
 	}
 
 	if len(newHost.APIOpts) > 0 {
@@ -462,12 +446,11 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 			merged := copyMapString(host.APIOpts)
 			for k, v := range newHost.APIOpts {
 				if host.APIOpts[k] != "" && host.APIOpts[k] != v {
-					log.WithFields(logrus.Fields{
-						"orig": host.APIOpts[k],
-						"new":  newHost.APIOpts[k],
-						"opt":  k,
-						"host": name,
-					}).Warn("Changing APIOpts setting for registry")
+					log.Warn("Changing APIOpts setting for registry",
+						slog.String("orig", host.APIOpts[k]),
+						slog.String("new", newHost.APIOpts[k]),
+						slog.String("opt", k),
+						slog.String("host", name))
 				}
 				merged[k] = v
 			}
@@ -479,44 +462,40 @@ func (host *Host) Merge(newHost Host, log *logrus.Logger) error {
 
 	if newHost.BlobChunk > 0 {
 		if host.BlobChunk != 0 && host.BlobChunk != newHost.BlobChunk {
-			log.WithFields(logrus.Fields{
-				"orig": host.BlobChunk,
-				"new":  newHost.BlobChunk,
-				"host": name,
-			}).Warn("Changing blobChunk settings for registry")
+			log.Warn("Changing blobChunk settings for registry",
+				slog.Int64("orig", host.BlobChunk),
+				slog.Int64("new", newHost.BlobChunk),
+				slog.String("host", name))
 		}
 		host.BlobChunk = newHost.BlobChunk
 	}
 
 	if newHost.BlobMax != 0 {
 		if host.BlobMax != 0 && host.BlobMax != newHost.BlobMax {
-			log.WithFields(logrus.Fields{
-				"orig": host.BlobMax,
-				"new":  newHost.BlobMax,
-				"host": name,
-			}).Warn("Changing blobMax settings for registry")
+			log.Warn("Changing blobMax settings for registry",
+				slog.Int64("orig", host.BlobMax),
+				slog.Int64("new", newHost.BlobMax),
+				slog.String("host", name))
 		}
 		host.BlobMax = newHost.BlobMax
 	}
 
 	if newHost.ReqPerSec != 0 {
 		if host.ReqPerSec != 0 && host.ReqPerSec != newHost.ReqPerSec {
-			log.WithFields(logrus.Fields{
-				"orig": host.ReqPerSec,
-				"new":  newHost.ReqPerSec,
-				"host": name,
-			}).Warn("Changing reqPerSec settings for registry")
+			log.Warn("Changing reqPerSec settings for registry",
+				slog.Float64("orig", host.ReqPerSec),
+				slog.Float64("new", newHost.ReqPerSec),
+				slog.String("host", name))
 		}
 		host.ReqPerSec = newHost.ReqPerSec
 	}
 
 	if newHost.ReqConcurrent > 0 {
 		if host.ReqConcurrent != 0 && host.ReqConcurrent != newHost.ReqConcurrent {
-			log.WithFields(logrus.Fields{
-				"orig": host.ReqConcurrent,
-				"new":  newHost.ReqConcurrent,
-				"host": name,
-			}).Warn("Changing reqPerSec settings for registry")
+			log.Warn("Changing reqPerSec settings for registry",
+				slog.Int64("orig", host.ReqConcurrent),
+				slog.Int64("new", newHost.ReqConcurrent),
+				slog.String("host", name))
 		}
 		host.ReqConcurrent = newHost.ReqConcurrent
 	}

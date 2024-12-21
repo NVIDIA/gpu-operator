@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	_ "crypto/sha512"
 
 	digest "github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/pkg/archive"
 	"github.com/regclient/regclient/scheme"
@@ -96,6 +96,8 @@ type imageOpt struct {
 	platform        string
 	platforms       []string
 	referrerConfs   []scheme.ReferrerConfig
+	referrerSrc     ref.Ref
+	referrerTgt     ref.Ref
 	tagList         []string
 	mu              sync.Mutex
 	seen            map[string]*imageSeen
@@ -225,6 +227,20 @@ func ImageWithReferrers(rOpts ...scheme.ReferrerOpts) ImageOpts {
 	}
 }
 
+// ImageWithReferrerSrc specifies an alternate repository to pull referrers from.
+func ImageWithReferrerSrc(src ref.Ref) ImageOpts {
+	return func(opts *imageOpt) {
+		opts.referrerSrc = src
+	}
+}
+
+// ImageWithReferrerTgt specifies an alternate repository to pull referrers from.
+func ImageWithReferrerTgt(tgt ref.Ref) ImageOpts {
+	return func(opts *imageOpt) {
+		opts.referrerTgt = tgt
+	}
+}
+
 // ImageCheckBase returns nil if the base image is unchanged.
 // A base image mismatch returns an error that wraps errs.ErrMismatch.
 func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...ImageOpts) error {
@@ -279,17 +295,15 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 			return err
 		}
 		if baseMH.GetDescriptor().Digest == expectDig {
-			rc.log.WithFields(logrus.Fields{
-				"name":   baseR.CommonName(),
-				"digest": baseMH.GetDescriptor().Digest.String(),
-			}).Debug("base image digest matches")
+			rc.slog.Debug("base image digest matches",
+				slog.String("name", baseR.CommonName()),
+				slog.String("digest", baseMH.GetDescriptor().Digest.String()))
 			return nil
 		} else {
-			rc.log.WithFields(logrus.Fields{
-				"name":     baseR.CommonName(),
-				"digest":   baseMH.GetDescriptor().Digest.String(),
-				"expected": expectDig.String(),
-			}).Debug("base image digest changed")
+			rc.slog.Debug("base image digest changed",
+				slog.String("name", baseR.CommonName()),
+				slog.String("digest", baseMH.GetDescriptor().Digest.String()),
+				slog.String("expected", expectDig.String()))
 			return fmt.Errorf("base digest changed, %s, expected %s, received %s%.0w",
 				baseR.CommonName(), expectDig.String(), baseMH.GetDescriptor().Digest.String(), errs.ErrMismatch)
 		}
@@ -383,11 +397,10 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 			return fmt.Errorf("image has fewer layers than base image")
 		}
 		if !layers[i].Same(baseLayers[i]) {
-			rc.log.WithFields(logrus.Fields{
-				"layer":    i,
-				"expected": layers[i].Digest.String(),
-				"digest":   baseLayers[i].Digest.String(),
-			}).Debug("image layer changed")
+			rc.slog.Debug("image layer changed",
+				slog.Int("layer", i),
+				slog.String("expected", layers[i].Digest.String()),
+				slog.String("digest", baseLayers[i].Digest.String()))
 			return fmt.Errorf("base layer changed, %s[%d], expected %s, received %s%.0w",
 				baseR.CommonName(), i, layers[i].Digest.String(), baseLayers[i].Digest.String(), errs.ErrMismatch)
 		}
@@ -425,19 +438,17 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 			!baseConfOCI.History[i].Created.Equal(*confOCI.History[i].Created) ||
 			baseConfOCI.History[i].CreatedBy != confOCI.History[i].CreatedBy ||
 			baseConfOCI.History[i].EmptyLayer != confOCI.History[i].EmptyLayer {
-			rc.log.WithFields(logrus.Fields{
-				"index":    i,
-				"expected": confOCI.History[i],
-				"history":  baseConfOCI.History[i],
-			}).Debug("image history changed")
+			rc.slog.Debug("image history changed",
+				slog.Int("index", i),
+				slog.Any("expected", confOCI.History[i]),
+				slog.Any("history", baseConfOCI.History[i]))
 			return fmt.Errorf("base history changed, %s[%d], expected %v, received %v%.0w",
 				baseR.CommonName(), i, confOCI.History[i], baseConfOCI.History[i], errs.ErrMismatch)
 		}
 	}
 
-	rc.log.WithFields(logrus.Fields{
-		"base": baseR.CommonName(),
-	}).Debug("base image layers and history matches")
+	rc.slog.Debug("base image layers and history matches",
+		slog.String("base", baseR.CommonName()))
 	return nil
 }
 
@@ -539,6 +550,7 @@ func (rc *RegClient) ImageCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.R
 func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt ref.Ref, d descriptor.Descriptor, child bool, parents []digest.Digest, opt *imageOpt) (err error) {
 	var mSrc, mTgt manifest.Manifest
 	var sDig digest.Digest
+	refTgtRepo := refTgt.SetTag("").CommonName()
 	seenCB := func(error) {}
 	defer func() {
 		if seenCB != nil {
@@ -552,7 +564,7 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		sDig = digest.Digest(refSrc.Digest)
 	}
 	if sDig != "" {
-		if seenCB, err = imageSeenOrWait(ctx, opt, refTgt.Tag, sDig, parents); seenCB == nil {
+		if seenCB, err = imageSeenOrWait(ctx, opt, refTgtRepo, refTgt.Tag, sDig, parents); seenCB == nil {
 			return err
 		}
 	}
@@ -570,7 +582,7 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 				return fmt.Errorf("copy failed, error getting source: %w", err)
 			}
 			sDig = mSrc.GetDescriptor().Digest
-			if seenCB, err = imageSeenOrWait(ctx, opt, refTgt.Tag, sDig, parents); seenCB == nil {
+			if seenCB, err = imageSeenOrWait(ctx, opt, refTgtRepo, refTgt.Tag, sDig, parents); seenCB == nil {
 				return err
 			}
 		}
@@ -588,7 +600,7 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 			return fmt.Errorf("copy failed, error getting source: %w", err)
 		}
 		sDig = mSrc.GetDescriptor().Digest
-		if seenCB, err = imageSeenOrWait(ctx, opt, refTgt.Tag, sDig, parents); seenCB == nil {
+		if seenCB, err = imageSeenOrWait(ctx, opt, refTgtRepo, refTgt.Tag, sDig, parents); seenCB == nil {
 			return err
 		}
 	}
@@ -600,7 +612,7 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		}
 		if sDig == "" {
 			sDig = mSrc.GetDescriptor().Digest
-			if seenCB, err = imageSeenOrWait(ctx, opt, refTgt.Tag, sDig, parents); seenCB == nil {
+			if seenCB, err = imageSeenOrWait(ctx, opt, refTgtRepo, refTgt.Tag, sDig, parents); seenCB == nil {
 				return err
 			}
 		}
@@ -639,9 +651,8 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 					return err
 				}
 				if !match {
-					rc.log.WithFields(logrus.Fields{
-						"platform": dEntry.Platform,
-					}).Debug("Platform excluded from copy")
+					rc.slog.Debug("Platform excluded from copy",
+						slog.Any("platform", dEntry.Platform))
 					continue
 				}
 			}
@@ -649,10 +660,9 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 			waitCount++
 			go func() {
 				var err error
-				rc.log.WithFields(logrus.Fields{
-					"platform": dEntry.Platform,
-					"digest":   dEntry.Digest.String(),
-				}).Debug("Copy platform")
+				rc.slog.Debug("Copy platform",
+					slog.Any("platform", dEntry.Platform),
+					slog.String("digest", dEntry.Digest.String()))
 				entrySrc := refSrc.SetDigest(dEntry.Digest.String())
 				entryTgt := refTgt.SetDigest(dEntry.Digest.String())
 				switch dEntry.MediaType {
@@ -687,28 +697,25 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		if err != nil {
 			// docker schema v1 does not have a config object, ignore if it's missing
 			if !errors.Is(err, errs.ErrUnsupportedMediaType) {
-				rc.log.WithFields(logrus.Fields{
-					"ref": refSrc.Reference,
-					"err": err,
-				}).Warn("Failed to get config digest from manifest")
+				rc.slog.Warn("Failed to get config digest from manifest",
+					slog.String("ref", refSrc.Reference),
+					slog.String("err", err.Error()))
 				return fmt.Errorf("failed to get config digest for %s: %w", refSrc.CommonName(), err)
 			}
 		} else {
 			waitCount++
 			go func() {
-				rc.log.WithFields(logrus.Fields{
-					"source": refSrc.Reference,
-					"target": refTgt.Reference,
-					"digest": cd.Digest.String(),
-				}).Info("Copy config")
+				rc.slog.Info("Copy config",
+					slog.String("source", refSrc.Reference),
+					slog.String("target", refTgt.Reference),
+					slog.String("digest", cd.Digest.String()))
 				err := rc.imageCopyBlob(ctx, refSrc, refTgt, cd, opt, bOpt...)
 				if err != nil && !errors.Is(err, context.Canceled) {
-					rc.log.WithFields(logrus.Fields{
-						"source": refSrc.Reference,
-						"target": refTgt.Reference,
-						"digest": cd.Digest.String(),
-						"err":    err,
-					}).Warn("Failed to copy config")
+					rc.slog.Warn("Failed to copy config",
+						slog.String("source", refSrc.Reference),
+						slog.String("target", refTgt.Reference),
+						slog.String("digest", cd.Digest.String()),
+						slog.String("err", err.Error()))
 				}
 				waitCh <- err
 			}()
@@ -722,30 +729,27 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		for _, layerSrc := range l {
 			if len(layerSrc.URLs) > 0 && !opt.includeExternal {
 				// skip blobs where the URLs are defined, these aren't hosted and won't be pulled from the source
-				rc.log.WithFields(logrus.Fields{
-					"source":        refSrc.Reference,
-					"target":        refTgt.Reference,
-					"layer":         layerSrc.Digest.String(),
-					"external-urls": layerSrc.URLs,
-				}).Debug("Skipping external layer")
+				rc.slog.Debug("Skipping external layer",
+					slog.String("source", refSrc.Reference),
+					slog.String("target", refTgt.Reference),
+					slog.String("layer", layerSrc.Digest.String()),
+					slog.Any("external-urls", layerSrc.URLs))
 				continue
 			}
 			waitCount++
 			layerSrc := layerSrc
 			go func() {
-				rc.log.WithFields(logrus.Fields{
-					"source": refSrc.Reference,
-					"target": refTgt.Reference,
-					"layer":  layerSrc.Digest.String(),
-				}).Info("Copy layer")
+				rc.slog.Info("Copy layer",
+					slog.String("source", refSrc.Reference),
+					slog.String("target", refTgt.Reference),
+					slog.String("layer", layerSrc.Digest.String()))
 				err := rc.imageCopyBlob(ctx, refSrc, refTgt, layerSrc, opt, bOpt...)
 				if err != nil && !errors.Is(err, context.Canceled) {
-					rc.log.WithFields(logrus.Fields{
-						"source": refSrc.Reference,
-						"target": refTgt.Reference,
-						"layer":  layerSrc.Digest.String(),
-						"err":    err,
-					}).Warn("Failed to copy layer")
+					rc.slog.Warn("Failed to copy layer",
+						slog.String("source", refSrc.Reference),
+						slog.String("target", refTgt.Reference),
+						slog.String("layer", layerSrc.Digest.String()),
+						slog.String("err", err.Error()))
 				}
 				waitCh <- err
 			}()
@@ -778,21 +782,36 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		}
 	}
 	if err != nil {
-		rc.log.WithFields(logrus.Fields{
-			"err":  err,
-			"sDig": sDig,
-		}).Debug("child manifest copy failed")
+		rc.slog.Debug("child manifest copy failed",
+			slog.String("err", err.Error()),
+			slog.String("sDig", sDig.String()))
 		return err
 	}
 
 	// copy referrers
 	referrerTags := []string{}
 	if opt.referrerConfs != nil {
-		rl, err := rc.ReferrerList(ctx, refSrc)
+		referrerOpts := []scheme.ReferrerOpts{}
+		rSubject := refSrc
+		referrerSrc := refSrc
+		referrerTgt := refTgt
+		if opt.referrerSrc.IsSet() {
+			referrerOpts = append(referrerOpts, scheme.WithReferrerSource(opt.referrerSrc))
+			referrerSrc = opt.referrerSrc
+		}
+		if opt.referrerTgt.IsSet() {
+			referrerTgt = opt.referrerTgt
+		}
+		if sDig != "" {
+			rSubject = rSubject.SetDigest(sDig.String())
+		}
+		rl, err := rc.ReferrerList(ctx, rSubject, referrerOpts...)
 		if err != nil {
 			return err
 		}
-		referrerTags = append(referrerTags, rl.Tags...)
+		if !rl.Source.IsSet() || ref.EqualRepository(refSrc, rl.Source) {
+			referrerTags = append(referrerTags, rl.Tags...)
+		}
 		descList := []descriptor.Descriptor{}
 		if len(opt.referrerConfs) == 0 {
 			descList = rl.Descriptors
@@ -809,8 +828,8 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 			if seen != nil {
 				continue // skip referrers that have been seen
 			}
-			referrerSrc := refSrc.SetDigest(rDesc.Digest.String())
-			referrerTgt := refTgt.SetDigest(rDesc.Digest.String())
+			referrerSrc := referrerSrc.SetDigest(rDesc.Digest.String())
+			referrerTgt := referrerTgt.SetDigest(rDesc.Digest.String())
 			rDesc := rDesc
 			waitCount++
 			go func() {
@@ -825,11 +844,10 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 					waitCh <- nil
 				} else {
 					if err != nil && !errors.Is(err, context.Canceled) {
-						rc.log.WithFields(logrus.Fields{
-							"digest": rDesc.Digest.String(),
-							"src":    referrerSrc.CommonName(),
-							"tgt":    referrerTgt.CommonName(),
-						}).Warn("Failed to copy referrer")
+						rc.slog.Warn("Failed to copy referrer",
+							slog.String("digest", rDesc.Digest.String()),
+							slog.String("src", referrerSrc.CommonName()),
+							slog.String("tgt", referrerTgt.CommonName()))
 					}
 					waitCh <- err
 				}
@@ -845,19 +863,17 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 			tl, err := rc.TagList(ctx, refSrc)
 			if err != nil {
 				opt.mu.Unlock()
-				rc.log.WithFields(logrus.Fields{
-					"source": refSrc.Reference,
-					"err":    err,
-				}).Warn("Failed to list tags for digest-tag copy")
+				rc.slog.Warn("Failed to list tags for digest-tag copy",
+					slog.String("source", refSrc.Reference),
+					slog.String("err", err.Error()))
 				return err
 			}
 			tags, err := tl.GetTags()
 			if err != nil {
 				opt.mu.Unlock()
-				rc.log.WithFields(logrus.Fields{
-					"source": refSrc.Reference,
-					"err":    err,
-				}).Warn("Failed to list tags for digest-tag copy")
+				rc.slog.Warn("Failed to list tags for digest-tag copy",
+					slog.String("source", refSrc.Reference),
+					slog.String("err", err.Error()))
 				return err
 			}
 			if tags == nil {
@@ -896,11 +912,10 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 						waitCh <- nil
 					} else {
 						if err != nil && !errors.Is(err, context.Canceled) {
-							rc.log.WithFields(logrus.Fields{
-								"tag": tag,
-								"src": refTagSrc.CommonName(),
-								"tgt": refTagTgt.CommonName(),
-							}).Warn("Failed to copy digest-tag")
+							rc.slog.Warn("Failed to copy digest-tag",
+								slog.String("tag", tag),
+								slog.String("src", refTagSrc.CommonName()),
+								slog.String("tgt", refTagTgt.CommonName()))
 						}
 						waitCh <- err
 					}
@@ -936,10 +951,9 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		err = rc.ManifestPut(ctx, refTgt, mSrc, mOpts...)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				rc.log.WithFields(logrus.Fields{
-					"target": refTgt.Reference,
-					"err":    err,
-				}).Warn("Failed to push manifest")
+				rc.slog.Warn("Failed to push manifest",
+					slog.String("target", refTgt.Reference),
+					slog.String("err", err.Error()))
 			}
 			return err
 		}
@@ -960,7 +974,7 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 }
 
 func (rc *RegClient) imageCopyBlob(ctx context.Context, refSrc ref.Ref, refTgt ref.Ref, d descriptor.Descriptor, opt *imageOpt, bOpt ...BlobOpts) error {
-	seenCB, err := imageSeenOrWait(ctx, opt, "", d.Digest, []digest.Digest{})
+	seenCB, err := imageSeenOrWait(ctx, opt, refTgt.SetTag("").CommonName(), "", d.Digest, []digest.Digest{})
 	if seenCB == nil {
 		return err
 	}
@@ -971,9 +985,9 @@ func (rc *RegClient) imageCopyBlob(ctx context.Context, refSrc ref.Ref, refTgt r
 
 // imageSeenOrWait returns either a callback to report the error when the digest hasn't been seen before
 // or it will wait for the previous copy to run and return the error from that copy
-func imageSeenOrWait(ctx context.Context, opt *imageOpt, tag string, dig digest.Digest, parents []digest.Digest) (func(error), error) {
+func imageSeenOrWait(ctx context.Context, opt *imageOpt, repo, tag string, dig digest.Digest, parents []digest.Digest) (func(error), error) {
 	var seenNew *imageSeen
-	key := tag + ":" + dig.String()
+	key := repo + "/" + tag + ":" + dig.String()
 	opt.mu.Lock()
 	seen := opt.seen[key]
 	if seen == nil {
@@ -992,7 +1006,7 @@ func imageSeenOrWait(ctx context.Context, opt *imageOpt, tag string, dig digest.
 		}
 		// look for loops in parents
 		for _, p := range parents {
-			if key == tag+":"+p.String() {
+			if key == repo+"/"+tag+":"+p.String() {
 				return nil, errs.ErrLoopDetected
 			}
 		}
@@ -1068,10 +1082,9 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 	// retrieve image manifest
 	m, err := rc.ManifestGet(ctx, r)
 	if err != nil {
-		rc.log.WithFields(logrus.Fields{
-			"ref": r.CommonName(),
-			"err": err,
-		}).Warn("Failed to get manifest")
+		rc.slog.Warn("Failed to get manifest",
+			slog.String("ref", r.CommonName()),
+			slog.String("err", err.Error()))
 		return err
 	}
 
@@ -1383,10 +1396,9 @@ func (rc *RegClient) imageImportDockerAddLayerHandlers(ctx context.Context, r re
 			}
 		}
 		if !found {
-			rc.log.WithFields(logrus.Fields{
-				"tags": tags,
-				"name": trd.name,
-			}).Warn("Could not find requested name")
+			rc.slog.Warn("Could not find requested name",
+				slog.Any("tags", tags),
+				slog.String("name", trd.name))
 			return
 		}
 	}
@@ -1476,9 +1488,8 @@ func (rc *RegClient) imageImportOCIAddHandler(ctx context.Context, r ref.Ref, tr
 		}
 		if ociLayout.Version != ociLayoutVersion {
 			// unknown version, ignore
-			rc.log.WithFields(logrus.Fields{
-				"version": ociLayout.Version,
-			}).Warn("Unsupported oci-layout version")
+			rc.slog.Warn("Unsupported oci-layout version",
+				slog.String("version", ociLayout.Version))
 			return nil
 		}
 		foundLayout = true

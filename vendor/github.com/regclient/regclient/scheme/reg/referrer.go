@@ -15,7 +15,6 @@ import (
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/mediatype"
 	v1 "github.com/regclient/regclient/types/oci/v1"
-	"github.com/regclient/regclient/types/platform"
 	"github.com/regclient/regclient/types/ref"
 	"github.com/regclient/regclient/types/referrer"
 	"github.com/regclient/regclient/types/warning"
@@ -23,80 +22,33 @@ import (
 
 const OCISubjectHeader = "OCI-Subject"
 
-// ReferrerList returns a list of referrers to a given reference
-func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.ReferrerOpts) (referrer.ReferrerList, error) {
+// ReferrerList returns a list of referrers to a given reference.
+// The reference must include the digest. Use [regclient.ReferrerList] to resolve the platform or tag.
+func (reg *Reg) ReferrerList(ctx context.Context, rSubject ref.Ref, opts ...scheme.ReferrerOpts) (referrer.ReferrerList, error) {
 	config := scheme.ReferrerConfig{}
 	for _, opt := range opts {
 		opt(&config)
 	}
+	var r ref.Ref
+	if config.SrcRepo.IsSet() {
+		r = config.SrcRepo.SetDigest(rSubject.Digest)
+	} else {
+		r = rSubject.SetDigest(rSubject.Digest)
+	}
 	rl := referrer.ReferrerList{
 		Tags: []string{},
+	}
+	if rSubject.Digest == "" {
+		return rl, fmt.Errorf("digest required to query referrers %s", rSubject.CommonName())
 	}
 	// dedup warnings
 	if w := warning.FromContext(ctx); w == nil {
 		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
 	}
-	// select a platform from a manifest list
-	if config.Platform != "" {
-		p, err := platform.Parse(config.Platform)
-		if err != nil {
-			return rl, err
-		}
-		m, err := reg.ManifestHead(ctx, r)
-		if err != nil {
-			return rl, err
-		}
-		if m.GetDescriptor().Digest.String() == "" {
-			m, err = reg.ManifestGet(ctx, r)
-			if err != nil {
-				return rl, err
-			}
-		}
-		for m.IsList() {
-			m, err = reg.ManifestGet(ctx, r)
-			if err != nil {
-				return rl, err
-			}
-			d, err := manifest.GetPlatformDesc(m, &p)
-			if err != nil {
-				return rl, err
-			}
-			m, err = reg.ManifestHead(ctx, r.SetDigest(d.Digest.String()))
-			if err != nil {
-				return rl, err
-			}
-			if m.GetDescriptor().Digest.String() == "" {
-				m, err = reg.ManifestGet(ctx, r.SetDigest(d.Digest.String()))
-				if err != nil {
-					return rl, err
-				}
-			}
-		}
-		r = r.SetDigest(m.GetDescriptor().Digest.String())
-	}
-	// if ref is a tag, run a head request for the digest
-	if r.Digest == "" {
-		m, err := reg.ManifestHead(ctx, r)
-		if err != nil {
-			return rl, err
-		}
-		if m.GetDescriptor().Digest == "" {
-			m, err = reg.ManifestGet(ctx, r)
-			if err != nil {
-				return rl, err
-			}
-		}
-		if m.GetDescriptor().Digest == "" {
-			return rl, fmt.Errorf("unable to resolve digest for ref %s", r.CommonName())
-		}
-		r = r.SetDigest(m.GetDescriptor().Digest.String())
-	}
-	rl.Subject = r
 
 	found := false
 	// try cache
-	rCache := r.SetDigest(r.Digest)
-	rl, err := reg.cacheRL.Get(rCache)
+	rl, err := reg.cacheRL.Get(r)
 	if err == nil {
 		found = true
 	}
@@ -113,7 +65,7 @@ func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Refe
 			if err == nil {
 				if config.MatchOpt.ArtifactType == "" {
 					// only cache if successful and artifactType is not filtered
-					reg.cacheRL.Set(rCache, rl)
+					reg.cacheRL.Set(r, rl)
 				}
 				found = true
 			}
@@ -123,8 +75,12 @@ func (reg *Reg) ReferrerList(ctx context.Context, r ref.Ref, opts ...scheme.Refe
 	if !found {
 		rl, err = reg.referrerListByTag(ctx, r)
 		if err == nil {
-			reg.cacheRL.Set(rCache, rl)
+			reg.cacheRL.Set(r, rl)
 		}
+	}
+	rl.Subject = rSubject
+	if config.SrcRepo.IsSet() {
+		rl.Source = config.SrcRepo
 	}
 	if err != nil {
 		return rl, err
@@ -290,7 +246,7 @@ func (reg *Reg) referrerDelete(ctx context.Context, r ref.Ref, m manifest.Manife
 		return err
 	}
 	// validate/set subject descriptor
-	if subject == nil || subject.MediaType == "" || subject.Digest == "" || subject.Size <= 0 {
+	if subject == nil || subject.Digest == "" {
 		return fmt.Errorf("refers is not set%.0w", errs.ErrNotFound)
 	}
 
@@ -343,7 +299,7 @@ func (reg *Reg) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest)
 		return err
 	}
 	// validate/set subject descriptor
-	if subject == nil || subject.MediaType == "" || subject.Digest == "" || subject.Size <= 0 {
+	if subject == nil || subject.Digest == "" {
 		return fmt.Errorf("subject is not set%.0w", errs.ErrNotFound)
 	}
 
@@ -366,7 +322,7 @@ func (reg *Reg) referrerPut(ctx context.Context, r ref.Ref, m manifest.Manifest)
 		if err != nil {
 			return err
 		}
-		if mDesc != nil && mDesc.MediaType != "" && mDesc.Size > 0 {
+		if mDesc != nil && mDesc.Digest != "" {
 			return fmt.Errorf("fallback referrers manifest should not have a subject: %s", rSubject.CommonName())
 		}
 	}

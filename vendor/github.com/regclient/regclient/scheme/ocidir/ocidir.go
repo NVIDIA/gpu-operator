@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/internal/pqueue"
 	"github.com/regclient/regclient/internal/reqmeta"
@@ -32,7 +31,7 @@ const (
 
 // OCIDir is used for accessing OCI Image Layouts defined as a directory
 type OCIDir struct {
-	log         *logrus.Logger
+	slog        *slog.Logger
 	gc          bool
 	modRefs     map[string]*ociGC
 	throttle    map[string]*pqueue.Queue[reqmeta.Data]
@@ -47,7 +46,7 @@ type ociGC struct {
 
 type ociConf struct {
 	gc       bool
-	log      *logrus.Logger
+	slog     *slog.Logger
 	throttle int
 }
 
@@ -57,7 +56,7 @@ type Opts func(*ociConf)
 // New creates a new OCIDir with options
 func New(opts ...Opts) *OCIDir {
 	conf := ociConf{
-		log:      &logrus.Logger{Out: io.Discard},
+		slog:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 		gc:       true,
 		throttle: defThrottle,
 	}
@@ -65,7 +64,7 @@ func New(opts ...Opts) *OCIDir {
 		opt(&conf)
 	}
 	return &OCIDir{
-		log:         conf.log,
+		slog:        conf.slog,
 		gc:          conf.gc,
 		modRefs:     map[string]*ociGC{},
 		throttle:    map[string]*pqueue.Queue[reqmeta.Data]{},
@@ -81,11 +80,11 @@ func WithGC(gc bool) Opts {
 	}
 }
 
-// WithLog provides a logrus logger
-// By default logging is disabled
-func WithLog(log *logrus.Logger) Opts {
+// WithSlog provides a slog logger.
+// By default logging is disabled.
+func WithSlog(slog *slog.Logger) Opts {
 	return func(c *ociConf) {
-		c.log = log
+		c.slog = slog
 	}
 }
 

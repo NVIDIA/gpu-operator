@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,12 +26,11 @@ import (
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/auth"
 	"github.com/regclient/regclient/internal/pqueue"
 	"github.com/regclient/regclient/internal/reqmeta"
+	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/warning"
 )
@@ -55,7 +55,7 @@ type Client struct {
 	retryLimit    int                       // number of retries before failing a request, this applies to each host, and each request
 	delayInit     time.Duration             // how long to initially delay requests on a failure
 	delayMax      time.Duration             // maximum time to delay a request
-	log           *logrus.Logger            // logging for tracing and failures
+	slog          *slog.Logger              // logging for tracing and failures
 	userAgent     string                    // user agent to specify in http request headers
 	mu            sync.Mutex                // mutex to prevent data races
 }
@@ -64,7 +64,7 @@ type clientHost struct {
 	config       *config.Host                // config entry
 	httpClient   *http.Client                // modified http client for registry specific settings
 	userAgent    string                      // user agent to specify in http request headers
-	log          *logrus.Logger              // logging for tracing and failures
+	slog         *slog.Logger                // logging for tracing and failures
 	auth         map[string]*auth.Auth       // map of auth handlers by repository
 	backoffCur   int                         // current count of backoffs for this host
 	backoffLast  time.Time                   // time the last request was released, this may be in the future if there is a queue, or zero if no delay is needed
@@ -120,7 +120,7 @@ func NewClient(opts ...Opts) *Client {
 		retryLimit: DefaultRetryLimit,
 		delayInit:  defaultDelayInit,
 		delayMax:   defaultDelayMax,
-		log:        &logrus.Logger{Out: io.Discard},
+		slog:       slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 		rootCAPool: [][]byte{},
 		rootCADirs: []string{},
 	}
@@ -151,10 +151,9 @@ func WithCertFiles(files []string) Opts {
 			//#nosec G304 command is run by a user accessing their own files
 			cert, err := os.ReadFile(f)
 			if err != nil {
-				c.log.WithFields(logrus.Fields{
-					"err":  err,
-					"file": f,
-				}).Warn("Failed to read certificate")
+				c.slog.Warn("Failed to read certificate",
+					slog.String("err", err.Error()),
+					slog.String("file", f))
 			} else {
 				c.rootCAPool = append(c.rootCAPool, cert)
 			}
@@ -203,10 +202,10 @@ func WithRetryLimit(rl int) Opts {
 	}
 }
 
-// WithLog injects a logrus Logger configuration.
-func WithLog(log *logrus.Logger) Opts {
+// WithLog injects a slog Logger configuration.
+func WithLog(slog *slog.Logger) Opts {
 	return func(c *Client) {
-		c.log = log
+		c.slog = slog
 	}
 }
 
@@ -336,10 +335,9 @@ func (resp *Resp) next() error {
 			bu := resp.backoffGet()
 			if !bu.IsZero() && bu.After(time.Now()) {
 				sleepTime := time.Until(bu)
-				c.log.WithFields(logrus.Fields{
-					"Host":    h.config.Name,
-					"Seconds": sleepTime.Seconds(),
-				}).Debug("Sleeping for backoff")
+				c.slog.Debug("Sleeping for backoff",
+					slog.String("Host", h.config.Name),
+					slog.Duration("Duration", sleepTime))
 				select {
 				case <-resp.ctx.Done():
 					return errs.ErrCanceled
@@ -426,10 +424,9 @@ func (resp *Resp) next() error {
 			resp.resp, err = hc.Do(httpReq)
 
 			if err != nil {
-				c.log.WithFields(logrus.Fields{
-					"URL": u.String(),
-					"err": err,
-				}).Debug("Request failed")
+				c.slog.Debug("Request failed",
+					slog.String("URL", u.String()),
+					slog.String("err", err.Error()))
 				backoff = true
 				return err
 			}
@@ -446,15 +443,13 @@ func (resp *Resp) next() error {
 					}
 					if err != nil {
 						if errors.Is(err, errs.ErrEmptyChallenge) || errors.Is(err, errs.ErrNoNewChallenge) || errors.Is(err, errs.ErrHTTPUnauthorized) {
-							c.log.WithFields(logrus.Fields{
-								"URL": u.String(),
-								"Err": err,
-							}).Debug("Failed to handle auth request")
+							c.slog.Debug("Failed to handle auth request",
+								slog.String("URL", u.String()),
+								slog.String("Err", err.Error()))
 						} else {
-							c.log.WithFields(logrus.Fields{
-								"URL": u.String(),
-								"Err": err,
-							}).Warn("Failed to handle auth request")
+							c.slog.Warn("Failed to handle auth request",
+								slog.String("URL", u.String()),
+								slog.String("Err", err.Error()))
 						}
 						dropHost = true
 					} else {
@@ -489,10 +484,9 @@ func (resp *Resp) next() error {
 			if resp.readCur == 0 && clHeader != "" {
 				cl, parseErr := strconv.ParseInt(clHeader, 10, 64)
 				if parseErr != nil {
-					c.log.WithFields(logrus.Fields{
-						"err":    err,
-						"header": clHeader,
-					}).Debug("failed to parse content-length header")
+					c.slog.Debug("failed to parse content-length header",
+						slog.String("err", parseErr.Error()),
+						slog.String("header", clHeader))
 				} else if resp.readMax > 0 {
 					if resp.readMax != cl {
 						return fmt.Errorf("unexpected content-length, expected %d, received %d", resp.readMax, cl)
@@ -570,10 +564,9 @@ func (resp *Resp) Read(b []byte) (int, error) {
 			resp.done = true
 		} else {
 			// short read, retry?
-			resp.client.log.WithFields(logrus.Fields{
-				"curRead":    resp.readCur,
-				"contentLen": resp.readMax,
-			}).Debug("EOF before reading all content, retrying")
+			resp.client.slog.Debug("EOF before reading all content, retrying",
+				slog.Int64("curRead", resp.readCur),
+				slog.Int64("contentLen", resp.readMax))
 			// retry
 			respErr := resp.backoffSet()
 			if respErr == nil {
@@ -581,9 +574,8 @@ func (resp *Resp) Read(b []byte) (int, error) {
 			}
 			// unrecoverable EOF
 			if respErr != nil {
-				resp.client.log.WithFields(logrus.Fields{
-					"err": respErr,
-				}).Warn("Failed to recover from short read")
+				resp.client.slog.Warn("Failed to recover from short read",
+					slog.String("err", respErr.Error()))
 				resp.done = true
 				return i, err
 			}
@@ -740,7 +732,7 @@ func (c *Client) getHost(host string) *clientHost {
 	h := &clientHost{
 		config:    conf,
 		userAgent: c.userAgent,
-		log:       c.log,
+		slog:      c.slog,
 		auth:      map[string]*auth.Auth{},
 	}
 	if h.config.ReqPerSec > 0 {
@@ -771,9 +763,8 @@ func (c *Client) getHost(host string) *clientHost {
 			} else {
 				rootPool, err := makeRootPool(c.rootCAPool, c.rootCADirs, h.config.Hostname, h.config.RegCert)
 				if err != nil {
-					c.log.WithFields(logrus.Fields{
-						"err": err,
-					}).Warn("failed to setup CA pool")
+					c.slog.Warn("failed to setup CA pool",
+						slog.String("err", err.Error()))
 				} else {
 					tlsc.RootCAs = rootPool
 				}
@@ -781,9 +772,8 @@ func (c *Client) getHost(host string) *clientHost {
 			if h.config.ClientCert != "" && h.config.ClientKey != "" {
 				cert, err := tls.X509KeyPair([]byte(h.config.ClientCert), []byte(h.config.ClientKey))
 				if err != nil {
-					c.log.WithFields(logrus.Fields{
-						"err": err,
-					}).Warn("failed to configure client certs")
+					c.slog.Warn("failed to configure client certs",
+						slog.String("err", err.Error()))
 				} else {
 					tlsc.Certificates = []tls.Certificate{cert}
 				}
@@ -841,7 +831,7 @@ func (ch *clientHost) getAuth(repo string) *auth.Auth {
 	}
 	if _, ok := ch.auth[repo]; !ok {
 		ch.auth[repo] = auth.NewAuth(
-			auth.WithLog(ch.log),
+			auth.WithLog(ch.slog),
 			auth.WithHTTPClient(ch.httpClient),
 			auth.WithCreds(ch.AuthCreds()),
 			auth.WithClientID(ch.userAgent),
@@ -873,27 +863,25 @@ func (wt *wrapTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		reqHead.Set("Authorization", "[censored]")
 	}
 	if err != nil {
-		wt.c.log.WithFields(logrus.Fields{
-			"req-method":  req.Method,
-			"req-url":     req.URL.String(),
-			"req-headers": reqHead,
-			"err":         err,
-		}).Debug("reg http request")
+		wt.c.slog.Debug("reg http request",
+			slog.String("req-method", req.Method),
+			slog.String("req-url", req.URL.String()),
+			slog.Any("req-headers", reqHead),
+			slog.String("err", err.Error()))
 	} else {
 		// extract any warnings
 		for _, wh := range resp.Header.Values("Warning") {
 			if match := warnRegexp.FindStringSubmatch(wh); len(match) == 2 {
 				// TODO(bmitch): pass other fields (registry hostname) with structured logging
-				warning.Handle(req.Context(), wt.c.log, match[1])
+				warning.Handle(req.Context(), wt.c.slog, match[1])
 			}
 		}
-		wt.c.log.WithFields(logrus.Fields{
-			"req-method":   req.Method,
-			"req-url":      req.URL.String(),
-			"req-headers":  reqHead,
-			"resp-status":  resp.Status,
-			"resp-headers": resp.Header,
-		}).Trace("reg http request")
+		wt.c.slog.Log(req.Context(), types.LevelTrace, "reg http request",
+			slog.String("req-method", req.Method),
+			slog.String("req-url", req.URL.String()),
+			slog.Any("req-headers", reqHead),
+			slog.String("resp-status", resp.Status),
+			slog.Any("resp-headers", resp.Header))
 	}
 	return resp, err
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 
@@ -15,7 +16,6 @@ import (
 	_ "crypto/sha512"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types/errs"
@@ -49,7 +49,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 	if mc.Manifest != nil {
 		if ms, ok := mc.Manifest.(manifest.Subjecter); ok {
 			sDesc, err := ms.GetSubject()
-			if err == nil && sDesc != nil && sDesc.MediaType != "" && sDesc.Size > 0 {
+			if err == nil && sDesc != nil && sDesc.Digest != "" {
 				// attempt to delete the referrer, but ignore if the referrer entry wasn't found
 				err = o.referrerDelete(ctx, r, mc.Manifest)
 				if err != nil && !errors.Is(err, errs.ErrNotFound) && !errors.Is(err, fs.ErrNotExist) {
@@ -134,10 +134,9 @@ func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, e
 	if desc.Size == 0 {
 		desc.Size = int64(len(mb))
 	}
-	o.log.WithFields(logrus.Fields{
-		"ref":  r.CommonName(),
-		"file": file,
-	}).Debug("retrieved manifest")
+	o.slog.Debug("retrieved manifest",
+		slog.String("ref", r.CommonName()),
+		slog.String("file", file))
 	return manifest.New(
 		manifest.WithRef(r),
 		manifest.WithDesc(desc),
@@ -279,10 +278,9 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 		return err
 	}
 	o.refMod(r)
-	o.log.WithFields(logrus.Fields{
-		"ref":  r.CommonName(),
-		"file": file,
-	}).Debug("pushed manifest")
+	o.slog.Debug("pushed manifest",
+		slog.String("ref", r.CommonName()),
+		slog.String("file", file))
 
 	// update referrers if defined on this manifest
 	if ms, ok := m.(manifest.Subjecter); ok {
@@ -290,7 +288,7 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 		if err != nil {
 			return err
 		}
-		if mDesc != nil && mDesc.MediaType != "" && mDesc.Size > 0 {
+		if mDesc != nil && mDesc.Digest != "" {
 			err = o.referrerPut(ctx, r, m)
 			if err != nil {
 				return err

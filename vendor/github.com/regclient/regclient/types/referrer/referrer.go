@@ -19,6 +19,7 @@ import (
 // ReferrerList contains the response to a request for referrers to a subject
 type ReferrerList struct {
 	Subject     ref.Ref                 `json:"subject"`               // subject queried
+	Source      ref.Ref                 `json:"source"`                // source for referrers, if different from subject
 	Descriptors []descriptor.Descriptor `json:"descriptors"`           // descriptors found in Index
 	Annotations map[string]string       `json:"annotations,omitempty"` // annotations extracted from Index
 	Manifest    manifest.Manifest       `json:"-"`                     // returned OCI Index
@@ -110,18 +111,21 @@ func (rl ReferrerList) IsEmpty() bool {
 func (rl ReferrerList) MarshalPretty() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-	if rl.Subject.Reference != "" {
-		fmt.Fprintf(tw, "Subject:\t%s\n", rl.Subject.Reference)
+	var rRef ref.Ref
+	if rl.Subject.IsSet() {
+		rRef = rl.Subject
+		fmt.Fprintf(tw, "Subject:\t%s\n", rl.Subject.CommonName())
 	}
-	rRef := rl.Subject
-	rRef.Tag = ""
+	if rl.Source.IsSet() {
+		rRef = rl.Source
+		fmt.Fprintf(tw, "Source:\t%s\n", rl.Source.CommonName())
+	}
 	fmt.Fprintf(tw, "\t\n")
 	fmt.Fprintf(tw, "Referrers:\t\n")
 	for _, d := range rl.Descriptors {
 		fmt.Fprintf(tw, "\t\n")
-		if rRef.Reference != "" {
-			rRef.Digest = d.Digest.String()
-			fmt.Fprintf(tw, "  Name:\t%s\n", rRef.CommonName())
+		if rRef.IsSet() {
+			fmt.Fprintf(tw, "  Name:\t%s\n", rRef.SetDigest(d.Digest.String()).CommonName())
 		}
 		err := d.MarshalPrettyTW(tw, "  ")
 		if err != nil {
