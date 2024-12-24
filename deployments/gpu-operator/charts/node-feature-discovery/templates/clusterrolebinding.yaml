@@ -33,7 +33,7 @@ subjects:
   namespace: {{ include "node-feature-discovery.namespace" .  }}
 {{- end }}
 
-{{- if and .Values.gc.enable .Values.gc.rbac.create (or (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi) .Values.topologyUpdater.enable) }}
+{{- if and .Values.gc.enable .Values.gc.rbac.create }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

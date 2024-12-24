@@ -1,4 +1,4 @@
-{{- if and .Values.gc.enable (or (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi) .Values.topologyUpdater.enable) -}}
+{{- if and .Values.gc.enable -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,6 +57,9 @@ spec:
         args:
           {{- if .Values.gc.interval | empty | not }}
           - "-gc-interval={{ .Values.gc.interval }}"
+          {{- end }}
+          {{- with .Values.gc.extraArgs }}
+          {{- toYaml . | nindent 10 }}
           {{- end }}
         resources:
       {{- toYaml .Values.gc.resources | nindent 12 }}
