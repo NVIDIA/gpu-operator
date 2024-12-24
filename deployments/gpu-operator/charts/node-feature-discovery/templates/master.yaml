@@ -23,10 +23,11 @@ spec:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
         role: master
-      {{- with .Values.master.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/nfd-master-conf.yaml") . | sha256sum }}
+        {{- with .Values.master.annotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
     {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
@@ -46,16 +47,58 @@ spec:
             {{- toYaml .Values.master.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          startupProbe:
+            grpc:
+              port: {{ .Values.master.healthPort | default "8082" }}
+          {{- with .Values.master.startupProbe.initialDelaySeconds }}
+            initialDelaySeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.startupProbe.failureThreshold }}
+            failureThreshold: {{ . }}
+          {{- end }}
+          {{- with .Values.master.startupProbe.periodSeconds }}
+            periodSeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.startupProbe.timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+          {{- end }}
           livenessProbe:
-            {{- toYaml .Values.master.livenessProbe | nindent 12 }}
+            grpc:
+              port: {{ .Values.master.healthPort | default "8082" }}
+          {{- with .Values.master.livenessProbe.initialDelaySeconds }}
+            initialDelaySeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.livenessProbe.failureThreshold }}
+            failureThreshold: {{ . }}
+          {{- end }}
+          {{- with .Values.master.livenessProbe.periodSeconds }}
+            periodSeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.livenessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+          {{- end }}
           readinessProbe:
-            {{- toYaml .Values.master.readinessProbe | nindent 12 }}
+            grpc:
+              port: {{ .Values.master.healthPort | default "8082" }}
+          {{- with .Values.master.readinessProbe.initialDelaySeconds }}
+            initialDelaySeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.readinessProbe.failureThreshold }}
+            failureThreshold: {{ . }}
+          {{- end }}
+          {{- with .Values.master.readinessProbe.periodSeconds }}
+            periodSeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.readinessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+          {{- end }}
+          {{- with .Values.master.readinessProbe.successThreshold }}
+            successThreshold: {{ . }}
+          {{- end }}
           ports:
-          - containerPort: {{ .Values.master.port | default "8080" }}
-            name: grpc
           - containerPort: {{ .Values.master.metricsPort | default "8081" }}
             name: metrics
-          - containerPort: {{ .Values.master.healthPort  | default "8082" }}
+          - containerPort: {{ .Values.master.healthPort | default "8082" }}
             name: health
           env:
           - name: NODE_NAME
@@ -73,28 +116,15 @@ spec:
             {{- if .Values.master.instance | empty | not }}
             - "-instance={{ .Values.master.instance }}"
             {{- end }}
-            {{- if not (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi) }}
-            - "-port={{ .Values.master.port | default "8080" }}"
-            {{- else if gt (int .Values.master.replicaCount) 1 }}
             - "-enable-leader-election"
-            {{- end }}
             {{- if .Values.master.extraLabelNs | empty | not }}
             - "-extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
             {{- end }}
             {{- if .Values.master.denyLabelNs | empty | not }}
             - "-deny-label-ns={{- join "," .Values.master.denyLabelNs }}"
             {{- end }}
-            {{- if .Values.master.resourceLabels | empty | not }}
-            - "-resource-labels={{- join "," .Values.master.resourceLabels }}"
-            {{- end }}
             {{- if .Values.master.enableTaints }}
             - "-enable-taints"
-            {{- end }}
-            {{- if .Values.master.crdController | kindIs "invalid" | not }}
-            - "-crd-controller={{ .Values.master.crdController }}"
-            {{- else }}
-            ## By default, disable crd controller for other than the default instances
-            - "-crd-controller={{ .Values.master.instance | empty }}"
             {{- end }}
             {{- if .Values.master.featureRulesController | kindIs "invalid" | not }}
             - "-featurerules-controller={{ .Values.master.featureRulesController }}"
@@ -105,32 +135,20 @@ spec:
             {{- if .Values.master.nfdApiParallelism | empty | not }}
             - "-nfd-api-parallelism={{ .Values.master.nfdApiParallelism }}"
             {{- end }}
-            {{- if .Values.tls.enable }}
-            - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-            - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-            - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
-            {{- end }}
             # Go over featureGates and add the feature-gate flag
             {{- range $key, $value := .Values.featureGates }}
             - "-feature-gates={{ $key }}={{ $value }}"
             {{- end }}
             - "-metrics={{ .Values.master.metricsPort  | default "8081" }}"
-            - "-grpc-health={{ .Values.master.healthPort  | default "8082" }}"
-          volumeMounts:
-            {{- if .Values.tls.enable }}
-            - name: nfd-master-cert
-              mountPath: "/etc/kubernetes/node-feature-discovery/certs"
-              readOnly: true
+            - "-grpc-health={{ .Values.master.healthPort | default "8082" }}"
+            {{- with .Values.master.extraArgs }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
+          volumeMounts:
             - name: nfd-master-conf
               mountPath: "/etc/kubernetes/node-feature-discovery"
               readOnly: true
       volumes:
-        {{- if .Values.tls.enable }}
-        - name: nfd-master-cert
-          secret:
-            secretName: nfd-master-cert
-        {{- end }}
         - name: nfd-master-conf
           configMap:
             name: {{ include "node-feature-discovery.fullname" . }}-master-conf
