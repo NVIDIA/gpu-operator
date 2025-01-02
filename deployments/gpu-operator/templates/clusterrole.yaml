@@ -144,3 +144,13 @@ rules:
 {{- if .Values.operator.cleanupCRD }}
   - delete
 {{- end }}
+# TODO: restrict RBAC for DRA driver
+- apiGroups:
+    - ""
+    - apps
+    - resource.k8s.io
+    - gpu.nvidia.com
+  resources:
+    - '*'
+  verbs:
+    - '*'
