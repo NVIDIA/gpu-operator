@@ -10,16 +10,14 @@ nameOverride: ""
 fullnameOverride: ""
 namespaceOverride: ""
 
-enableNodeFeatureApi: true
-
 featureGates:
-  NodeFeatureAPI: true
   NodeFeatureGroupAPI: false
 
 priorityClassName: ""
 
 master:
   enable: true
+  extraArgs: []
   extraEnvs: []
   hostNetwork: false
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
@@ -27,10 +25,24 @@ master:
     # autoDefaultNs: true
     # extraLabelNs: ["added.ns.io","added.kubernets.io"]
     # denyLabelNs: ["denied.ns.io","denied.kubernetes.io"]
-    # resourceLabels: ["vendor-1.com/feature-1","vendor-2.io/feature-2"]
     # enableTaints: false
     # labelWhiteList: "foo"
     # resyncPeriod: "2h"
+    # restrictions:
+    #   disableLabels: true
+    #   disableTaints: true
+    #   disableExtendedResources: true
+    #   disableAnnotations: true
+    #   allowOverwrite: false
+    #   denyNodeFeatureLabels: true
+    #   nodeFeatureNamespaceSelector:
+    #    matchLabels:
+    #      kubernetes.io/metadata.name: "node-feature-discovery"
+    #    matchExpressions:
+    #      - key: "kubernetes.io/metadata.name"
+    #        operator: "In"
+    #        values:
+    #           - "node-feature-discovery"
     # klog:
     #    addDirHeader: false
     #    alsologtostderr: false
@@ -54,10 +66,6 @@ master:
     #   retryPeriod: 2s
     # nfdApiParallelism: 10
   ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
-  # The TCP port that nfd-master listens for incoming requests. Default: 8080
-  # Deprecated this parameter is related to the deprecated gRPC API and will
-  # be removed with it in a future release
-  port: 8080
   metricsPort: 8081
   healthPort: 8082
   instance:
@@ -65,9 +73,7 @@ master:
   resyncPeriod:
   denyLabelNs: []
   extraLabelNs: []
-  resourceLabels: []
   enableTaints: false
-  crdController: null
   featureRulesController: null
   nfdApiParallelism: null
   deploymentAnnotations: {}
@@ -92,16 +98,12 @@ master:
     # The name of the service account to use.
     # If not set and create is true, a name is generated using the fullname template
     name:
-  
+
   # specify how many old ReplicaSets for the Deployment to retain.
-  revisionHistoryLimit: 
+  revisionHistoryLimit:
 
   rbac:
     create: true
-
-  service:
-    type: ClusterIP
-    port: 8080
 
   resources:
     limits:
@@ -145,27 +147,37 @@ master:
                 operator: In
                 values: [""]
                 
+  startupProbe:
+    grpc:
+      port: 8082
+    failureThreshold: 30
+    # periodSeconds: 10
   livenessProbe:
     grpc:
       port: 8082
-    initialDelaySeconds: 10
     # failureThreshold: 3
+    # initialDelaySeconds: 0
     # periodSeconds: 10
+    # timeoutSeconds: 1
   readinessProbe:
     grpc:
       port: 8082
-    initialDelaySeconds: 5
     failureThreshold: 10
+    # initialDelaySeconds: 0
     # periodSeconds: 10
+    # timeoutSeconds: 1
+    # successThreshold: 1
 
 worker:
   enable: true
+  extraArgs: []
   extraEnvs: []
   hostNetwork: false
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
     #  labelWhiteList:
     #  noPublish: false
+    #  noOwnerRefs: false
     #  sleepInterval: 60s
     #  featureSources: [all]
     #  labelSources: [all]
@@ -242,8 +254,6 @@ worker:
     #      - "class"
     #      - "vendor"
     #      - "device"
-    #  local:
-    #    hooksEnabled: false
     #  custom:
     #    # The following feature demonstrates the capabilities of the matchFeatures
     #    - name: "my custom rule"
@@ -426,12 +436,15 @@ worker:
     initialDelaySeconds: 10
     # failureThreshold: 3
     # periodSeconds: 10
+    # timeoutSeconds: 1
   readinessProbe:
     grpc:
       port: 8082
     initialDelaySeconds: 5
     failureThreshold: 10
     # periodSeconds: 10
+    # timeoutSeconds: 1
+    # successThreshold: 1
 
   serviceAccount:
     # Specifies whether a service account should be created.
@@ -483,6 +496,7 @@ topologyUpdater:
 
   enable: false
   createCRDs: false
+  extraArgs: []
   extraEnvs: []
   hostNetwork: false
 
@@ -519,12 +533,15 @@ topologyUpdater:
     initialDelaySeconds: 10
     # failureThreshold: 3
     # periodSeconds: 10
+    # timeoutSeconds: 1
   readinessProbe:
     grpc:
       port: 8082
     initialDelaySeconds: 5
     failureThreshold: 10
     # periodSeconds: 10
+    # timeoutSeconds: 1
+    # successThreshold: 1
 
   resources:
     limits:
@@ -542,6 +559,7 @@ topologyUpdater:
 
 gc:
   enable: true
+  extraArgs: []
   extraEnvs: []
   hostNetwork: false
   replicaCount: 1
@@ -573,19 +591,7 @@ gc:
   affinity: {}
 
   # specify how many old ReplicaSets for the Deployment to retain.
-  revisionHistoryLimit: 
-
-# Optionally use encryption for worker <--> master comms
-# TODO: verify hostname is not yet supported
-#
-# If you do not enable certManager (and have it installed) you will
-# need to manually, or otherwise, provision the TLS certs as secrets
-tls:
-  enable: false
-  certManager: false
-  certManagerCertificate:
-    issuerKind:
-    issuerName:
+  revisionHistoryLimit:
 
 prometheus:
   enable: false

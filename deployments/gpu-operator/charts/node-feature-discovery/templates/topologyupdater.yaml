@@ -22,10 +22,11 @@ spec:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
         role: topology-updater
-      {{- with .Values.topologyUpdater.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/nfd-topologyupdater-conf.yaml") . | sha256sum }}
+        {{- with .Values.topologyUpdater.annotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
       dnsPolicy: ClusterFirstWithHostNet
@@ -44,9 +45,38 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
         livenessProbe:
-          {{- toYaml .Values.topologyUpdater.livenessProbe | nindent 10 }}
+          grpc:
+            port: {{ .Values.topologyUpdater.healthPort | default "8082" }}
+        {{- with .Values.topologyUpdater.livenessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.livenessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.livenessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.livenessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
         readinessProbe:
-          {{- toYaml .Values.topologyUpdater.readinessProbe | nindent 10 }}
+          grpc:
+            port: {{ .Values.topologyUpdater.healthPort | default "8082" }}
+        {{- with .Values.topologyUpdater.readinessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.readinessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.readinessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.readinessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.topologyUpdater.readinessProbe.successThreshold }}
+          successThreshold: {{ . }}
+        {{- end }}
         env:
         - name: NODE_NAME
           valueFrom:
@@ -73,11 +103,6 @@ spec:
           {{- else }}
           - "-watch-namespace=*"
           {{- end }}
-          {{- if .Values.tls.enable }}
-          - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-          - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-          - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
-          {{- end }}
           {{- if not .Values.topologyUpdater.podSetFingerprint }}
           - "-pods-fingerprint=false"
           {{- end }}
@@ -88,12 +113,15 @@ spec:
           # Disable kubelet state tracking by giving an empty path
           - "-kubelet-state-dir="
           {{- end }}
-          - -metrics={{ .Values.topologyUpdater.metricsPort | default "8081"}}
-          - "-grpc-health={{ .Values.topologyUpdater.healthPort  | default "8082" }}"
+          - "-metrics={{ .Values.topologyUpdater.metricsPort | default "8081"}}"
+          - "-grpc-health={{ .Values.topologyUpdater.healthPort | default "8082" }}"
+          {{- with .Values.topologyUpdater.extraArgs }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
         ports:
           - containerPort: {{ .Values.topologyUpdater.metricsPort | default "8081"}}
             name: metrics
-          - containerPort: {{ .Values.topologyUpdater.healthPort  | default "8082" }}
+          - containerPort: {{ .Values.topologyUpdater.healthPort | default "8082" }}
             name: health
         volumeMounts:
         {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
@@ -107,11 +135,6 @@ spec:
         {{- if .Values.topologyUpdater.kubeletStateDir | empty | not }}
         - name: kubelet-state-files
           mountPath: /host-var/lib/kubelet
-          readOnly: true
-        {{- end }}
-        {{- if .Values.tls.enable }}
-        - name: nfd-topology-updater-cert
-          mountPath: "/etc/kubernetes/node-feature-discovery/certs"
           readOnly: true
         {{- end }}
         - name: nfd-topology-updater-conf
@@ -149,12 +172,6 @@ spec:
           items:
             - key: nfd-topology-updater.conf
               path: nfd-topology-updater.conf
-      {{- if .Values.tls.enable }}
-      - name: nfd-topology-updater-cert
-        secret:
-          secretName: nfd-topology-updater-cert
-      {{- end }}
-
 
     {{- with .Values.topologyUpdater.nodeSelector }}
       nodeSelector:

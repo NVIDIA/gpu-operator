@@ -22,10 +22,11 @@ spec:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
         role: worker
-      {{- with .Values.worker.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/nfd-worker-conf.yaml") . | sha256sum }}
+        {{- with .Values.worker.annotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       dnsPolicy: ClusterFirstWithHostNet
     {{- with .Values.priorityClassName }}
@@ -46,9 +47,38 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         livenessProbe:
-          {{- toYaml .Values.worker.livenessProbe | nindent 12 }}
+          grpc:
+            port: {{ .Values.worker.healthPort | default "8082" }}
+        {{- with .Values.worker.livenessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.livenessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.livenessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.livenessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
         readinessProbe:
-          {{- toYaml .Values.worker.readinessProbe | nindent 12 }}
+          grpc:
+            port: {{ .Values.worker.healthPort | default "8082" }}
+        {{- with .Values.worker.readinessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.readinessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.readinessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.readinessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.worker.readinessProbe.successThreshold }}
+          successThreshold: {{ . }}
+        {{- end }}
         env:
         - name: NODE_NAME
           valueFrom:
@@ -70,24 +100,19 @@ spec:
         command:
         - "nfd-worker"
         args:
-{{- if not (and .Values.featureGates.NodeFeatureAPI .Values.enableNodeFeatureApi)   }}
-        - "-server={{ include "node-feature-discovery.fullname" . }}-master:{{ .Values.master.service.port }}"
-{{- end }}
-{{- if .Values.tls.enable }}
-        - "-ca-file=/etc/kubernetes/node-feature-discovery/certs/ca.crt"
-        - "-key-file=/etc/kubernetes/node-feature-discovery/certs/tls.key"
-        - "-cert-file=/etc/kubernetes/node-feature-discovery/certs/tls.crt"
-{{- end }}
-# Go over featureGate and add the feature-gate flag
-{{- range $key, $value := .Values.featureGates }}
+        # Go over featureGate and add the feature-gate flag
+        {{- range $key, $value := .Values.featureGates }}
         - "-feature-gates={{ $key }}={{ $value }}"
-{{- end }}
+        {{- end }}
         - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
-        - "-grpc-health={{ .Values.worker.healthPort  | default "8082" }}"
+        - "-grpc-health={{ .Values.worker.healthPort | default "8082" }}"
+        {{- with .Values.gc.extraArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         ports:
           - containerPort: {{ .Values.worker.metricsPort | default "8081"}}
             name: metrics
-          - containerPort: {{ .Values.worker.healthPort  | default "8082" }}
+          - containerPort: {{ .Values.worker.healthPort | default "8082" }}
             name: health
         volumeMounts:
         - name: host-boot
@@ -113,20 +138,12 @@ spec:
           mountPath: "/host-usr/src"
           readOnly: true
         {{- end }}
-        - name: source-d
-          mountPath: "/etc/kubernetes/node-feature-discovery/source.d/"
-          readOnly: true
         - name: features-d
           mountPath: "/etc/kubernetes/node-feature-discovery/features.d/"
           readOnly: true
         - name: nfd-worker-conf
           mountPath: "/etc/kubernetes/node-feature-discovery"
           readOnly: true
-{{- if .Values.tls.enable }}
-        - name: nfd-worker-cert
-          mountPath: "/etc/kubernetes/node-feature-discovery/certs"
-          readOnly: true
-{{- end }}
       volumes:
         - name: host-boot
           hostPath:
@@ -151,9 +168,6 @@ spec:
           hostPath:
             path: "/usr/src"
         {{- end }}
-        - name: source-d
-          hostPath:
-            path: "/etc/kubernetes/node-feature-discovery/source.d/"
         - name: features-d
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/features.d/"
@@ -163,12 +177,7 @@ spec:
             items:
               - key: nfd-worker.conf
                 path: nfd-worker.conf
-{{- if .Values.tls.enable }}
-        - name: nfd-worker-cert
-          secret:
-            secretName: nfd-worker-cert
-{{- end }}
-    {{- with .Values.worker.nodeSelector }}
+      {{- with .Values.worker.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
