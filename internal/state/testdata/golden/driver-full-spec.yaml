@@ -146,6 +146,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: KERNEL_MODULE_TYPE
+          value: open
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
         - name: FOO

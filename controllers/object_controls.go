@@ -165,6 +165,8 @@ const (
 	DefaultCCModeEnvName = "DEFAULT_CC_MODE"
 	// OpenKernelModulesEnabledEnvName is the name of the driver-container envvar for enabling open GPU kernel module support
 	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
+	// KernelModuleTypeEnvName is the name of the driver-container envvar to set the desired kernel module type
+	KernelModuleTypeEnvName = "KERNEL_MODULE_TYPE"
 	// MPSRootEnvName is the name of the envvar for configuring the MPS root
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
@@ -2664,9 +2666,6 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if config.Driver.UsePrecompiledDrivers() {
 			return fmt.Errorf("GPUDirect Storage driver (nvidia-fs) is not supported along with pre-compiled NVIDIA drivers")
 		}
-		if config.GPUDirectStorage.IsOpenKernelModulesRequired() && !config.Driver.OpenKernelModulesEnabled() {
-			return fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'driver.useOpenKernelModules=true' in ClusterPolicy to enable OpenRM mode", config.GPUDirectStorage.Version)
-		}
 
 		gdsContainer := &obj.Spec.Template.Spec.Containers[i]
 
@@ -3166,8 +3165,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			setContainerEnv(driverContainer, env.Name, env.Value)
 		}
 	}
-	if config.Driver.OpenKernelModulesEnabled() {
-		setContainerEnv(driverContainer, OpenKernelModulesEnabledEnvName, "true")
+
+	if len(config.Driver.KernelModuleType) > 0 {
+		setContainerEnv(driverContainer, KernelModuleTypeEnvName, config.Driver.KernelModuleType)
+		// we set the "OPEN_KERNEL_MODULES_ENABLED" envar for backwards compatibility with older driver containers
+		if config.Driver.OpenKernelModulesEnabled() {
+			setContainerEnv(driverContainer, OpenKernelModulesEnabledEnvName, "true")
+		}
 	}
 
 	// set container probe timeouts

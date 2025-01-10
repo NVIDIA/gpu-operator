@@ -213,9 +213,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-      {{- if deref .Driver.Spec.UseOpenKernelModules }}
+      {{- if .Driver.Spec.KernelModuleType }}
+        - name: KERNEL_MODULE_TYPE
+          value: {{ .Driver.Spec.KernelModuleType }}
+        # we set this env var for backwards compatibility with older driver versions
+        {{- if eq .Driver.Spec.KernelModuleType "open"}}
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
+        {{- end }}
       {{- end }}
       {{- if and (.Openshift) (.Runtime.OpenshiftVersion) }}
         - name: OPENSHIFT_VERSION
