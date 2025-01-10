@@ -660,7 +660,6 @@ spec:
           verbs:
           - get
           - list
-          - create
           - watch
           - update
           - patch
