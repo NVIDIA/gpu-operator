@@ -221,8 +221,8 @@ func TestDriverSpec(t *testing.T) {
 				Effect:   "NoSchedule",
 			},
 		},
-		PriorityClassName:    "custom-priority-class-name",
-		UseOpenKernelModules: utils.BoolPtr(true),
+		PriorityClassName: "custom-priority-class-name",
+		KernelModuleType:  "open",
 	}
 
 	driverSpec.Labels = sanitizeDriverLabels(driverSpec.Labels)

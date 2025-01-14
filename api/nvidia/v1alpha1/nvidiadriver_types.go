@@ -53,11 +53,19 @@ type NVIDIADriverSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="usePrecompiled is an immutable field. Please create a new NvidiaDriver resource instead when you want to change this setting."
 	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
 
+	// Deprecated: This field is no longer honored by the gpu-operator. Please use KernelModuleType instead.
 	// UseOpenKernelModules indicates if the open GPU kernel modules should be used
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable use of open GPU kernel modules"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	UseOpenKernelModules *bool `json:"useOpenKernelModules,omitempty"`
+
+	// KernelModuleType represents the type of driver kernel modules to be used when installing the GPU driver.
+	// Accepted values are auto, proprietary and open. NOTE: If auto is chosen, it means that the recommended kernel module
+	// type is chosen based on the GPU devices on the host and the driver branch used
+	// +kubebuilder:validation:Enum=auto;open;proprietary
+	// +kubebuilder:default=auto
+	KernelModuleType string `json:"kernelModuleType,omitempty"`
 
 	// NVIDIA Driver container startup probe settings
 	StartupProbe *ContainerProbeSpec `json:"startupProbe,omitempty"`
@@ -642,10 +650,7 @@ func (d *NVIDIADriverSpec) IsGDRCopyEnabled() bool {
 
 // IsOpenKernelModulesEnabled returns true if NVIDIA OpenRM drivers are enabled
 func (d *NVIDIADriverSpec) IsOpenKernelModulesEnabled() bool {
-	if d.UseOpenKernelModules == nil || !*d.UseOpenKernelModules {
-		return false
-	}
-	return true
+	return d.KernelModuleType == "open"
 }
 
 // IsOpenKernelModulesRequired returns true if NVIDIA OpenRM drivers required in this configuration

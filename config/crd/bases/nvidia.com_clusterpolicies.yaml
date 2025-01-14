@@ -650,6 +650,17 @@ spec:
                       name:
                         type: string
                     type: object
+                  kernelModuleType:
+                    default: auto
+                    description: |-
+                      KernelModuleType represents the type of driver kernel modules to be used when installing the GPU driver.
+                      Accepted values are auto, proprietary and open. NOTE: If auto is chosen, it means that the recommended kernel module
+                      type is chosen based on the GPU devices on the host and the driver branch used
+                    enum:
+                    - auto
+                    - open
+                    - proprietary
+                    type: string
                   licensingConfig:
                     description: 'Optional: Licensing configuration for NVIDIA vGPU
                       licensing'
@@ -978,8 +989,9 @@ spec:
                       NVIDIA Driver is managed by the NVIDIADriver CRD type
                     type: boolean
                   useOpenKernelModules:
-                    description: UseOpenKernelModules indicates if the open GPU kernel
-                      modules should be used
+                    description: |-
+                      Deprecated: This field is no longer honored by the gpu-operator. Please use KernelModuleType instead.
+                      UseOpenKernelModules indicates if the open GPU kernel modules should be used
                     type: boolean
                   usePrecompiled:
                     description: UsePrecompiled indicates if deployment of NVIDIA

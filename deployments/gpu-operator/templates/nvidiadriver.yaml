@@ -7,7 +7,7 @@ spec:
   repository: {{ .Values.driver.repository }}
   image: {{ .Values.driver.image }}
   version: {{ .Values.driver.version }}
-  useOpenKernelModules: {{ .Values.driver.useOpenKernelModules }}
+  kernelModuleType: {{ .Values.driver.kernelModuleType }}
   usePrecompiled: {{ .Values.driver.usePrecompiled }}
   driverType: {{ .Values.driver.nvidiaDriverCRD.driverType | default "gpu" }}
   {{- if .Values.daemonsets.annotations }}
