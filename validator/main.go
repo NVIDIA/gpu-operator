@@ -215,6 +215,8 @@ const (
 	CCCapableLabelKey = "nvidia.com/cc.capable"
 	// appComponentLabelKey indicates the label key of the component
 	appComponentLabelKey = "app.kubernetes.io/component"
+	// wslNvidiaSMIPath indicates the path to the nvidia-smi binary on WSL
+	wslNvidiaSMIPath = "/usr/lib/wsl/lib/nvidia-smi"
 )
 
 func main() {
@@ -693,6 +695,11 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 
 func validateHostDriver(silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
+	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
+		log.Infof("WSL2 system detected, assuming driver is pre-installed")
+		disableDevCharSymlinkCreation = true
+		return nil
+	}
 	fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi")
 	if err != nil {
 		return fmt.Errorf("no 'nvidia-smi' file present on the host: %w", err)
