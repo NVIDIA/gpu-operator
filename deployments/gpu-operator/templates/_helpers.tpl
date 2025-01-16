@@ -76,5 +76,5 @@ Full image name with tag
 Full image name with tag
 */}}
 {{- define "driver-manager.fullimage" -}}
-{{- .Values.driver.manager.repository -}}/{{- .Values.driver.manager.image -}}:{{- .Values.driver.manager.version -}}
+{{- .Values.driverManager.repository -}}/{{- .Values.driverManager.image -}}:{{- .Values.driverManager.version -}}
 {{- end }}
