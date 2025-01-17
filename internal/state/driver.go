@@ -642,7 +642,7 @@ func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterin
 // 2. ensure to meet k8s constraints for metadata.name, i.e it
 // must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character
 func getSanitizedKernelVersion(kernelVersion string) string {
-	archRegex := regexp.MustCompile("x86_64|aarch64")
+	archRegex := regexp.MustCompile("x86_64(?:_64k)?|aarch64(?:_64k)?")
 	// remove arch strings, "_" and any trailing "." from the kernel version
 	sanitizedVersion := strings.TrimSuffix(strings.ReplaceAll(archRegex.ReplaceAllString(kernelVersion, ""), "_", "."), ".")
 	return strings.ToLower(sanitizedVersion)
