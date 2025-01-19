@@ -16,9 +16,6 @@ spec:
     rootFS: {{ .Values.hostPaths.rootFS }}
     driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
   operator:
-    {{- if .Values.operator.defaultRuntime }}
-    defaultRuntime: {{ .Values.operator.defaultRuntime }}
-    {{- end }}
     {{- if .Values.operator.runtimeClass }}
     runtimeClass: {{ .Values.operator.runtimeClass }}
     {{- end }}
