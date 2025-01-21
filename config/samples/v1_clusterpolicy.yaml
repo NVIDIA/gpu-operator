@@ -4,7 +4,6 @@ metadata:
   name: gpu-cluster-policy
 spec:
   operator:
-    defaultRuntime: crio
     runtimeClass: nvidia
     initContainer: {}
     use_ocp_driver_toolkit: true

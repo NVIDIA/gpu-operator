@@ -72,7 +72,6 @@ operator:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   priorityClassName: system-node-critical
-  defaultRuntime: docker
   runtimeClass: nvidia
   use_ocp_driver_toolkit: false
   # cleanup CRD on chart un-install
