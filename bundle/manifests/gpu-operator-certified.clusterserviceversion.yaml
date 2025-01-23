@@ -29,6 +29,7 @@ metadata:
           },
           "spec": {
             "operator": {
+              "defaultRuntime": "crio",
               "use_ocp_driver_toolkit": true,
               "initContainer": {
               }
