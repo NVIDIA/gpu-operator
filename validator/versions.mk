@@ -16,4 +16,4 @@
 include $(CURDIR)/../versions.mk
 
 CUDA_SAMPLES_VERSION ?= 11.7.1
-GOLANG_VERSION ?= 1.23.4
+GOLANG_VERSION ?= 1.23.5
