@@ -624,6 +624,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 				DriverType:     nvidiav1alpha1.GPU,
 			},
+			CRName:           "test-cr",
 			AppName:          "nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b",
 			Name:             "nvidia-gpu-driver-ubuntu22.04",
 			ImagePath:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
