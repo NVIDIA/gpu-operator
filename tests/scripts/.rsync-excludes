@@ -1,5 +1,6 @@
 vendor/
 .git
+.cache
 aws-kube-ci
 cnt-ci
 key.pem
