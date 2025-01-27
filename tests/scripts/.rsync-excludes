@@ -1,4 +1,5 @@
 vendor/
+.cache
 .git
 aws-kube-ci
 cnt-ci
