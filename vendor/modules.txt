@@ -37,8 +37,8 @@ github.com/NVIDIA/go-nvlib/pkg/pciids
 # github.com/NVIDIA/k8s-kata-manager v0.2.2
 ## explicit; go 1.22.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
-# github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
-## explicit; go 1.22.0
+# github.com/NVIDIA/k8s-operator-libs v0.0.0-20250122185056-00b15b893ab4
+## explicit; go 1.23.0
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
@@ -412,16 +412,16 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
-## explicit; go 1.22.0
+# github.com/openshift/api v0.0.0-20250127162009-d34de40f93fb
+## explicit; go 1.23.0
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
 github.com/openshift/api/security/v1
-# github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f
-## explicit; go 1.22.0
+# github.com/openshift/client-go v0.0.0-20250125113824-8e1f0b8fa9a7
+## explicit; go 1.23.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/internal
 github.com/openshift/client-go/config/clientset/versioned/scheme
@@ -926,7 +926,7 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.32.1
 ## explicit; go 1.23.0
 k8s.io/apiserver/pkg/endpoints/deprecation
-# k8s.io/cli-runtime v0.32.0
+# k8s.io/cli-runtime v0.32.1
 ## explicit; go 1.23.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
@@ -1251,8 +1251,8 @@ k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/validation
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kubectl v0.31.3
-## explicit; go 1.22.0
+# k8s.io/kubectl v0.32.1
+## explicit; go 1.23.0
 k8s.io/kubectl/pkg/cmd/util
 k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/scheme

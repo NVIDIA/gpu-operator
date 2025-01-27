@@ -8,15 +8,15 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.7.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.2
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20240826221728-249ba446fa35
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20250122185056-00b15b893ab4
 	github.com/NVIDIA/nvidia-container-toolkit v1.17.4
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.2
 	github.com/mittwald/go-helm-client v0.12.16
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
-	github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f
+	github.com/openshift/api v0.0.0-20250127162009-d34de40f93fb
+	github.com/openshift/client-go v0.0.0-20250125113824-8e1f0b8fa9a7
 	github.com/operator-framework/api v0.29.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.79.2
 	github.com/prometheus/client_golang v1.20.5
@@ -165,10 +165,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.16.4 // indirect
 	k8s.io/apiserver v0.32.1 // indirect
-	k8s.io/cli-runtime v0.32.0 // indirect
+	k8s.io/cli-runtime v0.32.1 // indirect
 	k8s.io/component-base v0.32.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
-	k8s.io/kubectl v0.31.3 // indirect
+	k8s.io/kubectl v0.32.1 // indirect
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
