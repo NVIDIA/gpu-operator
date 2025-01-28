@@ -770,3 +770,21 @@ func TestDriverVGPULicensing(t *testing.T) {
 	require.Equal(t, string(o), actual)
 
 }
+
+func TestGetSanitizedKernelVersion(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"5.14.0-427.37.1.el9_4.aarch64_64k", "5.14.0-427.37.1.el9.4"},
+		{"5.14.0-427.37.1.el9_4.aarch64", "5.14.0-427.37.1.el9.4"},
+		{"5.14.0-427.37.1.el9_4.x86_64_64k", "5.14.0-427.37.1.el9.4"},
+		{"5.14.0-427.37.1.el9_4.x86_64", "5.14.0-427.37.1.el9.4"},
+	}
+
+	for _, test := range tests {
+		result := getSanitizedKernelVersion(test.input)
+		require.NotEmpty(t, result)
+		require.Equal(t, test.expected, result)
+	}
+}
