@@ -141,7 +141,7 @@ func GetEventReason() string {
 func logEventf(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string,
 	args ...interface{}) {
 	if recorder != nil {
-		recorder.Eventf(object, eventType, reason, messageFmt, args, nil)
+		recorder.Eventf(object, eventType, reason, messageFmt, args...)
 	}
 }
 
