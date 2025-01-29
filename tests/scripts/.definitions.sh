@@ -17,7 +17,7 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 : ${LOG_DIR:="/tmp/logs"}
 : ${PROJECT:="$(basename "${PROJECT_DIR}")"}
 : ${TEST_NAMESPACE:="test-operator"}
-: ${TARGET_DRIVER_VERSION:="565.57.01"}
+: ${TARGET_DRIVER_VERSION:="550.144.03"}
 
 : ${OPERATOR_IMAGE:="nvcr.io/nvidia/gpu-operator"}
 
