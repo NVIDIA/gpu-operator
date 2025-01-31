@@ -9,9 +9,6 @@ subjects:
 - kind: ServiceAccount
   name: gpu-operator
   namespace: {{ $.Release.Namespace }}
-- kind: ServiceAccount
-  name: node-feature-discovery
-  namespace: {{ $.Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: gpu-operator

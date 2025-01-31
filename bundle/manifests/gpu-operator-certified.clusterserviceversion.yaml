@@ -660,7 +660,6 @@ spec:
           verbs:
           - get
           - list
-          - create
           - watch
           - update
           - patch
@@ -678,8 +677,6 @@ spec:
           - ""
           resources:
           - events
-          - pods
-          - pods/eviction
           verbs:
           - create
           - get
@@ -688,6 +685,20 @@ spec:
           - update
           - patch
           - delete
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods/eviction
+          verbs:
+          - create
         - apiGroups:
           - apps
           resources:
