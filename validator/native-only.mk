@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DOCKER_BUILD_PLATFORM_OPTIONS = --platform=linux/amd64
+DOCKER_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64
+DOCKER_BUILD_OPTIONS = --output=type=image,push=$(PUSH_ON_BUILD) --provenance=$(ATTACH_ATTESTATIONS) --sbom=$(ATTACH_ATTESTATIONS)
 
 $(PUSH_TARGETS): push-%:
 	$(DOCKER) push "$(IMAGE_NAME):$(IMAGE_TAG)"
