@@ -34,8 +34,8 @@ github.com/NVIDIA/go-nvlib/pkg/nvpci
 github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
 github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
 github.com/NVIDIA/go-nvlib/pkg/pciids
-# github.com/NVIDIA/k8s-kata-manager v0.2.2
-## explicit; go 1.22.0
+# github.com/NVIDIA/k8s-kata-manager v0.2.3
+## explicit; go 1.23.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 # github.com/NVIDIA/k8s-operator-libs v0.0.0-20250122185056-00b15b893ab4
 ## explicit; go 1.23.0
