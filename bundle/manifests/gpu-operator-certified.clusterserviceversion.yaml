@@ -775,6 +775,8 @@ spec:
           - services
           - services/finalizers
           - serviceaccounts
+          - pods
+          - pods/eviction
           verbs:
           - create
           - get
