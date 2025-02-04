@@ -116,7 +116,7 @@ jobs:
   ### Image builds ###
   build-gpu-operator:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04-arm
     strategy:
       matrix:
         dist: [ubi9]
@@ -163,7 +163,7 @@ jobs:
           make build-${{ matrix.dist }}
   build-gpu-operator-validator:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04-arm
     strategy:
       matrix:
         dist: [ubi9]
