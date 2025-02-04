@@ -19,6 +19,7 @@ on:
     branches:
       - "pull-request/[0-9]+"
       - main
+      - ARM_Runner
       - release-*
 
 jobs:
