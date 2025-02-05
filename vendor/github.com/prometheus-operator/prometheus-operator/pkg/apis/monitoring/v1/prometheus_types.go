@@ -296,6 +296,7 @@ type CommonPrometheusFields struct {
 	// +kubebuilder:default:="30s"
 	ScrapeInterval Duration `json:"scrapeInterval,omitempty"`
 	// Number of seconds to wait until a scrape request times out.
+	// The value cannot be greater than the scrape interval otherwise the operator will reject the resource.
 	ScrapeTimeout Duration `json:"scrapeTimeout,omitempty"`
 
 	// The protocols to negotiate during a scrape. It tells clients the
@@ -856,6 +857,29 @@ type CommonPrometheusFields struct {
 	// +optional
 	TSDB *TSDBSpec `json:"tsdb,omitempty"`
 
+	// File to which scrape failures are logged.
+	// Reloading the configuration will reopen the file.
+	//
+	// If the filename has an empty path, e.g. 'file.log', The Prometheus Pods
+	// will mount the file into an emptyDir volume at `/var/log/prometheus`.
+	// If a full path is provided, e.g. '/var/log/prometheus/file.log', you
+	// must mount a volume in the specified directory and it must be writable.
+	// It requires Prometheus >= v2.55.0.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +optional
+	ScrapeFailureLogFile *string `json:"scrapeFailureLogFile,omitempty"`
+
+	// The name of the service name used by the underlying StatefulSet(s) as the governing service.
+	// If defined, the Service  must be created before the Prometheus/PrometheusAgent resource in the same namespace and it must define a selector that matches the pod labels.
+	// If empty, the operator will create and manage a headless service named `prometheus-operated` for Prometheus resources,
+	// or `prometheus-agent-operated` for PrometheusAgent resources.
+	// When deploying multiple Prometheus/PrometheusAgent resources in the same namespace, it is recommended to specify a different value for each.
+	// See https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-network-id for more details.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	ServiceName *string `json:"serviceName,omitempty"`
+
 	// RuntimeConfig configures the values for the Prometheus process behavior
 	// +optional
 	Runtime *RuntimeConfig `json:"runtime,omitempty"`
@@ -957,7 +981,7 @@ type PrometheusList struct {
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of Prometheuses
-	Items []*Prometheus `json:"items"`
+	Items []Prometheus `json:"items"`
 }
 
 // DeepCopyObject implements the runtime.Object interface.
@@ -2121,6 +2145,13 @@ type ScrapeClass struct {
 	// +optional
 	Default *bool `json:"default,omitempty"`
 
+	// The protocol to use if a scrape returns blank, unparseable, or otherwise invalid Content-Type.
+	// It will only apply if the scrape resource doesn't specify any FallbackScrapeProtocol
+	//
+	// It requires Prometheus >= v3.0.0.
+	// +optional
+	FallbackScrapeProtocol *ScrapeProtocol `json:"fallbackScrapeProtocol,omitempty"`
+
 	// TLSConfig defines the TLS settings to use for the scrape. When the
 	// scrape objects define their own CA, certificate and/or key, they take
 	// precedence over the corresponding scrape class fields.
@@ -2191,9 +2222,15 @@ type OTLPConfig struct {
 	PromoteResourceAttributes []string `json:"promoteResourceAttributes,omitempty"`
 
 	// Configures how the OTLP receiver endpoint translates the incoming metrics.
-	// If unset, Prometheus uses its default value.
 	//
 	// It requires Prometheus >= v3.0.0.
 	// +optional
 	TranslationStrategy *TranslationStrategyOption `json:"translationStrategy,omitempty"`
+
+	// Enables adding `service.name`, `service.namespace` and `service.instance.id`
+	// resource attributes to the `target_info` metric, on top of converting them into the `instance` and `job` labels.
+	//
+	// It requires Prometheus >= v3.1.0.
+	// +optional
+	KeepIdentifyingResourceAttributes *bool `json:"keepIdentifyingResourceAttributes,omitempty"`
 }
