@@ -140,7 +140,7 @@ build-bundle-image:
 	$(DOCKER) build \
 	--build-arg VERSION=$(VERSION) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+	--build-arg GIT_COMMIT=$(GITHUB_SHA) \
 	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
 
 # Push the bundle image.
