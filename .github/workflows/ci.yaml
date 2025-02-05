@@ -245,7 +245,8 @@ jobs:
             echo "SHIVA1  ${GITHUB_HEAD_REF}"
           else
             echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-            echo "SHIVA2  ${GITHUB_REF#refs/heads/}    #GITHUB_HEAD_REF"
+            echo "SHIVA2  ${GITHUB_REF#refs/heads/}    $GITHUB_HEAD_REF"
+            env
             exit 2
           fi
           
