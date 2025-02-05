@@ -256,7 +256,7 @@ jobs:
       - name: Build image
         env:
           # BUNDLE_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-bundle:${CI_COMMIT_BRANCH}-latest"
-          BUNDLE_IMAGE: "ghcr.io/staging/gpu-operator-bundle:${{ BRANCH_NAME }}-latest"
+          BUNDLE_IMAGE: "ghcr.io/staging/gpu-operator-bundle:${{ env.BRANCH_NAME }}-latest"
           DEFAULT_CHANNEL: "stable"
           CHANNELS: "stable"
         run: |
