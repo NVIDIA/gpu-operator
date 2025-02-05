@@ -265,11 +265,13 @@ BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
 TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
 
 ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-include $(CURDIR)/multi-arch.mk
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),arm)
-include $(CURDIR)/arm-only.mk
+  include $(CURDIR)/multi-arch.mk
 else
-include $(CURDIR)/native-only.mk
+  ifeq ($(BUILD_MULTI_ARCH_IMAGES),arm)
+    include $(CURDIR)/arm-only.mk
+  else
+    include $(CURDIR)/native-only.mk
+  endif
 endif
 
 ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
