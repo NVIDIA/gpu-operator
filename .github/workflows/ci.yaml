@@ -143,11 +143,7 @@ jobs:
             GENERATE_ARTIFACTS="true"
           fi
           echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
-          #if [[ "${GENERATE_ARTIFACTS}" == "false" ]]; then
           echo "BUILD_MULTI_ARCH_IMAGES=arm" >> $GITHUB_ENV
-            #elif [[ "${GENERATE_ARTIFACTS}" == "true" ]]; then
-            #echo "BUILD_MULTI_ARCH_IMAGES=${NOT_USING_ARM}" >> $GITHUB_ENV
-            #fi
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -194,7 +190,7 @@ jobs:
             GENERATE_ARTIFACTS="true"
           fi
           echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
-          echo "BUILD_MULTI_ARCH_IMAGES=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
+          echo "BUILD_MULTI_ARCH_IMAGES=arm" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
