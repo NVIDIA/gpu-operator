@@ -314,3 +314,25 @@ jobs:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
           retention-days: 15
+
+  push-gpu-operator-bundle-image:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
+    needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out code
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build bundle-image
+        env:
+          BUNDLE_IMAGE: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${{ github.ref_name }}-latest"
+          VERSION: ""
+          DEFAULT_CHANNEL: "stable"
+          CHANNELS: "stable"
+        run: |
+          make push-bundle-image
