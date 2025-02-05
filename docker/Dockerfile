@@ -23,7 +23,7 @@ RUN set -eux; \
     \
     arch="$(uname -m)"; \
     case "${arch##*-}" in \
-        x86_64 | amd64) ARCH='arm64' ;; \
+        x86_64 | amd64) ARCH='amd64' ;; \
         ppc64el | ppc64le) ARCH='ppc64le' ;; \
         aarch64 | arm64) ARCH='arm64' ;; \
         *) echo "unsupported architecture" ; exit 1 ;; \
