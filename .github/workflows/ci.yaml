@@ -312,7 +312,7 @@ jobs:
 
   ### e2e tests ###
   e2e-tests-containerd:
-    needs: [build-gpu-operator, build-gpu-operator-validator]
+    needs: [build-gpu-operator-arm, build-gpu-operator-validator-arm, build-gpu-operator-amd, build-gpu-operator-validator-amd]
     runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
@@ -364,7 +364,7 @@ jobs:
           retention-days: 15
 
   e2e-tests-nvidiadriver:
-    needs: [build-gpu-operator, build-gpu-operator-validator]
+    needs: [build-gpu-operator-arm, build-gpu-operator-validator-arm, build-gpu-operator-amd, build-gpu-operator-validator-amd]
     runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
