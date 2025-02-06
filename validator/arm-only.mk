@@ -17,6 +17,3 @@ DOCKER_BUILD_PLATFORM_OPTIONS = --platform=linux/arm64
 $(PUSH_TARGETS): push-%:
         $(DOCKER) push "$(IMAGE_NAME):$(IMAGE_TAG)"
 
-push-short:
-        $(DOCKER) tag "$(IMAGE_NAME):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(IMAGE_NAME):$(VERSION)"
-        $(DOCKER) push "$(IMAGE_NAME):$(VERSION)"
