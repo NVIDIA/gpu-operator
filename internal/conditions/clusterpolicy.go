@@ -18,6 +18,7 @@ package conditions
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,16 +40,22 @@ func NewClusterPolicyUpdater(client client.Client) Updater {
 }
 
 func (u *clusterPolicyUpdater) SetConditionsReady(ctx context.Context, cr any, reason, message string) error {
-	clusterPolicyCr, _ := cr.(*nvidiav1.ClusterPolicy)
-	return u.setConditionsReady(ctx, clusterPolicyCr, reason, message)
+	clusterPolicyCr, ok := cr.(*nvidiav1.ClusterPolicy)
+	if !ok {
+		return fmt.Errorf("provided object is not a *nvidiav1.ClusterPolicy")
+	}
+	return u.setConditions(ctx, clusterPolicyCr, Ready, reason, message)
 }
 
 func (u *clusterPolicyUpdater) SetConditionsError(ctx context.Context, cr any, reason, message string) error {
-	clusterPolicyCr, _ := cr.(*nvidiav1.ClusterPolicy)
-	return u.setConditionsError(ctx, clusterPolicyCr, reason, message)
+	clusterPolicyCr, ok := cr.(*nvidiav1.ClusterPolicy)
+	if !ok {
+		return fmt.Errorf("provided object is not a *nvidiav1.ClusterPolicy")
+	}
+	return u.setConditions(ctx, clusterPolicyCr, Error, reason, message)
 }
 
-func (u *clusterPolicyUpdater) setConditionsReady(ctx context.Context, cr *nvidiav1.ClusterPolicy, reason, message string) error {
+func (u *clusterPolicyUpdater) setConditions(ctx context.Context, cr *nvidiav1.ClusterPolicy, statusType, reason, message string) error {
 	reqLogger := log.FromContext(ctx)
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1.ClusterPolicy{}
@@ -58,44 +65,37 @@ func (u *clusterPolicyUpdater) setConditionsReady(ctx context.Context, cr *nvidi
 		return err
 	}
 
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
+	switch statusType {
+	case Ready:
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:    Ready,
+			Status:  metav1.ConditionTrue,
+			Reason:  reason,
+			Message: message,
+		})
 
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:   Error,
-		Status: metav1.ConditionFalse,
-		Reason: Ready,
-	})
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:   Error,
+			Status: metav1.ConditionFalse,
+			Reason: Ready,
+		})
+	case Error:
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:   Ready,
+			Status: metav1.ConditionFalse,
+			Reason: Error,
+		})
 
-	return u.client.Status().Update(ctx, instance)
-}
-
-func (u *clusterPolicyUpdater) setConditionsError(ctx context.Context, cr *nvidiav1.ClusterPolicy, reason, message string) error {
-	reqLogger := log.FromContext(ctx)
-	// Fetch latest instance and update state to avoid version mismatch
-	instance := &nvidiav1.ClusterPolicy{}
-	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterPolicy instance for status update", "name", cr.Name)
-		return err
+		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+			Type:    Error,
+			Status:  metav1.ConditionTrue,
+			Reason:  reason,
+			Message: message,
+		})
+	default:
+		reqLogger.Error(nil, "Unknown status type provided", "statusType", statusType)
+		return fmt.Errorf("unknown status type provided: %s", statusType)
 	}
-
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:   Ready,
-		Status: metav1.ConditionFalse,
-		Reason: Error,
-	})
-
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    Error,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
 
 	return u.client.Status().Update(ctx, instance)
 }
