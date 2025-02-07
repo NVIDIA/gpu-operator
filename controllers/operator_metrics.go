@@ -61,25 +61,31 @@ const (
 
 	driverAutoUpgradeEnabled  = 1
 	driverAutoUpgradeDisabled = 0
+
+	// operatorMetricsNamespace is the name of the namespace used for the GPU Operator metrics.
+	operatorMetricsNamespace = "gpu_operator"
 )
 
-func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
+func initOperatorMetrics() *OperatorMetrics {
 	m := &OperatorMetrics{
 		gpuNodesTotal: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_gpu_nodes_total",
-				Help: "Number of nodes with GPUs",
+				Namespace: operatorMetricsNamespace,
+				Name:      "gpu_nodes_total",
+				Help:      "Number of nodes with GPUs",
 			},
 		),
 		reconciliationLastSuccess: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_reconciliation_last_success_ts_seconds",
-				Help: "Timestamp (in seconds) of the last reconciliation loop success",
+				Namespace: operatorMetricsNamespace,
+				Name:      "reconciliation_last_success_ts_seconds",
+				Help:      "Timestamp (in seconds) of the last reconciliation loop success",
 			},
 		),
 		reconciliationStatus: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_reconciliation_status",
+				Namespace: operatorMetricsNamespace,
+				Name:      "reconciliation_status",
 				Help: fmt.Sprintf("%d if the reconciliation is currently successful, %d if the operands are not ready, %d if the cluster policy is unavailable, %d if an error occurred within the operator.",
 					reconciliationStatusSuccess,
 					reconciliationStatusNotReady,
@@ -89,87 +95,101 @@ func initOperatorMetrics(n *ClusterPolicyController) *OperatorMetrics {
 		),
 		reconciliationTotal: promcli.NewCounter(
 			promcli.CounterOpts{
-				Name: "gpu_operator_reconciliation_total",
-				Help: "Total number of reconciliation",
+				Namespace: operatorMetricsNamespace,
+				Name:      "reconciliation_total",
+				Help:      "Total number of reconciliation",
 			},
 		),
 		reconciliationFailed: promcli.NewCounter(
 			promcli.CounterOpts{
-				Name: "gpu_operator_reconciliation_failed_total",
-				Help: "Number of failed reconciliation",
+				Namespace: operatorMetricsNamespace,
+				Name:      "reconciliation_failed_total",
+				Help:      "Number of failed reconciliation",
 			},
 		),
 		reconciliationHasNFDLabels: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_reconciliation_has_nfd_labels",
-				Help: "1 if NFD mandatory kernel labels have been found, 0 otherwise",
+				Namespace: operatorMetricsNamespace,
+				Name:      "reconciliation_has_nfd_labels",
+				Help:      "1 if NFD mandatory kernel labels have been found, 0 otherwise",
 			},
 		),
 
 		openshiftDriverToolkitEnabled: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_openshift_driver_toolkit_enabled",
-				Help: "1 if OCP DriverToolkit is enabled, -1 if requested but could not be enabled, 0 if not requested",
+				Namespace: operatorMetricsNamespace,
+				Name:      "openshift_driver_toolkit_enabled",
+				Help:      "1 if OCP DriverToolkit is enabled, -1 if requested but could not be enabled, 0 if not requested",
 			},
 		),
 		openshiftDriverToolkitNfdTooOld: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_openshift_driver_toolkit_nfd_too_old",
-				Help: "1 if OCP DriverToolkit is enabled but NFD doesn't expose OSTREE labels, 0 otherwise",
+				Namespace: operatorMetricsNamespace,
+				Name:      "openshift_driver_toolkit_nfd_too_old",
+				Help:      "1 if OCP DriverToolkit is enabled but NFD doesn't expose OSTREE labels, 0 otherwise",
 			},
 		),
 		openshiftDriverToolkitIsMissing: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_openshift_driver_toolkit_imagestream_missing",
-				Help: "1 if OCP DriverToolkit is enabled but its imagestream is not available, 0 otherwise",
+				Namespace: operatorMetricsNamespace,
+				Name:      "openshift_driver_toolkit_imagestream_missing",
+				Help:      "1 if OCP DriverToolkit is enabled but its imagestream is not available, 0 otherwise",
 			},
 		),
 		openshiftDriverToolkitRhcosTagsMissing: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_openshift_driver_toolkit_rhcos_tags_missing",
-				Help: "1 if OCP DriverToolkit is enabled but some of the RHCOS tags are missing, 0 otherwise",
+				Namespace: operatorMetricsNamespace,
+				Name:      "openshift_driver_toolkit_rhcos_tags_missing",
+				Help:      "1 if OCP DriverToolkit is enabled but some of the RHCOS tags are missing, 0 otherwise",
 			},
 		),
 		openshiftDriverToolkitIsBroken: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_openshift_driver_toolkit_imagestream_broken",
-				Help: "1 if OCP DriverToolkit is enabled but its imagestream is broken (rhbz#2015024), 0 otherwise",
+				Namespace: operatorMetricsNamespace,
+				Name:      "openshift_driver_toolkit_imagestream_broken",
+				Help:      "1 if OCP DriverToolkit is enabled but its imagestream is broken (rhbz#2015024), 0 otherwise",
 			},
 		),
 		driverAutoUpgradeEnabled: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_driver_auto_upgrade_enabled",
-				Help: "1 if driver auto upgrade is enabled 0 if not",
+				Namespace: operatorMetricsNamespace,
+				Name:      "driver_auto_upgrade_enabled",
+				Help:      "1 if driver auto upgrade is enabled 0 if not",
 			},
 		),
 		upgradesInProgress: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_nodes_upgrades_in_progress",
-				Help: "Total number of nodes on which the gpu operator pods are being upgraded",
+				Namespace: operatorMetricsNamespace,
+				Name:      "nodes_upgrades_in_progress",
+				Help:      "Total number of nodes on which the gpu operator pods are being upgraded",
 			},
 		),
 		upgradesDone: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_nodes_upgrades_done",
-				Help: "Total number of nodes on which the gpu operator pods are successfully upgraded",
+				Namespace: operatorMetricsNamespace,
+				Name:      "nodes_upgrades_done",
+				Help:      "Total number of nodes on which the gpu operator pods are successfully upgraded",
 			},
 		),
 		upgradesFailed: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_nodes_upgrades_failed",
-				Help: "Total number of nodes on which the gpu operator pod upgrades have failed",
+				Namespace: operatorMetricsNamespace,
+				Name:      "nodes_upgrades_failed",
+				Help:      "Total number of nodes on which the gpu operator pod upgrades have failed",
 			},
 		),
 		upgradesAvailable: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_nodes_upgrades_available",
-				Help: "Total number of nodes on which the gpu operator pod upgrades can be done",
+				Namespace: operatorMetricsNamespace,
+				Name:      "nodes_upgrades_available",
+				Help:      "Total number of nodes on which the gpu operator pod upgrades can be done",
 			},
 		),
 		upgradesPending: promcli.NewGauge(
 			promcli.GaugeOpts{
-				Name: "gpu_operator_nodes_upgrades_pending",
-				Help: "Total number of nodes on which the gpu operator pod upgrades are pending",
+				Namespace: operatorMetricsNamespace,
+				Name:      "nodes_upgrades_pending",
+				Help:      "Total number of nodes on which the gpu operator pod upgrades are pending",
 			},
 		),
 	}

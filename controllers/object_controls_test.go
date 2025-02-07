@@ -213,7 +213,7 @@ func setup() error {
 		scheme:    s,
 	}
 
-	clusterPolicyController.operatorMetrics = initOperatorMetrics(&clusterPolicyController)
+	clusterPolicyController.operatorMetrics = initOperatorMetrics()
 
 	hasNFDLabels, gpuNodeCount, err := clusterPolicyController.labelGPUNodes()
 	if err != nil {

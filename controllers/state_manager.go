@@ -785,7 +785,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.k8sVersion = k8sVersion
 		n.logger.Info("Kubernetes version detected", "version", k8sVersion)
 
-		n.operatorMetrics = initOperatorMetrics(n)
+		n.operatorMetrics = initOperatorMetrics()
 		n.logger.Info("Operator metrics initialized.")
 
 		addState(n, "/opt/gpu-operator/pre-requisites")
