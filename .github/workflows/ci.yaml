@@ -313,11 +313,11 @@ jobs:
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
-      - name: Push image
-        env:
-          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-amd
-        run: |
-          docker push IMAGE_NAME
+          #- name: Push image
+          #env:
+          #IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-amd
+          #run: |
+          #docker push IMAGE_NAME
 
 
   ### MULTI-ARCH-IMAGES test ###
