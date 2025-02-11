@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DOCKER_BUILD_PLATFORM_OPTIONS = --platform ?= linux/amd64
+#DOCKER_BUILD_PLATFORM_OPTIONS = --platform ?= linux/amd64
 
 $(PUSH_TARGETS): OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 $(PUSH_TARGETS): push-%:
