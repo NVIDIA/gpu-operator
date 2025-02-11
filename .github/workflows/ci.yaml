@@ -160,7 +160,7 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
-          VERSION: ${COMMIT_SHORT_SHA}
+          VERSION: ${COMMIT_SHORT_SHA}-arm
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
@@ -208,7 +208,7 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}
+          VERSION: ${COMMIT_SHORT_SHA}-arm
           SUBCOMPONENT: validator
         run: |
           echo "${VERSION}"
@@ -259,7 +259,7 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
-          VERSION: ${COMMIT_SHORT_SHA}
+          VERSION: ${COMMIT_SHORT_SHA}-amd
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
@@ -308,7 +308,7 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}
+          VERSION: ${COMMIT_SHORT_SHA}-amd
           SUBCOMPONENT: validator
         run: |
           echo "${VERSION}"
