@@ -347,12 +347,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Manifest
         env:
-          IMAGE_ID_ARM: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator:${COMMIT_SHORT_SHA}-arm
-          IMAGE_ID_AMD: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator:${COMMIT_SHORT_SHA}-amd
-          IMAGE_ID_ARM_VAL: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-arm
-          IMAGE_ID_AMD_VAL: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-amd
-          MANIFEST: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator:${COMMIT_SHORT_SHA}-multiarch
-          MANIFEST_VAL: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-multiarch
+          LOWERCASE_REPO_OWNER: ${{ env.LOWERCASE_REPO_OWNER }}
+          COMMIT_SHORT_SHA: ${{ env.COMMIT_SHORT_SHA }}
+          IMAGE_ID_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-arm
+          IMAGE_ID_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER}}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-amd
+          IMAGE_ID_ARM_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-arm
+          IMAGE_ID_AMD_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-amd
+          MANIFEST: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-multiarch
+          MANIFEST_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-multiarch
         run: |
           docker manifest create \
             ${MANIFEST} \
