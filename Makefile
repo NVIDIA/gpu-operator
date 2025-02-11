@@ -256,6 +256,10 @@ coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
+#build-multi-arch-image:
+
+
+
 ##### Public rules #####
 DISTRIBUTIONS := ubi9
 DEFAULT_PUSH_TARGET := ubi9

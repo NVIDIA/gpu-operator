@@ -313,6 +313,52 @@ jobs:
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
+      - name: Push image
+        env:
+          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator:${COMMIT_SHORT_SHA}-amd
+        run: |
+          docker push IMAGE_NAME
+
+
+  ### MULTI-ARCH-IMAGES test ###
+  #build-multi-arch-image:
+  #  needs: [build-gpu-operator-arm, build-gpu-operator-validator-arm, build-gpu-operator-amd, build-gpu-operator-validator-amd]
+  #  runs-on: ubuntu-latest
+  #  strategy:
+  #    matrix:
+  #      dist: [ubi9]
+  #  steps:
+  #    - uses: actions/checkout@v4
+  #      name: Check out code
+  #    - name: Calculate build vars
+  #      id: vars
+  #      run: |
+  #        echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+  #        echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
+  #        REPO_FULL_NAME="${{ github.event.pull_request.head.repo.full_name }}"
+  #        echo "${REPO_FULL_NAME}"
+  #        echo "LABEL_IMAGE_SOURCE=https://github.com/${REPO_FULL_NAME}" >> $GITHUB_ENV
+  #    - name: Set up QEMU
+  #      uses: docker/setup-qemu-action@v3
+  #      with:
+  #        image: tonistiigi/binfmt:master
+  #    - name: Set up Docker Buildx
+  #      uses: docker/setup-buildx-action@v3
+  #    - name: Login to GitHub Container Registry
+  #      uses: docker/login-action@v3
+  #      with:
+  #        registry: ghcr.io
+  #        username: ${{ github.actor }}
+  #        password: ${{ secrets.GITHUB_TOKEN }}
+  #    - name: Build Manifest
+  #      env:
+  #        IMAGE_ID: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
+  #        VERSION: ${COMMIT_SHORT_SHA}
+  #      run: |
+  #        echo "${VERSION}"
+  #        echo "${IMAGE_ID}"
+  #        make build-multi-arch-image
+
 
   ### e2e tests ###
   e2e-tests-containerd:
