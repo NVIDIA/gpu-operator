@@ -47,10 +47,10 @@ PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
 BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
 TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
 
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-  include $(CURDIR)/multi-arch.mk
+ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
+include $(CURDIR)/native-only.mk
 else
-  include $(CURDIR)/native-only.mk
+include $(CURDIR)/multi-arch.mk
 endif
 
 ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image validator

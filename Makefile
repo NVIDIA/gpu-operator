@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUILD_MULTI_ARCH_IMAGES ?= no
+BUILD_MULTI_ARCH_IMAGES ?= false
 DOCKER ?= docker
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -268,10 +268,10 @@ PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
 BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
 TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
 
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-  include $(CURDIR)/multi-arch.mk
+ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
+include $(CURDIR)/native-only.mk
 else
-  include $(CURDIR)/native-only.mk
+include $(CURDIR)/multi-arch.mk
 endif
 
 ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
