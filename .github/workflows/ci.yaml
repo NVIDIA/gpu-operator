@@ -114,7 +114,7 @@ jobs:
       - run: make docker-build
 
   ### Image builds ###
-  build-gpu-operator-arm:
+  build-gpu-operator-arm64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-24.04-arm
     strategy:
@@ -153,11 +153,11 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
-          VERSION: ${COMMIT_SHORT_SHA}-arm
+          VERSION: ${COMMIT_SHORT_SHA}-arm64
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
-  build-gpu-operator-validator-arm:
+  build-gpu-operator-validator-arm64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-24.04-arm
     strategy:
@@ -196,14 +196,14 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}-arm
+          VERSION: ${COMMIT_SHORT_SHA}-arm64
           SUBCOMPONENT: validator
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
 
   ### Image builds ###
-  build-gpu-operator-amd:
+  build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-latest
     strategy:
@@ -242,12 +242,12 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
-          VERSION: ${COMMIT_SHORT_SHA}-amd
+          VERSION: ${COMMIT_SHORT_SHA}-amd64
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
 
-  build-gpu-operator-validator-amd:
+  build-gpu-operator-validator-amd64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-latest
     strategy:
@@ -286,14 +286,14 @@ jobs:
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}-amd
+          VERSION: ${COMMIT_SHORT_SHA}-amd64
           SUBCOMPONENT: validator
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
 
   build-multi-arch-image:
-    needs: [build-gpu-operator-arm, build-gpu-operator-validator-arm, build-gpu-operator-amd, build-gpu-operator-validator-amd]
+    needs: [build-gpu-operator-arm64, build-gpu-operator-validator-arm64, build-gpu-operator-amd64, build-gpu-operator-validator-amd64]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -317,12 +317,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Manifest
         env:
-          IMAGE_ID_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-arm
-          IMAGE_ID_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER}}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-amd
-          IMAGE_ID_ARM_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-arm
-          IMAGE_ID_AMD_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-amd
-          MANIFEST: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}
-          MANIFEST_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}
+          IMAGE_ID_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-arm64
+          IMAGE_ID_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER}}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-amd64
+          IMAGE_ID_ARM_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-arm64
+          IMAGE_ID_AMD_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-amd64
+          MULTI_ARCH_MANIFEST: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}
+          MULTI_ARCH_MANIFEST_VAL: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}
         run: |
           docker manifest create \
             ${MANIFEST} \
