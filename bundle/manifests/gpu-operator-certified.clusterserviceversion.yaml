@@ -296,6 +296,19 @@ spec:
           path: imagePullPolicy
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - displayName: UseOpenKernelModules
+          description: 'Enable use of open GPU kernel modules'
+          path: useOpenKernelModules
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+        - displayName: Kernel Module Type
+          description: 'Kernel Module Type (default: Auto)'
+          path: kernelModuleType
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:select:auto'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:open'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:proprietary'
       statusDescriptors:
         - description: The current state of the driver.
           displayName: State
@@ -382,6 +395,19 @@ spec:
           path: driver.imagePullPolicy
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - displayName: UseOpenKernelModules
+          description: 'Enable use of open GPU kernel modules'
+          path: driver.useOpenKernelModules
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+        - displayName: Kernel Module Type
+          description: 'Kernel Module Type (default: Auto)'
+          path: kernelModuleType
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:select:auto'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:open'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:proprietary'
         - description: NVIDIA DCGM Exporter config
           displayName: NVIDIA DCGM Exporter config
           path: dcgmExporter
