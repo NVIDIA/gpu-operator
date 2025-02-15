@@ -483,7 +483,7 @@ type DriverSpec struct {
 	// UseOpenKernelModules indicates if the open GPU kernel modules should be used
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable use of open GPU kernel modules"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch,urn:alm:descriptor:com.tectonic.ui:hidden"
 	UseOpenKernelModules *bool `json:"useOpenKernelModules,omitempty"`
 
 	// KernelModuleType represents the type of driver kernel modules to be used when installing the GPU driver.
@@ -491,6 +491,9 @@ type DriverSpec struct {
 	// type is chosen based on the GPU devices on the host and the driver branch used
 	// +kubebuilder:validation:Enum=auto;open;proprietary
 	// +kubebuilder:default=auto
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel Module Type"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.description="Kernel Module Type"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:select:auto,urn:alm:descriptor:com.tectonic.ui:select:open,urn:alm:descriptor:com.tectonic.ui:select:proprietary"
 	KernelModuleType string `json:"kernelModuleType,omitempty"`
 
 	// Enabled indicates if deployment of NVIDIA Driver through operator is enabled
