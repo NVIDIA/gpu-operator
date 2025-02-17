@@ -315,10 +315,46 @@ jobs:
           path: ./logs/
           retention-days: 15
 
-  push-gpu-operator-bundle-image:
+  gpu-operator-and-validator-image-retag:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out code
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Calculate test vars
+        id: vars
+        run: |
+          COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}
+          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+          LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
+          echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
+
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
+          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
+          echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
+      - name: Retag gpu-operator and gpu-operator-validator
+        env:
+          ADDITIONAL_IMAGE_TAG: ${{ github.ref_name == 'main' && 'main-latest' || '' }}
+        run: |
+          docker pull ${OPERATOR_IMAGE}:${OPERATOR_VERSION}
+          docker pull ${VALIDATOR_IMAGE}:${VALIDATOR_VERSION}
+          docker tag ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:${ADDITIONAL_IMAGE_TAG}
+          docker push ${OPERATOR_IMAGE}:${ADDITIONAL_IMAGE_TAG}
+          docker tag ${VALIDATOR_IMAGE}:${VALIDATOR_VERSION} ${VALIDATOR_IMAGE}:${ADDITIONAL_IMAGE_TAG}
+          docker push ${VALIDATOR_IMAGE}:${ADDITIONAL_IMAGE_TAG}
+
+  push-gpu-operator-bundle-image:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
+    needs: [gpu-operator-and-validator-image-retag]
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
