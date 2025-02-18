@@ -756,7 +756,7 @@ func TestTransformDevicePlugin(t *testing.T) {
 		{
 			description: "transform device plugin",
 			ds: NewDaemonset().
-				WithContainer(corev1.Container{Name: "nvidia-device-plugin-ctr"}).
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				DevicePlugin: gpuv1.DevicePluginSpec{
@@ -772,7 +772,7 @@ func TestTransformDevicePlugin(t *testing.T) {
 				},
 			},
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
-				Name:            "nvidia-device-plugin-ctr",
+				Name:            "nvidia-device-plugin",
 				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Args:            []string{"--fail-on-init-error=false"},
@@ -1818,6 +1818,116 @@ func TestTransformDriver(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformToolkitCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "cdi enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+					},
+				}),
+		},
+		{
+			description: "cdi enabled and cdi default",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+					Default: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.DaemonSet.Spec.Template.Spec.Containers[0]
+			transformToolkitCtrForCDI(mainContainer, tc.cpSpec)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePluginCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "toolkit disabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "toolkit enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+						{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.DaemonSet.Spec.Template.Spec.Containers[0]
+			transformDevicePluginCtrForCDI(mainContainer, tc.cpSpec)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}

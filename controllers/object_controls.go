@@ -178,6 +178,8 @@ const (
 	// DriverInstallDirCtrPathEnvName is the name of the envvar used by the driver-validator to represent the path
 	// of the driver install dir mounted in the container
 	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
+	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
+	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
 )
 
 // ContainerProbe defines container probe types
@@ -1222,8 +1224,38 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
 	return envVars
 }
 
+func transformToolkitCtrForCDI(container *corev1.Container, config *gpuv1.ClusterPolicySpec) {
+	// When CDI is enabled in GPU Operator, we leverage native CDI support in containerd / cri-o
+	// to inject GPUs into workloads. We do not configure 'nvidia' as the default runtime. The
+	// 'nvidia' runtime will be set as the runtime class for our management containers so that
+	// they get access to all GPUs.
+	//
+	// Note: one could override this and continue to configure 'nvidia' as the default runtime
+	// by directly setting the 'NVIDIA_RUNTIME_SET_AS_DEFAULT' environment variable to 'true' in
+	// the toolkit container. One can leverage the 'toolkit.env' field in ClusterPolicy to
+	// directly configure environment variables for the toolkit container.
+	setContainerEnv(container, CDIEnabledEnvName, "true")
+	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
+
+	if config.CDI.IsDefault() {
+		setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
+	}
+}
+
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	var mainContainer *corev1.Container
+	mainContainerName := "nvidia-container-toolkit-ctr"
+	for i, ctr := range obj.Spec.Template.Spec.Containers {
+		if ctr.Name == mainContainerName {
+			mainContainer = &obj.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+	if mainContainer == nil {
+		return fmt.Errorf("failed to find main container %q", mainContainerName)
+	}
+
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
 	if err != nil {
@@ -1234,10 +1266,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if err != nil {
 		return err
 	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
+	mainContainer.Image = image
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
+	mainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.Toolkit.ImagePullSecrets) > 0 {
@@ -1255,16 +1287,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-		if config.CDI.IsDefault() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
-		}
+		transformToolkitCtrForCDI(mainContainer, config)
 	}
 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
+		setContainerEnv(mainContainer, ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
 
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
 			if volume.Name == "toolkit-install-dir" {
@@ -1273,9 +1301,9 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			}
 		}
 
-		for i, volumeMount := range obj.Spec.Template.Spec.Containers[0].VolumeMounts {
+		for i, volumeMount := range mainContainer.VolumeMounts {
 			if volumeMount.Name == "toolkit-install-dir" {
-				obj.Spec.Template.Spec.Containers[0].VolumeMounts[i].MountPath = config.Toolkit.InstallDir
+				mainContainer.VolumeMounts[i].MountPath = config.Toolkit.InstallDir
 				break
 			}
 		}
@@ -1292,13 +1320,13 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	if len(config.Toolkit.Env) > 0 {
 		for _, env := range config.Toolkit.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(mainContainer, env.Name, env.Value)
 		}
 	}
 
 	// configure runtime
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
+	err = transformForRuntime(obj, config, runtime, mainContainerName)
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
@@ -1384,8 +1412,30 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	return nil
 }
 
+func transformDevicePluginCtrForCDI(container *corev1.Container, config *gpuv1.ClusterPolicySpec) {
+	setContainerEnv(container, CDIEnabledEnvName, "true")
+	setContainerEnv(container, DeviceListStrategyEnvName, "cdi-annotations,cdi-cri")
+	setContainerEnv(container, CDIAnnotationPrefixEnvName, "cdi.k8s.io/")
+
+	if config.Toolkit.IsEnabled() {
+		setContainerEnv(container, NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
+	}
+}
+
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	var mainContainer *corev1.Container
+	mainContainerName := "nvidia-device-plugin"
+	for i, ctr := range obj.Spec.Template.Spec.Containers {
+		if ctr.Name == mainContainerName {
+			mainContainer = &obj.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+	if mainContainer == nil {
+		return fmt.Errorf("failed to find main container %q", mainContainerName)
+	}
+
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
 	if err != nil {
@@ -1397,10 +1447,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if err != nil {
 		return err
 	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
+	mainContainer.Image = image
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+	mainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
@@ -1417,13 +1467,13 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 	// set arguments if specified for device-plugin container
 	if len(config.DevicePlugin.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.DevicePlugin.Args
+		mainContainer.Args = config.DevicePlugin.Args
 	}
 
 	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MOFEDEnabledEnvName, "true")
+		setContainerEnv(mainContainer, GDSEnabledEnvName, "true")
+		setContainerEnv(mainContainer, MOFEDEnabledEnvName, "true")
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
@@ -1435,16 +1485,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	setRuntimeClassName(&obj.Spec.Template.Spec, config)
 
 	// update env required for MIG support
-	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
+	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
-		if config.Toolkit.IsEnabled() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
-		}
+		transformDevicePluginCtrForCDI(mainContainer, config)
 	}
 
 	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
@@ -1458,12 +1503,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
+		setContainerEnv(mainContainer, MPSRootEnvName, config.DevicePlugin.MPS.Root)
 	}
 
 	if len(config.DevicePlugin.Env) > 0 {
 		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(mainContainer, env.Name, env.Value)
 		}
 	}
 
