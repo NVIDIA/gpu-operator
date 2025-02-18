@@ -952,8 +952,12 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		n.singleton.Spec.Driver.UseNvdiaDriverCRDType() {
 		n.logger.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++
-		// Cleanup all driver daemonsets owned by ClusterPolicy.
-		err := n.cleanupAllDriverDaemonSets(n.ctx)
+		// Cleanup all driver daemonsets owned by ClusterPolicy, but orphan the dependent pod objects.
+		// This way, switching to the new NVIDIADriver API does not cause a cluster-wide disruption.
+		// NVIDIA driver pods owned by ClusterPolicy daemonsets will remain running until the NVIDIADriver
+		// controller migrates these pods to new ones owned by NVIDIADriver daemonsets.
+		deletePropagationOrphan := metav1.DeletePropagationOrphan
+		err := n.cleanupAllDriverDaemonSets(n.ctx, &client.DeleteOptions{PropagationPolicy: &deletePropagationOrphan})
 		if err != nil {
 			return gpuv1.NotReady, fmt.Errorf("failed to cleanup all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 		}
