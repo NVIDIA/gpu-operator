@@ -3623,7 +3623,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 func getPodsOwnedbyDaemonset(ds *appsv1.DaemonSet, pods []corev1.Pod, n ClusterPolicyController) []corev1.Pod {
 	dsPodList := []corev1.Pod{}
 	for _, pod := range pods {
-		if pod.OwnerReferences == nil || len(pod.OwnerReferences) < 1 {
+		if len(pod.OwnerReferences) < 1 {
 			n.logger.Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
 			continue
 		}
