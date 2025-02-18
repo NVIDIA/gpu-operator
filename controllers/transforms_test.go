@@ -1163,3 +1163,198 @@ func TestTransformSandboxValidator(t *testing.T) {
 		})
 	}
 }
+
+func TestTransformToolkitForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		ctrl        ClusterPolicyController
+		expectedDs  Daemonset
+	}{
+		{
+			description: "cdi disabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			ctrl:       ClusterPolicyController{},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+		},
+		{
+			description: "cdi enabled, runtime does not support cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			ctrl: ClusterPolicyController{},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: CrioConfigModeEnvName, Value: "config"},
+						{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "cdi enabled, cdi default, runtime does not support cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+					Default: newBoolPtr(true),
+				},
+			},
+			ctrl: ClusterPolicyController{},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: CrioConfigModeEnvName, Value: "config"},
+						{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+					},
+				}),
+		},
+		{
+			description: "cdi enabled, cdi default, runtime supports cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+					Default: newBoolPtr(true),
+				},
+			},
+			ctrl: ClusterPolicyController{
+				runtimeSupportsCDI: true,
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: CrioConfigModeEnvName, Value: "config"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			transformToolkitForCDI(tc.ds.DaemonSet, tc.cpSpec, tc.ctrl)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePluginForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		ctrl        ClusterPolicyController
+		expectedDs  Daemonset
+	}{
+		{
+			description: "cdi disabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			ctrl:       ClusterPolicyController{},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+		},
+		{
+			description: "cdi enabled, toolkit disabled, runtime supports cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			ctrl: ClusterPolicyController{
+				runtimeSupportsCDI: true,
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "cdi enabled, toolkit disabled, runtime does not support cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			ctrl: ClusterPolicyController{
+				runtimeSupportsCDI: false,
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "envvar,cdi-annotations"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "nvidia.cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "cdi enabled, toolkit enabled, runtime supports cdi",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			ctrl: ClusterPolicyController{
+				runtimeSupportsCDI: true,
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			transformDevicePluginForCDI(tc.ds.DaemonSet, tc.cpSpec, tc.ctrl)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
