@@ -1096,7 +1096,11 @@ func TestTransformValidator(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime:   gpuv1.Containerd,
+				logger:    ctrl.Log.WithName("test"),
+				singleton: &gpuv1.ClusterPolicy{Spec: *tc.cpSpec},
+			})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
