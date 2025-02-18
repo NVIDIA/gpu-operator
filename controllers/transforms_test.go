@@ -1202,38 +1202,17 @@ func TestTransformToolkitForCDI(t *testing.T) {
 					Env: []corev1.EnvVar{
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: CrioConfigModeEnvName, Value: "config"},
-						{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"},
-					},
-				}),
-		},
-		{
-			description: "cdi enabled, cdi default, runtime does not support cdi",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				CDI: gpuv1.CDIConfigSpec{
-					Enabled: newBoolPtr(true),
-					Default: newBoolPtr(true),
-				},
-			},
-			ctrl: ClusterPolicyController{},
-			expectedDs: NewDaemonset().WithContainer(
-				corev1.Container{
-					Name: "main-ctr",
-					Env: []corev1.EnvVar{
-						{Name: CDIEnabledEnvName, Value: "true"},
-						{Name: CrioConfigModeEnvName, Value: "config"},
-						{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: NvidiaCtrRuntimeCDIPrefixesEnvName, Value: "nvidia.cdi.k8s.io/"},
 					},
 				}),
 		},
 		{
-			description: "cdi enabled, cdi default, runtime supports cdi",
+			description: "cdi enabled, runtime supports cdi",
 			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
 					Enabled: newBoolPtr(true),
-					Default: newBoolPtr(true),
 				},
 			},
 			ctrl: ClusterPolicyController{

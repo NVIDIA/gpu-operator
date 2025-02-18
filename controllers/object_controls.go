@@ -1204,13 +1204,10 @@ func transformToolkitForCDI(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySp
 
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 
 	if !n.runtimeSupportsCDI {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-	}
-
-	if config.CDI.IsDefault() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 	}
 
 	// When the container runtime supports CDI, we do not configure 'nvidia' as the default runtime.
