@@ -19,6 +19,7 @@ echo "--------------------------------------------------------------------------
 # Install a workload and verify that this works as expected
 "${SCRIPT_DIR}"/install-workload.sh
 "${SCRIPT_DIR}"/verify-workload.sh
+"${SCRIPT_DIR}"/uninstall-workload.sh
 
 echo ""
 echo ""
@@ -26,6 +27,16 @@ echo "--------------Clusterpolicy Update Tests----------------------------------
 echo "------------------------------------------------------------------------------------"
 # Test updates through ClusterPolicy
 "${SCRIPT_DIR}"/update-clusterpolicy.sh
+
+echo ""
+echo ""
+echo "--------------CDI Tests--------------------------------------------"
+echo "------------------------------------------------------------------------------------"
+"${SCRIPT_DIR}"/enable-cdi.sh
+"${SCRIPT_DIR}"/verify-operator.sh
+"${SCRIPT_DIR}"/install-workload.sh
+"${SCRIPT_DIR}"/verify-workload.sh
+"${SCRIPT_DIR}"/uninstall-workload.sh
 
 echo ""
 echo ""
@@ -43,8 +54,7 @@ test_restart_operator ${TEST_NAMESPACE} ${CONTAINER_RUNTIME}
 "${SCRIPT_DIR}"/enable-operands.sh
 "${SCRIPT_DIR}"/verify-operator.sh
 
-# Uninstall the workload and operator
-"${SCRIPT_DIR}"/uninstall-workload.sh
+# Uninstall the operator
 "${SCRIPT_DIR}"/uninstall-operator.sh
 
 echo ""
