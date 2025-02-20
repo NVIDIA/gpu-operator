@@ -1277,7 +1277,7 @@ func TestTransformDevicePluginForCDI(t *testing.T) {
 					Name: "main-ctr",
 					Env: []corev1.EnvVar{
 						{Name: CDIEnabledEnvName, Value: "true"},
-						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-cri"},
 						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
 					},
 				}),
@@ -1327,7 +1327,7 @@ func TestTransformDevicePluginForCDI(t *testing.T) {
 					Env: []corev1.EnvVar{
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
-						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-cri"},
 						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
 					},
 				}),

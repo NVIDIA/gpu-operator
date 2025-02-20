@@ -1380,9 +1380,9 @@ func transformDevicePluginForCDI(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	// When the container runtime supports CDI, we leverage native CDI support in container / cri-o
-	// to inject GPUs into workloads. In this case, we use the standard CDI annotation prefix 'cdi.k8s.io/'
-	// instead of a custom annotation prefix that the 'nvidia' container runtime is configured to look for.
-	deviceListStrategy := "cdi-annotations"
+	// to inject GPUs into workloads. If native CDI is not supported, we leverage CDI support in
+	// NVIDIA Container Toolkit.
+	deviceListStrategy := "cdi-cri"
 	cdiAnnotationPrefix := "cdi.k8s.io/"
 	if !n.runtimeSupportsCDI {
 		deviceListStrategy = "envvar,cdi-annotations"
