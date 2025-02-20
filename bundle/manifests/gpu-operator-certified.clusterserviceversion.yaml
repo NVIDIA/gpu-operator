@@ -536,6 +536,20 @@ spec:
           path: toolkit.imagePullPolicy
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - displayName: CDI
+          description: Container Device Interface (CDI) Configuration
+          path: cdi
+        - displayName: Enabled
+          description: 'Enabled indicates whether CDI should be used as the mechanism for making GPUs accessible to containers.'
+          path: cdi.enabled
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+        - displayName: Default
+          description: 'Deprecated: This field is no longer used. Setting cdi.enabled=true will configure CDI as the default mechanism for making GPUs accessible to containers.'
+          path: cdi.default
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
         - displayName: NVIDIA DCGM config
           description: NVIDIA DCGM config
           path: dcgm
