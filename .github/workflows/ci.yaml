@@ -315,10 +315,39 @@ jobs:
           path: ./logs/
           retention-days: 15
 
-  push-gpu-operator-bundle-image:
+  release-latest-gpu-operator-and-validator-image:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out code
+      - name: set-up regctl
+        run: |
+          export REGCTL_VERSION=v0.8.2
+          mkdir -p bin
+          curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
+          chmod a+x bin/regctl
+          echo "$(pwd)/bin" >> $GITHUB_PATH
+      - name: Set environment variables
+        id: vars
+        run: |
+          COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}
+          LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
+          echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
+          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
+          echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
+      - name: Retag gpu-operator and gpu-operator-validator
+        run: |
+          regctl registry login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.GITHUB_TOKEN }}
+          regctl image copy ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:main-latest
+          regctl image copy ${VALIDATOR_IMAGE}:${VALIDATOR_VERSION} ${VALIDATOR_IMAGE}:main-latest
+
+  push-gpu-operator-bundle-image:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
+    needs: [release-latest-gpu-operator-and-validator-image]
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
