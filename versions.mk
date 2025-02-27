@@ -19,7 +19,7 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= v24.9.2
 
-GOLANG_VERSION ?= 1.23.6
+GOLANG_VERSION ?= 1.24.0
 
 GOLANGCI_LINT_VERSION ?= v1.64.5
 
