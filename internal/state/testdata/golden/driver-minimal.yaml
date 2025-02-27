@@ -240,6 +240,7 @@ spec:
           name: run-mellanox-drivers
       nodeSelector:
         nvidia.com/gpu.deploy.driver: "true"
+        nvidia.com/gpu.driver.managed-by: test-cr
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-gpu-driver-ubuntu22.04
       tolerations:
