@@ -456,6 +456,32 @@ spec:
       name: {{ .Values.devicePlugin.config.name }}
       default: {{ .Values.devicePlugin.config.default }}
     {{- end }}
+  imexDRADriver:
+    enabled: {{ .Values.imexDRADriver.enabled }}
+    {{- if .Values.imexDRADriver.repository }}
+    repository: {{ .Values.imexDRADriver.repository }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.image }}
+    image: {{ .Values.imexDRADriver.image }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.version }}
+    version: {{ .Values.imexDRADriver.version | quote }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.imexDRADriver.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.imexDRADriver.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.resources }}
+    resources: {{ toYaml .Values.imexDRADriver.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.env }}
+    env: {{ toYaml .Values.imexDRADriver.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.imexDRADriver.args }}
+    args: {{ toYaml .Values.imexDRADriver.args | nindent 6 }}
+    {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
     {{- if .Values.dcgm.repository }}
