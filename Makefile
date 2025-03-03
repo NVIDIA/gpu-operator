@@ -285,9 +285,7 @@ $(BUILD_TARGETS): build-%:
 		--tag $(IMAGE) \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
