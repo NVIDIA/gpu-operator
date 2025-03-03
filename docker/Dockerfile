@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG CUDA_SAMPLE_IMAGE=undefined
 ARG GOLANG_VERSION=x.x.x
 
 FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9 as builder
@@ -56,17 +55,17 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
+# Install must-gather dependency: `kubectl`
+ARG TARGETARCH
+RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
+    curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl && \
+    chmod +x ./kubectl
 
-FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9
+FROM nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0 AS sample-builder
 
-# Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
-RUN dnf remove -y cuda-*
-
-RUN dnf install -y \
-        kmod \
-        pciutils && \
-    rm -rf /var/cache/yum/*
+# The C/C++ distroless image is used as a base since the CUDA vectorAdd
+# sample application depends on C/C++ libraries.
+FROM nvcr.io/nvidia/distroless/cc:v3.1.7-dev
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -84,40 +83,27 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/kubectl /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
 COPY --from=sample-builder /cuda-samples/vectorAdd /usr/bin/vectorAdd
+# TODO: Copy the compat libs from the 'sample-builder' image instead.
+# The current 'sample-builder' image does not contain the compat libs in the ARM variant.
+# Once new sample images are published that contain the compat libs, we can update the below.
+COPY --from=builder /usr/local/cuda/compat /usr/local/cuda/compat
 
-# gpu-operator manifests
-RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
+COPY validator/manifests /opt/validator/manifests
 
-# validator manifests
-RUN mkdir -p /opt/validator/manifests
-COPY validator/manifests/plugin-workload-validation.yaml /opt/validator/manifests
-COPY validator/manifests/cuda-workload-validation.yaml /opt/validator/manifests
-
-RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
-
-# Install must-gather dependency: `kubectl`
-ARG TARGETARCH
-RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
-RUN chmod +x ./kubectl
-RUN mv ./kubectl /usr/local/bin
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
-# Install / upgrade packages here that are required to resolve CVEs
-ARG CVE_UPDATES
-RUN if [ -n "${CVE_UPDATES}" ]; then \
-        dnf update -y ${CVE_UPDATES} && \
-        rm -rf /var/cache/yum/*; \
-    fi
-
 USER 65532:65532
+
+COPY LICENSE /licenses/
 
 ENTRYPOINT ["/usr/bin/gpu-operator"]

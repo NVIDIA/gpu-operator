@@ -50,12 +50,11 @@ variables:
       regctl manifest get ${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} --list > /dev/null && echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}" || ( echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} does not exist" && sleep infinity )
   script:
     - regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"
-    - make IMAGE=${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} OUT_IMAGE=${OUT_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA} push-${DIST}
+    - make IMAGE=${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} OUT_IMAGE=${OUT_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA} push-image
 
 image:gpu-operator:
   extends:
     - .image-pull
-    - .dist-ubi9
     - .target-gpu-operator
 
 # We skip the integration tests for the internal CI:
@@ -101,7 +100,6 @@ image:gpu-operator:
 .scan:gpu-operator:
   extends:
     - .scan
-    - .dist-ubi9
     - .target-gpu-operator
   needs:
     - image:gpu-operator
@@ -130,7 +128,6 @@ scan:gpu-operator-arm64:
 release:ngc-gpu-operator:
   extends:
     - .release:ngc
-    - .dist-ubi9
     - .target-gpu-operator
 
 # Define the external image signing steps for NGC

@@ -217,6 +217,8 @@ const (
 	appComponentLabelKey = "app.kubernetes.io/component"
 	// wslNvidiaSMIPath indicates the path to the nvidia-smi binary on WSL
 	wslNvidiaSMIPath = "/usr/lib/wsl/lib/nvidia-smi"
+	// shell indicates what shell to use when invoking commands in a subprocess
+	shell = "sh"
 )
 
 func main() {
@@ -616,6 +618,7 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 		fmt.Printf("running command %s with args %v\n", command, args)
 		err := cmd.Run()
 		if err != nil {
+			log.Warningf("error running command: %v", err)
 			fmt.Printf("command failed, retrying after %d seconds\n", sleepSeconds)
 			time.Sleep(time.Duration(sleepSeconds) * time.Second)
 			continue
@@ -649,7 +652,7 @@ func setEnvVar(envvars []string, key, value string) []string {
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
 // container has completed and is in Ready state.
 func assertDriverContainerReady(silent bool) error {
-	command := "bash"
+	command := shell
 	args := []string{"-c", "stat /run/nvidia/validations/.driver-ctr-ready"}
 
 	if withWaitFlag {
@@ -932,7 +935,7 @@ func (n *NvidiaFs) validate() error {
 
 func (n *NvidiaFs) runValidation(silent bool) error {
 	// check for nvidia_fs module to be loaded
-	command := "bash"
+	command := shell
 	args := []string{"-c", "lsmod | grep nvidia_fs"}
 
 	if withWaitFlag {
@@ -1067,7 +1070,7 @@ func (m *MOFED) validate() error {
 
 func (m *MOFED) runValidation(silent bool) error {
 	// check for mlx5_core module to be loaded
-	command := "bash"
+	command := shell
 	args := []string{"-c", "lsmod | grep mlx5_core"}
 
 	// If MOFED container is running then use readiness flag set by the driver container instead
@@ -1632,7 +1635,7 @@ func (c *CCManager) setKubeClient(kubeClient kubernetes.Interface) {
 
 // Check that the ccManager container is ready after applying required ccMode
 func assertCCManagerContainerReady(silent, withWaitFlag bool) error {
-	command := "bash"
+	command := shell
 	args := []string{"-c", "stat /run/nvidia/validations/.cc-manager-ctr-ready"}
 
 	if withWaitFlag {
