@@ -14,4 +14,4 @@ annotations:
   operatorframework.io/suggested-namespace: nvidia-gpu-operator
 
   # Annotations to specify OCP versions compatibility.
-  com.redhat.openshift.versions: v4.12-v4.17
+  com.redhat.openshift.versions: v4.12-v4.18
