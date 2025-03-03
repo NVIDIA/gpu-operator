@@ -23,6 +23,4 @@ GOLANG_VERSION ?= 1.24.4
 
 GOLANGCI_LINT_VERSION ?= v2.1.6
 
-CUDA_SAMPLES_VERSION ?= 12.5.0
-
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
