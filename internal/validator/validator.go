@@ -51,8 +51,30 @@ func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alph
 		return err
 	}
 
+	crHasEmptyNodeSelector := false
+	if cr.Spec.NodeSelector == nil || len(cr.Spec.NodeSelector) == 0 {
+		crHasEmptyNodeSelector = true
+	}
+
 	names := map[string]struct{}{}
-	for di := range drivers.Items {
+	for di, driver := range drivers.Items {
+		if driver.Name == cr.Name {
+			continue
+		}
+
+		if crHasEmptyNodeSelector {
+			// If the CR we are validating has an empty node selector, it does not conflict
+			// with any other CR unless there is another CR that also is configured with an
+			// empty node selector. Only one NVIDIADriver instance can be configured with an
+			// empty node selector at any point in time. We deem such an instance as the 'default'
+			// instance, as it will get deployed on all GPU nodes. Other CRs, with non-empty
+			// node selectors, can override the 'default' NVIDIADriver instance.
+			if driver.Spec.NodeSelector == nil || len(driver.Spec.NodeSelector) == 0 {
+				return fmt.Errorf("cannot have empty nodeSelector as another CR is configured with an empty nodeSelector: %s", driver.Name)
+			}
+			continue
+		}
+
 		nodeList, err := nsv.getNVIDIADriverSelectedNodes(ctx, &drivers.Items[di])
 		if err != nil {
 			return err
