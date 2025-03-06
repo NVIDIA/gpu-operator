@@ -209,17 +209,6 @@ spec:
         - -xc
         image: nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1
         imagePullPolicy: IfNotPresent
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - lsmod | grep nvidia_fs
-          failureThreshold: 1
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          successThreshold: 1
-          timeoutSeconds: 10
         name: nvidia-fs-ctr
         securityContext:
           privileged: true

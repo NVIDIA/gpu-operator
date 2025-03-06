@@ -457,15 +457,6 @@ spec:
           successThreshold: 1
           periodSeconds: 10
           timeoutSeconds: 10
-        livenessProbe:
-          exec:
-            command:
-              [sh, -c, 'lsmod | grep nvidia_fs']
-          periodSeconds: 30
-          initialDelaySeconds: 30
-          failureThreshold: 1
-          successThreshold: 1
-          timeoutSeconds: 10
       {{- end }}
       # Note: GDRCopy is not supported along with precompiled drivers.
       #       Detect this in the controller and throw an error if
@@ -525,15 +516,6 @@ spec:
           failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
-          timeoutSeconds: 10
-        livenessProbe:
-          exec:
-            command:
-              [sh, -c, 'lsmod | grep gdrdrv']
-          periodSeconds: 30
-          initialDelaySeconds: 30
-          failureThreshold: 1
-          successThreshold: 1
           timeoutSeconds: 10
       {{- end }}
       # TODO: introduce UseOpenShiftDriverToolkit field into NVIDIADriver CR?

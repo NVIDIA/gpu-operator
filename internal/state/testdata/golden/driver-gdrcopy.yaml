@@ -209,17 +209,6 @@ spec:
         - -xc
         image: nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1
         imagePullPolicy: IfNotPresent
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - lsmod | grep gdrdrv
-          failureThreshold: 1
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          successThreshold: 1
-          timeoutSeconds: 10
         name: nvidia-gdrcopy-ctr
         securityContext:
           privileged: true
