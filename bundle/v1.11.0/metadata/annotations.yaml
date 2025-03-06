@@ -1,0 +1,17 @@
+annotations:
+  operators.operatorframework.io.bundle.channels.v1: stable,v1.11
+  operators.operatorframework.io.bundle.channel.default.v1: v1.11
+  operators.operatorframework.io.bundle.manifests.v1: manifests/
+  operators.operatorframework.io.bundle.mediatype.v1: registry+v1
+  operators.operatorframework.io.bundle.metadata.v1: metadata/
+  operators.operatorframework.io.bundle.package.v1: gpu-operator-certified
+  operators.operatorframework.io.metrics.builder: operator-sdk-v1.4.0
+  operators.operatorframework.io.metrics.mediatype.v1: metrics+v1
+  operators.operatorframework.io.metrics.project_layout: go.kubebuilder.io/v3
+  operators.operatorframework.io.test.config.v1: tests/scorecard/
+  operators.operatorframework.io.test.mediatype.v1: scorecard+v1
+  operatorframework.io/cluster-monitoring: "true"
+  operatorframework.io/suggested-namespace: nvidia-gpu-operator
+
+  # Annotations to specify OCP versions compatibility.
+  com.redhat.openshift.versions: v4.9-v4.10

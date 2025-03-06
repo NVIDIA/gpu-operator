@@ -1,0 +1,229 @@
+default:
+  image: docker:dind
+  services:
+    - name: docker:dind
+      command: ["--experimental"]
+
+variables:
+  TF_VAR_FILE: "$CI_PROJECT_DIR/tests/terraform.tfvars"
+  TF_VAR_project_name: "gpu-operator"
+  GIT_SUBMODULE_STRATEGY: recursive
+  BUILD_MULTI_ARCH_IMAGES: "true"
+
+stages:
+  - trigger
+  - image
+  - config-checks
+  - go-checks
+  - go-build
+  - unit-tests
+  - image-build
+  - tests
+  - scan
+  - deploy
+  - aws_kube_setup
+  - e2e_tests
+  - aws_kube_clean
+  - release
+  - sign
+
+# Enable pipelines on merge requests, tags, and branches.
+# Avoid duplicate pipelines when pushing to a branch associated with an open MR.
+# https://docs.gitlab.com/ee/ci/yaml/workflow.html#switch-between-branch-pipelines-and-merge-request-pipelines
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG != ""
+
+.main-or-manual:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG != ""
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+trigger-pipeline:
+  stage: trigger
+  script:
+    - echo "starting pipeline"
+  rules:
+    - !reference [.main-or-manual, rules]
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: manual
+      allow_failure: false
+    - when: always
+
+# Define the platform targets
+.platform-amd64:
+  variables:
+    PLATFORM: linux/amd64
+
+.platform-arm64:
+  variables:
+    PLATFORM: linux/arm64
+
+.buildx-setup:
+  before_script:
+    -  export BUILDX_VERSION=v0.15.1
+    -  apk add --no-cache curl
+    -  mkdir -p ~/.docker/cli-plugins
+    -  curl -sSLo ~/.docker/cli-plugins/docker-buildx "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64"
+    -  chmod a+x ~/.docker/cli-plugins/docker-buildx
+
+    -  docker buildx create --use --platform=linux/amd64,linux/arm64
+
+    -  '[[ -n "${SKIP_QEMU_SETUP}" ]] || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes'
+
+# Define targets for the gpu-operator and gpu-operator-validator images
+.dist-ubi9:
+  variables:
+    DIST: ubi9
+    CVE_UPDATES: "cyrus-sasl-lib"
+
+.target-gpu-operator:
+  variables:
+    IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
+    IN_IMAGE_NAME: "gpu-operator"
+    IMAGE_ARCHIVE: "gpu-operator.tar"
+
+.target-gpu-operator-validator:
+  variables:
+    SUBCOMPONENT: "validator"
+    IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
+    IN_IMAGE_NAME: "gpu-operator-validator"
+    IMAGE_ARCHIVE: "gpu-operator-validator.tar"
+    IN_REGISTRY: "${STAGING_REGISTRY}/gpu-operator"
+
+# .release forms the base of the deployment jobs which push images to the CI registry.
+# This is extended with the version to be deployed (e.g. the SHA or TAG) and the
+# target os.
+.release:
+  stage: release
+  variables:
+    # Define the source image for the release
+    IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
+    VERSION: "${CI_COMMIT_SHORT_SHA}"
+    # OUT_IMAGE_VERSION is overridden for external releases
+    OUT_IMAGE_VERSION: "${CI_COMMIT_SHORT_SHA}"
+  retry:
+    max: 2
+  before_script:
+    - !reference [.regctl-setup, before_script]
+    # We ensure that the OUT_IMAGE_VERSION is set
+    - 'echo Version: ${OUT_IMAGE_VERSION} ; [[ -n "${OUT_IMAGE_VERSION}" ]] || exit 1'
+    # In the case where we are deploying a different version to the CI_COMMIT_SHA, we
+    # need to tag the image.
+    # Note: a leading 'v' is stripped from the version if present
+    - apk add --no-cache make bash
+  script:
+    - 'echo "Logging in to CI registry ${CI_REGISTRY}"'
+    - regctl registry login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}"
+    - '[ ${CI_REGISTRY} = ${OUT_REGISTRY} ] || echo "Logging in to output registry ${OUT_REGISTRY}"'
+    - '[ ${CI_REGISTRY} = ${OUT_REGISTRY} ] || regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"'
+
+    # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
+    # Target
+    - make push-${DIST}
+
+.release-bundle:
+  stage: release
+  variables:
+    # Define the source image for the release
+    BUNDLE_IMAGE: ""
+    VERSION: ""
+    DEFAULT_CHANNEL: "stable"
+    CHANNELS: "stable"
+  before_script:
+    - apk add --no-cache make bash
+  script:
+    - 'echo "Logging in to CI registry ${CI_REGISTRY}"'
+    - docker login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}"
+    - make push-bundle-image
+
+# Download the regctl binary for use in the release steps
+.regctl-setup:
+  before_script:
+    - export REGCTL_VERSION=v0.8.0
+    - apk add --no-cache curl
+    - mkdir -p bin
+    - curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
+    - chmod a+x bin/regctl
+    - export PATH=$(pwd)/bin:${PATH}
+
+.release:external:
+  extends:
+    - .release
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        OUT_IMAGE_VERSION: "${CI_COMMIT_TAG}"
+    - if: $CI_COMMIT_BRANCH == $RELEASE_DEVEL_BRANCH
+      variables:
+        OUT_IMAGE_VERSION: "${DEVEL_RELEASE_IMAGE_VERSION}"
+
+# Define a staging release step that pushes an image to an internal "staging" repository
+# This is triggered for all pipelines (i.e. not only tags) to test the pipeline steps
+# outside of the release process.
+.release:staging:
+  extends:
+    - .release
+  variables:
+    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
+    OUT_REGISTRY: "${CI_REGISTRY}"
+
+release:staging-gpu-operator:
+  extends:
+    - .release:staging
+    - .dist-ubi9
+    - .target-gpu-operator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+
+release:staging-gpu-operator-validator:
+  extends:
+    - .release:staging
+    - .dist-ubi9
+    - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+
+release:staging-latest-gpu-operator:
+  extends:
+    - .release:staging
+    - .dist-ubi9
+    - .target-gpu-operator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+release:staging-latest-gpu-operator-validator:
+  extends:
+    - .release:staging
+    - .dist-ubi9
+    - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+release:gpu-operator-bundle-image:
+  extends:
+    - .release-bundle
+  variables:
+    BUNDLE_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-bundle:${CI_COMMIT_BRANCH}-latest"
+    VERSION: ""
+    DEFAULT_CHANNEL: "stable"
+    CHANNELS: "stable"
+  rules:
+    - if: $CI_COMMIT_BRANCH

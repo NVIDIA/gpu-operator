@@ -1,0 +1,117 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: gpu-operator
+  name: nvidia-gpu-operator-metrics
+  namespace: "FILLED_BY_THE_OPERATOR"
+spec:
+  groups:
+  - name: Alert on GPU Operator operator reconciliation failure
+    rules:
+    - alert: GPUOperatorReconciliationFailed
+      expr: |
+        gpu_operator_reconciliation_status != 1
+        AND
+        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 3600)
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not reconcile resources for 1h
+        description: |
+          GPU Operator reconciliation loop failed for more than 1h;
+          some of its DaemonSet operands might be unable to deploy on
+          some of the GPU-enabled nodes.
+
+    - alert: GPUOperatorReconciliationFailedNfdLabelsMissing
+      # GPU Operator reconciliation loop is failing
+      # For more than 30min
+      # And NFD labels cannot be found
+      expr: |
+        gpu_operator_reconciliation_status != 1
+        AND
+        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 1800)
+        AND
+        gpu_operator_reconciliation_has_nfd_labels == 0
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator reconciliation loop failed for more than 30min and NFD labels missing
+        description: |
+          GPU Operator reconciliation loop failed for more than 30min
+          and NFD labels cannot be found. Check that the NFD Operator
+          is installed and running properly.
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledNfdTooOld
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == -1
+        AND
+        gpu_operator_openshift_driver_toolkit_nfd_too_old == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but NFD too old to support it
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but the NFD version deployed in the cluster
+          is too old to support it.
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamMissing
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == -1
+        AND
+        gpu_operator_openshift_driver_toolkit_imagestream_missing == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but the driver-toolkit imagestream is missing
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but this version of OpenShift does not
+          support it (driver-toolkit imagestream is not available).
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamBroken
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == 1
+        AND
+        gpu_operator_openshift_driver_toolkit_imagestream_broken == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but the driver-toolkit imagestream is broken
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but the OpenShift driver-toolkit imagestream
+          is broken after the last cluster upgrade. See rhbz 2015024.
+
+    - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageTagsMissing
+      expr: |
+        gpu_operator_openshift_driver_toolkit_enabled == 1
+        AND
+        gpu_operator_openshift_driver_toolkit_rhcos_tags_missing == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator DriverToolkit is enabled but some RHCOS driver-toolkit imagestream tags are missing
+        description: |
+          The DriverToolkit is enabled in the GPU Operator
+          ClusterPolicy, but some RHCOS tags are missing in the
+          driver-toolkit imagestream.
+
+    - alert: GPUOperatorDriverAutoUpgradeFailures
+      expr: |
+        gpu_operator_driver_auto_upgrade_enabled == 1
+        AND
+        gpu_operator_nodes_upgrades_failed > 0
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: The GPU Driver Auto-Upgrade is enabled but failed on some nodes
+        description: |
+          The GPU Driver Auto-Upgrade is enabled in the GPU Operator
+          ClusterPolicy, but the driver upgrade has failed on some nodes. Check Node events or
+          GPU Operator logs for more details.

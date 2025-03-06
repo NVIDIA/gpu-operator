@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-node-status-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nvidia-node-status-exporter
+subjects:
+- kind: ServiceAccount
+  name: nvidia-node-status-exporter
+  namespace: "FILLED BY THE OPERATOR"

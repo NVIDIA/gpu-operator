@@ -1,0 +1,684 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    operators.openshift.io/infrastructure-features: '["Disconnected"]'
+    olm.skipRange: '>=v1.9.0 <v1.10.1'
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "nvidia.com/v1",
+          "kind": "ClusterPolicy",
+          "metadata": {
+            "name": "gpu-cluster-policy"
+          },
+          "spec": {
+            "dcgmExporter": {
+              "config": {
+                "name": ""
+              }
+            },
+            "dcgm": {
+              "enabled": true
+            },
+            "daemonsets": {
+            },
+            "devicePlugin": {
+            },
+            "driver": {
+              "enabled": true,
+              "use_ocp_driver_toolkit": true,
+              "repoConfig": {
+                "configMapName": ""
+              },
+              "certConfig": {
+                "name": ""
+              },
+              "licensingConfig": {
+                "nlsEnabled": false,
+                "configMapName": ""
+              },
+              "virtualTopology": {
+                "config": ""
+              },
+              "kernelModuleConfig": {
+                "name": ""
+              }
+            },
+            "gfd": {
+            },
+            "migManager": {
+              "enabled": true
+            },
+            "nodeStatusExporter": {
+              "enabled": true
+            },
+            "operator": {
+              "defaultRuntime": "crio",
+              "deployGFD": true,
+              "initContainer": {
+              }
+            },
+            "mig": {
+              "strategy": "single"
+            },
+            "toolkit": {
+              "enabled": true
+            },
+            "validator": {
+              "plugin": {
+                "env": [
+                  {
+                    "name": "WITH_WORKLOAD",
+                    "value": "true"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    operators.operatorframework.io/builder: operator-sdk-v1.4.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operatorframework.io/suggested-namespace: nvidia-gpu-operator
+    capabilities: Basic Install
+    categories: AI/Machine Learning, OpenShift Optional
+    certified: "true"
+    containerImage: nvcr.io/nvidia/gpu-operator@sha256:c7f9074c1a7f58947c807f23f2eece3a8b04e11175127919156f8e864821d45a
+    createdAt: "Mon Apr 18 10:06:40 PDT 2022"
+    description: Automate the management and monitoring of NVIDIA GPUs.
+    provider: NVIDIA
+    repository: http://github.com/NVIDIA/gpu-operator
+    support: NVIDIA
+  name: gpu-operator-certified.v1.10.1
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  relatedImages:
+    - name: gpu-operator-image
+      image: nvcr.io/nvidia/gpu-operator@sha256:c7f9074c1a7f58947c807f23f2eece3a8b04e11175127919156f8e864821d45a
+    - name: dcgm-exporter-image
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:67c48a8370c34f68b46eb57339e87d01c04198368a0423553fab7565c862c4df
+    - name: dcgm-image
+      image: nvcr.io/nvidia/cloud-native/dcgm@sha256:ac13256c295126b854a07421c45de0721e7a57974b38b3e66eb1fdc3a4e29f2e
+    - name: container-toolkit-image
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:9abb063e6b74085728fead5ed5bbe3bd7b3f57de60e87f6b964bba2d46f1bc67
+    - name: driver-image
+      image: nvcr.io/nvidia/driver@sha256:f99b66855e92451a59a722355dd52bf97eb985cc8a647172273de8178aeaa93c
+    - name: device-plugin-image
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:aa95c16106280e36a5e32d2fe4c66e8b70f5a114860c6f4ed5b1a4085c63601b
+    - name: gpu-feature-discovery-image
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:c2e3d0fe41a0d227dbb70caec03c780cc76317515e5ab3875f31d50c63f41c66
+    - name: mig-manager-image
+      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e8f06ce53415e8572f633b2169289d973993cb1e49d4dcc686ac134194d88f33
+    - name: init-container-image
+      image: nvcr.io/nvidia/cuda@sha256:7f0f7dc8c993a86865d4d9f9b0e36d113ea15603d5d5279d2879fa2bc21c8236
+    - name: gpu-operator-validator-image
+      image: nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:24d804e8f005d7aeca8343aa13e5f92295d8642a4c47cb24e3ac86a22543bc37
+    - name: k8s-driver-manager-image
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:5b16056257acc51b517d9cdb1da3218693cefc214af93789e6e214fd2b4cacf1
+  customresourcedefinitions:
+    owned:
+    - name: clusterpolicies.nvidia.com
+      kind: ClusterPolicy
+      version: v1
+      group: nvidia.com
+      displayName: ClusterPolicy
+      description: ClusterPolicy allows you to configure the GPU Operator
+      resources:
+        - kind: ServiceAccount
+          name: ''
+          version: v1
+        - kind: Deployment
+          name: ''
+          version: apps/v1
+        - kind: DaemonSet
+          name: ''
+          version: apps/v1
+        - kind: ConfigMap
+          name: ''
+          version: v1
+        - kind: Pod
+          name: ''
+          version: v1
+        - kind: clusterpolicies
+          name: ''
+          version: v1
+        - kind: clusterversions
+          name: ''
+          version: v1
+        - kind: nodes
+          name: ''
+          version: v1
+        - kind: status
+          name: ''
+          version: v1
+      specDescriptors:
+        - description: Operator config
+          displayName: Operator config
+          path: operator
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: operator.validator.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: operator.validator.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - description: DCGM Exporter config
+          displayName: DCGM Exporter config
+          path: dcgmExporter
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: dcgmExporter.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: dcgmExporter.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: dcgmExporter.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: dcgmExporter.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: dcgmExporter.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Device Plugin config
+          displayName: Device Plugin config
+          path: devicePlugin
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: devicePlugin.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: devicePlugin.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: devicePlugin.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: devicePlugin.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: devicePlugin.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Driver config
+          displayName: Driver config
+          path: driver
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: driver.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: driver.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: driver.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: driver.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: driver.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Group Feature Discovery Plugin config
+          displayName: Group Feature Discovery Plugin config
+          path: gfd
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: gfd.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: gfd.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: gfd.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: gfd.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: gfd.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Container Toolkit config
+          displayName: Container Toolkit config
+          path: toolkit
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: toolkit.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: toolkit.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: toolkit.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: toolkit.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: toolkit.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+      statusDescriptors:
+        - description: The current state of the operator.
+          displayName: State
+          path: state
+          x-descriptors:
+            - 'urn:alm:descriptor:text'
+  displayName: NVIDIA GPU Operator
+  description: >
+    Kubernetes provides access to special hardware resources such as NVIDIA
+    GPUs, NICs, Infiniband adapters and other devices through the [device plugin
+    framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/).
+    However, configuring and managing nodes with these hardware resources
+    requires configuration of multiple software components such as drivers,
+    container runtimes or other libraries which are difficult and prone to
+    errors.
+
+    The NVIDIA GPU Operator uses the [operator
+    framework](https://coreos.com/blog/introducing-operator-framework) within
+    Kubernetes to automate the management of all NVIDIA software components
+    needed to provision and monitor GPUs.
+    These components include the NVIDIA drivers (to enable CUDA), Kubernetes
+    device plugin for GPUs, the NVIDIA Container Runtime, automatic node
+    labelling and NVIDIA DCGM exporter.
+
+    Visit the official site of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) for more information.
+    For getting started with using the GPU Operator with OpenShift, see the instructions
+    [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/openshift/contents.html).
+  icon:
+  - base64data: iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAB2lBMVEUAAAD///8EBAN3uQACAgIAAAQJDQUCAgB1tgAHCQf+/v5Ufg5Hagxxqwt+xgJ3uAB9wwB4vQBRUVEeLA3e3t5nZ2coKCgODg4FBwZ9wwR6wAJ4vADz8/MbGxt5tw1vpw1/wgoOFwkLDwh9xQH5+fny8vLw8PDFxcWysrKFhYVvb282NjYyMjIqKioXFxdikxRYgxNCYxJQdhFqoQ9xrg16ugxyqgyAxQkEBQj7+/v29vbIyMhjY2NbW1tHR0cvLy8kJCQdHR0ZGRlKbxJ8uhFNcxFVgBAxSBBgkg93tQ50sA4qPg4XIg18vwsbKQsSGgsLCwsMEwqCyQeByQFztADPz8+/v7+6urqWlpZra2tKSkogICASEhJmmRE8XBA5VRA2UBBonA9biA9GaQ4sQg4jMw4mOQ0aJw2GzgsUHgttpAqJ0Ql/wQWG0AJ8vwF0uQCtra2jo6OQkJB9fX1VVVVCQkI9PT0iIiIUFBRSfBNgjhA7WRBGZw+GywmFzgaAyASBxQN2twDb29u2traenp6Kiop+fn53d3dzc3NyqRV4sxM/YBNAXRElNhBjlQ+IzA00TQ16vgxJbgp6vAl4tgJ3vgDs7Ozn5+fa2trS0tJCXRY6VBV6thSL1gf4nFdFAAAD80lEQVRYw+zSOXPaQBgG4He0LJJmbGRGDUIzuvgBQiAEPfcdwC33DTbUtmOwSyc+4iRucvzXRImLFJmRShc8xXbfu+9+szg4OHjjAsH/iFD49q7rqM6xc/wPtWyBhS8sC94ObWRCZDksh1+RzmcEfI0DoPrjylEkSTgViMs9udjYTwMG4Gf51Z1BM81ioRwit+QvgYsdUQZeKFr3ladyKXvVr+pAM5uKcmRLXFzoCIxn+0i/8lSaBMHnfi7qowfQuZnm3PuFPwGs13zD3NlViozY/z4YD6/TCQORbPr2q78GLB0ou5IO40pd5AxQZnJ83m2y9Ju2JYKfgEhWC18aEIfrZLURHwQC0B87ySZwHxX8BNDWB1KfQfyxT2TA24uPQMt8yTWA3obz8wQGlhTN06Z900MkuJLrYu3u5LkK9LTtGRF8NEDLeSnXYLUdHUFVlpPqTa4IamlhJZ464biY1w4CKGrROOW7uwLlV+Q02lanCF6cbSoPVLzUfPwDll5I9T6WyXWhZre1yjiI6VCSzCWY3+FKaAwGHngzpEygx6+V6Uzk6TJR7yhWxJ1bFgTPJ7gMc58aUCq+n+qNT6Pn8y/xOcCiZZVjnJ+AAPhEuj0SKZ9bL9ZpNS9SgM6z9p5w3jt43cMvecfWBhm7dtfEpfhYMDBYpFd7mDZIAxPCFKgBhB0hkWbE2wVMyqycfhOMEiebSzFz5IMTEjw7E87UFj4GVR7GXqaSkoIcISEc/I38/PwhOTUMRBrADgwK09zgYGUBqbwcARiQyp3Eyk6kC4BloqtbJTcaSHIHShALWFmBSRuCWBGC+AtDMAAGIpAAc9mBiB0sCLSXHUSygxSxEIoE7IKEgbhopKgogC96x04QCMMw/H0cG6f0cEmBHaLc7FFQzApoTLwtQgWUWo26glx2mzGkyoHM1PPMO/NrnSH8e2QAiRsZ8S3ZuJoW5Udg5moGoMRLN2gAnkcUctueJ1gADsdtlZ2AgmSYoaDZBXwRctcwy6HN3XX/wfnTnA7Q5x0S0Gku4wHpe7Ql8Mbtu4TqC3qcADGtUl4O3eK0AkZdKH1mU/a6MFQGA7pQGoAVoAuuPYZlLJF2BawVLLjwac6Q8wUax61/CpKQAT6ZX3hFqoqqAFvuf4AzM+NgsoBS/wcSOD7SFzyf6CE9UQK9II1MRvIJm8QSgsLiBZuypsAWKyARElgx5FcLv1N4nFLbB45Sh6+TzsQRtn7bz/B3fS9GQ12bgUE2PKycQbwgXD0SWLwVhpZFq4eHhWloOjLoqGvoRYRGAR2vp2EtpNUaTUpiRAizMAEhKNXpYZNnAUlBCSgFYTIxQTlMMJNGwSgYBdQHAFsKs+/bUkeyAAAAAElFTkSuQmCC
+    mediatype: image/png
+  install:
+    spec:
+      clusterPermissions:
+      - serviceAccountName: gpu-operator
+        rules:
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          - proxies
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - '*'
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
+          resourceNames:
+          - hostmount-anyuid
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - clusterrolebindings
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - nodes
+          - namespaces
+          - serviceaccounts
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - node.k8s.io
+          resources:
+          - runtimeclasses
+          verbs:
+          - get
+          - list
+          - create
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - '*'
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
+        - apiGroups:
+          - image.openshift.io
+          resources:
+          - imagestreams
+          verbs:
+          - get
+          - list
+          - watch
+      permissions:
+      - serviceAccountName: gpu-operator
+        rules:
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          - prometheusrules
+          verbs:
+          - get
+          - create
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resourceNames:
+          - gpu-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          - deployments
+          verbs:
+          - get
+        - apiGroups:
+          - nvidia.com
+          resources:
+          - '*'
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - '*'
+      deployments:
+      - name: gpu-operator
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/component: gpu-operator
+              app: gpu-operator
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/component: gpu-operator
+                app: gpu-operator
+            spec:
+              priorityClassName: system-node-critical
+              containers:
+              - args:
+                  - --leader-elect
+                  - --leader-lease-renew-deadline
+                  - "60s"
+                image: nvcr.io/nvidia/gpu-operator@sha256:c7f9074c1a7f58947c807f23f2eece3a8b04e11175127919156f8e864821d45a
+                command:
+                  - gpu-operator
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: gpu-operator
+                ports:
+                - name: metrics
+                  containerPort: 8080
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 1Gi
+                  requests:
+                    cpu: 200m
+                    memory: 200Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /host-etc/os-release
+                  name: host-os-release
+                  readOnly: true
+                env:
+                  - name: OPERATOR_NAMESPACE
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.namespace
+                  - name: "VALIDATOR_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator@sha256:24d804e8f005d7aeca8343aa13e5f92295d8642a4c47cb24e3ac86a22543bc37"
+                  - name: "GFD_IMAGE"
+                    value: "nvcr.io/nvidia/gpu-feature-discovery@sha256:c2e3d0fe41a0d227dbb70caec03c780cc76317515e5ab3875f31d50c63f41c66"
+                  - name: "CONTAINER_TOOLKIT_IMAGE"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:9abb063e6b74085728fead5ed5bbe3bd7b3f57de60e87f6b964bba2d46f1bc67"
+                  - name: "DCGM_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:ac13256c295126b854a07421c45de0721e7a57974b38b3e66eb1fdc3a4e29f2e"
+                  - name: "DCGM_EXPORTER_IMAGE"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:67c48a8370c34f68b46eb57339e87d01c04198368a0423553fab7565c862c4df"
+                  - name: "DEVICE_PLUGIN_IMAGE"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:aa95c16106280e36a5e32d2fe4c66e8b70f5a114860c6f4ed5b1a4085c63601b"
+                  - name: "DRIVER_IMAGE"
+                    value: "nvcr.io/nvidia/driver@sha256:f99b66855e92451a59a722355dd52bf97eb985cc8a647172273de8178aeaa93c"
+                  - name: "DRIVER_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:5b16056257acc51b517d9cdb1da3218693cefc214af93789e6e214fd2b4cacf1"
+                  - name: "MIG_MANAGER_IMAGE"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:e8f06ce53415e8572f633b2169289d973993cb1e49d4dcc686ac134194d88f33"
+                  - name: "CUDA_BASE_IMAGE"
+                    value: "nvcr.io/nvidia/cuda@sha256:7f0f7dc8c993a86865d4d9f9b0e36d113ea15603d5d5279d2879fa2bc21c8236"
+              terminationGracePeriodSeconds: 10
+              volumes:
+              - hostPath:
+                  path: /etc/os-release
+                name: host-os-release
+              serviceAccountName: gpu-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - gpu
+  - cuda
+  - compute
+  - operator
+  - deep learning
+  - monitoring
+  - tesla
+  maintainers:
+  - name: NVIDIA
+    email: operator_feedback@nvidia.com
+  maturity: stable
+  provider:
+    name: NVIDIA Corporation
+  version: 1.10.1
+  replaces: gpu-operator-certified.v1.10.0

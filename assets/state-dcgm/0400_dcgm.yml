@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-dcgm
+  name: nvidia-dcgm
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: hostmount-anyuid
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.dcgm: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dcgm
+      initContainers:
+      - name: toolkit-validation
+        image: "FILLED BY THE OPERATOR"
+        command: ['sh', '-c']
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        name: nvidia-dcgm-ctr
+        securityContext:
+          privileged: true
+        ports:
+        - name: "dcgm"
+          containerPort: 5555
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: "/run/nvidia"
+            type: Directory

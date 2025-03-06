@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-sandbox-device-plugin-daemonset
+  name: nvidia-sandbox-device-plugin-daemonset
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: nvidia-sandbox-device-plugin
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-sandbox-device-plugin-daemonset
+  template:
+    metadata:
+      labels:
+        app: nvidia-sandbox-device-plugin-daemonset
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.sandbox-device-plugin: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-sandbox-device-plugin
+      initContainers:
+        - name: vfio-pci-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args:
+            - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
+              if [ "$(</run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo vfio-pci not needed, skipping validation; exit 0; fi;
+              until [ -f /run/nvidia/validations/vfio-pci-ready ]; do echo waiting for vfio-pci driver ...; sleep 5; done;
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: void
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
+        - name: vgpu-devices-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args:
+            - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
+              if [ "$(</run/nvidia/validations/workload-type)" != "vm-vgpu" ]; then echo vgpu-devices not needed, skipping validation; exit 0; fi;
+              until [ -f /run/nvidia/validations/vgpu-devices-ready ]; do echo waiting for vGPU devices...; sleep 5; done;
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: void
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
+      containers:
+        - image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          name: nvidia-sandbox-device-plugin-ctr
+          command: ["nvidia-kubevirt-gpu-device-plugin"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: vfio
+              mountPath: /dev/vfio
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: vfio
+          hostPath:
+            path: /dev/vfio

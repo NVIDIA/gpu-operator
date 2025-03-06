@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-driver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nvidia-driver
+subjects:
+- kind: ServiceAccount
+  name: nvidia-driver
+  namespace: "FILLED BY THE OPERATOR"

@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- v1_clusterpolicy.yaml
+- nvidia_v1alpha1_nvidiadriver.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

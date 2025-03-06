@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-mig-manager-entrypoint
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-mig-manager
+data:
+  entrypoint.sh: |-
+    #!/bin/bash
+
+    until [[ -f /run/nvidia/validations/driver-ready ]]
+    do
+      echo "waiting for the driver validations to be ready..."
+      sleep 5
+    done
+    
+    set -o allexport
+    cat /run/nvidia/validations/driver-ready
+    . /run/nvidia/validations/driver-ready
+      
+    # manually export additional envs required by mig-manager
+    export WITH_SHUTDOWN_HOST_GPU_CLIENTS=$IS_HOST_DRIVER
+    echo "WITH_SHUTDOWN_HOST_GPU_CLIENTS=$WITH_SHUTDOWN_HOST_GPU_CLIENTS"
+
+    echo "Starting nvidia-mig-manager"
+    exec nvidia-mig-manager

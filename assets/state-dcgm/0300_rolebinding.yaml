@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dcgm
+  namespace: "FILLED BY THE OPERATOR"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nvidia-dcgm
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dcgm
+  namespace: "FILLED BY THE OPERATOR"

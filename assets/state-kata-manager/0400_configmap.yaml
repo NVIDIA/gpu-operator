@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-kata-manager-config
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-kata-manager
+data: {}

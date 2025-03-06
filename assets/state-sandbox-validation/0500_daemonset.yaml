@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-sandbox-validator
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-sandbox-validator
+    app.kubernetes.io/part-of: gpu-operator
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-sandbox-validator
+      app.kubernetes.io/part-of: gpu-operator
+  template:
+    metadata:
+      labels:
+        app: nvidia-sandbox-validator
+        app.kubernetes.io/part-of: gpu-operator
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.sandbox-validator: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-sandbox-validator
+      initContainers:
+        - name: cc-manager-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: cc-manager
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+        - name: vfio-pci-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: vfio-pci
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+        - name: vgpu-manager-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: vgpu-manager
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: driver-install-path
+              mountPath: /run/nvidia/driver
+              mountPropagation: HostToContainer
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+        - name: vgpu-devices-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: vgpu-devices
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+      containers:
+        - image: "FILLED BY THE OPERATOR"
+          name: nvidia-sandbox-validator
+          command: ['sh', '-c']
+          args: ["echo all validations are successful; sleep infinity"]
+          securityContext:
+            privileged: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/*"]
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: "/run/nvidia/validations"
+              mountPropagation: Bidirectional
+      volumes:
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: driver-install-path
+          hostPath:
+            path: /run/nvidia/driver
+        - name: host-root
+          hostPath:
+            path: /

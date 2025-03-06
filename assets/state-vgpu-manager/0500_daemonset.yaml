@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-vgpu-manager-daemonset
+  name: nvidia-vgpu-manager-daemonset
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: nvidia-vgpu-manager
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-vgpu-manager-daemonset
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-vgpu-manager-ctr
+      labels:
+        app: nvidia-vgpu-manager-daemonset
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.vgpu-manager: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-vgpu-manager
+      hostPID: true
+      hostIPC: true
+      initContainers:
+        - name: k8s-driver-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["driver-manager"]
+          args: ["uninstall_driver"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: ENABLE_AUTO_DRAIN
+            value: "false"
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
+      containers:
+        - image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          name: nvidia-vgpu-manager-ctr
+          command: ["nvidia-driver"]
+          args: ["init"]
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-os-release
+              mountPath: /host-etc/os-release
+            - name: vfio
+              mountPath: /dev/vfio
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+            - name: var-log
+              mountPath: /var/log
+            - name: dev-log
+              mountPath: /dev/log
+            - name: firmware-search-path
+              mountPath: /sys/module/firmware_class/parameters/path
+            - name: nv-firmware
+              mountPath: /lib/firmware
+        # Only kept when OpenShift DriverToolkit side-car is enabled.
+        - image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          name: openshift-driver-toolkit-ctr
+          command: [bash, -xc]
+          args: ["until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting for nvidia-vgpu-host-driver-ctr container to prepare the shared directory ...; sleep 10; done; exec /mnt/shared-nvidia-driver-toolkit/ocp_dtk_entrypoint dtk-build-driver"]
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          env:
+            - name: RHCOS_VERSION
+              value: "FILLED BY THE OPERATOR"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: void
+          volumeMounts:
+            # corresponding volumes are dynamically inject by the
+            # operator when OCP DriverToolkit side-car is enabled
+            - name: shared-nvidia-driver-toolkit
+              mountPath: /mnt/shared-nvidia-driver-toolkit
+            # Currently, the OCP DriverToolkit side-car loads the
+            # driver and mounts the driver rootfs, so the /run/nvidia
+            # volume is needed
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: var-log
+              mountPath: /var/log
+            - name: dev-log
+              mountPath: /dev/log
+            - name: firmware-search-path
+              mountPath: /sys/module/firmware_class/parameters/path
+            - name: nv-firmware
+              mountPath: /lib/firmware
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+        - name: vfio
+          hostPath:
+            path: /dev/vfio
+            type: Directory
+        - name: host-root
+          hostPath:
+            path: "/"
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: var-log
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: dev-log
+          hostPath:
+            path: /dev/log
+        - name: firmware-search-path
+          hostPath:
+            path: /sys/module/firmware_class/parameters/path
+        - name: nv-firmware
+          hostPath:
+            path: /run/nvidia/driver/lib/firmware
+            type: DirectoryOrCreate

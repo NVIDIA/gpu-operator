@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: nvidia-node-status-exporter
+  name: nvidia-node-status-exporter-alerts
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  groups:
+  - name: Alert on node deployment failure
+    rules:
+    - alert: GPUOperatorNodeDeploymentFailed
+      # There is no GPU exposed on the node,
+      expr: |
+        gpu_operator_node_device_plugin_devices_total == 0
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not expose GPUs
+        description: |
+          GPU Operator could not expose GPUs for more than 30min in the
+          node {{ $labels.node }}
+
+    - alert: GPUOperatorNodeDeploymentDriverFailed
+      # NVIDIA driver validation test fails
+      expr: |
+        gpu_operator_node_driver_validation == 0
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not expose GPUs (Driver)
+        description: |
+          GPU Operator could not expose GPUs for more than 30min and
+          nvidia driver could not be properly deployed in the node
+          {{ $labels.node }}
+
+    - alert: GPUOperatorNodeDeploymentToolkitFailed
+      # Toolkit synchronization barrier is closed
+      # and
+      # NVIDIA driver validation passes
+      expr: |
+        gpu_operator_node_toolkit_ready == 0
+        AND
+        gpu_operator_node_driver_validation == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not expose GPUs (Toolkit not working)
+        description: |
+          GPU Operator could not expose GPUs for more than 30min and the
+          GPU container-toolkit is not working properly in the node
+          {{ $labels.node }}
+
+    - alert: GPUOperatorNodeDeploymentCudaFailed
+      # CUDA synchronization barrier is closed
+      # and
+      # NVIDIA driver validation passes
+      expr: |
+        gpu_operator_node_cuda_ready == 0
+        AND
+        gpu_operator_node_driver_validation == 1
+      for: 30m
+      labels:
+        severity: warning
+      annotations:
+        summary: GPU Operator could not expose GPUs (CUDA not working)
+        description: |
+          GPU Operator could not expose GPUs for more than 30min and CUDA
+          applications could not run in the node {{ $labels.node }}

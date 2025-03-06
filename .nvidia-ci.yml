@@ -1,0 +1,333 @@
+default:
+  tags:
+    - cnt
+    - container-dev
+    - docker/privileged
+    - docker/multi-arch
+    - os/linux
+    - type/docker
+
+include:
+  - local: '.common-ci.yml'
+  - project: nsv-devops/cnt-ci
+    file: cnt-ci.yml
+    ref: "2023.10.09"
+
+variables:
+  # Release "devel"-tagged images off the main branch
+  RELEASE_DEVEL_BRANCH: "main"
+  DEVEL_RELEASE_IMAGE_VERSION: "devel"
+  # On the multi-arch builder we don't need the qemu setup.
+  SKIP_QEMU_SETUP: "1"
+  # Define the public staging registry
+  STAGING_REGISTRY: ghcr.io/nvidia
+  STAGING_VERSION: ${CI_COMMIT_SHORT_SHA}
+  GIT_SUBMODULE_PATHS: cnt-ci
+
+.image-pull:
+  stage: image-build
+  variables:
+    IN_REGISTRY: "${STAGING_REGISTRY}"
+    IN_IMAGE_NAME: gpu-operator
+    IN_VERSION: "${STAGING_VERSION}"
+    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
+    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
+  # We delay the job start to allow the public pipeline to generate the required images.
+  when: delayed
+  start_in: 30 minutes
+  timeout: 30 minutes
+  retry:
+    max: 2
+    when:
+      - job_execution_timeout
+      - stuck_or_timeout_failure
+  before_script:
+    - !reference [.regctl-setup, before_script]
+    - apk add --no-cache make bash
+    - >
+      regctl manifest get ${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} --list > /dev/null && echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION}" || ( echo "${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} does not exist" && sleep infinity )
+  script:
+    - regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"
+    - make IMAGE=${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} OUT_IMAGE=${OUT_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA} push-${DIST}
+
+image:gpu-operator:
+  extends:
+    - .image-pull
+    - .dist-ubi9
+    - .target-gpu-operator
+
+image:gpu-operator-validator:
+  extends:
+    - .image-pull
+    - .dist-ubi9
+    - .target-gpu-operator-validator
+  variables:
+    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
+
+# We skip the integration tests for the internal CI:
+.integration:
+  stage: test
+  before_script:
+    - echo "Skipped in internal CI"
+  script:
+    - echo "Skipped in internal CI"
+
+# The .scan step forms the base of the image scan operation performed before releasing
+# images.
+.scan:
+  stage: scan
+  image: "${PULSE_IMAGE}"
+  variables:
+    IMAGE: "${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_ARCHIVE: "gpu-operator.tar"
+  except:
+    variables:
+    - $CI_COMMIT_MESSAGE =~ /\[skip[ _-]scans?\]/i
+    - $SKIP_SCANS && $SKIP_SCANS == "yes"
+  before_script:
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker pull --platform="${PLATFORM}" "${IMAGE}"
+    - docker save "${IMAGE}" -o "${IMAGE_ARCHIVE}"
+    - AuthHeader=$(echo -n $SSA_CLIENT_ID:$SSA_CLIENT_SECRET | base64 -w0)
+    - >
+      export SSA_TOKEN=$(curl --request POST --header "Authorization: Basic $AuthHeader" --header "Content-Type: application/x-www-form-urlencoded" ${SSA_ISSUER_URL} | jq ".access_token" |  tr -d '"')
+    - if [ -z "$SSA_TOKEN" ]; then exit 1; else echo "SSA_TOKEN set!"; fi
+  script:
+    - pulse-cli -n $NSPECT_ID --ssa $SSA_TOKEN scan -i $IMAGE_ARCHIVE -p $CONTAINER_POLICY -o
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - pulse-cli.log
+      - licenses.json
+      - sbom.json
+      - vulns.json
+      - policy_evaluation.json
+
+.scan:gpu-operator:
+  extends:
+    - .scan
+    - .dist-ubi9
+    - .target-gpu-operator
+  needs:
+    - image:gpu-operator
+
+scan:gpu-operator-amd64:
+  extends:
+    - .scan:gpu-operator
+    - .platform-amd64
+
+scan:gpu-operator-arm64:
+  extends:
+    - .scan:gpu-operator
+    - .platform-arm64
+  needs:
+    - scan:gpu-operator-amd64
+
+.scan:gpu-operator-validator:
+  extends:
+    - .scan
+    - .dist-ubi9
+    - .target-gpu-operator-validator
+  needs:
+    - image:gpu-operator-validator
+
+scan:gpu-operator-validator-amd64:
+  extends:
+    - .scan:gpu-operator-validator
+    - .platform-amd64
+
+scan:gpu-operator-validator-arm64:
+  extends:
+    - .scan:gpu-operator-validator
+    - .platform-arm64
+  needs:
+    - scan:gpu-operator-validator-amd64
+
+# Define the external release steps for NGC and Dockerhub
+.release:ngc:
+  extends: .release:external
+  variables:
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+
+release:ngc-gpu-operator:
+  extends:
+    - .release:ngc
+    - .dist-ubi9
+    - .target-gpu-operator
+
+release:ngc-gpu-operator-validator:
+  extends:
+    - .release:ngc
+    - .dist-ubi9
+    - .target-gpu-operator-validator
+  variables:
+    IN_IMAGE_NAME: "gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
+
+# Define the external image signing steps for NGC
+# Download the ngc cli binary for use in the sign steps
+.ngccli-setup:
+  before_script:
+    - apt-get update && apt-get install -y curl unzip jq
+    - |
+      if [ -z "${NGCCLI_VERSION}" ]; then
+        NGC_VERSION_URL="https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions"
+        # Extract the latest version from the JSON data using jq
+        export NGCCLI_VERSION=$(curl -s $NGC_VERSION_URL | jq -r '.recipe.latestVersionIdStr')
+      fi
+      echo "NGCCLI_VERSION ${NGCCLI_VERSION}"
+    - curl -sSLo ngccli_linux.zip https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/${NGCCLI_VERSION}/files/ngccli_linux.zip
+    - unzip ngccli_linux.zip
+    - chmod u+x ngc-cli/ngc
+
+# .sign forms the base of the deployment jobs which signs images in the CI registry.
+# This is extended with the image name and version to be deployed.
+.sign:ngc:
+  image: ubuntu:latest
+  stage: sign
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    NGC_CLI_API_KEY: "${NGC_REGISTRY_TOKEN}"
+    IMAGE_NAME: "${NGC_REGISTRY_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
+  retry:
+    max: 2
+  before_script:
+    - !reference [.ngccli-setup, before_script]
+    # We ensure that the IMAGE_NAME and IMAGE_TAG is set
+    - 'echo Image Name: ${IMAGE_NAME} && [[ -n "${IMAGE_NAME}" ]] || exit 1'
+    - 'echo Image Tag: ${IMAGE_TAG} && [[ -n "${IMAGE_TAG}" ]] || exit 1'
+  script:
+    - 'echo "Signing the image ${IMAGE_NAME}:${IMAGE_TAG}"'
+    - ngc-cli/ngc registry image publish --source ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG} --public --discoverable --allow-guest --sign --org nvidia
+
+sign:ngc-gpu-operator:
+  extends:
+    - .sign:ngc
+  needs:
+    - release:ngc-gpu-operator
+  variables:
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
+
+sign:ngc-gpu-operator-validator:
+  extends:
+    - .sign:ngc
+  needs:
+    - release:ngc-gpu-operator-validator
+  variables:
+    IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
+
+.schedule_defaults:
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+
+.e2e_defaults:
+  variables:
+    # These should match the images generated by the deploy step.
+    # TODO: Should these use the staging release instead?
+    OPERATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
+    OPERATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator"
+    VALIDATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
+    VALIDATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator-validator"
+    TARGET_DRIVER_VERSION: "550.144.03"
+
+.e2e_tests:
+  extends:
+    - .e2e_defaults
+    - .schedule_defaults
+  stage: e2e_tests
+  image: alpine
+  variables:
+    SKIP_LAUNCH: "true"
+  before_script:
+    - apk add --no-cache openssh-client rsync bash sshpass curl
+  script:
+    - source cnt-ci/infrastructure-info
+    - chmod 400 ${VSPHERE_SSH_PRIVATE_KEY}
+    - export private_key="${VSPHERE_SSH_PRIVATE_KEY}"
+    - export instance_hostname="${instance_hostname}"
+    - rc=0
+    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_DEVICE} || rc=$?
+    - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
+    - exit $rc
+  artifacts:
+    when: always
+    paths:
+      - logs/
+
+e2e_tests_containerd_k8s1_25:
+  extends:
+    - .e2e_tests
+    - .runtime-containerd
+  dependencies:
+    - cnt_kube_setup_containerd_k8s1_25
+  needs:
+    - cnt_kube_setup_containerd_k8s1_25
+
+e2e_tests_containerd_k8s1_27:
+  extends:
+    - .e2e_tests
+    - .runtime-containerd
+  dependencies:
+    - cnt_kube_setup_containerd_k8s1_27
+  needs:
+    - cnt_kube_setup_containerd_k8s1_27
+
+.launch_infra:
+  extends:
+    - .cnt_kube_setup
+    - .e2e_defaults
+    - .infra_setup_defaults
+    - .schedule_defaults
+
+.clean_infra:
+  extends:
+    - .cnt_kube_clean
+    - .e2e_defaults
+    - .schedule_defaults
+
+.infra_setup_defaults:
+  variables:
+    TF_VAR_os: "ubuntu20.04"
+    TF_VAR_gpu_mode: "passthrough"
+
+.runtime-containerd:
+  variables:
+    TF_VAR_container_runtime: "containerd"
+    CONTAINER_RUNTIME: "containerd"
+
+cnt_kube_setup_containerd_k8s1_25:
+  extends:
+    - .launch_infra
+    - .runtime-containerd
+  variables:
+    TF_VAR_kubernetes_version: "1.25.11"
+    TF_VAR_gpu_device_name: "NVIDIA-A100-PCIE-40GB"
+
+cnt_kube_clean_containerd_k8s1_25:
+  extends:
+    - .clean_infra
+  dependencies:
+    - cnt_kube_setup_containerd_k8s1_25
+
+cnt_kube_setup_containerd_k8s1_27:
+  extends:
+    - .launch_infra
+    - .runtime-containerd
+  variables:
+    TF_VAR_kubernetes_version: "1.27.3"
+    TF_VAR_gpu_device_name: "NVIDIA-A100-PCIE-40GB"
+
+cnt_kube_clean_containerd_k8s1_27:
+  extends:
+    - .clean_infra
+  dependencies:
+    - cnt_kube_setup_containerd_k8s1_27

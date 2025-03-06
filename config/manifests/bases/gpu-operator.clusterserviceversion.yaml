@@ -1,0 +1,305 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    operators.openshift.io/infrastructure-features: '["Disconnected"]'
+    alm-examples: '[]'
+    capabilities: Basic Install
+    categories: AI/Machine Learning, OpenShift Optional
+    certified: "false"
+    containerImage: nvcr.io/nvidia/gpu-operator:1.6.2
+    createdAt: "Wed Feb 24 13:49:07 PST 2021"
+    description: Automate the management and monitoring of NVIDIA GPUs.
+    provider: NVIDIA
+    repository: http://github.com/NVIDIA/gpu-operator
+    support: NVIDIA
+  name: gpu-operator-certified.v1.6.2
+  namespace: placeholder
+spec:
+  displayName: NVIDIA GPU Operator
+  description: >
+    Kubernetes provides access to special hardware resources such as NVIDIA
+    GPUs, NICs, Infiniband adapters and other devices through the [device plugin
+    framework](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/).
+    However, configuring and managing nodes with these hardware resources
+    requires configuration of multiple software components such as drivers,
+    container runtimes or other libraries which are difficult and prone to
+    errors.
+
+    The NVIDIA GPU Operator uses the [operator
+    framework](https://coreos.com/blog/introducing-operator-framework) within
+    Kubernetes to automate the management of all NVIDIA software components
+    needed to provision and monitor GPUs.
+    These components include the NVIDIA drivers (to enable CUDA), Kubernetes
+    device plugin for GPUs, the NVIDIA Container Runtime, automatic node
+    labelling and NVIDIA DCGM exporter.
+
+    Visit the official site of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) for more information.
+    For getting started with using the GPU Operator with OpenShift, see the instructions
+    [here](https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html).
+  apiservicedefinitions: {}
+  relatedImages:
+    - name: gpu-operator-image
+      image: nvcr.io/nvidia/gpu-operator@sha256:98878888117a2e3d53924c39f300e4263ce3a25ed7fb12125ed0eaf5d16ec03a
+    - name: dcgm-exporter-image
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:ced606933cd2210768ee8488b624c64ac0bdce6f05d9c4b4210e251370a14ff8
+    - name: container-toolkit-image
+      image: nvcr.io/nvidia/k8s/container-toolkit@sha256:c91875db54ad5d2a2ed396c8fd15cc666411ff35c58c634680946371d32507ae
+    - name: driver-image
+      image: nvcr.io/nvidia/driver@sha256:017d2e2a1bc410e9d2ac116683fc49a6f28e935cadee86e712cc147ea0239469
+    - name: device-plugin-image
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:ea353fe57628f4d3c3e1cda126455d02f2277e3ee92fa9da441d409d76b2ac92
+    - name: gpu-feature-discovery-image
+      image: nvcr.io/nvidia/gpu-feature-discovery@sha256:bfc39d23568458dfd50c0c5323b6d42bdcd038c420fb2a2becd513a3ed3be27f
+    - name: cuda-sample-image
+      image: nvcr.io/nvidia/k8s/cuda-sample@sha256:2a30fe7e23067bc2c3f8f62a6867702a016af2b80b9f6ce861f3fea4dfd85bc2
+    - name: dcgm-init-container-image
+      image: nvcr.io/nvidia/cuda@sha256:ed723a1339cddd75eb9f2be2f3476edf497a1b189c10c9bf9eb8da4a16a51a59
+  customresourcedefinitions:
+    owned:
+    - name: clusterpolicies.nvidia.com
+      kind: ClusterPolicy
+      version: v1
+      group: nvidia.com
+      displayName: ClusterPolicy
+      description: ClusterPolicy allows you to configure the GPU Operator
+      resources:
+        - kind: ServiceAccount
+          name: ''
+          version: v1
+        - kind: Deployment
+          name: ''
+          version: apps/v1
+        - kind: DaemonSet
+          name: ''
+          version: apps/v1
+        - kind: ConfigMap
+          name: ''
+          version: v1
+        - kind: Pod
+          name: ''
+          version: v1
+        - kind: clusterpolicies
+          name: ''
+          version: v1
+        - kind: clusterversions
+          name: ''
+          version: v1
+        - kind: nodes
+          name: ''
+          version: v1
+        - kind: status
+          name: ''
+          version: v1
+      specDescriptors:
+        - description: Operator config
+          displayName: Operator config
+          path: operator
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: operator.validator.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: operator.validator.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - description: DCGM Exporter config
+          displayName: DCGM Exporter config
+          path: dcgmExporter
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: dcgmExporter.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: dcgmExporter.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: dcgmExporter.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: dcgmExporter.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: dcgmExporter.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Device Plugin config
+          displayName: Device Plugin config
+          path: devicePlugin
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: devicePlugin.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: devicePlugin.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: devicePlugin.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: devicePlugin.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: devicePlugin.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Driver config
+          displayName: Driver config
+          path: driver
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: driver.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: driver.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: driver.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: driver.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: driver.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Group Feature Discovery Plugin config
+          displayName: Group Feature Discovery Plugin config
+          path: gfd
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: gfd.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: gfd.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: gfd.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: gfd.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: gfd.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - description: Container Toolkit config
+          displayName: Container Toolkit config
+          path: toolkit
+        - description: 'Optional: Set Node affinity'
+          displayName: Node affinity
+          path: toolkit.affinity
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:com.tectonic.ui:nodeAffinity'
+        - description: Node selector to control the selection of nodes (optional)
+          displayName: Node Selector
+          path: toolkit.nodeSelector
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:selector:Node'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - description: 'Optional: Set tolerations'
+          displayName: Tolerations
+          path: toolkit.tolerations
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+            - 'urn:alm:descriptor:io.kubernetes:Tolerations'
+        - description: Image pull secrets
+          displayName: Image pull secrets
+          path: toolkit.imagePullSecrets
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - displayName: ImagePullPolicy
+          description: 'Image pull policy (default: IfNotPresent)'
+          path: toolkit.imagePullPolicy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+      statusDescriptors:
+        - description: The current state of the operator.
+          displayName: State
+          path: state
+          x-descriptors:
+            - 'urn:alm:descriptor:text'
+  icon:
+  - base64data: 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
+    mediatype: image/png
+  install:
+    spec:
+      deployments: null
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: true
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - gpu
+  - cuda
+  - compute
+  - operator
+  - deep learning
+  - monitoring
+  - tesla
+  maintainers:
+  - name: NVIDIA
+    email: operator_feedback@nvidia.com
+  maturity: stable
+  provider:
+    name: NVIDIA Corporation
+  version: 1.6.2
+  replaces: gpu-operator-certified.v1.6.0

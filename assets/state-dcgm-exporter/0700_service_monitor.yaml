@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-dcgm-exporter
+spec:
+  endpoints:
+  - port: gpu-metrics
+    path: "/metrics"
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - "FILLED BY THE OPERATOR"
+  selector:
+    matchLabels:
+     app: nvidia-dcgm-exporter

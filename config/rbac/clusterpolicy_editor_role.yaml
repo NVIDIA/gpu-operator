@@ -1,0 +1,24 @@
+# permissions for end users to edit clusterpolicies.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterpolicy-editor-role
+rules:
+- apiGroups:
+  - nvidia.com
+  resources:
+  - clusterpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nvidia.com
+  resources:
+  - clusterpolicies/status
+  verbs:
+  - get

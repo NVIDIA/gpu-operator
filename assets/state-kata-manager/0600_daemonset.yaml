@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-kata-manager
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-kata-manager
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-kata-manager
+  template:
+    metadata:
+      labels:
+        name: nvidia-kata-manager
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.kata-manager: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-kata-manager
+      hostPID: true
+      containers:
+        - name: nvidia-kata-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - /bin/entrypoint.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CONFIG_FILE
+              value: "/etc/kata-manager/config.yaml"
+            - name: LOAD_KERNEL_MODULES
+              value: "true"
+            - name: CDI_ENABLED
+              value: "true"
+          resources: {}
+          volumeMounts:
+          - name: nvidia-kata-manager-entrypoint
+            readOnly: true
+            mountPath: /bin/entrypoint.sh
+            subPath: entrypoint.sh
+          - name: nvidia-kata-manager-config
+            mountPath: /etc/kata-manager/config.yaml
+            subPath: config.yaml
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
+          - name: cdi-root
+            mountPath: /var/run/cdi
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          # Mark pod ready once PID file is created and PID is valid.
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - "-c"
+                - |
+                  pid_file="${KATA_ARTIFACTS_DIR}/k8s-kata-manager.pid"
+                  [[ -f "${pid_file}" ]] && [[ -d "/proc/$(cat $pid_file)" ]] && exit 0 || exit 1
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: nvidia-kata-manager-entrypoint
+          configMap:
+            name: nvidia-kata-manager-entrypoint
+            defaultMode: 448
+        - name: nvidia-kata-manager-config
+          configMap:
+            name: nvidia-kata-manager-config
+            defaultMode: 448
+        - name: host-root
+          hostPath:
+            path: /
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: "/run/nvidia/validations"
+            type: DirectoryOrCreate
+

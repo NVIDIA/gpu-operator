@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-vfio-manager
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-vfio-manager
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-vfio-manager
+  template:
+    metadata:
+      labels:
+        name: nvidia-vfio-manager
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu.deploy.vfio-manager: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-vfio-manager
+      initContainers:
+        - name: k8s-driver-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["driver-manager"]
+          args: ["uninstall_driver"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: ENABLE_AUTO_DRAIN
+            value: "false"
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
+      containers:
+        - name: nvidia-vfio-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - /bin/vfio-manage.sh bind --all && sleep inf
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+          - name: nvidia-vfio-manager
+            readOnly: true
+            mountPath: /bin/vfio-manage.sh
+            subPath: vfio-manage.sh
+          - name: host-sys
+            mountPath: /sys
+          - name: host-root
+            mountPath: /host
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "/bin/vfio-manage.sh unbind --all"]
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: nvidia-vfio-manager
+          configMap:
+            name: nvidia-vfio-manager
+            defaultMode: 448
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: "/"

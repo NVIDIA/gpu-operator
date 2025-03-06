@@ -1,0 +1,2398 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-vgpu-devices-config
+  namespace: "FILLED BY THE OPERATOR"
+data:
+  config.yaml: |
+    version: v1
+    vgpu-configs:
+        A2-1Q:
+            - devices: all
+              vgpu-devices:
+                A2-1Q: 16
+        A2-2Q:
+            - devices: all
+              vgpu-devices:
+                A2-2Q: 8
+        A2-4C:
+            - devices: all
+              vgpu-devices:
+                A2-4C: 4
+        A2-4Q:
+            - devices: all
+              vgpu-devices:
+                A2-4Q: 4
+        A2-8C:
+            - devices: all
+              vgpu-devices:
+                A2-8C: 2
+        A2-8Q:
+            - devices: all
+              vgpu-devices:
+                A2-8Q: 2
+        A2-16C:
+            - devices: all
+              vgpu-devices:
+                A2-16C: 1
+        A2-16Q:
+            - devices: all
+              vgpu-devices:
+                A2-16Q: 1
+        A10-1Q:
+            - devices: all
+              vgpu-devices:
+                A10-1Q: 24
+        A10-2Q:
+            - devices: all
+              vgpu-devices:
+                A10-2Q: 12
+        A10-3Q:
+            - devices: all
+              vgpu-devices:
+                A10-3Q: 8
+        A10-4C:
+            - devices: all
+              vgpu-devices:
+                A10-4C: 6
+        A10-4Q:
+            - devices: all
+              vgpu-devices:
+                A10-4Q: 6
+        A10-6C:
+            - devices: all
+              vgpu-devices:
+                A10-6C: 4
+        A10-6Q:
+            - devices: all
+              vgpu-devices:
+                A10-6Q: 4
+        A10-8C:
+            - devices: all
+              vgpu-devices:
+                A10-8C: 3
+        A10-8Q:
+            - devices: all
+              vgpu-devices:
+                A10-8Q: 3
+        A10-12C:
+            - devices: all
+              vgpu-devices:
+                A10-12C: 2
+        A10-12Q:
+            - devices: all
+              vgpu-devices:
+                A10-12Q: 2
+        A10-24C:
+            - devices: all
+              vgpu-devices:
+                A10-24C: 1
+        A10-24Q:
+            - devices: all
+              vgpu-devices:
+                A10-24Q: 1
+        A16-1Q:
+            - devices: all
+              vgpu-devices:
+                A16-1Q: 16
+        A16-2Q:
+            - devices: all
+              vgpu-devices:
+                A16-2Q: 8
+        A16-4C:
+            - devices: all
+              vgpu-devices:
+                A16-4C: 4
+        A16-4Q:
+            - devices: all
+              vgpu-devices:
+                A16-4Q: 4
+        A16-8C:
+            - devices: all
+              vgpu-devices:
+                A16-8C: 2
+        A16-8Q:
+            - devices: all
+              vgpu-devices:
+                A16-8Q: 2
+        A16-16C:
+            - devices: all
+              vgpu-devices:
+                A16-16C: 1
+        A16-16Q:
+            - devices: all
+              vgpu-devices:
+                A16-16Q: 1
+        A30-1-6C:
+            - devices: all
+              vgpu-devices:
+                A30-1-6C: 4
+        A30-1-6CME:
+            - devices: all
+              vgpu-devices:
+                A30-1-6CME: 1
+        A30-2-12C:
+            - devices: all
+              vgpu-devices:
+                A30-2-12C: 2
+        A30-2-12CME:
+            - devices: all
+              vgpu-devices:
+                A30-2-12CME: 1
+        A30-4C:
+            - devices: all
+              vgpu-devices:
+                A30-4C: 6
+        A30-4-24C:
+            - devices: all
+              vgpu-devices:
+                A30-4-24C: 1
+        A30-6C:
+            - devices: all
+              vgpu-devices:
+                A30-6C: 4
+        A30-8C:
+            - devices: all
+              vgpu-devices:
+                A30-8C: 3
+        A30-12C:
+            - devices: all
+              vgpu-devices:
+                A30-12C: 2
+        A30-24C:
+            - devices: all
+              vgpu-devices:
+                A30-24C: 1
+        A40-1Q:
+            - devices: all
+              vgpu-devices:
+                A40-1Q: 32
+        A40-2Q:
+            - devices: all
+              vgpu-devices:
+                A40-2Q: 24
+        A40-3Q:
+            - devices: all
+              vgpu-devices:
+                A40-3Q: 16
+        A40-4C:
+            - devices: all
+              vgpu-devices:
+                A40-4C: 12
+        A40-4Q:
+            - devices: all
+              vgpu-devices:
+                A40-4Q: 12
+        A40-6C:
+            - devices: all
+              vgpu-devices:
+                A40-6C: 8
+        A40-6Q:
+            - devices: all
+              vgpu-devices:
+                A40-6Q: 8
+        A40-8C:
+            - devices: all
+              vgpu-devices:
+                A40-8C: 6
+        A40-8Q:
+            - devices: all
+              vgpu-devices:
+                A40-8Q: 6
+        A40-12C:
+            - devices: all
+              vgpu-devices:
+                A40-12C: 4
+        A40-12Q:
+            - devices: all
+              vgpu-devices:
+                A40-12Q: 4
+        A40-16C:
+            - devices: all
+              vgpu-devices:
+                A40-16C: 3
+        A40-16Q:
+            - devices: all
+              vgpu-devices:
+                A40-16Q: 3
+        A40-24C:
+            - devices: all
+              vgpu-devices:
+                A40-24C: 2
+        A40-24Q:
+            - devices: all
+              vgpu-devices:
+                A40-24Q: 2
+        A40-48C:
+            - devices: all
+              vgpu-devices:
+                A40-48C: 1
+        A40-48Q:
+            - devices: all
+              vgpu-devices:
+                A40-48Q: 1
+        A100D-1-10C:
+            - devices: all
+              vgpu-devices:
+                A100D-1-10C: 7
+        A100D-1-10CME:
+            - devices: all
+              vgpu-devices:
+                A100D-1-10CME: 1
+        A100D-1-20C:
+            - devices: all
+              vgpu-devices:
+                A100D-1-20C: 4
+        A100D-2-20C:
+            - devices: all
+              vgpu-devices:
+                A100D-2-20C: 3
+        A100D-3-40C:
+            - devices: all
+              vgpu-devices:
+                A100D-3-40C: 2
+        A100D-4C:
+            - devices: all
+              vgpu-devices:
+                A100D-4C: 20
+        A100D-4-40C:
+            - devices: all
+              vgpu-devices:
+                A100D-4-40C: 1
+        A100D-7-80C:
+            - devices: all
+              vgpu-devices:
+                A100D-7-80C: 1
+        A100D-8C:
+            - devices: all
+              vgpu-devices:
+                A100D-8C: 10
+        A100D-10C:
+            - devices: all
+              vgpu-devices:
+                A100D-10C: 8
+        A100D-16C:
+            - devices: all
+              vgpu-devices:
+                A100D-16C: 5
+        A100D-20C:
+            - devices: all
+              vgpu-devices:
+                A100D-20C: 4
+        A100D-40C:
+            - devices: all
+              vgpu-devices:
+                A100D-40C: 2
+        A100D-80C:
+            - devices: all
+              vgpu-devices:
+                A100D-80C: 1
+        A100DX-1-10C:
+            - devices: all
+              vgpu-devices:
+                A100DX-1-10C: 7
+        A100DX-1-10CME:
+            - devices: all
+              vgpu-devices:
+                A100DX-1-10CME: 1
+        A100DX-1-20C:
+            - devices: all
+              vgpu-devices:
+                A100DX-1-20C: 4
+        A100DX-2-20C:
+            - devices: all
+              vgpu-devices:
+                A100DX-2-20C: 3
+        A100DX-3-40C:
+            - devices: all
+              vgpu-devices:
+                A100DX-3-40C: 2
+        A100DX-4C:
+            - devices: all
+              vgpu-devices:
+                A100DX-4C: 20
+        A100DX-4-40C:
+            - devices: all
+              vgpu-devices:
+                A100DX-4-40C: 1
+        A100DX-7-80C:
+            - devices: all
+              vgpu-devices:
+                A100DX-7-80C: 1
+        A100DX-8C:
+            - devices: all
+              vgpu-devices:
+                A100DX-8C: 10
+        A100DX-10C:
+            - devices: all
+              vgpu-devices:
+                A100DX-10C: 8
+        A100DX-16C:
+            - devices: all
+              vgpu-devices:
+                A100DX-16C: 5
+        A100DX-20C:
+            - devices: all
+              vgpu-devices:
+                A100DX-20C: 4
+        A100DX-40C:
+            - devices: all
+              vgpu-devices:
+                A100DX-40C: 2
+        A100DX-80C:
+            - devices: all
+              vgpu-devices:
+                A100DX-80C: 1
+        A100X-1-5C:
+            - devices: all
+              vgpu-devices:
+                A100X-1-5C: 7
+        A100X-1-5CME:
+            - devices: all
+              vgpu-devices:
+                A100X-1-5CME: 1
+        A100X-1-10C:
+            - devices: all
+              vgpu-devices:
+                A100X-1-10C: 4
+        A100X-2-10C:
+            - devices: all
+              vgpu-devices:
+                A100X-2-10C: 3
+        A100X-3-20C:
+            - devices: all
+              vgpu-devices:
+                A100X-3-20C: 2
+        A100X-4C:
+            - devices: all
+              vgpu-devices:
+                A100X-4C: 10
+        A100X-4-20C:
+            - devices: all
+              vgpu-devices:
+                A100X-4-20C: 1
+        A100X-5C:
+            - devices: all
+              vgpu-devices:
+                A100X-5C: 8
+        A100X-7-40C:
+            - devices: all
+              vgpu-devices:
+                A100X-7-40C: 1
+        A100X-8C:
+            - devices: all
+              vgpu-devices:
+                A100X-8C: 5
+        A100X-10C:
+            - devices: all
+              vgpu-devices:
+                A100X-10C: 4
+        A100X-20C:
+            - devices: all
+              vgpu-devices:
+                A100X-20C: 2
+        A100X-40C:
+            - devices: all
+              vgpu-devices:
+                A100X-40C: 1
+        A100-1-5C:
+            - devices: all
+              vgpu-devices:
+                A100-1-5C: 7
+        A100-1-5CME:
+            - devices: all
+              vgpu-devices:
+                A100-1-5CME: 1
+        A100-1-10C:
+            - devices: all
+              vgpu-devices:
+                A100-1-10C: 4
+        A100-2-10C:
+            - devices: all
+              vgpu-devices:
+                A100-2-10C: 3
+        A100-3-20C:
+            - devices: all
+              vgpu-devices:
+                A100-3-20C: 2
+        A100-4C:
+            - devices: all
+              vgpu-devices:
+                A100-4C: 10
+        A100-4-20C:
+            - devices: all
+              vgpu-devices:
+                A100-4-20C: 1
+        A100-5C:
+            - devices: all
+              vgpu-devices:
+                A100-5C: 8
+        A100-7-40C:
+            - devices: all
+              vgpu-devices:
+                A100-7-40C: 1
+        A100-8C:
+            - devices: all
+              vgpu-devices:
+                A100-8C: 5
+        A100-10C:
+            - devices: all
+              vgpu-devices:
+                A100-10C: 4
+        A100-20C:
+            - devices: all
+              vgpu-devices:
+                A100-20C: 2
+        A100-40C:
+            - devices: all
+              vgpu-devices:
+                A100-40C: 1
+        A800D-1-10C:
+            - devices: all
+              vgpu-devices:
+                A800D-1-10C: 7
+        A800D-1-10CME:
+            - devices: all
+              vgpu-devices:
+                A800D-1-10CME: 1
+        A800D-1-20C:
+            - devices: all
+              vgpu-devices:
+                A800D-1-20C: 4
+        A800D-2-20C:
+            - devices: all
+              vgpu-devices:
+                A800D-2-20C: 3
+        A800D-3-40C:
+            - devices: all
+              vgpu-devices:
+                A800D-3-40C: 2
+        A800D-4C:
+            - devices: all
+              vgpu-devices:
+                A800D-4C: 20
+        A800D-4-40C:
+            - devices: all
+              vgpu-devices:
+                A800D-4-40C: 1
+        A800D-7-80C:
+            - devices: all
+              vgpu-devices:
+                A800D-7-80C: 1
+        A800D-8C:
+            - devices: all
+              vgpu-devices:
+                A800D-8C: 10
+        A800D-10C:
+            - devices: all
+              vgpu-devices:
+                A800D-10C: 8
+        A800D-16C:
+            - devices: all
+              vgpu-devices:
+                A800D-16C: 5
+        A800D-20C:
+            - devices: all
+              vgpu-devices:
+                A800D-20C: 4
+        A800D-40C:
+            - devices: all
+              vgpu-devices:
+                A800D-40C: 2
+        A800D-80C:
+            - devices: all
+              vgpu-devices:
+                A800D-80C: 1
+        A800DX-1-10C:
+            - devices: all
+              vgpu-devices:
+                A800DX-1-10C: 7
+        A800DX-1-10CME:
+            - devices: all
+              vgpu-devices:
+                A800DX-1-10CME: 1
+        A800DX-1-20C:
+            - devices: all
+              vgpu-devices:
+                A800DX-1-20C: 4
+        A800DX-2-20C:
+            - devices: all
+              vgpu-devices:
+                A800DX-2-20C: 3
+        A800DX-3-40C:
+            - devices: all
+              vgpu-devices:
+                A800DX-3-40C: 2
+        A800DX-4C:
+            - devices: all
+              vgpu-devices:
+                A800DX-4C: 20
+        A800DX-4-40C:
+            - devices: all
+              vgpu-devices:
+                A800DX-4-40C: 1
+        A800DX-7-80C:
+            - devices: all
+              vgpu-devices:
+                A800DX-7-80C: 1
+        A800DX-8C:
+            - devices: all
+              vgpu-devices:
+                A800DX-8C: 10
+        A800DX-10C:
+            - devices: all
+              vgpu-devices:
+                A800DX-10C: 8
+        A800DX-16C:
+            - devices: all
+              vgpu-devices:
+                A800DX-16C: 5
+        A800DX-20C:
+            - devices: all
+              vgpu-devices:
+                A800DX-20C: 4
+        A800DX-40C:
+            - devices: all
+              vgpu-devices:
+                A800DX-40C: 2
+        A800DX-80C:
+            - devices: all
+              vgpu-devices:
+                A800DX-80C: 1
+        A800-1-5C:
+            - devices: all
+              vgpu-devices:
+                A800-1-5C: 7
+        A800-1-5CME:
+            - devices: all
+              vgpu-devices:
+                A800-1-5CME: 1
+        A800-1-10C:
+            - devices: all
+              vgpu-devices:
+                A800-1-10C: 4
+        A800-2-10C:
+            - devices: all
+              vgpu-devices:
+                A800-2-10C: 3
+        A800-3-20C:
+            - devices: all
+              vgpu-devices:
+                A800-3-20C: 2
+        A800-4C:
+            - devices: all
+              vgpu-devices:
+                A800-4C: 10
+        A800-4-20C:
+            - devices: all
+              vgpu-devices:
+                A800-4-20C: 1
+        A800-5C:
+            - devices: all
+              vgpu-devices:
+                A800-5C: 8
+        A800-7-40C:
+            - devices: all
+              vgpu-devices:
+                A800-7-40C: 1
+        A800-8C:
+            - devices: all
+              vgpu-devices:
+                A800-8C: 5
+        A800-10C:
+            - devices: all
+              vgpu-devices:
+                A800-10C: 4
+        A800-20C:
+            - devices: all
+              vgpu-devices:
+                A800-20C: 2
+        A800-40C:
+            - devices: all
+              vgpu-devices:
+                A800-40C: 1
+        GH200-1-12C:
+            - devices: all
+              vgpu-devices:
+                GH200-1-12C: 7
+        GH200-1-12CME:
+            - devices: all
+              vgpu-devices:
+                GH200-1-12CME: 1
+        GH200-1-24C:
+            - devices: all
+              vgpu-devices:
+                GH200-1-24C: 4
+        GH200-2-24C:
+            - devices: all
+              vgpu-devices:
+                GH200-2-24C: 3
+        GH200-3-48C:
+            - devices: all
+              vgpu-devices:
+                GH200-3-48C: 2
+        GH200-4-48C:
+            - devices: all
+              vgpu-devices:
+                GH200-4-48C: 1
+        GH200-7-96C:
+            - devices: all
+              vgpu-devices:
+                GH200-7-96C: 1
+        GH200-96C:
+            - devices: all
+              vgpu-devices:
+                GH200-96C: 1
+        H20-1-12C:
+            - devices: all
+              vgpu-devices:
+                H20-1-12C: 7
+        H20-1-12CME:
+            - devices: all
+              vgpu-devices:
+                H20-1-12CME: 1
+        H20-1-24C:
+            - devices: all
+              vgpu-devices:
+                H20-1-24C: 4
+        H20-2-24C:
+            - devices: all
+              vgpu-devices:
+                H20-2-24C: 3
+        H20-3-48C:
+            - devices: all
+              vgpu-devices:
+                H20-3-48C: 2
+        H20-4C:
+            - devices: all
+              vgpu-devices:
+                H20-4C: 24
+        H20-4-48C:
+            - devices: all
+              vgpu-devices:
+                H20-4-48C: 1
+        H20-6C:
+            - devices: all
+              vgpu-devices:
+                H20-6C: 16
+        H20-7-96C:
+            - devices: all
+              vgpu-devices:
+                H20-7-96C: 1
+        H20-8C:
+            - devices: all
+              vgpu-devices:
+                H20-8C: 12
+        H20-12C:
+            - devices: all
+              vgpu-devices:
+                H20-12C: 8
+        H20-16C:
+            - devices: all
+              vgpu-devices:
+                H20-16C: 6
+        H20-24C:
+            - devices: all
+              vgpu-devices:
+                H20-24C: 4
+        H20-32C:
+            - devices: all
+              vgpu-devices:
+                H20-32C: 3
+        H20-48C:
+            - devices: all
+              vgpu-devices:
+                H20-48C: 2
+        H20-96C:
+            - devices: all
+              vgpu-devices:
+                H20-96C: 1
+        H100L-1-12C:
+            - devices: all
+              vgpu-devices:
+                H100L-1-12C: 7
+        H100L-1-12CME:
+            - devices: all
+              vgpu-devices:
+                H100L-1-12CME: 1
+        H100L-1-24C:
+            - devices: all
+              vgpu-devices:
+                H100L-1-24C: 4
+        H100L-2-24C:
+            - devices: all
+              vgpu-devices:
+                H100L-2-24C: 3
+        H100L-3-47C:
+            - devices: all
+              vgpu-devices:
+                H100L-3-47C: 2
+        H100L-4C:
+            - devices: all
+              vgpu-devices:
+                H100L-4C: 23
+        H100L-4-47C:
+            - devices: all
+              vgpu-devices:
+                H100L-4-47C: 1
+        H100L-6C:
+            - devices: all
+              vgpu-devices:
+                H100L-6C: 15
+        H100L-7-94C:
+            - devices: all
+              vgpu-devices:
+                H100L-7-94C: 1
+        H100L-11C:
+            - devices: all
+              vgpu-devices:
+                H100L-11C: 8
+        H100L-15C:
+            - devices: all
+              vgpu-devices:
+                H100L-15C: 6
+        H100L-23C:
+            - devices: all
+              vgpu-devices:
+                H100L-23C: 4
+        H100L-47C:
+            - devices: all
+              vgpu-devices:
+                H100L-47C: 2
+        H100L-94C:
+            - devices: all
+              vgpu-devices:
+                H100L-94C: 1
+        H100XL-1-12C:
+            - devices: all
+              vgpu-devices:
+                H100XL-1-12C: 7
+        H100XL-1-12CME:
+            - devices: all
+              vgpu-devices:
+                H100XL-1-12CME: 1
+        H100XL-1-24C:
+            - devices: all
+              vgpu-devices:
+                H100XL-1-24C: 4
+        H100XL-2-24C:
+            - devices: all
+              vgpu-devices:
+                H100XL-2-24C: 3
+        H100XL-3-47C:
+            - devices: all
+              vgpu-devices:
+                H100XL-3-47C: 2
+        H100XL-4C:
+            - devices: all
+              vgpu-devices:
+                H100XL-4C: 23
+        H100XL-4-47C:
+            - devices: all
+              vgpu-devices:
+                H100XL-4-47C: 1
+        H100XL-6C:
+            - devices: all
+              vgpu-devices:
+                H100XL-6C: 15
+        H100XL-7-94C:
+            - devices: all
+              vgpu-devices:
+                H100XL-7-94C: 1
+        H100XL-11C:
+            - devices: all
+              vgpu-devices:
+                H100XL-11C: 8
+        H100XL-15C:
+            - devices: all
+              vgpu-devices:
+                H100XL-15C: 6
+        H100XL-23C:
+            - devices: all
+              vgpu-devices:
+                H100XL-23C: 4
+        H100XL-47C:
+            - devices: all
+              vgpu-devices:
+                H100XL-47C: 2
+        H100XL-94C:
+            - devices: all
+              vgpu-devices:
+                H100XL-94C: 1
+        H100XM-1-10C:
+            - devices: all
+              vgpu-devices:
+                H100XM-1-10C: 7
+        H100XM-1-10CME:
+            - devices: all
+              vgpu-devices:
+                H100XM-1-10CME: 1
+        H100XM-1-20C:
+            - devices: all
+              vgpu-devices:
+                H100XM-1-20C: 4
+        H100XM-2-20C:
+            - devices: all
+              vgpu-devices:
+                H100XM-2-20C: 3
+        H100XM-3-40C:
+            - devices: all
+              vgpu-devices:
+                H100XM-3-40C: 2
+        H100XM-4C:
+            - devices: all
+              vgpu-devices:
+                H100XM-4C: 20
+        H100XM-4-40C:
+            - devices: all
+              vgpu-devices:
+                H100XM-4-40C: 1
+        H100XM-5C:
+            - devices: all
+              vgpu-devices:
+                H100XM-5C: 16
+        H100XM-7-80C:
+            - devices: all
+              vgpu-devices:
+                H100XM-7-80C: 1
+        H100XM-8C:
+            - devices: all
+              vgpu-devices:
+                H100XM-8C: 10
+        H100XM-10C:
+            - devices: all
+              vgpu-devices:
+                H100XM-10C: 8
+        H100XM-16C:
+            - devices: all
+              vgpu-devices:
+                H100XM-16C: 5
+        H100XM-20C:
+            - devices: all
+              vgpu-devices:
+                H100XM-20C: 4
+        H100XM-40C:
+            - devices: all
+              vgpu-devices:
+                H100XM-40C: 2
+        H100XM-80C:
+            - devices: all
+              vgpu-devices:
+                H100XM-80C: 1
+        H100XS-1-8C:
+            - devices: all
+              vgpu-devices:
+                H100XS-1-8C: 7
+        H100XS-1-8CME:
+            - devices: all
+              vgpu-devices:
+                H100XS-1-8CME: 1
+        H100XS-1-16C:
+            - devices: all
+              vgpu-devices:
+                H100XS-1-16C: 4
+        H100XS-2-16C:
+            - devices: all
+              vgpu-devices:
+                H100XS-2-16C: 3
+        H100XS-3-32C:
+            - devices: all
+              vgpu-devices:
+                H100XS-3-32C: 2
+        H100XS-4C:
+            - devices: all
+              vgpu-devices:
+                H100XS-4C: 16
+        H100XS-4-32C:
+            - devices: all
+              vgpu-devices:
+                H100XS-4-32C: 1
+        H100XS-7-64C:
+            - devices: all
+              vgpu-devices:
+                H100XS-7-64C: 1
+        H100XS-8C:
+            - devices: all
+              vgpu-devices:
+                H100XS-8C: 8
+        H100XS-16C:
+            - devices: all
+              vgpu-devices:
+                H100XS-16C: 4
+        H100XS-32C:
+            - devices: all
+              vgpu-devices:
+                H100XS-32C: 2
+        H100XS-64C:
+            - devices: all
+              vgpu-devices:
+                H100XS-64C: 1
+        H100-1-10C:
+            - devices: all
+              vgpu-devices:
+                H100-1-10C: 7
+        H100-1-10CME:
+            - devices: all
+              vgpu-devices:
+                H100-1-10CME: 1
+        H100-1-20C:
+            - devices: all
+              vgpu-devices:
+                H100-1-20C: 4
+        H100-2-20C:
+            - devices: all
+              vgpu-devices:
+                H100-2-20C: 3
+        H100-3-40C:
+            - devices: all
+              vgpu-devices:
+                H100-3-40C: 2
+        H100-4C:
+            - devices: all
+              vgpu-devices:
+                H100-4C: 20
+        H100-4-40C:
+            - devices: all
+              vgpu-devices:
+                H100-4-40C: 1
+        H100-5C:
+            - devices: all
+              vgpu-devices:
+                H100-5C: 16
+        H100-7-80C:
+            - devices: all
+              vgpu-devices:
+                H100-7-80C: 1
+        H100-8C:
+            - devices: all
+              vgpu-devices:
+                H100-8C: 10
+        H100-10C:
+            - devices: all
+              vgpu-devices:
+                H100-10C: 8
+        H100-16C:
+            - devices: all
+              vgpu-devices:
+                H100-16C: 5
+        H100-20C:
+            - devices: all
+              vgpu-devices:
+                H100-20C: 4
+        H100-40C:
+            - devices: all
+              vgpu-devices:
+                H100-40C: 2
+        H100-80C:
+            - devices: all
+              vgpu-devices:
+                H100-80C: 1
+        H800L-1-12C:
+            - devices: all
+              vgpu-devices:
+                H800L-1-12C: 7
+        H800L-1-12CME:
+            - devices: all
+              vgpu-devices:
+                H800L-1-12CME: 1
+        H800L-1-24C:
+            - devices: all
+              vgpu-devices:
+                H800L-1-24C: 4
+        H800L-2-24C:
+            - devices: all
+              vgpu-devices:
+                H800L-2-24C: 3
+        H800L-3-47C:
+            - devices: all
+              vgpu-devices:
+                H800L-3-47C: 2
+        H800L-4C:
+            - devices: all
+              vgpu-devices:
+                H800L-4C: 23
+        H800L-4-47C:
+            - devices: all
+              vgpu-devices:
+                H800L-4-47C: 1
+        H800L-6C:
+            - devices: all
+              vgpu-devices:
+                H800L-6C: 15
+        H800L-7-94C:
+            - devices: all
+              vgpu-devices:
+                H800L-7-94C: 1
+        H800L-11C:
+            - devices: all
+              vgpu-devices:
+                H800L-11C: 8
+        H800L-15C:
+            - devices: all
+              vgpu-devices:
+                H800L-15C: 6
+        H800L-23C:
+            - devices: all
+              vgpu-devices:
+                H800L-23C: 4
+        H800L-47C:
+            - devices: all
+              vgpu-devices:
+                H800L-47C: 2
+        H800L-94C:
+            - devices: all
+              vgpu-devices:
+                H800L-94C: 1
+        H800XM-1-10C:
+            - devices: all
+              vgpu-devices:
+                H800XM-1-10C: 7
+        H800XM-1-10CME:
+            - devices: all
+              vgpu-devices:
+                H800XM-1-10CME: 1
+        H800XM-1-20C:
+            - devices: all
+              vgpu-devices:
+                H800XM-1-20C: 4
+        H800XM-2-20C:
+            - devices: all
+              vgpu-devices:
+                H800XM-2-20C: 3
+        H800XM-3-40C:
+            - devices: all
+              vgpu-devices:
+                H800XM-3-40C: 2
+        H800XM-4C:
+            - devices: all
+              vgpu-devices:
+                H800XM-4C: 20
+        H800XM-4-40C:
+            - devices: all
+              vgpu-devices:
+                H800XM-4-40C: 1
+        H800XM-5C:
+            - devices: all
+              vgpu-devices:
+                H800XM-5C: 16
+        H800XM-7-80C:
+            - devices: all
+              vgpu-devices:
+                H800XM-7-80C: 1
+        H800XM-8C:
+            - devices: all
+              vgpu-devices:
+                H800XM-8C: 10
+        H800XM-10C:
+            - devices: all
+              vgpu-devices:
+                H800XM-10C: 8
+        H800XM-16C:
+            - devices: all
+              vgpu-devices:
+                H800XM-16C: 5
+        H800XM-20C:
+            - devices: all
+              vgpu-devices:
+                H800XM-20C: 4
+        H800XM-40C:
+            - devices: all
+              vgpu-devices:
+                H800XM-40C: 2
+        H800XM-80C:
+            - devices: all
+              vgpu-devices:
+                H800XM-80C: 1
+        H800-1-10C:
+            - devices: all
+              vgpu-devices:
+                H800-1-10C: 7
+        H800-1-10CME:
+            - devices: all
+              vgpu-devices:
+                H800-1-10CME: 1
+        H800-1-20C:
+            - devices: all
+              vgpu-devices:
+                H800-1-20C: 4
+        H800-2-20C:
+            - devices: all
+              vgpu-devices:
+                H800-2-20C: 3
+        H800-3-40C:
+            - devices: all
+              vgpu-devices:
+                H800-3-40C: 2
+        H800-4C:
+            - devices: all
+              vgpu-devices:
+                H800-4C: 20
+        H800-4-40C:
+            - devices: all
+              vgpu-devices:
+                H800-4-40C: 1
+        H800-5C:
+            - devices: all
+              vgpu-devices:
+                H800-5C: 16
+        H800-7-80C:
+            - devices: all
+              vgpu-devices:
+                H800-7-80C: 1
+        H800-8C:
+            - devices: all
+              vgpu-devices:
+                H800-8C: 10
+        H800-10C:
+            - devices: all
+              vgpu-devices:
+                H800-10C: 8
+        H800-16C:
+            - devices: all
+              vgpu-devices:
+                H800-16C: 5
+        H800-20C:
+            - devices: all
+              vgpu-devices:
+                H800-20C: 4
+        H800-40C:
+            - devices: all
+              vgpu-devices:
+                H800-40C: 2
+        H800-80C:
+            - devices: all
+              vgpu-devices:
+                H800-80C: 1
+        L2-1Q:
+            - devices: all
+              vgpu-devices:
+                L2-1Q: 24
+        L2-2Q:
+            - devices: all
+              vgpu-devices:
+                L2-2Q: 12
+        L2-3Q:
+            - devices: all
+              vgpu-devices:
+                L2-3Q: 8
+        L2-4C:
+            - devices: all
+              vgpu-devices:
+                L2-4C: 6
+        L2-4Q:
+            - devices: all
+              vgpu-devices:
+                L2-4Q: 6
+        L2-6C:
+            - devices: all
+              vgpu-devices:
+                L2-6C: 4
+        L2-6Q:
+            - devices: all
+              vgpu-devices:
+                L2-6Q: 4
+        L2-8C:
+            - devices: all
+              vgpu-devices:
+                L2-8C: 3
+        L2-8Q:
+            - devices: all
+              vgpu-devices:
+                L2-8Q: 3
+        L2-12C:
+            - devices: all
+              vgpu-devices:
+                L2-12C: 2
+        L2-12Q:
+            - devices: all
+              vgpu-devices:
+                L2-12Q: 2
+        L2-24C:
+            - devices: all
+              vgpu-devices:
+                L2-24C: 1
+        L2-24Q:
+            - devices: all
+              vgpu-devices:
+                L2-24Q: 1
+        L4-1Q:
+            - devices: all
+              vgpu-devices:
+                L4-1Q: 24
+        L4-2Q:
+            - devices: all
+              vgpu-devices:
+                L4-2Q: 12
+        L4-3Q:
+            - devices: all
+              vgpu-devices:
+                L4-3Q: 8
+        L4-4C:
+            - devices: all
+              vgpu-devices:
+                L4-4C: 6
+        L4-4Q:
+            - devices: all
+              vgpu-devices:
+                L4-4Q: 6
+        L4-6C:
+            - devices: all
+              vgpu-devices:
+                L4-6C: 4
+        L4-6Q:
+            - devices: all
+              vgpu-devices:
+                L4-6Q: 4
+        L4-8C:
+            - devices: all
+              vgpu-devices:
+                L4-8C: 3
+        L4-8Q:
+            - devices: all
+              vgpu-devices:
+                L4-8Q: 3
+        L4-12C:
+            - devices: all
+              vgpu-devices:
+                L4-12C: 2
+        L4-12Q:
+            - devices: all
+              vgpu-devices:
+                L4-12Q: 2
+        L4-24C:
+            - devices: all
+              vgpu-devices:
+                L4-24C: 1
+        L4-24Q:
+            - devices: all
+              vgpu-devices:
+                L4-24Q: 1
+        L20-1Q:
+            - devices: all
+              vgpu-devices:
+                L20-1Q: 32
+        L20-2Q:
+            - devices: all
+              vgpu-devices:
+                L20-2Q: 24
+        L20-3Q:
+            - devices: all
+              vgpu-devices:
+                L20-3Q: 16
+        L20-4C:
+            - devices: all
+              vgpu-devices:
+                L20-4C: 12
+        L20-4Q:
+            - devices: all
+              vgpu-devices:
+                L20-4Q: 12
+        L20-6C:
+            - devices: all
+              vgpu-devices:
+                L20-6C: 8
+        L20-6Q:
+            - devices: all
+              vgpu-devices:
+                L20-6Q: 8
+        L20-8C:
+            - devices: all
+              vgpu-devices:
+                L20-8C: 6
+        L20-8Q:
+            - devices: all
+              vgpu-devices:
+                L20-8Q: 6
+        L20-12C:
+            - devices: all
+              vgpu-devices:
+                L20-12C: 4
+        L20-12Q:
+            - devices: all
+              vgpu-devices:
+                L20-12Q: 4
+        L20-16C:
+            - devices: all
+              vgpu-devices:
+                L20-16C: 3
+        L20-16Q:
+            - devices: all
+              vgpu-devices:
+                L20-16Q: 3
+        L20-24C:
+            - devices: all
+              vgpu-devices:
+                L20-24C: 2
+        L20-24Q:
+            - devices: all
+              vgpu-devices:
+                L20-24Q: 2
+        L20-48C:
+            - devices: all
+              vgpu-devices:
+                L20-48C: 1
+        L20-48Q:
+            - devices: all
+              vgpu-devices:
+                L20-48Q: 1
+        L40S-1Q:
+            - devices: all
+              vgpu-devices:
+                L40S-1Q: 32
+        L40S-2Q:
+            - devices: all
+              vgpu-devices:
+                L40S-2Q: 24
+        L40S-3Q:
+            - devices: all
+              vgpu-devices:
+                L40S-3Q: 16
+        L40S-4C:
+            - devices: all
+              vgpu-devices:
+                L40S-4C: 12
+        L40S-4Q:
+            - devices: all
+              vgpu-devices:
+                L40S-4Q: 12
+        L40S-6C:
+            - devices: all
+              vgpu-devices:
+                L40S-6C: 8
+        L40S-6Q:
+            - devices: all
+              vgpu-devices:
+                L40S-6Q: 8
+        L40S-8C:
+            - devices: all
+              vgpu-devices:
+                L40S-8C: 6
+        L40S-8Q:
+            - devices: all
+              vgpu-devices:
+                L40S-8Q: 6
+        L40S-12C:
+            - devices: all
+              vgpu-devices:
+                L40S-12C: 4
+        L40S-12Q:
+            - devices: all
+              vgpu-devices:
+                L40S-12Q: 4
+        L40S-16C:
+            - devices: all
+              vgpu-devices:
+                L40S-16C: 3
+        L40S-16Q:
+            - devices: all
+              vgpu-devices:
+                L40S-16Q: 3
+        L40S-24C:
+            - devices: all
+              vgpu-devices:
+                L40S-24C: 2
+        L40S-24Q:
+            - devices: all
+              vgpu-devices:
+                L40S-24Q: 2
+        L40S-48C:
+            - devices: all
+              vgpu-devices:
+                L40S-48C: 1
+        L40S-48Q:
+            - devices: all
+              vgpu-devices:
+                L40S-48Q: 1
+        L40-1Q:
+            - devices: all
+              vgpu-devices:
+                L40-1Q: 32
+        L40-2Q:
+            - devices: all
+              vgpu-devices:
+                L40-2Q: 24
+        L40-3Q:
+            - devices: all
+              vgpu-devices:
+                L40-3Q: 16
+        L40-4C:
+            - devices: all
+              vgpu-devices:
+                L40-4C: 12
+        L40-4Q:
+            - devices: all
+              vgpu-devices:
+                L40-4Q: 12
+        L40-6C:
+            - devices: all
+              vgpu-devices:
+                L40-6C: 8
+        L40-6Q:
+            - devices: all
+              vgpu-devices:
+                L40-6Q: 8
+        L40-8C:
+            - devices: all
+              vgpu-devices:
+                L40-8C: 6
+        L40-8Q:
+            - devices: all
+              vgpu-devices:
+                L40-8Q: 6
+        L40-12C:
+            - devices: all
+              vgpu-devices:
+                L40-12C: 4
+        L40-12Q:
+            - devices: all
+              vgpu-devices:
+                L40-12Q: 4
+        L40-16C:
+            - devices: all
+              vgpu-devices:
+                L40-16C: 3
+        L40-16Q:
+            - devices: all
+              vgpu-devices:
+                L40-16Q: 3
+        L40-24C:
+            - devices: all
+              vgpu-devices:
+                L40-24C: 2
+        L40-24Q:
+            - devices: all
+              vgpu-devices:
+                L40-24Q: 2
+        L40-48C:
+            - devices: all
+              vgpu-devices:
+                L40-48C: 1
+        L40-48Q:
+            - devices: all
+              vgpu-devices:
+                L40-48Q: 1
+        RTX5000-Ada-1Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-1Q: 32
+        RTX5000-Ada-2Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-2Q: 16
+        RTX5000-Ada-4C:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-4C: 8
+        RTX5000-Ada-4Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-4Q: 8
+        RTX5000-Ada-8C:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-8C: 4
+        RTX5000-Ada-8Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-8Q: 4
+        RTX5000-Ada-16C:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-16C: 2
+        RTX5000-Ada-16Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-16Q: 2
+        RTX5000-Ada-32C:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-32C: 1
+        RTX5000-Ada-32Q:
+            - devices: all
+              vgpu-devices:
+                RTX5000-Ada-32Q: 1
+        RTX5880-Ada-1Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-1Q: 32
+        RTX5880-Ada-2Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-2Q: 24
+        RTX5880-Ada-3Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-3Q: 16
+        RTX5880-Ada-4C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-4C: 12
+        RTX5880-Ada-4Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-4Q: 12
+        RTX5880-Ada-6C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-6C: 8
+        RTX5880-Ada-6Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-6Q: 8
+        RTX5880-Ada-8C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-8C: 6
+        RTX5880-Ada-8Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-8Q: 6
+        RTX5880-Ada-12C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-12C: 4
+        RTX5880-Ada-12Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-12Q: 4
+        RTX5880-Ada-16C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-16C: 3
+        RTX5880-Ada-16Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-16Q: 3
+        RTX5880-Ada-24C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-24C: 2
+        RTX5880-Ada-24Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-24Q: 2
+        RTX5880-Ada-48C:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-48C: 1
+        RTX5880-Ada-48Q:
+            - devices: all
+              vgpu-devices:
+                RTX5880-Ada-48Q: 1
+        RTX6000P-1Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-1Q: 24
+        RTX6000P-2Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-2Q: 12
+        RTX6000P-3Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-3Q: 8
+        RTX6000P-4C:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-4C: 6
+        RTX6000P-4Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-4Q: 6
+        RTX6000P-6C:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-6C: 4
+        RTX6000P-6Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-6Q: 4
+        RTX6000P-8C:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-8C: 3
+        RTX6000P-8Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-8Q: 3
+        RTX6000P-12C:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-12C: 2
+        RTX6000P-12Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-12Q: 2
+        RTX6000P-24C:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-24C: 1
+        RTX6000P-24Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000P-24Q: 1
+        RTX6000-Ada-1Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-1Q: 32
+        RTX6000-Ada-2Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-2Q: 24
+        RTX6000-Ada-3Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-3Q: 16
+        RTX6000-Ada-4C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-4C: 12
+        RTX6000-Ada-4Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-4Q: 12
+        RTX6000-Ada-6C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-6C: 8
+        RTX6000-Ada-6Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-6Q: 8
+        RTX6000-Ada-8C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-8C: 6
+        RTX6000-Ada-8Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-8Q: 6
+        RTX6000-Ada-12C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-12C: 4
+        RTX6000-Ada-12Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-12Q: 4
+        RTX6000-Ada-16C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-16C: 3
+        RTX6000-Ada-16Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-16Q: 3
+        RTX6000-Ada-24C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-24C: 2
+        RTX6000-Ada-24Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-24Q: 2
+        RTX6000-Ada-48C:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-48C: 1
+        RTX6000-Ada-48Q:
+            - devices: all
+              vgpu-devices:
+                RTX6000-Ada-48Q: 1
+        RTX8000P-1Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-1Q: 32
+        RTX8000P-2Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-2Q: 24
+        RTX8000P-3Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-3Q: 16
+        RTX8000P-4C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-4C: 8
+        RTX8000P-4Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-4Q: 12
+        RTX8000P-6C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-6C: 8
+        RTX8000P-6Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-6Q: 8
+        RTX8000P-8C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-8C: 6
+        RTX8000P-8Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-8Q: 6
+        RTX8000P-12C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-12C: 4
+        RTX8000P-12Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-12Q: 4
+        RTX8000P-16C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-16C: 3
+        RTX8000P-16Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-16Q: 3
+        RTX8000P-24C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-24C: 2
+        RTX8000P-24Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-24Q: 2
+        RTX8000P-48C:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-48C: 1
+        RTX8000P-48Q:
+            - devices: all
+              vgpu-devices:
+                RTX8000P-48Q: 1
+        RTXA5000-1Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-1Q: 24
+        RTXA5000-2Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-2Q: 12
+        RTXA5000-3Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-3Q: 8
+        RTXA5000-4C:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-4C: 6
+        RTXA5000-4Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-4Q: 6
+        RTXA5000-6C:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-6C: 4
+        RTXA5000-6Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-6Q: 4
+        RTXA5000-8C:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-8C: 3
+        RTXA5000-8Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-8Q: 3
+        RTXA5000-12C:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-12C: 2
+        RTXA5000-12Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-12Q: 2
+        RTXA5000-24C:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-24C: 1
+        RTXA5000-24Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5000-24Q: 1
+        RTXA5500-1Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-1Q: 24
+        RTXA5500-2Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-2Q: 12
+        RTXA5500-3Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-3Q: 8
+        RTXA5500-4C:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-4C: 6
+        RTXA5500-4Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-4Q: 6
+        RTXA5500-6C:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-6C: 4
+        RTXA5500-6Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-6Q: 4
+        RTXA5500-8C:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-8C: 3
+        RTXA5500-8Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-8Q: 3
+        RTXA5500-12C:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-12C: 2
+        RTXA5500-12Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-12Q: 2
+        RTXA5500-24C:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-24C: 1
+        RTXA5500-24Q:
+            - devices: all
+              vgpu-devices:
+                RTXA5500-24Q: 1
+        RTXA6000-1Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-1Q: 32
+        RTXA6000-2Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-2Q: 24
+        RTXA6000-3Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-3Q: 16
+        RTXA6000-4C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-4C: 12
+        RTXA6000-4Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-4Q: 12
+        RTXA6000-6C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-6C: 8
+        RTXA6000-6Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-6Q: 8
+        RTXA6000-8C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-8C: 6
+        RTXA6000-8Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-8Q: 6
+        RTXA6000-12C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-12C: 4
+        RTXA6000-12Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-12Q: 4
+        RTXA6000-16C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-16C: 3
+        RTXA6000-16Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-16Q: 3
+        RTXA6000-24C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-24C: 2
+        RTXA6000-24Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-24Q: 2
+        RTXA6000-48C:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-48C: 1
+        RTXA6000-48Q:
+            - devices: all
+              vgpu-devices:
+                RTXA6000-48Q: 1
+        T4-1Q:
+            - devices: all
+              vgpu-devices:
+                T4-1Q: 16
+        T4-2Q:
+            - devices: all
+              vgpu-devices:
+                T4-2Q: 8
+        T4-4C:
+            - devices: all
+              vgpu-devices:
+                T4-4C: 4
+        T4-4Q:
+            - devices: all
+              vgpu-devices:
+                T4-4Q: 4
+        T4-8C:
+            - devices: all
+              vgpu-devices:
+                T4-8C: 2
+        T4-8Q:
+            - devices: all
+              vgpu-devices:
+                T4-8Q: 2
+        T4-16C:
+            - devices: all
+              vgpu-devices:
+                T4-16C: 1
+        T4-16Q:
+            - devices: all
+              vgpu-devices:
+                T4-16Q: 1
+        V100D-1Q:
+            - devices: all
+              vgpu-devices:
+                V100D-1Q: 32
+        V100D-2Q:
+            - devices: all
+              vgpu-devices:
+                V100D-2Q: 16
+        V100D-4C:
+            - devices: all
+              vgpu-devices:
+                V100D-4C: 8
+        V100D-4Q:
+            - devices: all
+              vgpu-devices:
+                V100D-4Q: 8
+        V100D-8C:
+            - devices: all
+              vgpu-devices:
+                V100D-8C: 4
+        V100D-8Q:
+            - devices: all
+              vgpu-devices:
+                V100D-8Q: 4
+        V100D-16C:
+            - devices: all
+              vgpu-devices:
+                V100D-16C: 2
+        V100D-16Q:
+            - devices: all
+              vgpu-devices:
+                V100D-16Q: 2
+        V100D-32C:
+            - devices: all
+              vgpu-devices:
+                V100D-32C: 1
+        V100D-32Q:
+            - devices: all
+              vgpu-devices:
+                V100D-32Q: 1
+        V100DX-1Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-1Q: 32
+        V100DX-2Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-2Q: 16
+        V100DX-4C:
+            - devices: all
+              vgpu-devices:
+                V100DX-4C: 8
+        V100DX-4Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-4Q: 8
+        V100DX-8C:
+            - devices: all
+              vgpu-devices:
+                V100DX-8C: 4
+        V100DX-8Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-8Q: 4
+        V100DX-16C:
+            - devices: all
+              vgpu-devices:
+                V100DX-16C: 2
+        V100DX-16Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-16Q: 2
+        V100DX-32C:
+            - devices: all
+              vgpu-devices:
+                V100DX-32C: 1
+        V100DX-32Q:
+            - devices: all
+              vgpu-devices:
+                V100DX-32Q: 1
+        V100L-1Q:
+            - devices: all
+              vgpu-devices:
+                V100L-1Q: 16
+        V100L-2Q:
+            - devices: all
+              vgpu-devices:
+                V100L-2Q: 8
+        V100L-4C:
+            - devices: all
+              vgpu-devices:
+                V100L-4C: 4
+        V100L-4Q:
+            - devices: all
+              vgpu-devices:
+                V100L-4Q: 4
+        V100L-8C:
+            - devices: all
+              vgpu-devices:
+                V100L-8C: 2
+        V100L-8Q:
+            - devices: all
+              vgpu-devices:
+                V100L-8Q: 2
+        V100L-16C:
+            - devices: all
+              vgpu-devices:
+                V100L-16C: 1
+        V100L-16Q:
+            - devices: all
+              vgpu-devices:
+                V100L-16Q: 1
+        V100S-1Q:
+            - devices: all
+              vgpu-devices:
+                V100S-1Q: 32
+        V100S-2Q:
+            - devices: all
+              vgpu-devices:
+                V100S-2Q: 16
+        V100S-4C:
+            - devices: all
+              vgpu-devices:
+                V100S-4C: 8
+        V100S-4Q:
+            - devices: all
+              vgpu-devices:
+                V100S-4Q: 8
+        V100S-8C:
+            - devices: all
+              vgpu-devices:
+                V100S-8C: 4
+        V100S-8Q:
+            - devices: all
+              vgpu-devices:
+                V100S-8Q: 4
+        V100S-16C:
+            - devices: all
+              vgpu-devices:
+                V100S-16C: 2
+        V100S-16Q:
+            - devices: all
+              vgpu-devices:
+                V100S-16Q: 2
+        V100S-32C:
+            - devices: all
+              vgpu-devices:
+                V100S-32C: 1
+        V100S-32Q:
+            - devices: all
+              vgpu-devices:
+                V100S-32Q: 1
+        V100X-1Q:
+            - devices: all
+              vgpu-devices:
+                V100X-1Q: 16
+        V100X-2Q:
+            - devices: all
+              vgpu-devices:
+                V100X-2Q: 8
+        V100X-4C:
+            - devices: all
+              vgpu-devices:
+                V100X-4C: 4
+        V100X-4Q:
+            - devices: all
+              vgpu-devices:
+                V100X-4Q: 4
+        V100X-8C:
+            - devices: all
+              vgpu-devices:
+                V100X-8C: 2
+        V100X-8Q:
+            - devices: all
+              vgpu-devices:
+                V100X-8Q: 2
+        V100X-16C:
+            - devices: all
+              vgpu-devices:
+                V100X-16C: 1
+        V100X-16Q:
+            - devices: all
+              vgpu-devices:
+                V100X-16Q: 1
+        V100-1Q:
+            - devices: all
+              vgpu-devices:
+                V100-1Q: 16
+        V100-2Q:
+            - devices: all
+              vgpu-devices:
+                V100-2Q: 8
+        V100-4C:
+            - devices: all
+              vgpu-devices:
+                V100-4C: 4
+        V100-4Q:
+            - devices: all
+              vgpu-devices:
+                V100-4Q: 4
+        V100-8C:
+            - devices: all
+              vgpu-devices:
+                V100-8C: 2
+        V100-8Q:
+            - devices: all
+              vgpu-devices:
+                V100-8Q: 2
+        V100-16C:
+            - devices: all
+              vgpu-devices:
+                V100-16C: 1
+        V100-16Q:
+            - devices: all
+              vgpu-devices:
+                V100-16Q: 1
+        default:
+            - device-filter: "0x1DB110DE"
+              devices: all
+              vgpu-devices:
+                V100X-8Q: 2
+            - device-filter: "0x1DB310DE"
+              devices: all
+              vgpu-devices:
+                V100L-8Q: 2
+            - device-filter: "0x1DB410DE"
+              devices: all
+              vgpu-devices:
+                V100-8Q: 2
+            - device-filter: "0x1DB510DE"
+              devices: all
+              vgpu-devices:
+                V100DX-16Q: 2
+            - device-filter: "0x1DB610DE"
+              devices: all
+              vgpu-devices:
+                V100D-16Q: 2
+            - device-filter: "0x1DF610DE"
+              devices: all
+              vgpu-devices:
+                V100S-16Q: 2
+            - device-filter: "0x1E7810DE"
+              devices: all
+              vgpu-devices:
+                RTX8000P-24Q: 2
+            - device-filter: "0x1E7810DE"
+              devices: all
+              vgpu-devices:
+                RTX6000P-12Q: 2
+            - device-filter: "0x1EB810DE"
+              devices: all
+              vgpu-devices:
+                T4-8Q: 2
+            - device-filter: "0x20B010DE"
+              devices: all
+              vgpu-devices:
+                A100X-20C: 2
+            - device-filter: "0x20B210DE"
+              devices: all
+              vgpu-devices:
+                A100DX-40C: 2
+            - device-filter: "0x20B510DE"
+              devices: all
+              vgpu-devices:
+                A100D-40C: 2
+            - device-filter: "0x20B510DE"
+              devices: all
+              vgpu-devices:
+                A100D-40C: 2
+            - device-filter: "0x20B810DE"
+              devices: all
+              vgpu-devices:
+                A100D-40C: 2
+            - device-filter: "0x20B710DE"
+              devices: all
+              vgpu-devices:
+                A30-12C: 2
+            - device-filter: "0x20B710DE"
+              devices: all
+              vgpu-devices:
+                A30-12C: 2
+            - device-filter: "0x20B910DE"
+              devices: all
+              vgpu-devices:
+                A30-12C: 2
+            - device-filter: "0x20F110DE"
+              devices: all
+              vgpu-devices:
+                A100-20C: 2
+            - device-filter: "0x20F310DE"
+              devices: all
+              vgpu-devices:
+                A800DX-40C: 2
+            - device-filter: "0x20F510DE"
+              devices: all
+              vgpu-devices:
+                A800D-40C: 2
+            - device-filter: "0x20FD10DE"
+              devices: all
+              vgpu-devices:
+                A800D-40C: 2
+            - device-filter: "0x20F610DE"
+              devices: all
+              vgpu-devices:
+                A800-20C: 2
+            - device-filter: "0x223010DE"
+              devices: all
+              vgpu-devices:
+                RTXA6000-24Q: 2
+            - device-filter: "0x223110DE"
+              devices: all
+              vgpu-devices:
+                RTXA5000-12Q: 2
+            - device-filter: "0x223310DE"
+              devices: all
+              vgpu-devices:
+                RTXA5500-12Q: 2
+            - device-filter: "0x223510DE"
+              devices: all
+              vgpu-devices:
+                A40-24Q: 2
+            - device-filter: "0x223610DE"
+              devices: all
+              vgpu-devices:
+                A10-12Q: 2
+            - device-filter: "0x232110DE"
+              devices: all
+              vgpu-devices:
+                H100L-47C: 2
+            - device-filter: "0x232210DE"
+              devices: all
+              vgpu-devices:
+                H800-40C: 2
+            - device-filter: "0x232410DE"
+              devices: all
+              vgpu-devices:
+                H800XM-40C: 2
+            - device-filter: "0x232410DE"
+              devices: all
+              vgpu-devices:
+                H800XM-40C: 2
+            - device-filter: "0x232910DE"
+              devices: all
+              vgpu-devices:
+                H20-48C: 2
+            - device-filter: "0x232910DE"
+              devices: all
+              vgpu-devices:
+                H20-48C: 2
+            - device-filter: "0x233010DE"
+              devices: all
+              vgpu-devices:
+                H100XM-40C: 2
+            - device-filter: "0x233010DE"
+              devices: all
+              vgpu-devices:
+                H100XM-40C: 2
+            - device-filter: "0x233610DE"
+              devices: all
+              vgpu-devices:
+                H100XM-40C: 2
+            - device-filter: "0x233110DE"
+              devices: all
+              vgpu-devices:
+                H100-40C: 2
+            - device-filter: "0x233710DE"
+              devices: all
+              vgpu-devices:
+                H100XS-32C: 2
+            - device-filter: "0x233910DE"
+              devices: all
+              vgpu-devices:
+                H100XL-47C: 2
+            - device-filter: "0x233A10DE"
+              devices: all
+              vgpu-devices:
+                H800L-47C: 2
+            - device-filter: "0x234210DE"
+              devices: all
+              vgpu-devices:
+                GH200-96C: 1
+            - device-filter: "0x25B610DE"
+              devices: all
+              vgpu-devices:
+                A16-8Q: 2
+            - device-filter: "0x25B610DE"
+              devices: all
+              vgpu-devices:
+                A2-8Q: 2
+            - device-filter: "0x26B110DE"
+              devices: all
+              vgpu-devices:
+                RTX6000-Ada-24Q: 2
+            - device-filter: "0x26B210DE"
+              devices: all
+              vgpu-devices:
+                RTX5000-Ada-16Q: 2
+            - device-filter: "0x26B310DE"
+              devices: all
+              vgpu-devices:
+                RTX5880-Ada-24Q: 2
+            - device-filter: "0x26B510DE"
+              devices: all
+              vgpu-devices:
+                L40-24Q: 2
+            - device-filter: "0x26B910DE"
+              devices: all
+              vgpu-devices:
+                L40S-24Q: 2
+            - device-filter: "0x26BA10DE"
+              devices: all
+              vgpu-devices:
+                L20-24Q: 2
+            - device-filter: "0x26BA10DE"
+              devices: all
+              vgpu-devices:
+                L20-24Q: 2
+            - device-filter: "0x27B610DE"
+              devices: all
+              vgpu-devices:
+                L2-12Q: 2
+            - device-filter: "0x27B810DE"
+              devices: all
+              vgpu-devices:
+                L4-12Q: 2

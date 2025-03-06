@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: nvidia-dcgm-exporter
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm-exporter
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.dcgm-exporter: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dcgm-exporter
+      initContainers:
+      - name: toolkit-validation
+        image: "FILLED BY THE OPERATOR"
+        command: ['sh', '-c']
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: "/run/nvidia"
+            mountPropagation: HostToContainer
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        name: nvidia-dcgm-exporter
+        env:
+        - name: DCGM_EXPORTER_LISTEN
+          value: ":9400"
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        - name: DCGM_EXPORTER_COLLECTORS
+          value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: "metrics"
+          containerPort: 9400
+        volumeMounts:
+        - name: "pod-gpu-resources"
+          readOnly: true
+          mountPath: "/var/lib/kubelet/pod-resources"
+        securityContext:
+          privileged: true
+      volumes:
+      - name: "pod-gpu-resources"
+        hostPath:
+          path: "/var/lib/kubelet/pod-resources"
+      - name: run-nvidia
+        hostPath:
+          path: /run/nvidia

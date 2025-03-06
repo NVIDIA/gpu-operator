@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: nvidia-device-plugin-validator
+  generateName: nvidia-device-plugin-validator-
+  namespace: "FILLED_BY_VALIDATOR"
+spec:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  restartPolicy: OnFailure
+  serviceAccountName: nvidia-operator-validator
+  initContainers:
+  - name: plugin-validation
+    image: "FILLED_BY_VALIDATOR"
+    imagePullPolicy: IfNotPresent
+    command: ['sh', '-c']
+    args: ["vectorAdd"]
+    securityContext:
+      allowPrivilegeEscalation: false
+    resources:
+      limits:
+        "FILLED_BY_VALIDATOR": 1
+  containers:
+    - name: nvidia-device-plugin-validator
+      image: "FILLED_BY_VALIDATOR"
+      imagePullPolicy: IfNotPresent
+      # override command and args as validation is already done by initContainer
+      command: ['sh', '-c']
+      args: ["echo device-plugin workload validation is successful"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true

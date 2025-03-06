@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-device-plugin-entrypoint
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-device-plugin-daemonset
+data:
+  entrypoint.sh: |-
+    #!/bin/bash
+
+    until [[ -f /run/nvidia/validations/driver-ready ]]
+    do
+      echo "waiting for the driver validations to be ready..."
+      sleep 5
+    done
+    
+    set -o allexport
+    cat /run/nvidia/validations/driver-ready
+    . /run/nvidia/validations/driver-ready
+
+    echo "Starting nvidia-device-plugin"
+    exec nvidia-device-plugin

@@ -1,0 +1,684 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: {{ .Driver.AppName }}
+    nvidia.com/node.os-version: {{ .Driver.OSVersion }}
+    nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+    {{- if .Precompiled }}
+    nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
+    {{- end }}
+    {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+    app.kubernetes.io/component: "nvidia-vgpu-host-manager"
+    {{- else }}
+    app.kubernetes.io/component: "nvidia-driver"
+    {{- end }}
+    {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+    openshift.driver-toolkit.rhcos: {{ .Openshift.RHCOSVersion | quote }}
+    openshift.driver-toolkit: "true"
+    {{- if and (.Openshift) (not .Openshift.ToolkitImage) }}
+    openshift.driver-toolkit.rhcos-image-missing: "true"
+    {{- end }}
+    {{- end }}
+  name: {{ .Driver.AppName }}
+  namespace: {{ .Runtime.Namespace }}
+  annotations:
+    openshift.io/scc: {{ .Driver.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Driver.AppName }}
+  updateStrategy:
+    type: OnDelete
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-driver-ctr
+        {{- if .Driver.Spec.Annotations }}
+        {{- .Driver.Spec.Annotations | yaml | nindent 8 }}
+        {{- end }}
+      labels:
+        app: {{ .Driver.AppName }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        openshift.driver-toolkit: "true"
+        {{- if not .Openshift.ToolkitImage }}
+        openshift.driver-toolkit.rhcos-image-missing: "true"
+        {{- end }}
+        {{- end }}
+        nvidia.com/node.os-version: {{ .Driver.OSVersion }}
+        nvidia.com/precompiled: {{ toString (deref .Driver.Spec.UsePrecompiled) | quote }}
+        {{- if .Precompiled }}
+        nvidia.com/precompiled.kernel-version: {{ .Precompiled.SanitizedKernelVersion }}
+        {{- end }}
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        app.kubernetes.io/component: "nvidia-vgpu-host-manager"
+        {{- else }}
+        app.kubernetes.io/component: "nvidia-driver"
+        {{- end }}
+        {{- if .Driver.Spec.Labels }}
+        {{- .Driver.Spec.Labels | yaml | nindent 8 }}
+        {{- end }}
+    spec:
+      nodeSelector:
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        nvidia.com/gpu.deploy.vgpu-manager: "true"
+        {{- else }}
+        nvidia.com/gpu.deploy.driver: "true"
+        {{- end }}
+        {{- if .Driver.Spec.NodeSelector }}
+        {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
+        {{- end }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}
+        {{- end }}
+        {{- if .Precompiled }}
+        feature.node.kubernetes.io/kernel-version.full: {{ .Precompiled.KernelVersion | quote }}
+        {{- end }}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        {{- if .Driver.Spec.Tolerations }}
+        {{- .Driver.Spec.Tolerations | yaml | nindent 8 }}
+        {{- end }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - nvidia-driver
+                      - nvidia-vgpu-manager
+              topologyKey: kubernetes.io/hostname
+      priorityClassName: {{ default "system-node-critical" .Driver.Spec.PriorityClassName }}
+      serviceAccountName: {{ .Driver.Name }}
+      hostPID: true
+      # Add any configured pull secrets
+      {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) (and .GDRCopy .GDRCopy.Spec.ImagePullSecrets) }}
+      imagePullSecrets:
+      {{- range .Driver.Spec.ImagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- range .Driver.Spec.Manager.ImagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .GDS }}
+      {{- range .GDS.Spec.ImagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .GDRCopy }}
+      {{- range .GDRCopy.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      initContainers:
+        - name: k8s-driver-manager
+          image: {{ .Driver.ManagerImagePath }}
+          imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.Manager.ImagePullPolicy }}
+          command: ["driver-manager"]
+          args: ["uninstall_driver"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: ENABLE_GPU_POD_EVICTION
+            value: "true"
+          - name: ENABLE_AUTO_DRAIN
+          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+            value: "false"
+          {{- else }}
+            value: "true"
+          {{- end }}
+          - name: DRAIN_USE_FORCE
+            value: "false"
+          - name: DRAIN_POD_SELECTOR_LABEL
+            value: ""
+          - name: DRAIN_TIMEOUT_SECONDS
+            value: "0s"
+          - name: DRAIN_DELETE_EMPTYDIR_DATA
+            value: "false"
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
+          - name: GPU_DIRECT_RDMA_ENABLED
+            value: "true"
+          {{- if (deref .GPUDirectRDMA.UseHostMOFED) }}
+          - name: USE_HOST_MOFED
+            value: "true"
+          {{- end }}
+        {{- end }}
+        {{- if .Driver.Spec.Manager.Env }}
+          {{- range .Driver.Spec.Manager.Env }}
+          - name: {{ .Name }}
+            value: {{ .Value | quote }}
+          {{- end }}
+        {{- end }}
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
+            - name: run-mellanox-drivers
+              mountPath: /run/mellanox/drivers
+              mountPropagation: HostToContainer
+      containers:
+      - image: {{ .Driver.ImagePath }}
+        imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
+        name: nvidia-driver-ctr
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        command: ["ocp_dtk_entrypoint"]
+        {{- else }}
+        command: ["nvidia-driver"]
+        {{- end }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        args:
+        - "nv-ctr-run-with-dtk"
+        {{- else }}
+        args:
+        - "init"
+        {{- range .Driver.Spec.Args }}
+        - {{ . }}
+        {{- end }}
+        {{- end }}
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        env:
+        # always use runc for driver containers
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+      {{- if .Driver.Spec.KernelModuleType }}
+        - name: KERNEL_MODULE_TYPE
+          value: {{ .Driver.Spec.KernelModuleType }}
+        # we set this env var for backwards compatibility with older driver versions
+        {{- if eq .Driver.Spec.KernelModuleType "open"}}
+        - name: OPEN_KERNEL_MODULES_ENABLED
+          value: "true"
+        {{- end }}
+      {{- end }}
+      {{- if and (.Openshift) (.Runtime.OpenshiftVersion) }}
+        - name: OPENSHIFT_VERSION
+          value: {{ .Runtime.OpenshiftVersion | quote }}
+      {{- end }}
+      {{- if .Driver.Spec.Env }}
+        {{- range .Driver.Spec.Env }}
+        - name: {{ .Name }}
+          value : {{ .Value | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
+        - name: GPU_DIRECT_RDMA_ENABLED
+          value: "true"
+        {{- if deref .GPUDirectRDMA.UseHostMOFED }}
+        - name: USE_HOST_MOFED
+          value: "true"
+        {{- end }}
+      {{- end}}
+      {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) (not .Openshift.ToolkitImage) }}
+        - name: RHCOS_IMAGE_MISSING
+          value: "true"
+        - name: RHCOS_VERSION
+          value: {{ .Openshift.RHCOSVersion | quote }}
+      {{- end }}
+      {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) }}
+        {{- if .Runtime.OpenshiftProxySpec.HTTPProxy }}
+        - name: "HTTP_PROXY"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPProxy | quote }}
+        - name: "http_proxy"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPProxy | quote }}
+        {{- end }}
+        {{- if .Runtime.OpenshiftProxySpec.HTTPSProxy }}
+        - name: "HTTPS_PROXY"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPSProxy | quote }}
+        - name: "https_proxy"
+          value : {{ .Runtime.OpenshiftProxySpec.HTTPSProxy | quote }}
+        {{- end }}
+        {{- if .Runtime.OpenshiftProxySpec.NoProxy }}
+        - name: "NO_PROXY"
+          value : {{ .Runtime.OpenshiftProxySpec.NoProxy | quote }}
+        - name: "no_proxy"
+          value : {{ .Runtime.OpenshiftProxySpec.NoProxy | quote }}
+        {{- end }}
+      {{- end }}
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: run-nvidia-topologyd
+            mountPath: /run/nvidia-topologyd
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+          - name: host-os-release
+            mountPath: "/host-etc/os-release"
+            readOnly: true
+          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+          - name: cgroup
+            mountPath: /sys/fs/cgroup
+          - name: vfio
+            mountPath: /dev/vfio
+          {{- end }}
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
+            mountPropagation: HostToContainer
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+          - name: firmware-search-path
+            mountPath: /sys/module/firmware_class/parameters/path
+          - name: sysfs-memory-online
+            mountPath: /sys/devices/system/memory/auto_online_blocks
+          - name: nv-firmware
+            mountPath: /lib/firmware
+          {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+          {{- range .AdditionalConfigs.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- with .SubPath }}
+            subPath: {{ . }}
+            {{- end }}
+            {{- with .ReadOnly }}
+            readOnly: {{ . }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+          {{- end}}
+          {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+          - name: gpu-operator-trusted-ca
+            mountPath: /etc/pki/ca-trust/extracted/pem
+            readOnly: true
+          {{- end}}
+        {{- with .Driver.Spec.Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
+        {{- if not (eq .Driver.Spec.DriverType "vgpu-host-manager") }}
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
+          initialDelaySeconds: {{ .Driver.Spec.StartupProbe.InitialDelaySeconds }}
+          failureThreshold: {{ .Driver.Spec.StartupProbe.FailureThreshold }}
+          successThreshold: {{ .Driver.Spec.StartupProbe.SuccessThreshold }}
+          periodSeconds: {{ .Driver.Spec.StartupProbe.PeriodSeconds }}
+          timeoutSeconds: {{ .Driver.Spec.StartupProbe.TimeoutSeconds }}
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
+        {{- end }}
+      {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
+      - image: {{ .Driver.ImagePath }}
+        imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}
+        name: nvidia-peermem-ctr
+        command: ["nvidia-driver"]
+        # takes care of loading nvidia_peermem whenever it gets dynamically unloaded during MOFED driver re-install/update
+        args: ["reload_nvidia_peermem"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          {{- if deref .GPUDirectRDMA.UseHostMOFED }}
+          - name: USE_HOST_MOFED
+            value: "true"
+          {{- end }}
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+          {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+          {{- range .AdditionalConfigs.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
+            subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
+            readOnly: {{ .ReadOnly }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      {{- end }}
+      # Note: GDS is not supported along with precompiled drivers.
+      #       Detect this in the controller and throw an error if
+      #       GDS and precompiled are enabled
+      {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
+      - image: {{ .GDS.ImagePath }}
+        imagePullPolicy: IfNotPresent
+        name: nvidia-fs-ctr
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        command: ["ocp_dtk_entrypoint"]
+        args: ["nv-fs-ctr-run-with-dtk"]
+        {{- else }}
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gds-driver install"]
+        {{- end }}
+        {{- if .GDS.Spec.Env }}
+        env:
+          {{- range .GDS.Spec.Env }}
+          - name: {{ .Name }}
+            value : {{ .Value | quote }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+        {{- end}}
+        {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+        {{- range .AdditionalConfigs.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
+            subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
+            readOnly: {{ .ReadOnly }}
+            {{- end}}
+        {{- end }}
+        {{- end }}
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_fs']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_fs']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      {{- end }}
+      # Note: GDRCopy is not supported along with precompiled drivers.
+      #       Detect this in the controller and throw an error if
+      #       GDRCopy and precompiled are enabled
+      {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+      - image: {{ .GDRCopy.ImagePath }}
+        imagePullPolicy: {{ default "IfNotPresent" .GDRCopy.Spec.ImagePullPolicy }}
+        name: nvidia-gdrcopy-ctr
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        command: ["ocp_dtk_entrypoint"]
+        args: ["gdrcopy-ctr-run-with-dtk"]
+        {{- else }}
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gdrcopy-driver install"]
+        {{- end }}
+        {{- if .GDRCopy.Spec.Env }}
+        env:
+          {{- range .GDRCopy.Spec.Env }}
+          - name: {{ .Name }}
+            value : {{ .Value | quote }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+        {{- end}}
+        {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
+        {{- range .AdditionalConfigs.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
+            subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
+            readOnly: {{ .ReadOnly }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      {{- end }}
+      # TODO: introduce UseOpenShiftDriverToolkit field into NVIDIADriver CR?
+    {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        # Only kept when OpenShift DriverToolkit side-car is enabled.
+      {{- if .Openshift.ToolkitImage }}
+      - image: {{ .Openshift.ToolkitImage }}
+      {{- else }}
+      - image: {{ .Driver.ImagePath }}
+      {{- end }}
+        imagePullPolicy: IfNotPresent
+        name: openshift-driver-toolkit-ctr
+        command: [bash, -xc]
+        args: ["until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting for nvidia-driver-ctr container to prepare the shared directory ...; sleep 10; done; exec /mnt/shared-nvidia-driver-toolkit/ocp_dtk_entrypoint dtk-build-driver"]
+        securityContext:
+          # currently mandatory as 'nvidia-installer' loads (and
+          # unloads) the kernel module as part of the build process
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        env:
+          - name: RHCOS_VERSION
+            value: {{ .Openshift.RHCOSVersion }}
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          {{- if not .Openshift.ToolkitImage }}
+          - name: RHCOS_IMAGE_MISSING
+            value: "true"
+          {{- end }}
+          {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
+          - name: GDS_ENABLED
+            value: "true"
+          {{- end }}
+          {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+          - name: GDRCOPY_ENABLED
+            value: "true"
+          {{- end }}
+        volumeMounts:
+          # corresponding volumes are dynamically injected by the
+          # operator when the OCP DriverToolkit side-car is enabled
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+          - name: var-log
+            mountPath: /var/log
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
+            mountPropagation: HostToContainer
+          - name: host-os-release
+            mountPath: /host-etc/os-release
+            readOnly: true
+          - name: firmware-search-path
+            mountPath: /sys/module/firmware_class/parameters/path
+          - name: nv-firmware
+            mountPath: /lib/firmware
+      {{- end }}
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: var-log
+          hostPath:
+            path: /var/log
+        - name: dev-log
+          hostPath:
+            path: /dev/log
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
+        {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: vfio
+          hostPath:
+            path: /dev/vfio
+        {{- end }}
+        - name: run-nvidia-topologyd
+          hostPath:
+            path: /run/nvidia-topologyd
+            type: DirectoryOrCreate
+        - name: mlnx-ofed-usr-src
+          hostPath:
+            {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.UseHostMOFED) }}
+            path: /usr/src
+            {{- else }}
+            path: /run/mellanox/drivers/usr/src
+            {{- end }}
+            type: DirectoryOrCreate
+        - name: run-mellanox-drivers
+          hostPath:
+            path: /run/mellanox/drivers
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: {{ .HostRoot | default "/" }}
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: firmware-search-path
+          hostPath:
+            path: /sys/module/firmware_class/parameters/path
+        - name: sysfs-memory-online
+          hostPath:
+            path: /sys/devices/system/memory/auto_online_blocks
+        - name: nv-firmware
+          hostPath:
+            path: /run/nvidia/driver/lib/firmware
+            type: DirectoryOrCreate
+        {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
+        {{- range .AdditionalConfigs.Volumes }}
+        - name: {{ .Name }}
+          {{- if and .ConfigMap .ConfigMap.Items }}
+          configMap:
+            name: {{ .ConfigMap.Name }}
+            items:
+            {{- range .ConfigMap.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- if .Mode }}
+                mode: {{ .Mode }}
+              {{- end }}
+            {{- end }}
+          {{- else if .HostPath }}
+          hostPath:
+            path: {{ .HostPath.Path }}
+            type: {{ .HostPath.Type }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
+        - name: shared-nvidia-driver-toolkit
+          emptyDir: {}
+        {{- end }}
+        {{- if and (.Openshift) (.Runtime.OpenshiftProxySpec) (.Runtime.OpenshiftProxySpec.TrustedCA) (.Runtime.OpenshiftProxySpec.TrustedCA.Name) }}
+        - name: gpu-operator-trusted-ca
+          configMap:
+            name: gpu-operator-trusted-ca
+            items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
+        {{- end }}

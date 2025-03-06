@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-container-toolkit-daemonset
+  name: nvidia-container-toolkit-daemonset
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: hostmount-anyuid
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-container-toolkit-daemonset
+  template:
+    metadata:
+      labels:
+        app: nvidia-container-toolkit-daemonset
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.container-toolkit: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-container-toolkit
+      hostPID: true
+      initContainers:
+      - name: driver-validation
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c']
+        args: ["nvidia-validator"]
+        env:
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: driver
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: driver-install-dir
+            mountPath: /run/nvidia/driver
+            mountPropagation: HostToContainer
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
+            mountPropagation: Bidirectional
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
+          - name: host-dev-char
+            mountPath: /host-dev-char
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        command: ["/bin/bash", "-c"]
+        args:
+          - /bin/entrypoint.sh
+        env:
+        - name: ROOT
+          value: "/usr/local/nvidia"
+        - name: RUNTIME_ARGS
+          value: ""
+        - name: NVIDIA_CONTAINER_RUNTIME_MODES_CDI_DEFAULT_KIND
+          value: "management.nvidia.com/gpu"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "void"
+        - name: TOOLKIT_PID_FILE
+          value: "/run/nvidia/toolkit/toolkit.pid"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-container-toolkit-ctr
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: nvidia-container-toolkit-entrypoint
+            readOnly: true
+            mountPath: /bin/entrypoint.sh
+            subPath: entrypoint.sh
+          - name: toolkit-root
+            mountPath: /run/nvidia/toolkit
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
+          - name: toolkit-install-dir
+            mountPath: /usr/local/nvidia
+          - name: crio-hooks
+            mountPath: /usr/share/containers/oci/hooks.d
+          - name: driver-install-dir
+            mountPath: /driver-root
+            mountPropagation: HostToContainer
+          - name: host-root
+            mountPath: /host
+            readOnly: true
+            mountPropagation: HostToContainer
+          - name: cdi-root
+            mountPath: /var/run/cdi
+      volumes:
+        - name: nvidia-container-toolkit-entrypoint
+          configMap:
+            name: nvidia-container-toolkit-entrypoint
+            defaultMode: 448
+        - name: toolkit-root
+          hostPath:
+            path: /run/nvidia/toolkit
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: driver-install-dir
+          hostPath:
+            path: /run/nvidia/driver
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: /
+        - name: toolkit-install-dir
+          hostPath:
+            path: /usr/local/nvidia
+        - name: crio-hooks
+          hostPath:
+            path: /run/containers/oci/hooks.d
+        - name: host-dev-char
+          hostPath:
+            path: /dev/char
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+

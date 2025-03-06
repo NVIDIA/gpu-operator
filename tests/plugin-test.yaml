@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nvidia-plugin-test
+  labels:
+    app: nvidia-plugin-test
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: nvidia-plugin-test
+  template:
+    metadata:
+      labels:
+        app: nvidia-plugin-test
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: nvidia-device-plugin
+      containers:
+        - name: nvidia-plugin-test-ctr
+          image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.10.1
+          imagePullPolicy: IfNotPresent
+          command: ['sh', '-c']
+          args:
+            - "while true;  do vectorAdd; sleep 30; done"
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+      nodeSelector: # Schedule on the node with GPU sharing enabled
+          nvidia.com/gpu.product: Tesla-T4-SHARED

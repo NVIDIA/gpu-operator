@@ -1,0 +1,119 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  operator:
+    runtimeClass: nvidia
+    initContainer: {}
+    use_ocp_driver_toolkit: true
+
+  psp:
+    enabled: false
+
+  cdi: {}
+
+  sandboxWorkloads:
+    enabled: false
+    defaultWorkload: "container"
+
+  mig:
+    strategy: single
+
+  daemonsets: {}
+
+  validator:
+    plugin:
+    env:
+      - name: WITH_WORKLOAD
+        value: "false"
+
+  devicePlugin:
+    enabled: true
+    config:
+      name: ""
+      default: ""
+
+  gfd:
+    enabled: true
+
+  toolkit:
+    enabled: true
+
+  dcgm:
+    enabled: true
+
+  dcgmExporter:
+    enabled: true
+    # configmap name for custom dcgm metrics
+    config:
+      name: ""
+
+  gds:
+    enabled: false
+
+  migManager:
+    enabled: true
+    config:
+      name: ""
+    gpuClientsConfig:
+      name: ""
+
+  nodeStatusExporter:
+    enabled: false
+
+  driver:
+    enabled: true
+    useNvidiaDriverCRD: false
+    upgradePolicy:
+      autoUpgrade: true
+      drain:
+        deleteEmptyDir: false
+        enable: false
+        force: false
+        timeoutSeconds: 300
+      maxParallelUpgrades: 1
+      podDeletion:
+        deleteEmptyDir: false
+        force: false
+        timeoutSeconds: 300
+      waitForCompletion:
+        timeoutSeconds: 0
+    manager: {}
+    rdma:
+      enabled: false
+    # private mirror repository configuration
+    repoConfig:
+      configMapName: ""
+    # custom ssl key/certificate configuration
+    certConfig:
+      name: ""
+    # vGPU licensing configuration
+    licensingConfig:
+      configMapName: ""
+      nlsEnabled: true
+    # vGPU topology daemon configuration
+    virtualTopology:
+      config: ""
+    # kernel module configuration for NVIDIA driver
+    kernelModuleConfig:
+      name: ""
+
+  vgpuManager:
+    enabled: true
+
+  vgpuDeviceManager:
+    enabled: true
+    config:
+      name: ""
+      default: "default"
+
+  vfioManager:
+    enabled: true
+
+  sandboxDevicePlugin:
+    enabled: true
+
+  kataManager:
+    enabled: false
+    config: {}

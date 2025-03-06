@@ -1,0 +1,36 @@
+apiVersion: nvidia.com/v1alpha1
+kind: NVIDIADriver
+metadata:
+  name: nvidiadriver-sample
+spec:
+  # use pre-compiled packages for NVIDIA driver installation.
+  usePrecompiled: false
+  driverType: gpu
+  repository: nvcr.io/nvidia
+  image: driver
+  version: "570.86.15"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  nodeSelector: {}
+  manager: {}
+  rdma:
+    enabled: false
+    useHostMofed: false
+  gds:
+    enabled: false
+  # Private mirror repository configuration
+  repoConfig:
+    name: ""
+  # custom ssl key/certificate configuration
+  certConfig:
+    name: ""
+  # vGPU licensing configuration
+  licensingConfig:
+    name: ""
+    nlsEnabled: true
+  # vGPU topology daemon configuration
+  virtualTopologyConfig:
+    name: ""
+  # kernel module configuration for NVIDIA driver
+  kernelModuleConfig:
+    name: ""

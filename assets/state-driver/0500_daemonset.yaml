@@ -1,0 +1,337 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-driver-daemonset
+    nvidia.com/precompiled: "false"
+    app.kubernetes.io/component: nvidia-driver
+  name: nvidia-driver-daemonset
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: nvidia-driver
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-driver-daemonset
+  updateStrategy:
+    type: OnDelete
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: nvidia-driver-ctr
+      labels:
+        app: nvidia-driver-daemonset
+        nvidia.com/precompiled: "false"
+        app.kubernetes.io/component: nvidia-driver
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.driver: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - nvidia-driver
+              topologyKey: kubernetes.io/hostname
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-driver
+      hostPID: true
+      initContainers:
+        - name: k8s-driver-manager
+          image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          command: ["driver-manager"]
+          args: ["uninstall_driver"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: ENABLE_GPU_POD_EVICTION
+            value: "true"
+          - name: ENABLE_AUTO_DRAIN
+            value: "true"
+          - name: DRAIN_USE_FORCE
+            value: "false"
+          - name: DRAIN_POD_SELECTOR_LABEL
+            value: ""
+          - name: DRAIN_TIMEOUT_SECONDS
+            value: "0s"
+          - name: DRAIN_DELETE_EMPTYDIR_DATA
+            value: "false"
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia
+              mountPath: /run/nvidia
+              mountPropagation: Bidirectional
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: host-sys
+              mountPath: /sys
+            - name: run-mellanox-drivers
+              mountPath: /run/mellanox/drivers
+              mountPropagation: HostToContainer
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-driver-ctr
+        command: ["nvidia-driver"]
+        args: ["init"]
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: run-nvidia-topologyd
+            mountPath: /run/nvidia-topologyd
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+          - name: host-os-release
+            mountPath: "/host-etc/os-release"
+            readOnly: true
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
+            mountPropagation: HostToContainer
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+          - name: sysfs-memory-online
+            mountPath: /sys/devices/system/memory/auto_online_blocks
+          - name: firmware-search-path
+            mountPath: /sys/module/firmware_class/parameters/path
+          - name: nv-firmware
+            mountPath: /lib/firmware
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
+          initialDelaySeconds: 60
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 60
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-peermem-ctr
+        command: ["nvidia-driver"]
+        # takes care of loading nvidia_peermem whenever it gets dynamically unloaded during MOFED driver re-install/update
+        args: ["reload_nvidia_peermem"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: Bidirectional
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+          - name: run-mellanox-drivers
+            mountPath: /run/mellanox/drivers
+            mountPropagation: HostToContainer
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'nvidia-driver probe_nvidia_peermem']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-fs-ctr
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gds-driver install"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_fs']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep nvidia_fs']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: nvidia-gdrcopy-ctr
+        command: [bash, -xc]
+        args: ["until [ -d /run/nvidia/driver/usr/src ] && lsmod | grep nvidia; do echo  Waiting for nvidia-driver to be installed...; sleep 10; done; exec nvidia-gdrcopy-driver install"]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        volumeMounts:
+          - name: run-nvidia
+            mountPath: /run/nvidia
+            mountPropagation: HostToContainer
+          - name: var-log
+            mountPath: /var/log
+          - name: dev-log
+            mountPath: /dev/log
+            readOnly: true
+        startupProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
+          initialDelaySeconds: 10
+          failureThreshold: 120
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              [sh, -c, 'lsmod | grep gdrdrv']
+          periodSeconds: 30
+          initialDelaySeconds: 30
+          failureThreshold: 1
+          successThreshold: 1
+          timeoutSeconds: 10
+        # Only kept when OpenShift DriverToolkit side-car is enabled.
+      - image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        name: openshift-driver-toolkit-ctr
+        command: [bash, -xc]
+        args: ["until [ -f /mnt/shared-nvidia-driver-toolkit/dir_prepared ]; do echo  Waiting for nvidia-driver-ctr container to prepare the shared directory ...; sleep 10; done; exec /mnt/shared-nvidia-driver-toolkit/ocp_dtk_entrypoint dtk-build-driver"]
+        securityContext:
+          # currently mandatory as 'nvidia-installer' loads (and
+          # unloads) the kernel module as part of the build process
+          privileged: true
+          seLinuxOptions:
+            level: "s0"
+        env:
+          - name: RHCOS_VERSION
+            value: "FILLED BY THE OPERATOR"
+          # always use runc for driver containers
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+        volumeMounts:
+          # corresponding volumes are dynamically injected by the
+          # operator when the OCP DriverToolkit side-car is enabled
+          - name: shared-nvidia-driver-toolkit
+            mountPath: /mnt/shared-nvidia-driver-toolkit
+          - name: var-log
+            mountPath: /var/log
+          - name: mlnx-ofed-usr-src
+            mountPath: /run/mellanox/drivers/usr/src
+            mountPropagation: HostToContainer
+          - name: host-os-release
+            mountPath: /host-etc/os-release
+            readOnly: true
+      volumes:
+        - name: run-nvidia
+          hostPath:
+            path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: var-log
+          hostPath:
+            path: /var/log
+        - name: dev-log
+          hostPath:
+            path: /dev/log
+        - name: host-os-release
+          hostPath:
+            path: "/etc/os-release"
+        - name: run-nvidia-topologyd
+          hostPath:
+            path: /run/nvidia-topologyd
+            type: DirectoryOrCreate
+        - name: mlnx-ofed-usr-src
+          hostPath:
+            path: /run/mellanox/drivers/usr/src
+            type: DirectoryOrCreate
+        - name: run-mellanox-drivers
+          hostPath:
+            path: /run/mellanox/drivers
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: "/"
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: firmware-search-path
+          hostPath:
+            path: /sys/module/firmware_class/parameters/path
+        - name: sysfs-memory-online
+          hostPath:
+            path: /sys/devices/system/memory/auto_online_blocks
+        - name: nv-firmware
+          hostPath:
+            path: /run/nvidia/driver/lib/firmware
+            type: DirectoryOrCreate

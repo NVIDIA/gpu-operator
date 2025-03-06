@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-vgpu-device-manager
+  namespace: "FILLED BY THE OPERATOR"
+  name: nvidia-vgpu-device-manager
+  annotations:
+    openshift.io/scc: nvidia-vgpu-device-manager
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-vgpu-device-manager
+  template:
+    metadata:
+      labels:
+        app: nvidia-vgpu-device-manager
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.vgpu-device-manager: "true"
+      serviceAccountName: nvidia-vgpu-device-manager
+      initContainers:
+        - name: vgpu-manager-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          # TODO: Account for pre-installed vGPU Manager. Currently validator
+          # creates a different status file when driver is pre-installed.
+          args: ["until [ -f /run/nvidia/validations/vgpu-manager-ready ]; do echo waiting for NVIDIA vGPU Manager to be setup; sleep 5; done"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+      containers:
+      - name: nvidia-vgpu-device-manager
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CONFIG_FILE
+          value: "/vgpu-config/config.yaml"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /vgpu-config
+          name: vgpu-config
+        - mountPath: /sys
+          name: host-sys
+      volumes:
+      - name: vgpu-config
+        configMap:
+          name: "FILLED BY THE OPERATOR"
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: run-nvidia-validations
+        hostPath:
+          path: /run/nvidia/validations
+          type: DirectoryOrCreate
