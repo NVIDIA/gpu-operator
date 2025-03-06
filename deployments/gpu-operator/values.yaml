@@ -328,6 +328,7 @@ dcgmExporter:
     interval: 15s
     honorLabels: false
     additionalLabels: {}
+    # ServiceMonitor relabel configs to apply to samples before scraping
     relabelings: []
     # - source_labels:
     #     - __meta_kubernetes_pod_node_name
@@ -335,6 +336,9 @@ dcgmExporter:
     #   target_label: instance
     #   replacement: $1
     #   action: replace
+    # ServiceMonitor metric relabel configs to apply to samples before ingestion
+    metricRelabelings: []
+
   # DCGM Exporter configuration
   # This block is used to configure DCGM Exporter to emit a customized list of metrics.
   # Use "name" to either point to an existing ConfigMap or to create a new one with a

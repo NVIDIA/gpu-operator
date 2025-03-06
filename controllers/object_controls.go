@@ -4581,6 +4581,15 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			}
 			obj.Spec.Endpoints[0].RelabelConfigs = relabelConfigs
 		}
+		if serviceMonitor.MetricRelabelings != nil {
+			metricRelabelConfigs := make([]promv1.RelabelConfig, len(serviceMonitor.MetricRelabelings))
+			for i, relabel := range serviceMonitor.MetricRelabelings {
+				if relabel != nil {
+					metricRelabelConfigs[i] = *relabel
+				}
+			}
+			obj.Spec.Endpoints[0].MetricRelabelConfigs = metricRelabelConfigs
+		}
 	}
 	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
 		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
