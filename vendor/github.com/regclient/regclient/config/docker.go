@@ -130,6 +130,10 @@ func dockerAuthToHost(name string, conf dockerConfig, auth dockerAuthConfig) (Ho
 	}
 
 	h := HostNewName(name)
+	// ignore unknown names
+	if h.Name != DockerRegistry && !strings.HasSuffix(strings.TrimSuffix(name, "/"), h.Name) {
+		return Host{}, fmt.Errorf("rejecting entry with repository: %s", name)
+	}
 	h.User = auth.Username
 	h.Pass = auth.Password
 	h.Token = auth.IdentityToken
