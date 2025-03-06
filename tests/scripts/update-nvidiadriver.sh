@@ -10,12 +10,14 @@ source ${SCRIPT_DIR}/.definitions.sh
 
 # Import the check definitions
 source ${SCRIPT_DIR}/checks.sh
+source ${SCRIPT_DIR}/collect-logs.sh
 
 test_driver_image_updates() {
     # Update driver image version
     kubectl patch nvidiadriver/default --type='json' -p='[{"op": "replace", "path": "/spec/version", "value": '"$TARGET_DRIVER_VERSION"'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot update driver image with version $TARGET_DRIVER_VERSION for driver-daemonset"
+        collect_logs
         exit 1
     fi
 
@@ -26,6 +28,7 @@ test_driver_image_updates() {
     UPDATED_IMAGE=$(kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "$TEST_NAMESPACE" -o json | jq '.items[0].spec.template.spec.containers[0].image')
     if [[ "$UPDATED_IMAGE" != *"$TARGET_DRIVER_VERSION"* ]]; then
         echo "Image update failed for driver daemonset to version $TARGET_DRIVER_VERSION"
+        collect_logs
         exit 1
     fi
     echo "driver daemonset image updated successfully to version $TARGET_DRIVER_VERSION"
@@ -47,6 +50,7 @@ test_custom_labels_override() {
   if ! kubectl patch nvidiadriver/default --type='json' -p='[{"op": "add", "path": "/spec/labels", "value": {"cloudprovider": "aws", "platform": "kubernetes"}}]';
   then
     echo "cannot update the labels of the NVIDIADriver resource"
+    collect_logs
     exit 1
   fi
 
@@ -61,11 +65,13 @@ test_custom_labels_override() {
     cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
     if [ "$cp_label_value" != "aws" ]; then
         echo "Custom Label cloudprovider is incorrect when nvidiadriver labels are overridden - $pod"
+        collect_logs
         exit 1
     fi
     platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
     if [ "$platform_label_value" != "kubernetes" ]; then
         echo "Custom Label platform is incorrect when nvidiadriver labels are overridden - $pod"
+        collect_logs
         exit 1
     fi
   done
