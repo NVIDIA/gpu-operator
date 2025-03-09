@@ -895,14 +895,6 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 	obj.Spec.Template.Spec.Containers[0].Image = img
 
-	// update image for IMEX init container
-	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
-		if initCtr.Name == "gpu-feature-discovery-imex-init" {
-			obj.Spec.Template.Spec.InitContainers[i].Image = img
-			break
-		}
-	}
-
 	// update image pull policy
 	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.GPUFeatureDiscovery.ImagePullPolicy)
 
