@@ -104,9 +104,6 @@ spec:
             value: ""
           - name: PROCESS_TO_SIGNAL
             value: ""
-          volumeMounts:
-            - name: config
-              mountPath: /config
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
@@ -130,8 +127,6 @@ spec:
             - name: host-sys
               mountPath: /sys
               readOnly: true
-            - name: config
-              mountPath: /config
           securityContext:
             privileged: true
         - image: "FILLED BY THE OPERATOR"
@@ -162,9 +157,6 @@ spec:
             value: "1" # SIGHUP
           - name: PROCESS_TO_SIGNAL
             value: "gpu-feature-discovery"
-          volumeMounts:
-            - name: config
-              mountPath: /config
       volumes:
         - name: output-dir
           hostPath:
@@ -183,5 +175,3 @@ spec:
           hostPath:
             path: /run/nvidia/driver
             type: DirectoryOrCreate
-        - name: config
-          emptyDir: {}
