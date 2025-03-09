@@ -65,9 +65,7 @@ spec:
       containers:
         - image: "FILLED BY THE OPERATOR"
           name: gpu-feature-discovery
-          command: [ "/bin/bash", "-c" ]
-          args:
-            - /bin/entrypoint.sh
+          command: ["gpu-feature-discovery"]
           env:
             - name: GFD_SLEEP_INTERVAL
               value: 60s
@@ -82,24 +80,11 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-            - name: gpu-feature-discovery-entrypoint
-              readOnly: true
-              mountPath: /bin/entrypoint.sh
-              subPath: entrypoint.sh
             - name: output-dir
               mountPath: "/etc/kubernetes/node-feature-discovery/features.d"
             - name: host-sys
               mountPath: /sys
               readOnly: true
-            - name: run-nvidia-validations
-              mountPath: /run/nvidia/validations
-            - name: driver-install-dir
-              mountPath: /driver-root
-              mountPropagation: HostToContainer
-            - name: host-root
-              mountPath: /host
-              readOnly: true
-              mountPropagation: HostToContainer
           securityContext:
             privileged: true
         - image: "FILLED BY THE OPERATOR"
@@ -131,24 +116,13 @@ spec:
           - name: PROCESS_TO_SIGNAL
             value: "gpu-feature-discovery"
       volumes:
-        - name: gpu-feature-discovery-entrypoint
-          configMap:
-            name: gpu-feature-discovery-entrypoint
-            defaultMode: 448
         - name: output-dir
           hostPath:
             path: "/etc/kubernetes/node-feature-discovery/features.d"
         - name: host-sys
           hostPath:
             path: /sys
-        - name: run-nvidia-validations
+        - name: run-nvidia
           hostPath:
-            path: "/run/nvidia/validations"
-            type: DirectoryOrCreate
-        - name: host-root
-          hostPath:
-            path: /
-        - name: driver-install-dir
-          hostPath:
-            path: /run/nvidia/driver
-            type: DirectoryOrCreate
+            path: "/run/nvidia"
+            type: Directory
