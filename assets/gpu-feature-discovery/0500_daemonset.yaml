@@ -33,8 +33,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: run-nvidia
-              mountPath: /run/nvidia
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
               mountPropagation: HostToContainer
         - name: config-manager-init
           image: "FILLED BY THE OPERATOR"
@@ -124,7 +124,7 @@ spec:
         - name: host-sys
           hostPath:
             path: /sys
-        - name: run-nvidia
+        - name: run-nvidia-validations
           hostPath:
-            path: "/run/nvidia"
-            type: Directory
+            path: "/run/nvidia/validations"
+            type: DirectoryOrCreate
