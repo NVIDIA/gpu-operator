@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUILD_MULTI_ARCH_IMAGES ?= no
+BUILD_MULTI_ARCH_IMAGES ?= false
 DOCKER ?= docker
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
