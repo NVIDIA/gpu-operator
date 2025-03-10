@@ -99,8 +99,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	var condErr error
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
-		err = fmt.Errorf("Failed to get ClusterPolicy object: %v", err)
-		r.Log.Error(nil, err.Error())
+		r.Log.Error(nil, fmt.Sprintf("Failed to get ClusterPolicy object: %v", err))
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
