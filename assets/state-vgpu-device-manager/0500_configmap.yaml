@@ -611,6 +611,70 @@ data:
             - devices: all
               vgpu-devices:
                 A800-40C: 1
+        GB200-1-24C:
+            - devices: all
+              vgpu-devices:
+                GB200-1-24C: 7
+        GB200-1-24CME:
+            - devices: all
+              vgpu-devices:
+                GB200-1-24CME: 1
+        GB200-1-47C:
+            - devices: all
+              vgpu-devices:
+                GB200-1-47C: 4
+        GB200-2-47C:
+            - devices: all
+              vgpu-devices:
+                GB200-2-47C: 3
+        GB200-3-95C:
+            - devices: all
+              vgpu-devices:
+                GB200-3-95C: 2
+        GB200-4-95C:
+            - devices: all
+              vgpu-devices:
+                GB200-4-95C: 1
+        GB200-7-189C:
+            - devices: all
+              vgpu-devices:
+                GB200-7-189C: 1
+        GB200-189C:
+            - devices: all
+              vgpu-devices:
+                GB200-189C: 1
+        GH200L-1-18C:
+            - devices: all
+              vgpu-devices:
+                GH200L-1-18C: 7
+        GH200L-1-18CME:
+            - devices: all
+              vgpu-devices:
+                GH200L-1-18CME: 1
+        GH200L-1-36C:
+            - devices: all
+              vgpu-devices:
+                GH200L-1-36C: 4
+        GH200L-2-36C:
+            - devices: all
+              vgpu-devices:
+                GH200L-2-36C: 3
+        GH200L-3-72C:
+            - devices: all
+              vgpu-devices:
+                GH200L-3-72C: 2
+        GH200L-4-72C:
+            - devices: all
+              vgpu-devices:
+                GH200L-4-72C: 1
+        GH200L-7-144C:
+            - devices: all
+              vgpu-devices:
+                GH200L-7-144C: 1
+        GH200L-144C:
+            - devices: all
+              vgpu-devices:
+                GH200L-144C: 1
         GH200-1-12C:
             - devices: all
               vgpu-devices:
@@ -643,6 +707,70 @@ data:
             - devices: all
               vgpu-devices:
                 GH200-96C: 1
+        H20X-1-18C:
+            - devices: all
+              vgpu-devices:
+                H20X-1-18C: 7
+        H20X-1-18CME:
+            - devices: all
+              vgpu-devices:
+                H20X-1-18CME: 1
+        H20X-1-35C:
+            - devices: all
+              vgpu-devices:
+                H20X-1-35C: 4
+        H20X-2-35C:
+            - devices: all
+              vgpu-devices:
+                H20X-2-35C: 3
+        H20X-3-71C:
+            - devices: all
+              vgpu-devices:
+                H20X-3-71C: 2
+        H20X-4C:
+            - devices: all
+              vgpu-devices:
+                H20X-4C: 32
+        H20X-4-71C:
+            - devices: all
+              vgpu-devices:
+                H20X-4-71C: 1
+        H20X-7C:
+            - devices: all
+              vgpu-devices:
+                H20X-7C: 20
+        H20X-7-141C:
+            - devices: all
+              vgpu-devices:
+                H20X-7-141C: 1
+        H20X-8C:
+            - devices: all
+              vgpu-devices:
+                H20X-8C: 16
+        H20X-14C:
+            - devices: all
+              vgpu-devices:
+                H20X-14C: 10
+        H20X-17C:
+            - devices: all
+              vgpu-devices:
+                H20X-17C: 8
+        H20X-28C:
+            - devices: all
+              vgpu-devices:
+                H20X-28C: 5
+        H20X-35C:
+            - devices: all
+              vgpu-devices:
+                H20X-35C: 4
+        H20X-70C:
+            - devices: all
+              vgpu-devices:
+                H20X-70C: 2
+        H20X-141C:
+            - devices: all
+              vgpu-devices:
+                H20X-141C: 1
         H20-1-12C:
             - devices: all
               vgpu-devices:
@@ -987,6 +1115,134 @@ data:
             - devices: all
               vgpu-devices:
                 H100-80C: 1
+        H200X-1-18C:
+            - devices: all
+              vgpu-devices:
+                H200X-1-18C: 7
+        H200X-1-18CME:
+            - devices: all
+              vgpu-devices:
+                H200X-1-18CME: 1
+        H200X-1-35C:
+            - devices: all
+              vgpu-devices:
+                H200X-1-35C: 4
+        H200X-2-35C:
+            - devices: all
+              vgpu-devices:
+                H200X-2-35C: 3
+        H200X-3-71C:
+            - devices: all
+              vgpu-devices:
+                H200X-3-71C: 2
+        H200X-4C:
+            - devices: all
+              vgpu-devices:
+                H200X-4C: 32
+        H200X-4-71C:
+            - devices: all
+              vgpu-devices:
+                H200X-4-71C: 1
+        H200X-7C:
+            - devices: all
+              vgpu-devices:
+                H200X-7C: 20
+        H200X-7-141C:
+            - devices: all
+              vgpu-devices:
+                H200X-7-141C: 1
+        H200X-8C:
+            - devices: all
+              vgpu-devices:
+                H200X-8C: 16
+        H200X-14C:
+            - devices: all
+              vgpu-devices:
+                H200X-14C: 10
+        H200X-17C:
+            - devices: all
+              vgpu-devices:
+                H200X-17C: 8
+        H200X-28C:
+            - devices: all
+              vgpu-devices:
+                H200X-28C: 5
+        H200X-35C:
+            - devices: all
+              vgpu-devices:
+                H200X-35C: 4
+        H200X-70C:
+            - devices: all
+              vgpu-devices:
+                H200X-70C: 2
+        H200X-141C:
+            - devices: all
+              vgpu-devices:
+                H200X-141C: 1
+        H200-1-18C:
+            - devices: all
+              vgpu-devices:
+                H200-1-18C: 7
+        H200-1-18CME:
+            - devices: all
+              vgpu-devices:
+                H200-1-18CME: 1
+        H200-1-35C:
+            - devices: all
+              vgpu-devices:
+                H200-1-35C: 4
+        H200-2-35C:
+            - devices: all
+              vgpu-devices:
+                H200-2-35C: 3
+        H200-3-71C:
+            - devices: all
+              vgpu-devices:
+                H200-3-71C: 2
+        H200-4C:
+            - devices: all
+              vgpu-devices:
+                H200-4C: 32
+        H200-4-71C:
+            - devices: all
+              vgpu-devices:
+                H200-4-71C: 1
+        H200-7C:
+            - devices: all
+              vgpu-devices:
+                H200-7C: 20
+        H200-7-141C:
+            - devices: all
+              vgpu-devices:
+                H200-7-141C: 1
+        H200-8C:
+            - devices: all
+              vgpu-devices:
+                H200-8C: 16
+        H200-14C:
+            - devices: all
+              vgpu-devices:
+                H200-14C: 10
+        H200-17C:
+            - devices: all
+              vgpu-devices:
+                H200-17C: 8
+        H200-28C:
+            - devices: all
+              vgpu-devices:
+                H200-28C: 5
+        H200-35C:
+            - devices: all
+              vgpu-devices:
+                H200-35C: 4
+        H200-70C:
+            - devices: all
+              vgpu-devices:
+                H200-70C: 2
+        H200-141C:
+            - devices: all
+              vgpu-devices:
+                H200-141C: 1
         H800L-1-12C:
             - devices: all
               vgpu-devices:
@@ -2320,6 +2576,14 @@ data:
               devices: all
               vgpu-devices:
                 H20-48C: 2
+            - device-filter: "0x232C10DE"
+              devices: all
+              vgpu-devices:
+                H20X-70C: 2
+            - device-filter: "0x232C10DE"
+              devices: all
+              vgpu-devices:
+                H20X-70C: 2
             - device-filter: "0x233010DE"
               devices: all
               vgpu-devices:
@@ -2336,6 +2600,14 @@ data:
               devices: all
               vgpu-devices:
                 H100-40C: 2
+            - device-filter: "0x233510DE"
+              devices: all
+              vgpu-devices:
+                H200X-70C: 2
+            - device-filter: "0x233510DE"
+              devices: all
+              vgpu-devices:
+                H200X-70C: 2
             - device-filter: "0x233710DE"
               devices: all
               vgpu-devices:
@@ -2348,10 +2620,18 @@ data:
               devices: all
               vgpu-devices:
                 H800L-47C: 2
+            - device-filter: "0x233B10DE"
+              devices: all
+              vgpu-devices:
+                H200-70C: 2
             - device-filter: "0x234210DE"
               devices: all
               vgpu-devices:
                 GH200-96C: 1
+            - device-filter: "0x234810DE"
+              devices: all
+              vgpu-devices:
+                GH200L-144C: 1
             - device-filter: "0x25B610DE"
               devices: all
               vgpu-devices:
@@ -2396,3 +2676,11 @@ data:
               devices: all
               vgpu-devices:
                 L4-12Q: 2
+            - device-filter: "0x294110DE"
+              devices: all
+              vgpu-devices:
+                GB200-189C: 1
+            - device-filter: "0x294110DE"
+              devices: all
+              vgpu-devices:
+                GB200-189C: 1
