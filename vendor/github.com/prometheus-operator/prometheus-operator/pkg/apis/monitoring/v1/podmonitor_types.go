@@ -181,7 +181,7 @@ type PodMonitorList struct {
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of PodMonitors
-	Items []*PodMonitor `json:"items"`
+	Items []PodMonitor `json:"items"`
 }
 
 // DeepCopyObject implements the runtime.Object interface.
@@ -239,6 +239,7 @@ type PodMetricsEndpoint struct {
 	//
 	// If empty, Prometheus uses the global scrape timeout unless it is less
 	// than the target's scrape interval value in which the latter is used.
+	// The value cannot be greater than the scrape interval otherwise the operator will reject the resource.
 	ScrapeTimeout Duration `json:"scrapeTimeout,omitempty"`
 
 	// TLS configuration to use when scraping the target.
