@@ -231,7 +231,7 @@ spec:
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:73514b18701bf7443f5e03cfb2f5582bad2c33434d1b328530aa5dfa2f0cf02f
     - name: vgpu-device-manager-image
-      image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:7edd7a0413dcb39b6e3bcefaf06812f3293c8e480ca10783e821a561ed686200
+      image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:f899f870a1ef59611a8c3b3e9f58fa3c4d89d930c776d161737d017a3bb2feb0
     - name: gdrcopy-image
       image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:5024bbdb11698d8d867bced6078b82ef28e78144ed8f9b91bb2f8dedbc09a8d8
   customresourcedefinitions:
@@ -923,7 +923,7 @@ spec:
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:73514b18701bf7443f5e03cfb2f5582bad2c33434d1b328530aa5dfa2f0cf02f"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:7edd7a0413dcb39b6e3bcefaf06812f3293c8e480ca10783e821a561ed686200"
+                    value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:f899f870a1ef59611a8c3b3e9f58fa3c4d89d930c776d161737d017a3bb2feb0"
                   - name: "GDRCOPY_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:5024bbdb11698d8d867bced6078b82ef28e78144ed8f9b91bb2f8dedbc09a8d8"
               terminationGracePeriodSeconds: 10
