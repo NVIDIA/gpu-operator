@@ -270,6 +270,8 @@ spec:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
+          - name: run-nvidia-fabricmanager
+            mountPath: /run/nvidia-fabricmanager
           - name: run-nvidia-topologyd
             mountPath: /run/nvidia-topologyd
           - name: var-log
@@ -594,6 +596,10 @@ spec:
           hostPath:
             path: /dev/vfio
         {{- end }}
+        - name: run-nvidia-fabricmanager
+          hostPath:
+            path: /run/nvidia-fabricmanager
+            type: DirectoryOrCreate
         - name: run-nvidia-topologyd
           hostPath:
             path: /run/nvidia-topologyd
