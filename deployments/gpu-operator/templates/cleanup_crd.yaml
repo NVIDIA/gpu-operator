@@ -40,6 +40,11 @@ spec:
           - >
               kubectl delete clusterpolicy cluster-policy;
               kubectl delete crd clusterpolicies.nvidia.com;
-
+              kubectl delete crd nvidiadrivers.nvidia.com --ignore-not-found=true;
+            {{- if .Values.nfd.enabled -}}
+              kubectl delete crd nodefeatures.nfd.k8s-sigs.io --ignore-not-found=true;
+              kubectl delete crd nodefeaturegroups.nfd.k8s-sigs.io --ignore-not-found=true;
+              kubectl delete crd nodefeaturerules.nfd.k8s-sigs.io --ignore-not-found=true;
+            {{- end }}
       restartPolicy: OnFailure
 {{- end }}

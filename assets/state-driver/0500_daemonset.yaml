@@ -212,15 +212,6 @@ spec:
           successThreshold: 1
           periodSeconds: 10
           timeoutSeconds: 10
-        livenessProbe:
-          exec:
-            command:
-              [sh, -c, 'lsmod | grep nvidia_fs']
-          periodSeconds: 30
-          initialDelaySeconds: 30
-          failureThreshold: 1
-          successThreshold: 1
-          timeoutSeconds: 10
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-gdrcopy-ctr
@@ -247,15 +238,6 @@ spec:
           failureThreshold: 120
           successThreshold: 1
           periodSeconds: 10
-          timeoutSeconds: 10
-        livenessProbe:
-          exec:
-            command:
-              [sh, -c, 'lsmod | grep gdrdrv']
-          periodSeconds: 30
-          initialDelaySeconds: 30
-          failureThreshold: 1
-          successThreshold: 1
           timeoutSeconds: 10
         # Only kept when OpenShift DriverToolkit side-car is enabled.
       - image: "FILLED BY THE OPERATOR"

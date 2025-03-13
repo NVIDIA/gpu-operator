@@ -72,9 +72,6 @@ spec:
               value: ""
             - name: PROCESS_TO_SIGNAL
               value: ""
-          volumeMounts:
-            - name: config
-              mountPath: /config
       containers:
         - image: "FILLED BY OPERATOR"
           name: mps-control-daemon-ctr
@@ -96,8 +93,6 @@ spec:
               mountPath: /dev/shm
             - name: mps-root
               mountPath: /mps
-            - name: config
-              mountPath: /config
         - image: "FILLED BY THE OPERATOR"
           name: config-manager
           command: ["config-manager"]
@@ -126,9 +121,6 @@ spec:
               value: "1" # SIGHUP
             - name: PROCESS_TO_SIGNAL
               value: "/usr/bin/mps-control-daemon"
-          volumeMounts:
-            - name: config
-              mountPath: /config
       volumes:
         - name: run-nvidia
           hostPath:
@@ -141,5 +133,3 @@ spec:
         - name: mps-shm
           hostPath:
             path: /run/nvidia/mps/shm
-        - name: config
-          emptyDir: {}

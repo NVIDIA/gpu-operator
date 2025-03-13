@@ -146,7 +146,7 @@ driver:
   usePrecompiled: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "570.86.15"
+  version: "570.124.06"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   startupProbe:
@@ -234,7 +234,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.17.4-ubuntu20.04
+  version: v1.17.5-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -245,7 +245,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.0
+  version: v0.17.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -303,7 +303,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 4.1.0-1-ubuntu22.04
+  version: 4.1.1-1-ubuntu22.04
   imagePullPolicy: IfNotPresent
   args: []
   env: []
@@ -313,7 +313,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 4.1.0-4.0.2-ubuntu22.04
+  version: 4.1.1-4.0.4-ubuntu22.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
@@ -359,7 +359,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.0
+  version: v0.17.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -373,7 +373,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.11.0-ubuntu20.04
+  version: v0.12.0-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -387,7 +387,7 @@ migManager:
   # config:
   #   name: custom-mig-parted-configs
   #   create: true
-  #   data: |-
+  #   data:
   #     config.yaml: |-
   #       version: v1
   #       mig-configs:
@@ -478,7 +478,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: v0.2.8
+  version: v0.3.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -536,7 +536,7 @@ sandboxDevicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: kubevirt-gpu-device-plugin
-  version: v1.3.0
+  version: v1.3.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []

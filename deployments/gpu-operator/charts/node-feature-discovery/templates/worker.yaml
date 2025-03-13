@@ -106,7 +106,7 @@ spec:
         {{- end }}
         - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
         - "-grpc-health={{ .Values.worker.healthPort | default "8082" }}"
-        {{- with .Values.gc.extraArgs }}
+        {{- with .Values.worker.extraArgs }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         ports:

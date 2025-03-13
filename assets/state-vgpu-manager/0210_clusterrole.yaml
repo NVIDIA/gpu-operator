@@ -23,14 +23,15 @@ rules:
   - ""
   resources:
   - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
   - pods/eviction
   verbs:
   - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
 - apiGroups:
   - apps
   resources:
