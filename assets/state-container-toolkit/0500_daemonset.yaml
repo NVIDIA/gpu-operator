@@ -65,8 +65,6 @@ spec:
         env:
         - name: ROOT
           value: "/usr/local/nvidia"
-        - name: RUNTIME_ARGS
-          value: ""
         - name: NVIDIA_CONTAINER_RUNTIME_MODES_CDI_DEFAULT_KIND
           value: "management.nvidia.com/gpu"
         - name: NVIDIA_VISIBLE_DEVICES
