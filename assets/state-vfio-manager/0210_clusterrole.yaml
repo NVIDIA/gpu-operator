@@ -14,9 +14,22 @@ rules:
   - ""
   resources:
   - nodes
-  - pods
   verbs:
   - get
   - list
   - patch
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/eviction
+  verbs:
+  - create
