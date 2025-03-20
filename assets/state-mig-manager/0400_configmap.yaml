@@ -261,6 +261,12 @@ data:
           mig-devices:
             "4g.48gb": 1
 
+      all-4g.90gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.90gb": 1
+
       all-4g.95gb:
         - devices: all
           mig-enabled: true
