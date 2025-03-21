@@ -161,10 +161,11 @@ type ClusterPolicyController struct {
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
-	runtime        gpuv1.Runtime
-	hasGPUNodes    bool
-	hasNFDLabels   bool
-	sandboxEnabled bool
+	runtime            gpuv1.Runtime
+	runtimeSupportsCDI bool
+	hasGPUNodes        bool
+	hasNFDLabels       bool
+	sandboxEnabled     bool
 }
 
 func addState(n *ClusterPolicyController, path string) {
@@ -580,7 +581,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 
-func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
+func getRuntimeVersionString(node corev1.Node) (gpuv1.Runtime, string, error) {
 	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
 	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
 	var runtime gpuv1.Runtime
@@ -592,9 +593,11 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 	case strings.HasPrefix(runtimeVer, "cri-o"):
 		runtime = gpuv1.CRIO
 	default:
-		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
+		return "", "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
 	}
-	return runtime, nil
+	version := strings.SplitAfter(runtimeVer, "//")[1]
+	vVersion := "v" + strings.TrimPrefix(version, "v")
+	return runtime, vVersion, nil
 }
 
 func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
@@ -706,13 +709,14 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 	return nil
 }
 
-// getRuntime will detect the container runtime used by nodes in the
-// cluster and correctly set the value for clusterPolicyController.runtime
-// For openshift, set runtime to crio. Otherwise, the default runtime is
-// containerd -- if >=1 node is configured with containerd, set
-// clusterPolicyController.runtime = containerd
-func (n *ClusterPolicyController) getRuntime() error {
+// getContainerRuntimeInfo will detect the container runtime version used by nodes
+// in the cluster and correctly set the value for clusterPolicyController.runtime
+// and clusterPolicyController.runtimeSupportsCDI. On OpenShift, the runtime
+// is always assumed to be cri-o. We assume the runtime supports CDI unless
+// containerd < 1.7.0 is detected.
+func (n *ClusterPolicyController) getContainerRuntimeInfo() error {
 	ctx := n.ctx
+	n.runtimeSupportsCDI = true
 	// assume crio for openshift clusters
 	if n.openshift != "" {
 		n.runtime = gpuv1.CRIO
@@ -725,27 +729,26 @@ func (n *ClusterPolicyController) getRuntime() error {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return fmt.Errorf("Unable to list nodes prior to checking container runtime: %v", err)
+		return fmt.Errorf("failed to list nodes: %w", err)
 	}
 
 	var runtime gpuv1.Runtime
-	for _, node := range list.Items {
-		rt, err := getRuntimeString(node)
+	for i, node := range list.Items {
+		rt, version, err := getRuntimeVersionString(node)
 		if err != nil {
-			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
-			continue
+			return fmt.Errorf("failed to get runtime info for node %s: %w", node.Name, err)
 		}
-		runtime = rt
-		if runtime == gpuv1.Containerd {
-			// default to containerd if >=1 node running containerd
-			break
+		if i == 0 {
+			runtime = rt
+		} else if rt != runtime {
+			n.logger.Error(nil, "Different runtimes on different worker nodes is not supported")
+			return fmt.Errorf("different runtimes on different worker nodes is not supported")
+		}
+		if runtime == gpuv1.Containerd && semver.Compare(version, "v1.7.0") < 0 {
+			n.runtimeSupportsCDI = false
 		}
 	}
 
-	if runtime.String() == "" {
-		n.logger.Info("Unable to get runtime info from the cluster, defaulting to containerd")
-		runtime = gpuv1.Containerd
-	}
 	n.runtime = runtime
 	return nil
 }
@@ -868,11 +871,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 
 	// detect the container runtime on worker nodes
-	err = n.getRuntime()
+	err = n.getContainerRuntimeInfo()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get container runtime info: %w", err)
 	}
 	n.logger.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
+	n.logger.Info(fmt.Sprintf("Container runtime supports CDI: %t", n.runtimeSupportsCDI))
 
 	// fetch all kernel versions from the GPU nodes in the cluster
 	if n.singleton.Spec.Driver.IsEnabled() && n.singleton.Spec.Driver.UsePrecompiledDrivers() {
