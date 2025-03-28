@@ -1,32 +1,33 @@
 ---
-name: GPU Operator Bug report
+name: Bug report
 about: Create a report to help us improve
 title: ''
 labels: ''
-assignees: cdesiniotis, shivamerla
+assignees: ''
 
 ---
 
-_The template below is mostly useful for bug reports and support questions. Feel free to remove anything which doesn't apply to you and add more information where it makes sense._
-
 _**Important Note:  NVIDIA AI Enterprise customers can get support from NVIDIA Enterprise support. Please open a case [here](https://enterprise-support.nvidia.com/s/create-case)**._
 
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-### 1. Quick Debug Information
-* OS/Version(e.g. RHEL8.6, Ubuntu22.04):
-* Kernel Version:
-* Container Runtime Type/Version(e.g. Containerd, CRI-O, Docker):
-* K8s Flavor/Version(e.g. K8s, OCP, Rancher, GKE, EKS):
-* GPU Operator Version:
+**To Reproduce**
+Detailed steps to reproduce the issue.
+
+**Expected behavior**
+A clear and concise description of what you expected to happen.
+
+**Environment (please provide the following information):**
+ - GPU Operator Version: [e.g. v25.3.0]
+ - OS: [e.g. Ubuntu24.04]
+ - Kernel Version: [e.g. 6.8.0-generic]
+ - Container Runtime Version: [e.g. containerd 2.0.0]
+ - Kubernetes Distro and Version: [e.g. K8s, OpenShift, Rancher, GKE, EKS]
 
 
-### 2. Issue or feature description
-_Briefly explain the issue in terms of expected behavior and current behavior._
 
-### 3. Steps to reproduce the issue
-_Detailed steps to reproduce the issue._
-
-### 4. Information to [attach](https://help.github.com/articles/file-attachments-on-issues-and-pull-requests/) (optional if deemed irrelevant)
+**Information to [attach](https://help.github.com/articles/file-attachments-on-issues-and-pull-requests/)** (optional if deemed irrelevant)
 
  - [ ] kubernetes pods status: `kubectl get pods -n OPERATOR_NAMESPACE`
  - [ ] kubernetes daemonset status: `kubectl get ds -n OPERATOR_NAMESPACE`
