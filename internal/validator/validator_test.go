@@ -63,7 +63,7 @@ func makeTestDriver(opts ...driverOptions) *nvidiav1alpha1.NVIDIADriver {
 
 func named(name string) driverOptions {
 	return func(c *nvidiav1alpha1.NVIDIADriver) {
-		c.ObjectMeta.Name = name
+		c.Name = name
 	}
 }
 
@@ -75,7 +75,7 @@ func nodeSelector(labels map[string]string) driverOptions {
 
 func labelled(labels map[string]string) nodeOptions {
 	return func(n *corev1.Node) {
-		n.ObjectMeta.Labels = labels
+		n.Labels = labels
 	}
 }
 

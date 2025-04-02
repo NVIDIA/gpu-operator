@@ -79,7 +79,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Get the NvidiaDriver instance from this request
 	instance := &nvidiav1alpha1.NVIDIADriver{}
 	var condErr error
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -87,7 +87,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
-		err = fmt.Errorf("Error getting NVIDIADriver object: %w", err)
+		err = fmt.Errorf("error getting NVIDIADriver object: %w", err)
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
@@ -100,9 +100,9 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
 	clusterPolicyList := &gpuv1.ClusterPolicyList{}
-	err = r.Client.List(ctx, clusterPolicyList)
+	err = r.List(ctx, clusterPolicyList)
 	if err != nil {
-		err = fmt.Errorf("Error getting ClusterPolicy list: %v", err)
+		err = fmt.Errorf("error getting ClusterPolicy list: %v", err)
 		logger.V(consts.LogLevelError).Error(nil, err.Error())
 		instance.Status.State = nvidiav1alpha1.NotReady
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
@@ -212,7 +212,7 @@ func (r *NVIDIADriverReconciler) updateCrStatus(
 
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1alpha1.NVIDIADriver{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
+	err := r.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update")
 		return err
@@ -292,8 +292,8 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			reconcileRequests = append(reconcileRequests,
 				reconcile.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      nvidiaDriver.ObjectMeta.GetName(),
-						Namespace: nvidiaDriver.ObjectMeta.GetNamespace(),
+						Name:      nvidiaDriver.GetName(),
+						Namespace: nvidiaDriver.GetNamespace(),
 					},
 				})
 		}
@@ -319,8 +319,8 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			reconcileRequests = append(reconcileRequests,
 				reconcile.Request{
 					NamespacedName: types.NamespacedName{
-						Name:      nvidiaDriver.ObjectMeta.GetName(),
-						Namespace: nvidiaDriver.ObjectMeta.GetNamespace(),
+						Name:      nvidiaDriver.GetName(),
+						Namespace: nvidiaDriver.GetNamespace(),
 					},
 				})
 		}

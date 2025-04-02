@@ -201,7 +201,7 @@ func OpenshiftVersion(ctx context.Context) (string, error) {
 		return ocpV[0], nil
 	}
 
-	return "", fmt.Errorf("Failed to find Completed Cluster Version")
+	return "", fmt.Errorf("failed to find Completed Cluster Version")
 }
 
 // KubernetesVersion fetches the Kubernetes API server version
@@ -334,9 +334,9 @@ func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, e
 		if isValidWorkloadConfig(workloadConfig) {
 			return workloadConfig, nil
 		}
-		return defaultGPUWorkloadConfig, fmt.Errorf("Invalid GPU workload config: %v", workloadConfig)
+		return defaultGPUWorkloadConfig, fmt.Errorf("invalid GPU workload config: %v", workloadConfig)
 	}
-	return defaultGPUWorkloadConfig, fmt.Errorf("No GPU workload config found")
+	return defaultGPUWorkloadConfig, fmt.Errorf("no GPU workload config found")
 }
 
 // removeAllGPUStateLabels removes all gpuStateLabels from the provided map of node labels.
@@ -426,7 +426,7 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 	list := &corev1.NodeList{}
 	err := n.client.List(n.ctx, list, opts...)
 	if err != nil {
-		return fmt.Errorf("Unable to list nodes to check annotations, err %s", err.Error())
+		return fmt.Errorf("unable to list nodes to check annotations, err %s", err.Error())
 	}
 	for _, node := range list.Items {
 		node := node
@@ -438,7 +438,7 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 		// set node annotation for driver auto-upgrade
 		updateRequired := false
 		value := "true"
-		annotationValue, annotationExists := node.ObjectMeta.Annotations[driverAutoUpgradeAnnotationKey]
+		annotationValue, annotationExists := node.Annotations[driverAutoUpgradeAnnotationKey]
 		if n.singleton.Spec.Driver.UpgradePolicy != nil &&
 			n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade &&
 			!n.sandboxEnabled {
@@ -459,10 +459,10 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 			continue
 		}
 		// update annotation
-		node.ObjectMeta.Annotations[driverAutoUpgradeAnnotationKey] = value
+		node.Annotations[driverAutoUpgradeAnnotationKey] = value
 		if value == "null" {
 			// remove annotation if value is null
-			delete(node.ObjectMeta.Annotations, driverAutoUpgradeAnnotationKey)
+			delete(node.Annotations, driverAutoUpgradeAnnotationKey)
 		}
 		err := n.client.Update(n.ctx, &node)
 		if err != nil {
@@ -485,7 +485,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return false, 0, fmt.Errorf("Unable to list nodes to check labels, err %s", err.Error())
+		return false, 0, fmt.Errorf("unable to list nodes to check labels, err %s", err.Error())
 	}
 
 	clusterHasNFDLabels := false
@@ -501,26 +501,26 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		config, err := getWorkloadConfig(labels, n.sandboxEnabled)
 		if err != nil {
 			n.logger.Info("WARNING: failed to get GPU workload config for node; using default",
-				"NodeName", node.ObjectMeta.Name, "SandboxEnabled", n.sandboxEnabled,
+				"NodeName", node.Name, "SandboxEnabled", n.sandboxEnabled,
 				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
 		}
-		n.logger.Info("GPU workload configuration", "NodeName", node.ObjectMeta.Name, "GpuWorkloadConfig", config)
-		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.ObjectMeta.Name, n.logger}
+		n.logger.Info("GPU workload configuration", "NodeName", node.Name, "GpuWorkloadConfig", config)
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.Name, n.logger}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
-			n.logger.Info("Node has GPU(s)", "NodeName", node.ObjectMeta.Name)
+			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label
-			n.logger.Info("Setting node label", "NodeName", node.ObjectMeta.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
+			n.logger.Info("Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// update node labels
 			node.SetLabels(labels)
 			updateLabels = true
 		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
-			// previously labelled node and no longer has GPU's
+			// previously labelled node and no longer has GPUs
 			// label node to reset common Nvidia GPU label
-			n.logger.Info("Node no longer has GPUs", "NodeName", node.ObjectMeta.Name)
+			n.logger.Info("Node no longer has GPUs", "NodeName", node.Name)
 			n.logger.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
 			labels[commonGPULabelKey] = "false"
-			n.logger.Info("Disabling all operands for node", "NodeName", node.ObjectMeta.Name)
+			n.logger.Info("Disabling all operands for node", "NodeName", node.Name)
 			removeAllGPUStateLabels(labels)
 			// update node labels
 			node.SetLabels(labels)
@@ -529,16 +529,16 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 
 		if hasCommonGPULabel(labels) {
 			// If node has GPU, then add state labels as per the workload type
-			n.logger.Info("Checking GPU state labels on the node", "NodeName", node.ObjectMeta.Name)
+			n.logger.Info("Checking GPU state labels on the node", "NodeName", node.Name)
 			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
-				n.logger.Info("Applying correct GPU state labels to the node", "NodeName", node.ObjectMeta.Name)
+				n.logger.Info("Applying correct GPU state labels to the node", "NodeName", node.Name)
 				node.SetLabels(labels)
 				updateLabels = true
 			}
 			// Disable MIG on the node explicitly where no MIG config is specified
 			if n.singleton.Spec.MIGManager.IsEnabled() && hasMIGCapableGPU(labels) && !hasMIGConfigLabel(labels) {
 				if n.singleton.Spec.MIGManager.Config != nil && n.singleton.Spec.MIGManager.Config.Default == migConfigDisabledValue {
-					n.logger.Info("Setting MIG config label", "NodeName", node.ObjectMeta.Name, "Label", migConfigLabelKey, "Value", migConfigDisabledValue)
+					n.logger.Info("Setting MIG config label", "NodeName", node.Name, "Label", migConfigLabelKey, "Value", migConfigDisabledValue)
 					labels[migConfigLabelKey] = migConfigDisabledValue
 					node.SetLabels(labels)
 					updateLabels = true
@@ -553,12 +553,12 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 				if ok {
 					n.ocpDriverToolkit.rhcosVersions[rhcosVersion] = true
 					n.logger.V(1).Info("GPU node running RHCOS",
-						"nodeName", node.ObjectMeta.Name,
+						"nodeName", node.Name,
 						"RHCOS version", rhcosVersion,
 					)
 				} else {
 					n.logger.Info("node doesn't have the proper NFD RHCOS version label.",
-						"nodeName", node.ObjectMeta.Name,
+						"nodeName", node.Name,
 						"nfdLabel", nfdOSTreeVersionLabelKey,
 					)
 				}
@@ -569,8 +569,8 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		if updateLabels {
 			err = n.client.Update(ctx, &node)
 			if err != nil {
-				return false, 0, fmt.Errorf("Unable to label node %s for the GPU Operator deployment, err %s",
-					node.ObjectMeta.Name, err.Error())
+				return false, 0, fmt.Errorf("unable to label node %s for the GPU Operator deployment, err %s",
+					node.Name, err.Error())
 			}
 		}
 	} // end node loop
@@ -623,14 +623,14 @@ func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
 	// On K8s<1.21, namespaces are not automatically labeled with an immutable label. Initialize
 	// a labels map if needed before adding PSA labels.
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#automatic-labelling
-	if ns.ObjectMeta.Labels == nil {
-		ns.ObjectMeta.Labels = make(map[string]string)
+	if ns.Labels == nil {
+		ns.Labels = make(map[string]string)
 		modified = true
 	}
 	for _, mode := range podSecurityModes {
 		key := podSecurityLabelPrefix + mode
-		if val, ok := ns.ObjectMeta.Labels[key]; !ok || (val != podSecurityLevelPrivileged) {
-			ns.ObjectMeta.Labels[key] = podSecurityLevelPrivileged
+		if val, ok := ns.Labels[key]; !ok || (val != podSecurityLevelPrivileged) {
+			ns.Labels[key] = podSecurityLevelPrivileged
 			modified = true
 		}
 	}
@@ -669,7 +669,7 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 		return fmt.Errorf("ERROR: could not get Namespace %s from client: %v", namespaceName, err)
 	}
 
-	val, ok := ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey]
+	val, ok := ns.Labels[ocpNamespaceMonitoringLabelKey]
 	if ok {
 		// label already defined, do not change it
 		var msg string
@@ -696,10 +696,10 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 	n.logger.Info("Monitoring can be disabled by setting the namespace label " +
 		ocpNamespaceMonitoringLabelKey + "=false")
 	patch := client.MergeFrom(ns.DeepCopy())
-	ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
+	ns.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
 	err = n.client.Patch(ctx, ns, patch)
 	if err != nil {
-		return fmt.Errorf("Unable to label namespace %s for the GPU Operator monitoring, err %s",
+		return fmt.Errorf("unable to label namespace %s for the GPU Operator monitoring, err %s",
 			namespaceName, err.Error())
 	}
 
@@ -725,7 +725,7 @@ func (n *ClusterPolicyController) getRuntime() error {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return fmt.Errorf("Unable to list nodes prior to checking container runtime: %v", err)
+		return fmt.Errorf("unable to list nodes prior to checking container runtime: %v", err)
 	}
 
 	var runtime gpuv1.Runtime
