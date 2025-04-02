@@ -84,7 +84,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Fetch the ClusterPolicy instance
 	clusterPolicy := &gpuv1.ClusterPolicy{}
-	err := r.Client.Get(ctx, req.NamespacedName, clusterPolicy)
+	err := r.Get(ctx, req.NamespacedName, clusterPolicy)
 	if err != nil {
 		reqLogger.V(consts.LogLevelError).Error(err, "Error getting ClusterPolicy object")
 		if clusterPolicyCtrl.operatorMetrics != nil {
@@ -203,7 +203,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 	r.Log.Info("Resetting node upgrade labels from all nodes")
 
 	nodeList := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodeList)
+	err := r.List(ctx, nodeList)
 	if err != nil {
 		r.Log.Error(err, "Failed to get node list to reset upgrade labels")
 		return err
@@ -216,7 +216,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 		_, present := node.Labels[upgradeStateLabel]
 		if present {
 			delete(node.Labels, upgradeStateLabel)
-			err = r.Client.Update(ctx, node)
+			err = r.Update(ctx, node)
 			if err != nil {
 				r.Log.V(consts.LogLevelError).Error(
 					err, "Failed to reset upgrade state label from node", "node", node)
@@ -345,8 +345,8 @@ func getClusterPoliciesToReconcile(ctx context.Context, k8sClient client.Client)
 
 	for _, cp := range list.Items {
 		cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      cp.ObjectMeta.GetName(),
-			Namespace: cp.ObjectMeta.GetNamespace(),
+			Name:      cp.GetName(),
+			Namespace: cp.GetNamespace(),
 		}})
 	}
 
