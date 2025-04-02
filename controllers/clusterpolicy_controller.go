@@ -97,9 +97,9 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Fetch the ClusterPolicy instance
 	instance := &gpuv1.ClusterPolicy{}
 	var condErr error
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
-		err = fmt.Errorf("Failed to get ClusterPolicy object: %v", err)
+		err = fmt.Errorf("failed to get ClusterPolicy object: %v", err)
 		r.Log.Error(nil, err.Error())
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if apierrors.IsNotFound(err) {
@@ -118,7 +118,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// TODO: Handle deletion of the main ClusterPolicy and cycle to the next one.
 	// We already have a main Clusterpolicy
-	if clusterPolicyCtrl.singleton != nil && clusterPolicyCtrl.singleton.ObjectMeta.Name != instance.ObjectMeta.Name {
+	if clusterPolicyCtrl.singleton != nil && clusterPolicyCtrl.singleton.Name != instance.Name {
 		instance.SetStatus(gpuv1.Ignored, clusterPolicyCtrl.operatorNamespace)
 		// do not change `clusterPolicyCtrl.operatorMetrics.reconciliationStatus` here,
 		// spurious reconciliation
@@ -127,7 +127,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	err = clusterPolicyCtrl.init(ctx, r, instance)
 	if err != nil {
-		err = fmt.Errorf("Failed to initialize ClusterPolicy controller: %v", err)
+		err = fmt.Errorf("failed to initialize ClusterPolicy controller: %v", err)
 		r.Log.Error(nil, err.Error())
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
@@ -237,7 +237,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &gpuv1.ClusterPolicy{}
-	err := r.Client.Get(ctx, namespacedName, instance)
+	err := r.Get(ctx, namespacedName, instance)
 	if err != nil {
 		r.Log.Error(err, "Failed to get ClusterPolicy instance for status update")
 	}
@@ -261,7 +261,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
 		list := &gpuv1.ClusterPolicyList{}
 
-		err := r.Client.List(ctx, list, opts...)
+		err := r.List(ctx, list, opts...)
 		if err != nil {
 			r.Log.Error(err, "Unable to list ClusterPolicies")
 			return []reconcile.Request{}
@@ -271,8 +271,8 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 
 		for _, cp := range list.Items {
 			cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
-				Name:      cp.ObjectMeta.GetName(),
-				Namespace: cp.ObjectMeta.GetNamespace(),
+				Name:      cp.GetName(),
+				Namespace: cp.GetNamespace(),
 			}})
 		}
 		r.Log.Info("Reconciliate ClusterPolicies after node label update", "nb", len(cpToRec))

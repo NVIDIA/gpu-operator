@@ -257,7 +257,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 		}
 		// set one node with different kernel for pre-compiled driver tests
 		if nodes > 1 && i == nodes-1 {
-			n.ObjectMeta.Labels[nfdKernelLabelKey] = upgradedKernel
+			n.Labels[nfdKernelLabelKey] = upgradedKernel
 		}
 		err := cl.Create(ctx, n)
 		if err != nil {

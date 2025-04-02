@@ -460,7 +460,7 @@ func getDriverAppName(cr *nvidiav1alpha1.NVIDIADriver, pool nodePool) string {
 	var hashBuilder strings.Builder
 
 	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.getOS())
-	uid := string(cr.ObjectMeta.UID)
+	uid := string(cr.UID)
 
 	hashBuilder.WriteString(uid)
 	if pool.kernel != "" {

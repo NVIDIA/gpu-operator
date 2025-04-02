@@ -1038,7 +1038,7 @@ func TestTransformValidatorComponent(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformValidatorComponent(tc.cpSpec, &tc.pod.Pod.Spec, tc.component)
+			err := TransformValidatorComponent(tc.cpSpec, &tc.pod.Spec, tc.component)
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
