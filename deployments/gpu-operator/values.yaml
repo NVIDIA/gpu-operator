@@ -32,6 +32,10 @@ hostPaths:
   # config files, and executables can be found.
   driverInstallDir: "/run/nvidia/driver"
 
+  # kubeletRootDir represents the root with the kubelet base directory
+  # if empty will use /var/lib/kubelet as the default path
+  kubeletRootDir: ""
+
 daemonsets:
   labels: {}
   annotations: {}
