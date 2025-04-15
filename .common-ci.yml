@@ -116,8 +116,8 @@ trigger-pipeline:
     max: 2
   before_script:
     - !reference [.regctl-setup, before_script]
-    # We ensure that the OUT_IMAGE_VERSION is set
-    - 'echo Version: ${OUT_IMAGE_VERSION} ; [[ -n "${OUT_IMAGE_VERSION}" ]] || exit 1'
+    # We ensure that the OUT_IMAGE_VERSION and OUT_IMAGE_NAME is set
+    - 'echo "Version: ${OUT_IMAGE_VERSION}, Image: ${OUT_IMAGE_NAME}" ; [[ -n "${OUT_IMAGE_VERSION}" && -n "${OUT_IMAGE_NAME}" ]] || exit 1'
     # In the case where we are deploying a different version to the CI_COMMIT_SHA, we
     # need to tag the image.
     # Note: a leading 'v' is stripped from the version if present
@@ -175,9 +175,9 @@ trigger-pipeline:
   extends:
     - .release
   variables:
-    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
-    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
 
 release:staging-gpu-operator:
   extends:
@@ -185,7 +185,7 @@ release:staging-gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_STAGING_IMAGE_NAME}"
 
 release:staging-gpu-operator-validator:
   extends:
@@ -193,7 +193,7 @@ release:staging-gpu-operator-validator:
     - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_VALIDATOR_STAGING_IMAGE_NAME}"
 
 release:staging-latest-gpu-operator:
   extends:
@@ -201,7 +201,7 @@ release:staging-latest-gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_STAGING_IMAGE_NAME}"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -212,7 +212,7 @@ release:staging-latest-gpu-operator-validator:
     - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_VALIDATOR_STAGING_IMAGE_NAME}"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
   rules:
     - if: $CI_COMMIT_BRANCH
