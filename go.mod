@@ -30,9 +30,11 @@ require (
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/klog/v2 v2.130.1
-	sigs.k8s.io/controller-runtime v0.20.3
+	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/yaml v1.4.0
 )
+
+replace github.com/NVIDIA/k8s-operator-libs => github.com/heyvister1/k8s-operator-libs v0.0.0-20250418100512-c2fac92a880a
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
@@ -43,6 +45,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
+	github.com/Mellanox/maintenance-operator/api v0.1.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -164,10 +167,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.16.4 // indirect
 	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/cli-runtime v0.32.2 // indirect
+	k8s.io/cli-runtime v0.32.3 // indirect
 	k8s.io/component-base v0.32.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
-	k8s.io/kubectl v0.32.2 // indirect
+	k8s.io/kubectl v0.32.3 // indirect
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect

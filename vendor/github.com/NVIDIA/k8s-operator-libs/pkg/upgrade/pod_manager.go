@@ -55,7 +55,7 @@ type PodManager interface {
 	SchedulePodsRestart(ctx context.Context, pods []*corev1.Pod) error
 	SchedulePodEviction(ctx context.Context, config *PodManagerConfig) error
 	GetPodDeletionFilter() PodDeletionFilter
-	GetPodControllerRevisionHash(ctx context.Context, pod *corev1.Pod) (string, error)
+	GetPodControllerRevisionHash(pod *corev1.Pod) (string, error)
 	GetDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.DaemonSet) (string, error)
 }
 
@@ -81,10 +81,7 @@ func (m *PodManagerImpl) GetPodDeletionFilter() PodDeletionFilter {
 }
 
 // GetPodControllerRevisionHash returns the Pod Controller Revision Hash from its labels
-// TODO: Drop ctx as it's not used
-//
-//nolint:revive
-func (m *PodManagerImpl) GetPodControllerRevisionHash(ctx context.Context, pod *corev1.Pod) (string, error) {
+func (m *PodManagerImpl) GetPodControllerRevisionHash(pod *corev1.Pod) (string, error) {
 	if hash, ok := pod.Labels[PodControllerRevisionHashLabelKey]; ok {
 		return hash, nil
 	}
