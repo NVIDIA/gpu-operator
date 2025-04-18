@@ -152,17 +152,18 @@ func main() {
 	// setup upgrade controller
 	upgrade.SetDriverName("gpu")
 	upgradeLogger := ctrl.Log.WithName("controllers").WithName("Upgrade")
+	requestorOpts := upgrade.RequestorOptions{}
 	clusterUpgradeStateManager, err := upgrade.NewClusterUpgradeStateManager(
 		upgradeLogger,
 		mgr.GetConfig(),
 		mgr.GetEventRecorderFor("nvidia-gpu-operator"),
+		upgrade.StateOptions{Requestor: requestorOpts},
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create new ClusterUpdateStateManager", "controller", "Upgrade")
 		os.Exit(1)
 	}
 	clusterUpgradeStateManager = clusterUpgradeStateManager.WithPodDeletionEnabled(gpuPodSpecFilter).WithValidationEnabled("app=nvidia-operator-validator")
-
 	if err = (&controllers.UpgradeReconciler{
 		Client:       mgr.GetClient(),
 		Log:          upgradeLogger,
