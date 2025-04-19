@@ -794,6 +794,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-imex-dra-driver")
 		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
@@ -1027,6 +1028,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return true
 	case "state-operator-metrics":
 		return true
+	case "state-imex-dra-driver":
+		return clusterPolicySpec.IMEXDRADriver.IsEnabled()
 	default:
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false
