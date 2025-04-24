@@ -78,6 +78,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-ubi8 \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
+		--build-arg CVE_REMOVES="$(CVE_REMOVES)" \
 		--file $(DOCKERFILE) $(BUILD_DIR)
 
 # Provide a utility target to build the images to allow for use in external tools.

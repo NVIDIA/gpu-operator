@@ -86,9 +86,9 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 # Install / upgrade packages here that are required to resolve CVEs
 ARG CVE_UPDATES
-RUN if [ -n "${CVE_UPDATES}" ]; then \
-        dnf update -y ${CVE_UPDATES} && \
-        rm -rf /var/cache/yum/*; \
-    fi
+ARG CVE_REMOVES
+RUN if [ -n "${CVE_UPDATES}" ]; then dnf update -y ${CVE_UPDATES}; fi && \
+    if [ -n "${CVE_REMOVES}" ]; then dnf remove --skip-broken -y ${CVE_REMOVES}; fi && \
+    rm -rf /var/cache/yum/*
 
 ENTRYPOINT ["/bin/bash"]

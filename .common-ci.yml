@@ -86,6 +86,7 @@ trigger-pipeline:
   variables:
     DIST: ubi9
     CVE_UPDATES: "cyrus-sasl-lib"
+    CVE_REMOVES: "sqlite-libs"
 
 .target-gpu-operator:
   variables:

@@ -292,6 +292,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
+		--build-arg CVE_REMOVES="$(CVE_REMOVES)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
