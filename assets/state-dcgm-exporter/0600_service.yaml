@@ -7,6 +7,7 @@ metadata:
     app: nvidia-dcgm-exporter
   annotations:
     prometheus.io/scrape: "true"
+    prometheus.io/port: "9400"
 spec:
   selector:
     app: nvidia-dcgm-exporter
