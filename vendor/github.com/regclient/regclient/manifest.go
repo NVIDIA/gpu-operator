@@ -99,7 +99,7 @@ func (rc *RegClient) ManifestGet(ctx context.Context, r ref.Ref, opts ...Manifes
 		fn(&opt)
 	}
 	if opt.d.Digest != "" {
-		r.Digest = opt.d.Digest.String()
+		r = r.AddDigest(opt.d.Digest.String())
 		data, err := opt.d.GetData()
 		if err == nil {
 			return manifest.New(

@@ -31,14 +31,14 @@ import (
 // many calls are only supported by certain underlying media types.
 type Manifest interface {
 	GetDescriptor() descriptor.Descriptor
-	GetOrig() interface{}
+	GetOrig() any
 	GetRef() ref.Ref
 	IsList() bool
 	IsSet() bool
 	MarshalJSON() ([]byte, error)
 	RawBody() ([]byte, error)
 	RawHeaders() (http.Header, error)
-	SetOrig(interface{}) error
+	SetOrig(any) error
 
 	// Deprecated: GetConfig should be accessed using [Imager] interface.
 	GetConfig() (descriptor.Descriptor, error)
@@ -96,7 +96,7 @@ type manifestConfig struct {
 	r      ref.Ref
 	desc   descriptor.Descriptor
 	raw    []byte
-	orig   interface{}
+	orig   any
 	header http.Header
 }
 type Opts func(*manifestConfig)
@@ -156,7 +156,7 @@ func WithHeader(header http.Header) Opts {
 }
 
 // WithOrig provides the original manifest variable.
-func WithOrig(orig interface{}) Opts {
+func WithOrig(orig any) Opts {
 	return func(mc *manifestConfig) {
 		mc.orig = orig
 	}
@@ -275,7 +275,7 @@ func HasRateLimit(m Manifest) bool {
 }
 
 // OCIIndexFromAny converts manifest lists to an OCI index.
-func OCIIndexFromAny(orig interface{}) (v1.Index, error) {
+func OCIIndexFromAny(orig any) (v1.Index, error) {
 	ociI := v1.Index{
 		Versioned: v1.IndexSchemaVersion,
 		MediaType: mediatype.OCI1ManifestList,
@@ -293,8 +293,8 @@ func OCIIndexFromAny(orig interface{}) (v1.Index, error) {
 }
 
 // OCIIndexToAny converts from an OCI index back to the manifest list.
-func OCIIndexToAny(ociI v1.Index, origP interface{}) error {
-	// reflect is used to handle both *interface{} and *Manifest
+func OCIIndexToAny(ociI v1.Index, origP any) error {
+	// reflect is used to handle both *interface and *Manifest
 	rv := reflect.ValueOf(origP)
 	for rv.IsValid() && rv.Type().Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -321,7 +321,7 @@ func OCIIndexToAny(ociI v1.Index, origP interface{}) error {
 }
 
 // OCIManifestFromAny converts an image manifest to an OCI manifest.
-func OCIManifestFromAny(orig interface{}) (v1.Manifest, error) {
+func OCIManifestFromAny(orig any) (v1.Manifest, error) {
 	ociM := v1.Manifest{
 		Versioned: v1.ManifestSchemaVersion,
 		MediaType: mediatype.OCI1Manifest,
@@ -341,8 +341,8 @@ func OCIManifestFromAny(orig interface{}) (v1.Manifest, error) {
 }
 
 // OCIManifestToAny converts an OCI manifest back to the image manifest.
-func OCIManifestToAny(ociM v1.Manifest, origP interface{}) error {
-	// reflect is used to handle both *interface{} and *Manifest
+func OCIManifestToAny(ociM v1.Manifest, origP any) error {
+	// reflect is used to handle both *interface and *Manifest
 	rv := reflect.ValueOf(origP)
 	for rv.IsValid() && rv.Type().Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -372,7 +372,7 @@ func OCIManifestToAny(ociM v1.Manifest, origP interface{}) error {
 
 // FromOrig creates a new manifest from the original upstream manifest type.
 // This method should be used if you are creating a new manifest rather than pulling one from a registry.
-func fromOrig(c common, orig interface{}) (Manifest, error) {
+func fromOrig(c common, orig any) (Manifest, error) {
 	var mt string
 	var m Manifest
 	origDigest := c.desc.Digest
@@ -473,7 +473,7 @@ func fromCommon(c common) (Manifest, error) {
 			mt := struct {
 				MediaType     string                  `json:"mediaType,omitempty"`
 				SchemaVersion int                     `json:"schemaVersion,omitempty"`
-				Signatures    []interface{}           `json:"signatures,omitempty"`
+				Signatures    []any                   `json:"signatures,omitempty"`
 				Manifests     []descriptor.Descriptor `json:"manifests,omitempty"`
 				Layers        []descriptor.Descriptor `json:"layers,omitempty"`
 			}{}

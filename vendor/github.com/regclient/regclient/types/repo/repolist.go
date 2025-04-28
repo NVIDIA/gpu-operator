@@ -21,7 +21,7 @@ type RepoList struct {
 type repoCommon struct {
 	host      string
 	mt        string
-	orig      interface{}
+	orig      any
 	rawHeader http.Header
 	rawBody   []byte
 }
@@ -92,7 +92,7 @@ type RepoRegistryList struct {
 	Repositories []string `json:"repositories"`
 }
 
-func (r repoCommon) GetOrig() interface{} {
+func (r repoCommon) GetOrig() any {
 	return r.orig
 }
 

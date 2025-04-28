@@ -115,13 +115,13 @@ func (m *oci1Artifact) GetLayers() ([]descriptor.Descriptor, error) {
 	return m.Blobs, nil
 }
 
-func (m *oci1Manifest) GetOrig() interface{} {
+func (m *oci1Manifest) GetOrig() any {
 	return m.Manifest
 }
-func (m *oci1Index) GetOrig() interface{} {
+func (m *oci1Index) GetOrig() any {
 	return m.Index
 }
-func (m *oci1Artifact) GetOrig() interface{} {
+func (m *oci1Artifact) GetOrig() any {
 	return m.ArtifactManifest
 }
 
@@ -301,7 +301,7 @@ func (m *oci1Index) MarshalPretty() ([]byte, error) {
 		fmt.Fprintf(tw, "\t\n")
 		dRef := m.r
 		if dRef.Reference != "" {
-			dRef.Digest = d.Digest.String()
+			dRef = dRef.AddDigest(d.Digest.String())
 			fmt.Fprintf(tw, "  Name:\t%s\n", dRef.CommonName())
 		}
 		err := d.MarshalPrettyTW(tw, "  ")
@@ -473,7 +473,7 @@ func (m *oci1Index) SetManifestList(dl []descriptor.Descriptor) error {
 	return m.updateDesc()
 }
 
-func (m *oci1Manifest) SetOrig(origIn interface{}) error {
+func (m *oci1Manifest) SetOrig(origIn any) error {
 	orig, ok := origIn.(v1.Manifest)
 	if !ok {
 		return errs.ErrUnsupportedMediaType
@@ -488,7 +488,7 @@ func (m *oci1Manifest) SetOrig(origIn interface{}) error {
 	return m.updateDesc()
 }
 
-func (m *oci1Index) SetOrig(origIn interface{}) error {
+func (m *oci1Index) SetOrig(origIn any) error {
 	orig, ok := origIn.(v1.Index)
 	if !ok {
 		return errs.ErrUnsupportedMediaType
@@ -525,7 +525,7 @@ func (m *oci1Index) SetSubject(d *descriptor.Descriptor) error {
 	return m.updateDesc()
 }
 
-func (m *oci1Artifact) SetOrig(origIn interface{}) error {
+func (m *oci1Artifact) SetOrig(origIn any) error {
 	orig, ok := origIn.(v1.ArtifactManifest)
 	if !ok {
 		return errs.ErrUnsupportedMediaType

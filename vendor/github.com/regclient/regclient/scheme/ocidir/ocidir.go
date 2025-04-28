@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"sync"
 
@@ -335,7 +336,7 @@ func indexCreate() v1.Index {
 
 func indexGet(index v1.Index, r ref.Ref) (descriptor.Descriptor, error) {
 	if r.Digest == "" && r.Tag == "" {
-		r.Tag = "latest"
+		r = r.SetTag("latest")
 	}
 	if r.Digest != "" {
 		for _, im := range index.Manifests {
@@ -395,7 +396,7 @@ func indexSet(index *v1.Index, r ref.Ref, d descriptor.Descriptor) error {
 			// prune entries without any tag and a matching digest
 			// or entries with a matching tag
 			if (name == "" && index.Manifests[i].Digest == d.Digest) || (r.Tag != "" && name == r.Tag) {
-				index.Manifests = append(index.Manifests[:i], index.Manifests[i+1:]...)
+				index.Manifests = slices.Delete(index.Manifests, i, i+1)
 			}
 		}
 	} else {

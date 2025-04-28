@@ -88,10 +88,10 @@ func (m *docker2ManifestList) GetLayers() ([]descriptor.Descriptor, error) {
 	return []descriptor.Descriptor{}, fmt.Errorf("layers are not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 
-func (m *docker2Manifest) GetOrig() interface{} {
+func (m *docker2Manifest) GetOrig() any {
 	return m.Manifest
 }
-func (m *docker2ManifestList) GetOrig() interface{} {
+func (m *docker2ManifestList) GetOrig() any {
 	return m.ManifestList
 }
 
@@ -229,7 +229,7 @@ func (m *docker2ManifestList) MarshalPretty() ([]byte, error) {
 		fmt.Fprintf(tw, "\t\n")
 		dRef := m.r
 		if dRef.Reference != "" {
-			dRef.Digest = d.Digest.String()
+			dRef = dRef.AddDigest(d.Digest.String())
 			fmt.Fprintf(tw, "  Name:\t%s\n", dRef.CommonName())
 		}
 		err := d.MarshalPrettyTW(tw, "  ")
@@ -294,7 +294,7 @@ func (m *docker2ManifestList) SetManifestList(dl []descriptor.Descriptor) error 
 	return m.updateDesc()
 }
 
-func (m *docker2Manifest) SetOrig(origIn interface{}) error {
+func (m *docker2Manifest) SetOrig(origIn any) error {
 	orig, ok := origIn.(schema2.Manifest)
 	if !ok {
 		return errs.ErrUnsupportedMediaType
@@ -308,7 +308,7 @@ func (m *docker2Manifest) SetOrig(origIn interface{}) error {
 	return m.updateDesc()
 }
 
-func (m *docker2ManifestList) SetOrig(origIn interface{}) error {
+func (m *docker2ManifestList) SetOrig(origIn any) error {
 	orig, ok := origIn.(schema2.ManifestList)
 	if !ok {
 		return errs.ErrUnsupportedMediaType

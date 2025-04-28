@@ -266,16 +266,14 @@ func (reg *Reg) blobGetUploadURL(ctx context.Context, r ref.Ref, d descriptor.De
 				slog.String("err", err.Error()))
 		} else {
 			host := reg.hostGet(r.Registry)
+			reg.muHost.Lock()
 			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
-				if minSize > reg.blobChunkLimit {
-					host.BlobChunk = reg.blobChunkLimit
-				} else {
-					host.BlobChunk = minSize
-				}
+				host.BlobChunk = min(minSize, reg.blobChunkLimit)
 				reg.slog.Debug("Registry requested min chunk size",
 					slog.Int64("size", host.BlobChunk),
 					slog.String("host", host.Name))
 			}
+			reg.muHost.Unlock()
 		}
 	}
 	// Extract the location into a new putURL based on whether it's relative, fqdn with a scheme, or without a scheme.
@@ -335,17 +333,14 @@ func (reg *Reg) blobMount(ctx context.Context, rTgt ref.Ref, d descriptor.Descri
 				slog.String("err", err.Error()))
 		} else {
 			host := reg.hostGet(rTgt.Registry)
+			reg.muHost.Lock()
 			if (host.BlobChunk > 0 && minSize > host.BlobChunk) || (host.BlobChunk <= 0 && minSize > reg.blobChunkSize) {
-				// TODO(bmitch): potential race condition, may need a lock before setting/using values in host
-				if minSize > reg.blobChunkLimit {
-					host.BlobChunk = reg.blobChunkLimit
-				} else {
-					host.BlobChunk = minSize
-				}
+				host.BlobChunk = min(minSize, reg.blobChunkLimit)
 				reg.slog.Debug("Registry requested min chunk size",
 					slog.Int64("size", host.BlobChunk),
 					slog.String("host", host.Name))
 			}
+			reg.muHost.Unlock()
 		}
 	}
 	// 201 indicates the blob mount succeeded

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -34,7 +35,7 @@ func (o *OCIDir) tagDelete(_ context.Context, r ref.Ref) error {
 	for i, desc := range index.Manifests {
 		if t, ok := desc.Annotations[aOCIRefName]; ok && t == r.Tag {
 			// remove matching entry from index
-			index.Manifests = append(index.Manifests[:i], index.Manifests[i+1:]...)
+			index.Manifests = slices.Delete(index.Manifests, i, i+1)
 			changed = true
 		}
 	}
@@ -63,14 +64,7 @@ func (o *OCIDir) TagList(ctx context.Context, r ref.Ref, opts ...scheme.TagOpts)
 			if i := strings.LastIndex(t, ":"); i >= 0 {
 				t = t[i+1:]
 			}
-			found := false
-			for _, cur := range tl {
-				if cur == t {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !slices.Contains(tl, t) {
 				tl = append(tl, t)
 			}
 		}

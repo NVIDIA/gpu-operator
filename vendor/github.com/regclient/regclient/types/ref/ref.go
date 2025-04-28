@@ -72,7 +72,7 @@ func New(parse string) (Ref, error) {
 	case "":
 		ret.Scheme = "reg"
 		matchRef := refRE.FindStringSubmatch(tail)
-		if matchRef == nil || len(matchRef) < 5 {
+		if len(matchRef) < 5 {
 			if refRE.FindStringSubmatch(strings.ToLower(tail)) != nil {
 				return Ref{}, fmt.Errorf("%w \"%s\", repo must be lowercase", errs.ErrInvalidReference, tail)
 			}
@@ -105,7 +105,7 @@ func New(parse string) (Ref, error) {
 
 	case "ocidir", "ocifile":
 		matchPath := ocidirRE.FindStringSubmatch(tail)
-		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
+		if len(matchPath) < 2 || matchPath[1] == "" {
 			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrInvalidReference, scheme, tail)
 		}
 		ret.Path = matchPath[1]
@@ -140,7 +140,7 @@ func NewHost(parse string) (Ref, error) {
 	case "":
 		ret.Scheme = "reg"
 		matchReg := registryRE.FindStringSubmatch(tail)
-		if matchReg == nil || len(matchReg) < 2 {
+		if len(matchReg) < 2 {
 			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrParsingFailed, tail)
 		}
 		ret.Registry = matchReg[1]
@@ -150,7 +150,7 @@ func NewHost(parse string) (Ref, error) {
 
 	case "ocidir", "ocifile":
 		matchPath := ocidirRE.FindStringSubmatch(tail)
-		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
+		if len(matchPath) < 2 || matchPath[1] == "" {
 			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrParsingFailed, scheme, tail)
 		}
 		ret.Path = matchPath[1]
@@ -159,6 +159,14 @@ func NewHost(parse string) (Ref, error) {
 		return Ref{}, fmt.Errorf("%w, unknown scheme \"%s\" in \"%s\"", errs.ErrParsingFailed, scheme, parse)
 	}
 	return ret, nil
+}
+
+// AddDigest returns a ref with the requested digest set.
+// The tag will NOT be unset and the reference value will be reset.
+func (r Ref) AddDigest(digest string) Ref {
+	r.Digest = digest
+	r.Reference = r.CommonName()
+	return r
 }
 
 // CommonName outputs a parsable name from a reference.

@@ -35,21 +35,21 @@ ifeq "$(strip $(VER_BUMP))" ''
 endif
 MARKDOWN_LINT_VER?=v0.17.2
 GOMAJOR_VER?=v0.14.0
-GOSEC_VER?=v2.22.0
+GOSEC_VER?=v2.22.3
 GO_VULNCHECK_VER?=v1.1.4
-OSV_SCANNER_VER?=v1.9.2
+OSV_SCANNER_VER?=v2.0.1
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v1.19.0
-SYFT_CONTAINER?=anchore/syft:v1.19.0@sha256:bc1ae555a43011d23bb011a4f50e175fc9a5984a008a3f8f2d692b211fcacd2a
+SYFT_VERSION?=v1.22.0
+SYFT_CONTAINER?=anchore/syft:v1.22.0@sha256:b7b38b51897feb0a8118bbfe8e43a1eb94aaef31f8d0e4663354e42834a12126
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
 		-u "$(shell id -u):$(shell id -g)" \
 		$(SYFT_CONTAINER)
 endif
-STATICCHECK_VER?=v0.5.1
-CI_DISTRIBUTION_VER?=2.8.3
+STATICCHECK_VER?=v0.6.1
+CI_DISTRIBUTION_VER?=3.0.0
 CI_ZOT_VER?=v2.1.2
 
 .PHONY: .FORCE
@@ -102,7 +102,7 @@ vulnerability-scan: osv-scanner vulncheck-go ## Run all vulnerability scanners
 
 .PHONY: osv-scanner
 osv-scanner: $(GOPATH)/bin/osv-scanner .FORCE ## Run OSV Scanner
-	$(GOPATH)/bin/osv-scanner scan --config .osv-scanner.toml -r --experimental-licenses="Apache-2.0,BSD-3-Clause,MIT,CC-BY-SA-4.0,UNKNOWN" .
+	$(GOPATH)/bin/osv-scanner scan --config .osv-scanner.toml -r --licenses="Apache-2.0,BSD-3-Clause,MIT,CC-BY-SA-4.0,UNKNOWN" .
 
 .PHONY: vulncheck-go
 vulncheck-go: $(GOPATH)/bin/govulncheck .FORCE ## Run govulncheck
@@ -245,14 +245,15 @@ $(GOPATH)/bin/staticcheck: .FORCE
 	|| go install "honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VER)"
 
 $(GOPATH)/bin/govulncheck: .FORCE
-	@[ $$(go version -m $(GOPATH)/bin/govulncheck | \
+	@[ -f $(GOPATH)/bin/govulncheck ] \
+	&& [ $$(go version -m $(GOPATH)/bin/govulncheck | \
 		awk -F ' ' '{ if ($$1 == "mod" && $$2 == "golang.org/x/vuln") { printf "%s\n", $$3 } }') = "$(GO_VULNCHECK_VER)" ] \
 	|| CGO_ENABLED=0 go install "golang.org/x/vuln/cmd/govulncheck@$(GO_VULNCHECK_VER)"
 
 $(GOPATH)/bin/osv-scanner: .FORCE
 	@[ -f $(GOPATH)/bin/osv-scanner ] \
 	&& [ "$$(osv-scanner --version | awk -F ': ' '{ if ($$1 == "osv-scanner version") { printf "%s\n", $$2 } }')" = "$(OSV_SCANNER_VER)" ] \
-	|| CGO_ENABLED=0 go install "github.com/google/osv-scanner/cmd/osv-scanner@$(OSV_SCANNER_VER)"
+	|| CGO_ENABLED=0 go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@$(OSV_SCANNER_VER)"
 
 .PHONY: help
 help: # Display help

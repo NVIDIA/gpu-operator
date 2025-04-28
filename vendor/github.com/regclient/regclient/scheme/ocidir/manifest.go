@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"slices"
 
 	// crypto libraries included for go-digest
 	_ "crypto/sha256"
@@ -69,7 +70,7 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 		// remove matching entry from index
 		if r.Digest != "" && index.Manifests[i].Digest.String() == r.Digest {
 			changed = true
-			index.Manifests = append(index.Manifests[:i], index.Manifests[i+1:]...)
+			index.Manifests = slices.Delete(index.Manifests, i, i+1)
 		}
 	}
 	// push manifest back out
@@ -104,7 +105,7 @@ func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, e
 		return nil, fmt.Errorf("unable to read oci index: %w", err)
 	}
 	if r.Digest == "" && r.Tag == "" {
-		r.Tag = "latest"
+		r = r.SetTag("latest")
 	}
 	desc, err := indexGet(index, r)
 	if err != nil {
@@ -151,7 +152,7 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 		return nil, fmt.Errorf("unable to read oci index: %w", err)
 	}
 	if r.Digest == "" && r.Tag == "" {
-		r.Tag = "latest"
+		r = r.SetTag("latest")
 	}
 	desc, err := indexGet(index, r)
 	if err != nil {
@@ -181,9 +182,9 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 			return nil, err
 		}
 		mt := struct {
-			MediaType     string        `json:"mediaType,omitempty"`
-			SchemaVersion int           `json:"schemaVersion,omitempty"`
-			Signatures    []interface{} `json:"signatures,omitempty"`
+			MediaType     string `json:"mediaType,omitempty"`
+			SchemaVersion int    `json:"schemaVersion,omitempty"`
+			Signatures    []any  `json:"signatures,omitempty"`
 		}{}
 		err = json.Unmarshal(raw, &mt)
 		if err != nil {
@@ -218,7 +219,7 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 		opt(&config)
 	}
 	if !config.Child && r.Digest == "" && r.Tag == "" {
-		r.Tag = "latest"
+		r = r.SetTag("latest")
 	}
 	err := o.initIndex(r, true)
 	if err != nil {
@@ -232,9 +233,13 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	if err != nil {
 		return fmt.Errorf("could not serialize manifest: %w", err)
 	}
-	if r.Tag == "" {
-		// force digest to match manifest value
-		r.Digest = desc.Digest.String()
+	if r.Digest != "" && desc.Digest.String() != r.Digest {
+		// Digest algorithm may have changed, try recreating the manifest with the provided ref.
+		// This will fail if the ref digest does not match the manifest.
+		m, err = manifest.New(manifest.WithRef(r), manifest.WithRaw(b))
+		if err != nil {
+			return fmt.Errorf("failed to rebuilding manifest with ref \"%s\": %w", r.CommonName(), err)
+		}
 	}
 	if r.Tag != "" {
 		desc.Annotations = map[string]string{
