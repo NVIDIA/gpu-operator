@@ -431,7 +431,7 @@ github.com/openshift/client-go/image/applyconfigurations/image/v1
 github.com/openshift/client-go/image/applyconfigurations/internal
 github.com/openshift/client-go/image/clientset/versioned/scheme
 github.com/openshift/client-go/image/clientset/versioned/typed/image/v1
-# github.com/operator-framework/api v0.30.0
+# github.com/operator-framework/api v0.31.0
 ## explicit; go 1.23.0
 github.com/operator-framework/api/pkg/lib/version
 github.com/operator-framework/api/pkg/operators
@@ -630,7 +630,7 @@ golang.org/x/crypto/scrypt
 # golang.org/x/mod v0.24.0
 ## explicit; go 1.23.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.37.0
+# golang.org/x/net v0.38.0
 ## explicit; go 1.23.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -1299,7 +1299,7 @@ oras.land/oras-go/pkg/registry/remote/auth
 oras.land/oras-go/pkg/registry/remote/internal/errutil
 oras.land/oras-go/pkg/registry/remote/internal/syncutil
 oras.land/oras-go/pkg/target
-# sigs.k8s.io/controller-runtime v0.20.3
+# sigs.k8s.io/controller-runtime v0.20.4
 ## explicit; go 1.23.0
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder

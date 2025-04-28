@@ -163,8 +163,8 @@ type GrpcPodConfig struct {
 
 // ExtractContentConfig configures context extraction from a file-based catalog index image.
 type ExtractContentConfig struct {
-	// CacheDir is the directory storing the pre-calculated API cache.
-	CacheDir string `json:"cacheDir"`
+	// CacheDir is the (optional) directory storing the pre-calculated API cache.
+	CacheDir string `json:"cacheDir,omitempty"`
 	// CatalogDir is the directory storing the file-based catalog contents.
 	CatalogDir string `json:"catalogDir"`
 }
