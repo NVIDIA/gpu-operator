@@ -440,7 +440,7 @@ jobs:
         name: Check out code
       - name: set-up regctl
         run: |
-          export REGCTL_VERSION=v0.8.2
+          export REGCTL_VERSION=v0.8.3
           mkdir -p bin
           curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
           chmod a+x bin/regctl

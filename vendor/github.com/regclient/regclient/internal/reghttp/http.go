@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -528,7 +529,7 @@ func (resp *Resp) next() error {
 		}
 		err = loopErr
 		if dropHost {
-			hosts = append(hosts[:curHost], hosts[curHost+1:]...)
+			hosts = slices.Delete(hosts, curHost, curHost+1)
 		} else if !retryHost {
 			curHost++
 		}
@@ -643,9 +644,7 @@ func (resp *Resp) backoffGet() time.Time {
 	defer ch.mu.Unlock()
 	if ch.backoffCur > 0 {
 		delay := c.delayInit << ch.backoffCur
-		if delay > c.delayMax {
-			delay = c.delayMax
-		}
+		delay = min(delay, c.delayMax)
 		next := ch.backoffLast.Add(delay)
 		now := time.Now()
 		if now.After(next) {

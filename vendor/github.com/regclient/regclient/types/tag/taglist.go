@@ -29,7 +29,7 @@ type List struct {
 type tagCommon struct {
 	r         ref.Ref
 	mt        string
-	orig      interface{}
+	orig      any
 	rawHeader http.Header
 	rawBody   []byte
 	url       *url.URL
@@ -206,7 +206,7 @@ func (l *List) Append(add *List) error {
 }
 
 // GetOrig returns the underlying tag data structure if defined.
-func (t tagCommon) GetOrig() interface{} {
+func (t tagCommon) GetOrig() any {
 	return t.orig
 }
 

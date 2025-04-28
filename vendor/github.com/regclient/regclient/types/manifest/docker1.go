@@ -82,10 +82,10 @@ func (m *docker1SignedManifest) GetLayers() ([]descriptor.Descriptor, error) {
 	return dl, nil
 }
 
-func (m *docker1Manifest) GetOrig() interface{} {
+func (m *docker1Manifest) GetOrig() any {
 	return m.Manifest
 }
-func (m *docker1SignedManifest) GetOrig() interface{} {
+func (m *docker1SignedManifest) GetOrig() any {
 	return m.SignedManifest
 }
 
@@ -186,7 +186,7 @@ func (m *docker1SignedManifest) SetLayers(dl []descriptor.Descriptor) error {
 	return fmt.Errorf("set methods not supported for for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
 
-func (m *docker1Manifest) SetOrig(origIn interface{}) error {
+func (m *docker1Manifest) SetOrig(origIn any) error {
 	orig, ok := origIn.(schema1.Manifest)
 	if !ok {
 		return errs.ErrUnsupportedMediaType
@@ -211,7 +211,7 @@ func (m *docker1Manifest) SetOrig(origIn interface{}) error {
 	return nil
 }
 
-func (m *docker1SignedManifest) SetOrig(origIn interface{}) error {
+func (m *docker1SignedManifest) SetOrig(origIn any) error {
 	orig, ok := origIn.(schema1.SignedManifest)
 	if !ok {
 		return errs.ErrUnsupportedMediaType

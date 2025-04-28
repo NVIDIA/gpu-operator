@@ -36,7 +36,7 @@ const (
 )
 
 func init() {
-	for c := 0; c < 256; c++ {
+	for c := range 256 {
 		charLUs[c] = 0
 		if strings.ContainsRune(" \t\r\n", rune(c)) {
 			charLUs[c] |= isSpace
@@ -169,20 +169,20 @@ func (a *Auth) AddScope(host, scope string) error {
 	defer a.mu.Unlock()
 	success := false
 	if a.hs[host] == nil {
-		return ErrNoNewChallenge
+		return errs.ErrNoNewChallenge
 	}
 	for _, at := range a.authTypes {
 		if a.hs[host][at] != nil {
 			err := a.hs[host][at].AddScope(scope)
 			if err == nil {
 				success = true
-			} else if err != ErrNoNewChallenge {
+			} else if err != errs.ErrNoNewChallenge {
 				return err
 			}
 		}
 	}
 	if !success {
-		return ErrNoNewChallenge
+		return errs.ErrNoNewChallenge
 	}
 	a.slog.Debug("Auth scope added",
 		slog.String("host", host),
@@ -198,7 +198,7 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 	defer a.mu.Unlock()
 	// verify response is an access denied
 	if resp.StatusCode != http.StatusUnauthorized {
-		return ErrUnsupported
+		return errs.ErrUnsupported
 	}
 
 	// extract host and auth header
@@ -210,7 +210,7 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 	a.slog.Debug("Auth request parsed",
 		slog.Any("challenge", cl))
 	if len(cl) < 1 {
-		return ErrEmptyChallenge
+		return errs.ErrEmptyChallenge
 	}
 	goodChallenge := false
 	// loop over the received challenge(s)
@@ -235,7 +235,7 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 		err := a.hs[host][c.authType].ProcessChallenge(c)
 		if err == nil {
 			goodChallenge = true
-		} else if err == ErrNoNewChallenge {
+		} else if err == errs.ErrNoNewChallenge {
 			// handle race condition when another request updates the challenge
 			// detect that by seeing the current auth header is different
 			prevAH := resp.Request.Header.Get("Authorization")
@@ -248,7 +248,7 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 		}
 	}
 	if !goodChallenge {
-		return ErrUnauthorized
+		return errs.ErrHTTPUnauthorized
 	}
 
 	return nil
@@ -321,116 +321,127 @@ func ParseAuthHeaders(ahl []string) ([]challenge, error) {
 func parseAuthHeader(ah string) ([]challenge, error) {
 	var cl []challenge
 	var c *challenge
-	var eb, atb, kb, vb []byte // eb is element bytes, atb auth type, kb key, vb value
-	state := "string"
+	curElement := []byte{}
+	curKey := ""
+	stateElement := "string"
+	stateSyntax := "start"
 
 	for _, b := range []byte(ah) {
-		switch state {
+		switch stateElement {
 		case "string":
-			if len(eb) == 0 {
-				// beginning of string
-				if b == '"' { // TODO: Invalid?
-					state = "quoted"
-				} else if charLUs[b]&isToken != 0 {
-					// read any token
-					eb = append(eb, b)
-				} else if charLUs[b]&isSpace != 0 {
-					// ignore leading whitespace
-				} else {
-					// unknown leading char
-					return nil, ErrParseFailure
-				}
-			} else {
-				if charLUs[b]&isToken != 0 {
-					// read any token
-					eb = append(eb, b)
-				} else if b == '=' && len(atb) > 0 {
-					// equals when authtype is defined makes this a key
-					kb = eb
-					eb = []byte{}
-					state = "value"
-				} else if charLUs[b]&isSpace != 0 {
-					// space ends the element
-					atb = eb
-					eb = []byte{}
-					c = &challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
-					cl = append(cl, *c)
-				} else {
-					// unknown char
-					return nil, ErrParseFailure
-				}
-			}
-
-		case "value":
+			// string: ignore leading space, enter quote only if first character, handle escapes, handle valid tokens, else end
 			if charLUs[b]&isToken != 0 {
-				// read any token
-				vb = append(vb, b)
-			} else if b == '"' && len(vb) == 0 {
-				// quoted value
-				state = "quoted"
-			} else if charLUs[b]&isSpace != 0 || b == ',' {
-				// space or comma ends the value
-				c.params[strings.ToLower(string(kb))] = string(vb)
-				kb = []byte{}
-				vb = []byte{}
-				if b == ',' {
-					state = "string"
-				} else {
-					state = "endvalue"
-				}
-			} else {
-				// unknown char
-				return nil, ErrParseFailure
-			}
-
-		case "quoted":
-			if b == '"' {
-				// end quoted string
-				c.params[strings.ToLower(string(kb))] = string(vb)
-				kb = []byte{}
-				vb = []byte{}
-				state = "endvalue"
+				// add valid tokens to element
+				curElement = append(curElement, b)
+			} else if charLUs[b]&isSpace != 0 && len(curElement) == 0 {
+				// ignore leading spaces
+			} else if b == '"' && len(curElement) == 0 {
+				stateElement = "quote"
 			} else if b == '\\' {
-				state = "escape"
+				stateElement = "escape_string"
 			} else {
-				// all other bytes in a quoted string are taken as-is
-				vb = append(vb, b)
+				stateElement = "end"
 			}
-
-		case "endvalue":
-			if charLUs[b]&isSpace != 0 {
-				// ignore leading whitespace
-			} else if b == ',' {
-				// expect a comma separator, return to start of a string
-				state = "string"
+		case "quote":
+			// quote: handle escapes, handle closing quote (quote_end to read next character), all other tokens are valid
+			if b == '\\' {
+				stateElement = "escape_quote"
+			} else if b == '"' {
+				stateElement = "quote_end"
 			} else {
-				// unknown char
-				return nil, ErrParseFailure
+				curElement = append(curElement, b)
 			}
-
-		case "escape":
-			vb = append(vb, b)
-			state = "quoted"
-
+		case "quote_end":
+			// any character after the close quote is the end of the element
+			stateElement = "end"
+		case "escape_string":
+			// escape_string: handle any character and return to string state
+			curElement = append(curElement, b)
+			stateElement = "string"
+		case "escape_quote":
+			// escape_quote: handle any character and return to quote state
+			curElement = append(curElement, b)
+			stateElement = "quote"
+		case "end":
+			// finished parsing element, continue to processing element according to the current state
 		default:
-			return nil, ErrParseFailure
+			return nil, fmt.Errorf("unhandled element case: %w", errs.ErrParsingFailed)
 		}
-	}
+		if stateElement != "end" {
+			// continue parsing the element until it ends
+			continue
+		}
 
-	// process any content left at end of string, and handle any unfinished sections
-	switch state {
-	case "string":
-		if len(eb) != 0 {
-			atb = eb
-			c = &challenge{authType: strings.ToLower(string(atb)), params: map[string]string{}}
+		// syntax looks at each string within the overall challenge syntax
+		switch stateSyntax {
+		case "start":
+			// start: (start of auth_type) read auth_type and space (end_auth_type) or auth_type and comma (start)
+			if charLUs[b]&isSpace != 0 && len(curElement) > 0 {
+				stateSyntax = "end_auth_type"
+			} else if b == ',' && len(curElement) > 0 {
+				// state remains at start
+			} else {
+				return nil, fmt.Errorf("start element did not end with a space or comma: %w", errs.ErrParsingFailed)
+			}
+			c = &challenge{authType: strings.ToLower(string(curElement)), params: map[string]string{}}
 			cl = append(cl, *c)
+		case "start_or_param":
+			// start_or_param: (after param_value) read auth_type and space (end_auth_type) or param_key and equals (param_value)
+			if charLUs[b]&isSpace != 0 && len(curElement) > 0 {
+				c = &challenge{authType: strings.ToLower(string(curElement)), params: map[string]string{}}
+				cl = append(cl, *c)
+				stateSyntax = "end_auth_type"
+			} else if b == '=' && len(curElement) > 0 {
+				curKey = strings.ToLower((string(curElement)))
+				stateSyntax = "param_value"
+			} else {
+				return nil, fmt.Errorf("expected auth type or param: %w", errs.ErrParsingFailed)
+			}
+		case "end_auth_type":
+			// end_auth_type: (after reading auth_type) read param_key and equals (param_value) or just a comma (start)
+			if b == '=' && len(curElement) > 0 {
+				curKey = strings.ToLower((string(curElement)))
+				stateSyntax = "param_value"
+			} else if b == ',' && len(curElement) == 0 {
+				// ignore white space between end of auth_type and comma
+				stateSyntax = "start"
+			} else {
+				return nil, fmt.Errorf("expected param or comma: %w", errs.ErrParsingFailed)
+			}
+		case "param_value":
+			// param_value: (after param_key) read param_value and comma (start_or_param)
+			if b == ',' {
+				c.params[curKey] = string(curElement)
+				stateSyntax = "start_or_param"
+				curKey = ""
+			} else {
+				return nil, fmt.Errorf("expected param value: %w", errs.ErrParsingFailed)
+			}
+		default:
+			return nil, fmt.Errorf("unhandled syntax case: %w", errs.ErrParsingFailed)
 		}
-	case "value":
-		if len(vb) != 0 {
-			c.params[strings.ToLower(string(kb))] = string(vb)
+		// reset element state
+		stateElement = "string"
+		curElement = []byte{}
+	}
+	// at end of parsing, if the element is not empty, process according to syntax state:
+	if len(curElement) > 0 {
+		// ensure this is not within an unclosed quote or partial escape
+		if stateElement != "string" && stateElement != "quote_end" {
+			return nil, fmt.Errorf("eol element in state %s: %w", stateElement, errs.ErrParsingFailed)
 		}
-	case "quoted", "escape":
-		return nil, ErrParseFailure
+		switch stateSyntax {
+		case "start", "start_or_param":
+			// add a new auth type if a string is seen at the start, before any equals
+			c = &challenge{authType: strings.ToLower(string(curElement)), params: map[string]string{}}
+			cl = append(cl, *c)
+		case "param_value":
+			// add the last param key=val
+			c.params[curKey] = string(curElement)
+		case "end_auth_type":
+			// missing equals for param
+			return nil, fmt.Errorf("eol at param without value: %w", errs.ErrParsingFailed)
+		}
 	}
 
 	return cl, nil
@@ -454,19 +465,19 @@ func NewBasicHandler(client *http.Client, clientID, host string, credsFn CredsFn
 
 // AddScope is not valid for BasicHandler
 func (b *basicHandler) AddScope(scope string) error {
-	return ErrNoNewChallenge
+	return errs.ErrNoNewChallenge
 }
 
 // ProcessChallenge for BasicHandler is a noop
 func (b *basicHandler) ProcessChallenge(c challenge) error {
 	if _, ok := c.params["realm"]; !ok {
-		return ErrInvalidChallenge
+		return errs.ErrInvalidChallenge
 	}
 	if b.realm != c.params["realm"] {
 		b.realm = c.params["realm"]
 		return nil
 	}
-	return ErrNoNewChallenge
+	return errs.ErrNoNewChallenge
 }
 
 // GenerateAuth for BasicHandler generates base64 encoded user/pass for a host
@@ -519,7 +530,7 @@ func NewBearerHandler(client *http.Client, clientID, host string, credsFn CredsF
 func (b *bearerHandler) AddScope(scope string) error {
 	if b.scopeExists(scope) {
 		if b.token.Token == "" || !b.isExpired() {
-			return ErrNoNewChallenge
+			return errs.ErrNoNewChallenge
 		}
 		return nil
 	}
@@ -586,7 +597,7 @@ func parseScope(scope string) (string, []string, bool) {
 // Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:samalba/my-app:pull,push"
 func (b *bearerHandler) ProcessChallenge(c challenge) error {
 	if _, ok := c.params["realm"]; !ok {
-		return ErrInvalidChallenge
+		return errs.ErrInvalidChallenge
 	}
 	if _, ok := c.params["service"]; !ok {
 		c.params["service"] = ""
@@ -598,18 +609,18 @@ func (b *bearerHandler) ProcessChallenge(c challenge) error {
 	existingScope := b.scopeExists(c.params["scope"])
 
 	if b.realm == c.params["realm"] && b.service == c.params["service"] && existingScope && (b.token.Token == "" || !b.isExpired()) {
-		return ErrNoNewChallenge
+		return errs.ErrNoNewChallenge
 	}
 
 	if b.realm == "" {
 		b.realm = c.params["realm"]
 	} else if b.realm != c.params["realm"] {
-		return ErrInvalidChallenge
+		return errs.ErrInvalidChallenge
 	}
 	if b.service == "" {
 		b.service = c.params["service"]
 	} else if b.service != c.params["service"] {
-		return ErrInvalidChallenge
+		return errs.ErrInvalidChallenge
 	}
 	if !existingScope {
 		b.addScope(c.params["scope"])
@@ -629,7 +640,7 @@ func (b *bearerHandler) GenerateAuth() (string, error) {
 	if b.token.RefreshToken != "" || cred.Token != "" {
 		if err := b.tryPost(cred); err == nil {
 			return fmt.Sprintf("Bearer %s", b.token.Token), nil
-		} else if err != ErrUnauthorized {
+		} else if err != errs.ErrHTTPUnauthorized {
 			return "", fmt.Errorf("failed to request auth token (post): %w%.0w", err, errs.ErrHTTPUnauthorized)
 		}
 	}
@@ -637,11 +648,11 @@ func (b *bearerHandler) GenerateAuth() (string, error) {
 	// attempt a get (with basic auth if user/pass available)
 	if err := b.tryGet(cred); err == nil {
 		return fmt.Sprintf("Bearer %s", b.token.Token), nil
-	} else if err != ErrUnauthorized {
+	} else if err != errs.ErrHTTPUnauthorized {
 		return "", fmt.Errorf("failed to request auth token (get): %w%.0w", err, errs.ErrHTTPUnauthorized)
 	}
 
-	return "", ErrUnauthorized
+	return "", errs.ErrHTTPUnauthorized
 }
 
 // isExpired returns true when token issue date is either 0, token has expired,
@@ -764,7 +775,7 @@ func (b *bearerHandler) scopeExists(search string) bool {
 // validateResponse extracts the returned token
 func (b *bearerHandler) validateResponse(resp *http.Response) error {
 	if resp.StatusCode != 200 {
-		return ErrUnauthorized
+		return errs.ErrHTTPUnauthorized
 	}
 
 	// decode response and if successful, update token
@@ -833,7 +844,7 @@ func NewJWTHubHandler(client *http.Client, clientID, host string, credsFn CredsF
 
 // AddScope is not valid for JWTHubHandler
 func (j *jwtHubHandler) AddScope(scope string) error {
-	return ErrNoNewChallenge
+	return errs.ErrNoNewChallenge
 }
 
 // ProcessChallenge handles WWW-Authenticate header for JWT auth on Docker Hub
@@ -870,7 +881,7 @@ func (j *jwtHubHandler) ProcessChallenge(c challenge) error {
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 || resp.StatusCode >= 300 {
-		return ErrUnauthorized
+		return errs.ErrHTTPUnauthorized
 	}
 
 	var bodyParsed jwtHubResp
@@ -888,5 +899,5 @@ func (j *jwtHubHandler) GenerateAuth() (string, error) {
 	if len(j.jwt) > 0 {
 		return fmt.Sprintf("JWT %s", j.jwt), nil
 	}
-	return "", ErrUnauthorized
+	return "", errs.ErrHTTPUnauthorized
 }

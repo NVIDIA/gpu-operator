@@ -4,6 +4,7 @@ package pqueue
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 )
 
@@ -63,18 +64,11 @@ func (q *Queue[T]) Acquire(ctx context.Context, e T) (func(), error) {
 	case <-ctx.Done():
 		// context abort, remove queued entry
 		q.mu.Lock()
-		for i := range q.queued {
-			if q.queued[i] == &e {
-				if len(q.queued) >= i+1 {
-					q.queued = q.queued[:i]
-					q.wait = q.wait[:i]
-				} else {
-					q.queued = append(q.queued[:i], q.queued[i+1:]...)
-					q.wait = append(q.wait[:i], q.wait[i+1:]...)
-				}
-				q.mu.Unlock()
-				return nil, ctx.Err()
-			}
+		if i := slices.Index(q.queued, &e); i >= 0 {
+			q.queued = slices.Delete(q.queued, i, i+1)
+			q.wait = slices.Delete(q.wait, i, i+1)
+			q.mu.Unlock()
+			return nil, ctx.Err()
 		}
 		q.mu.Unlock()
 		// queued entry found, assume race condition with context and entry being released, release next entry
@@ -113,15 +107,8 @@ func (q *Queue[T]) release(prev *T) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	// remove prev entry from active list
-	for i := range q.active {
-		if q.active[i] == prev {
-			if i == len(q.active)+1 {
-				q.active = q.active[:i]
-			} else {
-				q.active = append(q.active[:i], q.active[i+1:]...)
-			}
-			break
-		}
+	if i := slices.Index(q.active, prev); i >= 0 {
+		q.active = slices.Delete(q.active, i, i+1)
 	}
 	// skip checks when at limit or nothing queued
 	if len(q.queued) == 0 {
@@ -140,23 +127,13 @@ func (q *Queue[T]) release(prev *T) {
 	if q.next != nil && len(q.queued) > 1 {
 		i = q.next(q.queued, q.active)
 		// validate response
-		if i < 0 {
-			i = 0
-		}
-		if i >= len(q.queued) {
-			i = len(q.queued) - 1
-		}
+		i = max(min(i, len(q.queued)-1), 0)
 	}
 	// release queued entry, move to active list, and remove from queued/wait lists
 	close(*q.wait[i])
 	q.active = append(q.active, q.queued[i])
-	if i == len(q.queued)-1 {
-		q.queued = q.queued[:i]
-		q.wait = q.wait[:i]
-	} else {
-		q.queued = append(q.queued[:i], q.queued[i+1:]...)
-		q.wait = append(q.wait[:i], q.wait[i+1:]...)
-	}
+	q.queued = slices.Delete(q.queued, i, i+1)
+	q.wait = slices.Delete(q.wait, i, i+1)
 }
 
 // releaseFn is a convenience wrapper around [release].
@@ -191,11 +168,7 @@ func AcquireMulti[T any](ctx context.Context, e T, qList ...*Queue[T]) (context.
 	// delete nil entries
 	for i := len(qList) - 1; i >= 0; i-- {
 		if qList[i] == nil {
-			if i == len(qList)-1 {
-				qList = qList[:i]
-			} else {
-				qList = append(qList[:i], qList[i+1:]...)
-			}
+			qList = slices.Delete(qList, i, i+1)
 		}
 	}
 	// empty/nil list is a noop
@@ -276,11 +249,9 @@ func (q *Queue[T]) checkContext(ctx context.Context) (bool, error) {
 	if qCtxVal.qList == nil {
 		return false, nil
 	}
-	for _, cur := range qCtxVal.qList {
-		if cur == q {
-			// instance already locked
-			return true, nil
-		}
+	if slices.Contains(qCtxVal.qList, q) {
+		// instance already locked
+		return true, nil
 	}
 	return true, fmt.Errorf("cannot acquire new locks during a transaction")
 }

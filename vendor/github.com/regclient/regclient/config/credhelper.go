@@ -86,6 +86,9 @@ func (ch *credHelper) list() ([]Host, error) {
 	}
 	hostList := []Host{}
 	for host, user := range credList {
+		if !HostValidate(host) {
+			continue
+		}
 		h := HostNewName(host)
 		h.User = user
 		h.CredHelper = ch.prog

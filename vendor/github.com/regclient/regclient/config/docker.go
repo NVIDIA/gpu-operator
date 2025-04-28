@@ -85,6 +85,9 @@ func dockerParse(cf *conffile.File) ([]Host, error) {
 	}
 	hosts := []Host{}
 	for name, auth := range dc.AuthConfigs {
+		if !HostValidate(name) {
+			continue
+		}
 		h, err := dockerAuthToHost(name, dc, auth)
 		if err != nil {
 			continue
@@ -93,9 +96,12 @@ func dockerParse(cf *conffile.File) ([]Host, error) {
 	}
 	// also include default entries for credential helpers
 	for name, helper := range dc.CredentialHelpers {
+		if !HostValidate(name) {
+			continue
+		}
 		h := HostNewName(name)
 		h.CredHelper = dockerHelperPre + helper
-		if _, ok := dc.AuthConfigs[h.Name]; ok {
+		if _, ok := dc.AuthConfigs[name]; ok {
 			continue // skip fields with auth config
 		}
 		hosts = append(hosts, *h)
