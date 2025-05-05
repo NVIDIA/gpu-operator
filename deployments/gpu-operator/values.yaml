@@ -146,7 +146,7 @@ driver:
   usePrecompiled: false
   repository: nvcr.io/nvidia
   image: driver
-  version: "570.124.06"
+  version: "570.133.20"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   startupProbe:
@@ -234,7 +234,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.17.5-ubuntu20.04
+  version: v1.17.6-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -446,7 +446,7 @@ gdrcopy:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: gdrdrv
-  version: "v2.4.4"
+  version: "v2.5"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
