@@ -191,10 +191,27 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 
 	for _, ds := range list.Items {
 		ds := ds
-		// We consider a daemonset to be stale only if it has no desired number of pods and no pods currently mis-scheduled
-		// As per the Kubernetes docs, a daemonset pod is mis-scheduled when an already scheduled pod no longer satisfies
-		// node affinity constraints or has un-tolerated taints, for e.g. "node.kubernetes.io/unreachable:NoSchedule"
+		// We consider a DaemonSet to be stale when all three conditions are true:
+		//
+		// 1. The desired number of pods reported by the DaemonSet controller is 0
+		// 2. The number of mis-scheduled pods is 0. As per the Kubernetes docs, a DaemonSet pod is mis-scheduled when an
+		//    already scheduled pod no longer satisfies node affinity constraints or has untolerated taints, e.g.
+		//    "node.kubernetes.io/unreachable:NoSchedule"
+		// 3. The DaemonSet's nodeSelector matches 0 nodes.
+		//
+		// #3 was added in response to https://github.com/NVIDIA/gpu-operator/issues/1368 where the NVIDIADriver controller
+		// entered an endless loop of creating and deleting a DaemonSet. The DaemonSet's nodeSelector matched one or more nodes,
+		// but DesiredNumberScheduled and NumberMisscheduled were both 0 because the DaemonSet did not tolerate a taint on all
+		// the nodes.
 		if ds.Status.DesiredNumberScheduled == 0 && ds.Status.NumberMisscheduled == 0 {
+			nodeList := &corev1.NodeList{}
+			err := s.client.List(ctx, nodeList, client.MatchingLabels(ds.Spec.Template.Spec.NodeSelector))
+			if err != nil {
+				return fmt.Errorf("failed to list nodes: %w", err)
+			}
+			if len(nodeList.Items) > 0 {
+				continue
+			}
 			logger.V(consts.LogLevelInfo).Info("Deleting inactive driver DaemonSet", "Name", ds.Name)
 			err = s.client.Delete(ctx, &ds)
 			if err != nil {
