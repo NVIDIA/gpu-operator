@@ -767,6 +767,12 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="MPS related configuration for the NVIDIA Device Plugin"
 	MPS *MPSConfig `json:"mps,omitempty"`
+
+	// Unpriveleged indicates NVIDIA Device Plugin should run with securityContext: priveleged: false
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Run NVIDIA Device Plugin daemon set with privileged false, which alllows limiting NVIDIA_VISIBLE_DEVICES"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Unprivileged *bool `json:"enabled,omitempty"`
 }
 
 // DevicePluginConfig defines ConfigMap name for NVIDIA Device Plugin config
