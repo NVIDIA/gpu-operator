@@ -954,6 +954,11 @@ type DCGMExporterServiceMonitorConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Relabelings allows to rewrite labels on metric sets for NVIDIA DCGM Exporter"
 	Relabelings []*promv1.RelabelConfig `json:"relabelings,omitempty"`
+
+	// MetricRelabelings configures the relabeling rules to apply to the samples before ingestion for NVIDIA DCGM Exporter.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="MetricRelabelings configures the relabeling rules to apply to the samples before ingestion for NVIDIA DCGM Exporter."
+	MetricRelabelings []*promv1.RelabelConfig `json:"metricRelabelings,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment
