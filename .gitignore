@@ -1,4 +1,5 @@
 /coverage.*
+lcov.info
 
 # Binaries for programs and plugins
 *.exe

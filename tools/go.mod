@@ -3,6 +3,7 @@ module github.com/NVIDIA/gpu-operator/tools
 go 1.24.0
 
 require (
+	github.com/jandelgado/gcov2lcov v1.1.1
 	k8s.io/code-generator v0.32.3
 	sigs.k8s.io/controller-tools v0.17.2
 	sigs.k8s.io/kustomize/kustomize/v5 v5.6.0

@@ -80,6 +80,7 @@ PWD = $(shell pwd)
 CLIENT_GEN = $(PWD)/bin/client-gen
 CONTROLLER_GEN = $(PWD)/bin/controller-gen
 KUSTOMIZE = $(PWD)/bin/kustomize
+GCOV2LCOV ?= $(PWD)/bin/gcov2lcov
 
 # Build gpu-operator binary
 gpu-operator:
@@ -255,6 +256,9 @@ unit-test: build
 coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
+
+cov-report: coverage install-tools
+	$(GCOV2LCOV) -infile $(COVERAGE_FILE) -outfile lcov.info
 
 ##### Public rules #####
 DISTRIBUTIONS := ubi9
