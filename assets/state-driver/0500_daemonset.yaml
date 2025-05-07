@@ -122,6 +122,9 @@ spec:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
             readOnly: true
+          - name: urm-nvidia-keyring
+            mountPath: "/usr/share/keyrings/urm-nvidia.gpg"
+            readOnly: true
           - name: mlnx-ofed-usr-src
             mountPath: /run/mellanox/drivers/usr/src
             mountPropagation: HostToContainer
@@ -323,3 +326,6 @@ spec:
           hostPath:
             path: /run/nvidia/driver/lib/firmware
             type: DirectoryOrCreate
+        - name: urm-nvidia-keyring
+          hostPath:
+            path: /usr/share/keyrings/urm-nvidia.gpg
