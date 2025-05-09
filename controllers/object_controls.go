@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"os"
 	"path"
 	"regexp"
@@ -31,7 +30,6 @@ import (
 
 	"path/filepath"
 
-	"github.com/davecgh/go-spew/spew"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -4294,7 +4292,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 			"Name", obj.Name,
 		)
 		// generate hash for the spec to create
-		hashStr := getDaemonsetHash(obj)
+		hashStr := utils.GetObjectHash(obj)
 		// add annotation to the Daemonset with hash value during creation
 		obj.Annotations[NvidiaAnnotationHashKey] = hashStr
 		err = n.client.Create(ctx, obj)
@@ -4326,18 +4324,6 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	return isDaemonSetReady(obj.Name, n), nil
 }
 
-func getDaemonsetHash(daemonset *appsv1.DaemonSet) string {
-	hasher := fnv.New32a()
-	printer := spew.ConfigState{
-		Indent:         " ",
-		SortKeys:       true,
-		DisableMethods: true,
-		SpewKeys:       true,
-	}
-	printer.Fprintf(hasher, "%#v", daemonset)
-	return fmt.Sprint(hasher.Sum32())
-}
-
 // isDaemonsetSpecChanged returns true if the spec has changed between existing one
 // and new Daemonset spec compared by hash.
 func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bool {
@@ -4348,7 +4334,7 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 		panic("appsv1.DaemonSet.Annotations must be allocated prior to calling isDaemonsetSpecChanged()")
 	}
 
-	hashStr := getDaemonsetHash(new)
+	hashStr := utils.GetObjectHash(new)
 	foundHashAnnotation := false
 
 	for annotation, value := range current.Annotations {
