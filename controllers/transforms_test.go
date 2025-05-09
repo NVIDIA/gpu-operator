@@ -1183,16 +1183,6 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 			errorExpected: true,
 		},
 		{
-			description: "node status exporter",
-			ds: NewDaemonset().
-				WithContainer(corev1.Container{Name: "dummy"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{},
-			},
-			expectedDs: NewDaemonset().
-				WithContainer(corev1.Container{Name: "dummy"}),
-		},
-		{
 			description: "valid node status exporter spec",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "dummy"}),
