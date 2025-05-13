@@ -55,10 +55,15 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make gpu-operator
 
-FROM nvcr.io/nvidia/cuda:12.8.1-base-ubi9
+# Download must-gather dependency: `kubectl`
+ARG TARGETARCH
+RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl && \
+    chmod +x ./kubectl
 
-# Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
-RUN dnf remove -y cuda-*
+FROM nvcr.io/nvidia/distroless/go:v3.1.7-dev
+
+USER 65532:65532
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -76,32 +81,15 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/kubectl /usr/bin/
 
-RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
-RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
-
-# Install must-gather dependency: `kubectl`
-ARG TARGETARCH
-RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
-RUN chmod +x ./kubectl
-RUN mv ./kubectl /usr/local/bin
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
-
-# Install / upgrade packages here that are required to resolve CVEs
-ARG CVE_UPDATES
-RUN if [ -n "${CVE_UPDATES}" ]; then \
-        dnf update -y ${CVE_UPDATES} && \
-        rm -rf /var/cache/yum/*; \
-    fi
-
-RUN useradd gpu-operator
-USER gpu-operator
 
 ENTRYPOINT ["/usr/bin/gpu-operator"]

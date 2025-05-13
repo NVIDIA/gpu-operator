@@ -51,22 +51,16 @@ FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 RUN mkdir /artifacts
 RUN cp /cuda-samples/vectorAdd /artifacts/vectorAdd
 
-FROM nvcr.io/nvidia/cuda:12.8.1-base-ubi9
+# The C/C++ distroless image is used as a base since the CUDA vectorAdd \
+# sample application depends on C/C++ libraries.
+FROM nvcr.io/nvidia/distroless/cc:v3.1.7-dev
 
-# Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
-RUN dnf remove -y cuda-*
+USER 0:0
 
-RUN dnf install -y \
-        kmod \
-        pciutils && \
-    rm -rf /var/cache/yum/*
-
-RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY --from=build /artifacts/nvidia-validator  /usr/bin/nvidia-validator
 COPY --from=sample-builder /artifacts/vectorAdd /usr/bin/vectorAdd
-RUN mkdir -p /var/nvidia/manifests
-COPY --from=build /artifacts/plugin-workload-validation.yaml /var/nvidia/manifests
-COPY --from=build /artifacts/cuda-workload-validation.yaml /var/nvidia/manifests
+COPY --from=build /artifacts/plugin-workload-validation.yaml /var/nvidia/manifests/plugin-workload-validation.yaml
+COPY --from=build /artifacts/cuda-workload-validation.yaml /var/nvidia/manifests/cuda-workload-validation.yaml
 
 ENV NVIDIA_DISABLE_REQUIRE="true"
 ENV NVIDIA_VISIBLE_DEVICES=void
@@ -83,12 +77,3 @@ LABEL name="NVIDIA Validator for the GPU Operator"
 LABEL summary="NVIDIA Validator for the GPU Operator"
 LABEL description="See summary"
 LABEL vsc-ref=${GIT_COMMIT}
-
-# Install / upgrade packages here that are required to resolve CVEs
-ARG CVE_UPDATES
-RUN if [ -n "${CVE_UPDATES}" ]; then \
-        dnf update -y ${CVE_UPDATES} && \
-        rm -rf /var/cache/yum/*; \
-    fi
-
-ENTRYPOINT ["/bin/bash"]
