@@ -103,7 +103,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = vendor.WriteString(fmt.Sprintf("0x%x", nvpci.PCINvidiaVendorID))
+	_, err = fmt.Fprintf(vendor, "0x%x", nvpci.PCINvidiaVendorID)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = class.WriteString(fmt.Sprintf("0x%x", nvpci.PCI3dControllerClass))
+	_, err = fmt.Fprintf(class, "0x%x", nvpci.PCI3dControllerClass)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = numa.WriteString(fmt.Sprintf("%v", numaNode))
+	_, err = fmt.Fprintf(numa, "%v", numaNode)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 	if err != nil {
 		return err
 	}
-	_, err = resource.WriteString(fmt.Sprintf("0x%x 0x%x 0x%x", bar0[0], bar0[1], bar0[2]))
+	_, err = fmt.Fprintf(resource, "0x%x 0x%x 0x%x", bar0[0], bar0[1], bar0[2])
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 		if err != nil {
 			return err
 		}
-		_, err = name.WriteString(fmt.Sprintf("NVIDIA %s", mdevTypeName))
+		_, err = fmt.Fprintf(name, "NVIDIA %s", mdevTypeName)
 		if err != nil {
 			return err
 		}
