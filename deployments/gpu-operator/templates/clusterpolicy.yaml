@@ -515,6 +515,9 @@ spec:
     {{- if .Values.dcgmExporter.serviceMonitor }}
     serviceMonitor: {{ toYaml .Values.dcgmExporter.serviceMonitor | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.service }}
+    service: {{ toYaml .Values.dcgmExporter.service | nindent 6 }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}
