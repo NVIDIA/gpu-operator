@@ -701,6 +701,27 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	return kFVersion, osTag, osVersion
 }
 
+func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
+	logger := n.logger.WithValues("Service", obj.Name)
+	transformations := map[string]func(*corev1.Service, *gpuv1.ClusterPolicySpec) error{
+		"nvidia-dcgm-exporter": TransformDCGMExporterService,
+	}
+
+	t, ok := transformations[obj.Name]
+	if !ok {
+		logger.V(2).Info(fmt.Sprintf("No transformation for Service '%s'", obj.Name))
+		return nil
+	}
+
+	err := t(obj, &n.singleton.Spec)
+	if err != nil {
+		logger.Error(err, "Failed to apply transformation", "Service", obj.Name)
+		return err
+	}
+
+	return nil
+}
+
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
@@ -962,6 +983,20 @@ func parseOSRelease() (map[string]string, error) {
 		}
 	}
 	return release, nil
+}
+
+func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPolicySpec) error {
+	serviceConfig := config.DCGMExporter.ServiceSpec
+	if serviceConfig != nil {
+		if len(serviceConfig.Type) > 0 {
+			obj.Spec.Type = serviceConfig.Type
+		}
+
+		if serviceConfig.InternalTrafficPolicy != nil {
+			obj.Spec.InternalTrafficPolicy = serviceConfig.InternalTrafficPolicy
+		}
+	}
+	return nil
 }
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
@@ -4465,8 +4500,14 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
+	err := preprocessService(obj, n)
+	if err != nil {
+		logger.Info("Couldn't preprocess Service", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
 	found := &corev1.Service{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
 		err = n.client.Create(ctx, obj)

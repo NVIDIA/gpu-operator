@@ -381,6 +381,19 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  service:
+                    description: 'Optional: Service configuration for NVIDIA DCGM
+                      Exporter'
+                    properties:
+                      internalTrafficPolicy:
+                        description: InternalTrafficPolicy describes how nodes distribute
+                          service traffic they receive on the ClusterIP.
+                        type: string
+                      type:
+                        description: Type represents the ServiceType which describes
+                          ingress methods for a service
+                        type: string
+                    type: object
                   serviceMonitor:
                     description: 'Optional: ServiceMonitor configuration for NVIDIA
                       DCGM Exporter'
