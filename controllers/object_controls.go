@@ -4544,6 +4544,33 @@ func crdExists(n ClusterPolicyController, name string) (bool, error) {
 	return true, nil
 }
 
+func serviceMonitorCustomEdits(desiredState *gpuv1.ServiceMonitorConfig, currentState *promv1.ServiceMonitor) {
+	// Apply custom edits for ServiceMonitor
+	if desiredState.Interval != "" {
+		currentState.Spec.Endpoints[0].Interval = desiredState.Interval
+	}
+
+	if desiredState.HonorLabels != nil {
+		currentState.Spec.Endpoints[0].HonorLabels = *desiredState.HonorLabels
+	}
+
+	if desiredState.AdditionalLabels != nil {
+		for key, value := range desiredState.AdditionalLabels {
+			currentState.ObjectMeta.Labels[key] = value
+		}
+	}
+
+	if desiredState.Relabelings != nil {
+		relabelConfigs := make([]promv1.RelabelConfig, len(desiredState.Relabelings))
+		for i, relabel := range desiredState.Relabelings {
+			if relabel != nil {
+				relabelConfigs[i] = *relabel
+			}
+		}
+		currentState.Spec.Endpoints[0].RelabelConfigs = relabelConfigs
+	}
+}
+
 // ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
@@ -4593,30 +4620,21 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 
 		// Apply custom edits for DCGM Exporter
-		if serviceMonitor.Interval != "" {
-			obj.Spec.Endpoints[0].Interval = serviceMonitor.Interval
-		}
-
-		if serviceMonitor.HonorLabels != nil {
-			obj.Spec.Endpoints[0].HonorLabels = *serviceMonitor.HonorLabels
-		}
-
-		if serviceMonitor.AdditionalLabels != nil {
-			for key, value := range serviceMonitor.AdditionalLabels {
-				obj.Labels[key] = value
-			}
-		}
-		if serviceMonitor.Relabelings != nil {
-			relabelConfigs := make([]promv1.RelabelConfig, len(serviceMonitor.Relabelings))
-			for i, relabel := range serviceMonitor.Relabelings {
-				if relabel != nil {
-					relabelConfigs[i] = *relabel
-				}
-			}
-			obj.Spec.Endpoints[0].RelabelConfigs = relabelConfigs
-		}
+		serviceMonitorCustomEdits(serviceMonitor, obj)
 	}
-	if n.stateNames[state] == "state-operator-metrics" || n.stateNames[state] == "state-node-status-exporter" {
+
+	if n.stateNames[state] == "state-operator-metrics" {
+		serviceMonitor := n.singleton.Spec.Operator.ServiceMonitor
+		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
+		if !serviceMonitorCRDExists {
+			logger.V(1).Info("ServiceMonitor CRD is missing, ignoring creation of CR for operator-metrics")
+			return gpuv1.Ready, nil
+		}
+		obj.Spec.NamespaceSelector.MatchNames = []string{obj.Namespace}
+		serviceMonitorCustomEdits(serviceMonitor, obj)
+	}
+
+	if n.stateNames[state] == "state-node-status-exporter" {
 		// if ServiceMonitor CRD is missing, assume prometheus is not setup and ignore CR creation
 		if !serviceMonitorCRDExists {
 			logger.V(1).Info("ServiceMonitor CRD is missing, ignoring creation of CR for operator-metrics")
