@@ -26,6 +26,7 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -2093,4 +2094,30 @@ func (c *CCManagerSpec) IsEnabled() bool {
 		return false
 	}
 	return *c.Enabled
+}
+
+// +kubebuilder:object:generate=false
+type ConfigWithName interface {
+	GetName() string
+}
+
+// GetConfigMapName returns the config's name if it's non-empty and differs from defaultName,
+// otherwise returns defaultName. The boolean indicates whether a custom name was used.
+func GetConfigMapName[T ConfigWithName](config T, defaultName string) (string, bool) {
+	if name := config.GetName(); name != "" {
+		return name, name != defaultName
+	}
+	return defaultName, false
+}
+
+func (c *MIGGPUClientsConfigSpec) GetName() string {
+	return ptr.Deref(c, MIGGPUClientsConfigSpec{}).Name
+}
+
+func (c *MIGPartedConfigSpec) GetName() string {
+	return ptr.Deref(c, MIGPartedConfigSpec{}).Name
+}
+
+func (c *VGPUDevicesConfigSpec) GetName() string {
+	return ptr.Deref(c, VGPUDevicesConfigSpec{}).Name
 }
