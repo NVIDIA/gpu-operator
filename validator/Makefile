@@ -75,7 +75,7 @@ $(BUILD_TARGETS): build-%:
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION)-ubi8 \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--file $(DOCKERFILE) $(BUILD_DIR)
