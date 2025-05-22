@@ -202,6 +202,94 @@ func TestTransformForHostRoot(t *testing.T) {
 	}
 }
 
+func TestTransformForKubeletRootDir(t *testing.T) {
+	podGPUResourcesVolumeName := "pod-gpu-resources"
+	testCases := []struct {
+		description    string
+		kubeletRootDir string
+		input          Daemonset
+		expectedOutput Daemonset
+	}{
+		{
+			description:    "no pod-gpu-resources volume in daemonset",
+			kubeletRootDir: "/custom-kubelet",
+			input:          NewDaemonset(),
+			expectedOutput: NewDaemonset(),
+		},
+		{
+			description:    "empty kubeletRootDir is a no-op",
+			kubeletRootDir: "",
+			input: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil),
+		},
+		{
+			description:    "default kubeletRootDir is a no-op",
+			kubeletRootDir: DefaultKubeletRootDir,
+			input: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil),
+		},
+		{
+			description:    "custom kubeletRootDir with pod-gpu-resources volume only",
+			kubeletRootDir: "/custom-kubelet",
+			input: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/custom-kubelet/pod-resources", nil),
+		},
+		{
+			description:    "custom kubeletRootDir with pod-gpu-resources volume and container mount",
+			kubeletRootDir: "/custom-kubelet",
+			input: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil).
+				WithContainer(corev1.Container{
+					Name: "test-container",
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: podGPUResourcesVolumeName, MountPath: "/var/lib/kubelet/pod-resources"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/custom-kubelet/pod-resources", nil).
+				WithContainer(corev1.Container{
+					Name: "test-container",
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: podGPUResourcesVolumeName, MountPath: "/custom-kubelet/pod-resources"},
+					},
+				}),
+		},
+		{
+			description:    "custom kubeletRootDir with pod-gpu-resources volume and init container mount",
+			kubeletRootDir: "/custom-kubelet",
+			input: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/var/lib/kubelet/pod-resources", nil).
+				WithInitContainer(corev1.Container{
+					Name: "test-init-container",
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: podGPUResourcesVolumeName, MountPath: "/var/lib/kubelet/pod-resources"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(podGPUResourcesVolumeName, "/custom-kubelet/pod-resources", nil).
+				WithInitContainer(corev1.Container{
+					Name: "test-init-container",
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: podGPUResourcesVolumeName, MountPath: "/custom-kubelet/pod-resources"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			transformForKubeletRootDir(tc.input.DaemonSet, tc.kubeletRootDir)
+			require.EqualValues(t, tc.expectedOutput, tc.input)
+		})
+	}
+}
+
 func TestTransformForDriverInstallDir(t *testing.T) {
 	driverInstallDirVolumeName := "driver-install-dir"
 	testCases := []struct {
