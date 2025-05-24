@@ -53,7 +53,7 @@ HYPERCONVERGED_RESOURCE=$($K get hco -oname --ignore-not-found)
 
 if [[ "$HYPERCONVERGED_RESOURCE" ]]; then
     echo "Get HyperConverged YAML"
-    $K get hyperconverged/hyperconverged -oyaml > $ARTIFACT_DIR/hyperconverged.yaml
+    $K get hyperconverged -A -oyaml > $ARTIFACT_DIR/hyperconverged.yaml
 else
     echo "OpenShift HyperConverged is not present in the cluster."
 fi
@@ -81,7 +81,7 @@ KUBEVIRT_RESOURCE=$($K get kubevirt -oname --ignore-not-found)
 
 if [[ "$KUBEVIRT_RESOURCE" ]]; then
     echo "Get KubeVirt YAML"
-    $K get kubevirt -oyaml > $ARTIFACT_DIR/kubevirt.yaml
+    $K get kubevirt -A -oyaml > $ARTIFACT_DIR/kubevirt.yaml
 else
     echo "KubeVirt is not present in the cluster."
 fi
