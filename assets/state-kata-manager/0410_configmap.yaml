@@ -7,11 +7,11 @@ metadata:
     app: nvidia-kata-manager
 data:
   entrypoint.sh: |-
-    #!/bin/bash
+    #!/bin/sh
 
-    if [[ "${CDI_ENABLED}" == "true" ]]; then
+    if [ "${CDI_ENABLED}" = "true" ]; then
       while true; do
-        if [[ -f /run/nvidia/validations/vfio-pci-ready ]]; then
+        if [ -f /run/nvidia/validations/vfio-pci-ready ]; then
           break
         fi
         echo "waiting for vfio-pci validations to complete..."
