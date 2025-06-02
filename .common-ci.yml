@@ -135,7 +135,7 @@ trigger-pipeline:
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
     - make push-${DIST}
-    - echo "${CI_COMMIT_SHORT_SHA} ${OUT_IMAGE_VERSION}" > build-info-${IN_IMAGE_NAME}-${OUT_IMAGE_VERSION}.txt
+    - echo "${CI_COMMIT_SHORT_SHA} ${OUT_IMAGE_VERSION}" > build-info-${IN_IMAGE_NAME}-${CI_COMMIT_SHORT_SHA}.txt
 
 .release-bundle:
   stage: release
@@ -233,64 +233,18 @@ release:gpu-operator-bundle-image:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# First job to process build information
-process-build-info:
-  stage: ngc-publish
-  # rules:
-    # - if: $CI_COMMIT_TAG
-  needs:
-    - job: release:staging-gpu-operator
-      optional: true
-    - job: release:staging-gpu-operator-validator
-      optional: true
-    - job: release:staging-latest-gpu-operator
-      optional: true
-    - job: release:staging-latest-gpu-operator-validator
-      optional: true
-    - job: release:ngc-gpu-operator
-      optional: true
-    - job: release:ngc-gpu-operator-validator
-      optional: true
-  extends:
-    - .target-gpu-operator-validator
-    - .target-gpu-operator
-  script:
-    - |
-      OUT_IMAGE_NAMES="gpu-operator-validator gpu-operator"
-      OUT_IMAGE_VERSIONS="${CI_COMMIT_SHORT_SHA} ${CI_COMMIT_BRANCH}-latest ${CI_COMMIT_TAG}"
-      > combined-build-info.txt
-      for out_image_name in $OUT_IMAGE_NAMES; do
-        for out_image_version in ${OUT_IMAGE_VERSIONS}; do
-          if [ -f "build-info-${out_image_name}-${out_image_version}.txt" ]; then
-            cat "build-info-${out_image_name}-${out_image_version}.txt" >> combined-build-info.txt
-          fi
-        done
-      done
-
-      # Verify we got some data
-      if [ ! -s combined-build-info.txt ]; then
-        echo "Error: No build information was collected"
-        exit 1
-      fi
-  artifacts:
-    paths:
-      - combined-build-info.txt
-
 # Second job to trigger downstream pipeline
 raise-publishing-merge-request:
   stage: ngc-publish
-  needs:
-    - job: process-build-info
-      artifacts: true
-  variables:
-    PROJECT_NAME: "gpu-operator"
-    SOURCE_VERSION: "${CI_COMMIT_SHORT_SHA}"
-    TARGET_VERSION: "test" # "${CI_COMMIT_TAG}"
   image: 
     name: "${CNT_NGC_PUBLISH_IMAGE}"
     pull_policy: always
-  before_script:
-    - apk add --no-cache bash git curl
-    - export GITLAB_ACCESS_TOKEN="${CNT_GITLAB_TOKEN}"
+  variables:
+    PROJECT_NAME: "gpu-operator"
+    TARGET_VERSION: "${CI_COMMIT_TAG}"
+    GITLAB_ACCESS_TOKEN: "${CNT_GITLAB_TOKEN}"
   script:
-    - update_project_artifacts.py "${PROJECT_NAME}" "combined-build-info.txt"
+    - cnt-ngc-publish render --project-name "gpu-operator" --versions-file "build-info-gpu-operator-${CI_COMMIT_SHORT_SHA}.txt"
+    - cnt-ngc-publish render --project-name "gpu-operator-validator" --versions-file "build-info-gpu-operator-validator-${CI_COMMIT_SHORT_SHA}.txt"
+    - cnt-ngc-publish merge-request --files "gpu-operator.yaml" "gpu-operator-validator.yaml"
+
