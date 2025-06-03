@@ -26,15 +26,15 @@ stages:
   - aws_kube_clean
   - release
   - sign
-
+  - ngc-publish
 # Enable pipelines on merge requests, tags, and branches.
 # Avoid duplicate pipelines when pushing to a branch associated with an open MR.
 # https://docs.gitlab.com/ee/ci/yaml/workflow.html#switch-between-branch-pipelines-and-merge-request-pipelines
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
-      when: never
+    #- if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      #when: never
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
@@ -106,6 +106,7 @@ trigger-pipeline:
 # target os.
 .release:
   stage: release
+  allow_failure: true
   variables:
     # Define the source image for the release
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
@@ -114,10 +115,13 @@ trigger-pipeline:
     OUT_IMAGE_VERSION: "${CI_COMMIT_SHORT_SHA}"
   retry:
     max: 2
+  artifacts:
+    paths:
+      - build-info-${IN_IMAGE_NAME}-${OUT_IMAGE_VERSION}.txt
   before_script:
     - !reference [.regctl-setup, before_script]
-    # We ensure that the OUT_IMAGE_VERSION is set
-    - 'echo Version: ${OUT_IMAGE_VERSION} ; [[ -n "${OUT_IMAGE_VERSION}" ]] || exit 1'
+    # We ensure that the OUT_IMAGE_VERSION and OUT_IMAGE_NAME is set
+    - 'echo "Version: ${OUT_IMAGE_VERSION}, Image: ${OUT_IMAGE_NAME}" ; [[ -n "${OUT_IMAGE_VERSION}" && -n "${OUT_IMAGE_NAME}" ]] || exit 1'
     # In the case where we are deploying a different version to the CI_COMMIT_SHA, we
     # need to tag the image.
     # Note: a leading 'v' is stripped from the version if present
@@ -131,6 +135,7 @@ trigger-pipeline:
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
     - make push-${DIST}
+    - echo "${CI_COMMIT_SHORT_SHA} ${OUT_IMAGE_VERSION}" > build-info-${IN_IMAGE_NAME}-${CI_COMMIT_SHORT_SHA}.txt
 
 .release-bundle:
   stage: release
@@ -175,9 +180,9 @@ trigger-pipeline:
   extends:
     - .release
   variables:
-    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
-    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
 
 release:staging-gpu-operator:
   extends:
@@ -185,7 +190,7 @@ release:staging-gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_STAGING_IMAGE_NAME}"
 
 release:staging-gpu-operator-validator:
   extends:
@@ -193,7 +198,7 @@ release:staging-gpu-operator-validator:
     - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_VALIDATOR_STAGING_IMAGE_NAME}"
 
 release:staging-latest-gpu-operator:
   extends:
@@ -201,7 +206,7 @@ release:staging-latest-gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_STAGING_IMAGE_NAME}"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -212,7 +217,7 @@ release:staging-latest-gpu-operator-validator:
     - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_VALIDATOR_STAGING_IMAGE_NAME}"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -227,3 +232,32 @@ release:gpu-operator-bundle-image:
     CHANNELS: "stable"
   rules:
     - if: $CI_COMMIT_BRANCH
+
+# Second job to trigger downstream pipeline
+raise-publishing-merge-request:
+  stage: ngc-publish
+  needs:
+    - job: release:staging-gpu-operator
+      artifacts: true
+      optional: true
+    - job: release:staging-gpu-operator-validator
+      artifacts: true
+      optional: true
+    - job: release:ngc-gpu-operator
+      artifacts: true
+      optional: true
+    - job: release:ngc-gpu-operator-validator
+      artifacts: true
+      optional: true
+  image: 
+    name: "${CNT_NGC_PUBLISH_IMAGE}"
+    pull_policy: always
+  variables:
+    PROJECT_NAME: "gpu-operator"
+    TARGET_VERSION: "test" # "${CI_COMMIT_TAG}"
+    GITLAB_ACCESS_TOKEN: "${CNT_GITLAB_TOKEN}"
+  script:
+    - cnt-ngc-publish render --project-name "gpu-operator" --versions-file "build-info-gpu-operator-${CI_COMMIT_SHORT_SHA}.txt"
+    - cnt-ngc-publish render --project-name "gpu-operator-validator" --versions-file "build-info-gpu-operator-validator-${CI_COMMIT_SHORT_SHA}.txt"
+    - cnt-ngc-publish merge-request --files "gpu-operator.yaml" "gpu-operator-validator.yaml"
+
