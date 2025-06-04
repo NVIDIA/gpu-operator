@@ -175,9 +175,9 @@ trigger-pipeline:
   extends:
     - .release
   variables:
-    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
-    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
 
 release:staging-gpu-operator:
   extends:
@@ -185,7 +185,7 @@ release:staging-gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
+    OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator"
 
 release:staging-gpu-operator-validator:
   extends:
@@ -193,4 +193,4 @@ release:staging-gpu-operator-validator:
     - .dist-ubi9
     - .target-gpu-operator-validator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
+    OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator-validator"
