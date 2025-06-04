@@ -559,7 +559,6 @@ ccManager:
   resources: {}
 
 node-feature-discovery:
-  enableNodeFeatureApi: true
   priorityClassName: system-node-critical
   gc:
     enable: true
