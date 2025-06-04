@@ -297,6 +297,36 @@ devicePlugin:
     # MPS root path on the host
     root: "/run/nvidia/mps"
 
+draDriver:
+  repository: nvcr.io/nvidia
+  image: k8s-dra-driver-gpu
+  version: v25.3.0-rc.4
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+  resources:
+    gpus:
+      enabled: false
+    computeDomains:
+      enabled: false
+
+  controller:
+    computeDomains:
+      env: []
+      resources: {}
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+  kubeletPlugin:
+    computeDomains:
+      env: []
+      resources: {}
+    gpus:
+      env: []
+      resources: {}
+
 # standalone dcgm hostengine
 dcgm:
   # disabled by default to use embedded nv-hostengine by exporter
