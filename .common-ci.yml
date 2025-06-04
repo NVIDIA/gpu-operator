@@ -25,7 +25,7 @@ stages:
   - e2e_tests
   - aws_kube_clean
   - release
-  - sign
+  - ngc-publish
 
 # Enable pipelines on merge requests, tags, and branches.
 # Avoid duplicate pipelines when pushing to a branch associated with an open MR.
@@ -171,4 +171,4 @@ release:staging-gpu-operator:
     - .release:staging
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${NGC_REGISTRY_STAGING_IMAGE_NAME}"
+    OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator"
