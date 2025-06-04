@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-dra-driver-kubelet-plugin
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dra-driver-kubelet-plugin
+  template:
+    metadata:
+      labels:
+        app: nvidia-dra-driver-kubelet-plugin
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.dra-driver-kubelet-plugin: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dra-driver
+      # TODO: add validation init container
+      containers:
+      - name: compute-domains
+        securityContext:
+          privileged: true
+        image: "FILLED BY THE OPERATOR"
+        # TODO: use entrypoint script instead and ensure NVIDIA_DRIVER_ROOT gets set
+        command: ["bash", "-c"]
+        args:
+          - |-
+            # Conditionally mask the params file to prevent this container from
+            # recreating any missing GPU device nodes. This is necessary, for
+            # example, when running under nvkind to limit the set GPUs governed
+            # by the plugin even though it has cgroup access to all of them.
+            if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+              cp /proc/driver/nvidia/params root/gpu-params
+              sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
+              mount --bind root/gpu-params /proc/driver/nvidia/params
+            fi
+            compute-domain-kubelet-plugin -v 6
+        env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: CDI_ROOT
+            value: /var/run/cdi
+          - name: NVIDIA_MIG_CONFIG_DEVICES
+            value: all
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        volumeMounts:
+          - name: plugins-registry
+            mountPath: /var/lib/kubelet/plugins_registry
+          - name: plugins
+            mountPath: /var/lib/kubelet/plugins
+            mountPropagation: Bidirectional
+          - name: cdi
+            mountPath: /var/run/cdi
+          # We always mount the driver root at /driver-root in the container.
+          - name: driver-root
+            mountPath: /driver-root
+            readOnly: true
+          # Pragmatic solution for host-managed drivers located not at /.
+          - name: host-dev
+            mountPath: /dev
+      - name: gpus
+        securityContext:
+          privileged: true
+        image: "FILLED BY THE OPERATOR"
+        # TODO: use entrypoint script instead and ensure NVIDIA_DRIVER_ROOT gets set
+        command: ["bash", "-c"]
+        args:
+          - |-
+            # Conditionally mask the params file to prevent this container from
+            # recreating any missing GPU device nodes. This is necessary, for
+            # example, when running under nvkind to limit the set GPUs governed
+            # by the plugin even though it has cgroup access to all of them.
+            if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+              cp /proc/driver/nvidia/params root/gpu-params
+              sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
+              mount --bind root/gpu-params /proc/driver/nvidia/params
+            fi
+            gpu-kubelet-plugin -v 6
+        env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: void
+          - name: CDI_ROOT
+            value: /var/run/cdi
+          - name: NVIDIA_MIG_CONFIG_DEVICES
+            value: all
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        volumeMounts:
+          - name: plugins-registry
+            mountPath: /var/lib/kubelet/plugins_registry
+          - name: plugins
+            mountPath: /var/lib/kubelet/plugins
+            mountPropagation: Bidirectional
+          - name: cdi
+            mountPath: /var/run/cdi
+          # We always mount the driver root at /driver-root in the container.
+          - name: driver-root
+            mountPath: /driver-root
+            readOnly: true
+      volumes:
+        - name: plugins-registry
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+        - name: plugins
+          hostPath:
+            path: /var/lib/kubelet/plugins
+        - name: cdi
+          hostPath:
+            path: /var/run/cdi
+        - name: driver-root
+          hostPath:
+            path: {{ .Values.nvidiaDriverRoot }}
+        - name: host-dev
+          hostPath:
+            path: /dev
