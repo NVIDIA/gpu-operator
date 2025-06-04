@@ -84,14 +84,15 @@ var (
 
 var gpuStateLabels = map[string]map[string]string{
 	gpuWorkloadConfigContainer: {
-		"nvidia.com/gpu.deploy.driver":                "true",
-		"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
-		"nvidia.com/gpu.deploy.container-toolkit":     "true",
-		"nvidia.com/gpu.deploy.device-plugin":         "true",
-		"nvidia.com/gpu.deploy.dcgm":                  "true",
-		"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
-		"nvidia.com/gpu.deploy.node-status-exporter":  "true",
-		"nvidia.com/gpu.deploy.operator-validator":    "true",
+		"nvidia.com/gpu.deploy.driver":                    "true",
+		"nvidia.com/gpu.deploy.gpu-feature-discovery":     "true",
+		"nvidia.com/gpu.deploy.container-toolkit":         "true",
+		"nvidia.com/gpu.deploy.device-plugin":             "true",
+		"nvidia.com/gpu.deploy.dra-driver-kubelet-plugin": "true",
+		"nvidia.com/gpu.deploy.dcgm":                      "true",
+		"nvidia.com/gpu.deploy.dcgm-exporter":             "true",
+		"nvidia.com/gpu.deploy.node-status-exporter":      "true",
+		"nvidia.com/gpu.deploy.operator-validator":        "true",
 	},
 	gpuWorkloadConfigVMPassthrough: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
@@ -785,6 +786,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-dra-driver")
 		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
@@ -1018,6 +1020,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return true
 	case "state-operator-metrics":
 		return true
+	case "state-dra-driver":
+		return clusterPolicySpec.DRADriver.IsEnabled()
 	default:
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false

@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,6 +146,8 @@ const (
 	NvidiaCtrRuntimeCDIPrefixesEnvName = "NVIDIA_CONTAINER_RUNTIME_MODES_CDI_ANNOTATION_PREFIXES"
 	// CDIEnabledEnvName is the name of the envvar used to enable CDI in the operands
 	CDIEnabledEnvName = "CDI_ENABLED"
+	// NvidiaCTKPathEnvName is the name of the envvar specifying the path to the 'nvidia-ctk' binary
+	NvidiaCTKPathEnvName = "NVIDIA_CTK_PATH"
 	// NvidiaCDIHookPathEnvName is the name of the envvar specifying the path to the 'nvidia-cdi-hook' binary
 	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
 	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
@@ -733,6 +736,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-vgpu-device-manager":              TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                     TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset":      TransformToolkit,
+		"nvidia-dra-driver-kubelet-plugin":        TransformDRADriverKubeletPlugin,
 		"nvidia-device-plugin-daemonset":          TransformDevicePlugin,
 		"nvidia-device-plugin-mps-control-daemon": TransformMPSControlDaemon,
 		"nvidia-sandbox-device-plugin-daemonset":  TransformSandboxDevicePlugin,
@@ -1584,6 +1588,74 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	return nil
+}
+
+// TransformDRADriverKubeletPlugin transforms nvidia-dra-driver-kubelet-plugin daemonset with required config as per ClusterPolicy
+func TransformDRADriverKubeletPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+
+	if len(config.DRADriver.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.DRADriver.ImagePullSecrets)
+	}
+
+	image, err := gpuv1.ImagePath(&config.DRADriver)
+	if err != nil {
+		return err
+	}
+
+	var containers []corev1.Container
+	for i, container := range obj.Spec.Template.Spec.Containers {
+		// Skip the container if the resource type is not enabled.
+		// As a result, the container will be removed from the spec.
+		if (container.Name == "gpus" && !config.DRADriver.IsGPUsEnabled()) ||
+			(container.Name == "compute-domains" && !config.DRADriver.IsComputeDomainsEnabled()) {
+			continue
+		}
+
+		obj.Spec.Template.Spec.Containers[i].Image = image
+		obj.Spec.Template.Spec.Containers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DRADriver.ImagePullPolicy)
+
+		if config.Toolkit.IsEnabled() {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), NvidiaCTKPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-ctk"))
+		}
+
+		// update the "gpus" container
+		if container.Name == "gpus" {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), "IMAGE_NAME", image)
+			if len(config.DRADriver.GPUs.KubeletPlugin.Env) > 0 {
+				for _, env := range config.DRADriver.GPUs.KubeletPlugin.Env {
+					setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
+				}
+			}
+
+			if config.DRADriver.GPUs.KubeletPlugin.Resources != nil {
+				obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DRADriver.GPUs.KubeletPlugin.Resources.Requests
+				obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DRADriver.GPUs.KubeletPlugin.Resources.Limits
+			}
+		}
+
+		// update the "compute-domains" container
+		if container.Name == "compute-domains" {
+			if len(config.DRADriver.ComputeDomains.KubeletPlugin.Env) > 0 {
+				for _, env := range config.DRADriver.ComputeDomains.KubeletPlugin.Env {
+					setContainerEnv(&(obj.Spec.Template.Spec.Containers[i]), env.Name, env.Value)
+				}
+			}
+
+			if config.DRADriver.ComputeDomains.KubeletPlugin.Resources != nil {
+				obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DRADriver.ComputeDomains.KubeletPlugin.Resources.Requests
+				obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DRADriver.ComputeDomains.KubeletPlugin.Resources.Limits
+			}
+		}
+
+		containers = append(containers, obj.Spec.Template.Spec.Containers[i])
+	}
+	obj.Spec.Template.Spec.Containers = containers
+
 	return nil
 }
 
@@ -3789,23 +3861,87 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 	return hash, nil
 }
 
+// TransformDRADriverController transforms nvidia-dra-driver-controller deployment with required config as per ClusterPolicy
+func TransformDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPolicySpec) error {
+	var computeDomainsCtr *corev1.Container
+	for i, ctr := range obj.Spec.Template.Spec.Containers {
+		if ctr.Name == "compute-domains" {
+			computeDomainsCtr = &obj.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+
+	if computeDomainsCtr == nil {
+		return fmt.Errorf("failed to find 'compute-domains' container")
+	}
+
+	config := spec.DRADriver
+	image, err := gpuv1.ImagePath(&config)
+	if err != nil {
+		return err
+	}
+
+	computeDomainsCtr.Image = image
+	setContainerEnv(computeDomainsCtr, "IMAGE_NAME", image)
+
+	computeDomainsCtr.ImagePullPolicy = gpuv1.ImagePullPolicy(config.ImagePullPolicy)
+
+	if len(config.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.ImagePullSecrets)
+	}
+
+	if len(config.ComputeDomains.Controller.Tolerations) > 0 {
+		obj.Spec.Template.Spec.Tolerations = append(obj.Spec.Template.Spec.Tolerations, config.ComputeDomains.Controller.Tolerations...)
+	}
+
+	if len(config.ComputeDomains.Controller.Env) > 0 {
+		for _, env := range config.ComputeDomains.Controller.Env {
+			setContainerEnv(computeDomainsCtr, env.Name, env.Value)
+		}
+	}
+
+	if config.ComputeDomains.Controller.Resources != nil {
+		computeDomainsCtr.Resources.Requests = config.ComputeDomains.Controller.Resources.Requests
+		computeDomainsCtr.Resources.Limits = config.ComputeDomains.Controller.Resources.Limits
+	}
+
+	return nil
+}
+
+func transformDeployment(obj *appsv1.Deployment, n ClusterPolicyController) error {
+	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
+	switch obj.Name {
+	case "nvidia-dra-driver-controller":
+		return TransformDRADriverController(obj, &n.singleton.Spec)
+	default:
+		logger.Info("No transformation for object")
+		return nil
+	}
+}
+
 // Deployment creates Deployment resource
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
+	stateName := n.stateNames[state]
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
+	if !n.isStateEnabled(stateName) || (obj.Name == "nvidia-dra-driver-controller" && !n.singleton.Spec.DRADriver.IsComputeDomainsEnabled()) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
+	}
+
+	if err := transformDeployment(obj, n); err != nil {
+		logger.Info("Failed to transform Deployment", "Error", err)
+		return gpuv1.NotReady, err
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
@@ -4999,4 +5135,77 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 	return gpuv1.Ready, nil
+}
+
+func createDeviceClass(n ClusterPolicyController, spec resourceapi.DeviceClass) (gpuv1.State, error) {
+	ctx := n.ctx
+	state := n.idx
+	obj := spec.DeepCopy()
+
+	logger := n.logger.WithValues("DeviceClass", obj.Name)
+
+	// Check if state is disabled and cleanup resource if exists
+	if !n.isStateEnabled(n.stateNames[state]) ||
+		(strings.Contains(obj.Name, "compute-domain") && !n.singleton.Spec.DRADriver.IsComputeDomainsEnabled()) ||
+		(obj.Name == "gpu.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) ||
+		(obj.Name == "mig.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	found := &resourceapi.DeviceClass{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	if err != nil && apierrors.IsNotFound(err) {
+		logger.Info("Not found, creating...")
+		err = n.client.Create(ctx, obj)
+		if err != nil {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
+	} else if err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = found.ResourceVersion
+
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
+	}
+	return gpuv1.Ready, nil
+}
+
+// DeviceClasses creates DeviceClass objects
+func DeviceClasses(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+
+	for _, obj := range n.resources[state].DeviceClasses {
+		obj := obj
+		stat, err := createDeviceClass(n, obj)
+		if err != nil {
+			return stat, err
+		}
+
+		switch stat {
+		case gpuv1.Ready:
+			continue
+		case gpuv1.Disabled:
+			continue
+		default:
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
