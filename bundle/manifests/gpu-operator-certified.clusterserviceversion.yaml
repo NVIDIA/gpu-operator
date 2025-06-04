@@ -98,6 +98,25 @@ metadata:
                 "maxUnavailable": "1"
               }
             },
+            "draDriver": {
+              "gpus": {
+                "enabled": false,
+                "kubeletPlugin": {}
+              },
+              "computeDomains": {
+                "enabled": false,
+                "controller": {
+                  "tolerations": [
+                    {
+                      "key": "node-role.kubernetes.io/control-plane",
+                      "operator": "Exists",
+                      "effect": "NoSchedule"
+                    }
+                  ]
+                },
+                "kubeletPlugin": {}
+              }
+            },
             "devicePlugin": {
               "enabled": true,
               "config": {
@@ -239,6 +258,8 @@ spec:
       image: nvcr.io/nvidia/cloud-native/vgpu-device-manager:v0.4.2@sha256:24892b0ee0ca924d3c644648e9f0e0fa80d238e2fb681b21913f32fd0af9cde7
     - name: gdrcopy-image
       image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:0460630559b0b932c8861237b62e69c2895dace42d37ad3cb02c87e5d751fafc
+    - name: dra-driver-image
+      image: nvcr.io/nvidia/k8s-dra-driver-gpu@sha256:5dd583277c1f2825cb637c3c07d8208c6278b1e6ccb4231f0ac011dbf651d5a9
   customresourcedefinitions:
     owned:
     - name: nvidiadrivers.nvidia.com
@@ -748,6 +769,7 @@ spec:
           - apps
           resources:
           - daemonsets
+          - deployments
           verbs:
           - get
           - list
@@ -775,6 +797,84 @@ spec:
           - update
           - patch
           - delete
+        - apiGroups:
+          - resource.nvidia.com
+          resources:
+          - computedomains
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.nvidia.com
+          resources:
+          - computedomains/status
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaims
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaimtemplates
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - deviceclasses
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceslices
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaims/status
+          verbs:
+          - update
       permissions:
       - serviceAccountName: gpu-operator
         rules:
@@ -803,6 +903,7 @@ spec:
           - apps
           resources:
           - daemonsets
+          - deployments
           verbs:
           - create
           - get
@@ -953,6 +1054,8 @@ spec:
                     value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager:v0.4.2@sha256:24892b0ee0ca924d3c644648e9f0e0fa80d238e2fb681b21913f32fd0af9cde7"
                   - name: "GDRCOPY_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:0460630559b0b932c8861237b62e69c2895dace42d37ad3cb02c87e5d751fafc"
+                  - name: "DRA_DRIVER_IMAGE"
+                    value: "nvcr.io/nvidia/k8s-dra-driver-gpu@sha256:5dd583277c1f2825cb637c3c07d8208c6278b1e6ccb4231f0ac011dbf651d5a9"
               terminationGracePeriodSeconds: 10
               serviceAccountName: gpu-operator
     strategy: deployment
