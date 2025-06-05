@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
-    olm.skipRange: '>=1.9.0 <25.3.0'
+    olm.skipRange: '>=1.9.0 <25.3.1'
     alm-examples: |-
       [
         {
@@ -161,7 +161,7 @@ metadata:
             "driverType": "gpu",
             "repository": "nvcr.io/nvidia",
             "image": "driver",
-            "version": "sha256:f581bc75cd8aece5dd9fb93be17e1e91d0d533a01af5a1880cf962eca7890662",
+            "version": "sha256:6729c252a8877f29a1e5e336b945efa5126ea555db3c83b06e2e3d9843e647c7",
             "nodeSelector": {},
             "manager": {},
             "repoConfig": {
@@ -195,7 +195,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v25.3.0
+  name: gpu-operator-certified.v25.3.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -203,13 +203,13 @@ spec:
     - name: gpu-operator-image
       image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:b848747435dfecb216484d16363a9897f64232b3c3ae7f171dde06525d8606b4
+      image: nvcr.io/nvidia/k8s/dcgm-exporter@sha256:6c78381d83e2ccd84e9645d35d8768d98a52b73c75d1bb9395b5f030ce9bd3a4
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm@sha256:ec473ac9f8e4f638e97ec5ffd6f6d3dbbfc3a53bdd07514745c8868676979bba
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:51c8f71d3b3c08ae4eb4853697e3f8e6f11e435e666e08210178e6a1faf8028f
     - name: driver-image
-      image: nvcr.io/nvidia/driver@sha256:f581bc75cd8aece5dd9fb93be17e1e91d0d533a01af5a1880cf962eca7890662
+      image: nvcr.io/nvidia/driver@sha256:6729c252a8877f29a1e5e336b945efa5126ea555db3c83b06e2e3d9843e647c7
     - name: driver-image-550
       image: nvcr.io/nvidia/driver@sha256:8b89435d54a2e6a33c480dd0659e9a4a73f872a6187f9f9eadd934ecb45ac273
     - name: driver-image-535
@@ -903,11 +903,11 @@ spec:
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm@sha256:ec473ac9f8e4f638e97ec5ffd6f6d3dbbfc3a53bdd07514745c8868676979bba"
                   - name: "DCGM_EXPORTER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:b848747435dfecb216484d16363a9897f64232b3c3ae7f171dde06525d8606b4"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:6c78381d83e2ccd84e9645d35d8768d98a52b73c75d1bb9395b5f030ce9bd3a4"
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f"
                   - name: "DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/driver@sha256:f581bc75cd8aece5dd9fb93be17e1e91d0d533a01af5a1880cf962eca7890662"
+                    value: "nvcr.io/nvidia/driver@sha256:6729c252a8877f29a1e5e336b945efa5126ea555db3c83b06e2e3d9843e647c7"
                   - name: "DRIVER_IMAGE-550"
                     value: "nvcr.io/nvidia/driver@sha256:8b89435d54a2e6a33c480dd0659e9a4a73f872a6187f9f9eadd934ecb45ac273"
                   - name: "DRIVER_IMAGE-535"
@@ -956,5 +956,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 25.3.0
-  replaces: gpu-operator-certified.v24.9.2
+  version: 25.3.1
+  replaces: gpu-operator-certified.v25.3.0
