@@ -313,7 +313,7 @@ dcgmExporter:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
-  version: 4.2.3-4.1.1-ubuntu22.04
+  version: 4.2.3-4.1.3-ubuntu22.04
   imagePullPolicy: IfNotPresent
   env:
     - name: DCGM_EXPORTER_LISTEN
