@@ -1631,6 +1631,28 @@ type VGPUDeviceManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="NVIDIA vGPU devices configuration for NVIDIA vGPU Device Manager container"
 	Config *VGPUDevicesConfigSpec `json:"config,omitempty"`
+
+	// Optional: Custom mig-parted configuration for NVIDIA vGPU Device Manager container
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom mig-parted configuration for NVIDIA vGPU Device Manager container"
+	MigConfig *VGPUMIGPartedConfigSpec `json:"migConfig,omitempty"`
+
+	// Optional: Custom gpu-clients configuration for NVIDIA vGPU Device Manager container
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom gpu-clients configuration for NVIDIA MIG Manager container"
+	GPUClientsConfig *MIGGPUClientsConfigSpec `json:"gpuClientsConfig,omitempty"`
+}
+
+// VGPUMIGPartedConfigSpec defines custom mig-parted config for NVIDIA vGPU Device Manager container.
+// There is no default mig-parted configuration for vGPU Device Manager, as the mig-parted configuration depends on the vGPU type used.
+type VGPUMIGPartedConfigSpec struct {
+	// ConfigMap name
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=default-mig-parted-config
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
 }
 
 // VGPUDevicesConfigSpec defines vGPU devices configuration for NVIDIA vGPU Device Manager container
@@ -2093,4 +2115,41 @@ func (c *CCManagerSpec) IsEnabled() bool {
 		return false
 	}
 	return *c.Enabled
+}
+
+type ConfigWithName interface {
+	GetName() string
+}
+
+// GetConfigMapName returns the config's name if it's non-empty and differs from defaultName,
+// otherwise returns defaultName. The boolean indicates whether a custom name was used.
+func GetConfigMapName[T ConfigWithName](config T, defaultName string) (string, bool) {
+	if config.GetName() != "" && config.GetName() != defaultName {
+		return config.GetName(), true
+	}
+	return defaultName, false
+}
+
+// safeGetName safely gets the name from a pointer, handling nil cases.
+func safeGetName[T any](ptr *T, getName func(T) string) string {
+	if ptr == nil {
+		return ""
+	}
+	return getName(*ptr)
+}
+
+func (c *MIGGPUClientsConfigSpec) GetName() string {
+	return safeGetName(c, func(c MIGGPUClientsConfigSpec) string { return c.Name })
+}
+
+func (c *MIGPartedConfigSpec) GetName() string {
+	return safeGetName(c, func(c MIGPartedConfigSpec) string { return c.Name })
+}
+
+func (c *VGPUMIGPartedConfigSpec) GetName() string {
+	return safeGetName(c, func(c VGPUMIGPartedConfigSpec) string { return c.Name })
+}
+
+func (c *VGPUDevicesConfigSpec) GetName() string {
+	return safeGetName(c, func(c VGPUDevicesConfigSpec) string { return c.Name })
 }
