@@ -85,10 +85,6 @@ operator:
     version: 12.8.1-base-ubi9
     imagePullPolicy: IfNotPresent
   tolerations:
-  - key: "node-role.kubernetes.io/master"
-    operator: "Equal"
-    value: ""
-    effect: "NoSchedule"
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Equal"
     value: ""
@@ -98,12 +94,6 @@ operator:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 1
-          preference:
-            matchExpressions:
-              - key: "node-role.kubernetes.io/master"
-                operator: In
-                values: [""]
         - weight: 1
           preference:
             matchExpressions:
@@ -572,10 +562,6 @@ node-feature-discovery:
       # disable creation to avoid duplicate serviceaccount creation by master spec below
       create: false
     tolerations:
-    - key: "node-role.kubernetes.io/master"
-      operator: "Equal"
-      value: ""
-      effect: "NoSchedule"
     - key: "node-role.kubernetes.io/control-plane"
       operator: "Equal"
       value: ""
