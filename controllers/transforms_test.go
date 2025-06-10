@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -563,6 +564,296 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 	}
 }
 
+func TestTransformToolkit(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset                // Input DaemonSet
+		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
+		expectedDs  Daemonset                // Expected output DaemonSet
+	}{
+		{
+			description: "transform nvidia-container-toolkit-ctr container",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-container-toolkit",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: "containerd"},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "foo", Value: "bar"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+					},
+				}).
+				WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
+				WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			controller := ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			}
+
+			err := TransformToolkit(tc.ds.DaemonSet, tc.cpSpec, controller)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePlugin(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset                // Input DaemonSet
+		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
+		expectedDs  Daemonset                // Expected output DaemonSet
+	}{
+		{
+			description: "transform device plugin",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin-ctr"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-device-plugin",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin-ctr",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDevicePlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDCGMExporter(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset                // Input DaemonSet
+		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
+		expectedDs  Daemonset                // Expected output DaemonSet
+	}{
+		{
+			description: "transform dcgm exporter",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDCGMExporter(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs.DaemonSet, tc.ds.DaemonSet)
+		})
+	}
+}
+
+func TestTransformMigManager(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform mig manager",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--test-flag"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--test-flag"},
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformMIGManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformKataManager(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform kata manager",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				KataManager: gpuv1.KataManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "kata-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--test-flag"},
+					Config: &kata_v1alpha1.Config{
+						ArtifactsDir: "/var/lib/kata",
+					},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-kata-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/kata-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--test-flag"},
+				Env: []corev1.EnvVar{
+					{Name: "KATA_ARTIFACTS_DIR", Value: "/var/lib/kata"},
+					{Name: "RUNTIME", Value: "containerd"},
+					{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "foo", Value: "bar"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
+					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+				},
+			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", newHostPathType(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformKataManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
 func TestTransformValidationInitContainer(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -779,11 +1070,11 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: "foo", Value: "bar"},
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
@@ -813,12 +1104,12 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
 					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+					{Name: "foo", Value: "bar"},
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
@@ -1072,7 +1363,16 @@ func TestTransformValidator(t *testing.T) {
 			description: "valid validator spec",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
-				WithContainer(corev1.Container{Name: "dummy"}),
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Validator: gpuv1.ValidatorSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1130,7 +1430,16 @@ func TestTransformSandboxValidator(t *testing.T) {
 			description: "valid validator spec",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
-				WithContainer(corev1.Container{Name: "dummy"}),
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Validator: gpuv1.ValidatorSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1147,7 +1456,8 @@ func TestTransformSandboxValidator(t *testing.T) {
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 				}).
-				WithPullSecret("pull-secret"),
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 		},
 	}
 
