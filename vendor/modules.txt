@@ -27,7 +27,7 @@ github.com/Masterminds/sprig/v3
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
-# github.com/NVIDIA/go-nvlib v0.7.2
+# github.com/NVIDIA/go-nvlib v0.7.3
 ## explicit; go 1.20
 github.com/NVIDIA/go-nvlib/pkg/nvmdev
 github.com/NVIDIA/go-nvlib/pkg/nvpci
