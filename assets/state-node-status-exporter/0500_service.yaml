@@ -7,6 +7,7 @@ metadata:
     app: nvidia-node-status-exporter
   annotations:
     prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
 spec:
   selector:
     app: nvidia-node-status-exporter
