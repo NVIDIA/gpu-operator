@@ -1250,12 +1250,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Toolkit.Resources.Limits
 		}
 	}
-	// set/append environment variables for toolkit container
-	if len(config.Toolkit.Env) > 0 {
-		for _, env := range config.Toolkit.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
@@ -1283,6 +1277,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 				obj.Spec.Template.Spec.Containers[0].VolumeMounts[i].MountPath = config.Toolkit.InstallDir
 				break
 			}
+		}
+	}
+	// set/append environment variables for toolkit container
+	if len(config.Toolkit.Env) > 0 {
+		for _, env := range config.Toolkit.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
 
@@ -1412,12 +1412,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if len(config.DevicePlugin.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.DevicePlugin.Args
 	}
-	// set/append environment variables for device-plugin container
-	if len(config.DevicePlugin.Env) > 0 {
-		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
+
 	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
@@ -1458,6 +1453,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			}
 		}
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
+	}
+	// set/append environment variables for device-plugin container
+	if len(config.DevicePlugin.Env) > 0 {
+		for _, env := range config.DevicePlugin.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
 	}
 
 	return nil
@@ -1615,12 +1616,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if len(config.DCGMExporter.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.DCGMExporter.Args
 	}
-	// set/append environment variables for exporter container
-	if len(config.DCGMExporter.Env) > 0 {
-		for _, env := range config.DCGMExporter.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
 
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
@@ -1659,6 +1654,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, metricsConfigVol)
 
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
+	}
+	// set/append environment variables for exporter container
+	if len(config.DCGMExporter.Env) > 0 {
+		for _, env := range config.DCGMExporter.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
 	}
 
 	release, err := parseOSRelease()
@@ -1794,13 +1795,6 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	// set/append environment variables for mig-manager container
-	if len(config.MIGManager.Env) > 0 {
-		for _, env := range config.MIGManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-
 	// set RuntimeClass for supported runtimes
 	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
 
@@ -1839,6 +1833,12 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
 		}
 	}
+	// set/append environment variables for mig-manager container
+	if len(config.MIGManager.Env) > 0 {
+		for _, env := range config.MIGManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
 
 	return nil
 }
@@ -1874,13 +1874,6 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		obj.Spec.Template.Spec.Containers[0].Args = config.KataManager.Args
 	}
 
-	// set/append environment variables for mig-manager container
-	if len(config.KataManager.Env) > 0 {
-		for _, env := range config.KataManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-
 	// mount artifactsDir
 	artifactsDir := DefaultKataArtifactsDir
 	if config.KataManager.Config.ArtifactsDir != "" {
@@ -1889,6 +1882,13 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 	// set env used by readinessProbe to determine path to kata-manager pid file.
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "KATA_ARTIFACTS_DIR", artifactsDir)
+
+	// set/append environment variables for mig-manager container
+	if len(config.KataManager.Env) > 0 {
+		for _, env := range config.KataManager.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
 
 	artifactsVolMount := corev1.VolumeMount{Name: "kata-artifacts", MountPath: artifactsDir}
 	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, artifactsVolMount)
@@ -1996,15 +1996,16 @@ func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		obj.Spec.Template.Spec.Containers[0].Args = config.CCManager.Args
 	}
 
+	// set default cc mode env
+	if config.CCManager.DefaultMode != "" {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DefaultCCModeEnvName, config.CCManager.DefaultMode)
+	}
+
 	// set/append environment variables for cc-manager container
 	if len(config.CCManager.Env) > 0 {
 		for _, env := range config.CCManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
-	}
-	// set default cc mode env
-	if config.CCManager.DefaultMode != "" {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DefaultCCModeEnvName, config.CCManager.DefaultMode)
 	}
 
 	return nil
@@ -2196,12 +2197,6 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		}
 		switch component {
 		case "cuda":
-			// set/append environment variables for cuda-validation container
-			if len(config.Validator.CUDA.Env) > 0 {
-				for _, env := range config.Validator.CUDA.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
-				}
-			}
 			// set additional env to indicate image, pullSecrets to spin-off cuda validation workload pod.
 			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
 			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImagePullPolicyEnvName, config.Validator.ImagePullPolicy)
@@ -2213,17 +2208,17 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			if podSpec.RuntimeClassName != nil {
 				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
 			}
+			// set/append environment variables for cuda-validation container
+			if len(config.Validator.CUDA.Env) > 0 {
+				for _, env := range config.Validator.CUDA.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
 		case "plugin":
 			// remove plugin init container from validator Daemonset if it is not enabled
 			if !config.DevicePlugin.IsEnabled() {
 				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
 				return nil
-			}
-			// set/append environment variables for plugin-validation container
-			if len(config.Validator.Plugin.Env) > 0 {
-				for _, env := range config.Validator.Plugin.Env {
-					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
-				}
 			}
 			// set additional env to indicate image, pullSecrets to spin-off plugin validation workload pod.
 			setContainerEnv(&(podSpec.InitContainers[i]), ValidatorImageEnvName, image)
@@ -2238,6 +2233,12 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 			// apply mig-strategy env to spin off plugin-validation workload pod
 			setContainerEnv(&(podSpec.InitContainers[i]), MigStrategyEnvName, string(config.MIG.Strategy))
+			// set/append environment variables for plugin-validation container
+			if len(config.Validator.Plugin.Env) > 0 {
+				for _, env := range config.Validator.Plugin.Env {
+					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
 		case "driver":
 			// set/append environment variables for driver-validation container
 			if len(config.Validator.Driver.Env) > 0 {
@@ -3213,12 +3214,6 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if len(config.Driver.Args) > 0 {
 		driverContainer.Args = config.Driver.Args
 	}
-	// set/append environment variables for driver container
-	if len(config.Driver.Env) > 0 {
-		for _, env := range config.Driver.Env {
-			setContainerEnv(driverContainer, env.Name, env.Value)
-		}
-	}
 
 	if len(config.Driver.KernelModuleType) > 0 {
 		setContainerEnv(driverContainer, KernelModuleTypeEnvName, config.Driver.KernelModuleType)
@@ -3253,6 +3248,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			}
 			// set env indicating host-mofed is enabled
 			setContainerEnv(driverContainer, UseHostMOFEDEnvName, "true")
+		}
+	}
+	// set/append environment variables for driver container
+	if len(config.Driver.Env) > 0 {
+		for _, env := range config.Driver.Env {
+			setContainerEnv(driverContainer, env.Name, env.Value)
 		}
 	}
 
@@ -3445,12 +3446,6 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	if len(config.VGPUManager.Args) > 0 {
 		container.Args = config.VGPUManager.Args
 	}
-	// set/append environment variables for exporter container
-	if len(config.VGPUManager.Env) > 0 {
-		for _, env := range config.VGPUManager.Env {
-			setContainerEnv(container, env.Name, env.Value)
-		}
-	}
 
 	release, err := parseOSRelease()
 	if err != nil {
@@ -3460,6 +3455,12 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 	// add env for OCP
 	if _, ok := release["OPENSHIFT_VERSION"]; ok {
 		setContainerEnv(container, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
+	}
+	// set/append environment variables for exporter container
+	if len(config.VGPUManager.Env) > 0 {
+		for _, env := range config.VGPUManager.Env {
+			setContainerEnv(container, env.Name, env.Value)
+		}
 	}
 
 	return nil
