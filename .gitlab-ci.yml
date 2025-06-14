@@ -98,12 +98,6 @@ build:gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
 
-build:gpu-operator-validator:
-  extends:
-    - .image-build
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-
 .e2e_defaults:
   variables:
     TF_VAR_project_name: "gpu-operator"
@@ -113,8 +107,6 @@ build:gpu-operator-validator:
     # TODO: Should these use the staging release instead?
     OPERATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
     OPERATOR_IMAGE: "${CI_REGISTRY_IMAGE}"
-    VALIDATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
-    VALIDATOR_IMAGE: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
     GPU_PRODUCT_NAME: "Tesla-T4"
   extends:
     - .dist-ubi9
@@ -139,7 +131,7 @@ build:gpu-operator-validator:
     - export instance_hostname="${instance_hostname}"
     - export TEST_CASE="${TEST_CASE}"
     - rc=0
-    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
+    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
     - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
     - exit $rc
   artifacts:

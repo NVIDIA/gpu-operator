@@ -62,6 +62,11 @@ func BoolPtr(v bool) *bool {
 	return &v
 }
 
+// Int64Ptr returns a pointer to the int64 passed in.
+func Int64Ptr(v int64) *int64 {
+	return &v
+}
+
 // GetObjectHash invokes Sum32 Hash function to return hash value of an unstructured Object
 func GetObjectHash(obj interface{}) string {
 	hasher := fnv.New32a()

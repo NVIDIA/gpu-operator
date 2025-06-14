@@ -185,9 +185,9 @@ const (
 	// migStrategySingle indicates mixed MIG strategy
 	migStrategySingle = "single"
 	// pluginWorkloadPodSpecPath indicates path to plugin validation pod definition
-	pluginWorkloadPodSpecPath = "/var/nvidia/manifests/plugin-workload-validation.yaml"
+	pluginWorkloadPodSpecPath = "/opt/validator/manifests/plugin-workload-validation.yaml"
 	// cudaWorkloadPodSpecPath indicates path to cuda validation pod definition
-	cudaWorkloadPodSpecPath = "/var/nvidia/manifests/cuda-workload-validation.yaml"
+	cudaWorkloadPodSpecPath = "/opt/validator/manifests/cuda-workload-validation.yaml"
 	// validatorImageEnvName indicates env name for validator image passed
 	validatorImageEnvName = "VALIDATOR_IMAGE"
 	// validatorImagePullPolicyEnvName indicates env name for validator image pull policy passed

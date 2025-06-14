@@ -596,11 +596,17 @@ func TestTransformValidationInitContainer(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithInitContainer(corev1.Container{
 				Name:            "toolkit-validation",
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
 		},
 	}
@@ -717,6 +723,9 @@ func TestTransformValidatorShared(t *testing.T) {
 				},
 				Args: []string{"--test-flag"},
 				Env:  []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithPullSecret("pull-secret"),
 		},
 	}
@@ -785,6 +794,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithRuntimeClassName("nvidia"),
 		},
 		{
@@ -819,6 +831,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
 					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
@@ -861,6 +876,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "foo", Value: "bar"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -880,6 +898,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Name:            "nvidia-fs-validation",
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -916,6 +937,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Name:            "cc-manager-validation",
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -957,6 +981,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "foo", Value: "bar"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -981,6 +1008,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}),
 		},
@@ -1007,6 +1037,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -1031,6 +1064,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}),
 		},
@@ -1088,6 +1124,9 @@ func TestTransformValidator(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
 				}).
 				WithPullSecret("pull-secret").
 				WithRuntimeClassName("nvidia"),
@@ -1146,6 +1185,9 @@ func TestTransformSandboxValidator(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
 				}).
 				WithPullSecret("pull-secret"),
 		},
@@ -1199,6 +1241,9 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/node-status-exporter:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
 				}),
 		},
 	}

@@ -16,10 +16,7 @@ GO_CMD ?= go
 
 OPERATOR_REPOSITORY ?= nvcr.io/nvidia
 OPERATOR_IMAGE ?= gpu-operator
-VALIDATOR_REPOSITORY ?= nvcr.io/nvidia/cloud-native
-VALIDATOR_IMAGE ?= gpu-operator-validator
 OPERATOR_VERSION ?= v23.9.0
-VALIDATOR_VERSION ?= v23.9.0
 
 HELM_CHART ?= $(CURDIR)/../../deployments/gpu-operator
 
@@ -34,8 +31,8 @@ e2e-test:
 		-operator-repository=$(OPERATOR_REPOSITORY) \
 		-operator-image=$(OPERATOR_IMAGE) \
 		-operator-version=$(OPERATOR_VERSION) \
-		-validator-repository=$(VALIDATOR_REPOSITORY) \
-		-validator-image=$(VALIDATOR_IMAGE) \
-		-validator-version=$(VALIDATOR_VERSION) \
+		-validator-repository=$(OPERATOR_REPOSITORY) \
+		-validator-image=$(OPERATOR_IMAGE) \
+		-validator-version=$(OPERATOR_VERSION) \
 		-helm-chart=$(HELM_CHART) \
 		-ginkgo.focus="gpu-operator-e2e"

@@ -81,7 +81,7 @@ trigger-pipeline:
 
     -  '[[ -n "${SKIP_QEMU_SETUP}" ]] || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes'
 
-# Define targets for the gpu-operator and gpu-operator-validator images
+# Define targets for the gpu-operator image
 .dist-ubi9:
   variables:
     DIST: ubi9
@@ -92,14 +92,6 @@ trigger-pipeline:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
     IN_IMAGE_NAME: "gpu-operator"
     IMAGE_ARCHIVE: "gpu-operator.tar"
-
-.target-gpu-operator-validator:
-  variables:
-    SUBCOMPONENT: "validator"
-    IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
-    IN_IMAGE_NAME: "gpu-operator-validator"
-    IMAGE_ARCHIVE: "gpu-operator-validator.tar"
-    IN_REGISTRY: "${STAGING_REGISTRY}/gpu-operator"
 
 # .release forms the base of the deployment jobs which push images to the CI registry.
 # This is extended with the version to be deployed (e.g. the SHA or TAG) and the
@@ -187,14 +179,6 @@ release:staging-gpu-operator:
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
 
-release:staging-gpu-operator-validator:
-  extends:
-    - .release:staging
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
-
 release:staging-latest-gpu-operator:
   extends:
     - .release:staging
@@ -202,17 +186,6 @@ release:staging-latest-gpu-operator:
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
-    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
-  rules:
-    - if: $CI_COMMIT_BRANCH
-
-release:staging-latest-gpu-operator-validator:
-  extends:
-    - .release:staging
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
     OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
   rules:
     - if: $CI_COMMIT_BRANCH

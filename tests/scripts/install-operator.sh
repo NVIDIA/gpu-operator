@@ -9,17 +9,12 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/.definitions.sh
 
 OPERATOR_REPOSITORY=$(dirname ${OPERATOR_IMAGE})
-VALIDATOR_REPOSITORY=$(dirname ${VALIDATOR_IMAGE})
 
 : ${OPERATOR_OPTIONS:=""}
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.repository=${OPERATOR_REPOSITORY} --set validator.repository=${VALIDATOR_REPOSITORY}"
+OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.repository=${OPERATOR_REPOSITORY} --set validator.repository=${OPERATOR_REPOSITORY}"
 
 if [[ -n "${OPERATOR_VERSION}" ]]; then
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION}"
-fi
-
-if [[ -n "${VALIDATOR_VERSION}" ]]; then
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set validator.version=${VALIDATOR_VERSION}"
+OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION} --set validator.version=${OPERATOR_VERSION}"
 fi
 
 OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.defaultRuntime=${CONTAINER_RUNTIME}"

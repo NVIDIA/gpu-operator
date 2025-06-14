@@ -82,11 +82,6 @@ CONTROLLER_GEN = $(PWD)/bin/controller-gen
 KUSTOMIZE = $(PWD)/bin/kustomize
 GCOV2LCOV ?= $(PWD)/bin/gcov2lcov
 
-# Build gpu-operator binary
-gpu-operator:
-	CGO_ENABLED=0 GOOS=$(GOOS) \
-		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator ./cmd/gpu-operator/...
-
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate check manifests
 	go run ./cmd/gpu-operator/...
@@ -214,12 +209,14 @@ goimports:
 lint:
 	golangci-lint run ./...
 
+BUILD_FLAGS = -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
+build:
+	go build $(BUILD_FLAGS) ./...
+
 cmds: $(CMD_TARGETS)
 $(CMD_TARGETS): cmd-%:
-	go build -ldflags "-s -w" $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
-
-build:
-	go build ./...
+	CGO_ENABLED=0 GOOS=$(GOOS) \
+		go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
 
 sync-crds:
 	@echo "- Syncing CRDs into Helm and OLM packages..."
@@ -277,12 +274,6 @@ endif
 ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 .PHONY: $(ALL_TARGETS)
 
-ifneq ($(SUBCOMPONENT),)
-# SUBCOMPONENT is set; assume this is the target folder
-$(ALL_TARGETS): %:
-	make -C $(SUBCOMPONENT) $(*)
-else
-
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
 $(DISTRIBUTIONS): %: build-%
@@ -294,6 +285,7 @@ $(BUILD_TARGETS): build-%:
 		--tag $(IMAGE) \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
+		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
@@ -303,7 +295,6 @@ $(BUILD_TARGETS): build-%:
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 docker-image: ${DEFAULT_PUSH_TARGET}
-endif
 
 install-tools:
 	@echo Installing tools from tools.go
