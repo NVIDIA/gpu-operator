@@ -173,49 +173,6 @@ jobs:
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
-  build-gpu-operator-validator-arm64:
-    needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-24.04-arm
-    strategy:
-      matrix:
-        dist: [ubi9]
-    steps:
-      - uses: actions/checkout@v4
-        name: Check out code
-      - name: Calculate build vars
-        id: vars
-        run: |
-          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-          echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
-
-          GENERATE_ARTIFACTS="false"
-          if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
-            GENERATE_ARTIFACTS="false"
-          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
-            GENERATE_ARTIFACTS="true"
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            GENERATE_ARTIFACTS="true"
-          fi
-          echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
-          echo "DOCKER_BUILD_PLATFORM_OPTIONS=--platform=linux/arm64" >> $GITHUB_ENV
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build image
-        env:
-          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}-arm64
-          SUBCOMPONENT: validator
-        run: |
-          echo "${VERSION}"
-          make build-${{ matrix.dist }}
-
-  ### Image builds ###
   build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-latest
@@ -260,50 +217,8 @@ jobs:
           echo "${VERSION}"
           make build-${{ matrix.dist }}
 
-  build-gpu-operator-validator-amd64:
-    needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dist: [ubi9]
-    steps:
-      - uses: actions/checkout@v4
-        name: Check out code
-      - name: Calculate build vars
-        id: vars
-        run: |
-          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-          echo "LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')" >> $GITHUB_ENV
-
-          GENERATE_ARTIFACTS="false"
-          if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
-            GENERATE_ARTIFACTS="false"
-          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
-            GENERATE_ARTIFACTS="true"
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            GENERATE_ARTIFACTS="true"
-          fi
-          echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
-          echo "DOCKER_BUILD_PLATFORM_OPTIONS=--platform=linux/amd64" >> $GITHUB_ENV
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build image
-        env:
-          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
-          VERSION: ${COMMIT_SHORT_SHA}-amd64
-          SUBCOMPONENT: validator
-        run: |
-          echo "${VERSION}"
-          make build-${{ matrix.dist }}
-
   build-multi-arch-images:
-    needs: [build-gpu-operator-arm64, build-gpu-operator-validator-arm64, build-gpu-operator-amd64, build-gpu-operator-validator-amd64]
+    needs: [build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -326,21 +241,13 @@ jobs:
         env:
           OPERATOR_IMAGE_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-arm64
           OPERATOR_IMAGE_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER}}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}-amd64
-          VALIDATOR_IMAGE_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-arm64
-          VALIDATOR_IMAGE_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}-amd64
           OPERATOR_MULTIARCH_IMAGE: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator:${{ env.COMMIT_SHORT_SHA }}
-          VALIDATOR_MULTIARCH_IMAGE: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/gpu-operator/gpu-operator-validator:${{ env.COMMIT_SHORT_SHA }}
         run: |
           docker manifest create \
             ${OPERATOR_MULTIARCH_IMAGE} \
             ${OPERATOR_IMAGE_AMD} \
             ${OPERATOR_IMAGE_ARM}
           docker manifest push ${OPERATOR_MULTIARCH_IMAGE}
-          docker manifest create \
-            ${VALIDATOR_MULTIARCH_IMAGE} \
-            ${VALIDATOR_IMAGE_AMD} \
-            ${VALIDATOR_IMAGE_ARM}
-          docker manifest push ${VALIDATOR_MULTIARCH_IMAGE}
 
   ### e2e tests ###
   e2e-tests-containerd:
@@ -371,8 +278,6 @@ jobs:
 
           echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
-          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
-          echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
 
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
@@ -384,7 +289,7 @@ jobs:
           TEST_CASE: "./tests/cases/defaults.sh"
         run: |
           echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
-          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
+          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
           ./tests/scripts/pull.sh /tmp/logs logs
           exit $rc
       - name: Archive test logs
@@ -423,8 +328,6 @@ jobs:
 
           echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
-          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
-          echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
 
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
@@ -436,7 +339,7 @@ jobs:
           TEST_CASE: "./tests/cases/nvidia-driver.sh"
         run: |
           echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
-          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
+          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
           ./tests/scripts/pull.sh /tmp/logs logs
           exit $rc
       - name: Archive test logs
@@ -447,7 +350,7 @@ jobs:
           path: ./logs/
           retention-days: 15
 
-  release-latest-gpu-operator-and-validator-image:
+  release-latest-gpu-operator-image:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
     runs-on: linux-amd64-cpu4
@@ -468,17 +371,14 @@ jobs:
           LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
           echo "OPERATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
           echo "OPERATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator" >> $GITHUB_ENV
-          echo "VALIDATOR_VERSION=${COMMIT_SHORT_SHA}" >> $GITHUB_ENV
-          echo "VALIDATOR_IMAGE=ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator"  >> $GITHUB_ENV
-      - name: Retag gpu-operator and gpu-operator-validator
+      - name: Retag gpu-operator
         run: |
           regctl registry login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.GITHUB_TOKEN }}
           regctl image copy ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:main-latest
-          regctl image copy ${VALIDATOR_IMAGE}:${VALIDATOR_VERSION} ${VALIDATOR_IMAGE}:main-latest
 
   push-gpu-operator-bundle-image:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
-    needs: [release-latest-gpu-operator-and-validator-image]
+    needs: [release-latest-gpu-operator-image]
     runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
