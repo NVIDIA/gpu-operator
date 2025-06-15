@@ -58,6 +58,9 @@ spec:
               fieldPath: metadata.namespace
         - name: "DRIVER_MANAGER_IMAGE"
           value: "{{ include "driver-manager.fullimage" . }}"
+        securityContext:
+          runAsUser: 65532
+          runAsGroup: 65532
         volumeMounts:
           - name: host-os-release
             mountPath: "/host-etc/os-release"
