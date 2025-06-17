@@ -50,8 +50,8 @@ daemonsets:
     maxUnavailable: "1"
 
 validator:
-  repository: nvcr.io/nvidia/cloud-native
-  image: gpu-operator-validator
+  repository: nvcr.io/nvidia
+  image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
   #version: ""
   imagePullPolicy: IfNotPresent
@@ -426,8 +426,8 @@ migManager:
 
 nodeStatusExporter:
   enabled: false
-  repository: nvcr.io/nvidia/cloud-native
-  image: gpu-operator-validator
+  repository: nvcr.io/nvidia
+  image: gpu-operator
   # If version is not specified, then default is to use chart.AppVersion
   #version: ""
   imagePullPolicy: IfNotPresent

@@ -192,6 +192,9 @@ const (
 	Readiness ContainerProbe = "readiness"
 )
 
+// rootUID represents user 0
+var rootUID = utils.Int64Ptr(0)
+
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
 	"centos": "/etc/yum.repos.d",
@@ -2079,6 +2082,19 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	return nil
 }
 
+// transformValidatorSecurityContext updates the security context for a validator
+// container so that it runs as uid 0. Some of the validations run commands
+// that require root privileges (e.g. chroot). In addition, all validations
+// create / delete status files in the '/run/nvidia/validations' host path
+// volume. This directory is initially created by the kubelet and thus has
+// the same group and ownership as the kubelet.
+func transformValidatorSecurityContext(ctr *corev1.Container) {
+	if ctr.SecurityContext == nil {
+		ctr.SecurityContext = &corev1.SecurityContext{}
+	}
+	ctr.SecurityContext.RunAsUser = rootUID
+}
+
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	err := TransformValidatorShared(obj, config)
@@ -2173,6 +2189,8 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+	// update the security context for the validator container
+	transformValidatorSecurityContext(&obj.Spec.Template.Spec.Containers[0])
 
 	return nil
 }
@@ -2194,6 +2212,9 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		if config.Validator.ImagePullPolicy != "" {
 			podSpec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
+		// update the security context for the validator container
+		transformValidatorSecurityContext(&podSpec.InitContainers[i])
+
 		switch component {
 		case "cuda":
 			// set/append environment variables for cuda-validation container
@@ -2338,6 +2359,9 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
+	// update the security context for the node status exporter container.
+	transformValidatorSecurityContext(&obj.Spec.Template.Spec.Containers[0])
 
 	return nil
 }
@@ -3532,6 +3556,8 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
+		// update the security context for the validator container
+		transformValidatorSecurityContext(&obj.Spec.Template.Spec.InitContainers[i])
 	}
 	// add any pull secrets needed for validation image
 	if len(config.Validator.ImagePullSecrets) > 0 {

@@ -58,14 +58,6 @@ image:gpu-operator:
     - .dist-ubi9
     - .target-gpu-operator
 
-image:gpu-operator-validator:
-  extends:
-    - .image-pull
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
-
 # We skip the integration tests for the internal CI:
 .integration:
   stage: test
@@ -126,26 +118,6 @@ scan:gpu-operator-arm64:
   needs:
     - scan:gpu-operator-amd64
 
-.scan:gpu-operator-validator:
-  extends:
-    - .scan
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  needs:
-    - image:gpu-operator-validator
-
-scan:gpu-operator-validator-amd64:
-  extends:
-    - .scan:gpu-operator-validator
-    - .platform-amd64
-
-scan:gpu-operator-validator-arm64:
-  extends:
-    - .scan:gpu-operator-validator
-    - .platform-arm64
-  needs:
-    - scan:gpu-operator-validator-amd64
-
 # Define the external release steps for NGC and Dockerhub
 .release:ngc:
   extends: .release:external
@@ -153,22 +125,13 @@ scan:gpu-operator-validator-arm64:
     OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
     OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
     OUT_REGISTRY: "${NGC_REGISTRY}"
-    OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}" # This needs to change for the gpu-operator and gpu-operator-validator
+    OUT_IMAGE_NAME: "${NGC_REGISTRY_IMAGE}"
 
 release:ngc-gpu-operator:
   extends:
     - .release:ngc
     - .dist-ubi9
     - .target-gpu-operator
-
-release:ngc-gpu-operator-validator:
-  extends:
-    - .release:ngc
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    IN_IMAGE_NAME: "gpu-operator-validator"
-    OUT_IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
 
 # Define the external image signing steps for NGC
 # Download the ngc cli binary for use in the sign steps
@@ -216,15 +179,6 @@ sign:ngc-gpu-operator:
   variables:
     IMAGE_TAG: "${CI_COMMIT_TAG}"
 
-sign:ngc-gpu-operator-validator:
-  extends:
-    - .sign:ngc
-  needs:
-    - release:ngc-gpu-operator-validator
-  variables:
-    IMAGE_NAME: "${NGC_PROD_VALIDATOR_IMAGE}"
-    IMAGE_TAG: "${CI_COMMIT_TAG}"
-
 .schedule_defaults:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -235,8 +189,6 @@ sign:ngc-gpu-operator-validator:
     # TODO: Should these use the staging release instead?
     OPERATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
     OPERATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator"
-    VALIDATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
-    VALIDATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator-validator"
     TARGET_DRIVER_VERSION: "550.163.01"
 
 .e2e_tests:
@@ -255,7 +207,7 @@ sign:ngc-gpu-operator-validator:
     - export private_key="${VSPHERE_SSH_PRIVATE_KEY}"
     - export instance_hostname="${instance_hostname}"
     - rc=0
-    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${VALIDATOR_IMAGE} ${VALIDATOR_VERSION} ${GPU_DEVICE} || rc=$?
+    - ${CI_PROJECT_DIR}/tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_DEVICE} || rc=$?
     - ${CI_PROJECT_DIR}/tests/scripts/pull.sh /tmp/logs logs
     - exit $rc
   artifacts:

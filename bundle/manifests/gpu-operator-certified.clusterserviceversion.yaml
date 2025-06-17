@@ -223,7 +223,7 @@ spec:
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:e8e8680c1e230a63f900f1f9b692af791644f6f14bdc54920f7a7c7f4a6a327b
     - name: gpu-operator-validator-image
-      image: ghcr.io/nvidia/gpu-operator/gpu-operator-validator:main-latest
+      image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:c525320fd1e771b911b68f8e760b83e8fccf1beea43bf9b009c4f0c591e193ea
     - name: vfio-manager-image
@@ -895,7 +895,7 @@ spec:
                       fieldRef:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
-                    value: "ghcr.io/nvidia/gpu-operator/gpu-operator-validator:main-latest"
+                    value: "ghcr.io/nvidia/gpu-operator:main-latest"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f"
                   - name: "CONTAINER_TOOLKIT_IMAGE"

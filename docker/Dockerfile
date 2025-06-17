@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG CUDA_SAMPLE_IMAGE=undefined
 ARG GOLANG_VERSION=x.x.x
 
 FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9 as builder
@@ -53,12 +54,19 @@ COPY *.mk .
 # Build
 ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
-RUN make gpu-operator
+RUN make cmds
+
+FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 
 FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9
 
 # Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
 RUN dnf remove -y cuda-*
+
+RUN dnf install -y \
+        kmod \
+        pciutils && \
+    rm -rf /var/cache/yum/*
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -76,10 +84,19 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/nvidia-validator /usr/bin/
+COPY --from=sample-builder /cuda-samples/vectorAdd /usr/bin/vectorAdd
 
+# gpu-operator manifests
 RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
+
+# validator manifests
+RUN mkdir -p /opt/validator/manifests
+COPY validator/manifests/plugin-workload-validation.yaml /opt/validator/manifests
+COPY validator/manifests/cuda-workload-validation.yaml /opt/validator/manifests
+
 RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
 COPY hack/must-gather.sh /usr/bin/gather
 
@@ -101,7 +118,6 @@ RUN if [ -n "${CVE_UPDATES}" ]; then \
         rm -rf /var/cache/yum/*; \
     fi
 
-RUN useradd gpu-operator
-USER gpu-operator
+USER 65532:65532
 
 ENTRYPOINT ["/usr/bin/gpu-operator"]
