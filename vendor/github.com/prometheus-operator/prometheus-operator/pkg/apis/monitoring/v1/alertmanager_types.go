@@ -276,6 +276,8 @@ type AlertmanagerSpec struct {
 	HostAliases []HostAlias `json:"hostAliases,omitempty"`
 	// Defines the web command line flags when starting Alertmanager.
 	Web *AlertmanagerWebSpec `json:"web,omitempty"`
+	// Defines the limits command line flags when starting Alertmanager.
+	Limits *AlertmanagerLimitsSpec `json:"limits,omitempty"`
 	// Configures the mutual TLS configuration for the Alertmanager cluster's gossip protocol.
 	//
 	// It requires Alertmanager >= 0.24.0.
@@ -302,6 +304,23 @@ type AlertmanagerSpec struct {
 	// It requires Alertmanager >= 0.27.0.
 	// +optional
 	EnableFeatures []string `json:"enableFeatures,omitempty"`
+	// AdditionalArgs allows setting additional arguments for the 'Alertmanager' container.
+	// It is intended for e.g. activating hidden flags which are not supported by
+	// the dedicated configuration options yet. The arguments are passed as-is to the
+	// Alertmanager container which may cause issues if they are invalid or not supported
+	// by the given Alertmanager version.
+	// +optional
+	AdditionalArgs []Argument `json:"additionalArgs,omitempty"`
+
+	// Optional duration in seconds the pod needs to terminate gracefully.
+	// Value must be non-negative integer. The value zero indicates stop immediately via
+	// the kill signal (no opportunity to shut down) which may lead to data corruption.
+	//
+	// Defaults to 120 seconds.
+	//
+	// +kubebuilder:validation:Minimum:=0
+	// +optional
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 type AlertmanagerConfigMatcherStrategy struct {
@@ -427,6 +446,24 @@ type AlertmanagerWebSpec struct {
 	Timeout *uint32 `json:"timeout,omitempty"`
 }
 
+// AlertmanagerLimitsSpec defines the limits command line flags when starting Alertmanager.
+// +k8s:openapi-gen=true
+type AlertmanagerLimitsSpec struct {
+	// The maximum number active and pending silences. This corresponds to the
+	// Alertmanager's `--silences.max-silences` flag.
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +kubebuilder:validation:Minimum:=0
+	// +optional
+	MaxSilences *int32 `json:"maxSilences,omitempty"`
+	// The maximum size of an individual silence as stored on disk. This corresponds to the Alertmanager's
+	// `--silences.max-per-silence-bytes` flag.
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +optional
+	MaxPerSilenceBytes *ByteSize `json:"maxPerSilenceBytes,omitempty"`
+}
+
 // GlobalSMTPConfig configures global SMTP parameters.
 // See https://prometheus.io/docs/alerting/latest/configuration/#configuration-file
 type GlobalSMTPConfig struct {
@@ -462,6 +499,10 @@ type GlobalSMTPConfig struct {
 	// Note that Go does not support unencrypted connections to remote SMTP endpoints.
 	// +optional
 	RequireTLS *bool `json:"requireTLS,omitempty"`
+
+	// The default TLS configuration for SMTP receivers
+	// +optional
+	TLSConfig *SafeTLSConfig `json:"tlsConfig,omitempty"`
 }
 
 // HostPort represents a "host:port" network address.
