@@ -95,11 +95,17 @@ data:
         echo "unbinding device $gpu"
         unbind_from_driver $gpu
         #for graphics mode, we need to unbind the auxiliary device as well
-        aux_dev=$(get_graphics_aux_dev "$gpu")
-        if [ "$aux_dev" != "NONE" ]; then
-          echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
-          unbind_from_driver "$aux_dev"
-        fi
+        aux_devs=$(get_graphics_aux_dev "$gpu")
+        readarray -t aux_dev_array < <(printf "%s\n" "$aux_devs")
+        for aux_dev in "${aux_dev_array[@]}"; do
+            if [ "$aux_dev" == "NONE" ]; then
+                continue
+            fi
+            if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
+                echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
+                unbind_from_driver "$aux_dev"
+            fi
+        done
     }
 
     unbind_all() {
@@ -140,11 +146,8 @@ data:
             echo "NONE"
             return
           fi
-
-          if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
-            echo "$aux_dev"
-            return
-          fi
+          echo "$aux_dev"
+          return
         fi
 
         echo "NONE"
@@ -160,11 +163,17 @@ data:
 
         bind_pci_device "$gpu"
         #for graphics mode, we need to bind the auxiliary device as well
-        aux_dev=$(get_graphics_aux_dev "$gpu")
-        if [ "$aux_dev" != "NONE" ]; then
-          echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
-          bind_pci_device "$aux_dev"
-        fi
+        aux_devs=$(get_graphics_aux_dev "$gpu")
+        readarray -t aux_dev_array < <(printf "%s\n" "$aux_devs")
+        for aux_dev in "${aux_dev_array[@]}"; do
+            if [ "$aux_dev" == "NONE" ]; then
+                continue
+            fi
+            if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
+                echo "gpu $gpu is in graphics mode aux_dev $aux_dev"
+                bind_pci_device "$aux_dev"
+            fi
+        done
     }
 
     bind_all() {
