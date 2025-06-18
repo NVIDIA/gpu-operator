@@ -7,7 +7,7 @@ metadata:
     app: nvidia-vfio-manager
 data:
   vfio-manage.sh: |-
-    #!/bin/bash
+    #!/bin/sh
 
     set -eu
 
@@ -25,9 +25,7 @@ data:
     }
 
     unbind_from_driver() {
-        local gpu=$1
-        local existing_driver_name
-        local existing_driver
+        gpu=$1
 
         [ -e "/sys/bus/pci/devices/$gpu/driver" ] || return 0
 
@@ -36,14 +34,12 @@ data:
 
         echo "unbinding device $gpu from driver $existing_driver_name"
         echo "$gpu" > "$existing_driver/unbind"
-        echo > /sys/bus/pci/devices/$gpu/driver_override
+        echo > "/sys/bus/pci/devices/$gpu/driver_override"
     }
 
     # unbind device from non vfio-pci driver
     unbind_from_other_driver() {
-        local gpu=$1
-        local existing_driver_name
-        local existing_driver
+        gpu=$1
 
         [ -e "/sys/bus/pci/devices/$gpu/driver" ] || return 0
 
@@ -54,22 +50,20 @@ data:
         [ "$existing_driver_name" != "vfio-pci" ] || return 0
         echo "unbinding device $gpu from driver $existing_driver_name"
         echo "$gpu" > "$existing_driver/unbind"
-        echo > /sys/bus/pci/devices/$gpu/driver_override
+        echo > "/sys/bus/pci/devices/$gpu/driver_override"
     }
 
     is_nvidia_gpu_device() {
-        local gpu=$1
+        gpu=$1
         # make sure device class is for NVIDIA GPU
         device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
         device_class=$(cat "$device_class_file")
-        [ "$device_class" == "0x030200" ] || [ "$device_class" == "0x030000" ] || return 1
+        [ "$device_class" = "0x030200" ] || [ "$device_class" = "0x030000" ] || return 1
         return 0
     }
 
     is_bound_to_vfio() {
-        local gpu=$1
-        local existing_driver_name
-        local existing_driver
+        gpu=$1
 
         # return if not bound to any driver
         [ -e "/sys/bus/pci/devices/$gpu/driver" ] || return 1
@@ -79,21 +73,21 @@ data:
 
         echo "existing driver is $existing_driver_name"
         # return if bound to other drivers(nvidia, nouveau)
-        [ "$existing_driver_name" == "vfio-pci" ] || return 1
+        [ "$existing_driver_name" = "vfio-pci" ] || return 1
 
         # bound to vfio
         return 0
     }
 
     unbind_device() {
-        local gpu=$1
+        gpu=$1
 
         if ! is_nvidia_gpu_device $gpu; then
             return 0
         fi
 
         echo "unbinding device $gpu"
-        unbind_from_driver $gpu
+        unbind_from_driver "$gpu"
         #for graphics mode, we need to unbind the auxiliary device as well
         aux_dev=$(get_graphics_aux_dev "$gpu")
         if [ "$aux_dev" != "NONE" ]; then
@@ -104,21 +98,21 @@ data:
 
     unbind_all() {
         for dev in /sys/bus/pci/devices/*; do
-            read vendor < $dev/vendor
+            read -r vendor < "$dev/vendor"
             if [ "$vendor" = "0x10de" ]; then
-                local dev_id=$(basename $dev)
-                unbind_device $dev_id
+                dev_id=$(basename "$dev")
+                unbind_device "$dev_id"
             fi
         done
     }
 
     bind_pci_device() {
-        local gpu=$1
+        gpu=$1
 
         if ! is_bound_to_vfio $gpu; then
           unbind_from_other_driver $gpu
           echo "binding device $gpu"
-          echo "vfio-pci" > /sys/bus/pci/devices/$gpu/driver_override
+          echo "vfio-pci" > "/sys/bus/pci/devices/$gpu/driver_override"
           echo "$gpu" > /sys/bus/pci/drivers/vfio-pci/bind
         else
           echo "device $gpu already bound to vfio-pci"
@@ -126,7 +120,7 @@ data:
     }
 
     get_graphics_aux_dev() {
-        local gpu=$1
+        gpu=$1
         device_class_file=$(readlink -f "/sys/bus/pci/devices/$gpu/class")
         device_class=$(cat "$device_class_file")
         if [ "$device_class" != "0x030000" ]; then
@@ -134,14 +128,14 @@ data:
           return
         fi
 
-        if ls "/sys/bus/pci/devices/$gpu" | grep consumer >& /dev/null; then
+        if ls "/sys/bus/pci/devices/$gpu" | grep consumer >/dev/null 2>&1; then
           aux_dev=$(ls "/sys/bus/pci/devices/$gpu" | grep consumer | awk -Fconsumer:pci: '{print $2}')
-          if [ "$aux_dev" == "" ]; then
+          if [ "$aux_dev" = "" ]; then
             echo "NONE"
             return
           fi
 
-          if ls "/sys/bus/pci/devices/$aux_dev/" >& /dev/null; then
+          if ls "/sys/bus/pci/devices/$aux_dev/" >/dev/null 2>&1; then
             echo "$aux_dev"
             return
           fi
@@ -151,9 +145,9 @@ data:
     }
 
     bind_device() {
-        local gpu=$1
+        gpu=$1
 
-        if ! is_nvidia_gpu_device $gpu; then
+        if ! is_nvidia_gpu_device "$gpu"; then
             echo "device $gpu is not a gpu!"
             return 0
         fi
@@ -169,10 +163,10 @@ data:
 
     bind_all() {
         for dev in /sys/bus/pci/devices/*; do
-            read vendor < $dev/vendor
+            read -r vendor < "$dev/vendor"
             if [ "$vendor" = "0x10de" ]; then
-                local dev_id=$(basename $dev)
-                bind_device $dev_id
+                dev_id=$(basename "$dev")
+                bind_device "$dev_id"
             fi
         done
     }
@@ -180,7 +174,7 @@ data:
     handle_bind() {
         chroot /host modprobe vfio-pci
         if [ "$DEVICE_ID" != "" ]; then
-            bind_device $DEVICE_ID
+            bind_device "$DEVICE_ID"
         elif [ "$ALL_DEVICES" = "true" ]; then
             bind_all
         else
@@ -190,7 +184,7 @@ data:
 
     handle_unbind() {
         if [ "$DEVICE_ID" != "" ]; then
-            unbind_device $DEVICE_ID
+            unbind_device "$DEVICE_ID"
         elif [ "$ALL_DEVICES" = "true" ]; then
             unbind_all
         else

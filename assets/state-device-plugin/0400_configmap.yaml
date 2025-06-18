@@ -7,9 +7,9 @@ metadata:
     app: nvidia-device-plugin-daemonset
 data:
   entrypoint.sh: |-
-    #!/bin/bash
+    #!/bin/sh
 
-    until [[ -f /run/nvidia/validations/driver-ready ]]
+    until [ -f /run/nvidia/validations/driver-ready ]
     do
       echo "waiting for the driver validations to be ready..."
       sleep 5
