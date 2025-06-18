@@ -15,7 +15,7 @@
 ARG CUDA_SAMPLE_IMAGE=undefined
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9 as builder
+FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 as builder
 
 RUN dnf install -y wget make git gcc
 
@@ -58,7 +58,7 @@ RUN make cmds
 
 FROM ${CUDA_SAMPLE_IMAGE} AS sample-builder
 
-FROM nvcr.io/nvidia/cuda:12.9.0-base-ubi9
+FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9
 
 # Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
 RUN dnf remove -y cuda-*
