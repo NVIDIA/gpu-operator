@@ -7,6 +7,6 @@ metadata:
     app: nvidia-dcgm-exporter
 data:
   entrypoint.sh: |-
-    #!/bin/bash
+    #!/bin/sh
     chcon -t  container_file_t /var/lib/kubelet/pod-resources
     chcon -t  container_file_t /var/lib/kubelet/pod-resources/*

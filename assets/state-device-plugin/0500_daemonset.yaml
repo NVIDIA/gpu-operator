@@ -64,7 +64,7 @@ spec:
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: nvidia-device-plugin
-        command: ["/bin/bash", "-c"]
+        command: ["/bin/sh", "-c"]
         args:
           - /bin/entrypoint.sh
         securityContext:

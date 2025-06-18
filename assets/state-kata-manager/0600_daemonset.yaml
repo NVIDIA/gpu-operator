@@ -27,7 +27,7 @@ spec:
         - name: nvidia-kata-manager
           image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
-          command: ["/bin/bash", "-c"]
+          command: ["/bin/sh", "-c"]
           args:
             - /bin/entrypoint.sh
           env:
@@ -66,11 +66,11 @@ spec:
           readinessProbe:
             exec:
               command:
-                - bash
+                - sh
                 - "-c"
                 - |
                   pid_file="${KATA_ARTIFACTS_DIR}/k8s-kata-manager.pid"
-                  [[ -f "${pid_file}" ]] && [[ -d "/proc/$(cat $pid_file)" ]] && exit 0 || exit 1
+                  [ -f "${pid_file}" ] && [ -d "/proc/$(cat $pid_file)" ] && exit 0 || exit 1
             initialDelaySeconds: 5
             periodSeconds: 5
       terminationGracePeriodSeconds: 30
