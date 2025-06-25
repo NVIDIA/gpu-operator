@@ -59,7 +59,7 @@ spec:
             mountPath: /host-dev-char
       containers:
       - image: "FILLED BY THE OPERATOR"
-        command: ["/bin/bash", "-c"]
+        command: ["/bin/sh", "-c"]
         args:
           - /bin/entrypoint.sh
         env:
