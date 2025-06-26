@@ -84,7 +84,79 @@ metadata:
                 "name": ""
               },
               "serviceMonitor": {
-                "enabled": true
+                "enabled": true,
+                "metricRelabelings": [
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_GPU_UTIL",
+                    "replacement": "accelerator_gpu_utilization",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_MEM_COPY_UTIL",
+                    "replacement": "accelerator_memory_used_bytes",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_FB_TOTAL",
+                    "replacement": "accelerator_memory_total_bytes",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_POWER_USAGE",
+                    "replacement": "accelerator_power_usage_watts",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_GPU_TEMP",
+                    "replacement": "accelerator_temperature_celcius",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_SM_CLOCK",
+                    "replacement": "accelerator_sm_clock_hertz",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "DCGM_FI_DEV_MEM_CLOCK",
+                    "replacement": "accelerator_memory_cloc_hertz",
+                    "sourceLabels": [
+                      "__name__"
+                    ],
+                    "targetLabel": "__name__"
+                  }
+                ],
+                "relabelings": [
+                  {
+                    "action": "replace",
+                    "replacement": "nvidia",
+                    "targetLabel": "vendor_id"
+                  }
+                ]
               }
             },
             "dcgm": {
