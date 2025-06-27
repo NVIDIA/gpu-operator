@@ -90,12 +90,11 @@ unit-tests:
     - 'echo "Logging in to CI registry ${CI_REGISTRY}"'
     - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   script:
-    - make build-${DIST}
+    - make build-image
 
 build:gpu-operator:
   extends:
     - .image-build
-    - .dist-ubi9
     - .target-gpu-operator
 
 .e2e_defaults:
@@ -108,8 +107,6 @@ build:gpu-operator:
     OPERATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
     OPERATOR_IMAGE: "${CI_REGISTRY_IMAGE}"
     GPU_PRODUCT_NAME: "Tesla-T4"
-  extends:
-    - .dist-ubi9
   except:
     variables:
       - $CI_COMMIT_MESSAGE =~ /skip-end-to-end-tests/

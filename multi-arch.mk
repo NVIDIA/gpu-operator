@@ -18,7 +18,7 @@ DOCKER_BUILD_OPTIONS = --output=type=image,push=$(PUSH_ON_BUILD) --provenance=$(
 DOCKER_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64,linux/arm64
 
 REGCTL ?= regctl
-$(PUSH_TARGETS): push-%:
+push-image:
 	$(REGCTL) \
 	        image copy \
 	        $(IMAGE) $(OUT_IMAGE)
