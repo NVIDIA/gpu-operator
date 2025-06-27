@@ -106,6 +106,9 @@ trigger-pipeline:
 # target os.
 .release:
   stage: release
+  needs: 
+    - image:gpu-operator
+    - image:gpu-operator-validator
   allow_failure: true
   variables:
     # Define the source image for the release
@@ -134,7 +137,7 @@ trigger-pipeline:
 
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
-    - make push-${DIST}
+    # - make push-${DIST}
     - echo "${CI_COMMIT_SHORT_SHA} ${OUT_IMAGE_VERSION}" > build-info-${IN_IMAGE_NAME}-${CI_COMMIT_SHORT_SHA}.txt
 
 .release-bundle:
@@ -236,15 +239,20 @@ release:gpu-operator-bundle-image:
 # Second job to trigger downstream pipeline
 raise-publishing-merge-request:
   stage: ngc-publish
+  needs: 
+    - release:staging-gpu-operator
+    - release:staging-gpu-operator-validator
   image: 
-    name: "${CNT_NGC_PUBLISH_IMAGE}"
+    name: "gitlab-master.nvidia.com:5005/dl/container-dev/ngc-automation:756501c7"
     pull_policy: always
   variables:
     PROJECT_NAME: "gpu-operator"
     TARGET_VERSION: "${CI_COMMIT_TAG}"
     GITLAB_ACCESS_TOKEN: "${CNT_GITLAB_TOKEN}"
   script:
-    - cnt-ngc-publish render --project-name "gpu-operator" --versions-file "build-info-gpu-operator-${CI_COMMIT_SHORT_SHA}.txt"
-    - cnt-ngc-publish render --project-name "gpu-operator-validator" --versions-file "build-info-gpu-operator-validator-${CI_COMMIT_SHORT_SHA}.txt"
+    - cnt-ngc-publish render --project-name "gpu-operator" --versions-file "build-info-gpu-operator-${CI_COMMIT_SHORT_SHA}.txt" --output "gpu-operator.yaml"
+    - cnt-ngc-publish render --project-name "gpu-operator-validator" --versions-file "build-info-gpu-operator-validator-${CI_COMMIT_SHORT_SHA}.txt" --output "gpu-operator-validator.yaml"
     - cnt-ngc-publish merge-request --files "gpu-operator.yaml" "gpu-operator-validator.yaml"
+    - echo "${CI_COMMIT_SHORT_SHA} v25.3.1" > test.txt
+    - cnt-ngc-publish upload-helm --versions-file "test.txt"
 
