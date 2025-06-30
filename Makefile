@@ -71,8 +71,6 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-all: gpu-operator
-
 GOOS ?= linux
 VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
 
@@ -258,12 +256,9 @@ cov-report: coverage install-tools
 	$(GCOV2LCOV) -infile $(COVERAGE_FILE) -outfile lcov.info
 
 ##### Public rules #####
-DISTRIBUTIONS := ubi9
-DEFAULT_PUSH_TARGET := ubi9
-
-PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
-BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
-TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
+PUSH_TARGETS := push-image
+BUILD_TARGETS := build-image
+TEST_TARGETS := test
 
 ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
 include $(CURDIR)/native-only.mk
@@ -271,13 +266,12 @@ else
 include $(CURDIR)/multi-arch.mk
 endif
 
-ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+ALL_TARGETS := $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 .PHONY: $(ALL_TARGETS)
 
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
-$(DISTRIBUTIONS): %: build-%
-$(BUILD_TARGETS): build-%:
+build-image:
 	DOCKER_BUILDKIT=1 \
 		$(DOCKER) $(BUILDX) build --pull \
 		$(DOCKER_BUILD_OPTIONS) \
@@ -285,16 +279,13 @@ $(BUILD_TARGETS): build-%:
 		--tag $(IMAGE) \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg CUDA_SAMPLE_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda$(CUDA_SAMPLES_VERSION) \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-docker-image: ${DEFAULT_PUSH_TARGET}
 
 install-tools:
 	@echo Installing tools from tools.go

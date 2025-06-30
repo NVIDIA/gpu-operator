@@ -82,11 +82,6 @@ trigger-pipeline:
     -  '[[ -n "${SKIP_QEMU_SETUP}" ]] || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes'
 
 # Define targets for the gpu-operator image
-.dist-ubi9:
-  variables:
-    DIST: ubi9
-    CVE_UPDATES: "cyrus-sasl-lib"
-
 .target-gpu-operator:
   variables:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
@@ -122,7 +117,7 @@ trigger-pipeline:
 
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
-    - make push-${DIST}
+    - make push-image
 
 .release-bundle:
   stage: release
@@ -174,7 +169,6 @@ trigger-pipeline:
 release:staging-gpu-operator:
   extends:
     - .release:staging
-    - .dist-ubi9
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
@@ -182,7 +176,6 @@ release:staging-gpu-operator:
 release:staging-latest-gpu-operator:
   extends:
     - .release:staging
-    - .dist-ubi9
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"

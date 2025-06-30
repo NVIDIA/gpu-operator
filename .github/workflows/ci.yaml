@@ -133,9 +133,6 @@ jobs:
   build-gpu-operator-arm64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-24.04-arm
-    strategy:
-      matrix:
-        dist: [ubi9]
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -172,13 +169,10 @@ jobs:
           VERSION: ${COMMIT_SHORT_SHA}-arm64
         run: |
           echo "${VERSION}"
-          make build-${{ matrix.dist }}
+          make build-image
   build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dist: [ubi9]
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -215,14 +209,11 @@ jobs:
           VERSION: ${COMMIT_SHORT_SHA}-amd64
         run: |
           echo "${VERSION}"
-          make build-${{ matrix.dist }}
+          make build-image
 
   build-multi-arch-images:
     needs: [build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dist: [ubi9]
     steps:
       - uses: actions/checkout@v4
         name: Check out code
