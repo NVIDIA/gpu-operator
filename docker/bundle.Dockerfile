@@ -1,6 +1,5 @@
 FROM scratch
 
-ARG VERSION=""
 ARG DEFAULT_CHANNEL=stable
 ARG CHANNELS=stable
 ARG GIT_COMMIT="unknown"
@@ -22,6 +21,6 @@ LABEL com.redhat.delivery.operator.bundle=true
 LABEL com.redhat.delivery.backport=false
 LABEL vsc-ref=${GIT_COMMIT}
 
-COPY bundle/${VERSION}/manifests /manifests/
-COPY bundle/${VERSION}/metadata /metadata/
+COPY bundle/manifests /manifests/
+COPY bundle/metadata /metadata/
 COPY bundle/tests/scorecard /tests/scorecard/
