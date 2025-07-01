@@ -43,6 +43,21 @@ if [[ "$ocp_cluster" ]]; then
     $K get clusterversion/version -oyaml > $ARTIFACT_DIR/openshift_version.yaml
 fi
 
+echo
+echo "#"
+echo "# KubeVirt HyperConverged Resources"
+echo "#"
+echo
+
+HYPERCONVERGED_RESOURCE=$($K get hyperconvergeds.hco.kubevirt.io -A -oname --ignore-not-found)
+
+if [[ "$HYPERCONVERGED_RESOURCE" ]]; then
+    echo "Get HyperConverged YAML"
+    $K get hyperconvergeds.hco.kubevirt.io -A -oyaml > $ARTIFACT_DIR/hyperconverged.yaml
+else
+    echo "HyperConverged resource(s) not found in the cluster."
+fi
+
 echo "Get the operator namespaces"
 OPERATOR_POD_NAME=$($K get pods -lapp=gpu-operator -oname -A)
 
@@ -55,6 +70,21 @@ OPERATOR_NAMESPACE=$($K get pods -lapp=gpu-operator -A -ojsonpath={.items[].meta
 
 echo "Using '$OPERATOR_NAMESPACE' as operator namespace"
 echo ""
+
+echo
+echo "#"
+echo "# KubeVirt Resources"
+echo "#"
+echo
+
+KUBEVIRT_RESOURCE=$($K get kubevirts.kubevirt.io -A -oname --ignore-not-found)
+
+if [[ "$KUBEVIRT_RESOURCE" ]]; then
+    echo "Get KubeVirt YAML"
+    $K get kubevirts.kubevirt.io -A -oyaml > $ARTIFACT_DIR/kubevirt.yaml
+else
+    echo "KubeVirt resource(s) not found in the cluster."
+fi
 
 echo "#"
 echo "# ClusterPolicy"
