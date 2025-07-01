@@ -65,7 +65,7 @@ FROM nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0 AS sample-builder
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v3.1.7-dev
+FROM nvcr.io/nvidia/distroless/cc:v3.1.9-dev
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
