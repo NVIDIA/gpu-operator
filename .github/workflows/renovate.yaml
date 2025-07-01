@@ -1,0 +1,28 @@
+name: Renovate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - renovateci
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@v43.0.1
+        with:
+          # token: ${{ secrets.RENOVATE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          configurationFile: .github/renovate.json
+        env:
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          LOG_LEVEL: debug
+          RENOVATE_LOG_LEVEL: debug
+          RENOVATE_REPOSITORIES: '["NVIDIA/gpu-operator"]'
+          # RENOVATE_AUTODISCOVER: true
+          # RENOVATE_ONBOARDING: false
+          DEBUG: hostRules,config,docker
