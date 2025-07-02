@@ -324,6 +324,8 @@ dcgmExporter:
       value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
   resources: {}
   service:
+    type: ClusterIP
+    externalTrafficPolicy: Cluster
     internalTrafficPolicy: Cluster
   serviceMonitor:
     enabled: false

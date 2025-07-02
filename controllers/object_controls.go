@@ -998,6 +998,10 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 		if serviceConfig.InternalTrafficPolicy != nil {
 			obj.Spec.InternalTrafficPolicy = serviceConfig.InternalTrafficPolicy
 		}
+
+		if serviceConfig.ExternalTrafficPolicy != nil {
+			obj.Spec.ExternalTrafficPolicy = *serviceConfig.ExternalTrafficPolicy
+		}
 	}
 	return nil
 }
