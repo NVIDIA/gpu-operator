@@ -397,6 +397,13 @@ spec:
                         description: InternalTrafficPolicy describes how nodes distribute
                           service traffic they receive on the ClusterIP.
                         type: string
+                      nodePort:
+                        description: |- 
+                          Custom port number to expose for the NodePort service.
+                          Must be between 30000 and 32767.
+                        minimum: 30000
+                        maximum: 32767
+                        type: integer
                       type:
                         description: Type represents the ServiceType which describes
                           ingress methods for a service

@@ -995,6 +995,10 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 			obj.Spec.Type = serviceConfig.Type
 		}
 
+		if serviceConfig.NodePort != nil && len(obj.Spec.Ports) > 0 {
+			obj.Spec.Ports[0].NodePort = *serviceConfig.NodePort
+		}
+
 		if serviceConfig.InternalTrafficPolicy != nil {
 			obj.Spec.InternalTrafficPolicy = serviceConfig.InternalTrafficPolicy
 		}

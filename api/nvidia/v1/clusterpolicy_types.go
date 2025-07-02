@@ -935,6 +935,13 @@ type DCGMExporterServiceConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Type corev1.ServiceType `json:"type,omitempty"`
 
+        // NodePort allows setting a custom port number for the NodePort service.
+        // Must be within the range configured in the Kubernetes API server (usually 30000-32767).
+        // +kubebuilder:validation:Minimum=30000
+        // +kubebuilder:validation:Maximum=32767
+        // +optional
+        NodePort *int32 `json:"nodePort,omitempty"`
+
         // ExternalTrafficPolicy controls how external traffic is handled by the Kubernetes service.
         // Acceptable values are "Cluster" and "Local". This setting only applies when service type is NodePort or LoadBalancer.
         // +kubebuilder:validation:Enum=Cluster;Local
