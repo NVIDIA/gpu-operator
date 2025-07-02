@@ -941,7 +941,7 @@ type DCGMExporterServiceConfig struct {
         // +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
         // +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="External Traffic Policy"
         // +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:select:Cluster,Local"
-        ExternalTrafficPolicy string `json:"externalTrafficPolicy,omitempty"`
+        ExternalTrafficPolicy *corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
 
 	// InternalTrafficPolicy describes how nodes distribute service traffic they receive on the ClusterIP.
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
