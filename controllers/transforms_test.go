@@ -788,11 +788,11 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: "foo", Value: "bar"},
 				},
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser: rootUID,
@@ -825,12 +825,12 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
 					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+					{Name: "foo", Value: "bar"},
 				},
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser: rootUID,
