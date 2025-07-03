@@ -1430,7 +1430,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// apply plugin configuration through ConfigMap if one is provided
 	err = handleDevicePluginConfig(obj, config)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// set RuntimeClass for supported runtimes
@@ -1519,7 +1519,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	// apply plugin configuration through ConfigMap if one is provided
 	err = handleDevicePluginConfig(obj, config)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// set RuntimeClass for supported runtimes
