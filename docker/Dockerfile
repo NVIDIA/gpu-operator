@@ -61,7 +61,28 @@ RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
     curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl && \
     chmod +x ./kubectl
 
-FROM nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0 AS sample-builder
+FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS sample-builder
+
+RUN dnf install -y --allowerasing \
+        cmake \
+        cuda-cudart-devel-12-9 \
+        cuda-nvcc-12-9 \
+        g++ \
+        curl \
+    && \
+    dnf clean all
+
+WORKDIR /build
+
+ARG SAMPLE_NAME=vectorAdd
+
+ARG CUDA_SAMPLES_VERSION=v12.9
+RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/${CUDA_SAMPLES_VERSION} | \
+    tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* && \
+    cd $(find /build/Samples -iname "${SAMPLE_NAME}") && \
+    cmake . && \
+    make && \
+    cp ${SAMPLE_NAME} /build/${SAMPLE_NAME}
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
@@ -85,7 +106,7 @@ WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
 COPY --from=builder /workspace/kubectl /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
-COPY --from=sample-builder /cuda-samples/vectorAdd /usr/bin/vectorAdd
+COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
 # TODO: Copy the compat libs from the 'sample-builder' image instead.
 # The current 'sample-builder' image does not contain the compat libs in the ARM variant.
 # Once new sample images are published that contain the compat libs, we can update the below.
