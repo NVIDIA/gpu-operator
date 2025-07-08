@@ -28,13 +28,13 @@ updates:
 
   # Update GPU Operator base images.
   - package-ecosystem: "docker"
-    directory: "/docker"
+    directories:
+    - "/docker"
     schedule:
       interval: "daily"
 
-  # Update GPU Operator Validator base images.
-  - package-ecosystem: "docker"
-    directory: "/validator"
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
       interval: "daily"
 
