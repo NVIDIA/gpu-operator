@@ -55,6 +55,15 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
+FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS kubectl-downloader
+
+RUN dnf install -y --allowerasing \
+        curl \
+    && \
+        dnf clean all
+
+WORKDIR /workspace
+
 # Install must-gather dependency: `kubectl`
 ARG TARGETARCH
 RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
@@ -104,7 +113,7 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
-COPY --from=builder /workspace/kubectl /usr/bin/
+COPY --from=kubectl-downloader /workspace/kubectl /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
 COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
 # TODO: Copy the compat libs from the 'sample-builder' image instead.
