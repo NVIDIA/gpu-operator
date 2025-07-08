@@ -38,7 +38,60 @@ updates:
     schedule:
       interval: "daily"
 
+# The release branch(es):
+  - package-ecosystem: "gomod"
+    target-branch: release-23.03
+    directories:
+    - "/"
+    # We don't update development or test dependencies on release branches
+    # - "deployments/devel"
+    # - "tests"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    labels:
+    - dependencies
+    - maintenance
+    ignore:
+    # For release branches we only consider patch updates.
+    - dependency-name: "*"
+      update-types:
+      - version-update:semver-major
+      - version-update:semver-minor
+    groups:
+      k8sio:
+        patterns:
+        - k8s.io/*
+        exclude-patterns:
+        - k8s.io/klog/*
+
+  - package-ecosystem: "docker"
+    target-branch: release-23.03
+    directories:
+    # Base images
+    - "/docker"
+    - "/validator"
+    # Golang version
+    - "/deployments/devel"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    ignore:
+    # For release branches we only apply patch updates to the golang version.
+    - dependency-name: "*golang*"
+      update-types:
+      - version-update:semver-major
+      - version-update:semver-minor
+    labels:
+    - dependencies
+    - maintenance
+
   - package-ecosystem: "github-actions"
+    target-branch: release-23.03
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
+    labels:
+    - dependencies
+    - maintenance
