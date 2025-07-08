@@ -132,7 +132,6 @@ bundle: manifests install-tools
 # Build the bundle image.
 build-bundle-image:
 	$(DOCKER) build \
-	--build-arg VERSION=$(VERSION) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
