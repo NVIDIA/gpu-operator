@@ -14,7 +14,7 @@
 
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 as builder
+FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS builder
 
 RUN dnf install -y wget make git gcc
 
@@ -31,8 +31,8 @@ RUN set -eux; \
     wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
     | tar -C /usr/local -xz
 
-ENV GOPATH /go
-ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
