@@ -154,7 +154,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/*-ready"]
+                command: ["sh", "-c", "rm -f /run/nvidia/validations/*-ready"]
           volumeMounts:
             - name: run-nvidia-validations
               mountPath: "/run/nvidia/validations"
