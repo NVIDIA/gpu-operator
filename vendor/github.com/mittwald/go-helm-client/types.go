@@ -202,4 +202,11 @@ type ChartSpec struct {
 	// Labels specifies a set of labels to be applied to the release
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+	// IgnoreNotFound indicates whether to ignore not found error during uninstall.
+	// +optional
+	IgnoreNotFound bool `json:"ignoreNotFound,omitempty"`
+	// DeletionPropagation indicates type of deletion propagation when uninstalling chart.
+	// Valid options are orphan, foreground, background. Defaulting to background.
+	// +optional
+	DeletionPropagation string `json:"deletionPropagation,omitempty"`
 }
