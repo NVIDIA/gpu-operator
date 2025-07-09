@@ -161,6 +161,8 @@ type ClusterPolicyController struct {
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
+	nodeRuntimeMap map[string]gpuv1.Runtime
+	// runtime provides backward compatibility for code expecting single cluster-wide runtime
 	runtime        gpuv1.Runtime
 	hasGPUNodes    bool
 	hasNFDLabels   bool
@@ -706,18 +708,12 @@ func (n *ClusterPolicyController) ocpEnsureNamespaceMonitoring() error {
 	return nil
 }
 
-// getRuntime will detect the container runtime used by nodes in the
-// cluster and correctly set the value for clusterPolicyController.runtime
-// For openshift, set runtime to crio. Otherwise, the default runtime is
-// containerd -- if >=1 node is configured with containerd, set
-// clusterPolicyController.runtime = containerd
-func (n *ClusterPolicyController) getRuntime() error {
+// getNodeRuntimeMap will detect the container runtime used by each node in the
+// cluster and return a map of node names to their respective runtimes.
+// For openshift, assume crio for all nodes. Otherwise, detect runtime per node.
+func (n *ClusterPolicyController) getNodeRuntimeMap() (map[string]gpuv1.Runtime, error) {
 	ctx := n.ctx
-	// assume crio for openshift clusters
-	if n.openshift != "" {
-		n.runtime = gpuv1.CRIO
-		return nil
-	}
+	nodeRuntimeMap := make(map[string]gpuv1.Runtime)
 
 	opts := []client.ListOption{
 		client.MatchingLabels{commonGPULabelKey: "true"},
@@ -725,29 +721,96 @@ func (n *ClusterPolicyController) getRuntime() error {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return fmt.Errorf("unable to list nodes prior to checking container runtime: %v", err)
+		return nil, fmt.Errorf("unable to list nodes prior to checking container runtime: %v", err)
 	}
 
-	var runtime gpuv1.Runtime
 	for _, node := range list.Items {
-		rt, err := getRuntimeString(node)
-		if err != nil {
-			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
+		// assume crio for openshift clusters
+		if n.openshift != "" {
+			nodeRuntimeMap[node.Name] = gpuv1.CRIO
 			continue
 		}
-		runtime = rt
-		if runtime == gpuv1.Containerd {
-			// default to containerd if >=1 node running containerd
-			break
+
+		rt, err := getRuntimeString(node)
+		if err != nil {
+			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v, defaulting to containerd", node.Name, err))
+			nodeRuntimeMap[node.Name] = gpuv1.Containerd
+			continue
+		}
+		nodeRuntimeMap[node.Name] = rt
+	}
+
+	if len(nodeRuntimeMap) == 0 {
+		n.logger.Info("No GPU nodes found in cluster")
+	}
+
+	return nodeRuntimeMap, nil
+}
+
+// labelNodesWithRuntime adds runtime labels to nodes based on their detected runtime
+func (n *ClusterPolicyController) labelNodesWithRuntime() error {
+	ctx := n.ctx
+
+	for nodeName, runtime := range n.nodeRuntimeMap {
+		node := &corev1.Node{}
+		err := n.client.Get(ctx, client.ObjectKey{Name: nodeName}, node)
+		if err != nil {
+			n.logger.Info(fmt.Sprintf("Failed to get node %s for runtime labeling: %v", nodeName, err))
+			continue
+		}
+
+		runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+		if node.Labels == nil {
+			node.Labels = make(map[string]string)
+		}
+
+		// Only update if label doesn't exist or is different
+		if currentValue, exists := node.Labels[runtimeLabel]; !exists || currentValue != "true" {
+			node.Labels[runtimeLabel] = "true"
+			// Remove other runtime labels
+			for _, otherRuntime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
+				if otherRuntime != runtime {
+					otherLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", otherRuntime.String())
+					delete(node.Labels, otherLabel)
+				}
+			}
+
+			err = n.client.Update(ctx, node)
+			if err != nil {
+				n.logger.Info(fmt.Sprintf("Failed to update runtime label for node %s: %v", nodeName, err))
+				continue
+			}
+			n.logger.Info(fmt.Sprintf("Added runtime label to node %s: %s=true", nodeName, runtimeLabel))
 		}
 	}
 
-	if runtime.String() == "" {
-		n.logger.Info("Unable to get runtime info from the cluster, defaulting to containerd")
-		runtime = gpuv1.Containerd
-	}
-	n.runtime = runtime
 	return nil
+}
+
+// getPrimaryRuntime returns the most common runtime in the cluster for compatibility
+// with existing code that expects a single cluster-wide runtime
+func (n *ClusterPolicyController) getPrimaryRuntime() gpuv1.Runtime {
+	if len(n.nodeRuntimeMap) == 0 {
+		return gpuv1.Containerd
+	}
+
+	// Count runtimes
+	runtimeCounts := make(map[gpuv1.Runtime]int)
+	for _, runtime := range n.nodeRuntimeMap {
+		runtimeCounts[runtime]++
+	}
+
+	// Find the most common runtime, preferring containerd in ties
+	var mostCommon gpuv1.Runtime = gpuv1.Containerd
+	maxCount := 0
+	for runtime, count := range runtimeCounts {
+		if count > maxCount || (count == maxCount && runtime == gpuv1.Containerd) {
+			maxCount = count
+			mostCommon = runtime
+		}
+	}
+
+	return mostCommon
 }
 
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
@@ -868,11 +931,22 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 
 	// detect the container runtime on worker nodes
-	err = n.getRuntime()
+	n.nodeRuntimeMap, err = n.getNodeRuntimeMap()
 	if err != nil {
 		return err
 	}
-	n.logger.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
+	n.logger.Info(fmt.Sprintf("Detected container runtimes per node: %v", n.nodeRuntimeMap))
+
+	// Set primary runtime for backward compatibility
+	n.runtime = n.getPrimaryRuntime()
+	n.logger.Info(fmt.Sprintf("Using primary runtime: %s", n.runtime.String()))
+
+	// label nodes with their runtime information
+	err = n.labelNodesWithRuntime()
+	if err != nil {
+		n.logger.Info(fmt.Sprintf("Failed to label nodes with runtime: %v", err))
+		// Don't fail the entire initialization if labeling fails
+	}
 
 	// fetch all kernel versions from the GPU nodes in the cluster
 	if n.singleton.Spec.Driver.IsEnabled() && n.singleton.Spec.Driver.UsePrecompiledDrivers() {
