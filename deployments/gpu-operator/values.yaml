@@ -80,8 +80,8 @@ operator:
   # to be passed during helm upgrade.
   upgradeCRD: true
   initContainer:
-    image: cuda
     repository: nvcr.io/nvidia
+    image: cuda
     version: 12.8.1-base-ubi9
     imagePullPolicy: IfNotPresent
   tolerations:
@@ -192,8 +192,8 @@ driver:
       timeoutSeconds: 300
       deleteEmptyDir: false
   manager:
-    image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
+    image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.0
@@ -464,8 +464,8 @@ vgpuManager:
   env: []
   resources: {}
   driverManager:
-    image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
+    image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.0
@@ -498,8 +498,8 @@ vfioManager:
   env: []
   resources: {}
   driverManager:
-    image: k8s-driver-manager
     repository: nvcr.io/nvidia/cloud-native
+    image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.0
