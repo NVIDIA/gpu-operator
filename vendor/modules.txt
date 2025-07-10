@@ -396,8 +396,8 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/regclient/regclient v0.8.3
-## explicit; go 1.22
+# github.com/regclient/regclient v0.9.0
+## explicit; go 1.23.0
 github.com/regclient/regclient
 github.com/regclient/regclient/config
 github.com/regclient/regclient/internal/auth
