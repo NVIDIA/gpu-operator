@@ -1,42 +1,33 @@
-# Release v0.8.3
+# Release v0.9.0
+
+Breaking:
+
+- Drop support for 3rd Go release because of upstream forced upgrades (see <https://github.com/golang/go/issues/69095>). ([PR 948][pr-948])
 
 Features:
 
-- Add `ref.AddDigest` method that does not unset the tag. ([PR 910][pr-910])
-- Adding a `regctl registry whoami` command. ([PR 912][pr-912])
-- Improve `regctl image check-base` output. ([PR 917][pr-917])
-- regsync option to abort on errors. ([PR 924][pr-924])
-- Improve fallback tag handling. ([PR 925][pr-925])
-- regctl flag to ignore missing images on delete. ([PR 930][pr-930])
+- Add a script to reproduce regclient images. ([PR 940][pr-940])
+- Support IPv6 hosts. ([PR 956][pr-956])
 
 Fixes:
 
-- Validate registry names. ([PR 911][pr-911])
-- Escape regexp example. ([PR 920][pr-920])
-- Auth header parsing. ([PR 936][pr-936])
+- Convert  docker attestations built with `oci-artifact=true`. ([PR 949][pr-949])
+- Allow duplicate keys in yaml config. ([PR 952][pr-952])
 
-Changes:
+Miscellaneous:
 
-- Update supported Go releases to 1.22, 1.23, and 1.24. ([PR 909][pr-909])
-- Modernize Go to the 1.22 specs. ([PR 910][pr-910])
-- Refactor cobra commands. ([PR 915][pr-915])
-- Include Docker Hub repository documentation. ([PR 918][pr-918])
-- Move documentation pointers to the website. ([PR 939][pr-939])
+- Migrate yaml library. ([PR 947][pr-947])
+- Convert the build to use OCI style attestations. ([PR 950][pr-950])
 
 Contributors:
 
+- @JimmyMa
 - @sudo-bmitch
 
-[pr-909]: https://github.com/regclient/regclient/pull/909
-[pr-910]: https://github.com/regclient/regclient/pull/910
-[pr-911]: https://github.com/regclient/regclient/pull/911
-[pr-912]: https://github.com/regclient/regclient/pull/912
-[pr-915]: https://github.com/regclient/regclient/pull/915
-[pr-917]: https://github.com/regclient/regclient/pull/917
-[pr-918]: https://github.com/regclient/regclient/pull/918
-[pr-920]: https://github.com/regclient/regclient/pull/920
-[pr-924]: https://github.com/regclient/regclient/pull/924
-[pr-925]: https://github.com/regclient/regclient/pull/925
-[pr-930]: https://github.com/regclient/regclient/pull/930
-[pr-936]: https://github.com/regclient/regclient/pull/936
-[pr-939]: https://github.com/regclient/regclient/pull/939
+[pr-940]: https://github.com/regclient/regclient/pull/940
+[pr-947]: https://github.com/regclient/regclient/pull/947
+[pr-948]: https://github.com/regclient/regclient/pull/948
+[pr-949]: https://github.com/regclient/regclient/pull/949
+[pr-950]: https://github.com/regclient/regclient/pull/950
+[pr-952]: https://github.com/regclient/regclient/pull/952
+[pr-956]: https://github.com/regclient/regclient/pull/956

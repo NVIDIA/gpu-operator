@@ -162,7 +162,7 @@ processors:
       repo: "docker.io/library/golang"
     filter:
       expr: '^v?\d+\.\d+$'
-    template: '["{{ index .VerMap ( index .VerList 2 ) }}", "{{ index .VerMap ( index .VerList 1 ) }}", "{{ index .VerMap ( index .VerList 0 ) }}"]'
+    template: '["{{ index .VerMap ( index .VerList 1 ) }}", "{{ index .VerMap ( index .VerList 0 ) }}"]'
   gha-golang-release:
     <<: *registry-tag-semver
     key: "golang-latest"
@@ -209,7 +209,7 @@ processors:
       repo: "docker.io/library/golang"
     filter:
       expr: '^\d+\.\d+$'
-    template: '{{ index .VerMap ( index .VerList 2 ) }}'
+    template: '{{ index .VerMap ( index .VerList 1 ) }}.0'
 
   makefile-ci-distribution:
     <<: *registry-tag-semver
