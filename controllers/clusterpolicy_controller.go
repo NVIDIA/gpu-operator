@@ -284,7 +284,20 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
 
-			return hasGPULabels(labels)
+			// Update runtime map for new GPU nodes
+			if hasGPULabels(labels) {
+				// Get the ClusterPolicyController instance to update the runtime map
+				// We need to find the active controller instance
+				if clusterPolicyCtrl.singleton != nil {
+					err := clusterPolicyCtrl.addNodeToRuntimeMap(e.Object)
+					if err != nil {
+						r.Log.Error(err, "Failed to add node to runtime map", "node", e.Object.GetName())
+					}
+				}
+				return true
+			}
+
+			return false
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
 			newLabels := e.ObjectNew.GetLabels()
@@ -333,6 +346,15 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// enabled.
 
 			labels := e.Object.GetLabels()
+			nodeName := e.Object.GetName()
+
+			// Remove node from runtime map if it was a GPU node
+			if hasGPULabels(labels) && clusterPolicyCtrl.singleton != nil {
+				err := clusterPolicyCtrl.removeNodeFromRuntimeMap(nodeName)
+				if err != nil {
+					r.Log.Error(err, "Failed to remove node from runtime map", "node", nodeName)
+				}
+			}
 
 			_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
 

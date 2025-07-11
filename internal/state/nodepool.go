@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +40,7 @@ type nodePool struct {
 	osVersion    string
 	rhcosVersion string
 	kernel       string
+	runtime      string
 	nodeSelector map[string]string
 }
 
@@ -117,6 +119,22 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 			nodePool.name = rhcosVersion
 		}
 
+		// Add runtime detection to node pool
+		runtime, err := detectNodeRuntime(node)
+		if err != nil {
+			logger.Info("WARNING: Could not detect runtime for node, defaulting to containerd", "Node", node.Name, "error", err)
+			nodePool.runtime = "containerd"
+		} else {
+			nodePool.runtime = runtime
+		}
+
+		// Add runtime to node selector for mixed-runtime support
+		runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", nodePool.runtime)
+		nodePool.nodeSelector[runtimeLabel] = "true"
+
+		// Update node pool name to include runtime for uniqueness
+		nodePool.name = fmt.Sprintf("%s-%s", nodePool.name, nodePool.runtime)
+
 		if _, exists := nodePoolMap[nodePool.name]; !exists {
 			logger.Info("Detected new node pool", "NodePool", nodePool)
 			nodePoolMap[nodePool.name] = nodePool
@@ -133,4 +151,20 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 
 func (n nodePool) getOS() string {
 	return fmt.Sprintf("%s%s", n.osRelease, n.osVersion)
+}
+
+// detectNodeRuntime detects the container runtime for a given node
+func detectNodeRuntime(node corev1.Node) (string, error) {
+	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
+	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
+	switch {
+	case strings.HasPrefix(runtimeVer, "docker"):
+		return "docker", nil
+	case strings.HasPrefix(runtimeVer, "containerd"):
+		return "containerd", nil
+	case strings.HasPrefix(runtimeVer, "cri-o"):
+		return "crio", nil
+	default:
+		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
+	}
 }
