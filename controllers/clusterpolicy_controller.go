@@ -304,30 +304,6 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
 
-			// Check if GPU status or runtime changed
-			oldHasGPU := hasGPULabels(oldLabels)
-			newHasGPU := hasGPULabels(newLabels)
-			gpuStatusChanged := oldHasGPU != newHasGPU
-
-			// Check if container runtime version changed
-			oldRuntimeVersion := ""
-			newRuntimeVersion := ""
-			if e.ObjectOld.Status.NodeInfo.ContainerRuntimeVersion != "" {
-				oldRuntimeVersion = e.ObjectOld.Status.NodeInfo.ContainerRuntimeVersion
-			}
-			if e.ObjectNew.Status.NodeInfo.ContainerRuntimeVersion != "" {
-				newRuntimeVersion = e.ObjectNew.Status.NodeInfo.ContainerRuntimeVersion
-			}
-			runtimeVersionChanged := oldRuntimeVersion != newRuntimeVersion
-
-			// Update runtime map if GPU status or runtime changed
-			if (gpuStatusChanged || runtimeVersionChanged) && clusterPolicyCtrl.singleton != nil {
-				err := clusterPolicyCtrl.updateNodeRuntimeInMap(e.ObjectNew)
-				if err != nil {
-					r.Log.Error(err, "Failed to update node runtime in map", "node", nodeName)
-				}
-			}
-
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
@@ -346,9 +322,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 				migManagerLabelMissing ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
-				osTreeLabelChanged ||
-				gpuStatusChanged ||
-				runtimeVersionChanged
+				osTreeLabelChanged
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
@@ -359,8 +333,6 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
-					"gpuStatusChanged", gpuStatusChanged,
-					"runtimeVersionChanged", runtimeVersionChanged,
 				)
 			}
 			return needsUpdate
