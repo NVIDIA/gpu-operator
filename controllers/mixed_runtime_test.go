@@ -46,7 +46,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node1",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -59,7 +60,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node2",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -72,7 +74,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node3",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -97,7 +100,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node1",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -110,7 +114,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node2",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -134,7 +139,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node1",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -147,7 +153,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node2",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -171,7 +178,8 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node1",
 						Labels: map[string]string{
-							"nvidia.com/gpu.present": "true",
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.present":                      "true",
 						},
 					},
 					Status: corev1.NodeStatus{
@@ -201,12 +209,12 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 			// Create fake client with test nodes
 			scheme := runtime.NewScheme()
 			_ = corev1.AddToScheme(scheme)
-			
+
 			objs := make([]runtime.Object, len(tt.nodes))
 			for i := range tt.nodes {
 				objs[i] = &tt.nodes[i]
 			}
-			
+
 			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Create controller with test data
@@ -354,12 +362,12 @@ func TestLabelNodesWithRuntime(t *testing.T) {
 			// Create fake client with test nodes
 			scheme := runtime.NewScheme()
 			_ = corev1.AddToScheme(scheme)
-			
+
 			objs := make([]runtime.Object, len(tt.nodes))
 			for i := range tt.nodes {
 				objs[i] = &tt.nodes[i]
 			}
-			
+
 			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Create controller with test data
@@ -392,6 +400,285 @@ func TestLabelNodesWithRuntime(t *testing.T) {
 						require.NotContains(t, node.Labels, runtimeLabel, "Runtime label %s should not exist on node %s", runtimeLabel, nodeName)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestAddNodeToRuntimeMap(t *testing.T) {
+	tests := []struct {
+		name        string
+		existingMap map[string]gpuv1.Runtime
+		node        corev1.Node
+		openshift   string
+		expectedMap map[string]gpuv1.Runtime
+		expectError bool
+	}{
+		{
+			name:        "add GPU node with containerd runtime",
+			existingMap: map[string]gpuv1.Runtime{},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "new-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0",
+					},
+				},
+			},
+			openshift: "",
+			expectedMap: map[string]gpuv1.Runtime{
+				"new-node": gpuv1.Containerd,
+			},
+			expectError: false,
+		},
+		{
+			name: "add GPU node to existing map",
+			existingMap: map[string]gpuv1.Runtime{
+				"existing-node": gpuv1.CRIO,
+			},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "new-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0",
+					},
+				},
+			},
+			openshift: "",
+			expectedMap: map[string]gpuv1.Runtime{
+				"existing-node": gpuv1.CRIO,
+				"new-node":      gpuv1.Containerd,
+			},
+			expectError: false,
+		},
+		{
+			name:        "skip non-GPU node",
+			existingMap: map[string]gpuv1.Runtime{},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "non-gpu-node",
+					Labels: map[string]string{},
+				},
+			},
+			openshift:   "",
+			expectedMap: map[string]gpuv1.Runtime{},
+			expectError: false,
+		},
+		{
+			name:        "add node in OpenShift cluster - force crio",
+			existingMap: map[string]gpuv1.Runtime{},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openshift-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0", // Should be ignored
+					},
+				},
+			},
+			openshift: "4.12.0",
+			expectedMap: map[string]gpuv1.Runtime{
+				"openshift-node": gpuv1.CRIO,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &ClusterPolicyController{
+				nodeRuntimeMap: tt.existingMap,
+				logger:         log.Log.WithName("test"),
+				openshift:      tt.openshift,
+			}
+
+			err := controller.addNodeToRuntimeMap(&tt.node)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedMap, controller.nodeRuntimeMap)
+			}
+		})
+	}
+}
+
+func TestRemoveNodeFromRuntimeMap(t *testing.T) {
+	tests := []struct {
+		name         string
+		existingMap  map[string]gpuv1.Runtime
+		nodeToRemove string
+		expectedMap  map[string]gpuv1.Runtime
+	}{
+		{
+			name: "remove existing node",
+			existingMap: map[string]gpuv1.Runtime{
+				"node1": gpuv1.Containerd,
+				"node2": gpuv1.CRIO,
+			},
+			nodeToRemove: "node1",
+			expectedMap: map[string]gpuv1.Runtime{
+				"node2": gpuv1.CRIO,
+			},
+		},
+		{
+			name: "remove non-existing node",
+			existingMap: map[string]gpuv1.Runtime{
+				"node1": gpuv1.Containerd,
+			},
+			nodeToRemove: "non-existing",
+			expectedMap: map[string]gpuv1.Runtime{
+				"node1": gpuv1.Containerd,
+			},
+		},
+		{
+			name:         "remove from empty map",
+			existingMap:  map[string]gpuv1.Runtime{},
+			nodeToRemove: "any-node",
+			expectedMap:  map[string]gpuv1.Runtime{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &ClusterPolicyController{
+				nodeRuntimeMap: tt.existingMap,
+				logger:         log.Log.WithName("test"),
+			}
+
+			err := controller.removeNodeFromRuntimeMap(tt.nodeToRemove)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedMap, controller.nodeRuntimeMap)
+		})
+	}
+}
+
+func TestUpdateNodeRuntimeInMap(t *testing.T) {
+	tests := []struct {
+		name        string
+		existingMap map[string]gpuv1.Runtime
+		node        corev1.Node
+		openshift   string
+		expectedMap map[string]gpuv1.Runtime
+		expectError bool
+	}{
+		{
+			name: "update existing node runtime",
+			existingMap: map[string]gpuv1.Runtime{
+				"test-node": gpuv1.Containerd,
+			},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "cri-o://1.24.0",
+					},
+				},
+			},
+			openshift: "",
+			expectedMap: map[string]gpuv1.Runtime{
+				"test-node": gpuv1.CRIO,
+			},
+			expectError: false,
+		},
+		{
+			name:        "add new GPU node",
+			existingMap: map[string]gpuv1.Runtime{},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "new-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0",
+					},
+				},
+			},
+			openshift: "",
+			expectedMap: map[string]gpuv1.Runtime{
+				"new-node": gpuv1.Containerd,
+			},
+			expectError: false,
+		},
+		{
+			name: "remove GPU label from node - should remove from map",
+			existingMap: map[string]gpuv1.Runtime{
+				"test-node": gpuv1.Containerd,
+			},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-node",
+					Labels: map[string]string{}, // No GPU label
+				},
+			},
+			openshift:   "",
+			expectedMap: map[string]gpuv1.Runtime{},
+			expectError: false,
+		},
+		{
+			name: "no change needed - same runtime",
+			existingMap: map[string]gpuv1.Runtime{
+				"test-node": gpuv1.Containerd,
+			},
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0",
+					},
+				},
+			},
+			openshift: "",
+			expectedMap: map[string]gpuv1.Runtime{
+				"test-node": gpuv1.Containerd,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &ClusterPolicyController{
+				nodeRuntimeMap: tt.existingMap,
+				logger:         log.Log.WithName("test"),
+				openshift:      tt.openshift,
+			}
+
+			err := controller.updateNodeRuntimeInMap(&tt.node)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedMap, controller.nodeRuntimeMap)
 			}
 		})
 	}

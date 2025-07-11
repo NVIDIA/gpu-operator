@@ -801,7 +801,7 @@ func (n *ClusterPolicyController) getPrimaryRuntime() gpuv1.Runtime {
 	}
 
 	// Find the most common runtime, preferring containerd in ties
-	var mostCommon gpuv1.Runtime = gpuv1.Containerd
+	var mostCommon = gpuv1.Containerd
 	maxCount := 0
 	for runtime, count := range runtimeCounts {
 		if count > maxCount || (count == maxCount && runtime == gpuv1.Containerd) {
@@ -811,6 +811,98 @@ func (n *ClusterPolicyController) getPrimaryRuntime() gpuv1.Runtime {
 	}
 
 	return mostCommon
+}
+
+// addNodeToRuntimeMap adds a GPU node to the runtime map
+func (n *ClusterPolicyController) addNodeToRuntimeMap(node *corev1.Node) error {
+	if n.nodeRuntimeMap == nil {
+		n.nodeRuntimeMap = make(map[string]gpuv1.Runtime)
+	}
+
+	// Only process GPU nodes
+	if !hasGPULabels(node.GetLabels()) {
+		return nil
+	}
+
+	var runtime gpuv1.Runtime
+	var err error
+
+	// assume crio for openshift clusters
+	if n.openshift != "" {
+		runtime = gpuv1.CRIO
+	} else {
+		runtime, err = getRuntimeString(*node)
+		if err != nil {
+			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v, defaulting to containerd", node.Name, err))
+			runtime = gpuv1.Containerd
+		}
+	}
+
+	n.nodeRuntimeMap[node.Name] = runtime
+	n.logger.Info(fmt.Sprintf("Added node %s to runtime map with runtime %s", node.Name, runtime.String()))
+
+	// Update primary runtime for backward compatibility
+	n.runtime = n.getPrimaryRuntime()
+
+	return nil
+}
+
+// removeNodeFromRuntimeMap removes a node from the runtime map
+func (n *ClusterPolicyController) removeNodeFromRuntimeMap(nodeName string) error {
+	if n.nodeRuntimeMap == nil {
+		return nil
+	}
+
+	if _, exists := n.nodeRuntimeMap[nodeName]; exists {
+		delete(n.nodeRuntimeMap, nodeName)
+		n.logger.Info(fmt.Sprintf("Removed node %s from runtime map", nodeName))
+
+		// Update primary runtime for backward compatibility
+		n.runtime = n.getPrimaryRuntime()
+	}
+
+	return nil
+}
+
+// updateNodeRuntimeInMap updates a node's runtime in the runtime map if it has changed
+func (n *ClusterPolicyController) updateNodeRuntimeInMap(node *corev1.Node) error {
+	if n.nodeRuntimeMap == nil {
+		n.nodeRuntimeMap = make(map[string]gpuv1.Runtime)
+	}
+
+	// Only process GPU nodes
+	if !hasGPULabels(node.GetLabels()) {
+		// If it's not a GPU node but exists in the map, remove it
+		if _, exists := n.nodeRuntimeMap[node.Name]; exists {
+			return n.removeNodeFromRuntimeMap(node.Name)
+		}
+		return nil
+	}
+
+	var newRuntime gpuv1.Runtime
+	var err error
+
+	// assume crio for openshift clusters
+	if n.openshift != "" {
+		newRuntime = gpuv1.CRIO
+	} else {
+		newRuntime, err = getRuntimeString(*node)
+		if err != nil {
+			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v, defaulting to containerd", node.Name, err))
+			newRuntime = gpuv1.Containerd
+		}
+	}
+
+	currentRuntime, exists := n.nodeRuntimeMap[node.Name]
+	if !exists || currentRuntime != newRuntime {
+		n.nodeRuntimeMap[node.Name] = newRuntime
+		n.logger.Info(fmt.Sprintf("Updated node %s runtime from %s to %s", node.Name, currentRuntime.String(), newRuntime.String()))
+
+		// Update primary runtime for backward compatibility
+		n.runtime = n.getPrimaryRuntime()
+	}
+
+	return nil
 }
 
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
