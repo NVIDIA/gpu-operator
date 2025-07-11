@@ -24,7 +24,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.7
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/mod v0.25.0
+	golang.org/x/mod v0.26.0
 	k8s.io/api v0.33.2
 	k8s.io/apiextensions-apiserver v0.33.2
 	k8s.io/apimachinery v0.33.2
