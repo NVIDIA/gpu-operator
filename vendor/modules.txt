@@ -24,6 +24,9 @@ github.com/Masterminds/sprig/v3
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
+# github.com/Mellanox/maintenance-operator/api v0.2.2
+## explicit; go 1.23.0
+github.com/Mellanox/maintenance-operator/api/v1alpha1
 # github.com/NVIDIA/go-nvlib v0.7.3
 ## explicit; go 1.20
 github.com/NVIDIA/go-nvlib/pkg/nvmdev
@@ -34,8 +37,8 @@ github.com/NVIDIA/go-nvlib/pkg/pciids
 # github.com/NVIDIA/k8s-kata-manager v0.2.3
 ## explicit; go 1.23.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
-# github.com/NVIDIA/k8s-operator-libs v0.0.0-20250311214045-7d667fbaa7ac
-## explicit; go 1.23.0
+# github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3
+## explicit; go 1.24.0
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
@@ -338,16 +341,17 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/openshift/api v0.0.0-20250311085700-14a17c7009c4
-## explicit; go 1.23.0
+# github.com/openshift/api v0.0.0-20250710082954-674ad74beffc
+## explicit; go 1.24.0
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
+github.com/openshift/api/config/v1alpha2
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
 github.com/openshift/api/security/v1
-# github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a
-## explicit; go 1.23.0
+# github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
+## explicit; go 1.24.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/internal
 github.com/openshift/client-go/config/clientset/versioned/scheme

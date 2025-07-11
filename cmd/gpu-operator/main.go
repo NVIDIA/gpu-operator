@@ -156,6 +156,7 @@ func main() {
 		upgradeLogger,
 		mgr.GetConfig(),
 		mgr.GetEventRecorderFor("nvidia-gpu-operator"),
+		upgrade.StateOptions{},
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create new ClusterUpdateStateManager", "controller", "Upgrade")

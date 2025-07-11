@@ -6,15 +6,15 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.7.3
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20250311214045-7d667fbaa7ac
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3
 	github.com/NVIDIA/nvidia-container-toolkit v1.17.8
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.3
 	github.com/mittwald/go-helm-client v0.12.18
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
-	github.com/openshift/api v0.0.0-20250311085700-14a17c7009c4
-	github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a
+	github.com/openshift/api v0.0.0-20250710082954-674ad74beffc
+	github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
 	github.com/operator-framework/api v0.32.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.81.0
 	github.com/prometheus/client_golang v1.22.0
@@ -42,6 +42,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
+	github.com/Mellanox/maintenance-operator/api v0.2.2 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
