@@ -239,64 +239,6 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 	}
 }
 
-func TestGetPrimaryRuntime(t *testing.T) {
-	tests := []struct {
-		name           string
-		nodeRuntimeMap map[string]gpuv1.Runtime
-		expectedResult gpuv1.Runtime
-	}{
-		{
-			name: "containerd is most common",
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-				"node2": gpuv1.Containerd,
-				"node3": gpuv1.CRIO,
-			},
-			expectedResult: gpuv1.Containerd,
-		},
-		{
-			name: "cri-o is most common",
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.CRIO,
-				"node2": gpuv1.CRIO,
-				"node3": gpuv1.Containerd,
-			},
-			expectedResult: gpuv1.CRIO,
-		},
-		{
-			name: "tie - should prefer containerd",
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-				"node2": gpuv1.CRIO,
-			},
-			expectedResult: gpuv1.Containerd,
-		},
-		{
-			name: "single runtime",
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Docker,
-			},
-			expectedResult: gpuv1.Docker,
-		},
-		{
-			name:           "empty map - defaults to containerd",
-			nodeRuntimeMap: map[string]gpuv1.Runtime{},
-			expectedResult: gpuv1.Containerd,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := &ClusterPolicyController{
-				nodeRuntimeMap: tt.nodeRuntimeMap,
-			}
-
-			result := controller.getPrimaryRuntime()
-			require.Equal(t, tt.expectedResult, result)
-		})
-	}
-}
-
 func TestLabelNodesWithRuntime(t *testing.T) {
 	tests := []struct {
 		name           string

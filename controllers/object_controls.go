@@ -728,12 +728,9 @@ func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-daemonset":                 TransformDriver,
 		"nvidia-vgpu-manager-daemonset":           TransformVGPUManager,
 		"nvidia-vgpu-device-manager":              TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                     TransformVFIOManager,
-		"nvidia-container-toolkit-daemonset":      TransformToolkit,
-		"nvidia-device-plugin-daemonset":          TransformDevicePlugin,
 		"nvidia-device-plugin-mps-control-daemon": TransformMPSControlDaemon,
 		"nvidia-sandbox-device-plugin-daemonset":  TransformSandboxDevicePlugin,
 		"nvidia-dcgm":                             TransformDCGM,
@@ -747,9 +744,19 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-cc-manager":                       TransformCCManager,
 	}
 
-	t, ok := transformations[obj.Name]
+	// For runtime-specific DaemonSets, get the base name for transformation lookup
+	baseName := obj.Name
+	runtimeSuffixes := []string{"-containerd", "-crio", "-docker"}
+	for _, suffix := range runtimeSuffixes {
+		if strings.HasSuffix(obj.Name, suffix) {
+			baseName = strings.TrimSuffix(obj.Name, suffix)
+			break
+		}
+	}
+
+	t, ok := transformations[baseName]
 	if !ok {
-		logger.Info(fmt.Sprintf("No transformation for Daemonset '%s'", obj.Name))
+		logger.Info(fmt.Sprintf("No transformation for Daemonset '%s' (base: '%s')", obj.Name, baseName))
 		return nil
 	}
 
@@ -952,8 +959,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		return err
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// Note: RuntimeClass not set for GPU discovery as it's not runtime-dependent
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
@@ -997,60 +1003,6 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 
 		if serviceConfig.InternalTrafficPolicy != nil {
 			obj.Spec.InternalTrafficPolicy = serviceConfig.InternalTrafficPolicy
-		}
-	}
-	return nil
-}
-
-// TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
-func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
-		return err
-	}
-
-	// update driver-manager initContainer
-	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
-	if err != nil {
-		return err
-	}
-
-	// update nvidia-driver container
-	err = transformDriverContainer(obj, config, n)
-	if err != nil {
-		return err
-	}
-
-	// update nvidia-peermem sidecar container
-	err = transformPeerMemoryContainer(obj, config, n)
-	if err != nil {
-		return err
-	}
-
-	// update nvidia-fs sidecar container
-	err = transformGDSContainer(obj, config, n)
-	if err != nil {
-		return err
-	}
-
-	// updated nvidia-gdrcopy sidecar container
-	err = transformGDRCopyContainer(obj, config, n)
-	if err != nil {
-		return err
-	}
-
-	// update/remove OpenShift Driver Toolkit sidecar container
-	err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-driver-ctr")
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
-	}
-
-	// updates for per kernel version pods using pre-compiled drivers
-	if config.Driver.UsePrecompiledDrivers() {
-		err = transformPrecompiledDriverDaemonset(obj, n)
-		if err != nil {
-			return fmt.Errorf("ERROR: failed to transform the pre-compiled Driver Daemonset: %s", err)
 		}
 	}
 	return nil
@@ -1223,90 +1175,6 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
 	return envVars
 }
 
-// TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
-func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
-		return err
-	}
-	// update image
-	image, err := gpuv1.ImagePath(&config.Toolkit)
-	if err != nil {
-		return err
-	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
-
-	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
-
-	// set image pull secrets
-	if len(config.Toolkit.ImagePullSecrets) > 0 {
-		addPullSecrets(&obj.Spec.Template.Spec, config.Toolkit.ImagePullSecrets)
-	}
-
-	// set resource limits
-	if config.Toolkit.Resources != nil {
-		// apply resource limits to all containers
-		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.Toolkit.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Toolkit.Resources.Limits
-		}
-	}
-	// set/append environment variables for toolkit container
-	if len(config.Toolkit.Env) > 0 {
-		for _, env := range config.Toolkit.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-
-	// update env required for CDI support
-	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
-		if config.CDI.IsDefault() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
-		}
-	}
-
-	// set install directory for the toolkit
-	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
-
-		for i, volume := range obj.Spec.Template.Spec.Volumes {
-			if volume.Name == "toolkit-install-dir" {
-				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.Toolkit.InstallDir
-				break
-			}
-		}
-
-		for i, volumeMount := range obj.Spec.Template.Spec.Containers[0].VolumeMounts {
-			if volumeMount.Name == "toolkit-install-dir" {
-				obj.Spec.Template.Spec.Containers[0].VolumeMounts[i].MountPath = config.Toolkit.InstallDir
-				break
-			}
-		}
-	}
-
-	// configure runtime
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
-	if err != nil {
-		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
-	}
-
-	// Update CRI-O hooks path to use default path for non OCP cases
-	if n.openshift == "" && n.runtime == gpuv1.CRIO {
-		for index, volume := range obj.Spec.Template.Spec.Volumes {
-			if volume.Name == "crio-hooks" {
-				obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/share/containers/oci/hooks.d"
-			}
-		}
-	}
-	return nil
-}
-
 func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, containerName string) error {
 	var mainContainer *corev1.Container
 	for i, ctr := range obj.Spec.Template.Spec.Containers {
@@ -1380,92 +1248,6 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	return nil
 }
 
-// TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
-func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
-		return err
-	}
-
-	// update image
-	image, err := gpuv1.ImagePath(&config.DevicePlugin)
-	if err != nil {
-		return err
-	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
-
-	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
-
-	// set image pull secrets
-	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
-		addPullSecrets(&obj.Spec.Template.Spec, config.DevicePlugin.ImagePullSecrets)
-	}
-
-	// set resource limits
-	if config.DevicePlugin.Resources != nil {
-		// apply resource limits to all containers
-		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.DevicePlugin.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.DevicePlugin.Resources.Limits
-		}
-	}
-	// set arguments if specified for device-plugin container
-	if len(config.DevicePlugin.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.DevicePlugin.Args
-	}
-	// set/append environment variables for device-plugin container
-	if len(config.DevicePlugin.Env) > 0 {
-		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
-	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MOFEDEnabledEnvName, "true")
-	}
-
-	// apply plugin configuration through ConfigMap if one is provided
-	err = handleDevicePluginConfig(obj, config)
-	if err != nil {
-		return err
-	}
-
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
-
-	// update env required for MIG support
-	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
-
-	// update env required for CDI support
-	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
-		if config.Toolkit.IsEnabled() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
-		}
-	}
-
-	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
-	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
-		config.DevicePlugin.MPS.Root != DefaultMPSRoot {
-		for i, volume := range obj.Spec.Template.Spec.Volumes {
-			switch volume.Name {
-			case "mps-root":
-				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.DevicePlugin.MPS.Root
-			case "mps-shm":
-				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
-			}
-		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
-	}
-
-	return nil
-}
-
 func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
@@ -1522,8 +1304,8 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// NOTE: This function should not be called anymore since device plugin uses per-runtime DaemonSets
+	// Skip RuntimeClass setting for unexpected calls
 
 	// update env required for MIG support
 	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
@@ -1637,8 +1419,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// Note: RuntimeClass not set for DCGM exporter as it's not runtime-dependent
 
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
@@ -1754,8 +1535,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// Note: RuntimeClass not set for DCGM as it's not runtime-dependent
 
 	return nil
 }
@@ -1804,8 +1584,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// Note: RuntimeClass not set for MIG manager as it's not runtime-dependent
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -1901,12 +1680,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 	// mount containerd config and socket
 
-	// setup mounts for runtime config file
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
-	if err != nil {
-		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
-	}
+	// Note: kata-manager is not runtime-dependent, no runtime-specific transformation needed
 
 	// Compute hash of kata manager config and add an annotation with the value.
 	// If the kata config changes, a new revision of the daemonset will be
@@ -2102,8 +1876,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		return fmt.Errorf("%v", err)
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	// Note: RuntimeClass not set for validator as it's not runtime-dependent
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
@@ -3385,8 +3158,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
 	}
 
-	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
-	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" || release["ID"] == "sl-micro" {
+	// set up subscription entitlements for RHEL (non-OpenShift) and SLES
+	// NOTE: This function should not be called anymore since driver uses per-runtime DaemonSets
+	if (release["ID"] == "rhel" && n.openshift == "") || release["ID"] == "sles" || release["ID"] == "sl-micro" {
 		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
 		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
 		if err != nil {
@@ -4316,6 +4090,26 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 			// deployment.
 			return n.ocpDriverToolkitDaemonSets(ctx)
 		}
+	}
+
+	// Check if this component requires per-runtime DaemonSets
+	runtimeDependentComponents := []string{
+		"nvidia-container-toolkit-daemonset",
+		"nvidia-device-plugin-daemonset",
+		"nvidia-driver-daemonset",
+	}
+	componentName := n.resources[state].DaemonSet.GetName()
+	isRuntimeDependent := false
+	for _, runtimeComp := range runtimeDependentComponents {
+		if componentName == runtimeComp {
+			isRuntimeDependent = true
+			break
+		}
+	}
+
+	// If this is a runtime-dependent component, always create per-runtime DaemonSets
+	if isRuntimeDependent {
+		return n.createRuntimeSpecificDaemonSets(ctx, obj, state)
 	}
 
 	err := preProcessDaemonSet(obj, n)

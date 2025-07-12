@@ -27,15 +27,19 @@ import (
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	"golang.org/x/mod/semver"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -162,8 +166,6 @@ type ClusterPolicyController struct {
 	ocpDriverToolkit OpenShiftDriverToolkit
 
 	nodeRuntimeMap map[string]gpuv1.Runtime
-	// runtime provides backward compatibility for code expecting single cluster-wide runtime
-	runtime        gpuv1.Runtime
 	hasGPUNodes    bool
 	hasNFDLabels   bool
 	sandboxEnabled bool
@@ -787,30 +789,223 @@ func (n *ClusterPolicyController) labelNodesWithRuntime() error {
 	return nil
 }
 
-// getPrimaryRuntime returns the most common runtime in the cluster for compatibility
-// with existing code that expects a single cluster-wide runtime
-func (n *ClusterPolicyController) getPrimaryRuntime() gpuv1.Runtime {
+// getActiveRuntimes returns a list of unique runtimes present in the cluster
+func (n *ClusterPolicyController) getActiveRuntimes() []gpuv1.Runtime {
 	if len(n.nodeRuntimeMap) == 0 {
-		return gpuv1.Containerd
+		return []gpuv1.Runtime{gpuv1.Containerd} // Default fallback
 	}
 
-	// Count runtimes
-	runtimeCounts := make(map[gpuv1.Runtime]int)
+	runtimeSet := make(map[gpuv1.Runtime]bool)
 	for _, runtime := range n.nodeRuntimeMap {
-		runtimeCounts[runtime]++
+		runtimeSet[runtime] = true
 	}
 
-	// Find the most common runtime, preferring containerd in ties
-	var mostCommon = gpuv1.Containerd
-	maxCount := 0
-	for runtime, count := range runtimeCounts {
-		if count > maxCount || (count == maxCount && runtime == gpuv1.Containerd) {
-			maxCount = count
-			mostCommon = runtime
+	var runtimes []gpuv1.Runtime
+	for runtime := range runtimeSet {
+		runtimes = append(runtimes, runtime)
+	}
+
+	// Sort for consistent ordering (containerd first, then others alphabetically)
+	for i := 0; i < len(runtimes); i++ {
+		for j := i + 1; j < len(runtimes); j++ {
+			if runtimes[i] == gpuv1.Containerd {
+				continue // containerd should stay first
+			}
+			if runtimes[j] == gpuv1.Containerd {
+				runtimes[i], runtimes[j] = runtimes[j], runtimes[i]
+			} else if runtimes[i].String() > runtimes[j].String() {
+				runtimes[i], runtimes[j] = runtimes[j], runtimes[i]
+			}
 		}
 	}
 
-	return mostCommon
+	return runtimes
+}
+
+// getRuntimeSpecificName generates a runtime-specific name for DaemonSets
+func getRuntimeSpecificName(baseName string, runtime gpuv1.Runtime) string {
+	return fmt.Sprintf("%s-%s", baseName, runtime.String())
+}
+
+// getRuntimeNodeSelector returns the node selector for a specific runtime
+func getRuntimeNodeSelector(runtime gpuv1.Runtime) map[string]string {
+	return map[string]string{
+		fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String()): "true",
+	}
+}
+
+// createRuntimeSpecificDaemonSets creates multiple DaemonSets, one per active runtime
+func (n *ClusterPolicyController) createRuntimeSpecificDaemonSets(ctx context.Context, baseObj *appsv1.DaemonSet, state int) (gpuv1.State, error) {
+	activeRuntimes := n.getActiveRuntimes()
+	logger := n.logger.WithValues("Component", baseObj.Name)
+	overallState := gpuv1.Ready
+	var errors []error
+
+	for _, runtime := range activeRuntimes {
+		// Create a copy of the base DaemonSet for this runtime
+		obj := baseObj.DeepCopy()
+		obj.Name = getRuntimeSpecificName(baseObj.Name, runtime)
+		// Add runtime-specific node selector
+		if obj.Spec.Template.Spec.NodeSelector == nil {
+			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
+		runtimeSelector := getRuntimeNodeSelector(runtime)
+		for key, value := range runtimeSelector {
+			obj.Spec.Template.Spec.NodeSelector[key] = value
+		}
+
+		logger.Info("Creating runtime-specific DaemonSet", "runtime", runtime.String(), "name", obj.Name)
+
+		// Apply runtime-specific transformations
+		err := n.applyRuntimeSpecificTransformations(obj, runtime, state)
+		if err != nil {
+			logger.Info("Failed to apply runtime-specific transformations", "runtime", runtime.String(), "error", err)
+			errors = append(errors, err)
+			overallState = gpuv1.NotReady
+			continue
+		}
+
+		// Set controller reference
+		if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
+			logger.Info("SetControllerReference failed", "runtime", runtime.String(), "error", err)
+			errors = append(errors, err)
+			overallState = gpuv1.NotReady
+			continue
+		}
+
+		// Apply labels and annotations
+		if obj.Labels == nil {
+			obj.Labels = make(map[string]string)
+		}
+		for labelKey, labelValue := range n.singleton.Spec.Daemonsets.Labels {
+			obj.Labels[labelKey] = labelValue
+		}
+
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
+		}
+		for annoKey, annoValue := range n.singleton.Spec.Daemonsets.Annotations {
+			obj.Annotations[annoKey] = annoValue
+		}
+
+		// Check if DaemonSet already exists
+		found := &appsv1.DaemonSet{}
+		err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
+		switch {
+		case err != nil && apierrors.IsNotFound(err):
+			// Create new DaemonSet
+			hashStr := utils.GetObjectHash(obj)
+			obj.Annotations[NvidiaAnnotationHashKey] = hashStr
+			err = n.client.Create(ctx, obj)
+			if err != nil {
+				logger.Info("Couldn't create runtime-specific DaemonSet", "runtime", runtime.String(), "name", obj.Name, "error", err)
+				errors = append(errors, err)
+				overallState = gpuv1.NotReady
+				continue
+			}
+			logger.Info("Created runtime-specific DaemonSet", "runtime", runtime.String(), "name", obj.Name)
+		case err != nil:
+			logger.Info("Error getting runtime-specific DaemonSet", "runtime", runtime.String(), "name", obj.Name, "error", err)
+			errors = append(errors, err)
+			overallState = gpuv1.NotReady
+			continue
+		default:
+			// DaemonSet exists - check if update is needed
+			updated := obj.DeepCopy()
+			updated.ResourceVersion = found.ResourceVersion
+			newHashStr := utils.GetObjectHash(updated)
+			foundHashStr := found.Annotations[NvidiaAnnotationHashKey]
+			if newHashStr != foundHashStr {
+				logger.Info("DaemonSet spec has changed, updating", "runtime", runtime.String(), "name", obj.Name)
+				updated.Annotations[NvidiaAnnotationHashKey] = newHashStr
+
+				err = n.client.Update(ctx, updated)
+				if err != nil {
+					logger.Info("Couldn't update runtime-specific DaemonSet", "runtime", runtime.String(), "name", obj.Name, "error", err)
+					errors = append(errors, err)
+					overallState = gpuv1.NotReady
+					continue
+				}
+			}
+		}
+
+		// Check DaemonSet readiness
+		if isDaemonSetReady(obj.Name, *n) != gpuv1.Ready {
+			overallState = gpuv1.NotReady
+		}
+	}
+
+	if len(errors) > 0 {
+		return overallState, fmt.Errorf("errors creating runtime-specific DaemonSets: %v", errors)
+	}
+
+	return overallState, nil
+}
+
+// applyRuntimeSpecificTransformations applies transformations specific to a runtime
+func (n *ClusterPolicyController) applyRuntimeSpecificTransformations(obj *appsv1.DaemonSet, runtime gpuv1.Runtime, state int) error {
+	// First apply the standard preprocessing
+	err := preProcessDaemonSet(obj, *n)
+	if err != nil {
+		return fmt.Errorf("failed to preprocess DaemonSet: %v", err)
+	}
+
+	// Now apply runtime-specific modifications based on component type
+	switch obj.Name {
+	case getRuntimeSpecificName("nvidia-container-toolkit-daemonset", runtime):
+		return n.applyToolkitRuntimeTransformations(obj, runtime)
+	case getRuntimeSpecificName("nvidia-device-plugin-daemonset", runtime):
+		return n.applyDevicePluginRuntimeTransformations(obj, runtime)
+	case getRuntimeSpecificName("nvidia-driver-daemonset", runtime):
+		return n.applyDriverRuntimeTransformations(obj, runtime)
+	}
+
+	return nil
+}
+
+// applyToolkitRuntimeTransformations applies runtime-specific transformations to the container toolkit
+func (n *ClusterPolicyController) applyToolkitRuntimeTransformations(obj *appsv1.DaemonSet, runtime gpuv1.Runtime) error {
+	config := &n.singleton.Spec
+
+	// Apply runtime-specific transformation
+	err := transformForRuntime(obj, config, runtime.String(), "nvidia-container-toolkit-ctr")
+	if err != nil {
+		return fmt.Errorf("error transforming toolkit daemonset for runtime %s: %w", runtime.String(), err)
+	}
+
+	// Apply CRI-O specific hooks path for non-OpenShift
+	if n.openshift == "" && runtime == gpuv1.CRIO {
+		for index, volume := range obj.Spec.Template.Spec.Volumes {
+			if volume.Name == "crio-hooks" {
+				obj.Spec.Template.Spec.Volumes[index].HostPath.Path = "/usr/share/containers/oci/hooks.d"
+			}
+		}
+	}
+
+	// Set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, runtime, config.Operator.RuntimeClass)
+
+	return nil
+}
+
+// applyDevicePluginRuntimeTransformations applies runtime-specific transformations to the device plugin
+func (n *ClusterPolicyController) applyDevicePluginRuntimeTransformations(obj *appsv1.DaemonSet, runtime gpuv1.Runtime) error {
+	config := &n.singleton.Spec
+
+	// Set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, runtime, config.Operator.RuntimeClass)
+
+	return nil
+}
+
+// applyDriverRuntimeTransformations applies runtime-specific transformations to the driver
+func (n *ClusterPolicyController) applyDriverRuntimeTransformations(obj *appsv1.DaemonSet, runtime gpuv1.Runtime) error {
+	config := &n.singleton.Spec
+
+	// Set RuntimeClass for supported runtimes
+	setRuntimeClass(&obj.Spec.Template.Spec, runtime, config.Operator.RuntimeClass)
+
+	return nil
 }
 
 // addNodeToRuntimeMap adds a GPU node to the runtime map
@@ -841,9 +1036,6 @@ func (n *ClusterPolicyController) addNodeToRuntimeMap(node *corev1.Node) error {
 	n.nodeRuntimeMap[node.Name] = runtime
 	n.logger.Info(fmt.Sprintf("Added node %s to runtime map with runtime %s", node.Name, runtime.String()))
 
-	// Update primary runtime for backward compatibility
-	n.runtime = n.getPrimaryRuntime()
-
 	return nil
 }
 
@@ -857,8 +1049,6 @@ func (n *ClusterPolicyController) removeNodeFromRuntimeMap(nodeName string) erro
 		delete(n.nodeRuntimeMap, nodeName)
 		n.logger.Info(fmt.Sprintf("Removed node %s from runtime map", nodeName))
 
-		// Update primary runtime for backward compatibility
-		n.runtime = n.getPrimaryRuntime()
 	}
 
 	return nil
@@ -987,10 +1177,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		return err
 	}
 	n.logger.Info(fmt.Sprintf("Detected container runtimes per node: %v", n.nodeRuntimeMap))
-
-	// Set primary runtime for backward compatibility
-	n.runtime = n.getPrimaryRuntime()
-	n.logger.Info(fmt.Sprintf("Using primary runtime: %s", n.runtime.String()))
 
 	// label nodes with their runtime information
 	err = n.labelNodesWithRuntime()

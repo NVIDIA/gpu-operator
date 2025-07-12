@@ -1135,7 +1135,7 @@ func TestTransformValidator(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			err := TransformValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -1195,7 +1195,7 @@ func TestTransformSandboxValidator(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformSandboxValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			err := TransformSandboxValidator(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -1250,7 +1250,7 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformNodeStatusExporter(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			err := TransformNodeStatusExporter(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
