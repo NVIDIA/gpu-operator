@@ -89,6 +89,8 @@ const (
 	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
+	// GPURuntimeLabelTemplate represents the template for GPU runtime labels
+	GPURuntimeLabelTemplate = "nvidia.com/gpu.runtime.%s"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
 	DriverInstallPathVolName = "driver-install-path"
 	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted

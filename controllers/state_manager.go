@@ -766,7 +766,7 @@ func (n *ClusterPolicyController) ensureAllGPUNodesHaveRuntimeLabels() error {
 		// Check if node already has a runtime label
 		hasRuntimeLabel := false
 		for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
-			runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+			runtimeLabel := fmt.Sprintf(GPURuntimeLabelTemplate, runtime.String())
 			if value, exists := node.Labels[runtimeLabel]; exists && value == "true" {
 				hasRuntimeLabel = true
 				break
@@ -807,7 +807,7 @@ func (n *ClusterPolicyController) getActiveRuntimes() []gpuv1.Runtime {
 	for _, node := range nodes.Items {
 		// Check for runtime labels
 		for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
-			runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+			runtimeLabel := fmt.Sprintf(GPURuntimeLabelTemplate, runtime.String())
 			if value, exists := node.Labels[runtimeLabel]; exists && value == "true" {
 				runtimeSet[runtime] = true
 			}
@@ -850,7 +850,7 @@ func getRuntimeSpecificName(baseName string, runtime gpuv1.Runtime) string {
 // getRuntimeNodeSelector returns the node selector for a specific runtime
 func getRuntimeNodeSelector(runtime gpuv1.Runtime) map[string]string {
 	return map[string]string{
-		fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String()): "true",
+		fmt.Sprintf(GPURuntimeLabelTemplate, runtime.String()): "true",
 	}
 }
 
@@ -1252,7 +1252,7 @@ func labelNodeWithRuntime(node *corev1.Node, client client.Client, openshift str
 		}
 	}
 
-	runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+	runtimeLabel := fmt.Sprintf(GPURuntimeLabelTemplate, runtime.String())
 	if node.Labels == nil {
 		node.Labels = make(map[string]string)
 	}
@@ -1263,7 +1263,7 @@ func labelNodeWithRuntime(node *corev1.Node, client client.Client, openshift str
 		// Remove other runtime labels
 		for _, otherRuntime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
 			if otherRuntime != runtime {
-				otherLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", otherRuntime.String())
+				otherLabel := fmt.Sprintf(GPURuntimeLabelTemplate, otherRuntime.String())
 				delete(node.Labels, otherLabel)
 			}
 		}
