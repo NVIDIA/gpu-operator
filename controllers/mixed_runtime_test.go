@@ -239,207 +239,77 @@ func TestGetNodeRuntimeMap(t *testing.T) {
 	}
 }
 
-func TestLabelNodesWithRuntime(t *testing.T) {
+func TestLabelNodeWithRuntime(t *testing.T) {
 	tests := []struct {
 		name           string
-		nodes          []corev1.Node
-		nodeRuntimeMap map[string]gpuv1.Runtime
-		expectedLabels map[string]map[string]string
+		node           corev1.Node
+		openshift      string
+		expectedLabels map[string]string
 	}{
 		{
-			name: "label nodes with different runtimes",
-			nodes: []corev1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node1",
-						Labels: map[string]string{
-							"feature.node.kubernetes.io/pci-10de.present": "true",
-						},
-					},
-					Status: corev1.NodeStatus{
-						NodeInfo: corev1.NodeSystemInfo{
-							ContainerRuntimeVersion: "containerd://1.6.0",
-						},
+			name: "label GPU node with containerd runtime",
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
 					},
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node2",
-						Labels: map[string]string{
-							"feature.node.kubernetes.io/pci-10de.present": "true",
-						},
-					},
-					Status: corev1.NodeStatus{
-						NodeInfo: corev1.NodeSystemInfo{
-							ContainerRuntimeVersion: "cri-o://1.24.0",
-						},
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "containerd://1.6.0",
 					},
 				},
 			},
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-				"node2": gpuv1.CRIO,
+			openshift: "",
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.runtime.containerd": "true",
 			},
-			expectedLabels: map[string]map[string]string{
-				"node1": {
-					"nvidia.com/gpu.runtime.containerd": "true",
+		},
+		{
+			name: "label GPU node with cri-o runtime",
+			node: corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node2",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
 				},
-				"node2": {
-					"nvidia.com/gpu.runtime.crio": "true",
+				Status: corev1.NodeStatus{
+					NodeInfo: corev1.NodeSystemInfo{
+						ContainerRuntimeVersion: "cri-o://1.24.0",
+					},
 				},
+			},
+			openshift: "",
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.runtime.crio": "true",
 			},
 		},
 		{
 			name: "remove old runtime labels when runtime changes",
-			nodes: []corev1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node1",
-						Labels: map[string]string{
-							"feature.node.kubernetes.io/pci-10de.present": "true",
-							"nvidia.com/gpu.runtime.crio":                  "true", // Old label
-						},
-					},
-					Status: corev1.NodeStatus{
-						NodeInfo: corev1.NodeSystemInfo{
-							ContainerRuntimeVersion: "containerd://1.6.0", // New runtime
-						},
-					},
-				},
-			},
-			nodeRuntimeMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd, // New runtime
-			},
-			expectedLabels: map[string]map[string]string{
-				"node1": {
-					"nvidia.com/gpu.runtime.containerd": "true",
-					// crio label should be removed
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create fake client with test nodes
-			scheme := runtime.NewScheme()
-			_ = corev1.AddToScheme(scheme)
-
-			objs := make([]runtime.Object, len(tt.nodes))
-			for i := range tt.nodes {
-				objs[i] = &tt.nodes[i]
-			}
-
-			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
-
-			// Create controller with test data
-			controller := &ClusterPolicyController{
-				client:         client,
-				logger:         log.Log.WithName("test"),
-				ctx:            context.Background(),
-				nodeRuntimeMap: tt.nodeRuntimeMap,
-				openshift:      "", // Default to non-OpenShift
-			}
-
-			// Call the method under test
-			err := controller.labelNodesWithRuntime()
-			require.NoError(t, err)
-
-			// Verify labels were applied correctly
-			for nodeName, expectedLabels := range tt.expectedLabels {
-				node := &corev1.Node{}
-				err := client.Get(context.Background(), types.NamespacedName{Name: nodeName}, node)
-				require.NoError(t, err)
-
-				// Check expected labels are present
-				for key, value := range expectedLabels {
-					require.Equal(t, value, node.Labels[key], "Expected label %s=%s on node %s", key, value, nodeName)
-				}
-
-				// Check that other runtime labels are removed
-				for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
-					runtimeLabel := "nvidia.com/gpu.runtime." + runtime.String()
-					if _, shouldExist := expectedLabels[runtimeLabel]; !shouldExist {
-						require.NotContains(t, node.Labels, runtimeLabel, "Runtime label %s should not exist on node %s", runtimeLabel, nodeName)
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestAddNodeToRuntimeMap(t *testing.T) {
-	tests := []struct {
-		name        string
-		existingMap map[string]gpuv1.Runtime
-		node        corev1.Node
-		openshift   string
-		expectedMap map[string]gpuv1.Runtime
-		expectError bool
-	}{
-		{
-			name:        "add GPU node with containerd runtime",
-			existingMap: map[string]gpuv1.Runtime{},
 			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "new-node",
+					Name: "node1",
 					Labels: map[string]string{
 						"feature.node.kubernetes.io/pci-10de.present": "true",
+						"nvidia.com/gpu.runtime.crio":                  "true", // Old label
 					},
 				},
 				Status: corev1.NodeStatus{
 					NodeInfo: corev1.NodeSystemInfo{
-						ContainerRuntimeVersion: "containerd://1.6.0",
+						ContainerRuntimeVersion: "containerd://1.6.0", // New runtime
 					},
 				},
 			},
 			openshift: "",
-			expectedMap: map[string]gpuv1.Runtime{
-				"new-node": gpuv1.Containerd,
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.runtime.containerd": "true",
+				// crio label should be removed
 			},
-			expectError: false,
 		},
 		{
-			name: "add GPU node to existing map",
-			existingMap: map[string]gpuv1.Runtime{
-				"existing-node": gpuv1.CRIO,
-			},
-			node: corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "new-node",
-					Labels: map[string]string{
-						"feature.node.kubernetes.io/pci-10de.present": "true",
-					},
-				},
-				Status: corev1.NodeStatus{
-					NodeInfo: corev1.NodeSystemInfo{
-						ContainerRuntimeVersion: "containerd://1.6.0",
-					},
-				},
-			},
-			openshift: "",
-			expectedMap: map[string]gpuv1.Runtime{
-				"existing-node": gpuv1.CRIO,
-				"new-node":      gpuv1.Containerd,
-			},
-			expectError: false,
-		},
-		{
-			name:        "skip non-GPU node",
-			existingMap: map[string]gpuv1.Runtime{},
-			node: corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "non-gpu-node",
-					Labels: map[string]string{},
-				},
-			},
-			openshift:   "",
-			expectedMap: map[string]gpuv1.Runtime{},
-			expectError: false,
-		},
-		{
-			name:        "add node in OpenShift cluster - force crio",
-			existingMap: map[string]gpuv1.Runtime{},
+			name: "openshift cluster forces crio runtime",
 			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "openshift-node",
@@ -454,79 +324,42 @@ func TestAddNodeToRuntimeMap(t *testing.T) {
 				},
 			},
 			openshift: "4.12.0",
-			expectedMap: map[string]gpuv1.Runtime{
-				"openshift-node": gpuv1.CRIO,
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.runtime.crio": "true",
 			},
-			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := &ClusterPolicyController{
-				nodeRuntimeMap: tt.existingMap,
-				logger:         log.Log.WithName("test"),
-				openshift:      tt.openshift,
-			}
+			// Create fake client with test node
+			scheme := runtime.NewScheme()
+			_ = corev1.AddToScheme(scheme)
 
-			err := controller.addNodeToRuntimeMap(&tt.node)
+			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(&tt.node).Build()
 
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedMap, controller.nodeRuntimeMap)
-			}
-		})
-	}
-}
-
-func TestRemoveNodeFromRuntimeMap(t *testing.T) {
-	tests := []struct {
-		name         string
-		existingMap  map[string]gpuv1.Runtime
-		nodeToRemove string
-		expectedMap  map[string]gpuv1.Runtime
-	}{
-		{
-			name: "remove existing node",
-			existingMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-				"node2": gpuv1.CRIO,
-			},
-			nodeToRemove: "node1",
-			expectedMap: map[string]gpuv1.Runtime{
-				"node2": gpuv1.CRIO,
-			},
-		},
-		{
-			name: "remove non-existing node",
-			existingMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-			},
-			nodeToRemove: "non-existing",
-			expectedMap: map[string]gpuv1.Runtime{
-				"node1": gpuv1.Containerd,
-			},
-		},
-		{
-			name:         "remove from empty map",
-			existingMap:  map[string]gpuv1.Runtime{},
-			nodeToRemove: "any-node",
-			expectedMap:  map[string]gpuv1.Runtime{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := &ClusterPolicyController{
-				nodeRuntimeMap: tt.existingMap,
-				logger:         log.Log.WithName("test"),
-			}
-
-			err := controller.removeNodeFromRuntimeMap(tt.nodeToRemove)
+			// Call the function under test
+			err := labelNodeWithRuntime(&tt.node, client, tt.openshift, log.Log.WithName("test"))
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedMap, controller.nodeRuntimeMap)
+
+			// Verify labels were applied correctly
+			node := &corev1.Node{}
+			err = client.Get(context.Background(), types.NamespacedName{Name: tt.node.Name}, node)
+			require.NoError(t, err)
+
+			// Check expected labels are present
+			for key, value := range tt.expectedLabels {
+				require.Equal(t, value, node.Labels[key], "Expected label %s=%s on node %s", key, value, tt.node.Name)
+			}
+
+			// Check that other runtime labels are removed
+			for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
+				runtimeLabel := "nvidia.com/gpu.runtime." + runtime.String()
+				if _, shouldExist := tt.expectedLabels[runtimeLabel]; !shouldExist {
+					require.NotContains(t, node.Labels, runtimeLabel, "Runtime label %s should not exist on node %s", runtimeLabel, tt.node.Name)
+				}
+			}
 		})
 	}
 }
+

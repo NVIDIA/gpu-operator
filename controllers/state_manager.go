@@ -165,7 +165,6 @@ type ClusterPolicyController struct {
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
-	nodeRuntimeMap map[string]gpuv1.Runtime
 	hasGPUNodes    bool
 	hasNFDLabels   bool
 	sandboxEnabled bool
@@ -749,42 +748,81 @@ func (n *ClusterPolicyController) getNodeRuntimeMap() (map[string]gpuv1.Runtime,
 	return nodeRuntimeMap, nil
 }
 
-// labelNodesWithRuntime adds runtime labels to nodes based on their detected runtime
-func (n *ClusterPolicyController) labelNodesWithRuntime() error {
+// ensureAllGPUNodesHaveRuntimeLabels ensures all GPU nodes have runtime labels
+func (n *ClusterPolicyController) ensureAllGPUNodesHaveRuntimeLabels() error {
 	ctx := n.ctx
 
-	for nodeName := range n.nodeRuntimeMap {
-		node := &corev1.Node{}
-		err := n.client.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-		if err != nil {
-			n.logger.Info(fmt.Sprintf("Failed to get node %s for runtime labeling: %v", nodeName, err))
-			continue
+	// Get all GPU nodes
+	opts := []client.ListOption{
+		client.MatchingLabels{commonGPULabelKey: "true"},
+	}
+	list := &corev1.NodeList{}
+	err := n.client.List(ctx, list, opts...)
+	if err != nil {
+		return fmt.Errorf("unable to list GPU nodes: %v", err)
+	}
+
+	for _, node := range list.Items {
+		// Check if node already has a runtime label
+		hasRuntimeLabel := false
+		for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
+			runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+			if value, exists := node.Labels[runtimeLabel]; exists && value == "true" {
+				hasRuntimeLabel = true
+				break
+			}
 		}
 
-		err = labelNodeWithRuntime(node, n.client, n.openshift, n.logger)
-		if err != nil {
-			n.logger.Info(fmt.Sprintf("Failed to label node %s with runtime: %v", nodeName, err))
-			continue
+		// If no runtime label, add one
+		if !hasRuntimeLabel {
+			err = labelNodeWithRuntime(&node, n.client, n.openshift, n.logger)
+			if err != nil {
+				n.logger.Info(fmt.Sprintf("Failed to label node %s with runtime: %v", node.Name, err))
+				continue
+			}
 		}
 	}
 
 	return nil
 }
 
-// getActiveRuntimes returns a list of unique runtimes present in the cluster
+// getActiveRuntimes returns a list of unique runtimes present in the cluster by querying node labels
 func (n *ClusterPolicyController) getActiveRuntimes() []gpuv1.Runtime {
-	if len(n.nodeRuntimeMap) == 0 {
-		return []gpuv1.Runtime{gpuv1.Containerd} // Default fallback
+	ctx := n.ctx
+	nodes := &corev1.NodeList{}
+	
+	// Get all GPU nodes
+	err := n.client.List(ctx, nodes, client.MatchingLabels{commonGPULabelKey: "true"})
+	if err != nil {
+		n.logger.Info(fmt.Sprintf("Unable to list GPU nodes for runtime detection: %v, defaulting to containerd", err))
+		return []gpuv1.Runtime{gpuv1.Containerd}
+	}
+
+	if len(nodes.Items) == 0 {
+		n.logger.Info("No GPU nodes found in cluster, defaulting to containerd")
+		return []gpuv1.Runtime{gpuv1.Containerd}
 	}
 
 	runtimeSet := make(map[gpuv1.Runtime]bool)
-	for _, runtime := range n.nodeRuntimeMap {
-		runtimeSet[runtime] = true
+	for _, node := range nodes.Items {
+		// Check for runtime labels
+		for _, runtime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
+			runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+			if value, exists := node.Labels[runtimeLabel]; exists && value == "true" {
+				runtimeSet[runtime] = true
+			}
+		}
 	}
 
 	var runtimes []gpuv1.Runtime
 	for runtime := range runtimeSet {
 		runtimes = append(runtimes, runtime)
+	}
+
+	// If no runtime labels found, default to containerd
+	if len(runtimes) == 0 {
+		n.logger.Info("No runtime labels found on GPU nodes, defaulting to containerd")
+		return []gpuv1.Runtime{gpuv1.Containerd}
 	}
 
 	// Sort for consistent ordering (containerd first, then others alphabetically)
@@ -1240,51 +1278,6 @@ func labelNodeWithRuntime(node *corev1.Node, client client.Client, openshift str
 	return nil
 }
 
-// addNodeToRuntimeMap adds a GPU node to the runtime map
-func (n *ClusterPolicyController) addNodeToRuntimeMap(node *corev1.Node) error {
-	if n.nodeRuntimeMap == nil {
-		n.nodeRuntimeMap = make(map[string]gpuv1.Runtime)
-	}
-
-	// Only process GPU nodes
-	if !hasGPULabels(node.GetLabels()) {
-		return nil
-	}
-
-	var runtime gpuv1.Runtime
-	var err error
-
-	// assume crio for openshift clusters
-	if n.openshift != "" {
-		runtime = gpuv1.CRIO
-	} else {
-		runtime, err = getRuntimeString(*node)
-		if err != nil {
-			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v, defaulting to containerd", node.Name, err))
-			runtime = gpuv1.Containerd
-		}
-	}
-
-	n.nodeRuntimeMap[node.Name] = runtime
-	n.logger.Info(fmt.Sprintf("Added node %s to runtime map with runtime %s", node.Name, runtime.String()))
-
-	return nil
-}
-
-// removeNodeFromRuntimeMap removes a node from the runtime map
-func (n *ClusterPolicyController) removeNodeFromRuntimeMap(nodeName string) error {
-	if n.nodeRuntimeMap == nil {
-		return nil
-	}
-
-	if _, exists := n.nodeRuntimeMap[nodeName]; exists {
-		delete(n.nodeRuntimeMap, nodeName)
-		n.logger.Info(fmt.Sprintf("Removed node %s from runtime map", nodeName))
-
-	}
-
-	return nil
-}
 
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
@@ -1403,17 +1396,10 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		return err
 	}
 
-	// detect the container runtime on worker nodes
-	n.nodeRuntimeMap, err = n.getNodeRuntimeMap()
+	// ensure all GPU nodes have runtime labels (in case they were created before the operator started)
+	err = n.ensureAllGPUNodesHaveRuntimeLabels()
 	if err != nil {
-		return err
-	}
-	n.logger.Info(fmt.Sprintf("Detected container runtimes per node: %v", n.nodeRuntimeMap))
-
-	// label nodes with their runtime information
-	err = n.labelNodesWithRuntime()
-	if err != nil {
-		n.logger.Info(fmt.Sprintf("Failed to label nodes with runtime: %v", err))
+		n.logger.Info(fmt.Sprintf("Failed to ensure all GPU nodes have runtime labels: %v", err))
 		// Don't fail the entire initialization if labeling fails
 	}
 
