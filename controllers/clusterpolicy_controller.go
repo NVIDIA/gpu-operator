@@ -302,6 +302,16 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
 
+			// Check if node gained GPU labels (became a GPU node)
+			nodeGainedGPULabels := !hasGPULabels(oldLabels) && hasGPULabels(newLabels)
+
+			// Label GPU nodes with their runtime if they gained GPU labels or if runtime info changed
+			if nodeGainedGPULabels || (hasGPULabels(newLabels) && e.ObjectOld.Status.NodeInfo.ContainerRuntimeVersion != e.ObjectNew.Status.NodeInfo.ContainerRuntimeVersion) {
+				if err := labelNodeWithRuntime(e.ObjectNew, r.Client, clusterPolicyCtrl.openshift, r.Log); err != nil {
+					r.Log.Error(err, "Failed to label node with runtime during update", "node", nodeName)
+				}
+			}
+
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			migManagerLabelMissing := hasMIGCapableGPU(newLabels) && !hasMIGManagerLabel(newLabels)
@@ -320,7 +330,8 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 				migManagerLabelMissing ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
-				osTreeLabelChanged
+				osTreeLabelChanged ||
+				nodeGainedGPULabels
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
@@ -331,6 +342,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
+					"nodeGainedGPULabels", nodeGainedGPULabels,
 				)
 			}
 			return needsUpdate
