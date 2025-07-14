@@ -284,20 +284,18 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
 
-			// Update runtime map for new GPU nodes
-			if hasGPULabels(labels) {
-				// Get the ClusterPolicyController instance to update the runtime map
-				// We need to find the active controller instance
-				if clusterPolicyCtrl.singleton != nil {
-					err := clusterPolicyCtrl.addNodeToRuntimeMap(e.Object)
-					if err != nil {
-						r.Log.Error(err, "Failed to add node to runtime map", "node", e.Object.GetName())
-					}
-				}
-				return true
+			// Only process GPU nodes
+			if !hasGPULabels(labels) {
+				return false
 			}
 
-			return false
+			// Label new GPU nodes with their runtime
+			if err := labelNodeWithRuntime(e.Object, r.Client, clusterPolicyCtrl.openshift, r.Log); err != nil {
+				r.Log.Error(err, "Failed to label node with runtime, will retry on next reconciliation", "node", e.Object.GetName())
+				// Still return true to trigger reconciliation - the controller can handle nodes without runtime labels
+				// and may succeed in labeling them during reconciliation
+			}
+			return true
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
 			newLabels := e.ObjectNew.GetLabels()
@@ -326,7 +324,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
-					"name", nodeName,
+					"node", nodeName,
 					"gpuCommonLabelMissing", gpuCommonLabelMissing,
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
 					"migManagerLabelMissing", migManagerLabelMissing,
@@ -346,15 +344,6 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// enabled.
 
 			labels := e.Object.GetLabels()
-			nodeName := e.Object.GetName()
-
-			// Remove node from runtime map if it was a GPU node
-			if hasGPULabels(labels) && clusterPolicyCtrl.singleton != nil {
-				err := clusterPolicyCtrl.removeNodeFromRuntimeMap(nodeName)
-				if err != nil {
-					r.Log.Error(err, "Failed to remove node from runtime map", "node", nodeName)
-				}
-			}
 
 			_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
 

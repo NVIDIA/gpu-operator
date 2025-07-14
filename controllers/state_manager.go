@@ -753,7 +753,7 @@ func (n *ClusterPolicyController) getNodeRuntimeMap() (map[string]gpuv1.Runtime,
 func (n *ClusterPolicyController) labelNodesWithRuntime() error {
 	ctx := n.ctx
 
-	for nodeName, runtime := range n.nodeRuntimeMap {
+	for nodeName := range n.nodeRuntimeMap {
 		node := &corev1.Node{}
 		err := n.client.Get(ctx, client.ObjectKey{Name: nodeName}, node)
 		if err != nil {
@@ -761,28 +761,10 @@ func (n *ClusterPolicyController) labelNodesWithRuntime() error {
 			continue
 		}
 
-		runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
-		if node.Labels == nil {
-			node.Labels = make(map[string]string)
-		}
-
-		// Only update if label doesn't exist or is different
-		if currentValue, exists := node.Labels[runtimeLabel]; !exists || currentValue != "true" {
-			node.Labels[runtimeLabel] = "true"
-			// Remove other runtime labels
-			for _, otherRuntime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
-				if otherRuntime != runtime {
-					otherLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", otherRuntime.String())
-					delete(node.Labels, otherLabel)
-				}
-			}
-
-			err = n.client.Update(ctx, node)
-			if err != nil {
-				n.logger.Info(fmt.Sprintf("Failed to update runtime label for node %s: %v", nodeName, err))
-				continue
-			}
-			n.logger.Info(fmt.Sprintf("Added runtime label to node %s: %s=true", nodeName, runtimeLabel))
+		err = labelNodeWithRuntime(node, n.client, n.openshift, n.logger)
+		if err != nil {
+			n.logger.Info(fmt.Sprintf("Failed to label node %s with runtime: %v", nodeName, err))
+			continue
 		}
 	}
 
@@ -1207,6 +1189,53 @@ func (n *ClusterPolicyController) applyDriverRuntimeTransformations(obj *appsv1.
 
 	// Set RuntimeClass for supported runtimes (runtime-specific part)
 	setRuntimeClass(&obj.Spec.Template.Spec, runtime, config.Operator.RuntimeClass)
+
+	return nil
+}
+
+// labelNodeWithRuntime labels a GPU node with its detected runtime
+func labelNodeWithRuntime(node *corev1.Node, client client.Client, openshift string, logger logr.Logger) error {
+	// Only process GPU nodes
+	if !hasGPULabels(node.GetLabels()) {
+		return nil
+	}
+
+	var runtime gpuv1.Runtime
+	var err error
+
+	// assume crio for openshift clusters
+	if openshift != "" {
+		runtime = gpuv1.CRIO
+	} else {
+		runtime, err = getRuntimeString(*node)
+		if err != nil {
+			logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v, defaulting to containerd", node.Name, err))
+			runtime = gpuv1.Containerd
+		}
+	}
+
+	runtimeLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", runtime.String())
+	if node.Labels == nil {
+		node.Labels = make(map[string]string)
+	}
+
+	// Only update if label doesn't exist or is different
+	if currentValue, exists := node.Labels[runtimeLabel]; !exists || currentValue != "true" {
+		node.Labels[runtimeLabel] = "true"
+		// Remove other runtime labels
+		for _, otherRuntime := range []gpuv1.Runtime{gpuv1.Docker, gpuv1.CRIO, gpuv1.Containerd} {
+			if otherRuntime != runtime {
+				otherLabel := fmt.Sprintf("nvidia.com/gpu.runtime.%s", otherRuntime.String())
+				delete(node.Labels, otherLabel)
+			}
+		}
+
+		err = client.Update(context.Background(), node)
+		if err != nil {
+			return fmt.Errorf("failed to update node %s with runtime label: %v", node.Name, err)
+		}
+		logger.Info(fmt.Sprintf("Labeled node %s with runtime %s", node.Name, runtime.String()))
+	}
 
 	return nil
 }

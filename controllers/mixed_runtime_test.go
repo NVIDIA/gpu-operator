@@ -251,14 +251,28 @@ func TestLabelNodesWithRuntime(t *testing.T) {
 			nodes: []corev1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:   "node1",
-						Labels: map[string]string{},
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+						},
+					},
+					Status: corev1.NodeStatus{
+						NodeInfo: corev1.NodeSystemInfo{
+							ContainerRuntimeVersion: "containerd://1.6.0",
+						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:   "node2",
-						Labels: map[string]string{},
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+						},
+					},
+					Status: corev1.NodeStatus{
+						NodeInfo: corev1.NodeSystemInfo{
+							ContainerRuntimeVersion: "cri-o://1.24.0",
+						},
 					},
 				},
 			},
@@ -282,7 +296,13 @@ func TestLabelNodesWithRuntime(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node1",
 						Labels: map[string]string{
-							"nvidia.com/gpu.runtime.crio": "true", // Old label
+							"feature.node.kubernetes.io/pci-10de.present": "true",
+							"nvidia.com/gpu.runtime.crio":                  "true", // Old label
+						},
+					},
+					Status: corev1.NodeStatus{
+						NodeInfo: corev1.NodeSystemInfo{
+							ContainerRuntimeVersion: "containerd://1.6.0", // New runtime
 						},
 					},
 				},
@@ -318,6 +338,7 @@ func TestLabelNodesWithRuntime(t *testing.T) {
 				logger:         log.Log.WithName("test"),
 				ctx:            context.Background(),
 				nodeRuntimeMap: tt.nodeRuntimeMap,
+				openshift:      "", // Default to non-OpenShift
 			}
 
 			// Call the method under test
