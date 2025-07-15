@@ -1304,9 +1304,6 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	// NOTE: This function should not be called anymore since device plugin uses per-runtime DaemonSets
-	// Skip RuntimeClass setting for unexpected calls
-
 	// update env required for MIG support
 	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
 
