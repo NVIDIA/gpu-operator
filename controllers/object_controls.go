@@ -4672,7 +4672,9 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	createRuntimeClassFunc := transformRuntimeClass
-	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
+	// For Kubernetes versions <= v1.20.0, use legacy v1beta1 API
+	// For newer versions, use v1 API (v1beta1 was deprecated in 1.22 and removed in 1.25+)
+	if n.k8sVersion != "" && semver.IsValid(n.k8sVersion) && semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
 		createRuntimeClassFunc = transformRuntimeClassLegacy
 	}
 
