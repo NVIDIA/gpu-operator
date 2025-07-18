@@ -535,24 +535,24 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
 	if obj.Name == MigPartedDefaultConfigMapName {
-		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" && config.MIGManager.Config.Name != MigPartedDefaultConfigMapName {
-			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.Config.Name))
+		if name, isCustom := gpuv1.GetConfigMapName(config.MIGManager.Config, MigPartedDefaultConfigMapName); isCustom {
+			logger.Info("Not creating resource, custom ConfigMap provided", "Name", name)
 			return gpuv1.Ready, nil
 		}
 	}
 
 	// avoid creating default 'gpu-clients' ConfigMap if custom one is provided
 	if obj.Name == MigDefaultGPUClientsConfigMapName {
-		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
-			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.MIGManager.GPUClientsConfig.Name))
+		if name, isCustom := gpuv1.GetConfigMapName(config.MIGManager.GPUClientsConfig, MigDefaultGPUClientsConfigMapName); isCustom {
+			logger.Info("Not creating resource, custom ConfigMap provided", "Name", name)
 			return gpuv1.Ready, nil
 		}
 	}
 
 	// avoid creating default vGPU device manager ConfigMap if custom one provided
 	if obj.Name == VgpuDMDefaultConfigMapName {
-		if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Name != "" {
-			logger.Info(fmt.Sprintf("Not creating resource, custom ConfigMap provided: %s", config.VGPUDeviceManager.Config.Name))
+		if name, isCustom := gpuv1.GetConfigMapName(config.VGPUDeviceManager.Config, VgpuDMDefaultConfigMapName); isCustom {
+			logger.Info("Not creating resource, custom ConfigMap provided", "Name", name)
 			return gpuv1.Ready, nil
 		}
 	}
@@ -1808,10 +1808,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 			continue
 		}
 
-		name := MigPartedDefaultConfigMapName
-		if config.MIGManager.Config != nil && config.MIGManager.Config.Name != "" && config.MIGManager.Config.Name != MigPartedDefaultConfigMapName {
-			name = config.MIGManager.Config.Name
-		}
+		name, _ := gpuv1.GetConfigMapName(config.MIGManager.Config, MigPartedDefaultConfigMapName)
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
 	}
@@ -1822,10 +1819,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 			continue
 		}
 
-		name := MigDefaultGPUClientsConfigMapName
-		if config.MIGManager.GPUClientsConfig != nil && config.MIGManager.GPUClientsConfig.Name != "" {
-			name = config.MIGManager.GPUClientsConfig.Name
-		}
+		name, _ := gpuv1.GetConfigMapName(config.MIGManager.GPUClientsConfig, MigDefaultGPUClientsConfigMapName)
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
 	}
@@ -2064,10 +2058,7 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 			continue
 		}
 
-		name := VgpuDMDefaultConfigMapName
-		if config.VGPUDeviceManager.Config != nil && config.VGPUDeviceManager.Config.Name != "" {
-			name = config.VGPUDeviceManager.Config.Name
-		}
+		name, _ := gpuv1.GetConfigMapName(config.VGPUDeviceManager.Config, VgpuDMDefaultConfigMapName)
 		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
 		break
 	}
