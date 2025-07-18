@@ -162,6 +162,7 @@ type ClusterPolicyController struct {
 	currentKernelVersion string
 
 	k8sVersion       string
+	draSupported     bool
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
@@ -224,6 +225,38 @@ func KubernetesVersion() (string, error) {
 	}
 
 	return info.GitVersion, nil
+}
+
+// IsDRASupported checks if Dynamic Resource Allocation is enabled in the Kubernetes cluster
+// by checking if the 'DeviceClass' resource is a valid Kind.
+func IsDRASupported(logger logr.Logger) (bool, error) {
+	cfg := config.GetConfigOrDie()
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return false, fmt.Errorf("error building discovery client: %w", err)
+	}
+
+	apiResourceLists, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return false, fmt.Errorf("error getting API resources from discovery client: %w", err)
+	}
+
+	var matches []string
+	kind := "DeviceClass"
+	for _, resourceList := range apiResourceLists {
+		for _, resource := range resourceList.APIResources {
+			if resource.Kind == kind {
+				matches = append(matches, resourceList.GroupVersion)
+			}
+		}
+	}
+
+	draSupported := len(matches) > 0
+	if draSupported {
+		logger.Info(fmt.Sprintf("Kind %q exists in the following group/versions: %s", kind, strings.Join(matches, ", ")))
+	}
+
+	return len(matches) > 0, nil
 }
 
 // GetClusterWideProxy returns cluster wide proxy object setup in OCP
@@ -884,6 +917,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 			return fmt.Errorf("error validating clusterpolicy: %w", err)
 		}
 
+		draSupported, err := IsDRASupported(n.logger)
+		if err != nil {
+			return fmt.Errorf("failed to detect if DRA is supported: %w", err)
+		}
+		n.draSupported = draSupported
+
 		n.operatorMetrics = initOperatorMetrics()
 		n.logger.Info("Operator metrics initialized.")
 
@@ -893,14 +932,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
-		addState(n, "/opt/gpu-operator/state-dra-driver")
 		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
 		addState(n, "/opt/gpu-operator/state-dcgm")
 		addState(n, "/opt/gpu-operator/state-dcgm-exporter")
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 		addState(n, "/opt/gpu-operator/state-mig-manager")
 		addState(n, "/opt/gpu-operator/state-node-status-exporter")
-		// add sandbox workload states
 		addState(n, "/opt/gpu-operator/state-vgpu-manager")
 		addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
 		addState(n, "/opt/gpu-operator/state-sandbox-validation")
@@ -909,6 +946,17 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-kata-device-plugin")
 		addState(n, "/opt/gpu-operator/state-kata-manager")
 		addState(n, "/opt/gpu-operator/state-cc-manager")
+
+		if n.draSupported {
+			addState(n, "/opt/gpu-operator/state-dra-driver")
+		}
+	}
+
+	// TODO: combine this validation logic with the call to
+	// ValidateClusterPolicySpec() up above
+	err := n.validateClusterPolicy()
+	if err != nil {
+		return fmt.Errorf("ClusterPolicy validation failed: %w", err)
 	}
 
 	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
