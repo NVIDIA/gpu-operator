@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -57,6 +59,7 @@ type NVIDIADriverReconciler struct {
 	stateManager          state.Manager
 	nodeSelectorValidator validator.Validator
 	conditionUpdater      conditions.Updater
+	operatorNamespace     string
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
@@ -124,6 +127,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	clusterPolicyInstance := clusterPolicyList.Items[0]
 
+	r.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
+
 	// Create a new InfoCatalog which is a generic interface for passing information to state managers
 	infoCatalog := state.NewInfoCatalog()
 
@@ -168,6 +173,16 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	clusterpolicyDriverLabels, err := getClusterpolicyDriverLabels(r.ClusterInfo, clusterPolicyInstance)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to get clusterpolicy driver labels: %w", err)
+	}
+
+	err = updateNodesManagedByDriver(ctx, r, instance, clusterpolicyDriverLabels)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to update nodes managed by driver: %w", err)
+	}
+
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
@@ -191,6 +206,9 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 		// if no errors are reported from any state, then we would be waiting on driver daemonset pods
+		// TODO: Avoid marking 'default' NVIDIADriver instances as NotReady if DesiredNumberScheduled == 0.
+		//       This will avoid unnecessary reconciliations when the 'default' instance is overriden on all
+		//       GPU nodes, and thus, DesiredNumberScheduled being 0 is valid.
 		if errorInfo == nil {
 			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "Waiting for driver pod to be ready")
 			if condErr != nil {
@@ -404,5 +422,154 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return fmt.Errorf("failed to add index key: %w", err)
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		pod := rawObj.(*corev1.Pod)
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func updateNodesManagedByDriver(ctx context.Context, r *NVIDIADriverReconciler, instance *nvidiav1alpha1.NVIDIADriver, clusterpolicyDriverLabels map[string]string) error {
+	nodes, err := getNVIDIADriverSelectedNodes(ctx, r.Client, instance)
+	if err != nil {
+		return fmt.Errorf("failed to get selected nodes for NVIDIADriver CR: %w", err)
+	}
+
+	// A map tracking which node objects need to be updated. E.g. updated label / annotations
+	// need to be applied.
+	nodesToUpdate := map[*corev1.Node]struct{}{}
+
+	for _, node := range nodes.Items {
+		labels := node.GetLabels()
+		annotations := node.GetAnnotations()
+
+		managedBy, exists := labels["nvidia.com/gpu.driver.managed-by"]
+		if !exists {
+			// if 'managed-by' label does not exist, label node with cr.Name
+			labels["nvidia.com/gpu.driver.managed-by"] = instance.Name
+			node.SetLabels(labels)
+			nodesToUpdate[&node] = struct{}{}
+			// If there is an orphan driver pod running on the node,
+			// indicate to the upgrade controller that an upgrade is required.
+			// This will occur when we are migrating from a Clusterpolicy owned
+			// daemonset to a NVIDIADriver owned daemonset.
+			podList := &corev1.PodList{}
+			err = r.Client.List(ctx, podList,
+				client.InNamespace(r.operatorNamespace),
+				client.MatchingLabels(clusterpolicyDriverLabels),
+				client.MatchingFields{"spec.nodeName": node.Name})
+			if err != nil {
+				return fmt.Errorf("failed to list driver pods: %w", err)
+			}
+			if len(podList.Items) == 0 {
+				continue
+			}
+			pod := podList.Items[0]
+			if pod.OwnerReferences == nil || len(pod.OwnerReferences) == 0 {
+				annotations["nvidia.com/gpu-driver-upgrade-requested"] = "true"
+				node.SetAnnotations(annotations)
+			}
+			continue
+		}
+
+		// do nothing if node is already being managed by this CR
+		if managedBy == instance.Name {
+			continue
+		}
+
+		// If node is 'managed-by' another CR, there are several scenarios
+		//    1) There is no driver pod running on the node. Therefore the label is stale.
+		//    2) There is a driver pod running on the node, and it is not an orphan. There are
+		//       two possible actions:
+		//           a) If the NVIDIADriver instance we are currently reconciling is the 'default'
+		//              instance (the node selector is empty), do nothing. All other NVIDIADriver
+		//              instances take precedence.
+		//           b) The pod running no longer falls into the node pool of the CR it is currently
+		//              being managed by. Thus, the NVIDIADriver instance we are currently reconciling
+		//              should take ownership of the node.
+		podList := &corev1.PodList{}
+		err = r.Client.List(ctx, podList,
+			client.InNamespace(r.operatorNamespace),
+			client.MatchingLabels(map[string]string{AppComponentLabelKey: AppComponentLabelValue}),
+			client.MatchingFields{"spec.nodeName": node.Name})
+		if err != nil {
+			return fmt.Errorf("failed to list driver pods: %w", err)
+		}
+		if len(podList.Items) == 0 {
+			labels["nvidia.com/gpu.driver.managed-by"] = instance.Name
+			node.SetLabels(labels)
+			nodesToUpdate[&node] = struct{}{}
+			continue
+		}
+		if instance.Spec.NodeSelector == nil || len(instance.Spec.NodeSelector) == 0 {
+			// If the nodeSelector for the NVIDIADriver instance is empty, then we
+			// treat it as the 'default' CR which has the lowest precedence. Allow
+			// the existing driver pod, owned by another NVIDIADriver CR, to continue
+			// to run.
+			continue
+		}
+		pod := podList.Items[0]
+		if pod.OwnerReferences != nil && len(pod.OwnerReferences) > 0 {
+			err := r.Client.Patch(ctx, &pod, client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(`{"metadata":{"labels":{"app": null}}}`))))
+			if err != nil {
+				return fmt.Errorf("failed to patch pod in order to make it an orphan: %w", err)
+			}
+		}
+		labels["nvidia.com/gpu.driver.managed-by"] = instance.Name
+		annotations["nvidia.com/gpu-driver-upgrade-requested"] = "true"
+		node.SetLabels(labels)
+		node.SetAnnotations(annotations)
+		nodesToUpdate[&node] = struct{}{}
+	}
+
+	// Apply updated labels / annotations on node objects
+	for node := range nodesToUpdate {
+		err = r.Client.Update(ctx, node)
+		if err != nil {
+			return fmt.Errorf("failed to update node %s: %w", node.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// getNVIDIADriverSelectedNodes returns selected nodes based on the nodeselector labels set for a given NVIDIADriver instance
+func getNVIDIADriverSelectedNodes(ctx context.Context, k8sClient client.Client, cr *nvidiav1alpha1.NVIDIADriver) (*corev1.NodeList, error) {
+	nodeList := &corev1.NodeList{}
+
+	if cr.Spec.NodeSelector == nil {
+		cr.Spec.NodeSelector = cr.GetNodeSelector()
+	}
+
+	selector := labels.Set(cr.Spec.NodeSelector).AsSelector()
+
+	opts := []client.ListOption{
+		client.MatchingLabelsSelector{Selector: selector},
+	}
+	err := k8sClient.List(ctx, nodeList, opts...)
+
+	return nodeList, err
+}
+
+// getClusterpolicyDriverLabels returns a set of labels that can be used to identify driver pods running that are owned by Clusterpolicy
+func getClusterpolicyDriverLabels(clusterInfo clusterinfo.Interface, clusterpolicy gpuv1.ClusterPolicy) (map[string]string, error) {
+	// initialize with common app=nvidia-driver-daemonset label
+	driverLabelKey := DriverLabelKey
+	driverLabelValue := DriverLabelValue
+
+	ocpVer, err := clusterInfo.GetOpenshiftVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the OpenShift version: %w", err)
+	}
+	if ocpVer != "" && clusterpolicy.Spec.Operator.UseOpenShiftDriverToolkit != nil && *clusterpolicy.Spec.Operator.UseOpenShiftDriverToolkit == true {
+		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not
+		// constant and changes based on rhcos version. Hence use DTK label instead
+		driverLabelKey = ocpDriverToolkitIdentificationLabel
+		driverLabelValue = ocpDriverToolkitIdentificationValue
+	}
+
+	return map[string]string{driverLabelKey: driverLabelValue}, nil
 }
