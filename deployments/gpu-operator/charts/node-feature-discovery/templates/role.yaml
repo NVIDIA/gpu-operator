@@ -11,6 +11,7 @@ rules:
   - nfd.k8s-sigs.io
   resources:
   - nodefeatures
+  - nodefeatures/finalizers
   verbs:
   - create
   - get
