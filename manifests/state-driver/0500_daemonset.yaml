@@ -650,9 +650,8 @@ spec:
             type: DirectoryOrCreate
         {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
         {{- range .AdditionalConfigs.Volumes }}
-        - name: {{ .Name }}
-          {{- if and .ConfigMap .ConfigMap.Items }}
-          configMap:
+        {{- if and .ConfigMap .ConfigMap.Items }}
+        - configMap:
             name: {{ .ConfigMap.Name }}
             items:
             {{- range .ConfigMap.Items }}
@@ -662,11 +661,27 @@ spec:
                 mode: {{ .Mode }}
               {{- end }}
             {{- end }}
-          {{- else if .HostPath }}
-          hostPath:
+          name: {{ .Name }}
+        {{- else if and .Secret .Secret.SecretName }}
+        - secret:
+            secretName: {{ .Secret.SecretName }}
+            {{- if .Secret.Items }}
+            items:
+            {{- range .Secret.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- if .Mode }}
+                mode: {{ .Mode }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          name: {{ .Name }}
+        {{- else if .HostPath }}
+        - hostPath:
             path: {{ .HostPath.Path }}
             type: {{ .HostPath.Type }}
-          {{- end }}
+          name: {{ .Name }}
+        {{- end }}
         {{- end }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}

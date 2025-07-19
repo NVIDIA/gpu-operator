@@ -1120,11 +1120,19 @@ type DriverCertConfigSpec struct {
 
 // DriverLicensingConfigSpec defines licensing server configuration for NVIDIA Driver container
 type DriverLicensingConfigSpec struct {
+	// Deprecated: ConfigMapName has been deprecated in favour of SecretName. Please use secrets to handle the licensing server configuration more securely
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	ConfigMapName string `json:"configMapName,omitempty"`
+
+	// SecretName indicates the name of the secret containing the licensing token
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Secret Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	SecretName string `json:"secretName,omitempty"`
 
 	// NLSEnabled indicates if NVIDIA Licensing System is used for licensing.
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1898,6 +1906,14 @@ func (d *DriverSpec) UsePrecompiledDrivers() bool {
 // OpenKernelModulesEnabled returns true if driver install is enabled using open GPU kernel modules
 func (d *DriverSpec) OpenKernelModulesEnabled() bool {
 	return d.KernelModuleType == "open"
+}
+
+// IsVGPULicensingEnabled returns true if the vgpu driver license config is provided
+func (d *DriverSpec) IsVGPULicensingEnabled() bool {
+	if d.LicensingConfig == nil {
+		return false
+	}
+	return d.LicensingConfig.ConfigMapName != "" || d.LicensingConfig.SecretName != ""
 }
 
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator
