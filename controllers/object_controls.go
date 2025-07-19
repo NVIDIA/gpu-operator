@@ -3283,7 +3283,47 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// set any licensing configuration required
-	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
+	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.SecretName != "" {
+		// skip existing volume mounts with name "licensing-config" (old configmap volume mounts)
+		var newVolumeMounts []corev1.VolumeMount
+		for _, volumeMount := range driverContainer.VolumeMounts {
+			if volumeMount.Name == "licensing-config" {
+				continue // skip
+			}
+			newVolumeMounts = append(newVolumeMounts, volumeMount)
+		}
+		driverContainer.VolumeMounts = newVolumeMounts
+
+		// add new volume mount
+		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
+
+		// gridd.conf always mounted
+		licenseItemsToInclude := []corev1.KeyToPath{
+			{
+				Key:  VGPULicensingFileName,
+				Path: VGPULicensingFileName,
+			},
+		}
+		// client config token only mounted when NLS is enabled
+		if config.Driver.LicensingConfig.IsNLSEnabled() {
+			licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
+				Key:  NLSClientTokenFileName,
+				Path: NLSClientTokenFileName,
+			})
+			nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
+		}
+
+		licensingConfigVolumeSource := corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: config.Driver.LicensingConfig.SecretName,
+				Items:      licenseItemsToInclude,
+			},
+		}
+		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+		podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+	} else if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
 		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
 

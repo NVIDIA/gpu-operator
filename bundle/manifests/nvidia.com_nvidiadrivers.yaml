@@ -239,6 +239,8 @@ spec:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
                       used for licensing.
                     type: boolean
+                  secretName:
+                    type: string
                 type: object
               livenessProbe:
                 description: NVIDIA Driver container liveness probe settings
