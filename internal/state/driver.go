@@ -703,3 +703,44 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 	}
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
 }
+
+func (s *stateDriver) createSecretVolumeMounts(ctx context.Context, namespace string, secretName string,
+	destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+	// get the Secret
+	secret := &corev1.Secret{}
+	opts := client.ObjectKey{Namespace: namespace, Name: secretName}
+	err := s.client.Get(ctx, opts, secret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ERROR: could not get Secret %s from client: %v", secretName, err)
+	}
+
+	// create one volume mount per file in the Secret and use subPath
+	var filenames []string
+	for filename := range secret.Data {
+		filenames = append(filenames, filename)
+	}
+	// sort so volume mounts are added to spec in deterministic order
+	sort.Strings(filenames)
+	var itemsToInclude []corev1.KeyToPath
+	var volumeMounts []corev1.VolumeMount
+	for _, filename := range filenames {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{Name: secretName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
+				SubPath: filename})
+		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
+			Key:  filename,
+			Path: filename,
+		})
+	}
+	return volumeMounts, itemsToInclude, nil
+}
+
+func createSecretVolume(secretName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		Secret: &corev1.SecretVolumeSource{
+			SecretName: secretName,
+			Items:      itemsToInclude,
+		},
+	}
+	return corev1.Volume{Name: secretName, VolumeSource: volumeSource}
+}
