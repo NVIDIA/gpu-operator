@@ -172,6 +172,14 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
 			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+
+			volumeMounts, itemsToInclude, err = s.createSecretVolumeMounts(ctx, operatorNamespace,
+				cr.Spec.CertConfig.Name, destinationDir)
+			if err != nil {
+				return nil, fmt.Errorf("ERROR: failed to create Secret VolumeMounts for custom certs: %w", err)
+			}
+			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
+			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createSecretVolume(cr.Spec.CertConfig.Name, itemsToInclude))
 		}
 
 		runtime, err := info.GetContainerRuntime()
