@@ -771,6 +771,82 @@ func TestDriverVGPULicensing(t *testing.T) {
 
 }
 
+func TestDriverVGPULicensingSecret(t *testing.T) {
+	const (
+		testName = "driver-vgpu-licensing-secret"
+	)
+
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.CertConfig = &nvidiav1alpha1.DriverCertConfigSpec{
+		Name: "test-cert-secret",
+	}
+	renderData.Driver.Spec.LicensingConfig = &nvidiav1alpha1.DriverLicensingConfigSpec{
+		SecretName: "test-secret",
+	}
+
+	renderData.AdditionalConfigs = &additionalConfigs{
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/gridd.conf",
+				SubPath:   "gridd.conf",
+			},
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/ClientConfigToken/client_configuration_token.tok",
+				SubPath:   "client_configuration_token.tok",
+			},
+		},
+		Volumes: []corev1.Volume{
+			{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "licensing-config-secret",
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "gridd.conf",
+								Path: "gridd.conf",
+							},
+							{
+								Key:  "client_configuration_token.tok",
+								Path: "client_configuration_token.tok",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Log("Start SHIVA: ")
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	// for _, obj := range objs {
+	// 	b, _ := yaml.Marshal(obj.Object)
+	// 	t.Log(string(b))
+	// }
+
+	t.Log("End SHIVA: ")
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+
+}
 func TestDriverSecretEnv(t *testing.T) {
 	const (
 		testName = "driver-secret-env"

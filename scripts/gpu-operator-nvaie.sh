@@ -67,11 +67,11 @@ create_nls_config() {
         exit 1
     fi
 
-    # Return if the configmap is already created
-    kubectl get configmap licensing-config -n ${NAMESPACE} > /dev/null 2>&1 && echo "licensing-config already exists" && return 0
+    # Return if the secret is already created
+    kubectl get secret licensing-config -n ${NAMESPACE} > /dev/null 2>&1 && echo "licensing-config already exists" && return 0
 
-    # Create a configmap for vGPU licensing
-    touch gridd.conf && kubectl create configmap licensing-config \
+    # Create a secret for vGPU licensing
+    touch gridd.conf && kubectl create secret generic licensing-config \
         -n ${NAMESPACE} --from-file=gridd.conf --from-file=client_configuration_token.tok
 }
 
@@ -136,7 +136,7 @@ install_operator() {
           --set driver.image=${VGPU_DRIVER_NAME} \
           --set driver.version="${VGPU_DRIVER_VERSION}" \
           --set driver.imagePullSecrets={${REGISTRY_SECRET_NAME}} \
-          --set driver.licensingConfig.configMapName="licensing-config" \
+          --set driver.licensingConfig.secretName="licensing-config" \
           ${HELM_INSTALL_OPTS}
 
     # List all deployed pods in the namespace
@@ -146,7 +146,7 @@ install_operator() {
 cleanup_operator() {
     helm delete gpu-operator -n ${NAMESPACE}
     kubectl delete secret ${REGISTRY_SECRET_NAME} -n ${NAMESPACE}
-    kubectl delete configmap licensing-config -n ${NAMESPACE}
+    kubectl delete secret licensing-config -n ${NAMESPACE}
 }
 
 usage() {

@@ -145,6 +145,11 @@ func (d Daemonset) WithRuntimeClassName(name string) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
+	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
+	return d
+}
+
 // Pod is a Pod wrapper used for testing
 type Pod struct {
 	*corev1.Pod
@@ -1676,6 +1681,153 @@ func TestTransformDriver(t *testing.T) {
 			}).WithInitContainer(corev1.Container{
 				Name:  "k8s-driver-manager",
 				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDriverWithLicensingConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "transform driver dependent containers with secretName",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					LicensingConfig: &gpuv1.DriverLicensingConfigSpec{
+						SecretName: "test-secret",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: VGPULicensingConfigMountPath,
+						SubPath:   VGPULicensingFileName,
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithVolume(corev1.Volume{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "test-secret",
+						Items: []corev1.KeyToPath{
+							{
+								Key:  VGPULicensingFileName,
+								Path: VGPULicensingFileName,
+							},
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "transform driver dependent containers with configMapName",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					LicensingConfig: &gpuv1.DriverLicensingConfigSpec{
+						ConfigMapName: "test-configmap",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: VGPULicensingConfigMountPath,
+						SubPath:   VGPULicensingFileName,
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithVolume(corev1.Volume{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-configmap",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  VGPULicensingFileName,
+								Path: VGPULicensingFileName,
+							},
+						},
+					},
+				},
 			}),
 			errorExpected: false,
 		},
