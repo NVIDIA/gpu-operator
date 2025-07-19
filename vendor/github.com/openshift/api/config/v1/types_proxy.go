@@ -77,7 +77,7 @@ type ProxySpec struct {
 	//      -----END CERTIFICATE-----
 	//
 	// +optional
-	TrustedCA SecretNameReference `json:"trustedCA,omitempty"`
+	TrustedCA ConfigMapNameReference `json:"trustedCA,omitempty"`
 }
 
 // ProxyStatus shows current known state of the cluster proxy.

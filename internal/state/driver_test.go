@@ -349,7 +349,7 @@ func TestDriverGDRCopyOpenShift(t *testing.T) {
 		HTTPProxy:  "http://user:pass@example:8080",
 		HTTPSProxy: "https://user:pass@example:8085",
 		NoProxy:    "internal.example.com",
-		TrustedCA: configv1.SecretNameReference{
+		TrustedCA: configv1.ConfigMapNameReference{
 			Name: "gpu-operator-trusted-ca",
 		},
 	}
@@ -434,7 +434,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 		HTTPProxy:  "http://user:pass@example:8080",
 		HTTPSProxy: "https://user:pass@example:8085",
 		NoProxy:    "internal.example.com",
-		TrustedCA: configv1.SecretNameReference{
+		TrustedCA: configv1.ConfigMapNameReference{
 			Name: "gpu-operator-trusted-ca",
 		},
 	}
