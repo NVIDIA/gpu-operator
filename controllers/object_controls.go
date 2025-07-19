@@ -323,11 +323,11 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
-// ServiceAccount creates ServiceAccount resource
-func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
+// createServiceAccount creates a ServiceAccount resource
+func createServiceAccount(n ClusterPolicyController, idx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].ServiceAccount.DeepCopy()
+	obj := n.resources[state].ServiceAccounts[idx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
@@ -356,6 +356,22 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 	return gpuv1.Ready, nil
+}
+
+// ServiceAccounts creates one or more ServiceAccount resources
+func ServiceAccounts(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].ServiceAccounts {
+		stat, err := createServiceAccount(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat == gpuv1.NotReady {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 // Role creates Role resource
@@ -464,11 +480,11 @@ func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
 	return gate(config)
 }
 
-// ClusterRole creates ClusterRole resource
-func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
+// createClusterRole creates a ClusterRole resource
+func createClusterRole(n ClusterPolicyController, idx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].ClusterRole.DeepCopy()
+	obj := n.resources[state].ClusterRoles[idx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
@@ -514,11 +530,27 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// ClusterRoleBinding creates ClusterRoleBinding resource
-func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
+// ClusterRoles creates one or more ClusterRole resources
+func ClusterRoles(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].ClusterRoles {
+		stat, err := createClusterRole(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat == gpuv1.NotReady {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
+}
+
+// createClusterRoleBinding creates a ClusterRoleBinding resource
+func createClusterRoleBinding(n ClusterPolicyController, idx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
+	obj := n.resources[state].ClusterRoleBindings[idx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
@@ -566,6 +598,22 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
+}
+
+// ClusterRoleBindings creates one or more ClusterRoleBinding resources
+func ClusterRoleBindings(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].ClusterRoleBindings {
+		stat, err := createClusterRoleBinding(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat == gpuv1.NotReady {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 // createConfigMap creates a ConfigMap resource
