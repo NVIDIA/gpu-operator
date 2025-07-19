@@ -67,8 +67,8 @@ const (
 	// Note, config files in the drop-in directory, /etc/crio/crio.conf.d,
 	// have a higher priority than the default /etc/crio/crio.conf file.
 	DefaultCRIOConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
-	// TrustedCAConfigMapName indicates configmap with custom user CA injected
-	TrustedCAConfigMapName = "gpu-operator-trusted-ca"
+	// TrustedCAsecretName indicates secret with custom user CA injected
+	TrustedCAsecretName = "gpu-operator-trusted-ca"
 	// TrustedCABundleFileName indicates custom user ca certificate filename
 	TrustedCABundleFileName = "ca-bundle.crt"
 	// TrustedCABundleMountDir indicates target mount directory of user ca bundle
@@ -1109,7 +1109,7 @@ func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error
 		}
 
 		// create trusted-ca configmap to inject custom user ca bundle into it
-		_, err = getOrCreateTrustedCAConfigMap(n, TrustedCAConfigMapName)
+		_, err = getOrCreateTrustedCA(n, TrustedCAsecretName)
 		if err != nil {
 			return err
 		}
@@ -1117,70 +1117,73 @@ func applyOCPProxySpec(n ClusterPolicyController, podSpec *corev1.PodSpec) error
 		// mount trusted-ca configmap
 		podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts,
 			corev1.VolumeMount{
-				Name:      TrustedCAConfigMapName,
+				Name:      TrustedCAsecretName,
 				ReadOnly:  true,
 				MountPath: TrustedCABundleMountDir,
 			})
 		podSpec.Volumes = append(podSpec.Volumes,
 			corev1.Volume{
-				Name: TrustedCAConfigMapName,
+				Name: TrustedCAsecretName,
 				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: TrustedCAConfigMapName,
-						},
-						Items: []corev1.KeyToPath{
-							{
-								Key:  TrustedCABundleFileName,
-								Path: TrustedCACertificate,
-							},
-						},
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: TrustedCAsecretName,
 					},
 				},
-			})
+			},
+		)
+		podSpec.Volumes = append(podSpec.Volumes,
+			corev1.Volume{
+				Name: TrustedCAsecretName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: TrustedCAsecretName,
+					},
+				},
+			},
+		)
 	}
 	return nil
 }
 
-// getOrCreateTrustedCAConfigMap creates or returns an existing Trusted CA Bundle ConfigMap.
-func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*corev1.ConfigMap, error) {
+// getOrCreateTrustedCA creates or returns an existing Trusted CA Bundle Secret.
+func getOrCreateTrustedCA(n ClusterPolicyController, name string) (*corev1.Secret, error) {
 	ctx := n.ctx
-	configMap := &corev1.ConfigMap{
+	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
+			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: n.operatorNamespace,
 		},
-		Data: map[string]string{
-			TrustedCABundleFileName: "",
+		Data: map[string][]byte{
+			TrustedCABundleFileName: []byte(""),
 		},
 	}
 
 	// apply label "config.openshift.io/inject-trusted-cabundle: true", so that cert is automatically filled/updated.
-	configMap.Labels = make(map[string]string)
-	configMap.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
+	secret.Labels = make(map[string]string)
+	secret.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
 
-	logger := n.logger.WithValues("ConfigMap", configMap.Name, "Namespace", configMap.Namespace)
+	logger := n.logger.WithValues("Secret", secret.Name, "Namespace", secret.Namespace)
 
-	if err := controllerutil.SetControllerReference(n.singleton, configMap, n.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(n.singleton, secret, n.scheme); err != nil {
 		return nil, err
 	}
 
-	found := &corev1.ConfigMap{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, found)
+	found := &corev1.Secret{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating")
-		err = n.client.Create(ctx, configMap)
+		err = n.client.Create(ctx, secret)
 		if err != nil {
 			logger.Info("Couldn't create")
-			return nil, fmt.Errorf("failed to create trusted CA bundle config map %q: %s", name, err)
+			return nil, fmt.Errorf("failed to create trusted CA bundle secret %q: %s", name, err)
 		}
-		return configMap, nil
+		return secret, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to get trusted CA bundle config map %q: %s", name, err)
+		return nil, fmt.Errorf("failed to get trusted CA bundle secret %q: %s", name, err)
 	}
 
 	return found, nil
@@ -2558,8 +2561,9 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		shareProcessNamespace := true
 		obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
 	}
-	// setup volumes from configmap and shared emptyDir
+	// setup volumes from configmap, secret, and shared emptyDir
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.DevicePlugin.Config.Name, nil))
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createSecretVolume(config.DevicePlugin.Config.Name, nil))
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createEmptyDirVolume("config"))
 
 	// apply env/volume changes to initContainer
@@ -2715,6 +2719,12 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+
+			volumeMounts, _, err = createSecretVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create Secret VolumeMounts for kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
 	}
 	return nil
@@ -2783,9 +2793,9 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
 			}
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			volumeMounts, _, err := createSecretVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 			if err != nil {
-				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+				return fmt.Errorf("ERROR: failed to create Secret VolumeMounts for custom certs: %w", err)
 			}
 			gdsContainer.VolumeMounts = append(gdsContainer.VolumeMounts, volumeMounts...)
 		}
@@ -2865,6 +2875,12 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+			}
+			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
+
+			volumeMounts, _, err = createSecretVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create Secret VolumeMounts for custom certs: %w", err)
 			}
 			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
 		}
@@ -3185,6 +3201,49 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
 }
 
+// createSecretVolumeMounts creates a VolumeMount for each key
+// in the Secret. Use subPath to ensure original contents
+// at destinationDir are not overwritten.
+func createSecretVolumeMounts(n ClusterPolicyController, secretName string, destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+	ctx := n.ctx
+	// get the Secret
+	secret := &corev1.Secret{}
+	opts := client.ObjectKey{Namespace: n.operatorNamespace, Name: secretName}
+	err := n.client.Get(ctx, opts, secret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ERROR: could not get Secret %s from client: %v", secretName, err)
+	}
+
+	// create one volume mount per file in the Secret and use subPath
+	var filenames []string
+	for filename := range secret.Data {
+		filenames = append(filenames, filename)
+	}
+	// sort so volume mounts are added to spec in deterministic order
+	sort.Strings(filenames)
+	var itemsToInclude []corev1.KeyToPath
+	var volumeMounts []corev1.VolumeMount
+	for _, filename := range filenames {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{Name: secretName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
+		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
+			Key:  filename,
+			Path: filename,
+		})
+	}
+	return volumeMounts, itemsToInclude, nil
+}
+
+func createSecretVolume(secretName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		Secret: &corev1.SecretVolumeSource{
+			SecretName: secretName,
+			Items:      itemsToInclude,
+		},
+	}
+	return corev1.Volume{Name: secretName, VolumeSource: volumeSource}
+}
+
 func createEmptyDirVolume(volumeName string) corev1.Volume {
 	return corev1.Volume{
 		Name: volumeName,
@@ -3276,7 +3335,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// set any licensing configuration required
-	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
+	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.SecretName != "" {
 		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
 
@@ -3298,11 +3357,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 
 		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.LicensingConfig.ConfigMapName,
-				},
-				Items: licenseItemsToInclude,
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: config.Driver.LicensingConfig.SecretName,
+				Items:      licenseItemsToInclude,
 			},
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
@@ -3340,6 +3397,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
+
+		volumeMounts, itemsToInclude, err = createSecretVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to create Secret VolumeMounts for kernel module configuration: %v", err)
+		}
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createSecretVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	if len(config.Driver.Env) > 0 {
@@ -3373,12 +3437,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 		}
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+
+		volumeMounts, itemsToInclude, err := createSecretVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
+			return fmt.Errorf("ERROR: failed to create Secret VolumeMounts for custom certs: %v", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+		podSpec.Volumes = append(podSpec.Volumes, createSecretVolume(config.Driver.CertConfig.Name, itemsToInclude))
 	}
 
 	release, err := parseOSRelease()

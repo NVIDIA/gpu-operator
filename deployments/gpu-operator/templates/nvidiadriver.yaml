@@ -48,9 +48,9 @@ spec:
   certConfig:
     name: {{ .Values.driver.certConfig.name }}
   {{- end }}
-  {{- if .Values.driver.licensingConfig.configMapName }}
+  {{- if .Values.driver.licensingConfig.secretName }}
   licensingConfig:
-    name: {{ .Values.driver.licensingConfig.configMapName }}
+    name: {{ .Values.driver.licensingConfig.secretName }}
     nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
   {{- end }}
   {{- if .Values.driver.virtualTopology.config }}
