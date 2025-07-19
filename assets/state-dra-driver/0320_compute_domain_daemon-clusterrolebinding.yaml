@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: compute-domain-daemon-clusterrole-binding
+  namespace: "FILLED BY THE OPERATOR"
+subjects:
+  - kind: ServiceAccount
+    name: compute-domain-daemon-service-account
+    namespace: "FILLED BY THE OPERATOR"
+roleRef:
+  kind: ClusterRole
+  name: compute-domain-daemon-clusterrole
+  apiGroup: rbac.authorization.k8s.io
