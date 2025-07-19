@@ -235,6 +235,8 @@ spec:
                 properties:
                   name:
                     type: string
+                  secretName:
+                    type: string
                   nlsEnabled:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
                       used for licensing.
