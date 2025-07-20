@@ -349,6 +349,11 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HostNetwork != nil {
+		in, out := &in.HostNetwork, &out.HostNetwork
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(ResourceRequirements)
