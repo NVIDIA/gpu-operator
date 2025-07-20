@@ -1608,6 +1608,10 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
 		addPullSecrets(&obj.Spec.Template.Spec, config.DCGMExporter.ImagePullSecrets)
 	}
+	// set hostNetwork
+	if config.DCGMExporter.HostNetwork != nil {
+		obj.Spec.Template.Spec.HostNetwork = *config.DCGMExporter.HostNetwork
+	}
 	// set resource limits
 	if config.DCGMExporter.Resources != nil {
 		// apply resource limits to all containers
