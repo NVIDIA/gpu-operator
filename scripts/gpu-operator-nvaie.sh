@@ -136,7 +136,7 @@ install_operator() {
           --set driver.image=${VGPU_DRIVER_NAME} \
           --set driver.version="${VGPU_DRIVER_VERSION}" \
           --set driver.imagePullSecrets={${REGISTRY_SECRET_NAME}} \
-          --set driver.licensingConfig.configMapName="licensing-config" \
+          --set driver.licensingConfig.secretName="licensing-config" \
           ${HELM_INSTALL_OPTS}
 
     # List all deployed pods in the namespace
