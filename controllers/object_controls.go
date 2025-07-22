@@ -2988,6 +2988,9 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	if mainContainerName == "nvidia-driver-ctr" && config.Driver.Resources != nil {
 		mainContainer.Resources.Requests = config.Driver.Resources.Requests
 		mainContainer.Resources.Limits = config.Driver.Resources.Limits
+		// Also apply resource settings to the DriverToolkit sidecar container
+		driverToolkitContainer.Resources.Requests = config.Driver.Resources.Requests
+		driverToolkitContainer.Resources.Limits = config.Driver.Resources.Limits
 	}
 
 	/* prepare the shared volumes */

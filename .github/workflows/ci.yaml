@@ -20,7 +20,6 @@ on:
       - "pull-request/[0-9]+"
       - main
       - release-*
-      - openshift-dtk-limits
 
 jobs:
   ### Configuration checks ###
