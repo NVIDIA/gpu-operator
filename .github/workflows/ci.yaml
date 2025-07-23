@@ -66,7 +66,10 @@ jobs:
   ### Golang checks and build ###
   go-check:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         name: Checkout code
@@ -87,11 +90,29 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -v --timeout 5m
           skip-cache: true
-      - run: make check
+      - name: Setup JFrog CLI
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        with:
+          oidc-provider-name: nvgithub
+          oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+      - env:
+          OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+          OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+          OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        run: |
+          OIDC_USER_ENCODED=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote_plus(os.environ["OIDC_USER"]))')
+          export GOPROXY="https://${OIDC_USER_ENCODED}:${OIDC_TOKEN}@${OIDC_ARTIFACTORY_ENDPOINT}/artifactory/api/go/edge-go-remote-virtual"
+          make check
   go-test:
     needs: [helm-lint, validate-csv, validate-helm-values]
     name: unit tests
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,25 +125,67 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-      - run: make coverage
+      - name: Setup JFrog CLI
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        with:
+          oidc-provider-name: nvgithub
+          oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+      - env:
+          OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+          OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+          OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        run: |
+          OIDC_USER_ENCODED=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote_plus(os.environ["OIDC_USER"]))')
+          export GOPROXY="https://${OIDC_USER_ENCODED}:${OIDC_TOKEN}@${OIDC_ARTIFACTORY_ENDPOINT}/artifactory/api/go/edge-go-remote-virtual"
+          make coverage
   go-build:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         name: Checkout code
       - run: make docker-build
   coverage:
     needs: [go-test]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      - name: Setup JFrog CLI
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        with:
+          oidc-provider-name: nvgithub
+          oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       - name: Generate coverage report
-        run: make cov-report
+        env:
+          OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+          OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+          OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        run: |
+          OIDC_USER_ENCODED=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote_plus(os.environ["OIDC_USER"]))')
+          export GOPROXY="https://${OIDC_USER_ENCODED}:${OIDC_TOKEN}@${OIDC_ARTIFACTORY_ENDPOINT}/artifactory/api/go/edge-go-remote-virtual"
+          make cov-report
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         with:
@@ -132,7 +195,11 @@ jobs:
   ### Image builds ###
   build-gpu-operator-arm64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-24.04-arm
+    runs-on: linux-arm64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -163,16 +230,33 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup JFrog CLI
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        with:
+          oidc-provider-name: nvgithub
+          oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-arm64
+          OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+          OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+          OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
         run: |
+          OIDC_USER_ENCODED=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote_plus(os.environ["OIDC_USER"]))')
+          export GOPROXY="https://${OIDC_USER_ENCODED}:${OIDC_TOKEN}@${OIDC_ARTIFACTORY_ENDPOINT}/artifactory/api/go/edge-go-remote-virtual"
           echo "${VERSION}"
           make build-image
   build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -203,11 +287,24 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup JFrog CLI
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        with:
+          oidc-provider-name: nvgithub
+          oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-amd64
+          OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+          OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+          OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
         run: |
+          OIDC_USER_ENCODED=$(python3 -c 'import urllib.parse, os; print(urllib.parse.quote_plus(os.environ["OIDC_USER"]))')
+          export GOPROXY="https://${OIDC_USER_ENCODED}:${OIDC_TOKEN}@${OIDC_ARTIFACTORY_ENDPOINT}/artifactory/api/go/edge-go-remote-virtual"
           echo "${VERSION}"
           make build-image
 
@@ -244,6 +341,9 @@ jobs:
   e2e-tests-containerd:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -294,6 +394,9 @@ jobs:
   e2e-tests-nvidiadriver:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         name: Check out code
