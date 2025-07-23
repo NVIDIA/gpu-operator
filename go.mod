@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator
 
-go 1.24.3
+go 1.24.4
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -15,7 +15,7 @@ require (
 	github.com/onsi/gomega v1.37.0
 	github.com/openshift/api v0.0.0-20250710082954-674ad74beffc
 	github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
-	github.com/operator-framework/api v0.32.0
+	github.com/operator-framework/api v0.33.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.83.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/regclient/regclient v0.9.0
