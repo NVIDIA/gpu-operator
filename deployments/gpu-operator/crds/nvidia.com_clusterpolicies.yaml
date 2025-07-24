@@ -337,6 +337,9 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostNetwork:
+                    description: Run the DCGM Exporter pod on the host’s network, sharing the node’s network interfaces and IP address
+                    type: boolean
                   image:
                     description: NVIDIA DCGM Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'

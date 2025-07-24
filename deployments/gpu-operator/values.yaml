@@ -322,6 +322,7 @@ dcgmExporter:
       value: "true"
     - name: DCGM_EXPORTER_COLLECTORS
       value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
+  hostNetwork: false
   resources: {}
   service:
     internalTrafficPolicy: Cluster
