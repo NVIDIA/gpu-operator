@@ -74,6 +74,7 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var leaderElectionNamespace string
 	var probeAddr string
 	var renewDeadline time.Duration
 
@@ -82,6 +83,9 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&leaderElectionNamespace, "leader-elect-namespace", "",
+		"Set the leader lease namespace for the controller manager. "+
+			"If undefined, the leader election namespace defaults to the namespace the operator is running in.")
 	flag.DurationVar(&renewDeadline, "leader-lease-renew-deadline", 0,
 		"Set the leader lease renew deadline duration (e.g. \"10s\") of the controller manager. "+
 			"Only enabled when the --leader-elect flag is set. "+
@@ -117,13 +121,14 @@ func main() {
 	}
 
 	options := ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsOptions,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "53822513.nvidia.com",
-		WebhookServer:          webhookServer,
-		Cache:                  cacheOptions,
+		Scheme:                  scheme,
+		Metrics:                 metricsOptions,
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionNamespace: leaderElectionNamespace,
+		LeaderElectionID:        "53822513.nvidia.com",
+		WebhookServer:           webhookServer,
+		Cache:                   cacheOptions,
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {
