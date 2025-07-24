@@ -186,6 +186,8 @@ release:staging-gpu-operator:
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator"
+  needs:
+    - image:gpu-operator
 
 release:staging-gpu-operator-validator:
   extends:
@@ -194,3 +196,5 @@ release:staging-gpu-operator-validator:
     - .target-gpu-operator-validator
   variables:
     OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator-validator"
+  needs:
+    - image:gpu-operator-validator
