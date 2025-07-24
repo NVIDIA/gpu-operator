@@ -66,7 +66,7 @@ jobs:
   ### Golang checks and build ###
   go-check:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Checkout code
@@ -88,10 +88,12 @@ jobs:
           args: -v --timeout 5m
           skip-cache: true
       - run: make check
+        env:
+          GOPROXY: ${{ secrets.GOPROXY }}
   go-test:
     needs: [helm-lint, validate-csv, validate-helm-values]
     name: unit tests
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,24 +107,34 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - run: make coverage
+        env:
+          GOPROXY: ${{ secrets.GOPROXY }}
   go-build:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Checkout code
       - run: make docker-build
   coverage:
     needs: [go-test]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - name: Generate coverage report
         run: make cov-report
+        env:
+          GOPROXY: ${{ secrets.GOPROXY }}
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         with:
@@ -132,7 +144,7 @@ jobs:
   ### Image builds ###
   build-gpu-operator-arm64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-24.04-arm
+    runs-on: linux-arm64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -167,12 +179,13 @@ jobs:
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-arm64
+          GOPROXY: ${{ secrets.GOPROXY }}
         run: |
           echo "${VERSION}"
           make build-image
   build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
     steps:
       - uses: actions/checkout@v4
         name: Check out code
@@ -207,6 +220,7 @@ jobs:
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-amd64
+          GOPROXY: ${{ secrets.GOPROXY }}
         run: |
           echo "${VERSION}"
           make build-image
