@@ -884,6 +884,16 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
+	// Optional Pod Annotations for the DCGM Exporter deployment
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Annotations for the DCGM Exporter deployment"
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// Optional Pod Labels for the DCGM Exporter deployment
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Labels for the DCGM Exporter deployment"
+	PodLabels map[string]string `json:"podLabels,omitempty"`
+
 	// Optional: Define resources requests and limits for each pod
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"

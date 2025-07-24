@@ -315,6 +315,8 @@ dcgmExporter:
   image: dcgm-exporter
   version: 4.2.3-4.1.3-ubuntu22.04
   imagePullPolicy: IfNotPresent
+  podAnnotations: {}
+  podLabels: {}
   env:
     - name: DCGM_EXPORTER_LISTEN
       value: ":9400"
