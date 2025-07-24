@@ -46,10 +46,6 @@ spec:
   dcgmExporter:
     enabled: true
     # configmap name for custom dcgm metrics
-    podLabels:
-      team: test
-    podAnnotations:
-      test: "test"
     config:
       name: ""
 
