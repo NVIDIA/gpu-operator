@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
-    olm.skipRange: '>=1.9.0 <25.3.1'
+    olm.skipRange: '>=1.9.0 <25.3.2'
     alm-examples: |-
       [
         {
@@ -195,7 +195,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v25.3.1
+  name: gpu-operator-certified.v25.3.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -215,11 +215,11 @@ spec:
     - name: driver-image-535
       image: nvcr.io/nvidia/driver@sha256:5bc9bf943a6240853f3effecbc7ec9ebdfe98fba40ad9a0dc2aab9bf519c9a10
     - name: device-plugin-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:630596340f8e83aa10b0bc13a46db76772e31b7dccfc34d3a4e41ab7e0aa6117
     - name: gpu-feature-discovery-image
-      image: nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f
+      image: nvcr.io/nvidia/k8s-device-plugin@sha256:630596340f8e83aa10b0bc13a46db76772e31b7dccfc34d3a4e41ab7e0aa6117
     - name: mig-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:d959c62e5098320744acd1b9d4869fc84074adc8e49b4b5defa2d6c4be57a6dc
+      image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:b1bfd5bf7493d2f197d6f1f633c35d9e6ef2bd4dea194e9fa8aad7de548635f1
     - name: init-container-image
       image: nvcr.io/nvidia/cuda@sha256:e8e8680c1e230a63f900f1f9b692af791644f6f14bdc54920f7a7c7f4a6a327b
     - name: gpu-operator-validator-image
@@ -897,7 +897,7 @@ spec:
                   - name: "VALIDATOR_IMAGE"
                     value: "ghcr.io/nvidia/gpu-operator/gpu-operator-validator:main-latest"
                   - name: "GFD_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:630596340f8e83aa10b0bc13a46db76772e31b7dccfc34d3a4e41ab7e0aa6117"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
                     value: "nvcr.io/nvidia/k8s/container-toolkit@sha256:51c8f71d3b3c08ae4eb4853697e3f8e6f11e435e666e08210178e6a1faf8028f"
                   - name: "DCGM_IMAGE"
@@ -905,7 +905,7 @@ spec:
                   - name: "DCGM_EXPORTER_IMAGE"
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:6c78381d83e2ccd84e9645d35d8768d98a52b73c75d1bb9395b5f030ce9bd3a4"
                   - name: "DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:037160a36de0f060fc21cc0cb2f795d980282ff1471b55530433ca4350b24c4f"
+                    value: "nvcr.io/nvidia/k8s-device-plugin@sha256:630596340f8e83aa10b0bc13a46db76772e31b7dccfc34d3a4e41ab7e0aa6117"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:6729c252a8877f29a1e5e336b945efa5126ea555db3c83b06e2e3d9843e647c7"
                   - name: "DRIVER_IMAGE-550"
@@ -915,7 +915,7 @@ spec:
                   - name: "DRIVER_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:c525320fd1e771b911b68f8e760b83e8fccf1beea43bf9b009c4f0c591e193ea"
                   - name: "MIG_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:d959c62e5098320744acd1b9d4869fc84074adc8e49b4b5defa2d6c4be57a6dc"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:b1bfd5bf7493d2f197d6f1f633c35d9e6ef2bd4dea194e9fa8aad7de548635f1"
                   - name: "CUDA_BASE_IMAGE"
                     value: "nvcr.io/nvidia/cuda@sha256:e8e8680c1e230a63f900f1f9b692af791644f6f14bdc54920f7a7c7f4a6a327b"
                   - name: "VFIO_MANAGER_IMAGE"
@@ -956,5 +956,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 25.3.1
-  replaces: gpu-operator-certified.v25.3.0
+  version: 25.3.2
+  replaces: gpu-operator-certified.v25.3.1

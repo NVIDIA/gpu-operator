@@ -245,7 +245,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.2
+  version: v0.17.3
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -361,7 +361,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.2
+  version: v0.17.3
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -375,7 +375,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.12.1-ubuntu20.04
+  version: v0.12.2-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
