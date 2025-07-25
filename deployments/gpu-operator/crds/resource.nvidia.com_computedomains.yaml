@@ -1,0 +1,104 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: computedomains.resource.nvidia.com
+spec:
+  group: resource.nvidia.com
+  names:
+    kind: ComputeDomain
+    listKind: ComputeDomainList
+    plural: computedomains
+    singular: computedomain
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: ComputeDomain prepares a set of nodes to run a multi-node workload
+            in.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: ComputeDomainSpec provides the spec for a ComputeDomain.
+              properties:
+                channel:
+                  description: ComputeDomainChannelSpec provides the spec for a channel
+                    used to run a workload inside a ComputeDomain.
+                  properties:
+                    resourceClaimTemplate:
+                      description: ComputeDomainResourceClaimTemplate provides the details
+                        of the ResourceClaimTemplate to generate.
+                      properties:
+                        name:
+                          type: string
+                      required:
+                        - name
+                      type: object
+                  required:
+                    - resourceClaimTemplate
+                  type: object
+                numNodes:
+                  type: integer
+              required:
+                - channel
+                - numNodes
+              type: object
+              x-kubernetes-validations:
+                - message: A computeDomain.spec is immutable
+                  rule: self == oldSelf
+            status:
+              description: ComputeDomainStatus provides the status for a ComputeDomain.
+              properties:
+                nodes:
+                  items:
+                    description: ComputeDomainNode provides information about each node
+                      added to a ComputeDomain.
+                    properties:
+                      cliqueID:
+                        type: string
+                      ipAddress:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                      - cliqueID
+                      - ipAddress
+                      - name
+                    type: object
+                  type: array
+                  x-kubernetes-list-map-keys:
+                    - name
+                  x-kubernetes-list-type: map
+                status:
+                  default: NotReady
+                  enum:
+                    - Ready
+                    - NotReady
+                  type: string
+              required:
+                - status
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
