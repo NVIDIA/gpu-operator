@@ -23,12 +23,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-
-	"path/filepath"
 
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -1619,6 +1618,26 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set arguments if specified for exporter container
 	if len(config.DCGMExporter.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.DCGMExporter.Args
+	}
+
+	// set labels if specified for exporter container
+	if obj.Spec.Template.ObjectMeta.Labels == nil {
+		obj.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+	}
+	for labelKey, labelValue := range config.DCGMExporter.PodLabels {
+		// disallow setting app label
+		if labelKey == "app" {
+			continue
+		}
+		obj.Spec.Template.ObjectMeta.Labels[labelKey] = labelValue
+	}
+
+	// set annotations if specified for exporter container
+	if obj.Spec.Template.ObjectMeta.Annotations == nil {
+		obj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for annKey, annValue := range config.DCGMExporter.PodAnnotations {
+		obj.Spec.Template.ObjectMeta.Annotations[annKey] = annValue
 	}
 
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
