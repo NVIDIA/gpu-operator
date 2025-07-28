@@ -48,7 +48,7 @@ type assetsFromFile []byte
 type Resources struct {
 	ServiceAccounts            []corev1.ServiceAccount
 	Role                       rbacv1.Role
-	RoleBinding                rbacv1.RoleBinding
+	RoleBindings               []rbacv1.RoleBinding
 	ClusterRoles               []rbacv1.ClusterRole
 	ClusterRoleBindings        []rbacv1.ClusterRoleBinding
 	ConfigMaps                 []corev1.ConfigMap
@@ -134,9 +134,14 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, Role)
 		case "RoleBinding":
-			_, _, err := s.Decode(m, nil, &res.RoleBinding)
+			roleBinding := rbacv1.RoleBinding{}
+			_, _, err := s.Decode(m, nil, &roleBinding)
 			panicIfError(err)
-			ctrl = append(ctrl, RoleBinding)
+			res.RoleBindings = append(res.RoleBindings, roleBinding)
+			// only add the ctrl function when the first RoleBinding is added for this component
+			if len(res.RoleBindings) == 1 {
+				ctrl = append(ctrl, RoleBindings)
+			}
 		case "ClusterRole":
 			clusterRole := rbacv1.ClusterRole{}
 			_, _, err := s.Decode(m, nil, &clusterRole)
