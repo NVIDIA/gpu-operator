@@ -395,11 +395,11 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// RoleBinding creates RoleBinding resource
-func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
+// createRoleBinding creates a RoleBinding resource
+func createRoleBinding(n ClusterPolicyController, idx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].RoleBinding.DeepCopy()
+	obj := n.resources[state].RoleBindings[idx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
@@ -415,12 +415,6 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	for idx := range obj.Subjects {
-		// we don't want to update ALL the Subjects[].Namespace, eg we need to keep 'openshift-monitoring'
-		// for allowing PrometheusOperator to scrape our metrics resources:
-		// see in assets/state-dcgm-exporter, 0500_prom_rolebinding_openshift.yaml vs 0300_rolebinding.yaml
-		if obj.Subjects[idx].Namespace != "FILLED BY THE OPERATOR" {
-			continue
-		}
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
@@ -444,6 +438,22 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
+}
+
+// RoleBindings creates one or more RoleBinding resources
+func RoleBindings(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].RoleBindings {
+		stat, err := createRoleBinding(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat == gpuv1.NotReady {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 // createClusterRole creates a ClusterRole resource
