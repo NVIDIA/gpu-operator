@@ -42,3 +42,21 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "docker"
+    # enable it to update all images from nvcr.io
+    # directories:
+    #   - "**/*"
+    directory:  "/bundle/manifests"
+    open-pull-requests-limit: 15
+    schedule:
+      interval: "daily"
+    registries:
+      - nvcr-repo
+
+registries:
+  nvcr-repo:
+    username: $oauthtoken
+    password: ${{ secrets.GITHUB_TOKEN }} # use registry password ${{secrets.REGISTRY_PASSWORD}} for forked dependabot
+    type: "docker-registry"
+    url: "https://nvcr.io"
