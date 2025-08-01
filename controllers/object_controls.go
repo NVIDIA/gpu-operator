@@ -147,8 +147,8 @@ const (
 	CDIEnabledEnvName = "CDI_ENABLED"
 	// NvidiaCDIHookPathEnvName is the name of the envvar specifying the path to the 'nvidia-cdi-hook' binary
 	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
-	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
-	CrioConfigModeEnvName = "CRIO_CONFIG_MODE"
+	// CRIOConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
+	CRIOConfigModeEnvName = "CRIO_CONFIG_MODE"
 	// DeviceListStrategyEnvName is the name of the envvar for configuring the device-list-strategy in the device-plugin
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
@@ -1258,7 +1258,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if config.CDI.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
 		if config.CDI.IsDefault() {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 		}
@@ -1325,6 +1324,11 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
 		setContainerEnv(mainContainer, "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
+	}
+
+	if runtime == gpuv1.CRIO.String() {
+		// We add the nvidia runtime to the cri-o config by default instead of installing the OCI prestart hook
+		setContainerEnv(mainContainer, CRIOConfigModeEnvName, "config")
 	}
 
 	// setup mounts for runtime config file
