@@ -1844,24 +1844,6 @@ func TestTransformToolkitCtrForCDI(t *testing.T) {
 					Env: []corev1.EnvVar{
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
-					},
-				}),
-		},
-		{
-			description: "cdi enabled and cdi default",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				CDI: gpuv1.CDIConfigSpec{
-					Enabled: newBoolPtr(true),
-					Default: newBoolPtr(true),
-				},
-			},
-			expectedDs: NewDaemonset().WithContainer(
-				corev1.Container{
-					Name: "main-ctr",
-					Env: []corev1.EnvVar{
-						{Name: CDIEnabledEnvName, Value: "true"},
-						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
 					},
 				}),
@@ -1871,7 +1853,7 @@ func TestTransformToolkitCtrForCDI(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			mainContainer := &tc.ds.DaemonSet.Spec.Template.Spec.Containers[0]
-			transformToolkitCtrForCDI(mainContainer, tc.cpSpec)
+			transformToolkitCtrForCDI(mainContainer)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}

@@ -1224,7 +1224,7 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
 	return envVars
 }
 
-func transformToolkitCtrForCDI(container *corev1.Container, config *gpuv1.ClusterPolicySpec) {
+func transformToolkitCtrForCDI(container *corev1.Container) {
 	// When CDI is enabled in GPU Operator, we leverage native CDI support in containerd / cri-o
 	// to inject GPUs into workloads. We do not configure 'nvidia' as the default runtime. The
 	// 'nvidia' runtime will be set as the runtime class for our management containers so that
@@ -1236,10 +1236,7 @@ func transformToolkitCtrForCDI(container *corev1.Container, config *gpuv1.Cluste
 	// directly configure environment variables for the toolkit container.
 	setContainerEnv(container, CDIEnabledEnvName, "true")
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
-
-	if config.CDI.IsDefault() {
-		setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
-	}
+	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
 }
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
@@ -1287,7 +1284,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		transformToolkitCtrForCDI(mainContainer, config)
+		transformToolkitCtrForCDI(mainContainer)
 	}
 
 	// set install directory for the toolkit
