@@ -1237,10 +1237,7 @@ func transformToolkitForCDI(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySp
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CRIOConfigModeEnvName, "config")
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaRuntimeSetAsDefaultEnvName, "false")
-
-	if config.CDI.IsDefault() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
-	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
 }
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
