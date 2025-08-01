@@ -502,6 +502,12 @@ spec:
     {{- if .Values.dcgmExporter.resources }}
     resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.podAnnotations }}
+    podAnnotations: {{ toYaml .Values.dcgmExporter.podAnnotations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.podLabels }}
+    podLabels: {{ toYaml .Values.dcgmExporter.podLabels | nindent 6 }}
+    {{- end }}
     {{- if .Values.dcgmExporter.env }}
     env: {{ toYaml .Values.dcgmExporter.env | nindent 6 }}
     {{- end }}
