@@ -1327,6 +1327,11 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		setContainerEnv(mainContainer, "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
 	}
 
+	if runtime == gpuv1.CRIO.String() {
+		// We add the nvidia runtime to the cri-o config by default instead of installing the OCI prestart hook
+		setContainerEnv(mainContainer, CrioConfigModeEnvName, "config")
+	}
+
 	// setup mounts for runtime config file
 	runtimeConfigFile, err := getRuntimeConfigFile(mainContainer, runtime)
 	if err != nil {
