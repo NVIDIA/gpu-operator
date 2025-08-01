@@ -614,6 +614,10 @@ func TestTransformToolkit(t *testing.T) {
 						},
 					},
 					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: CrioConfigModeEnvName, Value: "config"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
 						{Name: "RUNTIME", Value: "containerd"},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
@@ -671,6 +675,10 @@ func TestTransformDevicePlugin(t *testing.T) {
 						{Name: "foo", Value: "bar"},
 					},
 				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
 			},
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "nvidia-device-plugin-ctr",
@@ -679,6 +687,10 @@ func TestTransformDevicePlugin(t *testing.T) {
 				Args:            []string{"--fail-on-init-error=false"},
 				Env: []corev1.EnvVar{
 					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+					{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 					{Name: "foo", Value: "bar"},
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
@@ -768,6 +780,10 @@ func TestTransformMigManager(t *testing.T) {
 						{Name: "foo", Value: "bar"},
 					},
 				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
 			},
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "mig-manager",
@@ -775,6 +791,8 @@ func TestTransformMigManager(t *testing.T) {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Args:            []string{"--test-flag"},
 				Env: []corev1.EnvVar{
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 					{Name: "foo", Value: "bar"},
 				},
 			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
