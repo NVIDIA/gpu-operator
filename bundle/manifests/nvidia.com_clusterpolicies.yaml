@@ -136,13 +136,14 @@ spec:
                 properties:
                   default:
                     default: false
-                    description: Default indicates whether to use CDI as the default
-                      mechanism for providing GPU access to containers.
+                    description: 'Deprecated: This field is no longer used. Setting
+                      cdi.enabled=true will configure CDI as the default mechanism
+                      for making GPUs accessible to containers.'
                     type: boolean
                   enabled:
                     default: false
-                    description: Enabled indicates whether CDI can be used to make
-                      GPUs accessible to containers.
+                    description: Enabled indicates whether CDI should be used as the
+                      mechanism for making GPUs accessible to containers.
                     type: boolean
                 type: object
               daemonsets:
