@@ -499,6 +499,9 @@ spec:
     {{- if .Values.dcgmExporter.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.dcgmExporter.imagePullSecrets | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.hostNetwork }}
+    hostNetwork: {{ .Values.dcgmExporter.hostNetwork }}
+    {{- end }}
     {{- if .Values.dcgmExporter.resources }}
     resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
     {{- end }}
