@@ -13,7 +13,7 @@ psa:
   enabled: false
 
 cdi:
-  enabled: false
+  enabled: true
 
 sandboxWorkloads:
   enabled: false

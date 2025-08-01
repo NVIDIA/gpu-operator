@@ -141,7 +141,7 @@ spec:
                       for making GPUs accessible to containers.'
                     type: boolean
                   enabled:
-                    default: false
+                    default: true
                     description: Enabled indicates whether the Container Device Interface
                       (CDI) should be used as the mechanism for making GPUs accessible
                       to containers.

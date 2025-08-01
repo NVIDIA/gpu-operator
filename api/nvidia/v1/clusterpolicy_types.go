@@ -1660,7 +1660,7 @@ type VGPUDevicesConfigSpec struct {
 type CDIConfigSpec struct {
 	// Enabled indicates whether the Container Device Interface (CDI) should be used as the mechanism for making GPUs accessible to containers.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable CDI as the mechanism for making GPUs accessible to containers"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
@@ -2070,7 +2070,7 @@ func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
 // providing GPU access to containers
 func (c *CDIConfigSpec) IsEnabled() bool {
 	if c.Enabled == nil {
-		return false
+		return true
 	}
 	return *c.Enabled
 }
