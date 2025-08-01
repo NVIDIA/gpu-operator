@@ -1604,25 +1604,6 @@ func TestTransformToolkitForCDI(t *testing.T) {
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: CrioConfigModeEnvName, Value: "config"},
 						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
-					},
-				}),
-		},
-		{
-			description: "cdi enabled and cdi default",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				CDI: gpuv1.CDIConfigSpec{
-					Enabled: newBoolPtr(true),
-					Default: newBoolPtr(true),
-				},
-			},
-			expectedDs: NewDaemonset().WithContainer(
-				corev1.Container{
-					Name: "main-ctr",
-					Env: []corev1.EnvVar{
-						{Name: CDIEnabledEnvName, Value: "true"},
-						{Name: CrioConfigModeEnvName, Value: "config"},
-						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
 					},
 				}),
