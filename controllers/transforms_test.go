@@ -324,6 +324,7 @@ func TestTransformForRuntime(t *testing.T) {
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: CrioConfigModeEnvName, Value: "config"},
 						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 					},
