@@ -91,7 +91,7 @@ echo "# ClusterPolicy"
 echo "#"
 echo
 
-CLUSTER_POLICY_NAME=$($K get clusterpolicy -oname)
+CLUSTER_POLICY_NAME=$($K get clusterpolicies.nvidia.com -oname)
 
 if [[ "${CLUSTER_POLICY_NAME}" ]]; then
     echo "Get ${CLUSTER_POLICY_NAME}"
