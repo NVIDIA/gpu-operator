@@ -53,6 +53,61 @@ data:
           mig-devices:
             "7g.40gb": 1
 
+      # RTX-PRO-6000-96GB
+      all-1g.24gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb+gfx": 4
+
+      all-1g.24gb.me.all:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb+me.all": 1
+      
+      all-1g.24gb-me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb-me": 4
+
+      all-2g.48gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb": 2
+
+      all-2g.48gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb+gfx": 2
+
+      all-2g.48gb.me.all:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb+me.all": 1
+
+      all-2g.48gb-me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb-me": 2
+
+      all-4g.96gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.96gb": 1
+
+      all-4g.96gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.96gb+gfx": 1
+    
       # H100-80GB, H800-80GB, A100-80GB, A800-80GB, A100-40GB, A800-40GB
       all-1g.10gb:
         # H100-80GB, H800-80GB, A100-80GB, A800-80GB
@@ -180,8 +235,8 @@ data:
           mig-devices:
             "1g.24gb": 7
 
-        # H100 NVL 94GB
-        - device-filter: ["0x232110DE"]
+        # H100 NVL 94GB, RTX-PRO-6000-96GB
+        - device-filter: ["0x232110DE", "0x2BB510DE"]
           devices: all
           mig-enabled: true
           mig-devices:
@@ -301,6 +356,14 @@ data:
             "1g.24gb": 2
             "2g.47gb": 1
             "3g.95gb": 1
+        
+        # RTX-PRO-6000-96GB
+        - device-filter: ["0x2BB510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb": 2
+            "2g.48gb": 1
 
         # B200
         - device-filter: ["0x290110DE"]
