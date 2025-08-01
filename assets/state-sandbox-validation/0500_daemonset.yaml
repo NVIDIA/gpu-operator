@@ -123,7 +123,7 @@ spec:
         - image: "FILLED BY THE OPERATOR"
           name: nvidia-sandbox-validator
           command: ['sh', '-c']
-          args: ["echo all validations are successful; sleep infinity"]
+          args: ["echo all validations are successful; while true; do sleep 86400; done"]
           securityContext:
             privileged: true
           lifecycle:
