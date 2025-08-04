@@ -42,6 +42,8 @@ spec:
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
+          - name: ENABLE_GPU_POD_EVICTION
+            value: "false"
           - name: ENABLE_AUTO_DRAIN
             value: "false"
           - name: OPERATOR_NAMESPACE
