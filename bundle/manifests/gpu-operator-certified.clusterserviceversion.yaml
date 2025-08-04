@@ -123,12 +123,7 @@ metadata:
             },
             "validator": {
               "plugin": {
-                "env": [
-                  {
-                    "name": "WITH_WORKLOAD",
-                    "value": "false"
-                  }
-                ]
+                "env": []
               }
             },
             "vgpuManager": {

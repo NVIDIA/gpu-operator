@@ -127,7 +127,7 @@ spec:
           - name: WITH_WAIT
             value: "false"
           - name: WITH_WORKLOAD
-            value: "true"
+            value: "false"
           - name: MIG_STRATEGY
             value: "FILLED BY OPERATOR"
           - name: NODE_NAME
