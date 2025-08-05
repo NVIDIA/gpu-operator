@@ -282,7 +282,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL
