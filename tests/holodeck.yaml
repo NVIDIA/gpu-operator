@@ -27,6 +27,7 @@ spec:
   containerRuntime:
     install: true
     name: containerd
+    version: 1.7.27
   kubernetes:
     install: true
     installer: kubeadm
