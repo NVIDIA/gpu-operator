@@ -35,7 +35,7 @@ spec:
           image: {{ include "gpu-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
           command:
-          - /bin/sh
+          - sh
           - -c
           - >
               kubectl delete clusterpolicy cluster-policy;
