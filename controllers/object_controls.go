@@ -2781,6 +2781,14 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			gdsContainer.VolumeMounts = append(gdsContainer.VolumeMounts, volumeMounts...)
 		}
 
+		secretName := config.Driver.SecretEnv
+		if len(secretName) > 0 {
+			err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, gdsContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+			}
+		}
+
 		// transform the nvidia-fs-ctr to use the openshift driver toolkit
 		// notify openshift driver toolkit container GDS is enabled
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-fs-ctr")
@@ -2858,6 +2866,14 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
 			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
+		}
+
+		secretName := config.Driver.SecretEnv
+		if len(secretName) > 0 {
+			err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, gdrcopyContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+			}
 		}
 
 		// transform the nvidia-gdrcopy-ctr to use the openshift driver toolkit
@@ -3372,6 +3388,14 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
 	}
 
+	secretName := config.Driver.SecretEnv
+	if len(secretName) > 0 {
+		err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, driverContainer)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+		}
+	}
+
 	release, err := parseOSRelease()
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
@@ -3421,6 +3445,32 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, secretName string,
+	namespace string, container *corev1.Container) error {
+	envFrom := container.EnvFrom
+	if len(envFrom) == 0 {
+		envFrom = make([]corev1.EnvFromSource, 0)
+	}
+
+	// get the ConfigMap
+	sec := &corev1.Secret{}
+	opts := client.ObjectKey{Namespace: namespace, Name: secretName}
+	err := ctrlClient.Get(ctx, opts, sec)
+	if err != nil {
+		return fmt.Errorf("ERROR: could not get Secret %s from client: %w", secretName, err)
+	}
+
+	secretEnvSource := corev1.EnvFromSource{
+		SecretRef: &corev1.SecretEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: sec.Name,
+			},
+		}}
+	envFrom = append(envFrom, secretEnvSource)
+	container.EnvFrom = envFrom
 	return nil
 }
 

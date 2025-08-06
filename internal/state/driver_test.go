@@ -771,6 +771,47 @@ func TestDriverVGPULicensing(t *testing.T) {
 
 }
 
+func TestDriverSecretEnv(t *testing.T) {
+	const (
+		testName = "driver-secret-env"
+	)
+
+	state, err := NewStateDriver(nil, nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.SecretEnv = "test-secret-env"
+	renderData.GDS = &gdsDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
+			Enabled: utils.BoolPtr(true),
+		},
+	}
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+		Spec: &nvidiav1alpha1.GDRCopySpec{
+			Enabled: utils.BoolPtr(true),
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+
+}
+
 func TestGetSanitizedKernelVersion(t *testing.T) {
 	tests := []struct {
 		input    string

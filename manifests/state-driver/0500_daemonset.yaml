@@ -197,6 +197,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+        - secretRef:
+            name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         env:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
@@ -421,6 +426,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -481,6 +491,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
