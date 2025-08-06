@@ -83,7 +83,7 @@ spec:
           image: {{ include "gpu-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
           command:
-          - /bin/sh
+          - sh
           - -c
           - >
             kubectl apply -f /opt/gpu-operator/nvidia.com_clusterpolicies.yaml;
