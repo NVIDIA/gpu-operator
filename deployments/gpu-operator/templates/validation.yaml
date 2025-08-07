@@ -1,0 +1,14 @@
+{{- $draEnabled := or (eq .Values.draDriver.gpus.enabled true) (eq .Values.draDriver.computeDomains.enabled true) }}
+{{- $clusterSupportsDRA := or (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta1/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta2/DeviceClass") }}
+
+{{- if and (eq .Values.devicePlugin.enabled true) (eq .Values.draDriver.gpus.enabled true) }}
+{{- $error := "" }}
+{{- $error = printf "%s\nThe NVIDIA device plugin and the NVIDIA DRA Driver for GPUs cannot both be enabled" $error }}
+{{- fail $error }}
+{{- end}}
+
+{{- if and ($draEnabled) (not $clusterSupportsDRA) }}
+{{- $error := "" }}
+{{- $error = printf "%s\nCannot enable the NVIDIA DRA Driver for GPUs on a Kubernetes cluster that does not support DRA" $error }}
+{{- fail $error }}
+{{- end}}
