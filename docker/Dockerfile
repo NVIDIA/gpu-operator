@@ -14,7 +14,7 @@
 
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS builder
+FROM nvcr.io/nvidia/cuda:13.0.0-base-ubi9 AS builder
 
 RUN dnf install -y wget make git gcc
 
@@ -55,7 +55,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS kubectl-downloader
+FROM nvcr.io/nvidia/cuda:13.0.0-base-ubi9 AS kubectl-downloader
 
 RUN dnf install -y --allowerasing \
         curl \
@@ -70,7 +70,7 @@ RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
     curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl && \
     chmod +x ./kubectl
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS sample-builder
+FROM nvcr.io/nvidia/cuda:13.0.0-base-ubi9 AS sample-builder
 
 RUN dnf install -y --allowerasing \
         cmake \
