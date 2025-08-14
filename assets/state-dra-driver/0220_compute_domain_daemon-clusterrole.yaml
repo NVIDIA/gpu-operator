@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: compute-domain-daemon-clusterrole
+  namespace: "FILLED BY THE OPERATOR"
+rules:
+  - apiGroups:
+      - resource.nvidia.com
+    resources:
+      - computedomains
+      - computedomains/status
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
