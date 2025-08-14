@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/jandelgado/gcov2lcov v1.1.1
-	k8s.io/code-generator v0.33.2
+	k8s.io/code-generator v0.33.4
 	sigs.k8s.io/controller-tools v0.18.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.7.0
 )
@@ -53,7 +53,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.33.0 // indirect
 	k8s.io/apiextensions-apiserver v0.33.0 // indirect
-	k8s.io/apimachinery v0.33.2 // indirect
+	k8s.io/apimachinery v0.33.4 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250207200755-1244d31929d7 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
