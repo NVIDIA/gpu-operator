@@ -172,6 +172,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
 			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+
 		}
 
 		runtime, err := info.GetContainerRuntime()

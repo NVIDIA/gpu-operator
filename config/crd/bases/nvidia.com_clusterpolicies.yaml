@@ -679,11 +679,18 @@ spec:
                       licensing'
                     properties:
                       configMapName:
+                        description: |-
+                          nolint
+                          Deprecated: Use SecretName instead. for better security
                         type: string
                       nlsEnabled:
                         description: NLSEnabled indicates if NVIDIA Licensing System
                           is used for licensing.
                         type: boolean
+                      secretName:
+                        description: SecretName indicates the name of the secret containing
+                          the licensing token
+                        type: string
                     type: object
                   livenessProbe:
                     description: NVIDIA Driver container liveness probe settings
