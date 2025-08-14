@@ -200,6 +200,9 @@ spec:
     {{- if .Values.driver.kernelModuleConfig }}
     kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.secretEnv }}
+    secretEnv: {{ .Values.driver.secretEnv }}
+    {{- end }}
     {{- if .Values.driver.resources }}
     resources: {{ toYaml .Values.driver.resources | nindent 6 }}
     {{- end }}

@@ -616,6 +616,10 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              secretEnv:
+                description: 'Optional: SecretEnv represents the name of the Kubernetes
+                  Secret with secret environment variables for the NVIDIA Driver'
+                type: string
               startupProbe:
                 description: NVIDIA Driver container startup probe settings
                 properties:

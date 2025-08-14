@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -166,6 +167,31 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
 		}
 		return reconcile.Result{}, nil
+	}
+
+	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	err = fmt.Errorf("OPERATOR_NAMESPACE environment variable not set, cannot proceed")
+	if operatorNamespace == "" {
+		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		// we cannot do anything without the operator namespace,
+		// let the operator Pod run into `CrashloopBackOff`
+
+		os.Exit(1)
+	}
+
+	// ensure that the specified K8s secret actually exists in the operator namespace
+	secretName := instance.Spec.SecretEnv
+	if len(secretName) > 0 {
+		key := client.ObjectKey{Namespace: operatorNamespace, Name: secretName}
+		err = r.Get(ctx, key, &corev1.Secret{})
+		if err != nil {
+			logger.V(consts.LogLevelError).Error(nil, err.Error())
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+			if condErr != nil {
+				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+			}
+			return reconcile.Result{}, nil
+		}
 	}
 
 	// Sync state and update status

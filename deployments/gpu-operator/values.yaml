@@ -215,6 +215,8 @@ driver:
   # kernel module configuration for NVIDIA driver
   kernelModuleConfig:
     name: ""
+  # Name of Kubernetes Secret which contains secrets to be passed in as environment variables
+  secretEnv: ""
 
 toolkit:
   enabled: true
