@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -759,15 +758,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.scheme = reconciler.Scheme
 
 	if len(n.controls) == 0 {
-		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-
-		if clusterPolicyCtrl.operatorNamespace == "" {
-			n.logger.Error(nil, "OPERATOR_NAMESPACE environment variable not set, cannot proceed")
-			// we cannot do anything without the operator namespace,
-			// let the operator Pod run into `CrashloopBackOff`
-
-			os.Exit(1)
-		}
+		clusterPolicyCtrl.operatorNamespace = reconciler.Namespace
 
 		version, err := OpenshiftVersion(ctx)
 		if err != nil && !apierrors.IsNotFound(err) {

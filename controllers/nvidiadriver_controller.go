@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -54,6 +53,7 @@ type NVIDIADriverReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
 	ClusterInfo clusterinfo.Interface
+	Namespace   string
 
 	stateManager          state.Manager
 	nodeSelectorValidator validator.Validator
@@ -169,20 +169,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	err = fmt.Errorf("OPERATOR_NAMESPACE environment variable not set, cannot proceed")
-	if operatorNamespace == "" {
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
-		// we cannot do anything without the operator namespace,
-		// let the operator Pod run into `CrashloopBackOff`
-
-		os.Exit(1)
-	}
-
 	// ensure that the specified K8s secret actually exists in the operator namespace
 	secretName := instance.Spec.SecretEnv
 	if len(secretName) > 0 {
-		key := client.ObjectKey{Namespace: operatorNamespace, Name: secretName}
+		key := client.ObjectKey{Namespace: r.Namespace, Name: secretName}
 		err = r.Get(ctx, key, &corev1.Secret{})
 		if err != nil {
 			logger.V(consts.LogLevelError).Error(nil, err.Error())
@@ -265,6 +255,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	// Create state manager
 	stateManager, err := state.NewManager(
 		nvidiav1alpha1.NVIDIADriverCRDName,
+		r.Namespace,
 		mgr.GetClient(),
 		mgr.GetScheme())
 	if err != nil {

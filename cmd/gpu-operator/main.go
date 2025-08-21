@@ -94,7 +94,8 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logger)
 
 	ctrl.Log.Info(fmt.Sprintf("version: %s", info.GetVersionString()))
 
@@ -107,6 +108,15 @@ func main() {
 	})
 
 	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+
+	if operatorNamespace == "" {
+		logger.Error(nil, "OPERATOR_NAMESPACE environment variable not set, cannot proceed")
+		// we cannot do anything without the operator namespace,
+		// let the operator Pod run into `CrashloopBackOff`
+
+		os.Exit(1)
+	}
+
 	openshiftNamespace := consts.OpenshiftNamespace
 	cacheOptions := cache.Options{
 		DefaultNamespaces: map[string]cache.Config{
@@ -141,9 +151,10 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 	if err = (&controllers.ClusterPolicyReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
-		Scheme: mgr.GetScheme(),
+		Namespace: operatorNamespace,
+		Client:    mgr.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPolicy")
 		os.Exit(1)
@@ -185,6 +196,7 @@ func main() {
 	}
 
 	if err = (&controllers.NVIDIADriverReconciler{
+		Namespace:   operatorNamespace,
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		ClusterInfo: clusterInfo,

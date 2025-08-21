@@ -19,7 +19,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -139,18 +138,13 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 
 	additionalCfgs := &additionalConfigs{}
 
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
-	}
-
 	if !cr.Spec.UsePrecompiledDrivers() {
 		if cr.Spec.IsRepoConfigEnabled() {
 			destinationDir, err := getRepoConfigPath(pool.osRelease)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 				cr.Spec.RepoConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %w", err)
@@ -165,7 +159,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 				cr.Spec.CertConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
@@ -218,7 +212,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	// mount any custom kernel module configuration parameters at /drivers
 	if cr.Spec.IsKernelModuleConfigEnabled() {
 		destinationDir := "/drivers"
-		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 			cr.Spec.KernelModuleConfig.Name, destinationDir)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
