@@ -156,7 +156,7 @@ metadata:
             "driverType": "gpu",
             "repository": "nvcr.io/nvidia",
             "image": "driver",
-            "version": "sha256:44422f10e899d3419fbd611a02fc1c6127e071a2067bd36e3debb043bf251de0",
+            "version": "sha256:f24084b536f5abdef49832c4e3237e2f64691bb18d58c7febd19fad40ce94035",
             "nodeSelector": {},
             "manager": {},
             "repoConfig": {
@@ -204,6 +204,8 @@ spec:
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit@sha256:51c8f71d3b3c08ae4eb4853697e3f8e6f11e435e666e08210178e6a1faf8028f
     - name: driver-image
+      image: nvcr.io/nvidia/driver@sha256:f24084b536f5abdef49832c4e3237e2f64691bb18d58c7febd19fad40ce94035
+    - name: driver-image-570
       image: nvcr.io/nvidia/driver@sha256:44422f10e899d3419fbd611a02fc1c6127e071a2067bd36e3debb043bf251de0
     - name: driver-image-535
       image: nvcr.io/nvidia/driver@sha256:43aa99352e1dc47e9218f36340ae6328a6282ed1e7e9a61b4204475e980230ef
@@ -900,6 +902,8 @@ spec:
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin@sha256:630596340f8e83aa10b0bc13a46db76772e31b7dccfc34d3a4e41ab7e0aa6117"
                   - name: "DRIVER_IMAGE"
+                    value: "nvcr.io/nvidia/driver@sha256:f24084b536f5abdef49832c4e3237e2f64691bb18d58c7febd19fad40ce94035"
+                  - name: "DRIVER_IMAGE-570"
                     value: "nvcr.io/nvidia/driver@sha256:44422f10e899d3419fbd611a02fc1c6127e071a2067bd36e3debb043bf251de0"
                   - name: "DRIVER_IMAGE-535"
                     value: "nvcr.io/nvidia/driver@sha256:43aa99352e1dc47e9218f36340ae6328a6282ed1e7e9a61b4204475e980230ef"
