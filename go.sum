@@ -22,8 +22,8 @@ github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Mellanox/maintenance-operator/api v0.2.2 h1:7bl/txeHv49NdubQ72AqC7tLXa9oJrZuqk27TG5CybM=
 github.com/Mellanox/maintenance-operator/api v0.2.2/go.mod h1:pkd4TxjMFItohSXT0D1JhXB/E3d8jE5asBzxNATwT2s=
-github.com/NVIDIA/go-nvlib v0.7.4 h1:qnXK8qhm45YfxalhZ76XwKdAMmxz1GIgzE0e/Hhhshs=
-github.com/NVIDIA/go-nvlib v0.7.4/go.mod h1:i95Je7GinMy/+BDs++DAdbPmT2TubjNP8i8joC7DD7I=
+github.com/NVIDIA/go-nvlib v0.8.0 h1:vorMvnsJYvZaxiluSXFd+fIFeQFPWSiSjNPiJyvDs0c=
+github.com/NVIDIA/go-nvlib v0.8.0/go.mod h1:bV+OEgjJCbFXf5T8c082mVPFuiF+gKwf9CMT7DWGUBI=
 github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDsO/q05LBo=
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3 h1:vGT+oyUY7kOGLd71Cz0NfRVEep23jdd4fi+PYsZEj88=
