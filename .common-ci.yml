@@ -114,10 +114,15 @@ trigger-pipeline:
     - regctl registry login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}"
     - '[ ${CI_REGISTRY} = ${OUT_REGISTRY} ] || echo "Logging in to output registry ${OUT_REGISTRY}"'
     - '[ ${CI_REGISTRY} = ${OUT_REGISTRY} ] || regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"'
-
+    - echo "${VERSION} ${OUT_IMAGE_VERSION}" > build-info-${CI_PIPELINE_ID}.txt
+    - echo "Printing source and target image tags"
+    - cat build-info-${CI_PIPELINE_ID}.txt
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
     - make push-image
+  artifacts:
+    paths:
+      - build-info-${CI_PIPELINE_ID}.txt
 
 .release-bundle:
   stage: release
