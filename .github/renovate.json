@@ -86,10 +86,6 @@
       "separateMajorMinor": false
     },
     {
-      "groupName": "bump all nvcr packages for deploymens and clusterservice, skip driver",
-      "matchPackageNames": ["/.*/"]
-    },
-    {
       "matchPackageNames": ["nvcr.io/nvidia/driver"],
       "enabled": false
     }
