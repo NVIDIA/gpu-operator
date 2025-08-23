@@ -15,6 +15,7 @@ spec:
   hostPaths:
     rootFS: {{ .Values.hostPaths.rootFS }}
     driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
+    kubeletRootDir: {{ .Values.hostPaths.kubeletRootDir }}
   operator:
     {{- if .Values.operator.runtimeClass }}
     runtimeClass: {{ .Values.operator.runtimeClass }}
