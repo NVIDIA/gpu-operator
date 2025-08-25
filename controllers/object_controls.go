@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -111,6 +112,8 @@ const (
 	MigDefaultGPUClientsConfigMapName = "default-gpu-clients"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
+	// DCGMHPCJobMappingDirEnvName indicates env name to specify DCGM HPC job mapping directory.
+	DCGMHPCJobMappingDirEnvName = "DCGM_HPC_JOB_MAPPING_DIR"
 	// DCGMDefaultPort indicates default port bound to DCGM host engine
 	DCGMDefaultPort = 5555
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
@@ -1658,6 +1661,22 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, metricsConfigVol)
 
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
+	}
+
+	// Add nvidia-run volume mount if HPC job mapping enabled, so job mapping can be accessed.
+	hasHPCMappingEnv := getContainerEnv(&obj.Spec.Template.Spec.Containers[0], DCGMHPCJobMappingDirEnvName) != ""
+	hasHPCMappingArg := slices.ContainsFunc(
+		obj.Spec.Template.Spec.Containers[0].Args,
+		func(s string) bool { return strings.HasPrefix(s, "--hpc-job-mapping-dir") })
+	if hasHPCMappingEnv || hasHPCMappingArg {
+		mode := corev1.MountPropagationHostToContainer
+		volMount := corev1.VolumeMount{
+			Name:             "run-nvidia",
+			ReadOnly:         true,
+			MountPath:        "/run/nvidia",
+			MountPropagation: &mode,
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, volMount)
 	}
 
 	release, err := parseOSRelease()
