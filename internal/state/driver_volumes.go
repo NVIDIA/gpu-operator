@@ -245,13 +245,23 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, nlsTokenVolMount)
 		}
 
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: cr.Spec.LicensingConfig.Name,
+		var licensingConfigVolumeSource corev1.VolumeSource
+		if cr.Spec.LicensingConfig.SecretName != "" {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cr.Spec.LicensingConfig.SecretName,
+					Items:      licenseItemsToInclude,
 				},
-				Items: licenseItemsToInclude,
-			},
+			}
+		} else {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cr.Spec.LicensingConfig.Name,
+					},
+					Items: licenseItemsToInclude,
+				},
+			}
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
 		additionalCfgs.Volumes = append(additionalCfgs.Volumes, licensingConfigVol)
