@@ -169,6 +169,9 @@ spec:
     rdma:
       enabled: {{ .Values.driver.rdma.enabled }}
       useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
+      {{- if .Values.driver.GPUDirectRDMA.resources }}
+      resources: {{ toYaml .Values.driver.GPUDirectRDMA.resources | nindent 6 }}
+      {{- end }}
     manager:
       {{- if .Values.driver.manager.repository }}
       repository: {{ .Values.driver.manager.repository }}
@@ -627,6 +630,9 @@ spec:
     {{- if .Values.gds.args }}
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.gds.resources }}
+    resources: {{ toYaml .Values.gds.resources | nindent 6 }}
+    {{- end }}
   {{- end }}
   {{- if .Values.gdrcopy }}
   gdrcopy:
@@ -649,6 +655,9 @@ spec:
     {{- end }}
     {{- if .Values.gdrcopy.args }}
     args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.GDRCopy.resources }}
+    resources: {{ toYaml .Values.driver.GDRCopy.resources | nindent 6 }}
     {{- end }}
   {{- end }}
   sandboxWorkloads:

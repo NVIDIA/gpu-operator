@@ -287,6 +287,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct GDRCopy spec: %w", err)
 		}
+		logger.Error(err, "SHIVA CHECK ===== ", "gdrcopySpec", gdrcopySpec)
 		renderData.GDRCopy = gdrcopySpec
 
 		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {

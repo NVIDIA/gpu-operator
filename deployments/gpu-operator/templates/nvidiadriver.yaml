@@ -37,6 +37,9 @@ spec:
   rdma:
     enabled: {{ .Values.driver.rdma.enabled }}
     useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
+    {{- if .Values.driver.GPUDirectRDMA.resources }}
+    resources: {{ toYaml .Values.driver.GPUDirectRDMA.resources | nindent 6 }}
+    {{- end }}
   {{- if .Values.daemonsets.tolerations }}
   tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
   {{- end }}
@@ -95,6 +98,9 @@ spec:
     {{- if .Values.gds.args }}
     args: {{ toYaml .Values.gds.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.gds.resources }}
+    resources: {{ toYaml .Values.gds.resources | nindent 6 }}
+    {{- end }}
   {{- end }}
   {{- if .Values.gdrcopy }}
   gdrcopy:
@@ -118,5 +124,8 @@ spec:
     {{- if .Values.gdrcopy.args }}
     args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
     {{- end  }}
+    {{- if .Values.gdrcopy.resources }}
+    resources: {{ toYaml .Values.gdrcopy.resources | nindent 6 }}
+    {{- end }}
   {{- end }}
 {{- end }}

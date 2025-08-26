@@ -2680,6 +2680,19 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
 		}
+
+		n.logger.Error(nil, "SHIVA CHECK ===== ==== 0", "config.Driver.Resources", config.Driver.Resources)
+		if config.Driver.GPUDirectRDMA.Resources == nil && config.Driver.Resources != nil {
+			n.logger.Error(nil, "SHIVA CHECK ===== ==== 1", "config.Driver.Resources", config.Driver.Resources)
+			obj.Spec.Template.Spec.Containers[i].Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+			config.Driver.GPUDirectRDMA.Resources = &gpuv1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+		}
 		// update nvidia-peermem driver image and pull policy to be same as gpu-driver image
 		// as its installed as part of gpu-driver image
 		driverImage, err := resolveDriverTag(n, &config.Driver)
@@ -2729,6 +2742,15 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 
 		gdsContainer := &obj.Spec.Template.Spec.Containers[i]
+
+		n.logger.Error(nil, "SHIVA CHECK ===== ==== 0", "config.GPUDirectStorage.Resources", config.GPUDirectStorage.Resources)
+		if config.GPUDirectStorage.Resources == nil && config.Driver.Resources != nil {
+			n.logger.Error(nil, "SHIVA CHECK ===== ==== 1", "config.Driver.Resources", config.Driver.Resources)
+			gdsContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+		}
 
 		// update nvidia-fs(sidecar) image and pull policy
 		gdsImage, err := resolveDriverTag(n, config.GPUDirectStorage)
@@ -2838,6 +2860,19 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		if len(config.GDRCopy.Env) > 0 {
 			for _, env := range config.GDRCopy.Env {
 				setContainerEnv(gdrcopyContainer, env.Name, env.Value)
+			}
+		}
+
+		n.logger.Error(nil, "SHIVA CHECK ===== ==== 0", "config.GDRCopy.Resources", config.GDRCopy.Resources)
+		n.logger.Error(nil, "SHIVA CHECK ===== ==== 0", "config.Driver.Resources", config.Driver.Resources)
+
+		// set resources requests and limits for gdrcopy container
+		// if gdrcopy.resources is not set, then use driver.resources
+		if config.GDRCopy.Resources == nil && config.Driver.Resources != nil {
+			n.logger.Error(nil, "SHIVA CHECK ===== ==== 2", "config.Driver.Resources", config.Driver.Resources)
+			gdrcopyContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
 			}
 		}
 
