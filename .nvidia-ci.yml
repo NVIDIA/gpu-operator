@@ -237,7 +237,7 @@ sign:ngc-gpu-operator-validator:
     OPERATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator"
     VALIDATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
     VALIDATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator-validator"
-    TARGET_DRIVER_VERSION: "550.163.01"
+    TARGET_DRIVER_VERSION: "535.261.03"
 
 .e2e_tests:
   extends:

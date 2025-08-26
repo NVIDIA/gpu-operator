@@ -611,6 +611,210 @@ data:
             - devices: all
               vgpu-devices:
                 A800-40C: 1
+        B200X-1-23C:
+            - devices: all
+              vgpu-devices:
+                B200X-1-23C: 7
+        B200X-1-23CME:
+            - devices: all
+              vgpu-devices:
+                B200X-1-23CME: 1
+        B200X-1-45C:
+            - devices: all
+              vgpu-devices:
+                B200X-1-45C: 4
+        B200X-2-45C:
+            - devices: all
+              vgpu-devices:
+                B200X-2-45C: 3
+        B200X-3-90C:
+            - devices: all
+              vgpu-devices:
+                B200X-3-90C: 2
+        B200X-4-90C:
+            - devices: all
+              vgpu-devices:
+                B200X-4-90C: 1
+        B200X-7-180C:
+            - devices: all
+              vgpu-devices:
+                B200X-7-180C: 1
+        B200X-180C:
+            - devices: all
+              vgpu-devices:
+                B200X-180C: 1
+        DC-1-2Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-2Q: 48
+        DC-1-3Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-3Q: 32
+        DC-1-4Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-4Q: 24
+        DC-1-6Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-6Q: 16
+        DC-1-8C:
+            - devices: all
+              vgpu-devices:
+                DC-1-8C: 12
+        DC-1-8Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-8Q: 12
+        DC-1-12C:
+            - devices: all
+              vgpu-devices:
+                DC-1-12C: 8
+        DC-1-12Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-12Q: 8
+        DC-1-24C:
+            - devices: all
+              vgpu-devices:
+                DC-1-24C: 4
+        DC-1-24Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-24Q: 4
+        DC-2-12C:
+            - devices: all
+              vgpu-devices:
+                DC-2-12C: 8
+        DC-2-12Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-12Q: 8
+        DC-2-16C:
+            - devices: all
+              vgpu-devices:
+                DC-2-16C: 6
+        DC-2-16Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-16Q: 6
+        DC-2-24C:
+            - devices: all
+              vgpu-devices:
+                DC-2-24C: 4
+        DC-2-24Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-24Q: 4
+        DC-2-48C:
+            - devices: all
+              vgpu-devices:
+                DC-2-48C: 2
+        DC-2-48Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-48Q: 2
+        DC-3Q:
+            - devices: all
+              vgpu-devices:
+                DC-3Q: 32
+        DC-4Q:
+            - devices: all
+              vgpu-devices:
+                DC-4Q: 24
+        DC-4-24C:
+            - devices: all
+              vgpu-devices:
+                DC-4-24C: 4
+        DC-4-24Q:
+            - devices: all
+              vgpu-devices:
+                DC-4-24Q: 4
+        DC-4-32C:
+            - devices: all
+              vgpu-devices:
+                DC-4-32C: 3
+        DC-4-32Q:
+            - devices: all
+              vgpu-devices:
+                DC-4-32Q: 3
+        DC-4-48C:
+            - devices: all
+              vgpu-devices:
+                DC-4-48C: 2
+        DC-4-48Q:
+            - devices: all
+              vgpu-devices:
+                DC-4-48Q: 2
+        DC-4-96C:
+            - devices: all
+              vgpu-devices:
+                DC-4-96C: 1
+        DC-4-96Q:
+            - devices: all
+              vgpu-devices:
+                DC-4-96Q: 1
+        DC-6Q:
+            - devices: all
+              vgpu-devices:
+                DC-6Q: 16
+        DC-8C:
+            - devices: all
+              vgpu-devices:
+                DC-8C: 12
+        DC-8Q:
+            - devices: all
+              vgpu-devices:
+                DC-8Q: 12
+        DC-12C:
+            - devices: all
+              vgpu-devices:
+                DC-12C: 8
+        DC-12Q:
+            - devices: all
+              vgpu-devices:
+                DC-12Q: 8
+        DC-16C:
+            - devices: all
+              vgpu-devices:
+                DC-16C: 6
+        DC-16Q:
+            - devices: all
+              vgpu-devices:
+                DC-16Q: 6
+        DC-24C:
+            - devices: all
+              vgpu-devices:
+                DC-24C: 4
+        DC-24Q:
+            - devices: all
+              vgpu-devices:
+                DC-24Q: 4
+        DC-32C:
+            - devices: all
+              vgpu-devices:
+                DC-32C: 3
+        DC-32Q:
+            - devices: all
+              vgpu-devices:
+                DC-32Q: 3
+        DC-48C:
+            - devices: all
+              vgpu-devices:
+                DC-48C: 2
+        DC-48Q:
+            - devices: all
+              vgpu-devices:
+                DC-48Q: 2
+        DC-96C:
+            - devices: all
+              vgpu-devices:
+                DC-96C: 1
+        DC-96Q:
+            - devices: all
+              vgpu-devices:
+                DC-96Q: 1
         GB200-1-24C:
             - devices: all
               vgpu-devices:
@@ -2676,11 +2880,15 @@ data:
               devices: all
               vgpu-devices:
                 L4-12Q: 2
+            - device-filter: "0x290110DE"
+              devices: all
+              vgpu-devices:
+                B200X-180C: 1
             - device-filter: "0x294110DE"
               devices: all
               vgpu-devices:
                 GB200-189C: 1
-            - device-filter: "0x294110DE"
+            - device-filter: "0x2BB510DE"
               devices: all
               vgpu-devices:
-                GB200-189C: 1
+                DC-48Q: 2
