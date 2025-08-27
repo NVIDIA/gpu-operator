@@ -998,6 +998,16 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 		if serviceConfig.InternalTrafficPolicy != nil {
 			obj.Spec.InternalTrafficPolicy = serviceConfig.InternalTrafficPolicy
 		}
+
+		// set annotations if specified for dcgm-exporter service
+		if len(serviceConfig.Annotations) > 0 {
+			if obj.ObjectMeta.Annotations == nil {
+				obj.ObjectMeta.Annotations = make(map[string]string)
+			}
+			for annKey, annValue := range serviceConfig.Annotations {
+				obj.ObjectMeta.Annotations[annKey] = annValue
+			}
+		}
 	}
 	return nil
 }
