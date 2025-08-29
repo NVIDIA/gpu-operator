@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Helm
         uses: azure/setup-helm@v4.3.0
         id: install
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
@@ -68,7 +68,7 @@ jobs:
     needs: [helm-lint, validate-csv, validate-helm-values]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Checkout code
       - name: Get Golang version
         id: vars
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
@@ -109,14 +109,14 @@ jobs:
     needs: [helm-lint, validate-csv, validate-helm-values]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Checkout code
       - run: make docker-build
   coverage:
     needs: [go-test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -134,7 +134,7 @@ jobs:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -174,7 +174,7 @@ jobs:
     needs: [go-check, go-test, go-build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -215,7 +215,7 @@ jobs:
     needs: [build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -245,7 +245,7 @@ jobs:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.2.7
@@ -295,7 +295,7 @@ jobs:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.2.7
@@ -346,7 +346,7 @@ jobs:
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: set-up regctl
         run: |
@@ -372,7 +372,7 @@ jobs:
     needs: [release-latest-gpu-operator-image]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
