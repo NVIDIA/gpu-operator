@@ -656,8 +656,8 @@ spec:
     {{- if .Values.gdrcopy.args }}
     args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
     {{- end }}
-    {{- if .Values.driver.GDRCopy.resources }}
-    resources: {{ toYaml .Values.driver.GDRCopy.resources | nindent 6 }}
+    {{- if .Values.gdrcopy.resources }}
+    resources: {{ toYaml .Values.gdrcopy.resources | nindent 6 }}
     {{- end }}
   {{- end }}
   sandboxWorkloads:
