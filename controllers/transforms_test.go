@@ -1600,6 +1600,124 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 	}
 }
 
+func TestTransformDCGMExporterService(t *testing.T) {
+	testCases := []struct {
+		description     string
+		service         *corev1.Service
+		cpSpec          *gpuv1.ClusterPolicySpec
+		expectedService *corev1.Service
+	}{
+		{
+			description: "service without annotations",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			},
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type: corev1.ServiceTypeNodePort,
+					},
+				},
+			},
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeNodePort,
+				},
+			},
+		},
+		{
+			description: "service with custom annotations",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			},
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type: corev1.ServiceTypeNodePort,
+						Annotations: map[string]string{
+							"custom.annotation/key": "custom-value",
+							"another.annotation":    "another-value",
+						},
+					},
+				},
+			},
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape":  "true",
+						"custom.annotation/key": "custom-value",
+						"another.annotation":    "another-value",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeNodePort,
+				},
+			},
+		},
+		{
+			description: "service with nil service spec",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			},
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					ServiceSpec: nil,
+				},
+			},
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nvidia-dcgm-exporter",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDCGMExporterService(tc.service, tc.cpSpec)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedService, tc.service)
+		})
+	}
+}
+
 func TestTransformDriver(t *testing.T) {
 	initMockK8sClients()
 	testCases := []struct {
