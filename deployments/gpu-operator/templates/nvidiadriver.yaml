@@ -37,8 +37,8 @@ spec:
   rdma:
     enabled: {{ .Values.driver.rdma.enabled }}
     useHostMofed: {{ .Values.driver.rdma.useHostMofed }}
-    {{- if .Values.driver.GPUDirectRDMA.resources }}
-    resources: {{ toYaml .Values.driver.GPUDirectRDMA.resources | nindent 6 }}
+    {{- if .Values.driver.rdma.resources }}
+    resources: {{ toYaml .Values.driver.rdma.resources | nindent 6 }}
     {{- end }}
   {{- if .Values.daemonsets.tolerations }}
   tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
