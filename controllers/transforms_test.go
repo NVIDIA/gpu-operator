@@ -2929,3 +2929,112 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestTransformDriverWithResources(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+
+	resources := gpuv1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("400Mi"),
+		},
+	}
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "transform driver dependent containers with resources",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithContainer(corev1.Container{Name: "nvidia-fs"}).
+				WithContainer(corev1.Container{Name: "nvidia-gdrcopy"}).
+				WithContainer(corev1.Container{Name: "nvidia-peermem"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "driver",
+					Version:    "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository: "nvcr.io/nvidia/cloud-native",
+						Image:      "k8s-driver-manager",
+						Version:    "v0.8.0",
+					},
+					Resources: &resources,
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-fs",
+					Version:    "2.20.5",
+				},
+				GDRCopy: &gpuv1.GDRCopySpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gdrdrv",
+					Version:    "v2.5",
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-fs",
+				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-",
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-gdrcopy",
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-",
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:  "k8s-driver-manager",
+				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
