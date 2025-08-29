@@ -1,33 +1,21 @@
-# Release v0.9.0
-
-Breaking:
-
-- Drop support for 3rd Go release because of upstream forced upgrades (see <https://github.com/golang/go/issues/69095>). ([PR 948][pr-948])
+# Release v0.9.1
 
 Features:
 
-- Add a script to reproduce regclient images. ([PR 940][pr-940])
-- Support IPv6 hosts. ([PR 956][pr-956])
-
-Fixes:
-
-- Convert  docker attestations built with `oci-artifact=true`. ([PR 949][pr-949])
-- Allow duplicate keys in yaml config. ([PR 952][pr-952])
+- Allow relative urls in bearer auth. ([PR 963][pr-963])
+- Add "ns" query param to registry mirror requests. ([PR 976][pr-976])
 
 Miscellaneous:
 
-- Migrate yaml library. ([PR 947][pr-947])
-- Convert the build to use OCI style attestations. ([PR 950][pr-950])
+- Update to SLSA v1 provenance. ([PR 968][pr-968])
+- Add a "make clean" command. ([PR 969][pr-969])
 
 Contributors:
 
-- @JimmyMa
 - @sudo-bmitch
+- @wjordan
 
-[pr-940]: https://github.com/regclient/regclient/pull/940
-[pr-947]: https://github.com/regclient/regclient/pull/947
-[pr-948]: https://github.com/regclient/regclient/pull/948
-[pr-949]: https://github.com/regclient/regclient/pull/949
-[pr-950]: https://github.com/regclient/regclient/pull/950
-[pr-952]: https://github.com/regclient/regclient/pull/952
-[pr-956]: https://github.com/regclient/regclient/pull/956
+[pr-963]: https://github.com/regclient/regclient/pull/963
+[pr-968]: https://github.com/regclient/regclient/pull/968
+[pr-969]: https://github.com/regclient/regclient/pull/969
+[pr-976]: https://github.com/regclient/regclient/pull/976

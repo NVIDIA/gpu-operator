@@ -35,13 +35,13 @@ ifeq "$(strip $(VER_BUMP))" ''
 endif
 MARKDOWN_LINT_VER?=v0.18.1
 GOMAJOR_VER?=v0.14.0
-GOSEC_VER?=v2.22.5
+GOSEC_VER?=v2.22.8
 GO_VULNCHECK_VER?=v1.1.4
-OSV_SCANNER_VER?=v2.0.3
+OSV_SCANNER_VER?=v2.2.1
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v1.27.1
-SYFT_CONTAINER?=anchore/syft:v1.27.1@sha256:844ed6a928ef9396fac26d1de374e71dcaf80df14f05841670ed41619c5a718f
+SYFT_VERSION?=v1.31.0
+SYFT_CONTAINER?=anchore/syft:v1.31.0@sha256:c15fa8af4c25edd72c0daf026d095fe51adbcfc7ad5d79a66e93d88f249e5abb
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
@@ -50,7 +50,7 @@ ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 endif
 STATICCHECK_VER?=v0.6.1
 CI_DISTRIBUTION_VER?=3.0.0
-CI_ZOT_VER?=v2.1.5
+CI_ZOT_VER?=v2.1.7
 
 .PHONY: .FORCE
 .FORCE:
@@ -181,6 +181,13 @@ artifacts/%: artifact-pre .FORCE
 	CGO_ENABLED=0 go build ${GO_BUILD_FLAGS} -o "$@" ./cmd/$${command}/; \
 	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o cyclonedx-json >"artifacts/$${command}-$${platform}.cyclonedx.json"; \
 	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o spdx-json >"artifacts/$${command}-$${platform}.spdx.json"
+
+.PHONY: clean
+clean: ## delete generated content
+	[ ! -d artifacts ] || rm -r artifacts
+	[ ! -d bin ] || rm -r bin
+	[ ! -d output ] || rm -r output
+	[ ! -d vendor ] || rm -r vendor
 
 .PHONY: plugin-user
 plugin-user:
