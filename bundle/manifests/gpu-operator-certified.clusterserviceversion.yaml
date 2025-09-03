@@ -228,7 +228,7 @@ spec:
     - name: vgpu-device-manager-image
       image: nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:f899f870a1ef59611a8c3b3e9f58fa3c4d89d930c776d161737d017a3bb2feb0
     - name: gdrcopy-image
-      image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:8d4ed9f70bab1553b62d1d92fd3410f9cdf6205d8e8d88fd96228ff5a34a7052
+      image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:5c4e61f7ba83d7a64ff2523d447c209ce5bde1ddc79acaf1f32f19620b4912d6
   customresourcedefinitions:
     owned:
     - name: nvidiadrivers.nvidia.com
@@ -920,7 +920,7 @@ spec:
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/vgpu-device-manager@sha256:f899f870a1ef59611a8c3b3e9f58fa3c4d89d930c776d161737d017a3bb2feb0"
                   - name: "GDRCOPY_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:8d4ed9f70bab1553b62d1d92fd3410f9cdf6205d8e8d88fd96228ff5a34a7052"
+                    value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:5c4e61f7ba83d7a64ff2523d447c209ce5bde1ddc79acaf1f32f19620b4912d6"
               terminationGracePeriodSeconds: 10
               volumes:
               - hostPath:
