@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator
 
-go 1.24.3
+go 1.24.4
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -15,24 +15,24 @@ require (
 	github.com/onsi/gomega v1.37.0
 	github.com/openshift/api v0.0.0-20250710082954-674ad74beffc
 	github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
-	github.com/operator-framework/api v0.32.0
+	github.com/operator-framework/api v0.34.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.83.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/regclient/regclient v0.9.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/urfave/cli/v2 v2.27.7
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.27.0
-	k8s.io/api v0.33.2
-	k8s.io/apiextensions-apiserver v0.33.2
-	k8s.io/apimachinery v0.33.2
-	k8s.io/client-go v0.33.2
+	k8s.io/api v0.33.4
+	k8s.io/apiextensions-apiserver v0.33.4
+	k8s.io/apimachinery v0.33.4
+	k8s.io/client-go v0.33.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.21.0
-	sigs.k8s.io/yaml v1.5.0
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -150,9 +150,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.18.4 // indirect
-	k8s.io/apiserver v0.33.2 // indirect
+	k8s.io/apiserver v0.33.4 // indirect
 	k8s.io/cli-runtime v0.33.2 // indirect
-	k8s.io/component-base v0.33.2 // indirect
+	k8s.io/component-base v0.33.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a // indirect
 	k8s.io/kubectl v0.33.2 // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
