@@ -782,8 +782,8 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 // by the user in the podSpec
 func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
 	if len(dsSpec.Labels) > 0 {
-		if obj.Spec.Template.ObjectMeta.Labels == nil {
-			obj.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+		if obj.Spec.Template.Labels == nil {
+			obj.Spec.Template.Labels = make(map[string]string)
 		}
 		for labelKey, labelValue := range dsSpec.Labels {
 			// if the user specifies an override of the "app" or the ""app.kubernetes.io/part-of"" key, we skip it.
@@ -792,16 +792,16 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
 				continue
 			}
-			obj.Spec.Template.ObjectMeta.Labels[labelKey] = labelValue
+			obj.Spec.Template.Labels[labelKey] = labelValue
 		}
 	}
 
 	if len(dsSpec.Annotations) > 0 {
-		if obj.Spec.Template.ObjectMeta.Annotations == nil {
-			obj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+		if obj.Spec.Template.Annotations == nil {
+			obj.Spec.Template.Annotations = make(map[string]string)
 		}
 		for annoKey, annoVal := range dsSpec.Annotations {
-			obj.Spec.Template.ObjectMeta.Annotations[annoKey] = annoVal
+			obj.Spec.Template.Annotations[annoKey] = annoVal
 		}
 	}
 }
@@ -1047,7 +1047,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	// updates for per kernel version pods using pre-compiled drivers
 	if config.Driver.UsePrecompiledDrivers() {
-		err = transformPrecompiledDriverDaemonset(obj, config, n)
+		err = transformPrecompiledDriverDaemonset(obj, n)
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the pre-compiled Driver Daemonset: %s", err)
 		}
@@ -1159,17 +1159,17 @@ func getOrCreateTrustedCAConfigMap(n ClusterPolicyController, name string) (*cor
 	}
 
 	// apply label "config.openshift.io/inject-trusted-cabundle: true", so that cert is automatically filled/updated.
-	configMap.ObjectMeta.Labels = make(map[string]string)
-	configMap.ObjectMeta.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
+	configMap.Labels = make(map[string]string)
+	configMap.Labels["config.openshift.io/inject-trusted-cabundle"] = "true"
 
-	logger := n.logger.WithValues("ConfigMap", configMap.ObjectMeta.Name, "Namespace", configMap.ObjectMeta.Namespace)
+	logger := n.logger.WithValues("ConfigMap", configMap.Name, "Namespace", configMap.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, configMap, n.scheme); err != nil {
 		return nil, err
 	}
 
 	found := &corev1.ConfigMap{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: configMap.ObjectMeta.Namespace, Name: configMap.ObjectMeta.Name}, found)
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating")
 		err = n.client.Create(ctx, configMap)
@@ -1448,9 +1448,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
 		config.DevicePlugin.MPS.Root != DefaultMPSRoot {
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
-			if volume.Name == "mps-root" {
+			switch volume.Name {
+			case "mps-root":
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.DevicePlugin.MPS.Root
-			} else if volume.Name == "mps-shm" {
+			case "mps-shm":
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
@@ -1532,9 +1533,10 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
 		config.DevicePlugin.MPS.Root != DefaultMPSRoot {
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
-			if volume.Name == "mps-root" {
+			switch volume.Name {
+			case "mps-root":
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = config.DevicePlugin.MPS.Root
-			} else if volume.Name == "mps-shm" {
+			case "mps-shm":
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
@@ -2866,14 +2868,14 @@ func getSanitizedKernelVersion(kernelVersion string) string {
 	return strings.ToLower(sanitizedVersion)
 }
 
-func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) (err error) {
+func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, n ClusterPolicyController) (err error) {
 	sanitizedVersion := getSanitizedKernelVersion(n.currentKernelVersion)
 	// prepare the DaemonSet to be kernel-version specific
-	obj.ObjectMeta.Name += "-" + sanitizedVersion + "-" + n.kernelVersionMap[n.currentKernelVersion]
+	obj.Name += "-" + sanitizedVersion + "-" + n.kernelVersionMap[n.currentKernelVersion]
 
 	// add unique labels for each kernel-version specific Daemonset
-	obj.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
-	obj.Spec.Template.ObjectMeta.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
+	obj.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
+	obj.Spec.Template.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
 
 	// append kernel-version specific node-selector
 	obj.Spec.Template.Spec.NodeSelector[nfdKernelLabelKey] = n.currentKernelVersion
@@ -2928,19 +2930,19 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	/* prepare the DaemonSet to be RHCOS-version specific */
 	rhcosVersion := n.ocpDriverToolkit.currentRhcosVersion
 
-	if !strings.Contains(obj.ObjectMeta.Name, rhcosVersion) {
-		obj.ObjectMeta.Name += "-" + rhcosVersion
+	if !strings.Contains(obj.Name, rhcosVersion) {
+		obj.Name += "-" + rhcosVersion
 	}
-	obj.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
-	obj.Spec.Selector.MatchLabels["app"] = obj.ObjectMeta.Name
-	obj.Spec.Template.ObjectMeta.Labels["app"] = obj.ObjectMeta.Name
+	obj.Labels["app"] = obj.Name
+	obj.Spec.Selector.MatchLabels["app"] = obj.Name
+	obj.Spec.Template.Labels["app"] = obj.Name
 
-	obj.ObjectMeta.Labels[ocpDriverToolkitVersionLabel] = rhcosVersion
+	obj.Labels[ocpDriverToolkitVersionLabel] = rhcosVersion
 	obj.Spec.Template.Spec.NodeSelector[nfdOSTreeVersionLabelKey] = rhcosVersion
 
 	/* prepare the DaemonSet to be searchable */
-	obj.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
-	obj.Spec.Template.ObjectMeta.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
+	obj.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
+	obj.Spec.Template.Labels[ocpDriverToolkitIdentificationLabel] = ocpDriverToolkitIdentificationValue
 
 	/* prepare the DriverToolkit container */
 	setContainerEnv(driverToolkitContainer, "RHCOS_VERSION", rhcosVersion)
@@ -2961,8 +2963,8 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		n.logger.Info("DriverToolkit", "image", driverToolkitContainer.Image)
 	} else {
 		/* RHCOS tag missing in the Driver-Toolkit imagestream, setup fallback */
-		obj.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
-		obj.Spec.Template.ObjectMeta.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		obj.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
+		obj.Spec.Template.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
 		driverToolkitContainer.Image = mainContainer.Image
 		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
@@ -3031,7 +3033,7 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 					// this is useful for tools like kbld(carvel) which will just specify driver.image param as path:version
 					image = spec.Image + "-" + n.currentKernelVersion
 				} else {
-					return "", fmt.Errorf("Unable to resolve driver image path for pre-compiled drivers, driver.repository, driver.image and driver.version have to be specified in the ClusterPolicy")
+					return "", fmt.Errorf("unable to resolve driver image path for pre-compiled drivers, driver.repository, driver.image and driver.version have to be specified in the ClusterPolicy")
 				}
 			} else {
 				// use per kernel version tag
@@ -3062,7 +3064,7 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 			return "", err
 		}
 	default:
-		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
+		return "", fmt.Errorf("invalid type to construct image path: %v", v)
 	}
 
 	// if image digest is specified, use it directly
@@ -3607,7 +3609,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		return gpuv1.Ready
 	}
 
-	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Template.ObjectMeta.Labels)}
+	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Template.Labels)}
 
 	n.logger.V(2).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
@@ -3851,7 +3853,7 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 
 	for idx := range list.Items {
 		ds := list.Items[idx]
-		name := ds.ObjectMeta.Name
+		name := ds.Name
 		desiredNumberScheduled := ds.Status.DesiredNumberScheduled
 		numberMisscheduled := ds.Status.NumberMisscheduled
 
@@ -3995,8 +3997,8 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 	}
 
 	for idx := range list.Items {
-		name := list.Items[idx].ObjectMeta.Name
-		dsRhcosVersion, versionOk := list.Items[idx].ObjectMeta.Labels[ocpDriverToolkitVersionLabel]
+		name := list.Items[idx].Name
+		dsRhcosVersion, versionOk := list.Items[idx].Labels[ocpDriverToolkitVersionLabel]
 		clusterHasRhcosVersion, clusterOk := n.ocpDriverToolkit.rhcosVersions[dsRhcosVersion]
 		desiredNumberScheduled := list.Items[idx].Status.DesiredNumberScheduled
 
@@ -4179,15 +4181,15 @@ func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, se
 	var lastErr error
 	for idx := range dsList.Items {
 		n.logger.Info("Delete DaemonSet",
-			"Name", dsList.Items[idx].ObjectMeta.Name,
+			"Name", dsList.Items[idx].Name,
 		)
 		// ignore daemonsets that doesn't match the required name
-		if !strings.HasPrefix(dsList.Items[idx].ObjectMeta.Name, namePrefix) {
+		if !strings.HasPrefix(dsList.Items[idx].Name, namePrefix) {
 			continue
 		}
 		if err := n.client.Delete(ctx, &dsList.Items[idx]); err != nil {
 			n.logger.Error(err, "Could not get delete DaemonSet",
-				"Name", dsList.Items[idx].ObjectMeta.Name)
+				"Name", dsList.Items[idx].Name)
 			lastErr = err
 		}
 	}
@@ -4206,7 +4208,7 @@ func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, se
 	podCount := 0
 	for idx := range podList.Items {
 		// ignore pods that doesn't match the required name
-		if !strings.HasPrefix(podList.Items[idx].ObjectMeta.Name, namePrefix) {
+		if !strings.HasPrefix(podList.Items[idx].Name, namePrefix) {
 			continue
 		}
 		podCount++
@@ -4261,7 +4263,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 				overallState, errs := precompiledDriverDaemonsets(ctx, n)
 				if len(errs) != 0 {
 					// log errors
-					return overallState, fmt.Errorf("Unable to deploy precompiled driver daemonsets %v", errs)
+					return overallState, fmt.Errorf("unable to deploy precompiled driver daemonsets %v", errs)
 				}
 				return overallState, nil
 			}
@@ -4269,7 +4271,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 			n.ocpDriverToolkit.currentRhcosVersion == "" {
 			return n.ocpDriverToolkitDaemonSets(ctx)
 		}
-	} else if n.resources[state].DaemonSet.ObjectMeta.Name == commonVGPUManagerDaemonsetName {
+	} else if n.resources[state].DaemonSet.Name == commonVGPUManagerDaemonsetName {
 		podCount, err := n.cleanupUnusedVGPUManagerDaemonsets(ctx)
 		if err != nil {
 			return gpuv1.NotReady, err
@@ -4349,13 +4351,13 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	changed := isDaemonsetSpecChanged(found, obj)
 	if changed {
-		logger.Info("DaemonSet is different, updating", "name", obj.ObjectMeta.Name)
+		logger.Info("DaemonSet is different, updating", "name", obj.Name)
 		err = n.client.Update(ctx, obj)
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
 	} else {
-		logger.Info("DaemonSet identical, skipping update", "name", obj.ObjectMeta.Name)
+		logger.Info("DaemonSet identical, skipping update", "name", obj.Name)
 	}
 	return isDaemonSetReady(obj.Name, n), nil
 }
@@ -4601,7 +4603,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 
 		if !serviceMonitorCRDExists {
-			logger.Error(fmt.Errorf("Couldn't find ServiceMonitor CRD"), "Install Prometheus and necessary CRDs for gathering GPU metrics!")
+			logger.Error(fmt.Errorf("couldn't find ServiceMonitor CRD"), "Install Prometheus and necessary CRDs for gathering GPU metrics!")
 			return gpuv1.NotReady, nil
 		}
 
@@ -4616,7 +4618,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 
 		if serviceMonitor.AdditionalLabels != nil {
 			for key, value := range serviceMonitor.AdditionalLabels {
-				obj.ObjectMeta.Labels[key] = value
+				obj.Labels[key] = value
 			}
 		}
 		if serviceMonitor.Relabelings != nil {

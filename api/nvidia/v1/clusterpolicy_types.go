@@ -1771,7 +1771,7 @@ func imagePath(repository string, image string, version string, imagePathEnvName
 	}
 
 	// 3. If both are not set, error out
-	return "", fmt.Errorf("Empty image path provided through both ClusterPolicy CR and ENV %s", imagePathEnvName)
+	return "", fmt.Errorf("empty image path provided through both ClusterPolicy CR and ENV %s", imagePathEnvName)
 }
 
 // ImagePath sets image path for given component type
@@ -1835,7 +1835,7 @@ func ImagePath(spec interface{}) (string, error) {
 		config := spec.(*CCManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "CC_MANAGER_IMAGE")
 	default:
-		return "", fmt.Errorf("Invalid type to construct image path: %v", v)
+		return "", fmt.Errorf("invalid type to construct image path: %v", v)
 	}
 }
 

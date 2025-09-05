@@ -452,7 +452,7 @@ func getWorkloadConfig(ctx context.Context) (string, error) {
 
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return "", fmt.Errorf("Error getting cluster config - %s", err.Error())
+		return "", fmt.Errorf("error getting cluster config - %s", err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
@@ -1105,7 +1105,7 @@ func (p *Plugin) runWorkload() error {
 		return err
 	}
 
-	pod.ObjectMeta.Namespace = namespaceFlag
+	pod.Namespace = namespaceFlag
 	image := os.Getenv(validatorImageEnvName)
 	pod.Spec.Containers[0].Image = image
 	pod.Spec.InitContainers[0].Image = image
@@ -1133,7 +1133,7 @@ func (p *Plugin) runWorkload() error {
 	}
 
 	// update owner reference
-	pod.SetOwnerReferences(validatorDaemonset.ObjectMeta.OwnerReferences)
+	pod.SetOwnerReferences(validatorDaemonset.OwnerReferences)
 	// set pod tolerations
 	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
 	// update podSpec with node name, so it will just run on current node
@@ -1163,7 +1163,7 @@ func (p *Plugin) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].ObjectMeta.Name, options)
+		err = p.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %w", err)
 		}
@@ -1172,11 +1172,11 @@ func (p *Plugin) runWorkload() error {
 	// wait for plugin validation pod to be ready.
 	newPod, err := p.kubeClient.CoreV1().Pods(namespaceFlag).Create(ctx, pod, meta_v1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create plugin validation pod %s, err %w", pod.ObjectMeta.Name, err)
+		return fmt.Errorf("failed to create plugin validation pod %s, err %w", pod.Name, err)
 	}
 
-	// make sure its available
-	err = waitForPod(ctx, p.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
+	// make sure it's available
+	err = waitForPod(ctx, p.kubeClient, newPod.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
@@ -1369,7 +1369,7 @@ func (c *CUDA) runWorkload() error {
 	if err != nil {
 		return err
 	}
-	pod.ObjectMeta.Namespace = namespaceFlag
+	pod.Namespace = namespaceFlag
 	image := os.Getenv(validatorImageEnvName)
 	pod.Spec.Containers[0].Image = image
 	pod.Spec.InitContainers[0].Image = image
@@ -1397,7 +1397,7 @@ func (c *CUDA) runWorkload() error {
 	}
 
 	// update owner reference
-	pod.SetOwnerReferences(validatorDaemonset.ObjectMeta.OwnerReferences)
+	pod.SetOwnerReferences(validatorDaemonset.OwnerReferences)
 	// set pod tolerations
 	pod.Spec.Tolerations = validatorDaemonset.Spec.Template.Spec.Tolerations
 	// update podSpec with node name, so it will just run on current node
@@ -1416,7 +1416,7 @@ func (c *CUDA) runWorkload() error {
 		propagation := meta_v1.DeletePropagationBackground
 		gracePeriod := int64(0)
 		options := meta_v1.DeleteOptions{PropagationPolicy: &propagation, GracePeriodSeconds: &gracePeriod}
-		err = c.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].ObjectMeta.Name, options)
+		err = c.kubeClient.CoreV1().Pods(namespaceFlag).Delete(ctx, podList.Items[0].Name, options)
 		if err != nil {
 			return fmt.Errorf("cannot delete previous validation pod: %s", err)
 		}
@@ -1425,11 +1425,11 @@ func (c *CUDA) runWorkload() error {
 	// wait for cuda workload pod to be ready.
 	newPod, err := c.kubeClient.CoreV1().Pods(namespaceFlag).Create(ctx, pod, meta_v1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create cuda validation pod %s, err %+v", pod.ObjectMeta.Name, err)
+		return fmt.Errorf("failed to create cuda validation pod %s, err %+v", pod.Name, err)
 	}
 
 	// make sure it's available
-	err = waitForPod(ctx, c.kubeClient, newPod.ObjectMeta.Name, namespaceFlag)
+	err = waitForPod(ctx, c.kubeClient, newPod.Name, namespaceFlag)
 	if err != nil {
 		return err
 	}
