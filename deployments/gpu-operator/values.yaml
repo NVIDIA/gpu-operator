@@ -480,7 +480,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: v0.3.0
+  version: v0.4.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
