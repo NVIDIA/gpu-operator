@@ -82,7 +82,7 @@ operator:
   initContainer:
     image: cuda
     repository: nvcr.io/nvidia
-    version: 12.8.1-base-ubi9
+    version: 13.0.0-base-ubi9
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -196,7 +196,7 @@ driver:
     repository: nvcr.io/nvidia/cloud-native
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.0
+    version: v0.8.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -245,7 +245,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.3
+  version: v0.17.4
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -361,7 +361,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.3
+  version: v0.17.4
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env:
@@ -448,7 +448,7 @@ gdrcopy:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: gdrdrv
-  version: "v2.5"
+  version: "v2.5.1"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -468,7 +468,7 @@ vgpuManager:
     repository: nvcr.io/nvidia/cloud-native
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.0
+    version: v0.8.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -480,7 +480,7 @@ vgpuDeviceManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: vgpu-device-manager
-  version: v0.3.0
+  version: v0.4.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -492,7 +492,7 @@ vfioManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: cuda
-  version: 12.8.1-base-ubi9
+  version: 13.0.0-base-ubi9
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
@@ -502,7 +502,7 @@ vfioManager:
     repository: nvcr.io/nvidia/cloud-native
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.0
+    version: v0.8.1
     imagePullPolicy: IfNotPresent
     env:
       - name: ENABLE_GPU_POD_EVICTION
@@ -538,7 +538,7 @@ sandboxDevicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: kubevirt-gpu-device-plugin
-  version: v1.3.1
+  version: v1.4.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
