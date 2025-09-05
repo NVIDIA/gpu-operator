@@ -159,13 +159,24 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
-				cr.Spec.CertConfig.Name, destinationDir)
-			if err != nil {
-				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+
+			if cr.Spec.LicensingConfig.SecretName != "" {
+				volumeMounts, itemsToInclude, err := s.createSecretVolumeMounts(ctx, s.namespace,
+					cr.Spec.CertConfig.Name, destinationDir)
+				if err != nil {
+					return nil, fmt.Errorf("ERROR: failed to create Secret VolumeMounts for custom certs: %w", err)
+				}
+				additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
+				additionalCfgs.Volumes = append(additionalCfgs.Volumes, createSecretVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+			} else {
+				volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
+					cr.Spec.CertConfig.Name, destinationDir)
+				if err != nil {
+					return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
+				}
+				additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
+				additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
 			}
-			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
-			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
 		}
 
 		runtime, err := info.GetContainerRuntime()
@@ -222,7 +233,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	// set any licensing configuration required
-	if cr.Spec.IsVGPULicensingEnabled() {
+	if cr.Spec.IsVGPULicensingEnabled() || cr.Spec.IsVGPULicensingEnabledWithSecret() {
 		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true,
 			MountPath: consts.VGPULicensingConfigMountPath, SubPath: consts.VGPULicensingFileName}
 		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, licensingConfigVolMount)
@@ -245,13 +256,23 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, nlsTokenVolMount)
 		}
 
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: cr.Spec.LicensingConfig.Name,
+		var licensingConfigVolumeSource corev1.VolumeSource
+		if cr.Spec.IsVGPULicensingEnabledWithSecret() {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cr.Spec.LicensingConfig.SecretName,
+					Items:      licenseItemsToInclude,
 				},
-				Items: licenseItemsToInclude,
-			},
+			}
+		} else {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cr.Spec.LicensingConfig.Name,
+					},
+					Items: licenseItemsToInclude,
+				},
+			}
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
 		additionalCfgs.Volumes = append(additionalCfgs.Volumes, licensingConfigVol)

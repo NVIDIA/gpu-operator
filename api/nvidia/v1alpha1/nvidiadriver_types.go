@@ -430,6 +430,14 @@ type DriverRepoConfigSpec struct {
 type DriverLicensingConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Secret Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	SecretName string `json:"secretName,omitempty"`
+
+	// nolint
+	// Deprecated: Use SecretName instead. for better security
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
@@ -689,6 +697,14 @@ func (d *NVIDIADriverSpec) IsVGPULicensingEnabled() bool {
 		return false
 	}
 	return d.LicensingConfig.Name != ""
+}
+
+// IsVGPULicensingEnabledWithSecret returns true if the vgpu driver license config is provided with secret
+func (d *NVIDIADriverSpec) IsVGPULicensingEnabledWithSecret() bool {
+	if d.LicensingConfig == nil {
+		return false
+	}
+	return d.LicensingConfig.SecretName != ""
 }
 
 // IsKernelModuleConfigEnabled returns true if kernel module config is provided

@@ -233,6 +233,8 @@ spec:
               licensingConfig:
                 description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
                 properties:
+                  secretName:
+                    type: string
                   name:
                     type: string
                   nlsEnabled:
