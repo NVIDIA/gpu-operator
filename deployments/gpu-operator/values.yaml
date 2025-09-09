@@ -60,9 +60,7 @@ validator:
   args: []
   resources: {}
   plugin:
-    env:
-      - name: WITH_WORKLOAD
-        value: "false"
+    env: []
 
 operator:
   repository: nvcr.io/nvidia
@@ -198,19 +196,7 @@ driver:
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.1
     imagePullPolicy: IfNotPresent
-    env:
-      - name: ENABLE_GPU_POD_EVICTION
-        value: "true"
-      - name: ENABLE_AUTO_DRAIN
-        value: "false"
-      - name: DRAIN_USE_FORCE
-        value: "false"
-      - name: DRAIN_POD_SELECTOR_LABEL
-        value: ""
-      - name: DRAIN_TIMEOUT_SECONDS
-        value: "0s"
-      - name: DRAIN_DELETE_EMPTYDIR_DATA
-        value: "false"
+    env: []
   env: []
   resources: {}
   # Private mirror repository configuration
@@ -249,19 +235,7 @@ devicePlugin:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
-  env:
-    - name: PASS_DEVICE_SPECS
-      value: "true"
-    - name: FAIL_ON_INIT_ERROR
-      value: "true"
-    - name: DEVICE_LIST_STRATEGY
-      value: envvar
-    - name: DEVICE_ID_STRATEGY
-      value: uuid
-    - name: NVIDIA_VISIBLE_DEVICES
-      value: all
-    - name: NVIDIA_DRIVER_CAPABILITIES
-      value: all
+  env: []
   resources: {}
   # Plugin configuration
   # Use "name" to either point to an existing ConfigMap or to create a new one with a list of configurations(i.e with create=true).
@@ -315,13 +289,7 @@ dcgmExporter:
   image: dcgm-exporter
   version: 4.3.1-4.4.0-ubuntu22.04
   imagePullPolicy: IfNotPresent
-  env:
-    - name: DCGM_EXPORTER_LISTEN
-      value: ":9400"
-    - name: DCGM_EXPORTER_KUBERNETES
-      value: "true"
-    - name: DCGM_EXPORTER_COLLECTORS
-      value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
+  env: []
   resources: {}
   service:
     internalTrafficPolicy: Cluster
@@ -364,11 +332,7 @@ gfd:
   version: v0.17.4
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  env:
-    - name: GFD_SLEEP_INTERVAL
-      value: 60s
-    - name: GFD_FAIL_ON_INIT_ERROR
-      value: "true"
+  env: []
   resources: {}
 
 migManager:
@@ -378,9 +342,7 @@ migManager:
   version: v0.12.3-ubuntu20.04
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  env:
-    - name: WITH_REBOOT
-      value: "false"
+  env: []
   resources: {}
   # MIG configuration
   # Use "name" to either point to an existing ConfigMap or to create a new one with a list of configurations(i.e with create=true).
@@ -470,11 +432,7 @@ vgpuManager:
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.1
     imagePullPolicy: IfNotPresent
-    env:
-      - name: ENABLE_GPU_POD_EVICTION
-        value: "false"
-      - name: ENABLE_AUTO_DRAIN
-        value: "false"
+    env: []
 
 vgpuDeviceManager:
   enabled: true
@@ -504,11 +462,7 @@ vfioManager:
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.1
     imagePullPolicy: IfNotPresent
-    env:
-      - name: ENABLE_GPU_POD_EVICTION
-        value: "false"
-      - name: ENABLE_AUTO_DRAIN
-        value: "false"
+    env: []
 
 kataManager:
   enabled: false
