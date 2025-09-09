@@ -227,9 +227,7 @@ data:
             "1g.12gb+me": 1
 
       all-1g.24gb:
-        # H100 NVL 94GB, RTX-PRO-6000-96GB
-        - device-filter: ["0x232110DE", "0x2BB510DE"]
-          devices: all
+        - devices: all
           mig-enabled: true
           mig-devices:
             "1g.24gb": 4
