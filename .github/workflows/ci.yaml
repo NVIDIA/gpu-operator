@@ -154,6 +154,7 @@ jobs:
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-arm64
+          CVE_UPDATES: "pam libarchive"
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
@@ -195,6 +196,7 @@ jobs:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
           VERSION: ${COMMIT_SHORT_SHA}-arm64
           SUBCOMPONENT: validator
+          CVE_UPDATES: "pam libarchive"
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
@@ -240,6 +242,7 @@ jobs:
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-amd64
+          CVE_UPDATES: "pam libarchive"
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
@@ -282,6 +285,7 @@ jobs:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/gpu-operator-validator
           VERSION: ${COMMIT_SHORT_SHA}-amd64
           SUBCOMPONENT: validator
+          CVE_UPDATES: "pam libarchive"
         run: |
           echo "${VERSION}"
           make build-${{ matrix.dist }}
