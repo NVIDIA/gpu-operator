@@ -1282,13 +1282,6 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
-	// configure runtime
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
-	if err != nil {
-		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
-	}
-
 	// Update CRI-O hooks path to use default path for non OCP cases
 	if n.openshift == "" && n.runtime == gpuv1.CRIO {
 		for index, volume := range obj.Spec.Template.Spec.Volumes {
@@ -1302,6 +1295,13 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		for _, env := range config.Toolkit.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// configure runtime
+	runtime := n.runtime.String()
+	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
+	if err != nil {
+		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
 
 	return nil
@@ -1892,15 +1892,6 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, artifactsVol)
 
-	// mount containerd config and socket
-
-	// setup mounts for runtime config file
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
-	if err != nil {
-		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
-	}
-
 	// Compute hash of kata manager config and add an annotation with the value.
 	// If the kata config changes, a new revision of the daemonset will be
 	// created and thus the kata-manager pods will restart with the updated config.
@@ -1915,6 +1906,14 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		for _, env := range config.KataManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// mount containerd config and socket
+	// setup mounts for runtime config file
+	runtime := n.runtime.String()
+	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
+	if err != nil {
+		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
 	}
 
 	return nil
