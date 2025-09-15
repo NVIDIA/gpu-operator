@@ -14,7 +14,7 @@
 
 ARG GOLANG_VERSION=x.x.x
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS builder
+FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS builder
 
 RUN dnf install -y wget make git gcc
 
@@ -55,7 +55,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS kubectl-downloader
+FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS kubectl-downloader
 
 RUN dnf install -y --allowerasing \
         curl \
