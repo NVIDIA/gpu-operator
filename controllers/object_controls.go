@@ -2706,6 +2706,12 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
+		if config.Driver.Resources != nil {
+			err := setResourceRequestsLimits(config.Driver.Resources, &obj.Spec.Template.Spec.Containers[i])
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach resource requirements to the nvidia-peermem container: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -2794,6 +2800,12 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 		}
+		if config.Driver.Resources != nil {
+			err := setResourceRequestsLimits(config.Driver.Resources, gdsContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach resource requirements to the nvidia-fs container: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -2880,6 +2892,12 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-gdrcopy-ctr")
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %w", err)
+		}
+		if config.Driver.Resources != nil {
+			err := setResourceRequestsLimits(config.Driver.Resources, gdrcopyContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach resource requirements to the nvidia-gdrcopy container: %w", err)
+			}
 		}
 	}
 	return nil
@@ -3037,6 +3055,18 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		}
 	}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
+
+	// set resource limits
+	if config.Driver.Resources != nil {
+		err := setResourceRequestsLimits(config.Driver.Resources, mainContainer)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to attach resource requirements to the openshift driver toolkit container: %w", err)
+		}
+		err = setResourceRequestsLimits(config.Driver.Resources, driverToolkitContainer)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to attach resource requirements to the openshift driver toolkit container: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -3470,6 +3500,16 @@ func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, sec
 		}}
 	envFrom = append(envFrom, secretEnvSource)
 	container.EnvFrom = envFrom
+	return nil
+}
+
+func setResourceRequestsLimits(resources *gpuv1.ResourceRequirements, container *corev1.Container) error {
+	resourceLimits := &corev1.ResourceRequirements{
+		Requests: resources.Requests,
+		Limits:   resources.Limits,
+	}
+
+	container.Resources = *resourceLimits
 	return nil
 }
 
