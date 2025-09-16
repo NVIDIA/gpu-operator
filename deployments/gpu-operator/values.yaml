@@ -295,6 +295,7 @@ dcgmExporter:
   resources: {}
   service:
     internalTrafficPolicy: Cluster
+    annotations: {}
   serviceMonitor:
     enabled: false
     interval: 15s

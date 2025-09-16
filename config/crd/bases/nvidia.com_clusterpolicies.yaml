@@ -385,6 +385,12 @@ spec:
                     description: 'Optional: Service configuration for NVIDIA DCGM
                       Exporter'
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations to be added to the DCGM Exporter
+                          service
+                        type: object
                       internalTrafficPolicy:
                         description: InternalTrafficPolicy describes how nodes distribute
                           service traffic they receive on the ClusterIP.
