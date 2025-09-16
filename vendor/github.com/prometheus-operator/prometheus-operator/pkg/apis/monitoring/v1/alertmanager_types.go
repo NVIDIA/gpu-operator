@@ -103,7 +103,7 @@ type AlertmanagerSpec struct {
 	BaseImage string `json:"baseImage,omitempty"`
 	// An optional list of references to secrets in the same namespace
 	// to use for pulling prometheus and alertmanager images from registries
-	// see http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod
+	// see https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	// Secrets is a list of Secrets in the same namespace as the Alertmanager
 	// object, which shall be mounted into the Alertmanager Pods.
@@ -170,7 +170,7 @@ type AlertmanagerSpec struct {
 	// under a different route prefix. For example for use with `kubectl proxy`.
 	RoutePrefix string `json:"routePrefix,omitempty"`
 	// If set to true all actions on the underlying managed objects are not
-	// goint to be performed, except for delete actions.
+	// going to be performed, except for delete actions.
 	Paused bool `json:"paused,omitempty"`
 	// Define which Nodes the Pods are scheduled on.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -266,10 +266,12 @@ type AlertmanagerSpec struct {
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	// This is an alpha field from kubernetes 1.22 until 1.24 which requires enabling the StatefulSetMinReadySeconds feature gate.
+	//
+	// If unset, pods will be considered available as soon as they are ready.
+	//
+	// +kubebuilder:validation:Minimum:=0
 	// +optional
-	MinReadySeconds *uint32 `json:"minReadySeconds,omitempty"`
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 	// Pods' hostAliases configuration
 	// +listType=map
 	// +listMapKey=ip
@@ -321,6 +323,17 @@ type AlertmanagerSpec struct {
 	// +kubebuilder:validation:Minimum:=0
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+
+	// HostUsers supports the user space in Kubernetes.
+	//
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/user-namespaces/
+	//
+	//
+	// The feature requires at least Kubernetes 1.28 with the `UserNamespacesSupport` feature gate enabled.
+	// Starting Kubernetes 1.33, the feature is enabled by default.
+	//
+	// +optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 type AlertmanagerConfigMatcherStrategy struct {
@@ -330,7 +343,7 @@ type AlertmanagerConfigMatcherStrategy struct {
 	//
 	// The default value is `OnNamespace`.
 	//
-	// +kubebuilder:validation:Enum="OnNamespace";"None"
+	// +kubebuilder:validation:Enum="OnNamespace";"OnNamespaceExceptForAlertmanagerNamespace";"None"
 	// +kubebuilder:default:="OnNamespace"
 	Type AlertmanagerConfigMatcherStrategyType `json:"type,omitempty"`
 }
@@ -342,6 +355,12 @@ const (
 	// AlertmanagerConfig object only process alerts that have a `namespace`
 	// label equal to the namespace of the object.
 	OnNamespaceConfigMatcherStrategyType AlertmanagerConfigMatcherStrategyType = "OnNamespace"
+
+	// With `OnNamespaceExceptForAlertmanagerNamespace`, the route and inhibition rules of an
+	// AlertmanagerConfig object only process alerts that have a `namespace`
+	// label equal to the namespace of the object, unless the AlertmanagerConfig object
+	// is in the same namespace as the Alertmanager object, where it will process all alerts.
+	OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType AlertmanagerConfigMatcherStrategyType = "OnNamespaceExceptForAlertmanagerNamespace"
 
 	// With `None`, the route and inhbition rules of an AlertmanagerConfig
 	// object process all incoming alerts.
@@ -390,6 +409,25 @@ type AlertmanagerGlobalConfig struct {
 
 	// The default Pagerduty URL.
 	PagerdutyURL *string `json:"pagerdutyUrl,omitempty"`
+
+	// The default Telegram config
+	TelegramConfig *GlobalTelegramConfig `json:"telegram,omitempty"`
+
+	// The default configuration for Jira.
+	JiraConfig *GlobalJiraConfig `json:"jira,omitempty"`
+
+	// The default configuration for VictorOps.
+	VictorOpsConfig *GlobalVictorOpsConfig `json:"victorops,omitempty"`
+
+	// The default configuration for Rocket Chat.
+	RocketChatConfig *GlobalRocketChatConfig `json:"rocketChat,omitempty"`
+
+	// The default configuration for Jira.
+	WebexConfig *GlobalWebexConfig `json:"webex,omitempty"`
+
+	// The default WeChat Config
+	// +optional
+	WeChatConfig *GlobalWeChatConfig `json:"wechat,omitempty"`
 }
 
 // AlertmanagerStatus is the most recent observed status of the Alertmanager cluster. Read-only.
@@ -505,6 +543,88 @@ type GlobalSMTPConfig struct {
 	TLSConfig *SafeTLSConfig `json:"tlsConfig,omitempty"`
 }
 
+// GlobalTelegramConfig configures global Telegram parameters.
+type GlobalTelegramConfig struct {
+	// The default Telegram API URL.
+	//
+	// It requires Alertmanager >= v0.24.0.
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+}
+
+// GlobalJiraConfig configures global Jira parameters.
+type GlobalJiraConfig struct {
+	// The default Jira API URL.
+	//
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+}
+
+// GlobalRocketChatConfig configures global Rocket Chat parameters.
+type GlobalRocketChatConfig struct {
+	// The default Rocket Chat API URL.
+	//
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+
+	// The default Rocket Chat token.
+	//
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +optional
+	Token *v1.SecretKeySelector `json:"token,omitempty"`
+
+	// The default Rocket Chat Token ID.
+	//
+	// It requires Alertmanager >= v0.28.0.
+	//
+	// +optional
+	TokenID *v1.SecretKeySelector `json:"tokenID,omitempty"`
+}
+
+// GlobalWebexConfig configures global Webex parameters.
+// See https://prometheus.io/docs/alerting/latest/configuration/#configuration-file
+type GlobalWebexConfig struct {
+	// The default Webex API URL.
+	//
+	// It requires Alertmanager >= v0.25.0.
+	//
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+}
+
+type GlobalWeChatConfig struct {
+	// The default WeChat API URL.
+	// The default value is "https://qyapi.weixin.qq.com/cgi-bin/"
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+
+	// The default WeChat API Secret.
+	// +optional
+	APISecret *v1.SecretKeySelector `json:"apiSecret,omitempty"`
+
+	// The default WeChat API Corporate ID.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	APICorpID *string `json:"apiCorpID,omitempty"`
+}
+
+// GlobalVictorOpsConfig configures global VictorOps parameters.
+type GlobalVictorOpsConfig struct {
+	// The default VictorOps API URL.
+	//
+	// +optional
+	APIURL *URL `json:"apiURL,omitempty"`
+	// The default VictorOps API Key.
+	//
+	// +optional
+	APIKey *v1.SecretKeySelector `json:"apiKey,omitempty"`
+}
+
 // HostPort represents a "host:port" network address.
 type HostPort struct {
 	// Defines the host's address, it can be a DNS name or a literal IP address.
@@ -572,3 +692,7 @@ type ClusterTLSConfig struct {
 	// +required
 	ClientTLS SafeTLSConfig `json:"client"`
 }
+
+// URL represents a valid URL
+// +kubebuilder:validation:Pattern:="^(http|https)://.+$"
+type URL string
