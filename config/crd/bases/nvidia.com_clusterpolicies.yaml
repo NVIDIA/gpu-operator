@@ -1206,6 +1206,11 @@ spec:
                       DriverInstallDir represents the root at which driver files including libraries,
                       config files, and executables can be found.
                     type: string
+                  kubeletRootDir:
+                    description: |-
+                      KubeletRootDir represents the root with the kubelet base directory
+                      if empty will use /var/lib/kubelet as the default path
+                    type: string
                   rootFS:
                     description: |-
                       RootFS represents the path to the root filesystem of the host.
