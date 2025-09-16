@@ -294,6 +294,9 @@ dcgmExporter:
   env: []
   resources: {}
   service:
+    type: ClusterIP
+    nodePort: null
+    externalTrafficPolicy: Cluster
     internalTrafficPolicy: Cluster
   serviceMonitor:
     enabled: false
