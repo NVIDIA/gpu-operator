@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
-    olm.skipRange: '>=1.9.0 <25.3.3'
+    olm.skipRange: '>=1.9.0 <25.3.4'
     alm-examples: |-
       [
         {
@@ -190,7 +190,7 @@ metadata:
     provider: NVIDIA
     repository: http://github.com/NVIDIA/gpu-operator
     support: NVIDIA
-  name: gpu-operator-certified.v25.3.3
+  name: gpu-operator-certified.v25.3.4
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -951,5 +951,5 @@ spec:
   maturity: stable
   provider:
     name: NVIDIA Corporation
-  version: 25.3.3
-  replaces: gpu-operator-certified.v25.3.2
+  version: 25.3.4
+  replaces: gpu-operator-certified.v25.3.3
