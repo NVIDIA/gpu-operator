@@ -39,10 +39,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -5195,19 +5195,24 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func createDeviceClass(n ClusterPolicyController, spec resourceapi.DeviceClass) (gpuv1.State, error) {
+func createDeviceClass(n ClusterPolicyController, spec unstructured.Unstructured) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
 	obj := spec.DeepCopy()
+	deviceClassName := obj.GetName()
 
-	logger := n.logger.WithValues("DeviceClass", obj.Name)
+	logger := n.logger.WithValues("DeviceClass", deviceClassName)
+
+	gvr := n.resourceGVR
+	apiVersion := gvr.Group + "/" + gvr.Version
+	obj.SetAPIVersion(apiVersion)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[state]) ||
-		(strings.Contains(obj.Name, "compute-domain") && !n.singleton.Spec.DRADriver.IsComputeDomainsEnabled()) ||
-		(obj.Name == "gpu.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) ||
-		(obj.Name == "mig.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) {
-		err := n.client.Delete(ctx, obj)
+		(strings.Contains(deviceClassName, "compute-domain") && !n.singleton.Spec.DRADriver.IsComputeDomainsEnabled()) ||
+		(deviceClassName == "gpu.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) ||
+		(deviceClassName == "mig.nvidia.com" && !n.singleton.Spec.DRADriver.IsGPUsEnabled()) {
+		err := n.dynamicClient.Resource(gvr).Delete(ctx, deviceClassName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -5219,11 +5224,10 @@ func createDeviceClass(n ClusterPolicyController, spec resourceapi.DeviceClass) 
 		return gpuv1.NotReady, err
 	}
 
-	found := &resourceapi.DeviceClass{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
+	found, err := n.dynamicClient.Resource(gvr).Get(ctx, deviceClassName, metav1.GetOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
+		_, err := n.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -5234,9 +5238,9 @@ func createDeviceClass(n ClusterPolicyController, spec resourceapi.DeviceClass) 
 	}
 
 	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
+	obj.SetResourceVersion(found.GetResourceVersion())
 
-	err = n.client.Update(ctx, obj)
+	_, err = n.dynamicClient.Resource(gvr).Update(ctx, obj, metav1.UpdateOptions{})
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
