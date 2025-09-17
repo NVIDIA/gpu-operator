@@ -1872,7 +1872,7 @@ func TestTransformToolkitCtrForCDI(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			mainContainer := &tc.ds.DaemonSet.Spec.Template.Spec.Containers[0]
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
 			transformToolkitCtrForCDI(mainContainer)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
@@ -1928,7 +1928,7 @@ func TestTransformDevicePluginCtrForCDI(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			mainContainer := &tc.ds.DaemonSet.Spec.Template.Spec.Containers[0]
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
 			transformDevicePluginCtrForCDI(mainContainer, tc.cpSpec)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
