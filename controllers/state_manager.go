@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -145,7 +148,8 @@ type OpenShiftDriverToolkit struct {
 
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
-	client client.Client
+	client        client.Client
+	dynamicClient dynamic.Interface
 
 	ctx               context.Context
 	singleton         *gpuv1.ClusterPolicy
@@ -163,6 +167,7 @@ type ClusterPolicyController struct {
 
 	k8sVersion       string
 	draSupported     bool
+	resourceGVR      schema.GroupVersionResource
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
@@ -229,34 +234,48 @@ func KubernetesVersion() (string, error) {
 
 // IsDRASupported checks if Dynamic Resource Allocation is enabled in the Kubernetes cluster
 // by checking if the 'DeviceClass' resource is a valid Kind.
-func IsDRASupported(logger logr.Logger) (bool, error) {
+func IsDRASupported(logger logr.Logger) (bool, schema.GroupVersionResource, error) {
+	var resourceGVR schema.GroupVersionResource
+
 	cfg := config.GetConfigOrDie()
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
-		return false, fmt.Errorf("error building discovery client: %w", err)
+		return false, resourceGVR, fmt.Errorf("error building discovery client: %w", err)
 	}
 
 	apiResourceLists, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return false, fmt.Errorf("error getting API resources from discovery client: %w", err)
+		return false, resourceGVR, fmt.Errorf("error getting API resources from discovery client: %w", err)
 	}
 
-	var matches []string
+	var resourceAPIGroupVersions []string
 	kind := "DeviceClass"
 	for _, resourceList := range apiResourceLists {
 		for _, resource := range resourceList.APIResources {
 			if resource.Kind == kind {
-				matches = append(matches, resourceList.GroupVersion)
+				resourceAPIGroupVersions = append(resourceAPIGroupVersions, resourceList.GroupVersion)
 			}
 		}
 	}
 
-	draSupported := len(matches) > 0
-	if draSupported {
-		logger.Info(fmt.Sprintf("Kind %q exists in the following group/versions: %s", kind, strings.Join(matches, ", ")))
+	if len(resourceAPIGroupVersions) == 0 {
+		return false, resourceGVR, nil
 	}
 
-	return len(matches) > 0, nil
+	logger.Info(fmt.Sprintf("Kind %q exists in the following group/versions: %s", kind, strings.Join(resourceAPIGroupVersions, ", ")))
+
+	switch {
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "deviceclasses"}
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1beta2"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1beta2", Resource: "deviceclasses"}
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1beta1"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1beta1", Resource: "deviceclasses"}
+	default:
+		return false, resourceGVR, fmt.Errorf("failed to determine the GVR to use for the DeviceClass resource")
+	}
+
+	return true, resourceGVR, nil
 }
 
 // GetClusterWideProxy returns cluster wide proxy object setup in OCP
@@ -885,6 +904,16 @@ func (n *ClusterPolicyController) getRuntime() error {
 	return nil
 }
 
+func newDynamicClient() (dynamic.Interface, error) {
+	cfg := config.GetConfigOrDie()
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicClient, nil
+}
+
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
 	n.ctx = ctx
@@ -892,6 +921,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.logger = reconciler.Log
 	n.client = reconciler.Client
 	n.scheme = reconciler.Scheme
+
+	dynamicClient, err := newDynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to get dynamic k8s client: %w", err)
+	}
+	n.dynamicClient = dynamicClient
 
 	if len(n.controls) == 0 {
 		clusterPolicyCtrl.operatorNamespace = reconciler.Namespace
@@ -917,11 +952,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 			return fmt.Errorf("error validating clusterpolicy: %w", err)
 		}
 
-		draSupported, err := IsDRASupported(n.logger)
+		draSupported, resourceGVR, err := IsDRASupported(n.logger)
 		if err != nil {
 			return fmt.Errorf("failed to detect if DRA is supported: %w", err)
 		}
 		n.draSupported = draSupported
+		n.resourceGVR = resourceGVR
 
 		n.operatorMetrics = initOperatorMetrics()
 		n.logger.Info("Operator metrics initialized.")
@@ -954,7 +990,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 
 	// TODO: combine this validation logic with the call to
 	// ValidateClusterPolicySpec() up above
-	err := n.validateClusterPolicy()
+	err = n.validateClusterPolicy()
 	if err != nil {
 		return fmt.Errorf("ClusterPolicy validation failed: %w", err)
 	}
