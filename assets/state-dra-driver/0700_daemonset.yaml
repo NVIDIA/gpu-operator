@@ -55,7 +55,10 @@ spec:
           securityContext:
             privileged: true
           image: "FILLED BY THE OPERATOR"
-          command: ["/bin/sh", "-c"]
+          # (cdesiniotis) note that while the k8s-dra-driver-gpu image is built on top of
+          # the NVIDIA distroless base image, which does not have bash, a statically compiled
+          # bash is added to the final image at /bin/bash.
+          command: ["/bin/bash", "-c"]
           args:
             - /bin/entrypoint.sh "compute-domain-kubelet-plugin -v 6"
           env:
@@ -100,7 +103,10 @@ spec:
           securityContext:
             privileged: true
           image: "FILLED BY THE OPERATOR"
-          command: ["/bin/sh", "-c"]
+          # (cdesiniotis) note that while the k8s-dra-driver-gpu image is built on top of
+          # the NVIDIA distroless base image, which does not have bash, a statically compiled
+          # bash is added to the final image at /bin/bash.
+          command: ["/bin/bash", "-c"]
           args:
             - /bin/entrypoint.sh "gpu-kubelet-plugin -v 6"
           env:

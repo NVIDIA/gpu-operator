@@ -274,9 +274,9 @@ devicePlugin:
     root: "/run/nvidia/mps"
 
 draDriver:
-  repository: nvcr.io/nvidia
+  repository: ghcr.io/nvidia
   image: k8s-dra-driver-gpu
-  version: v25.3.0-rc.4
+  version: v25.8.0-dev-124734f2
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
 
