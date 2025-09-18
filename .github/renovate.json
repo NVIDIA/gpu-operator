@@ -88,6 +88,10 @@
     {
       "matchPackageNames": ["nvcr.io/nvidia/driver"],
       "enabled": false
+    },
+    {
+      "matchDatasources": ["*"],
+      "groupName": "{{depName}}"
     }
   ]
 }
