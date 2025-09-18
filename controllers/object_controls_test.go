@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -1085,285 +1086,308 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 }
 
 func TestServiceMonitor(t *testing.T) {
+	const (
+		testNS   = "test-ns"
+		testSM   = "test-sm"
+		filledNS = "FILLED BY THE OPERATOR"
+	)
+
+	// Create scheme with required types
 	scheme := runtime.NewScheme()
 	require.NoError(t, promv1.AddToScheme(scheme))
 	require.NoError(t, apiextensionsv1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 
-	truePtr := newBoolPtr(true)
-	falsePtr := newBoolPtr(false)
+	smTemplate := promv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{Name: testSM, Labels: map[string]string{}},
+		Spec: promv1.ServiceMonitorSpec{
+			NamespaceSelector: promv1.NamespaceSelector{MatchNames: []string{filledNS}},
+			Endpoints:         []promv1.Endpoint{{}},
+		},
+	}
 
-	type assertsFn func(t *testing.T, c client.Client, name, ns string)
+	// Create controller with given spec and state
+	newController := func(k8s client.Client, scheme *runtime.Scheme, spec gpuv1.ClusterPolicySpec, state string) ClusterPolicyController {
+		cp := &gpuv1.ClusterPolicy{Spec: spec}
+		return ClusterPolicyController{
+			client:            k8s,
+			ctx:               context.Background(),
+			singleton:         cp,
+			scheme:            scheme,
+			operatorNamespace: testNS,
+			resources:         []Resources{{ServiceMonitor: smTemplate}},
+			stateNames:        []string{state},
+			idx:               0,
+			logger:            ctrl.Log.WithName("test"),
+		}
+	}
 
-	testCases := []struct {
-		description       string
-		stateName         string
-		crdPresent        bool
-		dcgmEnabled       *bool
-		nodeStatusEnabled *bool
-		dcgmSMEnabled     *bool
-		withEdits         bool
-		wantState         gpuv1.State
-		extraAssert       assertsFn
+	// Retrieve ServiceMonitor from client
+	getSM := func(k8s client.Client) (*promv1.ServiceMonitor, error) {
+		found := &promv1.ServiceMonitor{}
+		err := k8s.Get(context.Background(), client.ObjectKey{Namespace: testNS, Name: testSM}, found)
+		return found, err
+	}
+
+	// CRD object for tests that need ServiceMonitor CRD present
+	serviceMonitorCRD := &apiextensionsv1.CustomResourceDefinition{ObjectMeta: metav1.ObjectMeta{Name: ServiceMonitorCRDName}}
+
+	tests := []struct {
+		description string
+		stateName   string
+		client      client.Client
+		cpSpec      gpuv1.ClusterPolicySpec
+		wantState   gpuv1.State
+		expectedSM  *promv1.ServiceMonitor
 	}{
 		{
 			description: "dcgm-exporter disabled, CRD missing -> Ready",
 			stateName:   "state-dcgm-exporter",
-			crdPresent:  false,
-			dcgmEnabled: falsePtr,
-			wantState:   gpuv1.Ready,
+			client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
+			},
+			wantState:  gpuv1.Ready,
+			expectedSM: nil,
 		},
 		{
-			description:   "dcgm-exporter SM enabled, CRD missing -> NotReady",
-			stateName:     "state-dcgm-exporter",
-			crdPresent:    false,
-			dcgmEnabled:   truePtr,
-			dcgmSMEnabled: truePtr,
-			wantState:     gpuv1.NotReady,
+			description: "dcgm-exporter SM enabled, CRD missing -> NotReady",
+			stateName:   "state-dcgm-exporter",
+			client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(true)},
+				},
+			},
+			wantState:  gpuv1.NotReady,
+			expectedSM: nil,
 		},
 		{
-			description:   "dcgm-exporter SM disabled, CRD present -> Disabled (delete if exists)",
-			stateName:     "state-dcgm-exporter",
-			crdPresent:    true,
-			dcgmEnabled:   truePtr,
-			dcgmSMEnabled: falsePtr,
-			wantState:     gpuv1.Disabled,
+			description: "dcgm-exporter SM disabled, CRD present -> Disabled (delete if exists)",
+			stateName:   "state-dcgm-exporter",
+			client:      fake.NewClientBuilder().WithScheme(scheme).WithObjects(serviceMonitorCRD).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(false)},
+				},
+			},
+			wantState:  gpuv1.Disabled,
+			expectedSM: nil,
 		},
 		{
 			description: "operator-metrics, CRD missing -> Ready (ignore create)",
 			stateName:   "state-operator-metrics",
-			crdPresent:  false,
+			client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+			cpSpec:      gpuv1.ClusterPolicySpec{},
 			wantState:   gpuv1.Ready,
+			expectedSM:  nil,
 		},
 		{
-			description:       "node-status-exporter disabled, CRD present -> Disabled",
-			stateName:         "state-node-status-exporter",
-			crdPresent:        true,
-			nodeStatusEnabled: falsePtr,
-			wantState:         gpuv1.Disabled,
+			description: "node-status-exporter disabled, CRD present -> Disabled",
+			stateName:   "state-node-status-exporter",
+			client:      fake.NewClientBuilder().WithScheme(scheme).WithObjects(serviceMonitorCRD).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{Enabled: ptr.To(false)},
+			},
+			wantState:  gpuv1.Disabled,
+			expectedSM: nil,
 		},
 		{
-			description:   "dcgm-exporter SM enabled, CRD present -> Ready and applies edits",
-			stateName:     "state-dcgm-exporter",
-			crdPresent:    true,
-			dcgmEnabled:   truePtr,
-			dcgmSMEnabled: truePtr,
-			withEdits:     true,
-			wantState:     gpuv1.Ready,
-			extraAssert: func(t *testing.T, c client.Client, name, ns string) {
-				// Verify object created with edits
-				found := &promv1.ServiceMonitor{}
-				err := c.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, found)
-				require.NoError(t, err)
-				require.Equal(t, promv1.Duration("15s"), found.Spec.Endpoints[0].Interval)
-				require.Equal(t, true, found.Spec.Endpoints[0].HonorLabels)
-				require.Equal(t, "b", found.Labels["a"])
-				require.NotNil(t, found.Spec.Endpoints[0].RelabelConfigs)
-				require.Equal(t, 1, len(found.Spec.Endpoints[0].RelabelConfigs))
+			description: "dcgm-exporter SM enabled, CRD present -> Ready and applies edits",
+			stateName:   "state-dcgm-exporter",
+			client:      fake.NewClientBuilder().WithScheme(scheme).WithObjects(serviceMonitorCRD).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{
+						Enabled:          ptr.To(true),
+						Interval:         promv1.Duration("15s"),
+						HonorLabels:      ptr.To(true),
+						AdditionalLabels: map[string]string{"a": "b"},
+						Relabelings:      []*promv1.RelabelConfig{{Action: "keep"}},
+					},
+				},
+			},
+			wantState: gpuv1.Ready,
+			expectedSM: &promv1.ServiceMonitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-sm",
+					Namespace: "test-ns",
+					Labels:    map[string]string{"a": "b"},
+				},
+				Spec: promv1.ServiceMonitorSpec{
+					NamespaceSelector: promv1.NamespaceSelector{MatchNames: []string{"test-ns"}},
+					Endpoints: []promv1.Endpoint{{
+						Interval:    promv1.Duration("15s"),
+						HonorLabels: true,
+						RelabelConfigs: []promv1.RelabelConfig{{
+							Action: "keep",
+						}},
+					}},
+				},
 			},
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
-			// Build fake client, optionally seed CRD existence by registering type only
-			b := fake.NewClientBuilder().WithScheme(scheme)
-			if tc.crdPresent {
-				crd := &apiextensionsv1.CustomResourceDefinition{ObjectMeta: metav1.ObjectMeta{Name: ServiceMonitorCRDName}}
-				b = b.WithObjects(crd)
-			}
-			k8sClient := b.Build()
+			k8sClient := tc.client
+			controller := newController(k8sClient, scheme, tc.cpSpec, tc.stateName)
 
-			// Base ClusterPolicy
-			cp := &gpuv1.ClusterPolicy{Spec: gpuv1.ClusterPolicySpec{}}
-			// Configure enables
-			if tc.dcgmEnabled != nil {
-				cp.Spec.DCGMExporter.Enabled = tc.dcgmEnabled
-			}
-			if tc.nodeStatusEnabled != nil {
-				cp.Spec.NodeStatusExporter.Enabled = tc.nodeStatusEnabled
-			}
-			// Configure DCGM SM
-			if tc.stateName == "state-dcgm-exporter" {
-				if tc.dcgmSMEnabled != nil {
-					cp.Spec.DCGMExporter.ServiceMonitor = &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: tc.dcgmSMEnabled}
-				}
-			}
-
-			// Build the ServiceMonitor resource template
-			sm := promv1.ServiceMonitor{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-sm", Labels: map[string]string{}},
-				Spec: promv1.ServiceMonitorSpec{
-					NamespaceSelector: promv1.NamespaceSelector{MatchNames: []string{"FILLED BY THE OPERATOR"}},
-					Endpoints:         []promv1.Endpoint{{}},
-				},
-			}
-			// If edits are requested, seed CP config for edits
-			if tc.withEdits {
-				cp.Spec.DCGMExporter.ServiceMonitor = &gpuv1.DCGMExporterServiceMonitorConfig{
-					Enabled:          truePtr,
-					Interval:         promv1.Duration("15s"),
-					HonorLabels:      truePtr,
-					AdditionalLabels: map[string]string{"a": "b"},
-					Relabelings:      []*promv1.RelabelConfig{{Action: "keep"}},
-				}
-			}
-
-			controller := ClusterPolicyController{
-				client:            k8sClient,
-				ctx:               context.TODO(),
-				singleton:         cp,
-				scheme:            scheme,
-				operatorNamespace: "test-ns",
-				resources:         []Resources{{ServiceMonitor: sm}},
-				stateNames:        []string{tc.stateName},
-				idx:               0,
-				logger:            ctrl.Log.WithName("test"),
-			}
-
+			// Calls the actual ServiceMonitor function under test and validates the state
 			state, err := ServiceMonitor(controller)
+
 			require.NoError(t, err)
 			require.Equal(t, tc.wantState, state)
 
-			if tc.extraAssert != nil {
-				tc.extraAssert(t, k8sClient, "test-sm", "test-ns")
+			found, err := getSM(k8sClient)
+			if tc.expectedSM == nil {
+				require.True(t, apierrors.IsNotFound(err))
+				return
 			}
+			require.NoError(t, err)
+
+			require.Equal(t, tc.expectedSM.Name, found.Name)
+			require.Equal(t, tc.expectedSM.Namespace, found.Namespace)
+			require.Equal(t, tc.expectedSM.Labels, found.Labels)
+			require.Equal(t, tc.expectedSM.Spec, found.Spec)
 		})
 	}
 }
 
 func TestService(t *testing.T) {
+	const (
+		testNS      = "test-ns"
+		testService = "nvidia-dcgm-exporter"
+	)
+
+	// Helper to create scheme with required types
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 
-	truePtr := newBoolPtr(true)
-	falsePtr := newBoolPtr(false)
-	localPolicy := corev1.ServiceInternalTrafficPolicyLocal
-
-	// Template Service for dcgm-exporter (triggers preprocessService)
-	svcTmpl := corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "nvidia-dcgm-exporter",
-		},
-		Spec: corev1.ServiceSpec{},
+	// Template Service
+	svcTemplate := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: testService},
+		Spec:       corev1.ServiceSpec{},
 	}
 
-	type assertsFn func(t *testing.T, c client.Client, name, ns string)
+	// Helper to create controller with given spec
+	newController := func(k8s client.Client, scheme *runtime.Scheme, spec gpuv1.ClusterPolicySpec) ClusterPolicyController {
+		cp := &gpuv1.ClusterPolicy{Spec: spec}
+		return ClusterPolicyController{
+			client:            k8s,
+			ctx:               context.Background(),
+			singleton:         cp,
+			scheme:            scheme,
+			operatorNamespace: testNS,
+			resources:         []Resources{{Service: svcTemplate}},
+			stateNames:        []string{"state-dcgm-exporter"},
+			idx:               0,
+			logger:            ctrl.Log.WithName("test"),
+		}
+	}
 
-	testCases := []struct {
-		description string
-		preExisting *corev1.Service
-		enabled     *bool
-		serviceCfg  *gpuv1.DCGMExporterServiceConfig
-		wantState   gpuv1.State
-		extraAssert assertsFn
+	// Helper to retrieve Service from client
+	getService := func(t *testing.T, k8s client.Client) (*corev1.Service, error) {
+		found := &corev1.Service{}
+		err := k8s.Get(context.Background(), client.ObjectKey{Namespace: testNS, Name: testService}, found)
+		return found, err
+	}
+
+	localPolicy := corev1.ServiceInternalTrafficPolicyLocal
+
+	tests := []struct {
+		description   string
+		client        client.Client
+		cpSpec        gpuv1.ClusterPolicySpec
+		wantState     gpuv1.State
+		expectService bool
+		expectType    corev1.ServiceType
+		expectPolicy  *corev1.ServiceInternalTrafficPolicy
+		expectIP      string // For ClusterIP preservation test
 	}{
 		{
 			description: "create and preprocess",
-			enabled:     truePtr,
-			serviceCfg: &gpuv1.DCGMExporterServiceConfig{
-				Type:                  corev1.ServiceTypeNodePort,
-				InternalTrafficPolicy: &localPolicy,
+			client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type:                  corev1.ServiceTypeNodePort,
+						InternalTrafficPolicy: &localPolicy,
+					},
+				},
 			},
-			wantState: gpuv1.Ready,
-			extraAssert: func(t *testing.T, c client.Client, name, ns string) {
-				found := &corev1.Service{}
-				err := c.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, found)
-				require.NoError(t, err)
-				require.Equal(t, corev1.ServiceTypeNodePort, found.Spec.Type)
-				require.NotNil(t, found.Spec.InternalTrafficPolicy)
-				require.Equal(t, corev1.ServiceInternalTrafficPolicyLocal, *found.Spec.InternalTrafficPolicy)
-			},
+			wantState:     gpuv1.Ready,
+			expectService: true,
+			expectType:    corev1.ServiceTypeNodePort,
+			expectPolicy:  &localPolicy,
 		},
 		{
 			description: "update preserves ClusterIP",
-			preExisting: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nvidia-dcgm-exporter",
-					Namespace: "test-ns",
-				},
+			client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: testService, Namespace: testNS},
 				Spec: corev1.ServiceSpec{
 					Type:      corev1.ServiceTypeClusterIP,
 					ClusterIP: "10.0.0.42",
 				},
+			}).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type:                  corev1.ServiceTypeNodePort,
+						InternalTrafficPolicy: &localPolicy,
+					},
+				},
 			},
-			enabled: truePtr,
-			serviceCfg: &gpuv1.DCGMExporterServiceConfig{
-				Type:                  corev1.ServiceTypeNodePort,
-				InternalTrafficPolicy: &localPolicy,
-			},
-			wantState: gpuv1.Ready,
-			extraAssert: func(t *testing.T, c client.Client, name, ns string) {
-				found := &corev1.Service{}
-				err := c.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, found)
-				require.NoError(t, err)
-				// ClusterIP preserved
-				require.Equal(t, "10.0.0.42", found.Spec.ClusterIP)
-				// Preprocess applied on update too
-				require.Equal(t, corev1.ServiceTypeNodePort, found.Spec.Type)
-				require.NotNil(t, found.Spec.InternalTrafficPolicy)
-				require.Equal(t, corev1.ServiceInternalTrafficPolicyLocal, *found.Spec.InternalTrafficPolicy)
-			},
+			wantState:     gpuv1.Ready,
+			expectService: true,
+			expectType:    corev1.ServiceTypeNodePort,
+			expectPolicy:  &localPolicy,
+			expectIP:      "10.0.0.42",
 		},
 		{
 			description: "disabled deletes and returns Disabled",
-			preExisting: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nvidia-dcgm-exporter",
-					Namespace: "test-ns",
-				},
+			client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: testService, Namespace: testNS},
 				Spec: corev1.ServiceSpec{
 					Type:      corev1.ServiceTypeClusterIP,
 					ClusterIP: "10.0.0.42",
 				},
+			}).Build(),
+			cpSpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
 			},
-			enabled:    falsePtr,
-			serviceCfg: nil,
-			wantState:  gpuv1.Disabled,
-			extraAssert: func(t *testing.T, c client.Client, name, ns string) {
-				found := &corev1.Service{}
-				err := c.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, found)
-				require.True(t, apierrors.IsNotFound(err))
-			},
+			wantState:     gpuv1.Disabled,
+			expectService: false,
 		},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
-			b := fake.NewClientBuilder().WithScheme(scheme)
-			if tc.preExisting != nil {
-				b = b.WithObjects(tc.preExisting)
-			}
-			k8sClient := b.Build()
-
-			cp := &gpuv1.ClusterPolicy{
-				Spec: gpuv1.ClusterPolicySpec{
-					DCGMExporter: gpuv1.DCGMExporterSpec{
-						Enabled:     tc.enabled,
-						ServiceSpec: tc.serviceCfg,
-					},
-				},
-			}
-
-			controller := ClusterPolicyController{
-				client:            k8sClient,
-				ctx:               context.TODO(),
-				singleton:         cp,
-				scheme:            scheme,
-				operatorNamespace: "test-ns",
-				resources:         []Resources{{Service: svcTmpl}},
-				stateNames:        []string{"state-dcgm-exporter"},
-				idx:               0,
-				logger:            ctrl.Log.WithName("test"),
-			}
+			controller := newController(tc.client, scheme, tc.cpSpec)
 
 			state, err := Service(controller)
 			require.NoError(t, err)
 			require.Equal(t, tc.wantState, state)
 
-			if tc.extraAssert != nil {
-				tc.extraAssert(t, k8sClient, "nvidia-dcgm-exporter", "test-ns")
+			found, err := getService(t, tc.client)
+			if !tc.expectService {
+				require.True(t, apierrors.IsNotFound(err))
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectType, found.Spec.Type)
+			if tc.expectPolicy != nil {
+				require.NotNil(t, found.Spec.InternalTrafficPolicy)
+				require.Equal(t, *tc.expectPolicy, *found.Spec.InternalTrafficPolicy)
+			}
+			if tc.expectIP != "" {
+				require.Equal(t, tc.expectIP, found.Spec.ClusterIP)
 			}
 		})
 	}
