@@ -222,7 +222,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.17.8-ubuntu20.04
+  version: v1.18.0-rc.4
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
