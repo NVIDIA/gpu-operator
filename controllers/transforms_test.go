@@ -647,15 +647,19 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/run/toolkit/config/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/run/toolkit/config", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
@@ -718,14 +722,18 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true"},
 						{Name: "RUNTIME", Value: "containerd"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/run/toolkit/config/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/run/toolkit/config", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
