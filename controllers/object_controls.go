@@ -1367,7 +1367,13 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// Handle the drop-in configs
-	if runtimeConfigFiles.dropInConfigFile != "" {
+	// TODO: It's a bit of a hack to skip the `nvidia-kata-manager` container here.
+	// Ideally if the two projects are using the SAME API then this should be
+	// captured more rigorously.
+	// Note that we probably want to implement drop-in file support in the
+	// kata manager in any case -- in which case it will be good to use a
+	// similar implementation.
+	if runtimeConfigFiles.dropInConfigFile != "" && containerName != "nvidia-kata-manager" {
 		sourceConfigFileName := path.Base(runtimeConfigFiles.dropInConfigFile)
 		sourceConfigDir := path.Dir(runtimeConfigFiles.dropInConfigFile)
 		// TODO: This should be a constant.
