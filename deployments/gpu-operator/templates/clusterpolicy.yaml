@@ -459,6 +459,50 @@ spec:
       name: {{ .Values.devicePlugin.config.name }}
       default: {{ .Values.devicePlugin.config.default }}
     {{- end }}
+  draDriver:
+    {{- if .Values.draDriver.repository }}
+    repository: {{ .Values.draDriver.repository }}
+    {{- end }}
+    {{- if .Values.draDriver.image }}
+    image: {{ .Values.draDriver.image }}
+    {{- end }}
+    {{- if .Values.draDriver.version }}
+    version: {{ .Values.draDriver.version | quote }}
+    {{- end }}
+    {{- if .Values.draDriver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.draDriver.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.draDriver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.draDriver.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    gpus:
+      enabled: {{ .Values.draDriver.gpus.enabled }}
+      kubeletPlugin:
+        {{- if .Values.draDriver.gpus.kubeletPlugin.env }}
+        env: {{ toYaml .Values.draDriver.gpus.kubeletPlugin.env | nindent 8 }}
+        {{- end }}
+        {{- if .Values.draDriver.gpus.kubeletPlugin.resources }}
+        resources: {{ toYaml .Values.draDriver.gpus.kubeletPlugin.resources | nindent 8 }}
+        {{- end }}
+    computeDomains:
+      enabled: {{ .Values.draDriver.computeDomains.enabled }}
+      controller:
+        {{- if .Values.draDriver.computeDomains.controller.env }}
+        env: {{ toYaml .Values.draDriver.computeDomains.controller.env | nindent 8 }}
+        {{- end }}
+        {{- if .Values.draDriver.computeDomains.controller.resources }}
+        resources: {{ toYaml .Values.draDriver.computeDomains.controller.resources | nindent 8 }}
+        {{- end }}
+        {{- if .Values.draDriver.computeDomains.controller.tolerations }}
+        tolerations: {{ toYaml .Values.draDriver.computeDomains.controller.tolerations | nindent 8 }}
+        {{- end }}
+      kubeletPlugin:
+        {{- if .Values.draDriver.computeDomains.kubeletPlugin.env }}
+        env: {{ toYaml .Values.draDriver.computeDomains.kubeletPlugin.env | nindent 8 }}
+        {{- end }}
+        {{- if .Values.draDriver.computeDomains.kubeletPlugin.resources }}
+        resources: {{ toYaml .Values.draDriver.computeDomains.kubeletPlugin.resources | nindent 8 }}
+        {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
     {{- if .Values.dcgm.repository }}

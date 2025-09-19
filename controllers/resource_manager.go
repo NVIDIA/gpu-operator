@@ -29,6 +29,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	secv1 "github.com/openshift/api/security/v1"
 
@@ -45,11 +46,11 @@ type assetsFromFile []byte
 
 // Resources indicates resources managed by GPU operator
 type Resources struct {
-	ServiceAccount             corev1.ServiceAccount
+	ServiceAccounts            []corev1.ServiceAccount
 	Role                       rbacv1.Role
-	RoleBinding                rbacv1.RoleBinding
-	ClusterRole                rbacv1.ClusterRole
-	ClusterRoleBinding         rbacv1.ClusterRoleBinding
+	RoleBindings               []rbacv1.RoleBinding
+	ClusterRoles               []rbacv1.ClusterRole
+	ClusterRoleBindings        []rbacv1.ClusterRoleBinding
 	ConfigMaps                 []corev1.ConfigMap
 	DaemonSet                  appsv1.DaemonSet
 	Deployment                 appsv1.Deployment
@@ -61,6 +62,7 @@ type Resources struct {
 	SecurityContextConstraints secv1.SecurityContextConstraints
 	RuntimeClasses             []nodev1.RuntimeClass
 	PrometheusRule             promv1.PrometheusRule
+	DeviceClasses              []unstructured.Unstructured
 }
 
 func filePathWalkDir(n *ClusterPolicyController, root string) ([]string, error) {
@@ -119,25 +121,45 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 
 		switch kind {
 		case "ServiceAccount":
-			_, _, err := s.Decode(m, nil, &res.ServiceAccount)
+			serviceAccount := corev1.ServiceAccount{}
+			_, _, err := s.Decode(m, nil, &serviceAccount)
 			panicIfError(err)
-			ctrl = append(ctrl, ServiceAccount)
+			res.ServiceAccounts = append(res.ServiceAccounts, serviceAccount)
+			// only add the ctrl function when the first ServiceAccount is added for this component
+			if len(res.ServiceAccounts) == 1 {
+				ctrl = append(ctrl, ServiceAccounts)
+			}
 		case "Role":
 			_, _, err := s.Decode(m, nil, &res.Role)
 			panicIfError(err)
 			ctrl = append(ctrl, Role)
 		case "RoleBinding":
-			_, _, err := s.Decode(m, nil, &res.RoleBinding)
+			roleBinding := rbacv1.RoleBinding{}
+			_, _, err := s.Decode(m, nil, &roleBinding)
 			panicIfError(err)
-			ctrl = append(ctrl, RoleBinding)
+			res.RoleBindings = append(res.RoleBindings, roleBinding)
+			// only add the ctrl function when the first RoleBinding is added for this component
+			if len(res.RoleBindings) == 1 {
+				ctrl = append(ctrl, RoleBindings)
+			}
 		case "ClusterRole":
-			_, _, err := s.Decode(m, nil, &res.ClusterRole)
+			clusterRole := rbacv1.ClusterRole{}
+			_, _, err := s.Decode(m, nil, &clusterRole)
 			panicIfError(err)
-			ctrl = append(ctrl, ClusterRole)
+			res.ClusterRoles = append(res.ClusterRoles, clusterRole)
+			// only add the ctrl function when the first ClusterRole is added for this component
+			if len(res.ClusterRoles) == 1 {
+				ctrl = append(ctrl, ClusterRoles)
+			}
 		case "ClusterRoleBinding":
-			_, _, err := s.Decode(m, nil, &res.ClusterRoleBinding)
+			clusterRoleBinding := rbacv1.ClusterRoleBinding{}
+			_, _, err := s.Decode(m, nil, &clusterRoleBinding)
 			panicIfError(err)
-			ctrl = append(ctrl, ClusterRoleBinding)
+			res.ClusterRoleBindings = append(res.ClusterRoleBindings, clusterRoleBinding)
+			// only add the ctrl function when the first ClusterRoleBinding is added for this component
+			if len(res.ClusterRoleBindings) == 1 {
+				ctrl = append(ctrl, ClusterRoleBindings)
+			}
 		case "ConfigMap":
 			cm := corev1.ConfigMap{}
 			_, _, err := s.Decode(m, nil, &cm)
@@ -180,6 +202,15 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			_, _, err := s.Decode(m, nil, &res.PrometheusRule)
 			panicIfError(err)
 			ctrl = append(ctrl, PrometheusRule)
+		case "DeviceClass":
+			deviceClass := unstructured.Unstructured{}
+			_, _, err := s.Decode(m, nil, &deviceClass)
+			panicIfError(err)
+			res.DeviceClasses = append(res.DeviceClasses, deviceClass)
+			// only add the ctrl function when the first DeviceClass is added
+			if len(res.DeviceClasses) == 1 {
+				ctrl = append(ctrl, DeviceClasses)
+			}
 		default:
 			n.logger.Info("Unknown Resource", "Manifest", m, "Kind", kind)
 		}

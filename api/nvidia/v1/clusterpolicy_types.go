@@ -51,6 +51,8 @@ type ClusterPolicySpec struct {
 	Toolkit ToolkitSpec `json:"toolkit"`
 	// DevicePlugin component spec
 	DevicePlugin DevicePluginSpec `json:"devicePlugin"`
+	// DRADriver component spec
+	DRADriver DRADriverSpec `json:"draDriver"`
 	// DCGMExporter spec
 	DCGMExporter DCGMExporterSpec `json:"dcgmExporter"`
 	// DCGM component spec
@@ -853,6 +855,104 @@ type SandboxDevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+}
+
+// DRADriverSpec defines the properties for the NVIDIA DRA Driver deployment
+type DRADriverSpec struct {
+	// NVIDIA DRA Driver image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// NVIDIA DRA Driver image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// NVIDIA DRA Driver image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// GPUs defines configuration for GPUs in the NVIDIA DRA Driver
+	GPUs DRADriverGPUs `json:"gpus,omitempty"`
+
+	// ComputeDomains defines configuration for ComputeDomains in the NVIDIA DRA Driver
+	ComputeDomains DRADriverComputeDomains `json:"computeDomains,omitempty"`
+}
+
+// DRADriverGPUs defines configuration for GPUs in the NVIDIA DRA Driver
+type DRADriverGPUs struct {
+	// Enabled indicates if GPUs are enabled in the NVIDIA DRA Driver
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPUs in the NVIDIA DRA Driver"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// KubeletPlugin defines configuration for the NVIDIA DRA Driver kubelet plugin
+	KubeletPlugin DRADriverKubeletPlugin `json:"kubeletPlugin,omitempty"`
+}
+
+// DRADriverComputeDomains defines configuration for ComputeDomains in the NVIDIA DRA Driver
+type DRADriverComputeDomains struct {
+	// Enabled indicates if ComputeDomains are enabled in the NVIDIA DRA Driver
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable ComputeDomains in the NVIDIA DRA Driver"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Controller defines configuration for the NVIDIA DRA Driver controller
+	Controller DRADriverController `json:"controller,omitempty"`
+
+	// KubeletPlugin defines configuration for the NVIDIA DRA Driver kubelet plugin
+	KubeletPlugin DRADriverKubeletPlugin `json:"kubeletPlugin,omitempty"`
+}
+
+// DRADriverController defines configuration for the NVIDIA DRA Driver controller
+type DRADriverController struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: Define resources requests and limits
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: Set tolerations
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Tolerations"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:io.kubernetes:Tolerations"
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// DRADriverKubeletPlugin defines configuration for the NVIDIA DRA Driver kubelet plugin
+type DRADriverKubeletPlugin struct {
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: Define resources requests and limits
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 }
 
 // DCGMExporterSpec defines the properties for NVIDIA DCGM Exporter deployment
@@ -1798,6 +1898,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *SandboxDevicePluginSpec:
 		config := spec.(*SandboxDevicePluginSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "SANDBOX_DEVICE_PLUGIN_IMAGE")
+	case *DRADriverSpec:
+		config := spec.(*DRADriverSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "DRA_DRIVER_IMAGE")
 	case *DCGMExporterSpec:
 		config := spec.(*DCGMExporterSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DCGM_EXPORTER_IMAGE")
@@ -1900,6 +2003,21 @@ func (p *DevicePluginSpec) IsEnabled() bool {
 		return true
 	}
 	return *p.Enabled
+}
+
+// IsEnabled returns true if the DRA Driver is enabled through gpu-operator
+func (d *DRADriverSpec) IsEnabled() bool {
+	return d.IsGPUsEnabled() || d.IsComputeDomainsEnabled()
+}
+
+// IsGPUsEnabled returns true if the GPUs resource is enabled in the DRA Driver
+func (d *DRADriverSpec) IsGPUsEnabled() bool {
+	return d.GPUs.Enabled != nil && *d.GPUs.Enabled
+}
+
+// IsComputeDomainsEnabled returns true if the ComputeDomains resource is enabled in the DRA Driver
+func (d *DRADriverSpec) IsComputeDomainsEnabled() bool {
+	return d.ComputeDomains.Enabled != nil && *d.ComputeDomains.Enabled
 }
 
 // IsEnabled returns true if dcgm-exporter is enabled(default) through gpu-operator
