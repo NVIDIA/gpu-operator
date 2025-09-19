@@ -57,16 +57,18 @@ import (
 const (
 	// DefaultContainerdConfigFile indicates default config file path for containerd
 	DefaultContainerdConfigFile = "/etc/containerd/config.toml"
+	// DefaultContainerdDropInConfigFile indicates default drop-in config file path for containerd
+	DefaultContainerdDropInConfigFile = "/etc/containerd/conf.d/99-nvidia.toml"
 	// DefaultContainerdSocketFile indicates default containerd socket file
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
 	// DefaultDockerConfigFile indicates default config file path for docker
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
-	// DefaultCRIOConfigFile indicates default config file path for cri-o.
-	// Note, config files in the drop-in directory, /etc/crio/crio.conf.d,
-	// have a higher priority than the default /etc/crio/crio.conf file.
-	DefaultCRIOConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
+	// DefaultCRIOConfigFile indicates default config file path for cri-o. .
+	DefaultCRIOConfigFile = "/etc/crio/config.toml"
+	// DefaultCRIODropInConfigFile indicates the default path to the drop-in config file for cri-o
+	DefaultCRIODropInConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
 	// TrustedCAConfigMapName indicates configmap with custom user CA injected
 	TrustedCAConfigMapName = "gpu-operator-trusted-ca"
 	// TrustedCABundleFileName indicates custom user ca certificate filename
@@ -95,6 +97,8 @@ const (
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
 	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
+	// DefaultRuntimeDropInConfigTargetDir represents target directory where drop-in config directory will be mounted
+	DefaultRuntimeDropInConfigTargetDir = "/runtime/config-dir.d/"
 	// ValidatorImageEnvName indicates env name for validator image passed
 	ValidatorImageEnvName = "VALIDATOR_IMAGE"
 	// ValidatorImagePullPolicyEnvName indicates env name for validator image pull policy passed
@@ -1355,12 +1359,18 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		setContainerEnv(mainContainer, CRIOConfigModeEnvName, "config")
 	}
 
+	// For runtime config files we have top-level configs and drop-in files.
+	// These are supported as follows:
+	//   * Docker only supports top-level config files.
+	//   * Containerd supports drop-in files, but required modification to the top-level config
+	//   * Crio supports drop-in files at a predefined location. The top-level config may be read
+	//     but should not be updated.
+
 	// setup mounts for runtime config file
-	runtimeConfigFile, err := getRuntimeConfigFile(mainContainer, runtime)
+	topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(mainContainer, runtime)
 	if err != nil {
-		return fmt.Errorf("error getting path to runtime config file: %v", err)
+		return fmt.Errorf("error getting path to runtime config file: %w", err)
 	}
-	sourceConfigFileName := path.Base(runtimeConfigFile)
 
 	var configEnvvarName string
 	switch runtime {
@@ -1372,15 +1382,43 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		configEnvvarName = "CRIO_CONFIG"
 	}
 
-	setContainerEnv(mainContainer, "RUNTIME_CONFIG", DefaultRuntimeConfigTargetDir+sourceConfigFileName)
-	setContainerEnv(mainContainer, configEnvvarName, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
+	// Handle the top-level configs
+	if topLevelConfigFile != "" {
+		sourceConfigFileName := path.Base(topLevelConfigFile)
+		sourceConfigDir := path.Dir(topLevelConfigFile)
+		containerConfigDir := DefaultRuntimeConfigTargetDir
+		setContainerEnv(mainContainer, "RUNTIME_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(mainContainer, configEnvvarName, containerConfigDir+sourceConfigFileName)
 
-	volMountConfigName := fmt.Sprintf("%s-config", runtime)
-	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
-	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
+		volMountConfigName := fmt.Sprintf("%s-config", runtime)
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
+		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
 
-	configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile), Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+	}
+
+	// Handle the drop-in configs
+	// TODO: It's a bit of a hack to skip the `nvidia-kata-manager` container here.
+	// Ideally if the two projects are using the SAME API then this should be
+	// captured more rigorously.
+	// Note that we probably want to implement drop-in file support in the
+	// kata manager in any case -- in which case it will be good to use a
+	// similar implementation.
+	if dropInConfigFile != "" && containerName != "nvidia-kata-manager" {
+		sourceConfigFileName := path.Base(dropInConfigFile)
+		sourceConfigDir := path.Dir(dropInConfigFile)
+		containerConfigDir := DefaultRuntimeDropInConfigTargetDir
+		setContainerEnv(mainContainer, "RUNTIME_DROP_IN_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(mainContainer, "RUNTIME_DROP_IN_CONFIG_HOST_PATH", dropInConfigFile)
+
+		volMountConfigName := fmt.Sprintf("%s-drop-in-config", runtime)
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
+		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
+
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+	}
 
 	// setup mounts for runtime socket file
 	runtimeSocketFile, err := getRuntimeSocketFile(mainContainer, runtime)
@@ -2396,30 +2434,47 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	return nil
 }
 
-// get runtime(docker, containerd) config file path based on toolkit container env or default
-func getRuntimeConfigFile(c *corev1.Container, runtime string) (string, error) {
-	var runtimeConfigFile string
+// getRuntimeConfigFiles returns the path to the top-level and drop-in config files that
+// should be used when configuring the specified container runtime.
+func getRuntimeConfigFiles(c *corev1.Container, runtime string) (string, string, error) {
 	switch runtime {
 	case gpuv1.Docker.String():
-		runtimeConfigFile = DefaultDockerConfigFile
+		topLevelConfigFile := DefaultDockerConfigFile
 		if value := getContainerEnv(c, "DOCKER_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		// Docker does not support drop-in files.
+		return topLevelConfigFile, "", nil
 	case gpuv1.Containerd.String():
-		runtimeConfigFile = DefaultContainerdConfigFile
+		topLevelConfigFile := DefaultContainerdConfigFile
 		if value := getContainerEnv(c, "CONTAINERD_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		dropInConfigFile := DefaultContainerdDropInConfigFile
+		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
+			dropInConfigFile = value
+		}
+		return topLevelConfigFile, dropInConfigFile, nil
 	case gpuv1.CRIO.String():
-		runtimeConfigFile = DefaultCRIOConfigFile
+		// TODO: We should still allow the top-level config to be specified
+		topLevelConfigFile := DefaultCRIOConfigFile
 		if value := getContainerEnv(c, "CRIO_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		dropInConfigFile := DefaultCRIODropInConfigFile
+		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
+			dropInConfigFile = value
+		}
+		return topLevelConfigFile, dropInConfigFile, nil
 	default:
-		return "", fmt.Errorf("invalid runtime: %s", runtime)
+		return "", "", fmt.Errorf("invalid runtime: %s", runtime)
 	}
-
-	return runtimeConfigFile, nil
 }
 
 // get runtime(docker, containerd) socket file path based on toolkit container env or default

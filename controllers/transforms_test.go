@@ -332,6 +332,7 @@ func TestTransformForRuntime(t *testing.T) {
 				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
@@ -340,11 +341,14 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
 						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
 						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
 					},
 				}),
@@ -354,17 +358,21 @@ func TestTransformForRuntime(t *testing.T) {
 			runtime:     gpuv1.CRIO,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("crio-config", filepath.Dir(DefaultCRIOConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
 						{Name: CRIOConfigModeEnvName, Value: "config"},
-						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
-						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 					},
 				}),
 		},
@@ -657,15 +665,19 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
@@ -731,14 +743,18 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true"},
 						{Name: "RUNTIME", Value: "containerd"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
@@ -2260,4 +2276,130 @@ func TestTransformDevicePluginCtrForCDI(t *testing.T) {
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
+}
+
+func TestGetRuntimeConfigFiles(t *testing.T) {
+	testCases := []struct {
+		description                string
+		container                  corev1.Container
+		runtime                    string
+		expectedTopLevelConfigFile string
+		expectedDropInConfigFile   string
+		errorExpected              bool
+	}{
+		{
+			description:   "invalid runtime",
+			container:     corev1.Container{},
+			runtime:       "foo",
+			errorExpected: true,
+		},
+		{
+			description:                "docker",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: DefaultDockerConfigFile,
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description: "docker, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/docker/daemon.json"},
+				},
+			},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: "/path/to/docker/daemon.json",
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description: "docker, config path overridden, DOCKER_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/docker/daemon.json"},
+					{Name: "DOCKER_CONFIG", Value: "/another/path/to/docker/daemon.json"},
+				},
+			},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: "/another/path/to/docker/daemon.json",
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description:                "containerd",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: DefaultContainerdConfigFile,
+			expectedDropInConfigFile:   DefaultContainerdDropInConfigFile,
+		},
+		{
+			description: "containerd, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/containerd/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/containerd/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: "/path/to/containerd/config.toml",
+			expectedDropInConfigFile:   "/path/to/containerd/drop-in/config.toml",
+		},
+		{
+			description: "containerd, config path overridden, CONTAINERD_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/containerd/config.toml"},
+					{Name: "CONTAINERD_CONFIG", Value: "/another/path/to/containerd/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/containerd/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: "/another/path/to/containerd/config.toml",
+			expectedDropInConfigFile:   "/path/to/containerd/drop-in/config.toml",
+		},
+		{
+			description:                "crio",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: DefaultCRIOConfigFile,
+			expectedDropInConfigFile:   DefaultCRIODropInConfigFile,
+		},
+		{
+			description: "crio, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/crio/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/crio/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: "/path/to/crio/config.toml",
+			expectedDropInConfigFile:   "/path/to/crio/drop-in/config.toml",
+		},
+		{
+			description: "crio, config path overridden, CRIO_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/crio/config.toml"},
+					{Name: "CRIO_CONFIG", Value: "/another/path/to/crio/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/crio/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: "/another/path/to/crio/config.toml",
+			expectedDropInConfigFile:   "/path/to/crio/drop-in/config.toml",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(&tc.container, tc.runtime)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedTopLevelConfigFile, topLevelConfigFile)
+			require.EqualValues(t, tc.expectedDropInConfigFile, dropInConfigFile)
+		})
+	}
+
 }
