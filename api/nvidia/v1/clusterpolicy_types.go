@@ -921,6 +921,11 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Service configuration for NVIDIA DCGM Exporter"
 	ServiceSpec *DCGMExporterServiceConfig `json:"service,omitempty"`
+
+	// Optional: Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // DCGMExporterMetricsConfig defines metrics to be collected by NVIDIA DCGM Exporter
