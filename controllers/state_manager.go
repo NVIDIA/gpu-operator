@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -30,7 +31,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -84,14 +87,15 @@ var (
 
 var gpuStateLabels = map[string]map[string]string{
 	gpuWorkloadConfigContainer: {
-		"nvidia.com/gpu.deploy.driver":                "true",
-		"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
-		"nvidia.com/gpu.deploy.container-toolkit":     "true",
-		"nvidia.com/gpu.deploy.device-plugin":         "true",
-		"nvidia.com/gpu.deploy.dcgm":                  "true",
-		"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
-		"nvidia.com/gpu.deploy.node-status-exporter":  "true",
-		"nvidia.com/gpu.deploy.operator-validator":    "true",
+		"nvidia.com/gpu.deploy.driver":                    "true",
+		"nvidia.com/gpu.deploy.gpu-feature-discovery":     "true",
+		"nvidia.com/gpu.deploy.container-toolkit":         "true",
+		"nvidia.com/gpu.deploy.device-plugin":             "true",
+		"nvidia.com/gpu.deploy.dra-driver-kubelet-plugin": "true",
+		"nvidia.com/gpu.deploy.dcgm":                      "true",
+		"nvidia.com/gpu.deploy.dcgm-exporter":             "true",
+		"nvidia.com/gpu.deploy.node-status-exporter":      "true",
+		"nvidia.com/gpu.deploy.operator-validator":        "true",
 	},
 	gpuWorkloadConfigVMPassthrough: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
@@ -140,7 +144,8 @@ type OpenShiftDriverToolkit struct {
 
 // ClusterPolicyController represents clusterpolicy controller spec for GPU operator
 type ClusterPolicyController struct {
-	client client.Client
+	client        client.Client
+	dynamicClient dynamic.Interface
 
 	ctx               context.Context
 	singleton         *gpuv1.ClusterPolicy
@@ -157,6 +162,8 @@ type ClusterPolicyController struct {
 	currentKernelVersion string
 
 	k8sVersion       string
+	draSupported     bool
+	resourceGVR      schema.GroupVersionResource
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
@@ -217,6 +224,52 @@ func KubernetesVersion() (string, error) {
 	}
 
 	return info.GitVersion, nil
+}
+
+// IsDRASupported checks if Dynamic Resource Allocation is enabled in the Kubernetes cluster
+// by checking if the 'DeviceClass' resource is a valid Kind.
+func IsDRASupported(logger logr.Logger) (bool, schema.GroupVersionResource, error) {
+	var resourceGVR schema.GroupVersionResource
+
+	cfg := config.GetConfigOrDie()
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return false, resourceGVR, fmt.Errorf("error building discovery client: %w", err)
+	}
+
+	apiResourceLists, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return false, resourceGVR, fmt.Errorf("error getting API resources from discovery client: %w", err)
+	}
+
+	var resourceAPIGroupVersions []string
+	kind := "DeviceClass"
+	for _, resourceList := range apiResourceLists {
+		for _, resource := range resourceList.APIResources {
+			if resource.Kind == kind {
+				resourceAPIGroupVersions = append(resourceAPIGroupVersions, resourceList.GroupVersion)
+			}
+		}
+	}
+
+	if len(resourceAPIGroupVersions) == 0 {
+		return false, resourceGVR, nil
+	}
+
+	logger.Info(fmt.Sprintf("Kind %q exists in the following group/versions: %s", kind, strings.Join(resourceAPIGroupVersions, ", ")))
+
+	switch {
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "deviceclasses"}
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1beta2"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1beta2", Resource: "deviceclasses"}
+	case slices.Contains(resourceAPIGroupVersions, "resource.k8s.io/v1beta1"):
+		resourceGVR = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1beta1", Resource: "deviceclasses"}
+	default:
+		return false, resourceGVR, fmt.Errorf("failed to determine the GVR to use for the DeviceClass resource")
+	}
+
+	return true, resourceGVR, nil
 }
 
 // GetClusterWideProxy returns cluster wide proxy object setup in OCP
@@ -749,6 +802,16 @@ func (n *ClusterPolicyController) getRuntime() error {
 	return nil
 }
 
+func newDynamicClient() (dynamic.Interface, error) {
+	cfg := config.GetConfigOrDie()
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicClient, nil
+}
+
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
 	n.ctx = ctx
@@ -756,6 +819,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.logger = reconciler.Log
 	n.client = reconciler.Client
 	n.scheme = reconciler.Scheme
+
+	dynamicClient, err := newDynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to get dynamic k8s client: %w", err)
+	}
+	n.dynamicClient = dynamicClient
 
 	if len(n.controls) == 0 {
 		clusterPolicyCtrl.operatorNamespace = reconciler.Namespace
@@ -776,6 +845,13 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.k8sVersion = k8sVersion
 		n.logger.Info("Kubernetes version detected", "version", k8sVersion)
 
+		draSupported, resourceGVR, err := IsDRASupported(n.logger)
+		if err != nil {
+			return fmt.Errorf("failed to detect if DRA is supported: %w", err)
+		}
+		n.draSupported = draSupported
+		n.resourceGVR = resourceGVR
+
 		n.operatorMetrics = initOperatorMetrics()
 		n.logger.Info("Operator metrics initialized.")
 
@@ -791,7 +867,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 		addState(n, "/opt/gpu-operator/state-mig-manager")
 		addState(n, "/opt/gpu-operator/state-node-status-exporter")
-		// add sandbox workload states
 		addState(n, "/opt/gpu-operator/state-vgpu-manager")
 		addState(n, "/opt/gpu-operator/state-vgpu-device-manager")
 		addState(n, "/opt/gpu-operator/state-sandbox-validation")
@@ -799,6 +874,15 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
 		addState(n, "/opt/gpu-operator/state-kata-manager")
 		addState(n, "/opt/gpu-operator/state-cc-manager")
+
+		if n.draSupported {
+			addState(n, "/opt/gpu-operator/state-dra-driver")
+		}
+	}
+
+	err = n.validateClusterPolicy()
+	if err != nil {
+		return fmt.Errorf("ClusterPolicy validation failed: %w", err)
 	}
 
 	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
@@ -1018,6 +1102,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return true
 	case "state-operator-metrics":
 		return true
+	case "state-dra-driver":
+		return clusterPolicySpec.DRADriver.IsEnabled()
 	default:
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false

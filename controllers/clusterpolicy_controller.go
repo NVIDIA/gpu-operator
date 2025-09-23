@@ -130,6 +130,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		err = fmt.Errorf("failed to initialize ClusterPolicy controller: %v", err)
 		r.Log.Error(nil, err.Error())
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
 		if condErr != nil {
 			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
