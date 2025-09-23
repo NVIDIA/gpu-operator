@@ -359,6 +359,7 @@ func TestTransformForRuntime(t *testing.T) {
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
 						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
 					},
@@ -648,6 +649,9 @@ func TestTransformToolkit(t *testing.T) {
 						},
 					},
 					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
 						{Name: "foo", Value: "bar"},
 						{Name: "RUNTIME", Value: "containerd"},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
@@ -718,6 +722,9 @@ func TestTransformToolkit(t *testing.T) {
 						},
 					},
 					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
 						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
@@ -761,7 +768,7 @@ func TestTransformDevicePlugin(t *testing.T) {
 		{
 			description: "transform device plugin",
 			ds: NewDaemonset().
-				WithContainer(corev1.Container{Name: "nvidia-device-plugin-ctr"}).
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				DevicePlugin: gpuv1.DevicePluginSpec{
@@ -775,14 +782,22 @@ func TestTransformDevicePlugin(t *testing.T) {
 						{Name: "foo", Value: "bar"},
 					},
 				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
 			},
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
-				Name:            "nvidia-device-plugin-ctr",
+				Name:            "nvidia-device-plugin",
 				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Args:            []string{"--fail-on-init-error=false"},
 				Env: []corev1.EnvVar{
 					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+					{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 					{Name: "foo", Value: "bar"},
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
@@ -977,6 +992,10 @@ func TestTransformMigManager(t *testing.T) {
 						{Name: "foo", Value: "bar"},
 					},
 				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
 			},
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "mig-manager",
@@ -984,6 +1003,8 @@ func TestTransformMigManager(t *testing.T) {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Args:            []string{"--test-flag"},
 				Env: []corev1.EnvVar{
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 					{Name: "foo", Value: "bar"},
 				},
 			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
@@ -2144,6 +2165,98 @@ func TestTransformDriver(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformToolkitCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "cdi enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
+			transformToolkitCtrForCDI(mainContainer)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePluginCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "toolkit disabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "toolkit enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+						{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
+			transformDevicePluginCtrForCDI(mainContainer, tc.cpSpec)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
