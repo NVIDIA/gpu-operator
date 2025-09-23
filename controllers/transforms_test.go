@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -142,6 +143,11 @@ func (d Daemonset) WithPullSecret(secret string) Daemonset {
 
 func (d Daemonset) WithRuntimeClassName(name string) Daemonset {
 	d.Spec.Template.Spec.RuntimeClassName = &name
+	return d
+}
+
+func (d Daemonset) WithHostNetwork(enabled bool) Daemonset {
+	d.Spec.Template.Spec.HostNetwork = enabled
 	return d
 }
 
@@ -844,6 +850,111 @@ func TestTransformDCGMExporter(t *testing.T) {
 	}
 }
 
+func TestTransformDCGM(t *testing.T) {
+	limits := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("100m"),
+		corev1.ResourceMemory: resource.MustParse("128Mi"),
+	}
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("50m"),
+		corev1.ResourceMemory: resource.MustParse("64Mi"),
+	}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform dcgm fully configured",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources:        &gpuv1.ResourceRequirements{Limits: limits, Requests: requests},
+					Args:             []string{"--foo"},
+					Env:              []gpuv1.EnvVar{{Name: "FOO", Value: "bar"}},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--foo"},
+					Env:             []corev1.EnvVar{{Name: "FOO", Value: "bar"}},
+					Resources:       corev1.ResourceRequirements{Limits: limits, Requests: requests},
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: corev1.ResourceRequirements{Limits: limits, Requests: requests},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm sets runtime class only when spec empty",
+			daemonset:   NewDaemonset().WithContainer(corev1.Container{Name: "dcgm"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				Operator: gpuv1.OperatorSpec{RuntimeClass: "nvidia"},
+				DCGM:     gpuv1.DCGMSpec{Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "dcgm enabled does not set remote engine env",
+			daemonset:   NewDaemonset().WithContainer(corev1.Container{Name: "dcgm"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "dcgm disabled with localhost env does not change hostNetwork",
+			daemonset: NewDaemonset().WithContainer(corev1.Container{
+				Name: "dcgm",
+				Env:  []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+			}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(false), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env:             []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDCGM(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset.DaemonSet, tc.daemonset.DaemonSet)
+		})
+	}
+}
+
 func TestTransformMigManager(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -1005,6 +1116,222 @@ func TestTransformKataManager(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformVFIOManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+	mockEnvCore := []corev1.EnvVar{{Name: "foo", Value: "bar"}}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform vfio manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vfio-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VFIOManager: gpuv1.VFIOManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "vfio-pci-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					Env:              mockEnv,
+					DriverManager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						Version:         "v1.0.0",
+						ImagePullPolicy: "IfNotPresent",
+						Env:             mockEnv,
+					},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-vfio-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/vfio-pci-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env:             mockEnvCore,
+					Resources:       resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "k8s-driver-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env:             mockEnvCore,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformVFIOManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
+		})
+	}
+}
+
+func TestTransformCCManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+	defaultMode := "devtools"
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform cc manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-cc-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				CCManager: gpuv1.CCManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "k8s-cc-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					DefaultMode:      defaultMode,
+					Env:              mockEnv,
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-cc-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/k8s-cc-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env: []corev1.EnvVar{
+						{Name: "DEFAULT_CC_MODE", Value: defaultMode},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformCCManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
+		})
+	}
+}
+
+func TestTransformVGPUDeviceManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform vgpu device manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VGPUDeviceManager: gpuv1.VGPUDeviceManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "vgpu-device-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					Env:              mockEnv,
+					Config: &gpuv1.VGPUDevicesConfigSpec{
+						Name:    "custom-vgpu-config",
+						Default: "perf",
+					},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-vgpu-device-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/vgpu-device-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env: []corev1.EnvVar{
+						{Name: "foo", Value: "bar"},
+						{Name: "DEFAULT_VGPU_CONFIG", Value: "perf"},
+					},
+					Resources: resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformVGPUDeviceManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
 		})
 	}
 }
