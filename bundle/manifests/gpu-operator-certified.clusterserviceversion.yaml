@@ -72,7 +72,8 @@ metadata:
               },
               "licensingConfig": {
                 "nlsEnabled": true,
-                "configMapName": ""
+                "configMapName": "",
+                "secretName": ""
               },
               "virtualTopology": {
                 "config": ""
@@ -170,7 +171,8 @@ metadata:
             },
             "licensingConfig": {
               "nlsEnabled": true,
-              "name": ""
+              "name": "",
+              "secretName": ""
             },
             "virtualTopologyConfig": {
               "name": ""
