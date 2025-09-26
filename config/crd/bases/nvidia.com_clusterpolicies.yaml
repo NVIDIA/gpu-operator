@@ -339,6 +339,10 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostPID:
+                    description: HostPID allows the DCGM-Exporter daemon set to access
+                      the host's PID namespace
+                    type: boolean
                   image:
                     description: NVIDIA DCGM Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'

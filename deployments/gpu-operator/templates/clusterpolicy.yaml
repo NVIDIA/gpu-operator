@@ -521,6 +521,9 @@ spec:
     {{- if .Values.dcgmExporter.service }}
     service: {{ toYaml .Values.dcgmExporter.service | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.hostPID }}
+    hostPID: {{ .Values.dcgmExporter.hostPID }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}

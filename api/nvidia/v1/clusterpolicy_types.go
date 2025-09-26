@@ -921,6 +921,13 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Service configuration for NVIDIA DCGM Exporter"
 	ServiceSpec *DCGMExporterServiceConfig `json:"service,omitempty"`
+
+	// HostPID allows the DCGM-Exporter daemon set to access the host's PID namespace
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostPID for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	HostPID *bool `json:"hostPID,omitempty"`
 }
 
 // DCGMExporterMetricsConfig defines metrics to be collected by NVIDIA DCGM Exporter
@@ -1909,6 +1916,15 @@ func (e *DCGMExporterSpec) IsEnabled() bool {
 		return true
 	}
 	return *e.Enabled
+}
+
+// IsHostPIDEnabled returns true if hostPID is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsHostPIDEnabled() bool {
+	if e.HostPID == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.HostPID
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
