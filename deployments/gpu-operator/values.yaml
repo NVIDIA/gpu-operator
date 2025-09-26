@@ -292,6 +292,9 @@ dcgmExporter:
   imagePullPolicy: IfNotPresent
   env: []
   resources: {}
+  # hostPID allows the DCGM-Exporter container to see processes on the host node
+  # Default: false
+  hostPID: false
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:
