@@ -376,6 +376,31 @@ func TestTransformForRuntime(t *testing.T) {
 					},
 				}),
 		},
+			// Cover the kata-manager naming case
+			{
+				description: "containerd skips drop-in for kata manager",
+				runtime:     gpuv1.Containerd,
+				input: NewDaemonset().
+					WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+				expectedOutput: NewDaemonset().
+					WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+					WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+					WithContainer(corev1.Container{
+						Name: "nvidia-kata-manager",
+						Env: []corev1.EnvVar{
+							{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+							{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+							{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+							{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+							{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+							{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						},
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+							{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						},
+					}),
+			},
 	}
 
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
