@@ -381,7 +381,8 @@ func TestTransformForRuntime(t *testing.T) {
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "test-ctr")
+			// pass pointer to the target container
+			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), &tc.input.Spec.Template.Spec.Containers[0])
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
 		})

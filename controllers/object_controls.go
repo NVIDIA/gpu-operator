@@ -1327,7 +1327,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// configure runtime
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, mainContainerName)
+	err = transformForRuntime(obj, config, runtime, mainContainer)
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
@@ -1335,16 +1335,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	return nil
 }
 
-func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, containerName string) error {
-	var mainContainer *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == containerName {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
+func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, container *corev1.Container) error {
+	mainContainer := container
 	if mainContainer == nil {
-		return fmt.Errorf("failed to find main container %q", containerName)
+		return fmt.Errorf("failed to find container for runtime transform")
 	}
 
 	setContainerEnv(mainContainer, "RUNTIME", runtime)
@@ -1405,7 +1399,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// Note that we probably want to implement drop-in file support in the
 	// kata manager in any case -- in which case it will be good to use a
 	// similar implementation.
-	if dropInConfigFile != "" && containerName != "nvidia-kata-manager" {
+	if dropInConfigFile != "" && mainContainer.Name != "nvidia-kata-manager" {
 		sourceConfigFileName := path.Base(dropInConfigFile)
 		sourceConfigDir := path.Dir(dropInConfigFile)
 		containerConfigDir := DefaultRuntimeDropInConfigTargetDir
@@ -1984,7 +1978,8 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// mount containerd config and socket
 	// setup mounts for runtime config file
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
+	// kata manager is the only container in this daemonset
+	err = transformForRuntime(obj, config, runtime, &obj.Spec.Template.Spec.Containers[0])
 	if err != nil {
 		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
 	}
