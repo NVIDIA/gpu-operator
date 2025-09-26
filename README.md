@@ -17,6 +17,66 @@ Note that the GPU Operator is specifically useful for scenarios where the Kubern
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html).
 
+## Development build and deploy
+
+The following steps describe how to build a development image of the operator and deploy it to a Kubernetes cluster either via kustomize (Makefile) or Helm.
+
+### Build a development image
+
+Set your desired image name and tag, then build the container image using the repository Makefile.
+
+```bash
+export IMAGE_NAME=<registry>/<repo>/gpu-operator   
+export VERSION=<tag>                              
+
+# Build the image locally
+make build-image IMAGE_NAME="$IMAGE_NAME" VERSION="$VERSION"
+
+# Optional: push as part of the build
+# PUSH_ON_BUILD=true make build-image IMAGE_NAME="$IMAGE_NAME" VERSION="$VERSION"
+```
+
+### Deploy using Helm
+
+The Helm chart is located at `deployments/gpu-operator`. To use a custom operator image, set `operator.repository` and `operator.version`. The validator uses the same image by default; set its repository/version as well if you publish under a different repository or tag.
+
+```bash
+helm upgrade --install gpu-operator deployments/gpu-operator \
+  --namespace gpu-operator --create-namespace \
+  --set operator.repository=$(dirname "$IMAGE_NAME") \
+  --set operator.image=$(basename "$IMAGE_NAME") \
+  --set operator.version="$VERSION" \
+  --set validator.repository=$(dirname "$IMAGE_NAME") \
+  --set validator.image=$(basename "$IMAGE_NAME") \
+  --set validator.version="$VERSION"
+
+# Verify
+kubectl logs -n gpu-operator deployment/gpu-operator -f
+
+# Cleanup
+helm uninstall gpu-operator -n gpu-operator
+```
+
+### Deploy using kustomize (Makefile)
+
+This deploys the operator manifests from `config/default` and injects your built image.
+
+```bash
+# Creates/updates resources in the current kube-context
+make deploy IMAGE_NAME="$IMAGE_NAME" VERSION="$VERSION"
+
+# View operator logs
+kubectl logs -n gpu-operator deployment/gpu-operator -f
+
+# Cleanup
+make undeploy
+```
+
+Notes:
+- `operator.image` and `validator.image` default to `gpu-operator`; override only if you changed the image name itself. If you kept the image name as `gpu-operator`, you can omit the `...image=` flags and set only `...repository` and `...version`.
+- To update CRDs during Helm upgrades, see `deployments/gpu-operator/templates/upgrade_crd.yaml` and related values in `values.yaml`.
+
+
 ## Webinar
 [How to easily use GPUs on Kubernetes](https://info.nvidia.com/how-to-use-gpus-on-kubernetes-webinar.html)
 
@@ -25,3 +85,4 @@ For information on platform support and getting started, visit the official docu
 
 ## Support and Getting Help
 Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
+
