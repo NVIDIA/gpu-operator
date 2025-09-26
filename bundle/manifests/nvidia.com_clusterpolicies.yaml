@@ -396,6 +396,10 @@ spec:
                           ingress methods for a service
                         type: string
                     type: object
+                  hostPID:
+                    description: HostPID allows the DCGM-Exporter container to see
+                      processes on the host node
+                    type: boolean
                   serviceMonitor:
                     description: 'Optional: ServiceMonitor configuration for NVIDIA
                       DCGM Exporter'
