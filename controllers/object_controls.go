@@ -1327,7 +1327,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// configure runtime
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, mainContainerName)
+	err = transformForRuntime(obj, config, runtime, mainContainer)
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
@@ -1335,28 +1335,17 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	return nil
 }
 
-func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, containerName string) error {
-	var mainContainer *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == containerName {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
-	if mainContainer == nil {
-		return fmt.Errorf("failed to find main container %q", containerName)
-	}
-
-	setContainerEnv(mainContainer, "RUNTIME", runtime)
+func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, container *corev1.Container) error {
+	setContainerEnv(container, "RUNTIME", runtime)
 
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
-		setContainerEnv(mainContainer, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
+		setContainerEnv(container, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
 	}
 
 	if runtime == gpuv1.CRIO.String() {
 		// We add the nvidia runtime to the cri-o config by default instead of installing the OCI prestart hook
-		setContainerEnv(mainContainer, CRIOConfigModeEnvName, "config")
+		setContainerEnv(container, CRIOConfigModeEnvName, "config")
 	}
 
 	// For runtime config files we have top-level configs and drop-in files.
@@ -1367,7 +1356,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	//     but should not be updated.
 
 	// setup mounts for runtime config file
-	topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(mainContainer, runtime)
+	topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(container, runtime)
 	if err != nil {
 		return fmt.Errorf("error getting path to runtime config file: %w", err)
 	}
@@ -1387,12 +1376,12 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		sourceConfigFileName := path.Base(topLevelConfigFile)
 		sourceConfigDir := path.Dir(topLevelConfigFile)
 		containerConfigDir := DefaultRuntimeConfigTargetDir
-		setContainerEnv(mainContainer, "RUNTIME_CONFIG", containerConfigDir+sourceConfigFileName)
-		setContainerEnv(mainContainer, configEnvvarName, containerConfigDir+sourceConfigFileName)
+		setContainerEnv(container, "RUNTIME_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(container, configEnvvarName, containerConfigDir+sourceConfigFileName)
 
 		volMountConfigName := fmt.Sprintf("%s-config", runtime)
 		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
-		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
+		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
 
 		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
@@ -1405,23 +1394,23 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// Note that we probably want to implement drop-in file support in the
 	// kata manager in any case -- in which case it will be good to use a
 	// similar implementation.
-	if dropInConfigFile != "" && containerName != "nvidia-kata-manager" {
+	if dropInConfigFile != "" && container.Name != "nvidia-kata-manager" {
 		sourceConfigFileName := path.Base(dropInConfigFile)
 		sourceConfigDir := path.Dir(dropInConfigFile)
 		containerConfigDir := DefaultRuntimeDropInConfigTargetDir
-		setContainerEnv(mainContainer, "RUNTIME_DROP_IN_CONFIG", containerConfigDir+sourceConfigFileName)
-		setContainerEnv(mainContainer, "RUNTIME_DROP_IN_CONFIG_HOST_PATH", dropInConfigFile)
+		setContainerEnv(container, "RUNTIME_DROP_IN_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(container, "RUNTIME_DROP_IN_CONFIG_HOST_PATH", dropInConfigFile)
 
 		volMountConfigName := fmt.Sprintf("%s-drop-in-config", runtime)
 		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
-		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
+		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
 
 		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
 	}
 
 	// setup mounts for runtime socket file
-	runtimeSocketFile, err := getRuntimeSocketFile(mainContainer, runtime)
+	runtimeSocketFile, err := getRuntimeSocketFile(container, runtime)
 	if err != nil {
 		return fmt.Errorf("error getting path to runtime socket: %w", err)
 	}
@@ -1434,12 +1423,12 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		} else if runtime == gpuv1.Docker.String() {
 			socketEnvvarName = "DOCKER_SOCKET"
 		}
-		setContainerEnv(mainContainer, "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
-		setContainerEnv(mainContainer, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(container, "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(container, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
-		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountSocket)
+		container.VolumeMounts = append(container.VolumeMounts, volMountSocket)
 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
@@ -1984,7 +1973,8 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// mount containerd config and socket
 	// setup mounts for runtime config file
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
+	// kata manager is the only container in this daemonset
+	err = transformForRuntime(obj, config, runtime, &obj.Spec.Template.Spec.Containers[0])
 	if err != nil {
 		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
 	}

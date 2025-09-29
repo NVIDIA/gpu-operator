@@ -376,12 +376,60 @@ func TestTransformForRuntime(t *testing.T) {
 					},
 				}),
 		},
+		// Cover the kata-manager naming case
+		{
+			description: "containerd skips drop-in for kata manager",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "nvidia-kata-manager",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
+			description: "docker",
+			runtime:     gpuv1.Docker,
+			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("docker-config", filepath.Dir(DefaultDockerConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("docker-socket", filepath.Dir(DefaultDockerSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.Docker.String()},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultDockerConfigFile))},
+						{Name: "DOCKER_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultDockerConfigFile))},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
+						{Name: "DOCKER_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "docker-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "docker-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
 	}
 
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "test-ctr")
+			// pass pointer to the target container
+			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), &tc.input.Spec.Template.Spec.Containers[0])
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
 		})
