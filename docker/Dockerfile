@@ -12,27 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG GOLANG_VERSION=x.x.x
-
-FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS builder
-
-RUN dnf install -y wget make git gcc
-
-ARG GOLANG_VERSION=0.0.0
-RUN set -eux; \
-    \
-    arch="$(uname -m)"; \
-    case "${arch##*-}" in \
-        x86_64 | amd64) ARCH='amd64' ;; \
-        ppc64el | ppc64le) ARCH='ppc64le' ;; \
-        aarch64 | arm64) ARCH='arm64' ;; \
-        *) echo "unsupported architecture" ; exit 1 ;; \
-    esac; \
-    wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
-    | tar -C /usr/local -xz
-
-ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+FROM golang:1.25.1 AS builder
 
 ARG GOPROXY=direct
 ENV GOPROXY=$GOPROXY
@@ -58,7 +38,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS kubectl-downloader
+FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS cuda-base
 
 RUN dnf install -y --allowerasing \
         curl \
@@ -116,13 +96,13 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
-COPY --from=kubectl-downloader /workspace/kubectl /usr/bin/
+COPY --from=cuda-base /workspace/kubectl /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
 COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
 # TODO: Copy the compat libs from the 'sample-builder' image instead.
 # The current 'sample-builder' image does not contain the compat libs in the ARM variant.
 # Once new sample images are published that contain the compat libs, we can update the below.
-COPY --from=builder /usr/local/cuda/compat /usr/local/cuda/compat
+COPY --from=cuda-base /usr/local/cuda/compat /usr/local/cuda/compat
 
 # The distroless image does not contain the ld.so.cache file. The update-ldcache
 # createContainer hook will skip updating the container's ldcache if this file
