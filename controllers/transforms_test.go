@@ -888,7 +888,7 @@ func TestTransformDCGMExporter(t *testing.T) {
 		expectedDs  Daemonset                // Expected output DaemonSet
 	}{
 		{
-			description: "transform dcgm exporter",
+			description: "transform dcgm exporter without annotations",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
 				WithContainer(corev1.Container{Name: "dummy"}),
@@ -917,6 +917,122 @@ func TestTransformDCGMExporter(t *testing.T) {
 					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter with annotations",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Annotations:      map[string]string{"dcgm-exporter": "test"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithPodAnnotations(map[string]string{"dcgm-exporter": "test"}),
+		},
+		{
+			description: "transform dcgm exporter with annotations and common annotations",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Daemonsets: gpuv1.DaemonsetsSpec{Annotations: map[string]string{
+					"key":                       "value",
+					"app":                       "value",
+					"app.kubernetes.io/part-of": "value",
+				}},
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Annotations:      map[string]string{"dcgm-exporter": "test"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").
+				WithPodAnnotations(map[string]string{
+					"dcgm-exporter":             "test",
+					"key":                       "value",
+					"app":                       "value",
+					"app.kubernetes.io/part-of": "value",
+				}),
+		},
+		{
+			description: "transform dcgm exporter only with common annotations",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Daemonsets: gpuv1.DaemonsetsSpec{Annotations: map[string]string{
+					"key":                       "value",
+					"app":                       "value",
+					"app.kubernetes.io/part-of": "value",
+				}},
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").
+				WithPodAnnotations(map[string]string{
+					"key":                       "value",
+					"app":                       "value",
+					"app.kubernetes.io/part-of": "value",
+				}),
 		},
 	}
 
