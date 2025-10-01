@@ -1705,6 +1705,11 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config)
 
+	// set hostPID if specified for DCGM Exporter
+	if config.DCGMExporter.IsHostPIDEnabled() {
+		obj.Spec.Template.Spec.HostPID = true
+	}
+
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
 		metricsConfigVolMount := corev1.VolumeMount{Name: "metrics-config", ReadOnly: true, MountPath: MetricsConfigMountPath, SubPath: MetricsConfigFileName}

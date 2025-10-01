@@ -292,6 +292,7 @@ dcgmExporter:
   imagePullPolicy: IfNotPresent
   env: []
   resources: {}
+  hostPID: false
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:
