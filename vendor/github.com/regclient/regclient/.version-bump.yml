@@ -100,12 +100,11 @@ processors:
     sourceArgs:
       image: "docker.io/library/golang:{{.ScanMatch.Tag}}"
   docker-arg-ecr:
-    <<: *git-commit
+    <<: *git-tag-semver
     scanArgs:
-      regexp: '^ARG ECR_HELPER_VER=(?P<Version>[0-9a-f]+)\s*$'
+      regexp: '^ARG ECR_HELPER_VER=(?P<Version>v?\d+\.\d+\.\d+)\s*$'
     sourceArgs:
       url: "https://github.com/awslabs/amazon-ecr-credential-helper.git"
-      ref: main
   docker-arg-gcr:
     <<: *git-tag-semver
     scanArgs:
