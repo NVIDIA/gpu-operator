@@ -354,6 +354,36 @@ func TestTransformForRuntime(t *testing.T) {
 				}),
 		},
 		{
+			description: "containerd, opt-out of drop-in config",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
 			description: "crio",
 			runtime:     gpuv1.CRIO,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
@@ -373,6 +403,31 @@ func TestTransformForRuntime(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}),
+		},
+		{
+			description: "crio, opt-out of drop-in config",
+			runtime:     gpuv1.CRIO,
+			input: NewDaemonset().WithContainer(corev1.Container{
+				Name: "test-ctr",
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+				},
+			}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 					},
 				}),
 		},
@@ -2404,6 +2459,17 @@ func TestGetRuntimeConfigFiles(t *testing.T) {
 			expectedDropInConfigFile:   "/path/to/containerd/drop-in/config.toml",
 		},
 		{
+			description: "containerd, opt-out of drop-in file",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+				},
+			},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: DefaultContainerdConfigFile,
+			expectedDropInConfigFile:   "",
+		},
+		{
 			description:                "crio",
 			container:                  corev1.Container{},
 			runtime:                    gpuv1.CRIO.String(),
@@ -2434,6 +2500,17 @@ func TestGetRuntimeConfigFiles(t *testing.T) {
 			runtime:                    gpuv1.CRIO.String(),
 			expectedTopLevelConfigFile: "/another/path/to/crio/config.toml",
 			expectedDropInConfigFile:   "/path/to/crio/drop-in/config.toml",
+		},
+		{
+			description: "crio, opt-out of drop-in file",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: ""},
+				},
+			},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: DefaultCRIOConfigFile,
+			expectedDropInConfigFile:   "",
 		},
 	}
 

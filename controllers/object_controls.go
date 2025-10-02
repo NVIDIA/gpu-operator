@@ -2444,9 +2444,10 @@ func getRuntimeConfigFiles(c *corev1.Container, runtime string) (string, string,
 		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
 			topLevelConfigFile = value
 		}
+		// Users can opt-out of using drop-in files by setting RUNTIME_DROP_IN_CONFIG to ""
 		dropInConfigFile := DefaultContainerdDropInConfigFile
-		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
-			dropInConfigFile = value
+		if containerContainsEnv(c, "RUNTIME_DROP_IN_CONFIG") {
+			dropInConfigFile = getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG")
 		}
 		return topLevelConfigFile, dropInConfigFile, nil
 	case gpuv1.CRIO.String():
@@ -2457,9 +2458,10 @@ func getRuntimeConfigFiles(c *corev1.Container, runtime string) (string, string,
 		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
 			topLevelConfigFile = value
 		}
+		// Users can opt-out of using drop-in files by setting RUNTIME_DROP_IN_CONFIG to ""
 		dropInConfigFile := DefaultCRIODropInConfigFile
-		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
-			dropInConfigFile = value
+		if containerContainsEnv(c, "RUNTIME_DROP_IN_CONFIG") {
+			dropInConfigFile = getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG")
 		}
 		return topLevelConfigFile, dropInConfigFile, nil
 	default:
@@ -2488,6 +2490,15 @@ func getRuntimeSocketFile(c *corev1.Container, runtime string) (string, error) {
 	}
 
 	return runtimeSocketFile, nil
+}
+
+func containerContainsEnv(c *corev1.Container, key string) bool {
+	for _, val := range c.Env {
+		if val.Name == key {
+			return true
+		}
+	}
+	return false
 }
 
 func getContainerEnv(c *corev1.Container, key string) string {
