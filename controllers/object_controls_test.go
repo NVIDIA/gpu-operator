@@ -89,6 +89,7 @@ var kubernetesResources = []client.Object{
 	&rbacv1.ClusterRole{},
 	&rbacv1.ClusterRoleBinding{},
 	&corev1.ConfigMap{},
+	&corev1.Secret{},
 	&appsv1.DaemonSet{},
 	&appsv1.Deployment{},
 	&corev1.Pod{},
