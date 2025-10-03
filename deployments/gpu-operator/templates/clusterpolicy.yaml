@@ -608,7 +608,7 @@ spec:
     {{- if .Values.nodeStatusExporter.args }}
     args: {{ toYaml .Values.nodeStatusExporter.args | nindent 6 }}
     {{- end }}
-  {{- if .Values.gds.enabled }}
+  {{- if .Values.gds }}
   gds:
     enabled: {{ .Values.gds.enabled }}
     {{- if .Values.gds.repository }}
