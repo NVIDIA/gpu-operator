@@ -178,6 +178,26 @@ func (p Pod) WithRuntimeClassName(name string) Pod {
 	return p
 }
 
+func TestFindContainerByName(t *testing.T) {
+	containers := []corev1.Container{
+		{Name: "config"},
+		{Name: "target", Image: "initial"},
+	}
+
+	t.Run("found", func(t *testing.T) {
+		result := findContainerByName(containers, "target")
+		require.NotNil(t, result)
+		require.Equal(t, "target", result.Name)
+		result.Image = "updated"
+		require.Equal(t, "updated", containers[1].Image)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		result := findContainerByName(containers, "missing")
+		require.Nil(t, result)
+	})
+}
+
 func TestTransformForHostRoot(t *testing.T) {
 	hostRootVolumeName := "host-root"
 	hostDevCharVolumeName := "host-dev-char"
@@ -881,6 +901,63 @@ func TestTransformDevicePlugin(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformMPSControlDaemon(t *testing.T) {
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform mps control daemon",
+			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "mps-control-daemon-mounts"}).
+				WithContainer(corev1.Container{Name: "mps-control-daemon-ctr"}).
+				WithHostPathVolume("mps-root", "/run/nvidia/mps", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/run/nvidia/mps/shm", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:       "nvcr.io",
+					Image:            "mps",
+					Version:          "latest",
+					ImagePullPolicy:  string(corev1.PullAlways),
+					ImagePullSecrets: []string{"secret"},
+					MPS:              &gpuv1.MPSConfig{Root: "/var/mps"},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "mps-control-daemon-mounts",
+					Image:           "nvcr.io/mps:latest",
+					ImagePullPolicy: corev1.PullAlways,
+				}).
+				WithContainer(corev1.Container{
+					Name:            "mps-control-daemon-ctr",
+					Image:           "nvcr.io/mps:latest",
+					ImagePullPolicy: corev1.PullAlways,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					},
+				}).
+				WithHostPathVolume("mps-root", "/var/mps", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/var/mps/shm", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithPullSecret("secret").
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformMPSControlDaemon(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset.DaemonSet, tc.daemonset.DaemonSet)
 		})
 	}
 }
