@@ -895,14 +895,12 @@ func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string
 		return
 	}
 
-	for i, ctr := range podSpec.InitContainers {
-		if ctr.Name == "driver-validation" {
-			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirEnvName, driverInstallDir)
-			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirCtrPathEnvName, driverInstallDir)
-			for j, volumeMount := range ctr.VolumeMounts {
-				if volumeMount.Name == "driver-install-dir" {
-					podSpec.InitContainers[i].VolumeMounts[j].MountPath = driverInstallDir
-				}
+	if ctr := findContainerByName(podSpec.InitContainers, "driver-validation"); ctr != nil {
+		setContainerEnv(ctr, DriverInstallDirEnvName, driverInstallDir)
+		setContainerEnv(ctr, DriverInstallDirCtrPathEnvName, driverInstallDir)
+		for i, volumeMount := range ctr.VolumeMounts {
+			if volumeMount.Name == "driver-install-dir" {
+				ctr.VolumeMounts[i].MountPath = driverInstallDir
 			}
 		}
 	}
@@ -1245,14 +1243,8 @@ func transformToolkitCtrForCDI(container *corev1.Container) {
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	var mainContainer *corev1.Container
 	mainContainerName := "nvidia-container-toolkit-ctr"
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == mainContainerName {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
+	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, mainContainerName)
 	if mainContainer == nil {
 		return fmt.Errorf("failed to find main container %q", mainContainerName)
 	}
@@ -1448,14 +1440,8 @@ func transformDevicePluginCtrForCDI(container *corev1.Container, config *gpuv1.C
 
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	var mainContainer *corev1.Container
 	mainContainerName := "nvidia-device-plugin"
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == mainContainerName {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
+	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, mainContainerName)
 	if mainContainer == nil {
 		return fmt.Errorf("failed to find main container %q", mainContainerName)
 	}
@@ -1553,22 +1539,13 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	imagePullPolicy := gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
 	// update image path and imagePullPolicy for 'mps-control-daemon-mounts' initContainer
-	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
-		if initCtr.Name == "mps-control-daemon-mounts" {
-			obj.Spec.Template.Spec.InitContainers[i].Image = image
-			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = imagePullPolicy
-			break
-		}
+	if initCtr := findContainerByName(obj.Spec.Template.Spec.InitContainers, "mps-control-daemon-mounts"); initCtr != nil {
+		initCtr.Image = image
+		initCtr.ImagePullPolicy = imagePullPolicy
 	}
 
 	// update image path and imagePullPolicy for main container
-	var mainContainer *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == "mps-control-daemon-ctr" {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
+	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "mps-control-daemon-ctr")
 	if mainContainer == nil {
 		return fmt.Errorf("failed to find main container 'mps-control-daemon-ctr'")
 	}
@@ -2511,6 +2488,16 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
+// findContainerByName returns a pointer to the container with the given name, or nil if not found.
+func findContainerByName(containers []corev1.Container, name string) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
 func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 	if config.Operator.RuntimeClass != "" {
 		return config.Operator.RuntimeClass
@@ -2646,13 +2633,7 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 }
 
 func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	var initContainer *corev1.Container
-	for i := range obj.Spec.Template.Spec.InitContainers {
-		if obj.Spec.Template.Spec.InitContainers[i].Name != "config-manager-init" {
-			continue
-		}
-		initContainer = &obj.Spec.Template.Spec.InitContainers[i]
-	}
+	initContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "config-manager-init")
 	if initContainer == nil {
 		// config-manager-init container is not added to the spec, this is a no-op
 		return nil
@@ -2704,13 +2685,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 }
 
 func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec) error {
-	var container *corev1.Container
-	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
-		if initCtr.Name == "k8s-driver-manager" {
-			container = &obj.Spec.Template.Spec.InitContainers[i]
-			break
-		}
-	}
+	container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 
 	if container == nil {
 		return fmt.Errorf("failed to find k8s-driver-manager initContainer in spec")
@@ -3281,24 +3256,11 @@ func createEmptyDirVolume(volumeName string) corev1.Volume {
 }
 
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	driverIndex := 0
-	driverCtrFound := false
-
 	podSpec := &obj.Spec.Template.Spec
-	for i, container := range podSpec.Containers {
-		// check if this is the main nvidia-driver container
-		if container.Name == "nvidia-driver-ctr" {
-			driverIndex = i
-			driverCtrFound = true
-			break
-		}
-	}
-
-	if !driverCtrFound {
+	driverContainer := findContainerByName(podSpec.Containers, "nvidia-driver-ctr")
+	if driverContainer == nil {
 		return fmt.Errorf("driver container (nvidia-driver-ctr) is missing from the driver daemonset manifest")
 	}
-
-	driverContainer := &podSpec.Containers[driverIndex]
 
 	image, err := resolveDriverTag(n, &config.Driver)
 	if err != nil {
@@ -3554,13 +3516,7 @@ func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, sec
 }
 
 func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	var container *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == "nvidia-vgpu-manager-ctr" {
-			container = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
+	container := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
 
 	if container == nil {
 		return fmt.Errorf("failed to find nvidia-vgpu-manager-ctr in spec")
