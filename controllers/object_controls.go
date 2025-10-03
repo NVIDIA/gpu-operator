@@ -1243,10 +1243,10 @@ func transformToolkitCtrForCDI(container *corev1.Container) {
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	mainContainerName := "nvidia-container-toolkit-ctr"
-	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, mainContainerName)
-	if mainContainer == nil {
-		return fmt.Errorf("failed to find main container %q", mainContainerName)
+	toolkitContainerName := "nvidia-container-toolkit-ctr"
+	toolkitMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, toolkitContainerName)
+	if toolkitMainContainer == nil {
+		return fmt.Errorf("failed to find toolkit container %q", toolkitContainerName)
 	}
 
 	// update validation container
@@ -1259,10 +1259,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if err != nil {
 		return err
 	}
-	mainContainer.Image = image
+	toolkitMainContainer.Image = image
 
 	// update image pull policy
-	mainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
+	toolkitMainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.Toolkit.ImagePullSecrets) > 0 {
@@ -1280,12 +1280,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		transformToolkitCtrForCDI(mainContainer)
+		transformToolkitCtrForCDI(toolkitMainContainer)
 	}
 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		setContainerEnv(mainContainer, ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
+		setContainerEnv(toolkitMainContainer, ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
 
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
 			if volume.Name == "toolkit-install-dir" {
@@ -1294,9 +1294,9 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			}
 		}
 
-		for i, volumeMount := range mainContainer.VolumeMounts {
+		for i, volumeMount := range toolkitMainContainer.VolumeMounts {
 			if volumeMount.Name == "toolkit-install-dir" {
-				mainContainer.VolumeMounts[i].MountPath = config.Toolkit.InstallDir
+				toolkitMainContainer.VolumeMounts[i].MountPath = config.Toolkit.InstallDir
 				break
 			}
 		}
@@ -1313,13 +1313,13 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	if len(config.Toolkit.Env) > 0 {
 		for _, env := range config.Toolkit.Env {
-			setContainerEnv(mainContainer, env.Name, env.Value)
+			setContainerEnv(toolkitMainContainer, env.Name, env.Value)
 		}
 	}
 
 	// configure runtime
 	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, mainContainer)
+	err = transformForRuntime(obj, config, runtime, toolkitMainContainer)
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
@@ -1440,10 +1440,10 @@ func transformDevicePluginCtrForCDI(container *corev1.Container, config *gpuv1.C
 
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	mainContainerName := "nvidia-device-plugin"
-	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, mainContainerName)
-	if mainContainer == nil {
-		return fmt.Errorf("failed to find main container %q", mainContainerName)
+	devicePluginContainerName := "nvidia-device-plugin"
+	devicePluginMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, devicePluginContainerName)
+	if devicePluginMainContainer == nil {
+		return fmt.Errorf("failed to find device plugin container %q", devicePluginContainerName)
 	}
 
 	// update validation container
@@ -1457,10 +1457,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if err != nil {
 		return err
 	}
-	mainContainer.Image = image
+	devicePluginMainContainer.Image = image
 
 	// update image pull policy
-	mainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+	devicePluginMainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
@@ -1477,13 +1477,13 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 	// set arguments if specified for device-plugin container
 	if len(config.DevicePlugin.Args) > 0 {
-		mainContainer.Args = config.DevicePlugin.Args
+		devicePluginMainContainer.Args = config.DevicePlugin.Args
 	}
 
 	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(mainContainer, GDSEnabledEnvName, "true")
-		setContainerEnv(mainContainer, MOFEDEnabledEnvName, "true")
+		setContainerEnv(devicePluginMainContainer, GDSEnabledEnvName, "true")
+		setContainerEnv(devicePluginMainContainer, MOFEDEnabledEnvName, "true")
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
@@ -1495,11 +1495,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	setRuntimeClassName(&obj.Spec.Template.Spec, config)
 
 	// update env required for MIG support
-	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
+	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		transformDevicePluginCtrForCDI(mainContainer, config)
+		transformDevicePluginCtrForCDI(devicePluginMainContainer, config)
 	}
 
 	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
@@ -1513,12 +1513,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
-		setContainerEnv(mainContainer, MPSRootEnvName, config.DevicePlugin.MPS.Root)
+		setContainerEnv(devicePluginMainContainer, MPSRootEnvName, config.DevicePlugin.MPS.Root)
 	}
 
 	if len(config.DevicePlugin.Env) > 0 {
 		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(mainContainer, env.Name, env.Value)
+			setContainerEnv(devicePluginMainContainer, env.Name, env.Value)
 		}
 	}
 
@@ -1545,12 +1545,12 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	// update image path and imagePullPolicy for main container
-	mainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "mps-control-daemon-ctr")
-	if mainContainer == nil {
+	mpsControlMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "mps-control-daemon-ctr")
+	if mpsControlMainContainer == nil {
 		return fmt.Errorf("failed to find main container 'mps-control-daemon-ctr'")
 	}
-	mainContainer.Image = image
-	mainContainer.ImagePullPolicy = imagePullPolicy
+	mpsControlMainContainer.Image = image
+	mpsControlMainContainer.ImagePullPolicy = imagePullPolicy
 
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
@@ -1575,7 +1575,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	setRuntimeClassName(&obj.Spec.Template.Spec, config)
 
 	// update env required for MIG support
-	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
+	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
 
 	// update MPS volumes if a custom MPS root is configured
 	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
@@ -2970,7 +2970,7 @@ func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, n ClusterPolicyC
 	return nil
 }
 
-func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, mainContainerName string) error {
+func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, operandContainerName string) error {
 	var err error
 
 	getContainer := func(name string, remove bool) (*corev1.Container, error) {
@@ -3006,8 +3006,8 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* find the main container and driver-toolkit sidecar container */
-	var mainContainer, driverToolkitContainer *corev1.Container
-	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
+	var operandMainContainer, driverToolkitContainer *corev1.Container
+	if operandMainContainer, err = getContainer(operandContainerName, false); err != nil {
 		return err
 	}
 
@@ -3054,25 +3054,25 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		obj.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 		obj.Spec.Template.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
-		driverToolkitContainer.Image = mainContainer.Image
-		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
-		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
+		driverToolkitContainer.Image = operandMainContainer.Image
+		setContainerEnv(operandMainContainer, "RHCOS_IMAGE_MISSING", "true")
+		setContainerEnv(operandMainContainer, "RHCOS_VERSION", rhcosVersion)
 		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
 		n.logger.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
 
 	/* prepare the main container to start from the DriverToolkit entrypoint */
-	switch mainContainerName {
+	switch operandContainerName {
 	case "nvidia-fs-ctr":
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
 	case "nvidia-gdrcopy-ctr":
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"gdrcopy-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"gdrcopy-ctr-run-with-dtk"}
 	default:
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"nv-ctr-run-with-dtk"}
 	}
 
 	/* prepare the shared volumes */
@@ -3080,7 +3080,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	volSharedDirName, volSharedDirPath := "shared-nvidia-driver-toolkit", "/mnt/shared-nvidia-driver-toolkit"
 
 	volMountSharedDir := corev1.VolumeMount{Name: volSharedDirName, MountPath: volSharedDirPath}
-	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountSharedDir)
+	operandMainContainer.VolumeMounts = append(operandMainContainer.VolumeMounts, volMountSharedDir)
 
 	volSharedDir := corev1.Volume{
 		Name: volSharedDirName,
