@@ -14,7 +14,7 @@
 
 FROM golang:1.25.1 AS builder
 
-ARG GOPROXY=direct
+ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
 
 WORKDIR /workspace

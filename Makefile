@@ -26,7 +26,7 @@ include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
-GOPROXY ?= direct
+GOPROXY ?= https://proxy.golang.org,direct
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
