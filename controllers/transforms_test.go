@@ -891,6 +891,44 @@ func TestTransformDevicePlugin(t *testing.T) {
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "transform device plugin, gds and gdrcopy enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "nvidia-device-plugin",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+				GDRCopy: &gpuv1.GDRCopySpec{
+					Enabled: newBoolPtr(true),
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: GDSEnabledEnvName, Value: "true"},
+					{Name: MOFEDEnabledEnvName, Value: "true"},
+					{Name: GDRCopyEnabledEnvName, Value: "true"},
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+					{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
 	}
 
 	for _, tc := range testCases {
