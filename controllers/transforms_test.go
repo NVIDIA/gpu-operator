@@ -1035,6 +1035,7 @@ func TestTransformDCGMExporter(t *testing.T) {
 				Args:            []string{"--fail-on-init-error=false"},
 				Env: []corev1.EnvVar{
 					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
 		},
