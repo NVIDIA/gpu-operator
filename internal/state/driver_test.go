@@ -829,3 +829,51 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 		require.Equal(t, test.expected, result)
 	}
 }
+
+func TestDriverResources(t *testing.T) {
+	const (
+		testName = "driver-resources"
+	)
+
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.Resources = &nvidiav1alpha1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			"memory": resource.MustParse("200Mi"),
+			"cpu":    resource.MustParse("500m"),
+		},
+		Requests: corev1.ResourceList{
+			"memory": resource.MustParse("200Mi"),
+			"cpu":    resource.MustParse("500m"),
+		},
+	}
+	renderData.GDS = &gdsDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
+			Enabled: utils.BoolPtr(true),
+		},
+	}
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+		Spec: &nvidiav1alpha1.GDRCopySpec{
+			Enabled: utils.BoolPtr(true),
+		},
+	}
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+}

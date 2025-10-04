@@ -456,6 +456,10 @@ spec:
             {{- end}}
         {{- end }}
         {{- end }}
+        {{- with .Driver.Spec.Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -520,6 +524,10 @@ spec:
             readOnly: {{ .ReadOnly }}
             {{- end }}
         {{- end }}
+        {{- end }}
+        {{- with .Driver.Spec.Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
         {{- end }}
         startupProbe:
           exec:
