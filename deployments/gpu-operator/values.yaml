@@ -195,8 +195,16 @@ driver:
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
     version: v0.8.1
     imagePullPolicy: IfNotPresent
-    env: []
-  env: []
+    env:
+      - name: DRIVER_VERSION
+        value: "580.82.07"
+      - name: FORCE_REINSTALL
+        value: "false"
+  env:
+    - name: DRIVER_VERSION
+      value: "580.82.07"
+    - name: FORCE_REINSTALL
+      value: "false"
   resources: {}
   # Private mirror repository configuration
   repoConfig:
