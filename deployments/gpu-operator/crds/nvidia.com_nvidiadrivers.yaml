@@ -234,11 +234,16 @@ spec:
                 description: 'Optional: Licensing configuration for NVIDIA vGPU licensing'
                 properties:
                   name:
+                    description: 'Deprecated: ConfigMapName has been deprecated in
+                      favour of SecretName. Please use secrets to handle the LicensingConfig
+                      more securely'
                     type: string
                   nlsEnabled:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
                       used for licensing.
                     type: boolean
+                  secretName:
+                    type: string
                 type: object
               livenessProbe:
                 description: NVIDIA Driver container liveness probe settings

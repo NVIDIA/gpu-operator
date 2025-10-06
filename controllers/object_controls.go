@@ -3264,6 +3264,52 @@ func createEmptyDirVolume(volumeName string) corev1.Volume {
 	}
 }
 
+func applyLicensingConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, driverContainer *corev1.Container) {
+	podSpec := &obj.Spec.Template.Spec
+
+	// add new volume mount
+	licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+	driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
+
+	// gridd.conf always mounted
+	licenseItemsToInclude := []corev1.KeyToPath{
+		{
+			Key:  VGPULicensingFileName,
+			Path: VGPULicensingFileName,
+		},
+	}
+	// client config token only mounted when NLS is enabled
+	if config.Driver.LicensingConfig.IsNLSEnabled() {
+		licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
+			Key:  NLSClientTokenFileName,
+			Path: NLSClientTokenFileName,
+		})
+		nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
+	}
+
+	var licensingConfigVolumeSource corev1.VolumeSource
+	if config.Driver.LicensingConfig.SecretName != "" {
+		licensingConfigVolumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: config.Driver.LicensingConfig.SecretName,
+				Items:      licenseItemsToInclude,
+			},
+		}
+	} else if config.Driver.LicensingConfig.ConfigMapName != "" {
+		licensingConfigVolumeSource = corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.LicensingConfig.ConfigMapName,
+				},
+				Items: licenseItemsToInclude,
+			},
+		}
+	}
+	licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+	podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+}
+
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	podSpec := &obj.Spec.Template.Spec
 	driverContainer := findContainerByName(podSpec.Containers, "nvidia-driver-ctr")
@@ -3333,37 +3379,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// set any licensing configuration required
-	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
-		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
-		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
-
-		// gridd.conf always mounted
-		licenseItemsToInclude := []corev1.KeyToPath{
-			{
-				Key:  VGPULicensingFileName,
-				Path: VGPULicensingFileName,
-			},
-		}
-		// client config token only mounted when NLS is enabled
-		if config.Driver.LicensingConfig.IsNLSEnabled() {
-			licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
-				Key:  NLSClientTokenFileName,
-				Path: NLSClientTokenFileName,
-			})
-			nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
-			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
-		}
-
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.LicensingConfig.ConfigMapName,
-				},
-				Items: licenseItemsToInclude,
-			},
-		}
-		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
-		podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+	if config.Driver.IsVGPULicensingEnabled() {
+		applyLicensingConfig(obj, config, driverContainer)
 	}
 
 	// set virtual topology daemon configuration if specified for vGPU driver
@@ -3432,7 +3449,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))

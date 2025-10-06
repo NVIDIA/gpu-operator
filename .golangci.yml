@@ -23,6 +23,15 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - linters:
+          - staticcheck
+        path: (.+)\.go$
+        text: 'SA1019: config.Driver.LicensingConfig.ConfigMapName is deprecated(.+)'
+      - linters:
+          - staticcheck
+        path: (.+)\.go$
+        text: 'SA1019: cr.Spec.LicensingConfig.Name is deprecated(.+)'
 formatters:
   enable:
     - gofmt

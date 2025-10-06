@@ -26,7 +26,7 @@ spec:
     name: ""
   # vGPU licensing configuration
   licensingConfig:
-    name: ""
+    secretName: ""
     nlsEnabled: true
   # vGPU topology daemon configuration
   virtualTopologyConfig:
