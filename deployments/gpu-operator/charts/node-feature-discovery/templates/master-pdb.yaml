@@ -1,0 +1,17 @@
+{{- if .Values.master.enable }}
+{{- if .Values.master.podDisruptionBudget.enable -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name:  {{ include "node-feature-discovery.fullname" . }}-master
+  namespace: {{ include "node-feature-discovery.namespace" . }}
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: master
+{{- toYaml (omit .Values.master.podDisruptionBudget "enable") | nindent 2 }}
+{{- end }}
+{{- end }}

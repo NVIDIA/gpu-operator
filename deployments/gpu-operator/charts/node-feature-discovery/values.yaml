@@ -15,17 +15,20 @@ featureGates:
 
 priorityClassName: ""
 
+postDeleteCleanup: true
+
 master:
   enable: true
   extraArgs: []
   extraEnvs: []
   hostNetwork: false
+  dnsPolicy: ClusterFirstWithHostNet
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
     # noPublish: false
-    # autoDefaultNs: true
     # extraLabelNs: ["added.ns.io","added.kubernets.io"]
     # denyLabelNs: ["denied.ns.io","denied.kubernetes.io"]
     # enableTaints: false
+    # informerPageSize: 200
     # labelWhiteList: "foo"
     # resyncPeriod: "2h"
     # restrictions:
@@ -66,15 +69,12 @@ master:
     #   retryPeriod: 2s
     # nfdApiParallelism: 10
   ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
-  metricsPort: 8081
-  healthPort: 8082
+  port: 8080
   instance:
-  featureApi:
   resyncPeriod:
   denyLabelNs: []
   extraLabelNs: []
   enableTaints: false
-  featureRulesController: null
   nfdApiParallelism: null
   deploymentAnnotations: {}
   replicaCount: 1
@@ -120,14 +120,15 @@ master:
   nodeSelector: {}
 
   tolerations:
-  - key: "node-role.kubernetes.io/master"
-    operator: "Equal"
-    value: ""
-    effect: "NoSchedule"
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Equal"
     value: ""
     effect: "NoSchedule"
+
+  podDisruptionBudget:
+    enable: false
+    minAvailable: 1
+    unhealthyPodEvictionPolicy: AlwaysAllow
 
   annotations: {}
 
@@ -137,31 +138,19 @@ master:
         - weight: 1
           preference:
             matchExpressions:
-              - key: "node-role.kubernetes.io/master"
-                operator: In
-                values: [""]
-        - weight: 1
-          preference:
-            matchExpressions:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
                 
   startupProbe:
-    grpc:
-      port: 8082
     failureThreshold: 30
     # periodSeconds: 10
-  livenessProbe:
-    grpc:
-      port: 8082
+  livenessProbe: {}
     # failureThreshold: 3
     # initialDelaySeconds: 0
     # periodSeconds: 10
     # timeoutSeconds: 1
   readinessProbe:
-    grpc:
-      port: 8082
     failureThreshold: 10
     # initialDelaySeconds: 0
     # periodSeconds: 10
@@ -173,6 +162,7 @@ worker:
   extraArgs: []
   extraEnvs: []
   hostNetwork: false
+  dnsPolicy: ClusterFirstWithHostNet
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
     #  labelWhiteList:
@@ -416,8 +406,7 @@ worker:
     #          matchName: {op: In, value: ["SWAP", "X86", "ARM"]}
 ### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
 
-  metricsPort: 8081
-  healthPort: 8082
+  port: 8080
   daemonsetAnnotations: {}
   podSecurityContext: {}
     # fsGroup: 2000
@@ -431,15 +420,11 @@ worker:
     # runAsUser: 1000
 
   livenessProbe:
-    grpc:
-      port: 8082
     initialDelaySeconds: 10
     # failureThreshold: 3
     # periodSeconds: 10
     # timeoutSeconds: 1
   readinessProbe:
-    grpc:
-      port: 8082
     initialDelaySeconds: 5
     failureThreshold: 10
     # periodSeconds: 10
@@ -483,6 +468,12 @@ worker:
 
   priorityClassName: ""
 
+  updateStrategy: {}
+    # type: RollingUpdate
+    # rollingUpdate:
+    #   maxSurge: 0
+    #   maxUnavailable: "10%"
+
 topologyUpdater:
   config: ### <NFD-TOPOLOGY-UPDATER-CONF-START-DO-NOT-REMOVE>
     ## key = node name, value = list of resources to be excluded.
@@ -499,6 +490,7 @@ topologyUpdater:
   extraArgs: []
   extraEnvs: []
   hostNetwork: false
+  dnsPolicy: ClusterFirstWithHostNet
 
   serviceAccount:
     create: true
@@ -511,8 +503,7 @@ topologyUpdater:
   rbac:
     create: true
 
-  metricsPort: 8081
-  healthPort: 8082
+  port: 8080
   kubeletConfigPath:
   kubeletPodResourcesSockPath:
   updateInterval: 60s
@@ -526,17 +517,13 @@ topologyUpdater:
       drop: [ "ALL" ]
     readOnlyRootFilesystem: true
     runAsUser: 0
-  
+
   livenessProbe:
-    grpc:
-      port: 8082
     initialDelaySeconds: 10
     # failureThreshold: 3
     # periodSeconds: 10
     # timeoutSeconds: 1
   readinessProbe:
-    grpc:
-      port: 8082
     initialDelaySeconds: 5
     failureThreshold: 10
     # periodSeconds: 10
@@ -563,6 +550,7 @@ gc:
   extraEnvs: []
   hostNetwork: false
   replicaCount: 1
+  dnsPolicy: ClusterFirstWithHostNet
 
   serviceAccount:
     create: true
@@ -575,6 +563,18 @@ gc:
 
   podSecurityContext: {}
 
+  livenessProbe:
+    initialDelaySeconds: 10
+    # failureThreshold: 3
+    # periodSeconds: 10
+    # timeoutSeconds: 1
+  readinessProbe:
+    initialDelaySeconds: 5
+    # failureThreshold: 3
+    # periodSeconds: 10
+    # timeoutSeconds: 1
+    # successThreshold: 1
+
   resources:
     limits:
       memory: 1Gi
@@ -582,13 +582,18 @@ gc:
       cpu: 10m
       memory: 128Mi
 
-  metricsPort: 8081
+  port: 8080
 
   nodeSelector: {}
   tolerations: []
   annotations: {}
   deploymentAnnotations: {}
   affinity: {}
+
+  podDisruptionBudget:
+    enable: false
+    minAvailable: 1
+    unhealthyPodEvictionPolicy: AlwaysAllow
 
   # specify how many old ReplicaSets for the Deployment to retain.
   revisionHistoryLimit:
