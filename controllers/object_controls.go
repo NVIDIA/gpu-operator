@@ -1403,6 +1403,25 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
 	}
 
+	// Handle any additional runtime config sources
+	const runtimeConfigSourceFile = "file"
+	if runtimeConfigSources := getContainerEnv(container, "RUNTIME_CONFIG_SOURCE"); runtimeConfigSources != "" {
+		var sources []string
+		for _, runtimeConfigSource := range strings.Split(runtimeConfigSources, ",") {
+			parts := strings.SplitN(runtimeConfigSource, "=", 2)
+			if len(parts) == 1 || parts[0] != runtimeConfigSourceFile {
+				sources = append(sources, runtimeConfigSource)
+				continue
+			}
+			// We transform the host path to a container path by prepending "/host" to the file
+			// path. This works because the toolkit container has the host's root filesystem
+			// mounted as read-only at "/host"
+			sourceConfigFile := filepath.Join("/host", parts[1])
+			sources = append(sources, runtimeConfigSourceFile+"="+sourceConfigFile)
+		}
+		setContainerEnv(container, "RUNTIME_CONFIG_SOURCE", strings.Join(sources, ","))
+	}
+
 	// setup mounts for runtime socket file
 	runtimeSocketFile, err := getRuntimeSocketFile(container, runtime)
 	if err != nil {
