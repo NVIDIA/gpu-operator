@@ -29,14 +29,11 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "node-feature-discovery.gc.serviceAccountName" . }}
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: {{ .Values.gc.dnsPolicy }}
     {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
     {{- end }}
-    {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+      imagePullSecrets: {{ include "node-feature-discovery.imagePullSecrets" . }}
       securityContext:
         {{- toYaml .Values.gc.podSecurityContext | nindent 8 }}
       hostNetwork: {{ .Values.gc.hostNetwork }}
@@ -44,6 +41,41 @@ spec:
       - name: gc
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+        {{- with .Values.gc.livenessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.livenessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.livenessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.livenessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+        {{- with .Values.gc.readinessProbe.initialDelaySeconds }}
+          initialDelaySeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.readinessProbe.failureThreshold }}
+          failureThreshold: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.readinessProbe.periodSeconds }}
+          periodSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.readinessProbe.timeoutSeconds }}
+          timeoutSeconds: {{ . }}
+        {{- end }}
+        {{- with .Values.gc.readinessProbe.successThreshold }}
+          successThreshold: {{ . }}
+        {{- end }}
         env:
         - name: NODE_NAME
           valueFrom:
@@ -70,8 +102,8 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
         ports:
-          - name: metrics
-            containerPort: {{ .Values.gc.metricsPort | default "8081"}}
+          - name: http
+            containerPort: {{ .Values.gc.port | default "8080"}}
 
     {{- with .Values.gc.nodeSelector }}
       nodeSelector:
