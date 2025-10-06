@@ -1489,7 +1489,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
-		setContainerEnv(mainContainer, GDRCopyEnabledEnvName, "true")
+		setContainerEnv(devicePluginMainContainer, GDRCopyEnabledEnvName, "true")
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
