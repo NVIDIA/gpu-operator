@@ -18,3 +18,9 @@ rules:
   - nvidiadrivers/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get

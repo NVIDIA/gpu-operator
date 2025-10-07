@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -749,6 +750,31 @@ func (n *ClusterPolicyController) getRuntime() error {
 	return nil
 }
 
+func (n *ClusterPolicyController) addLabelsFinalizer(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
+	labelsFinalizer := "labels.gpu-operator.nvidia.com/clusterpolicy-finalizer"
+	if clusterPolicy.DeletionTimestamp == nil || clusterPolicy.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(clusterPolicy, labelsFinalizer) {
+			controllerutil.AddFinalizer(clusterPolicy, labelsFinalizer)
+			if err := reconciler.Update(ctx, clusterPolicy); err != nil {
+				return fmt.Errorf("failed to update cluster policy: %v", err)
+			}
+		}
+	} else {
+		// If the cluster policy is being deleted, remove the labels finalizer
+		if controllerutil.ContainsFinalizer(clusterPolicy, labelsFinalizer) {
+			reconciler.Log.Info("Removing labels finalizer", "finalizer", labelsFinalizer)
+			if !removeAllGPUStateLabels(clusterPolicy.Labels) {
+				return fmt.Errorf("failed to remove all GPU state labels")
+			}
+			controllerutil.RemoveFinalizer(clusterPolicy, labelsFinalizer)
+			if err := reconciler.Update(ctx, clusterPolicy); err != nil && !apierrors.IsConflict(err) {
+				return fmt.Errorf("failed to update cluster policy: %v", err)
+			}
+		}
+	}
+	return nil
+}
+
 func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
 	n.singleton = clusterPolicy
 	n.ctx = ctx
@@ -844,6 +870,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.logger.Info("Pod Security Admission labels added to GPU Operator namespace", "namespace", n.operatorNamespace)
 	}
 
+	n.logger.Info("SHIVAAAAAAAA Calling labels: namespace, hasNFDLabels", "namespace", n.operatorNamespace, "hasNFDLabels", n.hasNFDLabels)
 	// fetch all nodes and label gpu nodes
 	hasNFDLabels, gpuNodeCount, err := n.labelGPUNodes()
 	if err != nil {
