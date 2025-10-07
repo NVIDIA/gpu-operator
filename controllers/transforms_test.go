@@ -400,6 +400,74 @@ func TestTransformForRuntime(t *testing.T) {
 				}),
 		},
 		{
+			description: "containerd, file config source preferred over command source",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file,command"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file,command"},
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
+			description: "containerd, custom config source configured",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file=/path/to/custom/source/config.toml,command"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file=/host/path/to/custom/source/config.toml,command"},
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
 			description: "crio",
 			runtime:     gpuv1.CRIO,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
