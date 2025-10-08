@@ -89,42 +89,56 @@ spec:
     plugin:
       {{- if .Values.validator.plugin.env }}
       env: {{ toYaml .Values.validator.plugin.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.cuda }}
     cuda:
       {{- if .Values.validator.cuda.env }}
       env: {{ toYaml .Values.validator.cuda.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.driver }}
     driver:
       {{- if .Values.validator.driver.env }}
       env: {{ toYaml .Values.validator.driver.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.toolkit }}
     toolkit:
       {{- if .Values.validator.toolkit.env }}
       env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vfioPCI }}
     vfioPCI:
       {{- if .Values.validator.vfioPCI.env }}
       env: {{ toYaml .Values.validator.vfioPCI.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuManager }}
     vgpuManager:
       {{- if .Values.validator.vgpuManager.env }}
       env: {{ toYaml .Values.validator.vgpuManager.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuDevices }}
     vgpuDevices:
       {{- if .Values.validator.vgpuDevices.env }}
       env: {{ toYaml .Values.validator.vgpuDevices.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
 
