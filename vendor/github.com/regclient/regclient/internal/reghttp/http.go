@@ -324,9 +324,14 @@ func (resp *Resp) next() error {
 				if h.config.TLS == config.TLSDisabled {
 					u.Scheme = "http"
 				}
+				query := url.Values{}
 				if req.Query != nil {
-					u.RawQuery = req.Query.Encode()
+					query = req.Query
 				}
+				if h.config.Hostname != reqHost.config.Hostname {
+					query.Set("ns", reqHost.config.Hostname)
+				}
+				u.RawQuery = query.Encode()
 			}
 			// close previous response
 			if resp.resp != nil && resp.resp.Body != nil {
