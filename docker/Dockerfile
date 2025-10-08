@@ -104,13 +104,6 @@ COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
 # Once new sample images are published that contain the compat libs, we can update the below.
 COPY --from=cuda-base /usr/local/cuda/compat /usr/local/cuda/compat
 
-# The distroless image does not contain the ld.so.cache file. The update-ldcache
-# createContainer hook will skip updating the container's ldcache if this file
-# does not exist. This can lead to issues running the CUDA vectorAdd sample
-# if the NVIDIA libraries are not present in the default dynamic linker search
-# path(s).
-COPY --from=sample-builder /etc/ld.so.cache /etc/
-
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
 COPY validator/manifests /opt/validator/manifests
