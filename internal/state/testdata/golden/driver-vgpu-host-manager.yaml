@@ -145,6 +145,13 @@ spec:
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-ubuntu22.04
         imagePullPolicy: IfNotPresent
         name: nvidia-driver-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:

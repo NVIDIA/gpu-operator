@@ -187,6 +187,10 @@ func TestDriverSpec(t *testing.T) {
 		ImagePullPolicy:  "Always",
 		ImagePullSecrets: []string{"secret-a", "secret-b"},
 		Resources: &nvidiav1alpha1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
 			Limits: corev1.ResourceList{
 				"memory": resource.MustParse("200Mi"),
 				"cpu":    resource.MustParse("500m"),
@@ -623,6 +627,16 @@ func getMinimalDriverRenderData() *driverRenderData {
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 				DriverType:     nvidiav1alpha1.GPU,
+				Resources: &nvidiav1alpha1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				},
 			},
 			AppName:          "nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b",
 			Name:             "nvidia-gpu-driver-ubuntu22.04",

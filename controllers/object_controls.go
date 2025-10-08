@@ -2789,6 +2789,12 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
+		if config.Driver.Resources != nil {
+			obj.Spec.Template.Spec.Containers[i].Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+		}
 	}
 	return nil
 }
@@ -2877,6 +2883,12 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
 		}
+		if config.Driver.Resources != nil {
+			gdsContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+		}
 	}
 	return nil
 }
@@ -2963,6 +2975,12 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-gdrcopy-ctr")
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %w", err)
+		}
+		if config.Driver.Resources != nil {
+			gdrcopyContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
 		}
 	}
 	return nil
@@ -3120,6 +3138,14 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		}
 	}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
+
+	// set resource limits
+	if config.Driver.Resources != nil {
+		driverToolkitContainer.Resources = corev1.ResourceRequirements{
+			Requests: config.Driver.Resources.Requests,
+			Limits:   config.Driver.Resources.Limits,
+		}
+	}
 	return nil
 }
 

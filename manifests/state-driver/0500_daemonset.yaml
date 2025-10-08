@@ -321,9 +321,8 @@ spec:
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
           {{- end}}
-        {{- with .Driver.Spec.Resources }}
-        resources:
-          {{ . | yaml | nindent 10 }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         {{- if not (eq .Driver.Spec.DriverType "vgpu-host-manager") }}
         startupProbe:
@@ -382,6 +381,9 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -456,6 +458,9 @@ spec:
             {{- end}}
         {{- end }}
         {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -521,6 +526,9 @@ spec:
             {{- end }}
         {{- end }}
         {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -584,6 +592,9 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
       {{- end }}
       volumes:
         - name: run-nvidia
