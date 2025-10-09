@@ -950,6 +950,36 @@ func TestTransformDevicePlugin(t *testing.T) {
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "transform device plugin, CDI is disabled",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "dummy"}).
+				WithInitContainer(corev1.Container{Name: "cdi-validation"}).
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-device-plugin",
+					Version:    "v1.0.0",
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "validator",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+				},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithRuntimeClassName("nvidia"),
+		},
 	}
 
 	for _, tc := range testCases {
