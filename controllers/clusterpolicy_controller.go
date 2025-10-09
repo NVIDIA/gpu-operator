@@ -254,6 +254,16 @@ func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedNa
 	}
 }
 
+func isOwnedByDaemonSet(ownerRefs []metav1.OwnerReference) bool {
+
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind == "DaemonSet" && ownerRef.Controller != nil && *ownerRef.Controller {
+			return true
+		}
+	}
+	return false
+}
+
 func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
@@ -288,6 +298,14 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			return hasGPULabels(labels)
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
+			r.Log.Info("SHIVAAAAAAAA Calling labels: UpdateFunc", "labels", e.ObjectNew.GetLabels())
+
+			ownerRefs := e.ObjectNew.GetOwnerReferences()
+			if isOwnedByDaemonSet(ownerRefs) {
+				return false
+			}
+			r.Log.Info("SHIVAAAAAAAA Calling labels: UpdateFunc", "ownerRefs", ownerRefs)
+
 			newLabels := e.ObjectNew.GetLabels()
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
@@ -323,6 +341,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"osTreeLabelChanged", osTreeLabelChanged,
 				)
 			}
+			r.Log.Info("SHIVAAAAAAAA Calling labels: UpdateFunc", "needsUpdate", needsUpdate)
 			return needsUpdate
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
