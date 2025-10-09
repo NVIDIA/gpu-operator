@@ -1,3 +1,19 @@
+/**
+ * Copyright 2025 NVIDIA CORPORATION
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 module.exports = async ({ github, context, core }) => {
 const branches = JSON.parse(process.env.BRANCHES_JSON || '[]');
 
@@ -70,7 +86,7 @@ for (const targetBranch of branches) {
     // Create backport branch from target release branch
     core.info(`Creating branch ${backportBranch} from ${targetBranch}`);
     execSync(`git fetch origin ${targetBranch}:${targetBranch}`, { stdio: 'inherit' });
-    execSync(`git checkout -b ${backportBranch} ${targetBranch}`, { stdio: 'inherit' });
+    execSync(`git checkout ${backportBranch} || git checkout -b ${backportBranch} ${targetBranch}`, { stdio: 'inherit' });
     // Cherry-pick each commit from the PR
     let hasConflicts = false;
     for (let i = 0; i < commits.length; i++) {
@@ -107,10 +123,12 @@ for (const targetBranch of branches) {
     execSync(`git push origin ${backportBranch}`, { stdio: 'inherit' });
     // Create pull request
     const commitList = commits.map(c => `- \`${c.sha.substring(0, 7)}\` ${c.commit.message.split('\n')[0]}`).join('\n');
-    const prBody = hasConflicts 
-      ? `🤖 **Automated backport of #${prNumber} to \`${targetBranch}\`**
-
-⚠️ **This PR has merge conflicts that need manual resolution.**
+    
+    // Build PR body based on conflict status
+    let prBody = `🤖 **Automated backport of #${prNumber} to \`${targetBranch}\`**\n\n`;
+    
+    if (hasConflicts) {
+      prBody += `⚠️ **This PR has merge conflicts that need manual resolution.**
 
 Original PR: #${prNumber}
 Original Author: @${prAuthor}
@@ -122,7 +140,7 @@ ${commitList}
 1. Review the conflicts in the "Files changed" tab
 2. Check out this branch locally: \`git fetch origin ${backportBranch} && git checkout ${backportBranch}\`
 3. Resolve conflicts manually
-4. Push the resolution: \`git push origin ${backportBranch}\`
+4. Push the resolution: \`git push --force-with-lease origin ${backportBranch}\`
 
 ---
 <details>
@@ -134,12 +152,11 @@ git checkout ${backportBranch}
 # Resolve conflicts in your editor
 git add .
 git commit
-git push origin ${backportBranch}
+git push --force-with-lease origin ${backportBranch}
 \`\`\`
-</details>`
-      : `🤖 **Automated backport of #${prNumber} to \`${targetBranch}\`**
-
-✅ Cherry-pick completed successfully with no conflicts.
+</details>`;
+    } else {
+      prBody += `✅ Cherry-pick completed successfully with no conflicts.
 
 Original PR: #${prNumber}
 Original Author: @${prAuthor}
@@ -148,6 +165,7 @@ Original Author: @${prAuthor}
 ${commitList}
 
 This backport was automatically created by the backport bot.`;
+    }
 
     const newPR = await github.rest.pulls.create({
       owner: context.repo.owner,
@@ -218,5 +236,3 @@ for (const result of results) {
 }
 return results;
 };
-
-

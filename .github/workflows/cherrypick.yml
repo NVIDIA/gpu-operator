@@ -43,7 +43,7 @@ jobs:
 
       - name: Extract target branches from PR comments
         id: extract-branches
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const run = require('./.github/scripts/extract-branches.js');
@@ -56,12 +56,10 @@ jobs:
 
       - name: Backport to release branches
         id: backport
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           BRANCHES_JSON: ${{ steps.extract-branches.outputs.result }}
         with:
           script: |
             const run = require('./.github/scripts/backport.js');
             return await run({ github, context, core });
-
-
