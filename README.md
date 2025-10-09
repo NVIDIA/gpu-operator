@@ -17,6 +17,16 @@ Note that the GPU Operator is specifically useful for scenarios where the Kubern
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html).
 
+### Quick Verification After Installation
+
+After deploying the GPU Operator using the installation command, you can verify that all the pods are running successfully by running:
+
+```bash
+kubectl get pods -n gpu-operator
+```
+
+If all pods show a `Running` status, the installation was successful!
+
 ## Webinar
 [How to easily use GPUs on Kubernetes](https://info.nvidia.com/how-to-use-gpus-on-kubernetes-webinar.html)
 
