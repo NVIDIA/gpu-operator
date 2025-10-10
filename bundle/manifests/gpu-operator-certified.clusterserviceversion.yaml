@@ -847,6 +847,16 @@ spec:
           - watch
           - update
           - delete
+        - apiGroups:
+          - "nfd.k8s-sigs.io"
+          resources:
+          - "nodefeatures"
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
       deployments:
       - name: gpu-operator
         spec:
