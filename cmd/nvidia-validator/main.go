@@ -63,6 +63,9 @@ type Driver struct {
 // NvidiaFs GDS Driver component
 type NvidiaFs struct{}
 
+// GDRCopy driver component
+type GDRCopy struct{}
+
 // CUDA represents spec to run cuda workload
 type CUDA struct {
 	ctx        context.Context
@@ -150,6 +153,8 @@ const (
 	driverStatusFile = "driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
 	nvidiaFsStatusFile = "nvidia-fs-ready"
+	// gdrCopyStatusFile indicates status file for GDRCopy driver (gdrdrv) readiness
+	gdrCopyStatusFile = "gdrcopy-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
 	toolkitStatusFile = "toolkit-ready"
 	// pluginStatusFile indicates status file for plugin readiness
@@ -434,6 +439,8 @@ func isValidComponent() bool {
 	case "cc-manager":
 		fallthrough
 	case "nvidia-fs":
+		fallthrough
+	case "gdrcopy":
 		return true
 	default:
 		return false
@@ -513,6 +520,13 @@ func start(c *cli.Context) error {
 		err := nvidiaFs.validate()
 		if err != nil {
 			return fmt.Errorf("error validating nvidia-fs driver installation: %w", err)
+		}
+		return nil
+	case "gdrcopy":
+		gdrcopy := &GDRCopy{}
+		err := gdrcopy.validate()
+		if err != nil {
+			return fmt.Errorf("error validating gdrcopy driver installation: %w", err)
 		}
 		return nil
 	case "toolkit":
@@ -937,6 +951,38 @@ func (n *NvidiaFs) runValidation(silent bool) error {
 	// check for nvidia_fs module to be loaded
 	command := shell
 	args := []string{"-c", "lsmod | grep nvidia_fs"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+	return runCommand(command, args, silent)
+}
+
+func (g *GDRCopy) validate() error {
+	// delete driver status file if already present
+	err := deleteStatusFile(outputDirFlag + "/" + gdrCopyStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = g.runValidation(false)
+	if err != nil {
+		log.Info("gdrcopy driver is not ready")
+		return err
+	}
+
+	// create driver status file
+	err = createStatusFile(outputDirFlag + "/" + gdrCopyStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *GDRCopy) runValidation(silent bool) error {
+	// check for gdrdrv module to be loaded
+	command := shell
+	args := []string{"-c", "lsmod | grep -E '^gdrdrv\\s'"}
 
 	if withWaitFlag {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)

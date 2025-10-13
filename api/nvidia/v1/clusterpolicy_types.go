@@ -2062,6 +2062,15 @@ func (gds *GPUDirectStorageSpec) IsEnabled() bool {
 	return *gds.Enabled
 }
 
+// IsGDRCopyEnabled returns true if GDRCopy is enabled through gpu-operator
+func (c *ClusterPolicySpec) IsGDRCopyEnabled() bool {
+	if c.GDRCopy == nil {
+		// GDRCopy is disabled by default
+		return false
+	}
+	return c.GDRCopy.IsEnabled()
+}
+
 // IsEnabled returns true if GDRCopy is enabled through gpu-operator
 func (gdrcopy *GDRCopySpec) IsEnabled() bool {
 	if gdrcopy.Enabled == nil {

@@ -2173,6 +2173,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	components := []string{
 		"driver",
 		"nvidia-fs",
+		"gdrcopy",
 		"toolkit",
 		"cuda",
 		"plugin",
@@ -2332,6 +2333,12 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		case "nvidia-fs":
 			if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
 				// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
+				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+				return nil
+			}
+		case "gdrcopy":
+			if !config.IsGDRCopyEnabled() {
+				// remove gdrcopy init container from validator Daemonset if GDRCopy is not enabled
 				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
 				return nil
 			}
