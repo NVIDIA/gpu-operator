@@ -241,7 +241,7 @@ validate-helm-values: cmds
 
 validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
-	@git diff --exit-code -- api config
+	@git diff --exit-code -- api config bundle deployments
 
 COVERAGE_FILE := coverage.out
 unit-test: build
