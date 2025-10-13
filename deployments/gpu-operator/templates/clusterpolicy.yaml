@@ -593,7 +593,7 @@ spec:
     {{- if .Values.migManager.config }}
     config:
       name: {{ .Values.migManager.config.name }}
-      default: {{ .Values.migManager.config.default }}
+      default: {{ .Values.migManager.config.default | quote }}
     {{- end }}
     {{- if .Values.migManager.gpuClientsConfig }}
     gpuClientsConfig: {{ toYaml .Values.migManager.gpuClientsConfig | nindent 6 }}
