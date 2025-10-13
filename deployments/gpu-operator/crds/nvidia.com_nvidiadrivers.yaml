@@ -235,8 +235,8 @@ spec:
                 properties:
                   name:
                     description: 'Deprecated: ConfigMapName has been deprecated in
-                      favour of SecretName. Please use secrets to handle the LicensingConfig
-                      more securely'
+                      favour of SecretName. Please use secrets to handle the licensing
+                      server configuration more securely'
                     type: string
                   nlsEnabled:
                     description: NLSEnabled indicates if NVIDIA Licensing System is
