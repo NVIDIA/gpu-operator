@@ -478,7 +478,6 @@ func TestTransformForRuntime(t *testing.T) {
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
-						{Name: CRIOConfigModeEnvName, Value: "config"},
 						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
@@ -775,12 +774,14 @@ func TestTransformToolkit(t *testing.T) {
 		description string
 		ds          Daemonset                // Input DaemonSet
 		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
-		expectedDs  Daemonset                // Expected output DaemonSet
+		runtime     gpuv1.Runtime
+		expectedDs  Daemonset // Expected output DaemonSet
 	}{
 		{
 			description: "transform nvidia-container-toolkit-ctr container",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Toolkit: gpuv1.ToolkitSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -822,6 +823,7 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
 						{Name: "foo", Value: "bar"},
 						{Name: "RUNTIME", Value: "containerd"},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
@@ -847,6 +849,7 @@ func TestTransformToolkit(t *testing.T) {
 			description: "transform nvidia-container-toolkit-ctr container with custom ctr runtime socket",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Toolkit: gpuv1.ToolkitSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -899,6 +902,7 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
 						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
@@ -920,12 +924,84 @@ func TestTransformToolkit(t *testing.T) {
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.CRIO,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}).
+				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.CRIO,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: CRIOConfigModeEnvName, Value: "hook"},
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}).
+				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			controller := ClusterPolicyController{
-				runtime: gpuv1.Containerd,
+				runtime: tc.runtime,
 				logger:  ctrl.Log.WithName("test"),
 			}
 
@@ -2587,6 +2663,7 @@ func TestTransformToolkitCtrForCDI(t *testing.T) {
 						{Name: CDIEnabledEnvName, Value: "true"},
 						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
 						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
 					},
 				}),
 		},
