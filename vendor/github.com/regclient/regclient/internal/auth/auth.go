@@ -69,7 +69,7 @@ type challenge struct {
 type handler interface {
 	AddScope(scope string) error
 	ProcessChallenge(challenge) error
-	GenerateAuth() (string, error)
+	UpdateRequest(*http.Request) error
 }
 
 // handlerBuild is used to make a new handler for a specific authType and URL
@@ -239,8 +239,8 @@ func (a *Auth) HandleResponse(resp *http.Response) error {
 			// handle race condition when another request updates the challenge
 			// detect that by seeing the current auth header is different
 			prevAH := resp.Request.Header.Get("Authorization")
-			ah, err := a.hs[host][c.authType].GenerateAuth()
-			if err == nil && prevAH != ah {
+			err := a.hs[host][c.authType].UpdateRequest(resp.Request)
+			if err == nil && prevAH != resp.Request.Header.Get("Authorization") {
 				goodChallenge = true
 			}
 		} else {
@@ -263,10 +263,9 @@ func (a *Auth) UpdateRequest(req *http.Request) error {
 		return nil
 	}
 	var err error
-	var ah string
 	for _, at := range a.authTypes {
 		if a.hs[host][at] != nil {
-			ah, err = a.hs[host][at].GenerateAuth()
+			err = a.hs[host][at].UpdateRequest(req)
 			if err != nil {
 				a.slog.Debug("Failed to generate auth",
 					slog.String("err", err.Error()),
@@ -274,7 +273,6 @@ func (a *Auth) UpdateRequest(req *http.Request) error {
 					slog.String("authtype", at))
 				continue
 			}
-			req.Header.Set("Authorization", ah)
 			break
 		}
 	}
@@ -480,14 +478,15 @@ func (b *basicHandler) ProcessChallenge(c challenge) error {
 	return errs.ErrNoNewChallenge
 }
 
-// GenerateAuth for BasicHandler generates base64 encoded user/pass for a host
-func (b *basicHandler) GenerateAuth() (string, error) {
+// UpdateRequest for BasicHandler generates base64 encoded user/pass for a host
+func (b *basicHandler) UpdateRequest(req *http.Request) error {
 	cred := b.credsFn(b.host)
 	if cred.User == "" || cred.Password == "" {
-		return "", fmt.Errorf("no credentials available: %w", errs.ErrHTTPUnauthorized)
+		return fmt.Errorf("no credentials available: %w", errs.ErrHTTPUnauthorized)
 	}
-	auth := base64.StdEncoding.EncodeToString([]byte(cred.User + ":" + cred.Password))
-	return fmt.Sprintf("Basic %s", auth), nil
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s",
+		base64.StdEncoding.EncodeToString([]byte(cred.User+":"+cred.Password))))
+	return nil
 }
 
 // bearerHandler supports Bearer auth type requests
@@ -498,6 +497,7 @@ type bearerHandler struct {
 	host           string
 	credsFn        CredsFn
 	scopes         []string
+	tokenURL       *url.URL
 	token          bearerToken
 	slog           *slog.Logger
 }
@@ -628,31 +628,39 @@ func (b *bearerHandler) ProcessChallenge(c challenge) error {
 	return nil
 }
 
-// GenerateAuth for BasicHandler generates base64 encoded user/pass for a host
-func (b *bearerHandler) GenerateAuth() (string, error) {
+// UpdateRequest for BearerHandler adds a bearer token to the request.
+func (b *bearerHandler) UpdateRequest(req *http.Request) error {
+	// handle relative realm values
+	if b.tokenURL == nil {
+		u, err := req.URL.Parse(b.realm)
+		if err != nil {
+			return err
+		}
+		b.tokenURL = u
+	}
 	// if unexpired token already exists, return it
 	if b.token.Token != "" && !b.isExpired() {
-		return fmt.Sprintf("Bearer %s", b.token.Token), nil
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", b.token.Token))
+		return nil
 	}
-
 	// attempt to post if a refresh token is available or token auth is being used
 	cred := b.credsFn(b.host)
 	if b.token.RefreshToken != "" || cred.Token != "" {
 		if err := b.tryPost(cred); err == nil {
-			return fmt.Sprintf("Bearer %s", b.token.Token), nil
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", b.token.Token))
+			return nil
 		} else if err != errs.ErrHTTPUnauthorized {
-			return "", fmt.Errorf("failed to request auth token (post): %w%.0w", err, errs.ErrHTTPUnauthorized)
+			return fmt.Errorf("failed to request auth token (post): %w%.0w", err, errs.ErrHTTPUnauthorized)
 		}
 	}
-
 	// attempt a get (with basic auth if user/pass available)
 	if err := b.tryGet(cred); err == nil {
-		return fmt.Sprintf("Bearer %s", b.token.Token), nil
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", b.token.Token))
+		return nil
 	} else if err != errs.ErrHTTPUnauthorized {
-		return "", fmt.Errorf("failed to request auth token (get): %w%.0w", err, errs.ErrHTTPUnauthorized)
+		return fmt.Errorf("failed to request auth token (get): %w%.0w", err, errs.ErrHTTPUnauthorized)
 	}
-
-	return "", errs.ErrHTTPUnauthorized
+	return errs.ErrHTTPUnauthorized
 }
 
 // isExpired returns true when token issue date is either 0, token has expired,
@@ -668,7 +676,7 @@ func (b *bearerHandler) isExpired() bool {
 
 // tryGet requests a new token with a GET request
 func (b *bearerHandler) tryGet(cred Cred) error {
-	req, err := http.NewRequest("GET", b.realm, nil)
+	req, err := http.NewRequest("GET", b.tokenURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -723,7 +731,7 @@ func (b *bearerHandler) tryPost(cred Cred) error {
 		form.Set("password", cred.Password)
 	}
 
-	req, err := http.NewRequest("POST", b.realm, strings.NewReader(form.Encode()))
+	req, err := http.NewRequest("POST", b.tokenURL.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
@@ -894,10 +902,11 @@ func (j *jwtHubHandler) ProcessChallenge(c challenge) error {
 	return nil
 }
 
-// GenerateAuth for JWTHubHandler adds JWT header
-func (j *jwtHubHandler) GenerateAuth() (string, error) {
+// UpdateRequest for JWTHubHandler adds JWT header
+func (j *jwtHubHandler) UpdateRequest(req *http.Request) error {
 	if len(j.jwt) > 0 {
-		return fmt.Sprintf("JWT %s", j.jwt), nil
+		req.Header.Set("Authorization", fmt.Sprintf("JWT %s", j.jwt))
+		return nil
 	}
-	return "", errs.ErrHTTPUnauthorized
+	return errs.ErrHTTPUnauthorized
 }
