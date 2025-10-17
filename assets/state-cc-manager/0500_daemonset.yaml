@@ -34,7 +34,9 @@ spec:
               fieldRef:
                 fieldPath: spec.nodeName
           - name: CC_CAPABLE_DEVICE_IDS
-            value: "0x2322,0x2331"
+            # TODO - revisit: This list was reduced in 03688e3f61433cbf3bb8e2fad241d12672b04836
+            # We should align with deployments\gpu-operator\templates\nodefeaturerules.yaml
+            value: "0x2322,0x2321,0x2331"
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void

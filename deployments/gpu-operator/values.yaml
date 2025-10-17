@@ -511,7 +511,9 @@ ccManager:
   imagePullSecrets: []
   env:
     - name: CC_CAPABLE_DEVICE_IDS
-      value: "0x2339,0x2331,0x2330,0x2324,0x2322,0x233d"
+      # TODO: 0x233d does not seem to be listed in deployments\gpu-operator\templates\nodefeaturerules.yaml, or 0500_daemonset.yaml
+      # The value was at least added to assets\state-cc-manager\0500_daemonset.yaml in 094e28f5056cf5ebfcf5c0a6277672cdda2c9e08 (but later on removed)
+      value: "0x2339,0x2331,0x2330,0x2324,0x2322,0x2321,0x233d"
   resources: {}
 
 node-feature-discovery:
