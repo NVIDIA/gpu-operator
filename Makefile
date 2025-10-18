@@ -221,6 +221,8 @@ sync-crds:
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/deployments/gpu-operator/crds
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/bundle/manifests
 
+TOOLS_DIR := $(PROJECT_DIR)/tools
+E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-modules:
 	@echo "- Verifying that the dependencies have expected content..."
 	go mod verify
@@ -230,6 +232,16 @@ validate-modules:
 	@echo "- Checking if the vendor dir is in sync..."
 	go mod vendor
 	@git diff --exit-code -- vendor
+	@echo "- [tools] Verifying that the dependencies have expected content..."
+	go -C $(TOOLS_DIR) mod verify
+	@echo "- [tools] Checking for any unused/missing packages in go.mod..."
+	go -C $(TOOLS_DIR) mod tidy
+	@git diff --exit-code -- $(TOOLS_DIR)/go.sum $(TOOLS_DIR)/go.mod
+	@echo "- [tests/e2e] Verifying that the dependencies have expected content..."
+	go -C $(E2E_TESTS_DIR) mod verify
+	@echo "- [tests/e2e] Checking for any unused/missing packages in go.mod..."
+	go -C $(E2E_TESTS_DIR) mod tidy
+	@git diff --exit-code -- $(E2E_TESTS_DIR)/go.sum $(E2E_TESTS_DIR)/go.mod
 
 validate-csv: cmds
 	./gpuop-cfg validate csv --input=./bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
