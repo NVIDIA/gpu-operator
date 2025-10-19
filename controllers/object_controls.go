@@ -958,7 +958,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
@@ -1241,6 +1241,7 @@ func transformToolkitCtrForCDI(container *corev1.Container) {
 	setContainerEnv(container, CDIEnabledEnvName, "true")
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
 	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
+	setContainerEnv(container, CRIOConfigModeEnvName, "config")
 }
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
@@ -1283,6 +1284,18 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		transformToolkitCtrForCDI(toolkitMainContainer)
+	} else if n.runtime == gpuv1.CRIO {
+		// (cdesiniotis) When CDI is not enabled and cri-o is the container runtime,
+		// we continue to install the OCI prestart hook as opposed to adding nvidia
+		// runtime handlers to the cri-o configuration. Users can override this behavior
+		// and have nvidia runtime handlers added to the cri-o configuration by setting
+		// the 'CRIO_CONFIG_MODE' environment variable to 'config' in the toolkit container.
+		// However, one should note setting 'CRIO_CONFIG_MODE' to 'config' in this case
+		// (when CDI is not enabled) would result in the 'nvidia' runtime being set as
+		// the default runtime. While this should work in theory, it is a significant
+		// change -- which was the primary motivation to continue using the OCI prestart
+		// hook by default in this case.
+		setContainerEnv(toolkitMainContainer, CRIOConfigModeEnvName, "hook")
 	}
 
 	// set install directory for the toolkit
@@ -1335,11 +1348,6 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
 		setContainerEnv(container, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
-	}
-
-	if runtime == gpuv1.CRIO.String() {
-		// We add the nvidia runtime to the cri-o config by default instead of installing the OCI prestart hook
-		setContainerEnv(container, CRIOConfigModeEnvName, "config")
 	}
 
 	// For runtime config files we have top-level configs and drop-in files.
@@ -1517,7 +1525,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
@@ -1597,7 +1605,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
@@ -1705,7 +1713,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set hostPID if specified for DCGM Exporter
 	if config.DCGMExporter.IsHostPIDEnabled() {
@@ -1830,7 +1838,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	return nil
 }
@@ -1872,7 +1880,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -2166,7 +2174,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		return fmt.Errorf("%v", err)
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
@@ -2540,7 +2548,10 @@ func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 	return DefaultRuntimeClass
 }
 
-func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec) {
+func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
+	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
+		return
+	}
 	runtimeClassName := getRuntimeClassName(config)
 	podSpec.RuntimeClassName = &runtimeClassName
 }
