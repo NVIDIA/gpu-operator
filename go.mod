@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.8.1
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20251016051157-45a3526990c0
 	github.com/NVIDIA/nvidia-container-toolkit v1.18.0-rc.6
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.3
