@@ -763,12 +763,26 @@ func (n *ClusterPolicyController) addLabelsFinalizer(ctx context.Context, reconc
 		// If the cluster policy is being deleted, remove the labels finalizer
 		if controllerutil.ContainsFinalizer(clusterPolicy, labelsFinalizer) {
 			reconciler.Log.Info("Removing labels finalizer", "finalizer", labelsFinalizer)
-			if !removeAllGPUStateLabels(clusterPolicy.Labels) {
-				return fmt.Errorf("failed to remove all GPU state labels")
+			_, gpuNodeCount, err := n.labelGPUNodes()
+			if err != nil {
+				// return fmt.Errorf("failed to label GPU nodes: %v", err)
+				reconciler.Log.Error(nil, "Failed to label GPU nodes", "error", err)
 			}
+			if gpuNodeCount == 0 {
+				// return fmt.Errorf("no GPU nodes found")
+				reconciler.Log.Info("No GPU nodes found, skipping removal of labels finalizer")
+			}
+			// if !removeAllGPUStateLabels(clusterPolicy.Labels) {
+			// 	return fmt.Errorf("failed to remove all GPU state labels")
+			// }
 			controllerutil.RemoveFinalizer(clusterPolicy, labelsFinalizer)
 			if err := reconciler.Update(ctx, clusterPolicy); err != nil && !apierrors.IsConflict(err) {
 				return fmt.Errorf("failed to update cluster policy: %v", err)
+			}
+			_, _, err = n.labelGPUNodes()
+			if err != nil {
+				// return fmt.Errorf("failed to label GPU nodes: %v", err)
+				reconciler.Log.Error(nil, "Failed to label GPU nodes", "error", err)
 			}
 		}
 	}
