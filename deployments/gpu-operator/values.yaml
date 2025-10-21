@@ -193,7 +193,7 @@ driver:
     image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.1
+    version: v0.9.0
     imagePullPolicy: IfNotPresent
     env: []
   env: []
@@ -432,7 +432,7 @@ vgpuManager:
     image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.1
+    version: v0.9.0
     imagePullPolicy: IfNotPresent
     env: []
 
@@ -462,7 +462,7 @@ vfioManager:
     image: k8s-driver-manager
     # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
     # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
-    version: v0.8.1
+    version: v0.9.0
     imagePullPolicy: IfNotPresent
     env: []
 
