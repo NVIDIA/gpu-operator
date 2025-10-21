@@ -341,7 +341,7 @@ migManager:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-mig-manager
-  version: v0.12.3-ubuntu20.04
+  version: v0.13.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
