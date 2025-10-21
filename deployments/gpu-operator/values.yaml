@@ -232,7 +232,7 @@ devicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.4
+  version: v0.18.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
@@ -331,7 +331,7 @@ gfd:
   enabled: true
   repository: nvcr.io/nvidia
   image: k8s-device-plugin
-  version: v0.17.4
+  version: v0.18.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
