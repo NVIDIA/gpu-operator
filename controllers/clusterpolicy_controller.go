@@ -130,6 +130,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		// TODO Check if return error or continue
 		r.Log.Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return ctrl.Result{}, err
 	}
 
 	err = clusterPolicyCtrl.init(ctx, r, instance)
