@@ -18,8 +18,8 @@ github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDs
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3 h1:vGT+oyUY7kOGLd71Cz0NfRVEep23jdd4fi+PYsZEj88=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20250709180754-c80af13d73e3/go.mod h1:0GPZJRwr6nY1IVhGUyzG9YfKhNFQq8UlhYe4u7jVF0U=
-github.com/NVIDIA/nvidia-container-toolkit v1.18.0-rc.6 h1:amceSfbzYhu531xPx68bZ7O6Qut1ciHWSkvcKv481gA=
-github.com/NVIDIA/nvidia-container-toolkit v1.18.0-rc.6/go.mod h1:WwIZSaF/PJwxZNfefva+fYns97XfjgBjicBIhynYNdQ=
+github.com/NVIDIA/nvidia-container-toolkit v1.18.0 h1:bXoKq9C1WHU5fF6VqXvX3RkMzpp4ihTUgBPrh66vTf0=
+github.com/NVIDIA/nvidia-container-toolkit v1.18.0/go.mod h1:ZxWSG7fnFo2Z7xSGtMyZVF7WnTbj1lgx4dMrBLUq90g=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -269,8 +269,8 @@ golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210616094352-59db8d763f22/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
-golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+golang.org/x/sys v0.37.0 h1:fdNQudmxPjkdUTPnLn5mdQv7Zwvbvpaxqs831goi9kQ=
+golang.org/x/sys v0.37.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/term v0.35.0 h1:bZBVKBudEyhRcajGcNc3jIfWPqV4y/Kt2XcoigOWtDQ=
 golang.org/x/term v0.35.0/go.mod h1:TPGtkTLesOwf2DE8CgVYiZinHAOuy5AYUYT1lENIZnA=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
