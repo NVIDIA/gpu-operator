@@ -18,6 +18,7 @@ spec:
       labels:
         app: nvidia-vgpu-manager-daemonset
     spec:
+      terminationGracePeriodSeconds: 120
       nodeSelector:
         nvidia.com/gpu.deploy.vgpu-manager: "true"
       tolerations:

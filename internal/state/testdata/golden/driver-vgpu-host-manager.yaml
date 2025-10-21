@@ -238,6 +238,7 @@ spec:
         nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-vgpu-manager-ubuntu22.04
+      terminationGracePeriodSeconds: 120
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu

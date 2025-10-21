@@ -330,6 +330,7 @@ spec:
         nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-vgpu-manager-openshift
+      terminationGracePeriodSeconds: 120
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu
