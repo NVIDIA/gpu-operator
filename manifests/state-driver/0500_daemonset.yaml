@@ -59,6 +59,9 @@ spec:
         {{- .Driver.Spec.Labels | yaml | nindent 8 }}
         {{- end }}
     spec:
+      {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+      terminationGracePeriodSeconds: 120
+      {{- end }}
       nodeSelector:
         {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
         nvidia.com/gpu.deploy.vgpu-manager: "true"
