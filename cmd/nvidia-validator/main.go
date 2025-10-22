@@ -30,7 +30,8 @@ import (
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
-	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
+	"github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvdevices"
+	"github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvmodules"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -865,21 +866,27 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 		driverRootCtrPath = "/host"
 	}
 
-	// We now create the symlinks in /dev/char.
-	creator, err := devchar.NewSymlinkCreator(
-		devchar.WithDriverRoot(driverRootCtrPath),
-		devchar.WithDevRoot(driverInfo.devRoot),
-		devchar.WithDevCharPath(hostDevCharPath),
-		devchar.WithCreateAll(true),
-		devchar.WithCreateDeviceNodes(true),
-		devchar.WithLoadKernelModules(loadKernelModules),
-	)
-	if err != nil {
-		return fmt.Errorf("error creating symlink creator: %w", err)
+	if loadKernelModules {
+		modules := nvmodules.New(
+			nvmodules.WithRoot(driverRootCtrPath),
+		)
+		if err := modules.LoadAll(); err != nil {
+			return fmt.Errorf("failed to load NVIDIA kernel modules: %v", err)
+		}
 	}
 
-	err = creator.CreateLinks()
+	devices, err := nvdevices.New(
+		nvdevices.WithDevRoot(driverInfo.devRoot),
+	)
 	if err != nil {
+		return err
+	}
+
+	if err := devices.CreateNVIDIAControlDevices(); err != nil {
+		return fmt.Errorf("failed to create device nodes for NVIDIA control devices: %v", err)
+	}
+	// We now create the symlinks in /dev/char on the host.
+	if err := devices.CreateDevCharSymlinks(hostDevCharPath, false); err != nil {
 		return fmt.Errorf("error creating symlinks: %w", err)
 	}
 
