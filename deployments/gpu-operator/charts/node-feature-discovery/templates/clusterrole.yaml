@@ -137,10 +137,4 @@ rules:
   verbs:
   - delete
   - list
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
 {{- end }}

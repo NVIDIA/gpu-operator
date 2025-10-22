@@ -3846,16 +3846,6 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 				}
 			}
 		}
-		// Create owner ref
-		// ownerReference := []metav1.OwnerReference{}
-		// // Get pod owner reference
-		// ownerReference = append(ownerReference, metav1.OwnerReference{
-		// 	APIVersion: corev1.SchemeGroupVersion.String(),
-		// 	Kind:       "Pod",
-		// 	Name:       pod.Name,
-		// 	UID:        pod.UID,
-		// })
-		// pod.OwnerReferences = ownerReference
 	}
 
 	// All containers are ready

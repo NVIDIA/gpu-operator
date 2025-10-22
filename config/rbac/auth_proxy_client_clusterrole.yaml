@@ -5,9 +5,3 @@ metadata:
 rules:
 - nonResourceURLs: ["/metrics"]
   verbs: ["get"]
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get

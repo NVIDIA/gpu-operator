@@ -11,9 +11,3 @@ rules:
   resources:
   - subjectaccessreviews
   verbs: ["create"]
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get

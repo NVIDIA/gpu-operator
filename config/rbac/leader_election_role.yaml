@@ -25,9 +25,3 @@ rules:
   verbs:
   - create
   - patch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get

@@ -18,9 +18,3 @@ rules:
   - clusterpolicies/status
   verbs:
   - get
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
