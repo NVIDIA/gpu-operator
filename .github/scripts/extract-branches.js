@@ -21,7 +21,7 @@ module.exports = async ({ github, context, core }) => {
   const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
 
   if (!prNumber) {
-    core.setFailed('Could not determine PR number from event');
+    core.warning('Could not determine PR number from event - skipping backport');
     return [];
   }
 
@@ -29,8 +29,12 @@ module.exports = async ({ github, context, core }) => {
   if (context.payload.pull_request?.body) {
     const prBody = context.payload.pull_request.body;
     // Strict ASCII, anchored; allow X.Y or X.Y.Z
-    const bodyMatches = prBody.matchAll(/^\/cherry-pick\s+(release-\d+\.\d+(?:\.\d+)?)/gmi);
-    branches.push(...Array.from(bodyMatches, m => m[1]));
+    // Support multiple space-separated branches on one line
+    const lineMatches = prBody.matchAll(/^\/cherry-pick\s+(.+)$/gmi);
+    for (const match of lineMatches) {
+      const branchMatches = match[1].matchAll(/release-\d+\.\d+(?:\.\d+)?/g);
+      branches.push(...Array.from(branchMatches, m => m[0]));
+    }
   }
 
   // Check all comments
@@ -41,15 +45,18 @@ module.exports = async ({ github, context, core }) => {
   });
 
   for (const comment of comments.data) {
-    const commentMatches = comment.body.matchAll(/^\/cherry-pick\s+(release-\d+\.\d+(?:\.\d+)?)/gmi);
-    branches.push(...Array.from(commentMatches, m => m[1]));
+    const lineMatches = comment.body.matchAll(/^\/cherry-pick\s+(.+)$/gmi);
+    for (const match of lineMatches) {
+      const branchMatches = match[1].matchAll(/release-\d+\.\d+(?:\.\d+)?/g);
+      branches.push(...Array.from(branchMatches, m => m[0]));
+    }
   }
 
   // Deduplicate
   branches = [...new Set(branches)];
 
   if (branches.length === 0) {
-    core.setFailed('No valid release branches found in /cherry-pick comments');
+    core.info('No cherry-pick requests found - skipping backport');
     return [];
   }
 

@@ -29,31 +29,7 @@ const { data: pullRequest } = await github.rest.pulls.get({
 
 const prTitle = pullRequest.title;
 const prAuthor = pullRequest.user.login;
-
-// Validate PR is merged
-if (!pullRequest.merged) {
-  // If triggered by a comment on an unmerged PR, acknowledge and exit gracefully
-  if (context.eventName === 'issue_comment') {
-    core.info('PR is not merged yet. Acknowledging /cherry-pick command and will backport after merge.');
-    // Add a reaction to the comment
-    await github.rest.reactions.createForIssueComment({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      comment_id: context.payload.comment.id,
-      content: 'eyes'
-    });
-    // Add a comment explaining what will happen
-    await github.rest.issues.createComment({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      issue_number: prNumber,
-      body: `👀 Backport request acknowledged for: ${branches.map(b => `\`${b}\``).join(', ')}\n\nThe backport PR(s) will be automatically created when this PR is merged.`
-    });
-    return [];
-  }
-  core.setFailed('PR is not merged yet. Only merged PRs can be backported.');
-  return;
-}
+const isMerged = pullRequest.merged;
 
 // Get all commits from the PR
 const { data: commits } = await github.rest.pulls.listCommits({
@@ -63,8 +39,8 @@ const { data: commits } = await github.rest.pulls.listCommits({
 });
 
 if (commits.length === 0) {
-  core.setFailed('No commits found in PR. This should not happen for merged PRs.');
-  return;
+  core.warning('No commits found in PR - skipping backport');
+  return [];
 }
 
 core.info(`Backporting PR #${prNumber}: "${prTitle}"`);
@@ -83,10 +59,10 @@ for (const targetBranch of branches) {
   core.info(`========================================`);
   const backportBranch = `backport-${prNumber}-to-${targetBranch}`;
   try {
-    // Create backport branch from target release branch
-    core.info(`Creating branch ${backportBranch} from ${targetBranch}`);
+    // Create/reset backport branch from target release branch
+    core.info(`Creating/resetting branch ${backportBranch} from ${targetBranch}`);
     execSync(`git fetch origin ${targetBranch}:${targetBranch}`, { stdio: 'inherit' });
-    execSync(`git checkout ${backportBranch} || git checkout -b ${backportBranch} ${targetBranch}`, { stdio: 'inherit' });
+    execSync(`git checkout -B ${backportBranch} ${targetBranch}`, { stdio: 'inherit' });
     // Cherry-pick each commit from the PR
     let hasConflicts = false;
     for (let i = 0; i < commits.length; i++) {
@@ -113,24 +89,44 @@ for (const targetBranch of branches) {
             // If continue fails, make a simple commit
             execSync(`git commit --no-edit --allow-empty-message || git commit -m "Cherry-pick ${commitSha} (with conflicts)"`, { stdio: 'inherit' });
           }
+        } else if (error.message && error.message.includes('previous cherry-pick is now empty')) {
+          // Handle empty commits (changes already exist in target branch)
+          core.info(`Commit ${commitSha.substring(0, 7)} is empty (changes already in target branch), skipping`);
+          execSync('git cherry-pick --skip', { stdio: 'inherit' });
         } else {
           throw error;
         }
       }
     }
-    // Push the backport branch
+    // Push the backport branch (force to handle updates)
     core.info(`Pushing ${backportBranch} to origin`);
-    execSync(`git push origin ${backportBranch}`, { stdio: 'inherit' });
+    execSync(`git push --force-with-lease origin ${backportBranch}`, { stdio: 'inherit' });
+    
+    // Check if a PR already exists for this backport branch
+    const { data: existingPRs } = await github.rest.pulls.list({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      head: `${context.repo.owner}:${backportBranch}`,
+      base: targetBranch,
+      state: 'open'
+    });
+    const existingPR = existingPRs.length > 0 ? existingPRs[0] : null;
+    
     // Create pull request
     const commitList = commits.map(c => `- \`${c.sha.substring(0, 7)}\` ${c.commit.message.split('\n')[0]}`).join('\n');
     
-    // Build PR body based on conflict status
+    // Build PR body based on conflict status and merge status
     let prBody = `🤖 **Automated backport of #${prNumber} to \`${targetBranch}\`**\n\n`;
+    
+    // Add merge status indicator
+    if (!isMerged) {
+      prBody += `⚠️ **Note:** The source PR #${prNumber} is not yet merged. This backport was created from the current state of the PR and may need updates if more commits are added before merge.\n\n`;
+    }
     
     if (hasConflicts) {
       prBody += `⚠️ **This PR has merge conflicts that need manual resolution.**
 
-Original PR: #${prNumber}
+Original PR: #${prNumber} ${isMerged ? '(merged)' : '(not yet merged)'}
 Original Author: @${prAuthor}
 
 **Cherry-picked commits (${commits.length}):**
@@ -158,7 +154,7 @@ git push --force-with-lease origin ${backportBranch}
     } else {
       prBody += `✅ Cherry-pick completed successfully with no conflicts.
 
-Original PR: #${prNumber}
+Original PR: #${prNumber} ${isMerged ? '(merged)' : '(not yet merged)'}
 Original Author: @${prAuthor}
 
 **Cherry-picked commits (${commits.length}):**
@@ -167,37 +163,98 @@ ${commitList}
 This backport was automatically created by the backport bot.`;
     }
 
-    const newPR = await github.rest.pulls.create({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      title: `[${targetBranch}] ${prTitle}`,
-      head: backportBranch,
-      base: targetBranch,
-      body: prBody,
-      draft: hasConflicts
-    });
-    // Add labels
-    await github.rest.issues.addLabels({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      issue_number: newPR.data.number,
-      labels: ['backport', hasConflicts ? 'needs-manual-resolution' : 'auto-backport']
-    });
-    // Link to original PR
-    await github.rest.issues.createComment({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      issue_number: prNumber,
-      body: `🤖 Backport PR created for \`${targetBranch}\`: #${newPR.data.number} ${hasConflicts ? '⚠️ (has conflicts)' : '✅'}`
-    });
-    results.push({
-      branch: targetBranch,
-      success: true,
-      prNumber: newPR.data.number,
-      prUrl: newPR.data.html_url,
-      hasConflicts
-    });
-    core.info(`✅ Successfully created backport PR #${newPR.data.number}`);
+    if (existingPR) {
+      // Update existing PR
+      core.info(`Found existing PR #${existingPR.number}, updating it`);
+      await github.rest.pulls.update({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: existingPR.number,
+        body: prBody,
+        draft: hasConflicts
+      });
+      
+      // Update labels
+      const currentLabels = existingPR.labels.map(l => l.name);
+      const desiredLabels = ['backport', hasConflicts ? 'needs-manual-resolution' : 'auto-backport'];
+      
+      // Remove old labels if conflict status changed
+      if (hasConflicts && currentLabels.includes('auto-backport')) {
+        await github.rest.issues.removeLabel({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: existingPR.number,
+          name: 'auto-backport'
+        }).catch(() => {}); // Ignore if label doesn't exist
+      } else if (!hasConflicts && currentLabels.includes('needs-manual-resolution')) {
+        await github.rest.issues.removeLabel({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          issue_number: existingPR.number,
+          name: 'needs-manual-resolution'
+        }).catch(() => {}); // Ignore if label doesn't exist
+      }
+      
+      // Add current labels
+      await github.rest.issues.addLabels({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: existingPR.number,
+        labels: desiredLabels
+      });
+      
+      // Comment about the update
+      await github.rest.issues.createComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: prNumber,
+        body: `🤖 Updated existing backport PR for \`${targetBranch}\`: #${existingPR.number} ${hasConflicts ? '⚠️ (has conflicts)' : '✅'}`
+      });
+      
+      results.push({
+        branch: targetBranch,
+        success: true,
+        prNumber: existingPR.number,
+        prUrl: existingPR.html_url,
+        hasConflicts,
+        updated: true
+      });
+      core.info(`✅ Successfully updated backport PR #${existingPR.number}`);
+    } else {
+      // Create new PR
+      const newPR = await github.rest.pulls.create({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        title: `[${targetBranch}] ${prTitle}`,
+        head: backportBranch,
+        base: targetBranch,
+        body: prBody,
+        draft: hasConflicts
+      });
+      // Add labels
+      await github.rest.issues.addLabels({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: newPR.data.number,
+        labels: ['backport', hasConflicts ? 'needs-manual-resolution' : 'auto-backport']
+      });
+      // Link to original PR
+      await github.rest.issues.createComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: prNumber,
+        body: `🤖 Backport PR created for \`${targetBranch}\`: #${newPR.data.number} ${hasConflicts ? '⚠️ (has conflicts)' : '✅'}`
+      });
+      results.push({
+        branch: targetBranch,
+        success: true,
+        prNumber: newPR.data.number,
+        prUrl: newPR.data.html_url,
+        hasConflicts,
+        updated: false
+      });
+      core.info(`✅ Successfully created backport PR #${newPR.data.number}`);
+    }
   } catch (error) {
     core.error(`❌ Failed to backport to ${targetBranch}: ${error.message}`);
     // Comment on original PR about the failure
@@ -229,7 +286,8 @@ core.info('Backport Summary');
 core.info('========================================');
 for (const result of results) {
   if (result.success) {
-    core.info(`✅ ${result.branch}: PR #${result.prNumber} ${result.hasConflicts ? '(has conflicts)' : ''}`);
+    const action = result.updated ? 'Updated' : 'Created';
+    core.info(`✅ ${result.branch}: ${action} PR #${result.prNumber} ${result.hasConflicts ? '(has conflicts)' : ''}`);
   } else {
     core.error(`❌ ${result.branch}: ${result.error}`);
   }
