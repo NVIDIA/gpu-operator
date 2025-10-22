@@ -23,6 +23,13 @@ on:
 
 jobs:
   ### Configuration checks ###
+  docker-version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - run: |
+          docker --version
   helm-lint:
     runs-on: ubuntu-latest
     steps:
