@@ -35,7 +35,7 @@ github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
-# github.com/NVIDIA/nvidia-container-toolkit v1.18.0
+# github.com/NVIDIA/nvidia-container-toolkit v1.18.0 => ../container-toolkit
 ## explicit; go 1.24.0
 github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/info/proc/devices
@@ -44,8 +44,8 @@ github.com/NVIDIA/nvidia-container-toolkit/internal/logger
 github.com/NVIDIA/nvidia-container-toolkit/internal/lookup
 github.com/NVIDIA/nvidia-container-toolkit/internal/lookup/symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/nvcaps
-github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvdevices
-github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvmodules
+github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvdevices
+github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvmodules
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -381,7 +381,7 @@ github.com/ulikunitz/xz/lzma
 # github.com/urfave/cli/v2 v2.27.7
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/urfave/cli/v3 v3.4.1
+# github.com/urfave/cli/v3 v3.5.0
 ## explicit; go 1.22
 github.com/urfave/cli/v3
 # github.com/x448/float16 v0.8.4
@@ -1185,3 +1185,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# github.com/NVIDIA/nvidia-container-toolkit => ../container-toolkit
