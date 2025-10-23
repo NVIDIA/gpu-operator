@@ -16,10 +16,6 @@ BUILD_MULTI_ARCH_IMAGES ?= false
 DOCKER ?= docker
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-BUILDX  =
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-BUILDX = buildx
-endif
 
 ##### Global variables #####
 include $(CURDIR)/versions.mk
@@ -284,8 +280,7 @@ ALL_TARGETS := $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
 build-image:
-	DOCKER_BUILDKIT=1 \
-		$(DOCKER) $(BUILDX) build --pull \
+		$(DOCKER) build --pull \
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
