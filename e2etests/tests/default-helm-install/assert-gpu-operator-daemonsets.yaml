@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gpu-feature-discovery
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-container-toolkit-daemonset
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-operator-validator
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gpu-operator-node-feature-discovery-worker
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-driver-daemonset
+  namespace: ($namespace)
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)

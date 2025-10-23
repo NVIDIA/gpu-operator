@@ -1,0 +1,24 @@
+{
+    "packages": {
+        "kubectl": "1.33.4",
+        "kustomize": "5.7.1",
+        "go": "1.25",
+        "golangci-lint": "latest",
+        "kubernetes-helm": "3.19.0",
+        "kyverno-chainsaw": "0.2.13",
+        "apple-sdk_15": {
+            "name": "apple-sdk_15",
+            "version": "latest",
+            "platforms": [
+                "aarch64-darwin",
+                "x86_64-darwin"
+            ],
+            "excluded_platforms": ["x86_64-linux"]
+        }
+    },
+    "shell": {
+        "init_hook": [
+            "export \"GOROOT=$(go env GOROOT)\""
+        ]
+    }
+}
