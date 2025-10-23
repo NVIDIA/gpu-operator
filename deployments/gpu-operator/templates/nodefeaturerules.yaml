@@ -89,6 +89,15 @@ spec:
           matchExpressions:
             vendor: {op: In, value: ["10de"]}
             device: {op: In, value: ["2322"]}
+    - name: "NVIDIA H100L 94GB"
+      labels:
+        "nvidia.com/gpu.H100L": "true"
+        "nvidia.com/gpu.family": "hopper"
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+            device: {op: In, value: ["2321"]}
     - name: "NVIDIA CC Enabled"
       labels:
         "nvidia.com/cc.capable": "true"
@@ -104,4 +113,3 @@ spec:
               nvidia.com/gpu.family: {op: In, value: ["hopper"]}
               tdx.enabled: {op: IsTrue}
 {{- end }}
-
