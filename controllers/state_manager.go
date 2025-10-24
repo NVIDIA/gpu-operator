@@ -417,6 +417,11 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 			modified = true
 		}
 	}
+	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
+		w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
+		delete(labels, migManagerLabelKey)
+		modified = true
+	}
 	return modified
 }
 
@@ -884,7 +889,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.logger.Info("Pod Security Admission labels added to GPU Operator namespace", "namespace", n.operatorNamespace)
 	}
 
-	n.logger.Info("SHIVAAAAAAAA Calling labels: namespace, hasNFDLabels", "namespace", n.operatorNamespace, "hasNFDLabels", n.hasNFDLabels)
 	// fetch all nodes and label gpu nodes
 	hasNFDLabels, gpuNodeCount, err := n.labelGPUNodes()
 	if err != nil {
