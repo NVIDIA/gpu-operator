@@ -299,3 +299,6 @@ install-tools:
 	@echo Installing tools from tools.go
 	export GOBIN=$(PROJECT_DIR)/bin && \
 	grep '^\s*_' tools/tools.go | awk '{print $$2}' | xargs -tI % $(GO_CMD) install -mod=readonly -modfile=tools/go.mod %
+
+e2etest:
+	KUBECONFIG=$(PROJECT_DIR)/kubeconfig chainsaw test $(PROJECT_DIR)/e2etests/tests/

@@ -330,6 +330,9 @@ jobs:
           CONTAINER_RUNTIME: "containerd"
           TEST_CASE: "./tests/cases/defaults.sh"
         run: |
+          apt update && apt install -y curl
+          curl -fsSL https://get.jetify.com/devbox | FORCE=1 bash
+          echo | devbox run chainsaw-tests
           echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
           ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
           ./tests/scripts/pull.sh /tmp/logs logs
