@@ -395,6 +395,11 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
 	modified := false
 	for workloadConfig, labelsMap := range gpuStateLabels {
+		if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
+			w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
+			delete(labels, migManagerLabelKey)
+			modified = true
+		}
 		if workloadConfig == w.config {
 			continue
 		}
@@ -416,11 +421,6 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 			delete(labels, migManagerLabelKey)
 			modified = true
 		}
-	}
-	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
-		w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
-		delete(labels, migManagerLabelKey)
-		modified = true
 	}
 	return modified
 }
