@@ -378,13 +378,13 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 	modified := false
 	for key, value := range gpuStateLabels[w.config] {
 		if _, ok := labels[key]; !ok {
-			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
+			w.log.Info("SHIVA1 Setting node label", "NodeName", w.node, "Label", key, "Value", value)
 			labels[key] = value
 			modified = true
 		}
 	}
 	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
-		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
+		w.log.Info("SHIVA2 Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
 		labels[migManagerLabelKey] = migManagerLabelValue
 		modified = true
 	}
@@ -514,7 +514,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label
-			n.logger.Info("Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
+			n.logger.Info("SHIVA3 Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// update node labels
 			node.SetLabels(labels)
@@ -523,7 +523,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			// previously labelled node and no longer has GPUs
 			// label node to reset common Nvidia GPU label
 			n.logger.Info("Node no longer has GPUs", "NodeName", node.Name)
-			n.logger.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
+			n.logger.Info("SHIVA4 Setting node label", "Label", commonGPULabelKey, "Value", "false")
 			labels[commonGPULabelKey] = "false"
 			n.logger.Info("Disabling all operands for node", "NodeName", node.Name)
 			removeAllGPUStateLabels(labels)
