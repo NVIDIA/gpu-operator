@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -377,13 +378,13 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 	modified := false
 	for key, value := range gpuStateLabels[w.config] {
 		if _, ok := labels[key]; !ok {
-			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
+			w.log.Info("SHIVA1 Setting node label", "NodeName", w.node, "Label", key, "Value", value)
 			labels[key] = value
 			modified = true
 		}
 	}
 	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
-		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
+		w.log.Info("SHIVA2 Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
 		labels[migManagerLabelKey] = migManagerLabelValue
 		modified = true
 	}
@@ -394,6 +395,11 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
 	modified := false
 	for workloadConfig, labelsMap := range gpuStateLabels {
+		if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
+			w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
+			delete(labels, migManagerLabelKey)
+			modified = true
+		}
 		if workloadConfig == w.config {
 			continue
 		}
@@ -508,7 +514,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label
-			n.logger.Info("Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
+			n.logger.Info("SHIVA3 Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
 			labels[commonGPULabelKey] = commonGPULabelValue
 			// update node labels
 			node.SetLabels(labels)
@@ -517,7 +523,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 			// previously labelled node and no longer has GPUs
 			// label node to reset common Nvidia GPU label
 			n.logger.Info("Node no longer has GPUs", "NodeName", node.Name)
-			n.logger.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
+			n.logger.Info("SHIVA4 Setting node label", "Label", commonGPULabelKey, "Value", "false")
 			labels[commonGPULabelKey] = "false"
 			n.logger.Info("Disabling all operands for node", "NodeName", node.Name)
 			removeAllGPUStateLabels(labels)
@@ -746,6 +752,45 @@ func (n *ClusterPolicyController) getRuntime() error {
 		runtime = gpuv1.Containerd
 	}
 	n.runtime = runtime
+	return nil
+}
+
+func (n *ClusterPolicyController) addLabelsFinalizer(ctx context.Context, reconciler *ClusterPolicyReconciler, clusterPolicy *gpuv1.ClusterPolicy) error {
+	labelsFinalizer := "labels.gpu-operator.nvidia.com/clusterpolicy-finalizer"
+	if clusterPolicy.DeletionTimestamp == nil || clusterPolicy.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(clusterPolicy, labelsFinalizer) {
+			controllerutil.AddFinalizer(clusterPolicy, labelsFinalizer)
+			if err := reconciler.Update(ctx, clusterPolicy); err != nil {
+				return fmt.Errorf("failed to update cluster policy: %v", err)
+			}
+		}
+	} else {
+		// If the cluster policy is being deleted, remove the labels finalizer
+		if controllerutil.ContainsFinalizer(clusterPolicy, labelsFinalizer) {
+			reconciler.Log.Info("Removing labels finalizer", "finalizer", labelsFinalizer)
+			_, gpuNodeCount, err := n.labelGPUNodes()
+			if err != nil {
+				// return fmt.Errorf("failed to label GPU nodes: %v", err)
+				reconciler.Log.Error(nil, "Failed to label GPU nodes", "error", err)
+			}
+			if gpuNodeCount == 0 {
+				// return fmt.Errorf("no GPU nodes found")
+				reconciler.Log.Info("No GPU nodes found, skipping removal of labels finalizer")
+			}
+			// if !removeAllGPUStateLabels(clusterPolicy.Labels) {
+			// 	return fmt.Errorf("failed to remove all GPU state labels")
+			// }
+			controllerutil.RemoveFinalizer(clusterPolicy, labelsFinalizer)
+			if err := reconciler.Update(ctx, clusterPolicy); err != nil && !apierrors.IsConflict(err) {
+				return fmt.Errorf("failed to update cluster policy: %v", err)
+			}
+			_, _, err = n.labelGPUNodes()
+			if err != nil {
+				// return fmt.Errorf("failed to label GPU nodes: %v", err)
+				reconciler.Log.Error(nil, "Failed to label GPU nodes", "error", err)
+			}
+		}
+	}
 	return nil
 }
 
