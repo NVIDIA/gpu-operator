@@ -146,6 +146,18 @@ func getModuleRoot(dir string) (string, error) {
 	return dir, nil
 }
 
+// mockOSRelease returns a mock parseOSRelease function for testing.
+// It allows tests to simulate different operating systems without filesystem access.
+func mockOSRelease(osID, version string) func() (map[string]string, error) {
+	return func() (map[string]string, error) {
+		return map[string]string{
+			"ID":         osID,
+			"VERSION_ID": version,
+			"NAME":       osID,
+		}, nil
+	}
+}
+
 // setup creates a mock kubernetes cluster and client. Nodes are labeled with the minimum
 // required NFD labels to be detected as GPU nodes by the GPU Operator. A sample
 // ClusterPolicy resource is applied to the cluster. The ClusterPolicyController
@@ -158,8 +170,8 @@ func setup() error {
 	boolTrue = new(bool)
 	*boolTrue = true
 
-	// add env for calls that we cannot mock
-	os.Setenv("UNIT_TEST", "true")
+	// Mock parseOSRelease to avoid filesystem dependency in tests
+	parseOSRelease = mockOSRelease("ubuntu", "20.04")
 
 	s := scheme.Scheme
 	if err := gpuv1.AddToScheme(s); err != nil {
@@ -1392,4 +1404,60 @@ func TestService(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseOSReleaseFromFile(t *testing.T) {
+	tests := []struct {
+		description string
+		content     string
+		expected    map[string]string
+	}{
+		{
+			description: "quoted values",
+			content:     `NAME="Ubuntu"` + "\n" + `VERSION_ID="20.04"`,
+			expected:    map[string]string{"NAME": "Ubuntu", "VERSION_ID": "20.04"},
+		},
+		{
+			description: "unquoted values",
+			content:     `NAME=Ubuntu` + "\n" + `ID=ubuntu`,
+			expected:    map[string]string{"NAME": "Ubuntu", "ID": "ubuntu"},
+		},
+		{
+			description: "mixed quoted and unquoted",
+			content:     `ID="rhel"` + "\n" + `VERSION_ID=8.5`,
+			expected:    map[string]string{"ID": "rhel", "VERSION_ID": "8.5"},
+		},
+		{
+			description: "empty lines and comments",
+			content:     `NAME="Ubuntu"` + "\n\n# comment\n" + `ID=ubuntu`,
+			expected:    map[string]string{"NAME": "Ubuntu", "ID": "ubuntu"},
+		},
+	}
+
+	tempDir := t.TempDir()
+
+	// Save original value and restore after tests for future subsequent tests (if needed)
+	originalPath := osReleaseFilePath
+	defer func() { osReleaseFilePath = originalPath }()
+
+	for i, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			testFile := filepath.Join(tempDir, fmt.Sprintf("os-release-%d", i))
+			err := os.WriteFile(testFile, []byte(test.content), 0600)
+			require.NoError(t, err)
+
+			// Override the path for this test
+			osReleaseFilePath = testFile
+			result, err := parseOSReleaseFromFile()
+			require.NoError(t, err)
+			require.Equal(t, test.expected, result)
+		})
+	}
+
+	t.Run("file not found", func(t *testing.T) {
+		osReleaseFilePath = "/nonexistent/path"
+		_, err := parseOSReleaseFromFile()
+		require.Error(t, err)
+		require.True(t, os.IsNotExist(err))
+	})
 }
