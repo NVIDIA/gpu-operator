@@ -1,0 +1,75 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: default-helm-install
+spec:
+  failFast: true
+  bindings:
+    - name: nodes
+      # total nodes in cluster
+      value: (length(x_k8s_list($client, 'v1', 'Node', '').items))
+  steps:
+
+    # Install GPU Operator via helm template and apply the rendered manifests
+    # We specifically use helm template here as "helm install" installs few
+    # things outside of the namespace (like clusterroles) which are not
+    # removed by "helm uninstall" and may interfere with other tests. By using
+    # "helm template" we ensure chainsaw is able to clean up all resources it
+    # creates during the test.
+    - name: install gpu operator
+      try:
+      - script:
+          content: |
+            set -e
+            helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
+            helm repo update
+            helm template gpu-operator nvidia/gpu-operator --namespace $NAMESPACE > /tmp/default-gpu-operator.yaml
+      - apply:
+          file: /tmp/default-gpu-operator.yaml
+
+    # Sample step to list pods in the namespace
+    - name: list gpu operator pods
+      try:
+      - script:
+          content: |
+            set -e
+            kubectl get pods -n $NAMESPACE
+
+    # Assert that all the GPU Operator daemonset pods are running
+    - name: assert gpu operator daemonset pods are running
+      try:
+      - assert:
+          file: assert-gpu-operator-daemonsets.yaml
+      catch:
+      - script:
+          content: |
+            set -e
+            kubectl get pods -n $NAMESPACE -o wide
+            kubectl describe daemonset -n $NAMESPACE
+
+    # Assert that all the GPU Operator deployment pods are running
+    - name: assert gpu operator deployment pods are running
+      try:
+      - assert:
+          file: assert-gpu-operator-deployments.yaml
+      catch:
+      - script:
+          content: |
+            set -e
+            kubectl get pods -n $NAMESPACE -o wide
+            kubectl describe deployment -n $NAMESPACE
+
+    # Test running a pod that requests GPU resources
+    - name: test running pod with gpu
+      try:
+      - apply:
+          file: gpu-pod.yaml
+      - assert:
+          file: assert-gpu-pod.yaml
+      catch:
+      - script:
+          content: |
+            set -e
+            kubectl get pod pod-with-gpu -n $NAMESPACE -o wide
+            kubectl describe pod pod-with-gpu -n $NAMESPACE
+            kubectl logs pod-with-gpu -n $NAMESPACE
