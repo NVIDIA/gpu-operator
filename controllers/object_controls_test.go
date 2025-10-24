@@ -146,6 +146,18 @@ func getModuleRoot(dir string) (string, error) {
 	return dir, nil
 }
 
+// mockOSRelease returns a mock parseOSRelease function for testing.
+// It allows tests to simulate different operating systems without filesystem access.
+func mockOSRelease(osID, version string) func() (map[string]string, error) {
+	return func() (map[string]string, error) {
+		return map[string]string{
+			"ID":         osID,
+			"VERSION_ID": version,
+			"NAME":       osID,
+		}, nil
+	}
+}
+
 // setup creates a mock kubernetes cluster and client. Nodes are labeled with the minimum
 // required NFD labels to be detected as GPU nodes by the GPU Operator. A sample
 // ClusterPolicy resource is applied to the cluster. The ClusterPolicyController
@@ -158,8 +170,8 @@ func setup() error {
 	boolTrue = new(bool)
 	*boolTrue = true
 
-	// add env for calls that we cannot mock
-	os.Setenv("UNIT_TEST", "true")
+	// Mock parseOSRelease to avoid filesystem dependency in tests
+	parseOSRelease = mockOSRelease("ubuntu", "20.04")
 
 	s := scheme.Scheme
 	if err := gpuv1.AddToScheme(s); err != nil {
