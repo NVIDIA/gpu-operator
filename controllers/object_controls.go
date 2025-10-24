@@ -222,12 +222,6 @@ var CertConfigPathMap = map[string]string{
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
 }
 
-func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = pathType
-	return hostPathType
-}
-
 // MountPathToVolumeSource maps a container mount path to a VolumeSource
 type MountPathToVolumeSource map[string]corev1.VolumeSource
 
@@ -240,19 +234,19 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: utils.HostPathTypePtr(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -260,19 +254,19 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: utils.HostPathTypePtr(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -280,13 +274,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: utils.HostPathTypePtr(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -294,13 +288,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: utils.HostPathTypePtr(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -1385,7 +1379,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
 		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
 
-		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: utils.HostPathTypePtr(corev1.HostPathDirectoryOrCreate)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
 	}
 
@@ -1407,7 +1401,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
 		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
 
-		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: utils.HostPathTypePtr(corev1.HostPathDirectoryOrCreate)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
 	}
 
@@ -1964,7 +1958,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	artifactsVolMount := corev1.VolumeMount{Name: "kata-artifacts", MountPath: artifactsDir}
 	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, artifactsVolMount)
 
-	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: utils.HostPathTypePtr(corev1.HostPathDirectoryOrCreate)}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, artifactsVol)
 
 	// Compute hash of kata manager config and add an annotation with the value.

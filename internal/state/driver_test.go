@@ -703,7 +703,7 @@ func getSampleAdditionalConfigs() *additionalConfigs {
 				VolumeSource: corev1.VolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
 						Path: "/opt/config/test-host-path",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+						Type: utils.HostPathTypePtr(corev1.HostPathDirectoryOrCreate),
 					},
 				},
 			},
@@ -712,7 +712,7 @@ func getSampleAdditionalConfigs() *additionalConfigs {
 				VolumeSource: corev1.VolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
 						Path: "/opt/config/test-host-path-ro",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+						Type: utils.HostPathTypePtr(corev1.HostPathDirectoryOrCreate),
 					},
 				},
 			},

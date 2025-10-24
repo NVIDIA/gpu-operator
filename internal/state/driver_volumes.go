@@ -27,6 +27,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -60,19 +61,19 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: utils.HostPathTypePtr(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -80,19 +81,19 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: utils.HostPathTypePtr(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -100,13 +101,13 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: utils.HostPathTypePtr(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -114,23 +115,16 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: utils.HostPathTypePtr(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: utils.HostPathTypePtr(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
-}
-
-// TODO: make this a public utils method
-func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = pathType
-	return hostPathType
 }
 
 func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alpha1.NVIDIADriver, info clusterinfo.Interface, pool nodePool) (*additionalConfigs, error) {
