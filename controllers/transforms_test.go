@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 var mockClientMap map[string]client.Client
@@ -2910,8 +2911,8 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 					{
 						Name:      "licensing-config",
 						ReadOnly:  true,
-						MountPath: VGPULicensingConfigMountPath,
-						SubPath:   VGPULicensingFileName,
+						MountPath: consts.VGPULicensingConfigMountPath,
+						SubPath:   consts.VGPULicensingFileName,
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -2925,8 +2926,8 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 						SecretName: "test-secret",
 						Items: []corev1.KeyToPath{
 							{
-								Key:  VGPULicensingFileName,
-								Path: VGPULicensingFileName,
+								Key:  consts.VGPULicensingFileName,
+								Path: consts.VGPULicensingFileName,
 							},
 						},
 					},
@@ -2964,8 +2965,8 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 					{
 						Name:      "licensing-config",
 						ReadOnly:  true,
-						MountPath: VGPULicensingConfigMountPath,
-						SubPath:   VGPULicensingFileName,
+						MountPath: consts.VGPULicensingConfigMountPath,
+						SubPath:   consts.VGPULicensingFileName,
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -2981,8 +2982,8 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 						},
 						Items: []corev1.KeyToPath{
 							{
-								Key:  VGPULicensingFileName,
-								Path: VGPULicensingFileName,
+								Key:  consts.VGPULicensingFileName,
+								Path: consts.VGPULicensingFileName,
 							},
 						},
 					},
