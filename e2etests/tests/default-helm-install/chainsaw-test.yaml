@@ -16,16 +16,14 @@ spec:
     # removed by "helm uninstall" and may interfere with other tests. By using
     # "helm template" we ensure chainsaw is able to clean up all resources it
     # creates during the test.
-    - name: install gpu operator
+    - name: generate gpu operator manifests
       try:
       - script:
           content: |
             set -e
             helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
             helm repo update
-            helm template gpu-operator nvidia/gpu-operator --namespace $NAMESPACE > /tmp/default-gpu-operator.yaml
-      - apply:
-          file: /tmp/default-gpu-operator.yaml
+            helm install --wait gpu-operator  -n $NAMESPACE --create-namespace nvidia/gpu-operator
 
     # Sample step to list pods in the namespace
     - name: list gpu operator pods
@@ -73,3 +71,10 @@ spec:
             kubectl get pod pod-with-gpu -n $NAMESPACE -o wide
             kubectl describe pod pod-with-gpu -n $NAMESPACE
             kubectl logs pod-with-gpu -n $NAMESPACE
+
+    - name: cleanup gpu operator
+      finally:
+      - script:
+          content: |
+            set -e
+            helm uninstall gpu-operator -n $NAMESPACE || true
