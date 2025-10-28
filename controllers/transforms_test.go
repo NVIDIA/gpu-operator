@@ -377,8 +377,8 @@ func TestTransformForRuntime(t *testing.T) {
 			input: NewDaemonset().
 				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
@@ -410,8 +410,8 @@ func TestTransformForRuntime(t *testing.T) {
 					},
 				}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
@@ -444,8 +444,8 @@ func TestTransformForRuntime(t *testing.T) {
 					},
 				}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
@@ -472,8 +472,8 @@ func TestTransformForRuntime(t *testing.T) {
 			runtime:     gpuv1.CRIO,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -496,7 +496,7 @@ func TestTransformForRuntime(t *testing.T) {
 			input: NewDaemonset().
 				WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "nvidia-kata-manager",
@@ -519,7 +519,7 @@ func TestTransformForRuntime(t *testing.T) {
 			runtime:     gpuv1.Docker,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("docker-config", filepath.Dir(DefaultDockerConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("docker-config", filepath.Dir(DefaultDockerConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("docker-socket", filepath.Dir(DefaultDockerSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
@@ -840,8 +840,8 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
-				WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
@@ -919,8 +919,8 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 					},
 				}).
-				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
 				WithPullSecret("pull-secret"),
 		},
@@ -957,8 +957,8 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 					},
 				}).
-				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 		{
 			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi disabled",
@@ -993,8 +993,8 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 					},
 				}).
-				WithHostPathVolume("crio-config", "/etc/crio", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 	}
 
@@ -1120,8 +1120,8 @@ func TestTransformMPSControlDaemon(t *testing.T) {
 			daemonset: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "mps-control-daemon-mounts"}).
 				WithContainer(corev1.Container{Name: "mps-control-daemon-ctr"}).
-				WithHostPathVolume("mps-root", "/run/nvidia/mps", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("mps-shm", "/run/nvidia/mps/shm", newHostPathType(corev1.HostPathDirectoryOrCreate)),
+				WithHostPathVolume("mps-root", "/run/nvidia/mps", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/run/nvidia/mps/shm", ptr.To(corev1.HostPathDirectoryOrCreate)),
 			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
 				DevicePlugin: gpuv1.DevicePluginSpec{
 					Repository:       "nvcr.io",
@@ -1146,8 +1146,8 @@ func TestTransformMPSControlDaemon(t *testing.T) {
 						{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
 					},
 				}).
-				WithHostPathVolume("mps-root", "/var/mps", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("mps-shm", "/var/mps/shm", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-root", "/var/mps", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/var/mps/shm", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithPullSecret("secret").
 				WithRuntimeClassName("nvidia"),
 		},
@@ -1540,7 +1540,7 @@ func TestTransformKataManager(t *testing.T) {
 					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
 				},
-			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", newHostPathType(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
+			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
 		},
 		{
 			description: "transform kata manager with custom container runtime socket",
@@ -1594,8 +1594,8 @@ func TestTransformKataManager(t *testing.T) {
 				},
 			}).WithPullSecret("pull-secret").
 				WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).
-				WithHostPathVolume("kata-artifacts", "/var/lib/kata", newHostPathType(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil),
 		},
 	}
