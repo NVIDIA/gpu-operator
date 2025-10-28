@@ -336,7 +336,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: containerd-e2e-test-logs
           path: ./logs/
@@ -389,7 +389,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
