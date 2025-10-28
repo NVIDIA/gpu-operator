@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -61,14 +62,12 @@ func (u *nvDriverUpdater) SetConditionsError(ctx context.Context, cr any, reason
 	return u.setConditions(ctx, nvDriverCr, Error, reason, message)
 }
 
-func (u *nvDriverUpdater) setConditions(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, statusType, reason, message string) error {
-	reqLogger := log.FromContext(ctx)
+// updateConditions updates the conditions of the NVIDIADriver CR
+func (u *nvDriverUpdater) updateConditions(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, statusType, reason, message string) error {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1alpha1.NVIDIADriver{}
-	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get NVIDIADriver instance for status update", "name", cr.Name)
-		return err
+	if err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance); err != nil {
+		return fmt.Errorf("failed to get NVIDIADriver instance for status update: %w", err)
 	}
 
 	switch statusType {
@@ -107,9 +106,23 @@ func (u *nvDriverUpdater) setConditions(ctx context.Context, cr *nvidiav1alpha1.
 			instance.Status.State = nvidiav1alpha1.NotReady
 		}
 	default:
-		reqLogger.Error(nil, "Unknown status type provided", "statusType", statusType)
 		return fmt.Errorf("unknown status type provided: %s", statusType)
 	}
 
 	return u.client.Status().Update(ctx, instance)
+}
+
+// setConditions updates the conditions of the NVIDIADriver CR
+// with retry on conflict to handle version mismatches
+func (u *nvDriverUpdater) setConditions(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, statusType, reason, message string) error {
+	reqLogger := log.FromContext(ctx)
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return u.updateConditions(ctx, cr, statusType, reason, message)
+	})
+
+	if err != nil {
+		reqLogger.Error(err, "Failed to update NVIDIADriver status after retries", "name", cr.Name)
+	}
+	return err
 }
