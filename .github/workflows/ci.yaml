@@ -21,6 +21,10 @@ on:
       - main
       - release-*
 
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ### Configuration checks ###
   helm-lint:
