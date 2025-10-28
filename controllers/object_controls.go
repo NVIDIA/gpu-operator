@@ -961,19 +961,22 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	return nil
 }
 
-// Read and parse os-release file
-func parseOSRelease() (map[string]string, error) {
+// parseOSRelease can be overridden in tests for mocking filesystem access.
+// In production, it reads and parses /host-etc/os-release.
+var parseOSRelease = parseOSReleaseFromFile
+
+// osReleaseFilePath is the path to the os-release file, configurable for testing.
+var osReleaseFilePath = "/host-etc/os-release"
+
+// parseOSReleaseFromFile reads and parses the os-release file from the host filesystem.
+func parseOSReleaseFromFile() (map[string]string, error) {
 	release := map[string]string{}
 
-	// TODO: mock this call instead
-	if os.Getenv("UNIT_TEST") == "true" {
-		return release, nil
-	}
-
-	f, err := os.Open("/host-etc/os-release")
+	f, err := os.Open(osReleaseFilePath)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	re := regexp.MustCompile(`^(?P<key>\w+)=(?P<value>.+)`)
 
