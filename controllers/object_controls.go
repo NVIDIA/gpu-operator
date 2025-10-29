@@ -78,18 +78,6 @@ const (
 	TrustedCABundleMountDir = "/etc/pki/ca-trust/extracted/pem"
 	// TrustedCACertificate indicates injected CA certificate name
 	TrustedCACertificate = "tls-ca-bundle.pem"
-	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration file
-	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
-	// VGPULicensingFileName is the vGPU licensing configuration filename
-	VGPULicensingFileName = "gridd.conf"
-	// NLSClientTokenMountPath inidicates the target mount path for NLS client config token file (.tok)
-	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
-	// NLSClientTokenFileName is the NLS client config token filename
-	NLSClientTokenFileName = "client_configuration_token.tok"
-	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
-	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
-	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename
-	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
@@ -3329,23 +3317,23 @@ func applyLicensingConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	podSpec := &obj.Spec.Template.Spec
 
 	// add new volume mount
-	licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
+	licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: consts.VGPULicensingConfigMountPath, SubPath: consts.VGPULicensingFileName}
 	driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
 
 	// gridd.conf always mounted
 	licenseItemsToInclude := []corev1.KeyToPath{
 		{
-			Key:  VGPULicensingFileName,
-			Path: VGPULicensingFileName,
+			Key:  consts.VGPULicensingFileName,
+			Path: consts.VGPULicensingFileName,
 		},
 	}
 	// client config token only mounted when NLS is enabled
 	if config.Driver.LicensingConfig.IsNLSEnabled() {
 		licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
-			Key:  NLSClientTokenFileName,
-			Path: NLSClientTokenFileName,
+			Key:  consts.NLSClientTokenFileName,
+			Path: consts.NLSClientTokenFileName,
 		})
-		nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
+		nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: consts.NLSClientTokenMountPath, SubPath: consts.NLSClientTokenFileName}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
 	}
 
@@ -3446,7 +3434,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set virtual topology daemon configuration if specified for vGPU driver
 	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
-		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
+		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: consts.VGPUTopologyConfigMountPath, SubPath: consts.VGPUTopologyConfigFileName}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, topologyConfigVolMount)
 
 		topologyConfigVolumeSource := corev1.VolumeSource{
@@ -3456,8 +3444,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				},
 				Items: []corev1.KeyToPath{
 					{
-						Key:  VGPUTopologyConfigFileName,
-						Path: VGPUTopologyConfigFileName,
+						Key:  consts.VGPUTopologyConfigFileName,
+						Path: consts.VGPUTopologyConfigFileName,
 					},
 				},
 			},
