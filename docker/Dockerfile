@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG CUDA_SAMPLES_VERSION=12.9
+
 FROM golang:1.25.3 AS builder
 
 ARG GOPROXY="https://proxy.golang.org,direct"
@@ -38,32 +40,30 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:13.0.1-base-ubi9 AS cuda-base
+FROM registry.access.redhat.com/ubi9/ubi:latest AS sample-builder
 
-RUN dnf install -y --allowerasing \
-        curl \
-    && \
-        dnf clean all
+RUN ARCH=$(uname -m) && OS_ARCH=${ARCH/amd64/x86_64} && OS_ARCH=${ARCH/aarch64/sbsa} && OS_ARCH=${ARCH/arm64/sbsa} \
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$OS_ARCH/cuda-rhel9.repo
 
-WORKDIR /workspace
-
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS sample-builder
-
-RUN dnf install -y --allowerasing \
+ARG CUDA_SAMPLES_VERSION
+RUN CUDA_PACKAGE_VERSION=${CUDA_SAMPLES_VERSION/./-} && \
+    dnf install -y --allowerasing \
         cmake \
-        cuda-cudart-devel-12-9 \
-        cuda-nvcc-12-9 \
+        cuda-cudart-devel-${CUDA_PACKAGE_VERSION} \
+        cuda-compat-${CUDA_PACKAGE_VERSION} \
+        cuda-nvcc-${CUDA_PACKAGE_VERSION} \
         g++ \
         curl \
     && \
     dnf clean all
 
+ENV PATH=/usr/local/cuda/bin:${PATH}
+
 WORKDIR /build
 
 ARG SAMPLE_NAME=vectorAdd
 
-ARG CUDA_SAMPLES_VERSION=v12.9
-RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/${CUDA_SAMPLES_VERSION} | \
+RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${CUDA_SAMPLES_VERSION} | \
     tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* && \
     cd $(find /build/Samples -iname "${SAMPLE_NAME}") && \
     cmake . && \
@@ -93,10 +93,8 @@ COPY --from=builder /workspace/gpu-operator /usr/bin/
 COPY --from=builder /workspace/manage-crds /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
 COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
-# TODO: Copy the compat libs from the 'sample-builder' image instead.
-# The current 'sample-builder' image does not contain the compat libs in the ARM variant.
-# Once new sample images are published that contain the compat libs, we can update the below.
-COPY --from=cuda-base /usr/local/cuda/compat /usr/local/cuda/compat
+ARG CUDA_SAMPLES_VERSION
+COPY --from=sample-builder /usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat /usr/local/cuda/compat
 
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
