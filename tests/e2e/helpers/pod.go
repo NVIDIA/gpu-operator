@@ -14,7 +14,7 @@
 # limitations under the License.
 **/
 
-package kubernetes
+package helpers
 
 import (
 	"bytes"
@@ -28,17 +28,17 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-type Client struct {
+type PodClient struct {
 	k8sClient corev1client.CoreV1Interface
 }
 
-func NewClient(k8sClient corev1client.CoreV1Interface) *Client {
-	return &Client{
+func NewPodClient(k8sClient corev1client.CoreV1Interface) *PodClient {
+	return &PodClient{
 		k8sClient: k8sClient,
 	}
 }
 
-func (c *Client) GetPodsByLabel(ctx context.Context, namespace string, labelMap map[string]string) ([]corev1.Pod, error) {
+func (c *PodClient) GetPodsByLabel(ctx context.Context, namespace string, labelMap map[string]string) ([]corev1.Pod, error) {
 	podList, err := c.k8sClient.Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labelMap).String(),
 	})
@@ -48,17 +48,17 @@ func (c *Client) GetPodsByLabel(ctx context.Context, namespace string, labelMap 
 	return podList.Items, nil
 }
 
-func (c *Client) IsPodReady(ctx context.Context, podName, namespace string) (bool, error) {
+func (c *PodClient) IsPodReady(ctx context.Context, podName, namespace string) (bool, error) {
 	pod, err := c.k8sClient.Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return false, fmt.Errorf("unexpected error getting pod  %s: %w", podName, err)
+		return false, fmt.Errorf("unexpected error getting pod %s: %w", podName, err)
 	}
 
-	for _, c := range pod.Status.Conditions {
-		if c.Type != corev1.PodReady {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type != corev1.PodReady {
 			continue
 		}
-		if c.Status == corev1.ConditionTrue {
+		if condition.Status == corev1.ConditionTrue {
 			return true, nil
 		}
 	}
@@ -66,40 +66,39 @@ func (c *Client) IsPodReady(ctx context.Context, podName, namespace string) (boo
 	return false, nil
 }
 
-func (c *Client) EnsureNoPodRestarts(ctx context.Context, podName, namespace string) (bool, error) {
+func (c *PodClient) EnsureNoPodRestarts(ctx context.Context, podName, namespace string) (bool, error) {
 	pod, err := c.k8sClient.Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return false, fmt.Errorf("unexpected error getting pod  %s: %w", podName, err)
+		return false, fmt.Errorf("unexpected error getting pod %s: %w", podName, err)
 	}
 
-	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.RestartCount > 0 {
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.RestartCount > 0 {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (c *Client) GetPodLogs(ctx context.Context, pod corev1.Pod) string {
+func (c *PodClient) GetPodLogs(ctx context.Context, pod corev1.Pod) (string, error) {
 	podLogOpts := corev1.PodLogOptions{}
 	req := c.k8sClient.Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
 	podLogs, err := req.Stream(ctx)
 	if err != nil {
-		return "error in opening stream"
+		return "", fmt.Errorf("failed to open log stream: %w", err)
 	}
 	defer podLogs.Close()
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, podLogs)
+	buffer := new(bytes.Buffer)
+	_, err = io.Copy(buffer, podLogs)
 	if err != nil {
-		return "error in copy information from podLogs to buf"
+		return "", fmt.Errorf("failed to copy log stream: %w", err)
 	}
-	str := buf.String()
 
-	return str
+	return buffer.String(), nil
 }
 
-func (c *Client) CreateNamespace(ctx context.Context, namespaceName string, labels map[string]string) (*corev1.Namespace, error) {
+func (c *PodClient) CreateNamespace(ctx context.Context, namespaceName string, labels map[string]string) (*corev1.Namespace, error) {
 	namespaceObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   namespaceName,
@@ -111,6 +110,7 @@ func (c *Client) CreateNamespace(ctx context.Context, namespaceName string, labe
 	return c.k8sClient.Namespaces().Create(ctx, namespaceObj, metav1.CreateOptions{})
 }
 
-func (c *Client) DeleteNamespace(ctx context.Context, namespaceName string) error {
+func (c *PodClient) DeleteNamespace(ctx context.Context, namespaceName string) error {
 	return c.k8sClient.Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
 }
+
