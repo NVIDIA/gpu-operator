@@ -17,10 +17,11 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 
 	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate"
 )
@@ -35,7 +36,7 @@ func main() {
 	config := config{}
 
 	// Create the top-level CLI
-	c := cli.NewApp()
+	c := cli.Command{}
 	c.Name = "gpuop-cfg"
 	c.Usage = "Tools for managing and verifying configuration files for NVIDIA GPU Operator"
 	c.Version = "0.1.0"
@@ -47,18 +48,19 @@ func main() {
 			Aliases:     []string{"d"},
 			Usage:       "Enable debug-level logging",
 			Destination: &config.Debug,
-			EnvVars:     []string{"DEBUG"},
+			Sources:     cli.EnvVars("DEBUG"),
 		},
 	}
 
 	// Set log-level for all subcommands
-	c.Before = func(c *cli.Context) error {
+	c.Before = func(ctx context.Context, cli *cli.Command) (context.Context, error) {
 		logLevel := log.InfoLevel
 		if config.Debug {
 			logLevel = log.DebugLevel
 		}
 		logger.SetLevel(logLevel)
-		return nil
+
+		return ctx, nil
 	}
 
 	// Define the subcommands
@@ -66,7 +68,7 @@ func main() {
 		validate.NewCommand(logger),
 	}
 
-	err := c.Run(os.Args)
+	err := c.Run(context.Background(), os.Args)
 	if err != nil {
 		log.Errorf("%v", err)
 		log.Exit(1)

@@ -32,7 +32,7 @@ import (
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -227,7 +227,8 @@ const (
 )
 
 func main() {
-	c := cli.NewApp()
+	c := cli.Command{}
+
 	c.Before = validateFlags
 	c.Action = start
 	c.Version = info.GetVersionString()
@@ -238,7 +239,7 @@ func main() {
 			Value:       "",
 			Usage:       "absolute path to the kubeconfig file",
 			Destination: &kubeconfigFlag,
-			EnvVars:     []string{"KUBECONFIG"},
+			Sources:     cli.EnvVars("KUBECONFIG"),
 		},
 		&cli.StringFlag{
 			Name:        "node-name",
@@ -246,7 +247,7 @@ func main() {
 			Value:       "",
 			Usage:       "the name of the node to deploy plugin validation pod",
 			Destination: &nodeNameFlag,
-			EnvVars:     []string{"NODE_NAME"},
+			Sources:     cli.EnvVars("NODE_NAME"),
 		},
 		&cli.StringFlag{
 			Name:        "namespace",
@@ -254,7 +255,7 @@ func main() {
 			Value:       "",
 			Usage:       "the namespace in which the operator resources are deployed",
 			Destination: &namespaceFlag,
-			EnvVars:     []string{"OPERATOR_NAMESPACE"},
+			Sources:     cli.EnvVars("OPERATOR_NAMESPACE"),
 		},
 		&cli.BoolFlag{
 			Name:        "with-wait",
@@ -262,7 +263,7 @@ func main() {
 			Value:       false,
 			Usage:       "indicates to wait for validation to complete successfully",
 			Destination: &withWaitFlag,
-			EnvVars:     []string{"WITH_WAIT"},
+			Sources:     cli.EnvVars("WITH_WAIT"),
 		},
 		&cli.BoolFlag{
 			Name:        "with-workload",
@@ -270,7 +271,7 @@ func main() {
 			Value:       true,
 			Usage:       "indicates to validate with GPU workload",
 			Destination: &withWorkloadFlag,
-			EnvVars:     []string{"WITH_WORKLOAD"},
+			Sources:     cli.EnvVars("WITH_WORKLOAD"),
 		},
 		&cli.StringFlag{
 			Name:        "component",
@@ -278,7 +279,7 @@ func main() {
 			Value:       "",
 			Usage:       "the name of the operator component to validate",
 			Destination: &componentFlag,
-			EnvVars:     []string{"COMPONENT"},
+			Sources:     cli.EnvVars("COMPONENT"),
 		},
 		&cli.BoolFlag{
 			Name:        "cleanup-all",
@@ -286,7 +287,7 @@ func main() {
 			Value:       false,
 			Usage:       "indicates to cleanup all previous validation status files",
 			Destination: &cleanupAllFlag,
-			EnvVars:     []string{"CLEANUP_ALL"},
+			Sources:     cli.EnvVars("CLEANUP_ALL"),
 		},
 		&cli.StringFlag{
 			Name:        "output-dir",
@@ -294,7 +295,7 @@ func main() {
 			Value:       defaultStatusPath,
 			Usage:       "output directory where all validation status files are created",
 			Destination: &outputDirFlag,
-			EnvVars:     []string{"OUTPUT_DIR"},
+			Sources:     cli.EnvVars("OUTPUT_DIR"),
 		},
 		&cli.IntFlag{
 			Name:        "sleep-interval-seconds",
@@ -302,7 +303,7 @@ func main() {
 			Value:       defaultSleepIntervalSeconds,
 			Usage:       "sleep interval in seconds between command retries",
 			Destination: &sleepIntervalSecondsFlag,
-			EnvVars:     []string{"SLEEP_INTERVAL_SECONDS"},
+			Sources:     cli.EnvVars("SLEEP_INTERVAL_SECONDS"),
 		},
 		&cli.StringFlag{
 			Name:        "mig-strategy",
@@ -310,7 +311,7 @@ func main() {
 			Value:       migStrategySingle,
 			Usage:       "MIG Strategy",
 			Destination: &migStrategyFlag,
-			EnvVars:     []string{"MIG_STRATEGY"},
+			Sources:     cli.EnvVars("MIG_STRATEGY"),
 		},
 		&cli.IntFlag{
 			Name:        "metrics-port",
@@ -318,7 +319,7 @@ func main() {
 			Value:       defaultMetricsPort,
 			Usage:       "port on which the metrics will be exposed. 0 means disabled.",
 			Destination: &metricsPort,
-			EnvVars:     []string{"METRICS_PORT"},
+			Sources:     cli.EnvVars("METRICS_PORT"),
 		},
 		&cli.StringFlag{
 			Name:        "default-gpu-workload-config",
@@ -326,35 +327,35 @@ func main() {
 			Value:       "",
 			Usage:       "default GPU workload config. determines what components to validate by default when sandbox workloads are enabled in the cluster.",
 			Destination: &defaultGPUWorkloadConfigFlag,
-			EnvVars:     []string{"DEFAULT_GPU_WORKLOAD_CONFIG"},
+			Sources:     cli.EnvVars("DEFAULT_GPU_WORKLOAD_CONFIG"),
 		},
 		&cli.BoolFlag{
 			Name:        "disable-dev-char-symlink-creation",
 			Value:       false,
 			Usage:       "disable creation of symlinks under /dev/char corresponding to NVIDIA character devices",
 			Destination: &disableDevCharSymlinkCreation,
-			EnvVars:     []string{"DISABLE_DEV_CHAR_SYMLINK_CREATION"},
+			Sources:     cli.EnvVars("DISABLE_DEV_CHAR_SYMLINK_CREATION"),
 		},
 		&cli.StringFlag{
 			Name:        "host-root",
 			Value:       "/",
 			Usage:       "root path of the underlying host",
 			Destination: &hostRootFlag,
-			EnvVars:     []string{"HOST_ROOT"},
+			Sources:     cli.EnvVars("HOST_ROOT"),
 		},
 		&cli.StringFlag{
 			Name:        "driver-install-dir",
 			Value:       defaultDriverInstallDir,
 			Usage:       "the path on the host where a containerized NVIDIA driver installation is made available",
 			Destination: &driverInstallDirFlag,
-			EnvVars:     []string{"DRIVER_INSTALL_DIR"},
+			Sources:     cli.EnvVars("DRIVER_INSTALL_DIR"),
 		},
 		&cli.StringFlag{
 			Name:        "driver-install-dir-ctr-path",
 			Value:       defaultDriverInstallDirCtrPath,
 			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
 			Destination: &driverInstallDirCtrPathFlag,
-			EnvVars:     []string{"DRIVER_INSTALL_DIR_CTR_PATH"},
+			Sources:     cli.EnvVars("DISABLE_DEV_CHAR_SYMLINK_CREATION"),
 		},
 	}
 
@@ -365,7 +366,7 @@ func main() {
 	go handleSignal()
 
 	// invoke command
-	err := c.Run(os.Args)
+	err := c.Run(context.Background(), os.Args)
 	if err != nil {
 		log.SetOutput(os.Stderr)
 		log.Printf("Error: %v", err)
@@ -383,37 +384,37 @@ func handleSignal() {
 	log.Fatalf("Exiting due to signal [%v] notification for pid [%d]", s.String(), os.Getpid())
 }
 
-func validateFlags(c *cli.Context) error {
+func validateFlags(ctx context.Context, cli *cli.Command) (context.Context, error) {
 	if componentFlag == "" {
-		return fmt.Errorf("invalid -c <component-name> flag: must not be empty string")
+		return ctx, fmt.Errorf("invalid -c <component-name> flag: must not be empty string")
 	}
 	if !isValidComponent() {
-		return fmt.Errorf("invalid -c <component-name> flag value: %s", componentFlag)
+		return ctx, fmt.Errorf("invalid -c <component-name> flag value: %s", componentFlag)
 	}
 	if componentFlag == "plugin" {
 		if nodeNameFlag == "" {
-			return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for plugin validation")
+			return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for plugin validation")
 		}
 		if namespaceFlag == "" {
-			return fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for plugin validation")
+			return ctx, fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for plugin validation")
 		}
 	}
 	if componentFlag == "cuda" && namespaceFlag == "" {
-		return fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for cuda validation")
+		return ctx, fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for cuda validation")
 	}
 	if componentFlag == "metrics" {
 		if metricsPort == defaultMetricsPort {
-			return fmt.Errorf("invalid -p <port> flag: must not be empty or 0 for the metrics component")
+			return ctx, fmt.Errorf("invalid -p <port> flag: must not be empty or 0 for the metrics component")
 		}
 		if nodeNameFlag == "" {
-			return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for metrics exporter")
+			return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for metrics exporter")
 		}
 	}
 	if nodeNameFlag == "" && (componentFlag == "vfio-pci" || componentFlag == "vgpu-manager" || componentFlag == "vgpu-devices") {
-		return fmt.Errorf("invalid -n <node-name> flag: must not be empty string for %s validation", componentFlag)
+		return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for %s validation", componentFlag)
 	}
 
-	return nil
+	return ctx, nil
 }
 
 func isValidComponent() bool {
@@ -487,7 +488,7 @@ func getWorkloadConfig(ctx context.Context) (string, error) {
 	return value, nil
 }
 
-func start(c *cli.Context) error {
+func start(ctx context.Context, cli *cli.Command) error {
 	// if cleanup is requested, delete all existing status files(default)
 	if cleanupAllFlag {
 		// cleanup output directory and create again each time
@@ -508,7 +509,7 @@ func start(c *cli.Context) error {
 	switch componentFlag {
 	case "driver":
 		driver := &Driver{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := driver.validate()
 		if err != nil {
@@ -538,7 +539,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "cuda":
 		cuda := &CUDA{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := cuda.validate()
 		if err != nil {
@@ -547,7 +548,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "plugin":
 		plugin := &Plugin{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := plugin.validate()
 		if err != nil {
@@ -556,7 +557,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "mofed":
 		mofed := &MOFED{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := mofed.validate()
 		if err != nil {
@@ -565,7 +566,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "metrics":
 		metrics := &Metrics{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := metrics.run()
 		if err != nil {
@@ -574,7 +575,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "vfio-pci":
 		vfioPCI := &VfioPCI{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := vfioPCI.validate()
 		if err != nil {
@@ -583,7 +584,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "vgpu-manager":
 		vGPUManager := &VGPUManager{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := vGPUManager.validate()
 		if err != nil {
@@ -592,7 +593,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "vgpu-devices":
 		vGPUDevices := &VGPUDevices{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := vGPUDevices.validate()
 		if err != nil {
@@ -601,7 +602,7 @@ func start(c *cli.Context) error {
 		return nil
 	case "cc-manager":
 		CCManager := &CCManager{
-			ctx: c.Context,
+			ctx: ctx,
 		}
 		err := CCManager.validate()
 		if err != nil {
