@@ -18,7 +18,7 @@ package validate
 
 import (
 	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 
 	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate/clusterpolicy"
 	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate/csv"
@@ -43,7 +43,7 @@ func (m command) build() *cli.Command {
 		Usage: "Perform various validations for GPU Operator configuration files",
 	}
 
-	validate.Subcommands = []*cli.Command{
+	validate.Commands = []*cli.Command{
 		csv.NewCommand(m.logger),
 		clusterpolicy.NewCommand(m.logger),
 	}

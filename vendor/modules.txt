@@ -62,9 +62,6 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
-# github.com/cpuguy83/go-md2man/v2 v2.0.7
-## explicit; go 1.12
-github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -380,9 +377,6 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# github.com/urfave/cli/v2 v2.27.7
-## explicit; go 1.18
-github.com/urfave/cli/v2
 # github.com/urfave/cli/v3 v3.4.1
 ## explicit; go 1.22
 github.com/urfave/cli/v3
@@ -392,9 +386,6 @@ github.com/x448/float16
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
-## explicit; go 1.15
-github.com/xrash/smetrics
 # go.uber.org/automaxprocs v1.6.0
 ## explicit; go 1.20
 go.uber.org/automaxprocs

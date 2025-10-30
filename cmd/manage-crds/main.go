@@ -23,7 +23,7 @@ import (
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/crdutil"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/NVIDIA/gpu-operator/internal/info"
 )
@@ -32,16 +32,14 @@ var logger = log.New()
 
 type config struct {
 	Debug     bool
-	crdsPaths *cli.StringSlice
+	crdsPaths []string
 }
 
 func main() {
-	config := config{
-		crdsPaths: cli.NewStringSlice(),
-	}
+	config := config{}
 
 	// Create the top-level CLI
-	c := cli.NewApp()
+	c := cli.Command{}
 	c.Name = "manage-crds"
 	c.Usage = "Tools for managing Custom Resource Definitions (CRDs) for NVIDIA GPU Operator"
 	c.Version = info.GetVersionString()
@@ -53,18 +51,18 @@ func main() {
 			Aliases:     []string{"d"},
 			Usage:       "Enable debug-level logging",
 			Destination: &config.Debug,
-			EnvVars:     []string{"DEBUG"},
+			Sources:     cli.EnvVars("DEBUG"),
 		},
 	}
 
 	// Set log-level for all subcommands
-	c.Before = func(c *cli.Context) error {
+	c.Before = func(ctx context.Context, cli *cli.Command) (context.Context, error) {
 		logLevel := log.InfoLevel
 		if config.Debug {
 			logLevel = log.DebugLevel
 		}
 		logger.SetLevel(logLevel)
-		return nil
+		return ctx, nil
 	}
 
 	// Common flags for both apply and delete subcommands
@@ -74,7 +72,7 @@ func main() {
 			Aliases:     []string{"f"},
 			Usage:       "Path to CRD manifest file or directory (can be specified multiple times, directories are searched recursively)",
 			Required:    true,
-			Destination: config.crdsPaths,
+			Destination: &config.crdsPaths,
 		},
 	}
 
@@ -84,21 +82,21 @@ func main() {
 			Name:  "apply",
 			Usage: "Apply CRDs from the specified path",
 			Flags: commonFlags,
-			Action: func(c *cli.Context) error {
-				return runApply(c.Context, config)
+			Action: func(ctx context.Context, cli *cli.Command) error {
+				return runApply(ctx, config)
 			},
 		},
 		{
 			Name:  "delete",
 			Usage: "Delete CRDs from the specified path",
 			Flags: commonFlags,
-			Action: func(c *cli.Context) error {
-				return runDelete(c.Context, config)
+			Action: func(ctx context.Context, cli *cli.Command) error {
+				return runDelete(ctx, config)
 			},
 		},
 	}
 
-	err := c.Run(os.Args)
+	err := c.Run(context.Background(), os.Args)
 	if err != nil {
 		log.Errorf("%v", err)
 		log.Exit(1)
@@ -106,7 +104,7 @@ func main() {
 }
 
 func runApply(ctx context.Context, cfg config) error {
-	paths := cfg.crdsPaths.Value()
+	paths := cfg.crdsPaths
 	logger.Infof("Applying CRDs from %d path(s): %v", len(paths), paths)
 
 	if err := crdutil.ProcessCRDs(ctx, crdutil.CRDOperationApply, paths...); err != nil {
@@ -118,7 +116,7 @@ func runApply(ctx context.Context, cfg config) error {
 }
 
 func runDelete(ctx context.Context, cfg config) error {
-	paths := cfg.crdsPaths.Value()
+	paths := cfg.crdsPaths
 	logger.Infof("Deleting CRDs from %d path(s): %v", len(paths), paths)
 
 	if err := crdutil.ProcessCRDs(ctx, crdutil.CRDOperationDelete, paths...); err != nil {
