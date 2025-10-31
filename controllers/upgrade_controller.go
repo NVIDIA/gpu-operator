@@ -86,7 +86,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	clusterPolicy := &gpuv1.ClusterPolicy{}
 	err := r.Get(ctx, req.NamespacedName, clusterPolicy)
 	if err != nil {
-		reqLogger.V(consts.LogLevelError).Error(err, "Error getting ClusterPolicy object")
+		reqLogger.Error(err, "Error getting ClusterPolicy object")
 		if clusterPolicyCtrl.operatorMetrics != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		}
@@ -218,7 +218,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 			delete(node.Labels, upgradeStateLabel)
 			err = r.Update(ctx, node)
 			if err != nil {
-				r.Log.V(consts.LogLevelError).Error(
+				r.Log.Error(
 					err, "Failed to reset upgrade state label from node", "node", node)
 				return err
 			}

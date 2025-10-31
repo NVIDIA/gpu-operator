@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"time"
@@ -79,47 +80,41 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Get the NvidiaDriver instance from this request
 	instance := &nvidiav1alpha1.NVIDIADriver{}
-	var condErr error
-	err := r.Get(ctx, req.NamespacedName, instance)
-	if err != nil {
+	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
-		err = fmt.Errorf("error getting NVIDIADriver object: %w", err)
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		wrappedErr := fmt.Errorf("error getting NVIDIADriver object: %w", err)
+		logger.Error(err, "error getting NVIDIADriver object")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, wrappedErr.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{}, wrappedErr
 	}
 
 	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
 	clusterPolicyList := &gpuv1.ClusterPolicyList{}
-	err = r.List(ctx, clusterPolicyList)
-	if err != nil {
-		err = fmt.Errorf("error getting ClusterPolicy list: %v", err)
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
+	if err := r.List(ctx, clusterPolicyList); err != nil {
+		err = fmt.Errorf("error getting ClusterPolicy list: %w", err)
+		logger.Error(err, "error getting ClusterPolicy list")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
-		return reconcile.Result{}, fmt.Errorf("error getting ClusterPolicyList: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	if len(clusterPolicyList.Items) == 0 {
-		err = fmt.Errorf("no ClusterPolicy object found in the cluster")
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		err := fmt.Errorf("no ClusterPolicy object found in the cluster")
+		logger.Error(err, "no ClusterPolicy object found in the cluster")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, err
 	}
@@ -137,34 +132,30 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Verify the nodeSelector configured for this NVIDIADriver instance does
 	// not conflict with any other instances. This ensures only one driver
 	// is deployed per GPU node.
-	err = r.nodeSelectorValidator.Validate(ctx, instance)
-	if err != nil {
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+	if err := r.nodeSelectorValidator.Validate(ctx, instance); err != nil {
+		logger.Error(err, "nodeSelector validation failed")
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
 	}
 
 	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
-		err = fmt.Errorf("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers")
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		err := errors.New("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers")
+		logger.Error(err, "unsupported driver combination detected")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
 	}
 
 	if instance.Spec.IsGDSEnabled() && instance.Spec.IsOpenKernelModulesRequired() && !instance.Spec.IsOpenKernelModulesEnabled() {
-		err = fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'useOpenKernelModules=true' to enable OpenRM mode", instance.Spec.GPUDirectStorage.Version)
-		logger.V(consts.LogLevelError).Error(nil, err.Error())
+		err := fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'useOpenKernelModules=true' to enable OpenRM mode", instance.Spec.GPUDirectStorage.Version)
+		logger.Error(err, "unsupported driver combination detected")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-		if condErr != nil {
-			logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
 	}
@@ -173,12 +164,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	secretName := instance.Spec.SecretEnv
 	if len(secretName) > 0 {
 		key := client.ObjectKey{Namespace: r.Namespace, Name: secretName}
-		err = r.Get(ctx, key, &corev1.Secret{})
-		if err != nil {
-			logger.V(consts.LogLevelError).Error(nil, err.Error())
-			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
-			if condErr != nil {
-				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		if err := r.Get(ctx, key, &corev1.Secret{}); err != nil {
+			logger.Error(err, "failed to get secret")
+			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+				logger.Error(condErr, "failed to set condition")
 			}
 			return reconcile.Result{}, nil
 		}
@@ -188,8 +177,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
 	// update CR status
-	err = r.updateCrStatus(ctx, instance, managerStatus)
-	if err != nil {
+	if err := r.updateCrStatus(ctx, instance, managerStatus); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -199,24 +187,23 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		for _, result := range managerStatus.StatesStatus {
 			if result.Status != state.SyncStateReady && result.ErrInfo != nil {
 				errorInfo = result.ErrInfo
-				condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo.Error()))
-				if condErr != nil {
-					logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+				if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo.Error())); condErr != nil {
+					logger.Error(condErr, "failed to set condition")
 				}
 				break
 			}
 		}
 		// if no errors are reported from any state, then we would be waiting on driver daemonset pods
 		if errorInfo == nil {
-			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "Waiting for driver pod to be ready")
-			if condErr != nil {
-				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.DriverNotReady, "Waiting for driver pod to be ready"); condErr != nil {
+				logger.Error(condErr, "failed to set condition")
 			}
 		}
 		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if condErr = r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.Reconciled, "All resources have been successfully reconciled"); condErr != nil {
+	if condErr := r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.Reconciled, "All resources have been successfully reconciled"); condErr != nil {
+		logger.Error(condErr, "failed to set condition")
 		return ctrl.Result{}, condErr
 	}
 	return reconcile.Result{}, nil
@@ -244,7 +231,7 @@ func (r *NVIDIADriverReconciler) updateCrStatus(
 	reqLogger.V(consts.LogLevelInfo).Info("Updating CR Status", "Status", instance.Status)
 	err = r.Status().Update(ctx, instance)
 	if err != nil {
-		reqLogger.V(consts.LogLevelError).Error(err, "Failed to update CR status")
+		reqLogger.Error(err, "Failed to update CR status")
 		return err
 	}
 	return nil
