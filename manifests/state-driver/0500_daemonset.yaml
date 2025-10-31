@@ -148,6 +148,18 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+        {{- if .Driver.Spec.Version }}
+          - name: DRIVER_VERSION
+            value: {{ .Driver.Spec.Version | quote }}
+        {{- end }}
+        {{- if .Driver.Spec.KernelModuleType }}
+          - name: KERNEL_MODULE_TYPE
+            value: {{ .Driver.Spec.KernelModuleType | quote }}
+        {{- end }}
+        {{- if .Driver.Spec.DriverType }}
+          - name: DRIVER_TYPE
+            value: {{ .Driver.Spec.DriverType | quote }}
+        {{- end }}
         {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
           - name: GPU_DIRECT_RDMA_ENABLED
             value: "true"
@@ -225,6 +237,10 @@ spec:
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
         {{- end }}
+      {{- end }}
+      {{- if .Driver.Spec.DriverType }}
+        - name: DRIVER_TYPE
+          value: {{ .Driver.Spec.DriverType | quote }}
       {{- end }}
       {{- if and (.Openshift) (.Runtime.OpenshiftVersion) }}
         - name: OPENSHIFT_VERSION
