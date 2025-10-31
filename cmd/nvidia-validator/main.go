@@ -843,6 +843,20 @@ func (d *Driver) createStatusFile(driverInfo driverInfo) error {
 	return createStatusFileWithContent(outputDirFlag+"/"+driverStatusFile, statusFileContent)
 }
 
+// areNvidiaModulesLoaded checks if NVIDIA kernel modules are already loaded in kernel memory.
+func areNvidiaModulesLoaded() bool {
+	// Check if the nvidia module is loaded by checking if /sys/module/nvidia/refcnt exists
+	if _, err := os.Stat("/sys/module/nvidia/refcnt"); err == nil {
+		refcntData, err := os.ReadFile("/sys/module/nvidia/refcnt")
+		if err == nil {
+			refcnt := strings.TrimSpace(string(refcntData))
+			log.Infof("NVIDIA kernel modules already loaded in kernel memory (refcnt=%s)", refcnt)
+			return true
+		}
+	}
+	return false
+}
+
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
 func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation bool) error {
 	if disableDevCharSymlinkCreation {
@@ -853,8 +867,16 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 
 	log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
 
-	// Only attempt to load NVIDIA kernel modules when we can chroot into driverRoot
-	loadKernelModules := driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot)
+	// Check if NVIDIA modules are already loaded in kernel memory.
+	// If they are, we don't need to run modprobe (which would fail if modules aren't in /lib/modules/).
+	// This handles the case where the driver container performed a userspace-only install
+	// after detecting that modules were already loaded from a previous boot.
+	modulesAlreadyLoaded := areNvidiaModulesLoaded()
+
+	// Only attempt to load NVIDIA kernel modules when:
+	// 1. Modules are not already loaded in kernel memory, AND
+	// 2. We can chroot into driverRoot to run modprobe
+	loadKernelModules := !modulesAlreadyLoaded && (driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot))
 
 	// driverRootCtrPath is the path of the driver install dir in the container. This will either be
 	// driverInstallDirCtrPathFlag or '/host'.
