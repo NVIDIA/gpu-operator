@@ -31,6 +31,6 @@ spec:
   kubernetes:
     install: true
     installer: kubeadm
-    version: v1.32.3
-    crictlVersion: v1.32.0
-    calicoVersion: v3.29.3
+    version: v1.34.1
+    crictlVersion: v1.34.0
+    calicoVersion: v3.31.0
