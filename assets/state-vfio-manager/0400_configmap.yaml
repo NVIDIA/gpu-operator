@@ -24,6 +24,52 @@ data:
         exit 0
     }
 
+    # Map of device IDs to their required VFIO drivers
+    # Returns the appropriate VFIO driver name for a given device ID
+    get_vfio_driver_for_device_id() {
+        device_id=$1
+        
+        # Device ID to driver mapping
+    # GB200 (0x2941) requires nvgrace_gpu_vfio_pci for coherent memory
+    if [ "$device_id" = "0x2941" ]; then
+        echo "nvgrace_gpu_vfio_pci"
+        return
+    fi
+        
+        # Add future device mappings here:
+        
+        # Default: standard VFIO-PCI for all other NVIDIA GPUs
+        echo "vfio-pci"
+    }
+
+    # Get the appropriate VFIO driver for a given GPU PCI address
+    get_vfio_driver() {
+        gpu=$1
+        device_id_file="/sys/bus/pci/devices/$gpu/device"
+        
+        # Fallback to standard driver if device ID cannot be read
+        if [ ! -e "$device_id_file" ]; then
+            echo "vfio-pci"
+            return
+        fi
+        
+        device_id=$(cat "$device_id_file")
+        get_vfio_driver_for_device_id "$device_id"
+    }
+
+    # Check if driver name is a VFIO variant (vfio-pci, nvgrace_gpu_vfio_pci, etc.)
+    is_vfio_driver() {
+        driver_name=$1
+        case "$driver_name" in
+            vfio-pci|nvgrace_gpu_vfio_pci|vfio-cxl)
+                return 0
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    }
+
     unbind_from_driver() {
         gpu=$1
 
@@ -37,7 +83,7 @@ data:
         echo > "/sys/bus/pci/devices/$gpu/driver_override"
     }
 
-    # unbind device from non vfio-pci driver
+    # unbind device from non-VFIO driver
     unbind_from_other_driver() {
         gpu=$1
 
@@ -46,8 +92,11 @@ data:
         existing_driver=$(readlink -f "/sys/bus/pci/devices/$gpu/driver")
         existing_driver_name=$(basename "$existing_driver")
 
-        # return if bound to vfio-pci
-        [ "$existing_driver_name" != "vfio-pci" ] || return 0
+        # return if already bound to any VFIO variant
+        if is_vfio_driver "$existing_driver_name"; then
+            return 0
+        fi
+        
         echo "unbinding device $gpu from driver $existing_driver_name"
         echo "$gpu" > "$existing_driver/unbind"
         echo > "/sys/bus/pci/devices/$gpu/driver_override"
@@ -72,10 +121,12 @@ data:
         existing_driver_name=$(basename "$existing_driver")
 
         echo "existing driver is $existing_driver_name"
-        # return if bound to other drivers(nvidia, nouveau)
-        [ "$existing_driver_name" = "vfio-pci" ] || return 1
-
-        # bound to vfio
+        
+        # Get the expected VFIO driver for this GPU
+        expected_driver=$(get_vfio_driver "$gpu")
+        
+        # Check if bound to the correct VFIO driver
+        [ "$existing_driver_name" = "$expected_driver" ] || return 1
         return 0
     }
 
@@ -108,14 +159,15 @@ data:
 
     bind_pci_device() {
         gpu=$1
+        vfio_driver=$(get_vfio_driver "$gpu")
 
-        if ! is_bound_to_vfio $gpu; then
-          unbind_from_other_driver $gpu
-          echo "binding device $gpu"
-          echo "vfio-pci" > "/sys/bus/pci/devices/$gpu/driver_override"
-          echo "$gpu" > /sys/bus/pci/drivers/vfio-pci/bind
+        if ! is_bound_to_vfio "$gpu"; then
+            unbind_from_other_driver "$gpu"
+            echo "binding device $gpu to $vfio_driver"
+            echo "$vfio_driver" > "/sys/bus/pci/devices/$gpu/driver_override"
+            echo "$gpu" > "/sys/bus/pci/drivers/$vfio_driver/bind"
         else
-          echo "device $gpu already bound to vfio-pci"
+            echo "device $gpu already bound to correct VFIO driver"
         fi
     }
 
@@ -172,7 +224,17 @@ data:
     }
 
     handle_bind() {
-        chroot /host modprobe vfio-pci
+        # Determine which VFIO module to load by checking first NVIDIA GPU
+        vfio_module="vfio-pci"  # default
+        for dev in /sys/bus/pci/devices/*; do
+            if [ -e "$dev/vendor" ] && [ "$(cat "$dev/vendor")" = "0x10de" ]; then
+                vfio_module=$(get_vfio_driver "$(basename "$dev")")
+                break
+            fi
+        done
+        
+        chroot /host modprobe "$vfio_module"
+        
         if [ "$DEVICE_ID" != "" ]; then
             bind_device "$DEVICE_ID"
         elif [ "$ALL_DEVICES" = "true" ]; then

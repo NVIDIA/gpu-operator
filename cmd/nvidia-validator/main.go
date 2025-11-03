@@ -384,6 +384,21 @@ func handleSignal() {
 	log.Fatalf("Exiting due to signal [%v] notification for pid [%d]", s.String(), os.Getpid())
 }
 
+// Map of GPU device IDs to their required VFIO drivers
+var vfioDriverMap = map[uint16]string{
+	0x2941: "nvgrace_gpu_vfio_pci", // GB200 - coherent memory architecture
+	// Future device mappings:
+	// 0xXXXX: "vfio-cxl",  // Example: CXL-based GPUs
+}
+
+// getExpectedVFIODriver returns the expected VFIO driver for a GPU device
+func getExpectedVFIODriver(dev *nvpci.NvidiaPCIDevice) string {
+	if driver, exists := vfioDriverMap[dev.Device]; exists {
+		return driver
+	}
+	return "vfio-pci" // Default for all other GPUs
+}
+
 func validateFlags(ctx context.Context, cli *cli.Command) (context.Context, error) {
 	if componentFlag == "" {
 		return ctx, fmt.Errorf("invalid -c <component-name> flag: must not be empty string")
@@ -1541,8 +1556,10 @@ func (v *VfioPCI) runValidation() error {
 	}
 
 	for _, dev := range nvdevices {
-		if dev.Driver != "vfio-pci" {
-			return fmt.Errorf("device not bound to 'vfio-pci'; device: %s driver: '%s'", dev.Address, dev.Driver)
+		expectedDriver := getExpectedVFIODriver(dev)
+		if dev.Driver != expectedDriver {
+			return fmt.Errorf("device not bound to expected VFIO driver; device: %s expected: '%s' actual: '%s'",
+				dev.Address, expectedDriver, dev.Driver)
 		}
 	}
 
