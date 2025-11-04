@@ -1,6 +1,7 @@
 name: Stale issues and pull requests
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "21 4 * * *"
 
