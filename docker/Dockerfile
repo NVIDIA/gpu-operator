@@ -78,7 +78,11 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/${C
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
+<<<<<<< HEAD
 FROM nvcr.io/nvidia/distroless/cc:v3.1.13-dev
+=======
+FROM nvcr.io/nvidia/distroless/cc:v3.2.1-dev
+>>>>>>> e848e4f3 (Bump nvidia/distroless/cc from v3.2.0-dev to v3.2.1-dev in /docker)
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
