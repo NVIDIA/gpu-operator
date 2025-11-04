@@ -62,6 +62,7 @@ type ClusterPolicyReconciler struct {
 	client.Client
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
+	Namespace        string
 	conditionUpdater conditions.Updater
 }
 

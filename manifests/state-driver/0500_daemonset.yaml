@@ -59,6 +59,9 @@ spec:
         {{- .Driver.Spec.Labels | yaml | nindent 8 }}
         {{- end }}
     spec:
+      {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+      terminationGracePeriodSeconds: 120
+      {{- end }}
       nodeSelector:
         {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
         nvidia.com/gpu.deploy.vgpu-manager: "true"
@@ -132,11 +135,7 @@ spec:
           - name: ENABLE_GPU_POD_EVICTION
             value: "true"
           - name: ENABLE_AUTO_DRAIN
-          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
             value: "false"
-          {{- else }}
-            value: "true"
-          {{- end }}
           - name: DRAIN_USE_FORCE
             value: "false"
           - name: DRAIN_POD_SELECTOR_LABEL
@@ -201,6 +200,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+        - secretRef:
+            name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         env:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
@@ -320,9 +324,8 @@ spec:
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
           {{- end}}
-        {{- with .Driver.Spec.Resources }}
-        resources:
-          {{ . | yaml | nindent 10 }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         {{- if not (eq .Driver.Spec.DriverType "vgpu-host-manager") }}
         startupProbe:
@@ -381,6 +384,9 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -425,6 +431,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -449,6 +460,9 @@ spec:
             readOnly: {{ .ReadOnly }}
             {{- end}}
         {{- end }}
+        {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         startupProbe:
           exec:
@@ -485,6 +499,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -509,6 +528,9 @@ spec:
             readOnly: {{ .ReadOnly }}
             {{- end }}
         {{- end }}
+        {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         startupProbe:
           exec:
@@ -573,6 +595,9 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
       {{- end }}
       volumes:
         - name: run-nvidia
@@ -639,9 +664,8 @@ spec:
             type: DirectoryOrCreate
         {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
         {{- range .AdditionalConfigs.Volumes }}
-        - name: {{ .Name }}
-          {{- if and .ConfigMap .ConfigMap.Items }}
-          configMap:
+        {{- if and .ConfigMap .ConfigMap.Items }}
+        - configMap:
             name: {{ .ConfigMap.Name }}
             items:
             {{- range .ConfigMap.Items }}
@@ -651,11 +675,27 @@ spec:
                 mode: {{ .Mode }}
               {{- end }}
             {{- end }}
-          {{- else if .HostPath }}
-          hostPath:
+          name: {{ .Name }}
+        {{- else if and .Secret .Secret.SecretName }}
+        - secret:
+            secretName: {{ .Secret.SecretName }}
+            {{- if .Secret.Items }}
+            items:
+            {{- range .Secret.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- if .Mode }}
+                mode: {{ .Mode }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          name: {{ .Name }}
+        {{- else if .HostPath }}
+        - hostPath:
             path: {{ .HostPath.Path }}
             type: {{ .HostPath.Type }}
-          {{- end }}
+          name: {{ .Name }}
+        {{- end }}
         {{- end }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}

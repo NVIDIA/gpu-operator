@@ -33,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/render"
-	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -66,7 +66,7 @@ func TestDriverRenderMinimal(t *testing.T) {
 		testName = "driver-minimal"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -95,7 +95,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 		testName = "driver-rdma"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -105,7 +105,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
-		Enabled: utils.BoolPtr(true),
+		Enabled: ptr.To(true),
 	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
@@ -128,7 +128,7 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	const (
 		testName = "driver-rdma-hostmofed"
 	)
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -138,8 +138,8 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
-		Enabled:      utils.BoolPtr(true),
-		UseHostMOFED: utils.BoolPtr(true),
+		Enabled:      ptr.To(true),
+		UseHostMOFED: ptr.To(true),
 	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
@@ -162,7 +162,7 @@ func TestDriverSpec(t *testing.T) {
 	const (
 		testName = "driver-full-spec"
 	)
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -187,6 +187,10 @@ func TestDriverSpec(t *testing.T) {
 		ImagePullPolicy:  "Always",
 		ImagePullSecrets: []string{"secret-a", "secret-b"},
 		Resources: &nvidiav1alpha1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
 			Limits: corev1.ResourceList{
 				"memory": resource.MustParse("200Mi"),
 				"cpu":    resource.MustParse("500m"),
@@ -250,7 +254,7 @@ func TestDriverGDS(t *testing.T) {
 		testName = "driver-gds"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -262,7 +266,7 @@ func TestDriverGDS(t *testing.T) {
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
 		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
-			Enabled:          utils.BoolPtr(true),
+			Enabled:          ptr.To(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
 		},
 	}
@@ -288,7 +292,7 @@ func TestDriverGDRCopy(t *testing.T) {
 		testName = "driver-gdrcopy"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -300,7 +304,7 @@ func TestDriverGDRCopy(t *testing.T) {
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
 		Spec: &nvidiav1alpha1.GDRCopySpec{
-			Enabled:          utils.BoolPtr(true),
+			Enabled:          ptr.To(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
 		},
 	}
@@ -328,7 +332,7 @@ func TestDriverGDRCopyOpenShift(t *testing.T) {
 		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -357,7 +361,7 @@ func TestDriverGDRCopyOpenShift(t *testing.T) {
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1-rhcos4.13",
 		Spec: &nvidiav1alpha1.GDRCopySpec{
-			Enabled:          utils.BoolPtr(true),
+			Enabled:          ptr.To(true),
 			ImagePullSecrets: []string{"ngc-secret"},
 		},
 	}
@@ -383,7 +387,7 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 		testName = "driver-additional-configs"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -414,7 +418,7 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -459,13 +463,13 @@ func TestDriverPrecompiled(t *testing.T) {
 		testName = "driver-precompiled"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
-	renderData.Driver.Spec.UsePrecompiled = utils.BoolPtr(true)
+	renderData.Driver.Spec.UsePrecompiled = ptr.To(true)
 	renderData.Driver.Name = "nvidia-gpu-driver-ubuntu22.04"
 	renderData.Driver.AppName = "nvidia-gpu-driver-ubuntu22.04-646cdfdb96"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04"
@@ -550,7 +554,7 @@ func TestVGPUHostManagerDaemonset(t *testing.T) {
 	const (
 		testName = "driver-vgpu-host-manager"
 	)
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -582,7 +586,7 @@ func TestVGPUHostManagerDaemonsetOpenShift(t *testing.T) {
 		rhcosVersion = "413.92.202304252344-0"
 		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867"
 	)
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -623,6 +627,16 @@ func getMinimalDriverRenderData() *driverRenderData {
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 				DriverType:     nvidiav1alpha1.GPU,
+				Resources: &nvidiav1alpha1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				},
 			},
 			AppName:          "nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b",
 			Name:             "nvidia-gpu-driver-ubuntu22.04",
@@ -689,7 +703,7 @@ func getSampleAdditionalConfigs() *additionalConfigs {
 				VolumeSource: corev1.VolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
 						Path: "/opt/config/test-host-path",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+						Type: ptr.To(corev1.HostPathDirectoryOrCreate),
 					},
 				},
 			},
@@ -698,7 +712,7 @@ func getSampleAdditionalConfigs() *additionalConfigs {
 				VolumeSource: corev1.VolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
 						Path: "/opt/config/test-host-path-ro",
-						Type: newHostPathType(corev1.HostPathDirectoryOrCreate),
+						Type: ptr.To(corev1.HostPathDirectoryOrCreate),
 					},
 				},
 			},
@@ -711,7 +725,7 @@ func TestDriverVGPULicensing(t *testing.T) {
 		testName = "driver-vgpu-licensing"
 	)
 
-	state, err := NewStateDriver(nil, nil, manifestDir)
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)
 	stateDriver, ok := state.(*stateDriver)
 	require.True(t, ok)
@@ -752,6 +766,115 @@ func TestDriverVGPULicensing(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+
+}
+
+func TestDriverVGPULicensingSecret(t *testing.T) {
+	const (
+		testName = "driver-vgpu-licensing-secret"
+	)
+
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+
+	renderData.Driver.Spec.LicensingConfig = &nvidiav1alpha1.DriverLicensingConfigSpec{
+		SecretName: "licensing-config-secret",
+		NLSEnabled: ptr.To(true),
+	}
+
+	renderData.AdditionalConfigs = &additionalConfigs{
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/gridd.conf",
+				SubPath:   "gridd.conf",
+			},
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/ClientConfigToken/client_configuration_token.tok",
+				SubPath:   "client_configuration_token.tok",
+			},
+		},
+		Volumes: []corev1.Volume{
+			{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "licensing-config-secret",
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "gridd.conf",
+								Path: "gridd.conf",
+							},
+							{
+								Key:  "client_configuration_token.tok",
+								Path: "client_configuration_token.tok",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+
+	o, err := os.ReadFile(filepath.Join(manifestResultDir, testName+".yaml"))
+	require.Nil(t, err)
+
+	require.Equal(t, string(o), actual)
+
+}
+
+func TestDriverSecretEnv(t *testing.T) {
+	const (
+		testName = "driver-secret-env"
+	)
+
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.SecretEnv = "test-secret-env"
+	renderData.GDS = &gdsDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
+			Enabled: ptr.To(true),
+		},
+	}
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+		Spec: &nvidiav1alpha1.GDRCopySpec{
+			Enabled: ptr.To(true),
 		},
 	}
 

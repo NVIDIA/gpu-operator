@@ -105,3 +105,22 @@ Create the name of the service account which nfd-gc will use
     {{ default "default" .Values.gc.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+imagePullSecrets helper - uses local values or falls back to global values
+*/}}
+{{- define "node-feature-discovery.imagePullSecrets" -}}
+{{- $imagePullSecrets := list -}}
+{{- if .Values.imagePullSecrets -}}
+  {{- range .Values.imagePullSecrets -}}
+    {{- $imagePullSecrets = append $imagePullSecrets . -}}
+  {{- end -}}
+{{- else if and .Values.global .Values.global.imagePullSecrets -}}
+  {{- range .Values.global.imagePullSecrets -}}
+    {{- $imagePullSecrets = append $imagePullSecrets . -}}
+  {{- end -}}
+{{- end -}}
+{{- if $imagePullSecrets -}}
+{{- $imagePullSecrets | toJson }}
+{{- end -}}
+{{- end -}}

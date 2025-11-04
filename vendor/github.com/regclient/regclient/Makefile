@@ -19,10 +19,12 @@ VCS_VERSION?=$(shell vcs_describe="$$(git describe --all)"; \
   fi; \
   echo "$${vcs_version}" | sed -r 's#/+#-#g')
 VCS_TAG?=$(shell git describe --tags --abbrev=0 2>/dev/null || true)
+VCS_SEC?=$(shell git log -1 --format=%ct)
+VCS_DATE?=$(shell date -d "@$(VCS_SEC)" +%Y-%m-%dT%H:%M:%SZ --utc)
 LD_FLAGS?=-s -w -extldflags -static -buildid= -X \"github.com/regclient/regclient/internal/version.vcsTag=$(VCS_TAG)\"
 GO_BUILD_FLAGS?=-trimpath -ldflags "$(LD_FLAGS)"
 DOCKERFILE_EXT?=$(shell if docker build --help 2>/dev/null | grep -q -- '--progress'; then echo ".buildkit"; fi)
-DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)" --build-arg "VCS_VERSION=$(VCS_VERSION)"
+DOCKER_ARGS?=--build-arg "VCS_REF=$(VCS_REF)" --build-arg "VCS_VERSION=$(VCS_VERSION)" --build-arg "SOURCE_DATE_EPOCH=$(VCS_SEC)"  --build-arg "BUILD_DATE=$(VCS_DATE)"
 GOPATH?=$(shell go env GOPATH)
 PWD:=$(shell pwd)
 VER_BUMP?=$(shell command -v version-bump 2>/dev/null)
@@ -34,14 +36,14 @@ ifeq "$(strip $(VER_BUMP))" ''
 		$(VER_BUMP_CONTAINER)
 endif
 MARKDOWN_LINT_VER?=v0.18.1
-GOMAJOR_VER?=v0.14.0
-GOSEC_VER?=v2.22.5
+GOMAJOR_VER?=v0.15.0
+GOSEC_VER?=v2.22.8
 GO_VULNCHECK_VER?=v1.1.4
-OSV_SCANNER_VER?=v2.0.3
+OSV_SCANNER_VER?=v2.2.2
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v1.27.1
-SYFT_CONTAINER?=anchore/syft:v1.27.1@sha256:844ed6a928ef9396fac26d1de374e71dcaf80df14f05841670ed41619c5a718f
+SYFT_VERSION?=v1.32.0
+SYFT_CONTAINER?=anchore/syft:v1.32.0@sha256:b6a6da626d98f5cb92e28934176709003cce6cdcf674816959c7d84845d94045
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
@@ -50,7 +52,7 @@ ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 endif
 STATICCHECK_VER?=v0.6.1
 CI_DISTRIBUTION_VER?=3.0.0
-CI_ZOT_VER?=v2.1.5
+CI_ZOT_VER?=v2.1.7
 
 .PHONY: .FORCE
 .FORCE:
@@ -181,6 +183,13 @@ artifacts/%: artifact-pre .FORCE
 	CGO_ENABLED=0 go build ${GO_BUILD_FLAGS} -o "$@" ./cmd/$${command}/; \
 	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o cyclonedx-json >"artifacts/$${command}-$${platform}.cyclonedx.json"; \
 	$(SYFT) scan -q "file:$@" --source-name "$${command}" -o spdx-json >"artifacts/$${command}-$${platform}.spdx.json"
+
+.PHONY: clean
+clean: ## delete generated content
+	[ ! -d artifacts ] || rm -r artifacts
+	[ ! -d bin ] || rm -r bin
+	[ ! -d output ] || rm -r output
+	[ ! -d vendor ] || rm -r vendor
 
 .PHONY: plugin-user
 plugin-user:

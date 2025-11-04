@@ -21,29 +21,33 @@ on:
       - main
       - release-*
 
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ### Configuration checks ###
   helm-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Helm
-        uses: azure/setup-helm@v4.3.0
+        uses: azure/setup-helm@v4.3.1
         id: install
       - run: helm lint deployments/gpu-operator/
   validate-csv:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - run: make validate-csv
@@ -51,14 +55,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - run: make validate-helm-values
@@ -66,9 +70,12 @@ jobs:
   ### Golang checks and build ###
   go-check:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Checkout code
       - name: Get Golang version
         id: vars
@@ -78,7 +85,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
           echo "GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION##GOLANGCI_LINT_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - name: Lint
@@ -87,42 +94,75 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -v --timeout 5m
           skip-cache: true
-      - run: make check
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
+      - env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make check
   go-test:
     needs: [helm-lint, validate-csv, validate-helm-values]
     name: unit tests
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get Golang version
         id: vars
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-      - run: make coverage
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
+      - env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make coverage
   go-build:
     needs: [helm-lint, validate-csv, validate-helm-values]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Checkout code
       - run: make docker-build
   coverage:
     needs: [go-test]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
       - name: Generate coverage report
-        run: make cov-report
+        env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make cov-report
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         with:
@@ -132,9 +172,13 @@ jobs:
   ### Image builds ###
   build-gpu-operator-arm64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-24.04-arm
+    runs-on: linux-arm64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -155,26 +199,32 @@ jobs:
           fi
           echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
           echo "DOCKER_BUILD_PLATFORM_OPTIONS=--platform=linux/arm64" >> $GITHUB_ENV
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-arm64
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
         run: |
           echo "${VERSION}"
           make build-image
   build-gpu-operator-amd64:
     needs: [go-check, go-test, go-build]
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -195,18 +245,20 @@ jobs:
           fi
           echo "PUSH_ON_BUILD=${GENERATE_ARTIFACTS}" >> $GITHUB_ENV
           echo "DOCKER_BUILD_PLATFORM_OPTIONS=--platform=linux/amd64" >> $GITHUB_ENV
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator
           VERSION: ${COMMIT_SHORT_SHA}-amd64
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
         run: |
           echo "${VERSION}"
           make build-image
@@ -215,7 +267,7 @@ jobs:
     needs: [build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -244,11 +296,14 @@ jobs:
   e2e-tests-containerd:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.7
+        uses: NVIDIA/holodeck@v0.2.17
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -285,7 +340,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: containerd-e2e-test-logs
           path: ./logs/
@@ -294,11 +349,14 @@ jobs:
   e2e-tests-nvidiadriver:
     needs: [build-multi-arch-images]
     runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.7
+        uses: NVIDIA/holodeck@v0.2.17
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -335,7 +393,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
@@ -346,11 +404,11 @@ jobs:
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: set-up regctl
         run: |
-          export REGCTL_VERSION=v0.8.3
+          export REGCTL_VERSION=v0.9.2
           mkdir -p bin
           curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
           chmod a+x bin/regctl
@@ -372,7 +430,7 @@ jobs:
     needs: [release-latest-gpu-operator-image]
     runs-on: linux-amd64-cpu4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

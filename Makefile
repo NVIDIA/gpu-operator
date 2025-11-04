@@ -16,16 +16,13 @@ BUILD_MULTI_ARCH_IMAGES ?= false
 DOCKER ?= docker
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-BUILDX  =
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-BUILDX = buildx
-endif
 
 ##### Global variables #####
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+GOPROXY ?= https://proxy.golang.org,direct
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
@@ -220,6 +217,8 @@ sync-crds:
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/deployments/gpu-operator/crds
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/bundle/manifests
 
+TOOLS_DIR := $(PROJECT_DIR)/tools
+E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-modules:
 	@echo "- Verifying that the dependencies have expected content..."
 	go mod verify
@@ -229,6 +228,16 @@ validate-modules:
 	@echo "- Checking if the vendor dir is in sync..."
 	go mod vendor
 	@git diff --exit-code -- vendor
+	@echo "- [tools] Verifying that the dependencies have expected content..."
+	go -C $(TOOLS_DIR) mod verify
+	@echo "- [tools] Checking for any unused/missing packages in go.mod..."
+	go -C $(TOOLS_DIR) mod tidy
+	@git diff --exit-code -- $(TOOLS_DIR)/go.sum $(TOOLS_DIR)/go.mod
+	@echo "- [tests/e2e] Verifying that the dependencies have expected content..."
+	go -C $(E2E_TESTS_DIR) mod verify
+	@echo "- [tests/e2e] Checking for any unused/missing packages in go.mod..."
+	go -C $(E2E_TESTS_DIR) mod tidy
+	@git diff --exit-code -- $(E2E_TESTS_DIR)/go.sum $(E2E_TESTS_DIR)/go.mod
 
 validate-csv: cmds
 	./gpuop-cfg validate csv --input=./bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
@@ -240,7 +249,7 @@ validate-helm-values: cmds
 
 validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
-	@git diff --exit-code -- api config
+	@git diff --exit-code -- api config bundle deployments
 
 COVERAGE_FILE := coverage.out
 unit-test: build
@@ -271,8 +280,7 @@ ALL_TARGETS := $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
 build-image:
-	DOCKER_BUILDKIT=1 \
-		$(DOCKER) $(BUILDX) build --pull \
+		$(DOCKER) build --pull \
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
@@ -280,6 +288,7 @@ build-image:
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
+		--build-arg GOPROXY="$(GOPROXY)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
 # Provide a utility target to build the images to allow for use in external tools.

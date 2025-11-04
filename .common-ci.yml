@@ -137,7 +137,7 @@ trigger-pipeline:
 # Download the regctl binary for use in the release steps
 .regctl-setup:
   before_script:
-    - export REGCTL_VERSION=v0.8.3
+    - export REGCTL_VERSION=v0.9.2
     - apk add --no-cache curl
     - mkdir -p bin
     - curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
@@ -172,3 +172,5 @@ release:staging-gpu-operator:
     - .target-gpu-operator
   variables:
     OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator"
+  needs:
+    - image:gpu-operator

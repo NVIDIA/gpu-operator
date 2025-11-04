@@ -77,6 +77,27 @@ spec:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
+        - name: gdrcopy-validation
+          image: "FILLED BY THE OPERATOR"
+          command: [ 'sh', '-c' ]
+          args: [ "nvidia-validator" ]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: gdrcopy
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
         - name: toolkit-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
@@ -127,7 +148,7 @@ spec:
           - name: WITH_WAIT
             value: "false"
           - name: WITH_WORKLOAD
-            value: "true"
+            value: "false"
           - name: MIG_STRATEGY
             value: "FILLED BY OPERATOR"
           - name: NODE_NAME
@@ -148,7 +169,7 @@ spec:
         - image: "FILLED BY THE OPERATOR"
           name: nvidia-operator-validator
           command: ['sh', '-c']
-          args: ["echo all validations are successful; sleep infinity"]
+          args: ["echo all validations are successful; while true; do sleep 86400; done"]
           securityContext:
             privileged: true
           lifecycle:

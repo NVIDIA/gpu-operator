@@ -170,6 +170,9 @@ spec:
           limits:
             cpu: 500m
             memory: 200Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -232,7 +235,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL

@@ -53,6 +53,7 @@ type NVIDIADriverReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
 	ClusterInfo clusterinfo.Interface
+	Namespace   string
 
 	stateManager          state.Manager
 	nodeSelectorValidator validator.Validator
@@ -168,6 +169,21 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	// ensure that the specified K8s secret actually exists in the operator namespace
+	secretName := instance.Spec.SecretEnv
+	if len(secretName) > 0 {
+		key := client.ObjectKey{Namespace: r.Namespace, Name: secretName}
+		err = r.Get(ctx, key, &corev1.Secret{})
+		if err != nil {
+			logger.V(consts.LogLevelError).Error(nil, err.Error())
+			condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+			if condErr != nil {
+				logger.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+			}
+			return reconcile.Result{}, nil
+		}
+	}
+
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
 
@@ -239,6 +255,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	// Create state manager
 	stateManager, err := state.NewManager(
 		nvidiav1alpha1.NVIDIADriverCRDName,
+		r.Namespace,
 		mgr.GetClient(),
 		mgr.GetScheme())
 	if err != nil {

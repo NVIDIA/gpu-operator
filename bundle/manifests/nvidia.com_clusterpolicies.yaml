@@ -136,13 +136,15 @@ spec:
                 properties:
                   default:
                     default: false
-                    description: Default indicates whether to use CDI as the default
-                      mechanism for providing GPU access to containers.
+                    description: 'Deprecated: This field is no longer used. Setting
+                      cdi.enabled=true will configure CDI as the default mechanism
+                      for making GPUs accessible to containers.'
                     type: boolean
                   enabled:
-                    default: false
-                    description: Enabled indicates whether CDI can be used to make
-                      GPUs accessible to containers.
+                    default: true
+                    description: Enabled indicates whether the Container Device Interface
+                      (CDI) should be used as the mechanism for making GPUs accessible
+                      to containers.
                     type: boolean
                 type: object
               daemonsets:
@@ -337,6 +339,10 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostPID:
+                    description: HostPID allows the DCGM-Exporter daemon set to access
+                      the host's PID namespace
+                    type: boolean
                   image:
                     description: NVIDIA DCGM Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'
@@ -679,11 +685,18 @@ spec:
                       licensing'
                     properties:
                       configMapName:
+                        description: 'Deprecated: ConfigMapName has been deprecated
+                          in favour of SecretName. Please use secrets to handle the
+                          licensing server configuration more securely'
                         type: string
                       nlsEnabled:
                         description: NLSEnabled indicates if NVIDIA Licensing System
                           is used for licensing.
                         type: boolean
+                      secretName:
+                        description: SecretName indicates the name of the secret containing
+                          the licensing token
+                        type: string
                     type: object
                   livenessProbe:
                     description: NVIDIA Driver container liveness probe settings
@@ -857,6 +870,10 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  secretEnv:
+                    description: 'Optional: SecretEnv represents the name of the Kubernetes
+                      Secret with secret environment variables for the NVIDIA Driver'
+                    type: string
                   startupProbe:
                     description: NVIDIA Driver container startup probe settings
                     properties:

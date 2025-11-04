@@ -1,3 +1,4 @@
+{{- if .Values.postDeleteCleanup }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -66,6 +67,7 @@ spec:
         role: prune
     spec:
       serviceAccountName: {{ include "node-feature-discovery.fullname" . }}-prune
+      imagePullSecrets: {{ include "node-feature-discovery.imagePullSecrets" . }}
       containers:
         - name: nfd-master
           securityContext:
@@ -92,3 +94,9 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.master.resources }}
+      resources:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

@@ -222,6 +222,13 @@ spec:
               - -c
               - rm -f /run/nvidia/validations/.driver-ctr-ready
         name: nvidia-driver-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -284,6 +291,13 @@ spec:
         image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867
         imagePullPolicy: IfNotPresent
         name: openshift-driver-toolkit-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -319,7 +333,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL

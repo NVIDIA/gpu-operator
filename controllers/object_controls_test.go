@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -88,6 +89,7 @@ var kubernetesResources = []client.Object{
 	&rbacv1.ClusterRole{},
 	&rbacv1.ClusterRoleBinding{},
 	&corev1.ConfigMap{},
+	&corev1.Secret{},
 	&appsv1.DaemonSet{},
 	&appsv1.Deployment{},
 	&corev1.Pod{},
@@ -144,6 +146,18 @@ func getModuleRoot(dir string) (string, error) {
 	return dir, nil
 }
 
+// mockOSRelease returns a mock parseOSRelease function for testing.
+// It allows tests to simulate different operating systems without filesystem access.
+func mockOSRelease(osID, version string) func() (map[string]string, error) {
+	return func() (map[string]string, error) {
+		return map[string]string{
+			"ID":         osID,
+			"VERSION_ID": version,
+			"NAME":       osID,
+		}, nil
+	}
+}
+
 // setup creates a mock kubernetes cluster and client. Nodes are labeled with the minimum
 // required NFD labels to be detected as GPU nodes by the GPU Operator. A sample
 // ClusterPolicy resource is applied to the cluster. The ClusterPolicyController
@@ -156,8 +170,8 @@ func setup() error {
 	boolTrue = new(bool)
 	*boolTrue = true
 
-	// add env for calls that we cannot mock
-	os.Setenv("UNIT_TEST", "true")
+	// Mock parseOSRelease to avoid filesystem dependency in tests
+	parseOSRelease = mockOSRelease("ubuntu", "20.04")
 
 	s := scheme.Scheme
 	if err := gpuv1.AddToScheme(s); err != nil {
@@ -1117,4 +1131,368 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 		require.NotEmpty(t, result)
 		require.Equal(t, test.expected, result)
 	}
+}
+
+func TestServiceMonitor(t *testing.T) {
+	const (
+		testNamespace      = "test-namespace"
+		testServiceMonitor = "test-service-monitor"
+		filledNamespace    = "FILLED BY THE OPERATOR"
+	)
+
+	// Create scheme with required types
+	scheme := runtime.NewScheme()
+	require.NoError(t, promv1.AddToScheme(scheme))
+	require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+
+	serviceMonitor := promv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{Name: testServiceMonitor, Labels: map[string]string{}},
+		Spec: promv1.ServiceMonitorSpec{
+			NamespaceSelector: promv1.NamespaceSelector{MatchNames: []string{filledNamespace}},
+			Endpoints:         []promv1.Endpoint{{}},
+		},
+	}
+
+	// Create controller with given spec and state
+	newController := func(k8s client.Client, scheme *runtime.Scheme, spec gpuv1.ClusterPolicySpec, state string) ClusterPolicyController {
+		clusterPolicy := &gpuv1.ClusterPolicy{Spec: spec}
+		resources := []Resources{{ServiceMonitor: serviceMonitor}}
+
+		return ClusterPolicyController{
+			client:            k8s,
+			ctx:               context.Background(),
+			singleton:         clusterPolicy,
+			scheme:            scheme,
+			operatorNamespace: testNamespace,
+			resources:         resources,
+			stateNames:        []string{state},
+			idx:               0,
+			logger:            ctrl.Log.WithName("test"),
+		}
+	}
+
+	// CRD object for tests that need ServiceMonitor CRD present
+	serviceMonitorCRD := &apiextensionsv1.CustomResourceDefinition{ObjectMeta: metav1.ObjectMeta{Name: ServiceMonitorCRDName}}
+
+	tests := []struct {
+		description            string
+		stateName              string
+		k8sObjects             []client.Object
+		clusterPolicySpec      gpuv1.ClusterPolicySpec
+		expectedState          gpuv1.State
+		expectedServiceMonitor *promv1.ServiceMonitor
+	}{
+		{
+			description: "dcgm-exporter disabled, CRD missing -> Ready",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  nil,
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
+			},
+			expectedState:          gpuv1.Ready,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM enabled, CRD missing -> NotReady",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  nil,
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(true)},
+				},
+			},
+			expectedState:          gpuv1.NotReady,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM disabled, CRD present -> Disabled (delete if exists)",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  []client.Object{serviceMonitorCRD},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(false)},
+				},
+			},
+			expectedState:          gpuv1.Disabled,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description:            "operator-metrics, CRD missing -> Ready (ignore create)",
+			stateName:              "state-operator-metrics",
+			k8sObjects:             nil,
+			clusterPolicySpec:      gpuv1.ClusterPolicySpec{},
+			expectedState:          gpuv1.Ready,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "node-status-exporter disabled, CRD present -> Disabled",
+			stateName:   "state-node-status-exporter",
+			k8sObjects:  []client.Object{serviceMonitorCRD},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{Enabled: ptr.To(false)},
+			},
+			expectedState:          gpuv1.Disabled,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM enabled, CRD present -> Ready and applies edits",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  []client.Object{serviceMonitorCRD},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{
+						Enabled:          ptr.To(true),
+						Interval:         promv1.Duration("15s"),
+						HonorLabels:      ptr.To(true),
+						AdditionalLabels: map[string]string{"a": "b"},
+						Relabelings:      []*promv1.RelabelConfig{{Action: "keep"}},
+					},
+				},
+			},
+			expectedState: gpuv1.Ready,
+			expectedServiceMonitor: &promv1.ServiceMonitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-monitor",
+					Namespace: "test-namespace",
+					Labels:    map[string]string{"a": "b"},
+				},
+				Spec: promv1.ServiceMonitorSpec{
+					NamespaceSelector: promv1.NamespaceSelector{MatchNames: []string{"test-namespace"}},
+					Endpoints: []promv1.Endpoint{{
+						Interval:    promv1.Duration("15s"),
+						HonorLabels: true,
+						RelabelConfigs: []promv1.RelabelConfig{{
+							Action: "keep",
+						}},
+					}},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			k8sClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(tc.k8sObjects...).
+				Build()
+
+			controller := newController(k8sClient, scheme, tc.clusterPolicySpec, tc.stateName)
+
+			// Calls the actual ServiceMonitor function under test and validates the state
+			state, err := ServiceMonitor(controller)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedState, state)
+
+			found := &promv1.ServiceMonitor{}
+			err = k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testServiceMonitor}, found)
+			if tc.expectedServiceMonitor == nil {
+				require.True(t, apierrors.IsNotFound(err))
+				return
+			}
+			require.NoError(t, err)
+
+			require.Equal(t, tc.expectedServiceMonitor.Name, found.Name)
+			require.Equal(t, tc.expectedServiceMonitor.Namespace, found.Namespace)
+			require.Equal(t, tc.expectedServiceMonitor.Labels, found.Labels)
+			require.Equal(t, tc.expectedServiceMonitor.Spec, found.Spec)
+		})
+	}
+}
+
+func TestService(t *testing.T) {
+	const (
+		testNamespace = "test-namespace"
+		testService   = "nvidia-dcgm-exporter"
+	)
+
+	// Helper to create scheme with required types
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+
+	// Template Service
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: testService},
+		Spec:       corev1.ServiceSpec{},
+	}
+
+	// Helper to create controller with given spec
+	newController := func(k8s client.Client, scheme *runtime.Scheme, spec gpuv1.ClusterPolicySpec) ClusterPolicyController {
+		clusterPolicy := &gpuv1.ClusterPolicy{Spec: spec}
+		resources := []Resources{{Service: service}}
+		return ClusterPolicyController{
+			client:            k8s,
+			ctx:               context.Background(),
+			singleton:         clusterPolicy,
+			scheme:            scheme,
+			operatorNamespace: testNamespace,
+			resources:         resources,
+			stateNames:        []string{"state-dcgm-exporter"},
+			idx:               0,
+			logger:            ctrl.Log.WithName("test"),
+		}
+	}
+
+	localPolicy := corev1.ServiceInternalTrafficPolicyLocal
+
+	tests := []struct {
+		description       string
+		k8sObjects        []client.Object
+		clusterPolicySpec gpuv1.ClusterPolicySpec
+		expectedState     gpuv1.State
+		expectService     bool
+		expectedType      corev1.ServiceType
+		expectedPolicy    *corev1.ServiceInternalTrafficPolicy
+		expectedIP        string // For ClusterIP preservation test
+	}{
+		{
+			description: "create and preprocess",
+			k8sObjects:  nil,
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type:                  corev1.ServiceTypeNodePort,
+						InternalTrafficPolicy: &localPolicy,
+					},
+				},
+			},
+			expectedState:  gpuv1.Ready,
+			expectService:  true,
+			expectedType:   corev1.ServiceTypeNodePort,
+			expectedPolicy: &localPolicy,
+		},
+		{
+			description: "update preserves ClusterIP",
+			k8sObjects: []client.Object{&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: testService, Namespace: testNamespace},
+				Spec: corev1.ServiceSpec{
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "10.0.0.42",
+				},
+			}},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
+						Type:                  corev1.ServiceTypeNodePort,
+						InternalTrafficPolicy: &localPolicy,
+					},
+				},
+			},
+			expectedState:  gpuv1.Ready,
+			expectService:  true,
+			expectedType:   corev1.ServiceTypeNodePort,
+			expectedPolicy: &localPolicy,
+			expectedIP:     "10.0.0.42",
+		},
+		{
+			description: "disabled deletes and returns Disabled",
+			k8sObjects: []client.Object{&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: testService, Namespace: testNamespace},
+				Spec: corev1.ServiceSpec{
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "10.0.0.42",
+				},
+			}},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
+			},
+			expectedState: gpuv1.Disabled,
+			expectService: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			k8sClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(tc.k8sObjects...).
+				Build()
+
+			controller := newController(k8sClient, scheme, tc.clusterPolicySpec)
+
+			state, err := Service(controller)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedState, state)
+
+			found := &corev1.Service{}
+			err = k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testService}, found)
+			if !tc.expectService {
+				require.True(t, apierrors.IsNotFound(err))
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedType, found.Spec.Type)
+			if tc.expectedPolicy != nil {
+				require.NotNil(t, found.Spec.InternalTrafficPolicy)
+				require.Equal(t, *tc.expectedPolicy, *found.Spec.InternalTrafficPolicy)
+			}
+			if tc.expectedIP != "" {
+				require.Equal(t, tc.expectedIP, found.Spec.ClusterIP)
+			}
+		})
+	}
+}
+
+func TestParseOSReleaseFromFile(t *testing.T) {
+	tests := []struct {
+		description string
+		content     string
+		expected    map[string]string
+	}{
+		{
+			description: "quoted values",
+			content:     `NAME="Ubuntu"` + "\n" + `VERSION_ID="20.04"`,
+			expected:    map[string]string{"NAME": "Ubuntu", "VERSION_ID": "20.04"},
+		},
+		{
+			description: "unquoted values",
+			content:     `NAME=Ubuntu` + "\n" + `ID=ubuntu`,
+			expected:    map[string]string{"NAME": "Ubuntu", "ID": "ubuntu"},
+		},
+		{
+			description: "mixed quoted and unquoted",
+			content:     `ID="rhel"` + "\n" + `VERSION_ID=8.5`,
+			expected:    map[string]string{"ID": "rhel", "VERSION_ID": "8.5"},
+		},
+		{
+			description: "empty lines and comments",
+			content:     `NAME="Ubuntu"` + "\n\n# comment\n" + `ID=ubuntu`,
+			expected:    map[string]string{"NAME": "Ubuntu", "ID": "ubuntu"},
+		},
+	}
+
+	tempDir := t.TempDir()
+
+	// Save original value and restore after tests for future subsequent tests (if needed)
+	originalPath := osReleaseFilePath
+	defer func() { osReleaseFilePath = originalPath }()
+
+	for i, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			testFile := filepath.Join(tempDir, fmt.Sprintf("os-release-%d", i))
+			err := os.WriteFile(testFile, []byte(test.content), 0600)
+			require.NoError(t, err)
+
+			// Override the path for this test
+			osReleaseFilePath = testFile
+			result, err := parseOSReleaseFromFile()
+			require.NoError(t, err)
+			require.Equal(t, test.expected, result)
+		})
+	}
+
+	t.Run("file not found", func(t *testing.T) {
+		osReleaseFilePath = "/nonexistent/path"
+		_, err := parseOSReleaseFromFile()
+		require.Error(t, err)
+		require.True(t, os.IsNotExist(err))
+	})
 }

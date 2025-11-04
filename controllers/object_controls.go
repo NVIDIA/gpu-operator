@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/yaml"
@@ -56,16 +57,18 @@ import (
 const (
 	// DefaultContainerdConfigFile indicates default config file path for containerd
 	DefaultContainerdConfigFile = "/etc/containerd/config.toml"
+	// DefaultContainerdDropInConfigFile indicates default drop-in config file path for containerd
+	DefaultContainerdDropInConfigFile = "/etc/containerd/conf.d/99-nvidia.toml"
 	// DefaultContainerdSocketFile indicates default containerd socket file
 	DefaultContainerdSocketFile = "/run/containerd/containerd.sock"
 	// DefaultDockerConfigFile indicates default config file path for docker
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
-	// DefaultCRIOConfigFile indicates default config file path for cri-o.
-	// Note, config files in the drop-in directory, /etc/crio/crio.conf.d,
-	// have a higher priority than the default /etc/crio/crio.conf file.
-	DefaultCRIOConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
+	// DefaultCRIOConfigFile indicates default config file path for cri-o. .
+	DefaultCRIOConfigFile = "/etc/crio/config.toml"
+	// DefaultCRIODropInConfigFile indicates the default path to the drop-in config file for cri-o
+	DefaultCRIODropInConfigFile = "/etc/crio/crio.conf.d/99-nvidia.conf"
 	// TrustedCAConfigMapName indicates configmap with custom user CA injected
 	TrustedCAConfigMapName = "gpu-operator-trusted-ca"
 	// TrustedCABundleFileName indicates custom user ca certificate filename
@@ -74,18 +77,6 @@ const (
 	TrustedCABundleMountDir = "/etc/pki/ca-trust/extracted/pem"
 	// TrustedCACertificate indicates injected CA certificate name
 	TrustedCACertificate = "tls-ca-bundle.pem"
-	// VGPULicensingConfigMountPath indicates target mount path for vGPU licensing configuration file
-	VGPULicensingConfigMountPath = "/drivers/gridd.conf"
-	// VGPULicensingFileName is the vGPU licensing configuration filename
-	VGPULicensingFileName = "gridd.conf"
-	// NLSClientTokenMountPath inidicates the target mount path for NLS client config token file (.tok)
-	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
-	// NLSClientTokenFileName is the NLS client config token filename
-	NLSClientTokenFileName = "client_configuration_token.tok"
-	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
-	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
-	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename
-	VGPUTopologyConfigFileName = "nvidia-topologyd.conf"
 	// DefaultRuntimeClass represents "nvidia" RuntimeClass
 	DefaultRuntimeClass = "nvidia"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
@@ -94,6 +85,8 @@ const (
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
 	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
+	// DefaultRuntimeDropInConfigTargetDir represents target directory where drop-in config directory will be mounted
+	DefaultRuntimeDropInConfigTargetDir = "/runtime/config-dir.d/"
 	// ValidatorImageEnvName indicates env name for validator image passed
 	ValidatorImageEnvName = "VALIDATOR_IMAGE"
 	// ValidatorImagePullPolicyEnvName indicates env name for validator image pull policy passed
@@ -128,6 +121,8 @@ const (
 	GDSEnabledEnvName = "GDS_ENABLED"
 	// MOFEDEnabledEnvName is the env name to enable MOFED devices injection with device-plugin
 	MOFEDEnabledEnvName = "MOFED_ENABLED"
+	// GDRCopyEnabledEnvName is the envvar that enables injection of the GDRCopy device node with the device-plugin
+	GDRCopyEnabledEnvName = "GDRCOPY_ENABLED"
 	// ServiceMonitorCRDName is the name of the CRD defining the ServiceMonitor kind
 	ServiceMonitorCRDName = "servicemonitors.monitoring.coreos.com"
 	// DefaultToolkitInstallDir is the default toolkit installation directory on the host
@@ -146,8 +141,8 @@ const (
 	CDIEnabledEnvName = "CDI_ENABLED"
 	// NvidiaCDIHookPathEnvName is the name of the envvar specifying the path to the 'nvidia-cdi-hook' binary
 	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
-	// CrioConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
-	CrioConfigModeEnvName = "CRIO_CONFIG_MODE"
+	// CRIOConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
+	CRIOConfigModeEnvName = "CRIO_CONFIG_MODE"
 	// DeviceListStrategyEnvName is the name of the envvar for configuring the device-list-strategy in the device-plugin
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
@@ -177,6 +172,8 @@ const (
 	// DriverInstallDirCtrPathEnvName is the name of the envvar used by the driver-validator to represent the path
 	// of the driver install dir mounted in the container
 	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
+	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
+	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
 )
 
 // ContainerProbe defines container probe types
@@ -192,7 +189,7 @@ const (
 )
 
 // rootUID represents user 0
-var rootUID = utils.Int64Ptr(0)
+var rootUID = ptr.To(int64(0))
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
@@ -213,12 +210,6 @@ var CertConfigPathMap = map[string]string{
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
 }
 
-func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = pathType
-	return hostPathType
-}
-
 // MountPathToVolumeSource maps a container mount path to a VolumeSource
 type MountPathToVolumeSource map[string]corev1.VolumeSource
 
@@ -231,19 +222,19 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: ptr.To(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -251,19 +242,19 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: ptr.To(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -271,13 +262,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: ptr.To(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -285,13 +276,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: ptr.To(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -888,14 +879,12 @@ func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string
 		return
 	}
 
-	for i, ctr := range podSpec.InitContainers {
-		if ctr.Name == "driver-validation" {
-			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirEnvName, driverInstallDir)
-			setContainerEnv(&(podSpec.InitContainers[i]), DriverInstallDirCtrPathEnvName, driverInstallDir)
-			for j, volumeMount := range ctr.VolumeMounts {
-				if volumeMount.Name == "driver-install-dir" {
-					podSpec.InitContainers[i].VolumeMounts[j].MountPath = driverInstallDir
-				}
+	if ctr := findContainerByName(podSpec.InitContainers, "driver-validation"); ctr != nil {
+		setContainerEnv(ctr, DriverInstallDirEnvName, driverInstallDir)
+		setContainerEnv(ctr, DriverInstallDirCtrPathEnvName, driverInstallDir)
+		for i, volumeMount := range ctr.VolumeMounts {
+			if volumeMount.Name == "driver-install-dir" {
+				ctr.VolumeMounts[i].MountPath = driverInstallDir
 			}
 		}
 	}
@@ -951,8 +940,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		return err
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
@@ -960,19 +948,22 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	return nil
 }
 
-// Read and parse os-release file
-func parseOSRelease() (map[string]string, error) {
+// parseOSRelease can be overridden in tests for mocking filesystem access.
+// In production, it reads and parses /host-etc/os-release.
+var parseOSRelease = parseOSReleaseFromFile
+
+// osReleaseFilePath is the path to the os-release file, configurable for testing.
+var osReleaseFilePath = "/host-etc/os-release"
+
+// parseOSReleaseFromFile reads and parses the os-release file from the host filesystem.
+func parseOSReleaseFromFile() (map[string]string, error) {
 	release := map[string]string{}
 
-	// TODO: mock this call instead
-	if os.Getenv("UNIT_TEST") == "true" {
-		return release, nil
-	}
-
-	f, err := os.Open("/host-etc/os-release")
+	f, err := os.Open(osReleaseFilePath)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	re := regexp.MustCompile(`^(?P<key>\w+)=(?P<value>.+)`)
 
@@ -1222,8 +1213,30 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
 	return envVars
 }
 
+func transformToolkitCtrForCDI(container *corev1.Container) {
+	// When CDI is enabled in GPU Operator, we leverage native CDI support in containerd / cri-o
+	// to inject GPUs into workloads. We do not configure 'nvidia' as the default runtime. The
+	// 'nvidia' runtime will be set as the runtime class for our management containers so that
+	// they get access to all GPUs.
+	//
+	// Note: one could override this and continue to configure 'nvidia' as the default runtime
+	// by directly setting the 'NVIDIA_RUNTIME_SET_AS_DEFAULT' environment variable to 'true' in
+	// the toolkit container. One can leverage the 'toolkit.env' field in ClusterPolicy to
+	// directly configure environment variables for the toolkit container.
+	setContainerEnv(container, CDIEnabledEnvName, "true")
+	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
+	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
+	setContainerEnv(container, CRIOConfigModeEnvName, "config")
+}
+
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	toolkitContainerName := "nvidia-container-toolkit-ctr"
+	toolkitMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, toolkitContainerName)
+	if toolkitMainContainer == nil {
+		return fmt.Errorf("failed to find toolkit container %q", toolkitContainerName)
+	}
+
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
 	if err != nil {
@@ -1234,10 +1247,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	if err != nil {
 		return err
 	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
+	toolkitMainContainer.Image = image
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
+	toolkitMainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Toolkit.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.Toolkit.ImagePullSecrets) > 0 {
@@ -1255,17 +1268,24 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeCDIPrefixesEnvName, "nvidia.cdi.k8s.io/")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CrioConfigModeEnvName, "config")
-		if config.CDI.IsDefault() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCtrRuntimeModeEnvName, "cdi")
-		}
+		transformToolkitCtrForCDI(toolkitMainContainer)
+	} else if n.runtime == gpuv1.CRIO {
+		// (cdesiniotis) When CDI is not enabled and cri-o is the container runtime,
+		// we continue to install the OCI prestart hook as opposed to adding nvidia
+		// runtime handlers to the cri-o configuration. Users can override this behavior
+		// and have nvidia runtime handlers added to the cri-o configuration by setting
+		// the 'CRIO_CONFIG_MODE' environment variable to 'config' in the toolkit container.
+		// However, one should note setting 'CRIO_CONFIG_MODE' to 'config' in this case
+		// (when CDI is not enabled) would result in the 'nvidia' runtime being set as
+		// the default runtime. While this should work in theory, it is a significant
+		// change -- which was the primary motivation to continue using the OCI prestart
+		// hook by default in this case.
+		setContainerEnv(toolkitMainContainer, CRIOConfigModeEnvName, "hook")
 	}
 
 	// set install directory for the toolkit
 	if config.Toolkit.InstallDir != "" && config.Toolkit.InstallDir != DefaultToolkitInstallDir {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
+		setContainerEnv(toolkitMainContainer, ToolkitInstallDirEnvName, config.Toolkit.InstallDir)
 
 		for i, volume := range obj.Spec.Template.Spec.Volumes {
 			if volume.Name == "toolkit-install-dir" {
@@ -1274,19 +1294,12 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 			}
 		}
 
-		for i, volumeMount := range obj.Spec.Template.Spec.Containers[0].VolumeMounts {
+		for i, volumeMount := range toolkitMainContainer.VolumeMounts {
 			if volumeMount.Name == "toolkit-install-dir" {
-				obj.Spec.Template.Spec.Containers[0].VolumeMounts[i].MountPath = config.Toolkit.InstallDir
+				toolkitMainContainer.VolumeMounts[i].MountPath = config.Toolkit.InstallDir
 				break
 			}
 		}
-	}
-
-	// configure runtime
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-container-toolkit-ctr")
-	if err != nil {
-		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
 
 	// Update CRI-O hooks path to use default path for non OCP cases
@@ -1300,38 +1313,40 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	if len(config.Toolkit.Env) > 0 {
 		for _, env := range config.Toolkit.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(toolkitMainContainer, env.Name, env.Value)
 		}
+	}
+
+	// configure runtime
+	runtime := n.runtime.String()
+	err = transformForRuntime(obj, config, runtime, toolkitMainContainer)
+	if err != nil {
+		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
 	}
 
 	return nil
 }
 
-func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, containerName string) error {
-	var mainContainer *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == containerName {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
-	if mainContainer == nil {
-		return fmt.Errorf("failed to find main container %q", containerName)
-	}
-
-	setContainerEnv(mainContainer, "RUNTIME", runtime)
+func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, container *corev1.Container) error {
+	setContainerEnv(container, "RUNTIME", runtime)
 
 	if runtime == gpuv1.Containerd.String() {
 		// Set the runtime class name that is to be configured for containerd
-		setContainerEnv(mainContainer, "CONTAINERD_RUNTIME_CLASS", getRuntimeClass(config))
+		setContainerEnv(container, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
 	}
 
+	// For runtime config files we have top-level configs and drop-in files.
+	// These are supported as follows:
+	//   * Docker only supports top-level config files.
+	//   * Containerd supports drop-in files, but required modification to the top-level config
+	//   * Crio supports drop-in files at a predefined location. The top-level config may be read
+	//     but should not be updated.
+
 	// setup mounts for runtime config file
-	runtimeConfigFile, err := getRuntimeConfigFile(mainContainer, runtime)
+	topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(container, runtime)
 	if err != nil {
-		return fmt.Errorf("error getting path to runtime config file: %v", err)
+		return fmt.Errorf("error getting path to runtime config file: %w", err)
 	}
-	sourceConfigFileName := path.Base(runtimeConfigFile)
 
 	var configEnvvarName string
 	switch runtime {
@@ -1343,18 +1358,65 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		configEnvvarName = "CRIO_CONFIG"
 	}
 
-	setContainerEnv(mainContainer, "RUNTIME_CONFIG", DefaultRuntimeConfigTargetDir+sourceConfigFileName)
-	setContainerEnv(mainContainer, configEnvvarName, DefaultRuntimeConfigTargetDir+sourceConfigFileName)
+	// Handle the top-level configs
+	if topLevelConfigFile != "" {
+		sourceConfigFileName := path.Base(topLevelConfigFile)
+		sourceConfigDir := path.Dir(topLevelConfigFile)
+		containerConfigDir := DefaultRuntimeConfigTargetDir
+		setContainerEnv(container, "RUNTIME_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(container, configEnvvarName, containerConfigDir+sourceConfigFileName)
 
-	volMountConfigName := fmt.Sprintf("%s-config", runtime)
-	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: DefaultRuntimeConfigTargetDir}
-	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountConfig)
+		volMountConfigName := fmt.Sprintf("%s-config", runtime)
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
+		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
 
-	configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeConfigFile), Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+	}
+
+	// Handle the drop-in configs
+	// TODO: It's a bit of a hack to skip the `nvidia-kata-manager` container here.
+	// Ideally if the two projects are using the SAME API then this should be
+	// captured more rigorously.
+	// Note that we probably want to implement drop-in file support in the
+	// kata manager in any case -- in which case it will be good to use a
+	// similar implementation.
+	if dropInConfigFile != "" && container.Name != "nvidia-kata-manager" {
+		sourceConfigFileName := path.Base(dropInConfigFile)
+		sourceConfigDir := path.Dir(dropInConfigFile)
+		containerConfigDir := DefaultRuntimeDropInConfigTargetDir
+		setContainerEnv(container, "RUNTIME_DROP_IN_CONFIG", containerConfigDir+sourceConfigFileName)
+		setContainerEnv(container, "RUNTIME_DROP_IN_CONFIG_HOST_PATH", dropInConfigFile)
+
+		volMountConfigName := fmt.Sprintf("%s-drop-in-config", runtime)
+		volMountConfig := corev1.VolumeMount{Name: volMountConfigName, MountPath: containerConfigDir}
+		container.VolumeMounts = append(container.VolumeMounts, volMountConfig)
+
+		configVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: sourceConfigDir, Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, configVol)
+	}
+
+	// Handle any additional runtime config sources
+	const runtimeConfigSourceFile = "file"
+	if runtimeConfigSources := getContainerEnv(container, "RUNTIME_CONFIG_SOURCE"); runtimeConfigSources != "" {
+		var sources []string
+		for _, runtimeConfigSource := range strings.Split(runtimeConfigSources, ",") {
+			parts := strings.SplitN(runtimeConfigSource, "=", 2)
+			if len(parts) == 1 || parts[0] != runtimeConfigSourceFile {
+				sources = append(sources, runtimeConfigSource)
+				continue
+			}
+			// We transform the host path to a container path by prepending "/host" to the file
+			// path. This works because the toolkit container has the host's root filesystem
+			// mounted as read-only at "/host"
+			sourceConfigFile := filepath.Join("/host", parts[1])
+			sources = append(sources, runtimeConfigSourceFile+"="+sourceConfigFile)
+		}
+		setContainerEnv(container, "RUNTIME_CONFIG_SOURCE", strings.Join(sources, ","))
+	}
 
 	// setup mounts for runtime socket file
-	runtimeSocketFile, err := getRuntimeSocketFile(mainContainer, runtime)
+	runtimeSocketFile, err := getRuntimeSocketFile(container, runtime)
 	if err != nil {
 		return fmt.Errorf("error getting path to runtime socket: %w", err)
 	}
@@ -1367,12 +1429,12 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		} else if runtime == gpuv1.Docker.String() {
 			socketEnvvarName = "DOCKER_SOCKET"
 		}
-		setContainerEnv(mainContainer, "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
-		setContainerEnv(mainContainer, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(container, "RUNTIME_SOCKET", DefaultRuntimeSocketTargetDir+sourceSocketFileName)
+		setContainerEnv(container, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
 		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
-		mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountSocket)
+		container.VolumeMounts = append(container.VolumeMounts, volMountSocket)
 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
@@ -1380,8 +1442,24 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	return nil
 }
 
+func transformDevicePluginCtrForCDI(container *corev1.Container, config *gpuv1.ClusterPolicySpec) {
+	setContainerEnv(container, CDIEnabledEnvName, "true")
+	setContainerEnv(container, DeviceListStrategyEnvName, "cdi-annotations,cdi-cri")
+	setContainerEnv(container, CDIAnnotationPrefixEnvName, "cdi.k8s.io/")
+
+	if config.Toolkit.IsEnabled() {
+		setContainerEnv(container, NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
+	}
+}
+
 // TransformDevicePlugin transforms k8s-device-plugin daemonset with required config as per ClusterPolicy
 func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	devicePluginContainerName := "nvidia-device-plugin"
+	devicePluginMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, devicePluginContainerName)
+	if devicePluginMainContainer == nil {
+		return fmt.Errorf("failed to find device plugin container %q", devicePluginContainerName)
+	}
+
 	// update validation container
 	err := transformValidationInitContainer(obj, config)
 	if err != nil {
@@ -1393,10 +1471,10 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if err != nil {
 		return err
 	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
+	devicePluginMainContainer.Image = image
 
 	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
+	devicePluginMainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
@@ -1413,13 +1491,17 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 	// set arguments if specified for device-plugin container
 	if len(config.DevicePlugin.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.DevicePlugin.Args
+		devicePluginMainContainer.Args = config.DevicePlugin.Args
 	}
 
 	// add env to allow injection of /dev/nvidia-fs and /dev/infiniband devices for GDS
 	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), GDSEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MOFEDEnabledEnvName, "true")
+		setContainerEnv(devicePluginMainContainer, GDSEnabledEnvName, "true")
+		setContainerEnv(devicePluginMainContainer, MOFEDEnabledEnvName, "true")
+	}
+
+	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
+		setContainerEnv(devicePluginMainContainer, GDRCopyEnabledEnvName, "true")
 	}
 
 	// apply plugin configuration through ConfigMap if one is provided
@@ -1428,20 +1510,14 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
-	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
+	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIEnabledEnvName, "true")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DeviceListStrategyEnvName, "envvar,cdi-annotations")
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), CDIAnnotationPrefixEnvName, "nvidia.cdi.k8s.io/")
-		if config.Toolkit.IsEnabled() {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), NvidiaCDIHookPathEnvName, filepath.Join(config.Toolkit.InstallDir, "toolkit/nvidia-cdi-hook"))
-		}
+		transformDevicePluginCtrForCDI(devicePluginMainContainer, config)
 	}
 
 	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
@@ -1455,12 +1531,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 				obj.Spec.Template.Spec.Volumes[i].HostPath.Path = filepath.Join(config.DevicePlugin.MPS.Root, "shm")
 			}
 		}
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), MPSRootEnvName, config.DevicePlugin.MPS.Root)
+		setContainerEnv(devicePluginMainContainer, MPSRootEnvName, config.DevicePlugin.MPS.Root)
 	}
 
 	if len(config.DevicePlugin.Env) > 0 {
 		for _, env := range config.DevicePlugin.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+			setContainerEnv(devicePluginMainContainer, env.Name, env.Value)
 		}
 	}
 
@@ -1481,27 +1557,18 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	imagePullPolicy := gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
 	// update image path and imagePullPolicy for 'mps-control-daemon-mounts' initContainer
-	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
-		if initCtr.Name == "mps-control-daemon-mounts" {
-			obj.Spec.Template.Spec.InitContainers[i].Image = image
-			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = imagePullPolicy
-			break
-		}
+	if initCtr := findContainerByName(obj.Spec.Template.Spec.InitContainers, "mps-control-daemon-mounts"); initCtr != nil {
+		initCtr.Image = image
+		initCtr.ImagePullPolicy = imagePullPolicy
 	}
 
 	// update image path and imagePullPolicy for main container
-	var mainContainer *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == "mps-control-daemon-ctr" {
-			mainContainer = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
-	}
-	if mainContainer == nil {
+	mpsControlMainContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "mps-control-daemon-ctr")
+	if mpsControlMainContainer == nil {
 		return fmt.Errorf("failed to find main container 'mps-control-daemon-ctr'")
 	}
-	mainContainer.Image = image
-	mainContainer.ImagePullPolicy = imagePullPolicy
+	mpsControlMainContainer.Image = image
+	mpsControlMainContainer.ImagePullPolicy = imagePullPolicy
 
 	// set image pull secrets
 	if len(config.DevicePlugin.ImagePullSecrets) > 0 {
@@ -1523,11 +1590,10 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
-	applyMIGConfiguration(mainContainer, config.MIG.Strategy)
+	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
 
 	// update MPS volumes if a custom MPS root is configured
 	if config.DevicePlugin.MPS != nil && config.DevicePlugin.MPS.Root != "" &&
@@ -1652,8 +1718,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+
+	// set hostPID if specified for DCGM Exporter
+	if config.DCGMExporter.IsHostPIDEnabled() {
+		obj.Spec.Template.Spec.HostPID = true
+	}
 
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
@@ -1679,16 +1749,20 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
 	}
 
-	release, err := parseOSRelease()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+	if n.openshift != "" {
+		if err = transformDCGMExporterForOpenShift(obj, config); err != nil {
+			return fmt.Errorf("failed to transform dcgm-exporter for openshift: %w", err)
+		}
 	}
 
-	// skip SELinux changes if not an OCP cluster
-	if _, ok := release["OPENSHIFT_VERSION"]; !ok {
-		return nil
+	for _, env := range config.DCGMExporter.Env {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 	}
 
+	return nil
+}
+
+func transformDCGMExporterForOpenShift(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
 	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
 	initImage, err := gpuv1.ImagePath(&config.Operator.InitContainer)
 	if err != nil {
@@ -1727,12 +1801,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
 	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
-
-	if len(config.DCGMExporter.Env) > 0 {
-		for _, env := range config.DCGMExporter.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
 
 	return nil
 }
@@ -1775,8 +1843,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	return nil
 }
@@ -1818,8 +1885,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -1903,17 +1969,8 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	artifactsVolMount := corev1.VolumeMount{Name: "kata-artifacts", MountPath: artifactsDir}
 	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, artifactsVolMount)
 
-	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: newHostPathType(corev1.HostPathDirectoryOrCreate)}}}
+	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, artifactsVol)
-
-	// mount containerd config and socket
-
-	// setup mounts for runtime config file
-	runtime := n.runtime.String()
-	err = transformForRuntime(obj, config, runtime, "nvidia-kata-manager")
-	if err != nil {
-		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
-	}
 
 	// Compute hash of kata manager config and add an annotation with the value.
 	// If the kata config changes, a new revision of the daemonset will be
@@ -1929,6 +1986,15 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		for _, env := range config.KataManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// mount containerd config and socket
+	// setup mounts for runtime config file
+	runtime := n.runtime.String()
+	// kata manager is the only container in this daemonset
+	err = transformForRuntime(obj, config, runtime, &obj.Spec.Template.Spec.Containers[0])
+	if err != nil {
+		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
 	}
 
 	return nil
@@ -2113,14 +2179,14 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		return fmt.Errorf("%v", err)
 	}
 
-	// set RuntimeClass for supported runtimes
-	setRuntimeClass(&obj.Spec.Template.Spec, n.runtime, config.Operator.RuntimeClass)
+	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
 	components := []string{
 		"driver",
 		"nvidia-fs",
+		"gdrcopy",
 		"toolkit",
 		"cuda",
 		"plugin",
@@ -2283,6 +2349,12 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
 				return nil
 			}
+		case "gdrcopy":
+			if !config.IsGDRCopyEnabled() {
+				// remove gdrcopy init container from validator Daemonset if GDRCopy is not enabled
+				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
+				return nil
+			}
 		case "cc-manager":
 			if !config.CCManager.IsEnabled() {
 				// remove  cc-manager init container from validator Daemonset if it is not enabled
@@ -2377,30 +2449,47 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	return nil
 }
 
-// get runtime(docker, containerd) config file path based on toolkit container env or default
-func getRuntimeConfigFile(c *corev1.Container, runtime string) (string, error) {
-	var runtimeConfigFile string
+// getRuntimeConfigFiles returns the path to the top-level and drop-in config files that
+// should be used when configuring the specified container runtime.
+func getRuntimeConfigFiles(c *corev1.Container, runtime string) (string, string, error) {
 	switch runtime {
 	case gpuv1.Docker.String():
-		runtimeConfigFile = DefaultDockerConfigFile
+		topLevelConfigFile := DefaultDockerConfigFile
 		if value := getContainerEnv(c, "DOCKER_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		// Docker does not support drop-in files.
+		return topLevelConfigFile, "", nil
 	case gpuv1.Containerd.String():
-		runtimeConfigFile = DefaultContainerdConfigFile
+		topLevelConfigFile := DefaultContainerdConfigFile
 		if value := getContainerEnv(c, "CONTAINERD_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		dropInConfigFile := DefaultContainerdDropInConfigFile
+		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
+			dropInConfigFile = value
+		}
+		return topLevelConfigFile, dropInConfigFile, nil
 	case gpuv1.CRIO.String():
-		runtimeConfigFile = DefaultCRIOConfigFile
+		// TODO: We should still allow the top-level config to be specified
+		topLevelConfigFile := DefaultCRIOConfigFile
 		if value := getContainerEnv(c, "CRIO_CONFIG"); value != "" {
-			runtimeConfigFile = value
+			topLevelConfigFile = value
+		} else if value := getContainerEnv(c, "RUNTIME_CONFIG"); value != "" {
+			topLevelConfigFile = value
 		}
+		dropInConfigFile := DefaultCRIODropInConfigFile
+		if value := getContainerEnv(c, "RUNTIME_DROP_IN_CONFIG"); value != "" {
+			dropInConfigFile = value
+		}
+		return topLevelConfigFile, dropInConfigFile, nil
 	default:
-		return "", fmt.Errorf("invalid runtime: %s", runtime)
+		return "", "", fmt.Errorf("invalid runtime: %s", runtime)
 	}
-
-	return runtimeConfigFile, nil
 }
 
 // get runtime(docker, containerd) socket file path based on toolkit container env or default
@@ -2447,20 +2536,29 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
-func getRuntimeClass(config *gpuv1.ClusterPolicySpec) string {
+// findContainerByName returns a pointer to the container with the given name, or nil if not found.
+func findContainerByName(containers []corev1.Container, name string) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 	if config.Operator.RuntimeClass != "" {
 		return config.Operator.RuntimeClass
 	}
 	return DefaultRuntimeClass
 }
 
-func setRuntimeClass(podSpec *corev1.PodSpec, runtime gpuv1.Runtime, runtimeClass string) {
-	if runtime == gpuv1.Containerd {
-		if runtimeClass == "" {
-			runtimeClass = DefaultRuntimeClass
-		}
-		podSpec.RuntimeClassName = &runtimeClass
+func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
+	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
+		return
 	}
+	runtimeClassName := getRuntimeClassName(config)
+	podSpec.RuntimeClassName = &runtimeClassName
 }
 
 func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) {
@@ -2586,13 +2684,7 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 }
 
 func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	var initContainer *corev1.Container
-	for i := range obj.Spec.Template.Spec.InitContainers {
-		if obj.Spec.Template.Spec.InitContainers[i].Name != "config-manager-init" {
-			continue
-		}
-		initContainer = &obj.Spec.Template.Spec.InitContainers[i]
-	}
+	initContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "config-manager-init")
 	if initContainer == nil {
 		// config-manager-init container is not added to the spec, this is a no-op
 		return nil
@@ -2644,13 +2736,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 }
 
 func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec) error {
-	var container *corev1.Container
-	for i, initCtr := range obj.Spec.Template.Spec.InitContainers {
-		if initCtr.Name == "k8s-driver-manager" {
-			container = &obj.Spec.Template.Spec.InitContainers[i]
-			break
-		}
-	}
+	container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 
 	if container == nil {
 		return fmt.Errorf("failed to find k8s-driver-manager initContainer in spec")
@@ -2726,6 +2812,12 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
+		if config.Driver.Resources != nil {
+			obj.Spec.Template.Spec.Containers[i].Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
+		}
 	}
 	return nil
 }
@@ -2800,11 +2892,25 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			gdsContainer.VolumeMounts = append(gdsContainer.VolumeMounts, volumeMounts...)
 		}
 
+		secretName := config.Driver.SecretEnv
+		if len(secretName) > 0 {
+			err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, gdsContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+			}
+		}
+
 		// transform the nvidia-fs-ctr to use the openshift driver toolkit
 		// notify openshift driver toolkit container GDS is enabled
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-fs-ctr")
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %s", err)
+		}
+		if config.Driver.Resources != nil {
+			gdsContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
 		}
 	}
 	return nil
@@ -2879,11 +2985,25 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			gdrcopyContainer.VolumeMounts = append(gdrcopyContainer.VolumeMounts, volumeMounts...)
 		}
 
+		secretName := config.Driver.SecretEnv
+		if len(secretName) > 0 {
+			err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, gdrcopyContainer)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+			}
+		}
+
 		// transform the nvidia-gdrcopy-ctr to use the openshift driver toolkit
 		// notify openshift driver toolkit container that gdrcopy is enabled
 		err = transformOpenShiftDriverToolkitContainer(obj, config, n, "nvidia-gdrcopy-ctr")
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to transform the Driver Toolkit Container: %w", err)
+		}
+		if config.Driver.Resources != nil {
+			gdrcopyContainer.Resources = corev1.ResourceRequirements{
+				Requests: config.Driver.Resources.Requests,
+				Limits:   config.Driver.Resources.Limits,
+			}
 		}
 	}
 	return nil
@@ -2914,7 +3034,7 @@ func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, n ClusterPolicyC
 	return nil
 }
 
-func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, mainContainerName string) error {
+func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController, operandContainerName string) error {
 	var err error
 
 	getContainer := func(name string, remove bool) (*corev1.Container, error) {
@@ -2950,8 +3070,8 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	}
 
 	/* find the main container and driver-toolkit sidecar container */
-	var mainContainer, driverToolkitContainer *corev1.Container
-	if mainContainer, err = getContainer(mainContainerName, false); err != nil {
+	var operandMainContainer, driverToolkitContainer *corev1.Container
+	if operandMainContainer, err = getContainer(operandContainerName, false); err != nil {
 		return err
 	}
 
@@ -2998,25 +3118,25 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		obj.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 		obj.Spec.Template.Labels["openshift.driver-toolkit.rhcos-image-missing"] = "true"
 
-		driverToolkitContainer.Image = mainContainer.Image
-		setContainerEnv(mainContainer, "RHCOS_IMAGE_MISSING", "true")
-		setContainerEnv(mainContainer, "RHCOS_VERSION", rhcosVersion)
+		driverToolkitContainer.Image = operandMainContainer.Image
+		setContainerEnv(operandMainContainer, "RHCOS_IMAGE_MISSING", "true")
+		setContainerEnv(operandMainContainer, "RHCOS_VERSION", rhcosVersion)
 		setContainerEnv(driverToolkitContainer, "RHCOS_IMAGE_MISSING", "true")
 
 		n.logger.Info("WARNING: DriverToolkit image tag missing. Version-specific fallback mode enabled.", "rhcosVersion", rhcosVersion)
 	}
 
 	/* prepare the main container to start from the DriverToolkit entrypoint */
-	switch mainContainerName {
+	switch operandContainerName {
 	case "nvidia-fs-ctr":
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"nv-fs-ctr-run-with-dtk"}
 	case "nvidia-gdrcopy-ctr":
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"gdrcopy-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"gdrcopy-ctr-run-with-dtk"}
 	default:
-		mainContainer.Command = []string{"ocp_dtk_entrypoint"}
-		mainContainer.Args = []string{"nv-ctr-run-with-dtk"}
+		operandMainContainer.Command = []string{"ocp_dtk_entrypoint"}
+		operandMainContainer.Args = []string{"nv-ctr-run-with-dtk"}
 	}
 
 	/* prepare the shared volumes */
@@ -3024,7 +3144,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 	volSharedDirName, volSharedDirPath := "shared-nvidia-driver-toolkit", "/mnt/shared-nvidia-driver-toolkit"
 
 	volMountSharedDir := corev1.VolumeMount{Name: volSharedDirName, MountPath: volSharedDirPath}
-	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts, volMountSharedDir)
+	operandMainContainer.VolumeMounts = append(operandMainContainer.VolumeMounts, volMountSharedDir)
 
 	volSharedDir := corev1.Volume{
 		Name: volSharedDirName,
@@ -3041,6 +3161,14 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 		}
 	}
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, volSharedDir)
+
+	// set resource limits
+	if config.Driver.Resources != nil {
+		driverToolkitContainer.Resources = corev1.ResourceRequirements{
+			Requests: config.Driver.Resources.Requests,
+			Limits:   config.Driver.Resources.Limits,
+		}
+	}
 	return nil
 }
 
@@ -3204,25 +3332,58 @@ func createEmptyDirVolume(volumeName string) corev1.Volume {
 	}
 }
 
-func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	driverIndex := 0
-	driverCtrFound := false
-
+func applyLicensingConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, driverContainer *corev1.Container) {
 	podSpec := &obj.Spec.Template.Spec
-	for i, container := range podSpec.Containers {
-		// check if this is the main nvidia-driver container
-		if container.Name == "nvidia-driver-ctr" {
-			driverIndex = i
-			driverCtrFound = true
-			break
+
+	// add new volume mount
+	licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: consts.VGPULicensingConfigMountPath, SubPath: consts.VGPULicensingFileName}
+	driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
+
+	// gridd.conf always mounted
+	licenseItemsToInclude := []corev1.KeyToPath{
+		{
+			Key:  consts.VGPULicensingFileName,
+			Path: consts.VGPULicensingFileName,
+		},
+	}
+	// client config token only mounted when NLS is enabled
+	if config.Driver.LicensingConfig.IsNLSEnabled() {
+		licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
+			Key:  consts.NLSClientTokenFileName,
+			Path: consts.NLSClientTokenFileName,
+		})
+		nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: consts.NLSClientTokenMountPath, SubPath: consts.NLSClientTokenFileName}
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
+	}
+
+	var licensingConfigVolumeSource corev1.VolumeSource
+	if config.Driver.LicensingConfig.SecretName != "" {
+		licensingConfigVolumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: config.Driver.LicensingConfig.SecretName,
+				Items:      licenseItemsToInclude,
+			},
+		}
+	} else if config.Driver.LicensingConfig.ConfigMapName != "" {
+		licensingConfigVolumeSource = corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: config.Driver.LicensingConfig.ConfigMapName,
+				},
+				Items: licenseItemsToInclude,
+			},
 		}
 	}
+	licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
+	podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+}
 
-	if !driverCtrFound {
+func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	podSpec := &obj.Spec.Template.Spec
+	driverContainer := findContainerByName(podSpec.Containers, "nvidia-driver-ctr")
+	if driverContainer == nil {
 		return fmt.Errorf("driver container (nvidia-driver-ctr) is missing from the driver daemonset manifest")
 	}
-
-	driverContainer := &podSpec.Containers[driverIndex]
 
 	image, err := resolveDriverTag(n, &config.Driver)
 	if err != nil {
@@ -3286,42 +3447,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// set any licensing configuration required
-	if config.Driver.LicensingConfig != nil && config.Driver.LicensingConfig.ConfigMapName != "" {
-		licensingConfigVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: VGPULicensingConfigMountPath, SubPath: VGPULicensingFileName}
-		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigVolMount)
-
-		// gridd.conf always mounted
-		licenseItemsToInclude := []corev1.KeyToPath{
-			{
-				Key:  VGPULicensingFileName,
-				Path: VGPULicensingFileName,
-			},
-		}
-		// client config token only mounted when NLS is enabled
-		if config.Driver.LicensingConfig.IsNLSEnabled() {
-			licenseItemsToInclude = append(licenseItemsToInclude, corev1.KeyToPath{
-				Key:  NLSClientTokenFileName,
-				Path: NLSClientTokenFileName,
-			})
-			nlsTokenVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: NLSClientTokenMountPath, SubPath: NLSClientTokenFileName}
-			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
-		}
-
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: config.Driver.LicensingConfig.ConfigMapName,
-				},
-				Items: licenseItemsToInclude,
-			},
-		}
-		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
-		podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+	if config.Driver.IsVGPULicensingEnabled() {
+		applyLicensingConfig(obj, config, driverContainer)
 	}
 
 	// set virtual topology daemon configuration if specified for vGPU driver
 	if config.Driver.VirtualTopology != nil && config.Driver.VirtualTopology.Config != "" {
-		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: VGPUTopologyConfigMountPath, SubPath: VGPUTopologyConfigFileName}
+		topologyConfigVolMount := corev1.VolumeMount{Name: "topology-config", ReadOnly: true, MountPath: consts.VGPUTopologyConfigMountPath, SubPath: consts.VGPUTopologyConfigFileName}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, topologyConfigVolMount)
 
 		topologyConfigVolumeSource := corev1.VolumeSource{
@@ -3331,8 +3463,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				},
 				Items: []corev1.KeyToPath{
 					{
-						Key:  VGPUTopologyConfigFileName,
-						Path: VGPUTopologyConfigFileName,
+						Key:  consts.VGPUTopologyConfigFileName,
+						Path: consts.VGPUTopologyConfigFileName,
 					},
 				},
 			},
@@ -3385,10 +3517,18 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %v", err)
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+	}
+
+	secretName := config.Driver.SecretEnv
+	if len(secretName) > 0 {
+		err := createSecretEnvReference(n.ctx, n.client, secretName, n.operatorNamespace, driverContainer)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to attach secret %s to the driver container: %w", secretName, err)
+		}
 	}
 
 	release, err := parseOSRelease()
@@ -3443,14 +3583,34 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	return nil
 }
 
-func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	var container *corev1.Container
-	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == "nvidia-vgpu-manager-ctr" {
-			container = &obj.Spec.Template.Spec.Containers[i]
-			break
-		}
+func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, secretName string,
+	namespace string, container *corev1.Container) error {
+	envFrom := container.EnvFrom
+	if len(envFrom) == 0 {
+		envFrom = make([]corev1.EnvFromSource, 0)
 	}
+
+	// get the ConfigMap
+	sec := &corev1.Secret{}
+	opts := client.ObjectKey{Namespace: namespace, Name: secretName}
+	err := ctrlClient.Get(ctx, opts, sec)
+	if err != nil {
+		return fmt.Errorf("ERROR: could not get Secret %s from client: %w", secretName, err)
+	}
+
+	secretEnvSource := corev1.EnvFromSource{
+		SecretRef: &corev1.SecretEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: sec.Name,
+			},
+		}}
+	envFrom = append(envFrom, secretEnvSource)
+	container.EnvFrom = envFrom
+	return nil
+}
+
+func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	container := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
 
 	if container == nil {
 		return fmt.Errorf("failed to find nvidia-vgpu-manager-ctr in spec")
@@ -4707,7 +4867,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	// apply runtime class name as per ClusterPolicy
 	if obj.Name == "FILLED_BY_OPERATOR" {
-		runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+		runtimeClassName := getRuntimeClassName(&n.singleton.Spec)
 		obj.Name = runtimeClassName
 		obj.Handler = runtimeClassName
 	}
@@ -4754,7 +4914,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	// apply runtime class name as per ClusterPolicy
 	if obj.Name == "FILLED_BY_OPERATOR" {
-		runtimeClassName := getRuntimeClass(&n.singleton.Spec)
+		runtimeClassName := getRuntimeClassName(&n.singleton.Spec)
 		obj.Name = runtimeClassName
 		obj.Handler = runtimeClassName
 	}

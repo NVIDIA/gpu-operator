@@ -588,6 +588,11 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the NVIDIA driver"
 	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
+
+	// Optional: SecretEnv represents the name of the Kubernetes Secret with secret environment variables for the NVIDIA Driver
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Name of the Kubernetes Secret with secret environment variables for the NVIDIA Driver"
+	SecretEnv string `json:"secretEnv,omitempty"`
 }
 
 // VGPUManagerSpec defines the properties for the NVIDIA vGPU Manager deployment
@@ -926,6 +931,13 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Service configuration for NVIDIA DCGM Exporter"
 	ServiceSpec *DCGMExporterServiceConfig `json:"service,omitempty"`
+
+	// HostPID allows the DCGM-Exporter daemon set to access the host's PID namespace
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostPID for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	HostPID *bool `json:"hostPID,omitempty"`
 }
 
 // DCGMExporterMetricsConfig defines metrics to be collected by NVIDIA DCGM Exporter
@@ -1118,11 +1130,19 @@ type DriverCertConfigSpec struct {
 
 // DriverLicensingConfigSpec defines licensing server configuration for NVIDIA Driver container
 type DriverLicensingConfigSpec struct {
+	// Deprecated: ConfigMapName has been deprecated in favour of SecretName. Please use secrets to handle the licensing server configuration more securely
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	ConfigMapName string `json:"configMapName,omitempty"`
+
+	// SecretName indicates the name of the secret containing the licensing token
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Secret Name"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	SecretName string `json:"secretName,omitempty"`
 
 	// NLSEnabled indicates if NVIDIA Licensing System is used for licensing.
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1663,20 +1683,20 @@ type VGPUDevicesConfigSpec struct {
 
 // CDIConfigSpec defines how the Container Device Interface is used in the cluster.
 type CDIConfigSpec struct {
-	// Enabled indicates whether CDI can be used to make GPUs accessible to containers.
+	// Enabled indicates whether the Container Device Interface (CDI) should be used as the mechanism for making GPUs accessible to containers.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable CDI as a mechanism for making GPUs accessible to containers"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable CDI as the mechanism for making GPUs accessible to containers"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Default indicates whether to use CDI as the default mechanism for providing GPU access to containers.
+	// Deprecated: This field is no longer used. Setting cdi.enabled=true will configure CDI as the default mechanism for making GPUs accessible to containers.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Configure CDI as the default mechanism for making GPUs accessible to containers"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Deprecated: This field is no longer used"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch,urn:alm:descriptor:com.tectonic.ui:hidden"
 	Default *bool `json:"default,omitempty"`
 }
 
@@ -1898,6 +1918,14 @@ func (d *DriverSpec) OpenKernelModulesEnabled() bool {
 	return d.KernelModuleType == "open"
 }
 
+// IsVGPULicensingEnabled returns true if the vgpu driver license config is provided
+func (d *DriverSpec) IsVGPULicensingEnabled() bool {
+	if d.LicensingConfig == nil {
+		return false
+	}
+	return d.LicensingConfig.ConfigMapName != "" || d.LicensingConfig.SecretName != ""
+}
+
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator
 func (p *DevicePluginSpec) IsEnabled() bool {
 	if p.Enabled == nil {
@@ -1914,6 +1942,15 @@ func (e *DCGMExporterSpec) IsEnabled() bool {
 		return true
 	}
 	return *e.Enabled
+}
+
+// IsHostPIDEnabled returns true if hostPID is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsHostPIDEnabled() bool {
+	if e.HostPID == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.HostPID
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
@@ -2035,6 +2072,15 @@ func (gds *GPUDirectStorageSpec) IsEnabled() bool {
 	return *gds.Enabled
 }
 
+// IsGDRCopyEnabled returns true if GDRCopy is enabled through gpu-operator
+func (c *ClusterPolicySpec) IsGDRCopyEnabled() bool {
+	if c.GDRCopy == nil {
+		// GDRCopy is disabled by default
+		return false
+	}
+	return c.GDRCopy.IsEnabled()
+}
+
 // IsEnabled returns true if GDRCopy is enabled through gpu-operator
 func (gdrcopy *GDRCopySpec) IsEnabled() bool {
 	if gdrcopy.Enabled == nil {
@@ -2075,18 +2121,9 @@ func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
 // providing GPU access to containers
 func (c *CDIConfigSpec) IsEnabled() bool {
 	if c.Enabled == nil {
-		return false
+		return true
 	}
 	return *c.Enabled
-}
-
-// IsDefault returns true if CDI is enabled as the default
-// mechanism for providing GPU access to containers
-func (c *CDIConfigSpec) IsDefault() bool {
-	if c.Default == nil {
-		return false
-	}
-	return *c.Default
 }
 
 // IsEnabled returns true if Kata Manager is enabled

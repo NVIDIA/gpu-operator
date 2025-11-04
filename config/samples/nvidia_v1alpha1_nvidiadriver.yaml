@@ -8,7 +8,7 @@ spec:
   driverType: gpu
   repository: nvcr.io/nvidia
   image: driver
-  version: "570.158.01"
+  version: "580.95.05"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   nodeSelector: {}
@@ -26,7 +26,7 @@ spec:
     name: ""
   # vGPU licensing configuration
   licensingConfig:
-    name: ""
+    secretName: ""
     nlsEnabled: true
   # vGPU topology daemon configuration
   virtualTopologyConfig:

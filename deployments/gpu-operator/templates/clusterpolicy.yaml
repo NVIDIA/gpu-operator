@@ -89,42 +89,56 @@ spec:
     plugin:
       {{- if .Values.validator.plugin.env }}
       env: {{ toYaml .Values.validator.plugin.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.cuda }}
     cuda:
       {{- if .Values.validator.cuda.env }}
       env: {{ toYaml .Values.validator.cuda.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.driver }}
     driver:
       {{- if .Values.validator.driver.env }}
       env: {{ toYaml .Values.validator.driver.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.toolkit }}
     toolkit:
       {{- if .Values.validator.toolkit.env }}
       env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vfioPCI }}
     vfioPCI:
       {{- if .Values.validator.vfioPCI.env }}
       env: {{ toYaml .Values.validator.vfioPCI.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuManager }}
     vgpuManager:
       {{- if .Values.validator.vgpuManager.env }}
       env: {{ toYaml .Values.validator.vgpuManager.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuDevices }}
     vgpuDevices:
       {{- if .Values.validator.vgpuDevices.env }}
       env: {{ toYaml .Values.validator.vgpuDevices.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
 
@@ -199,6 +213,9 @@ spec:
     {{- end }}
     {{- if .Values.driver.kernelModuleConfig }}
     kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.secretEnv }}
+    secretEnv: {{ .Values.driver.secretEnv }}
     {{- end }}
     {{- if .Values.driver.resources }}
     resources: {{ toYaml .Values.driver.resources | nindent 6 }}
@@ -524,6 +541,9 @@ spec:
     {{- if .Values.dcgmExporter.service }}
     service: {{ toYaml .Values.dcgmExporter.service | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.hostPID }}
+    hostPID: {{ .Values.dcgmExporter.hostPID }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}
@@ -579,7 +599,7 @@ spec:
     {{- if .Values.migManager.config }}
     config:
       name: {{ .Values.migManager.config.name }}
-      default: {{ .Values.migManager.config.default }}
+      default: {{ .Values.migManager.config.default | quote }}
     {{- end }}
     {{- if .Values.migManager.gpuClientsConfig }}
     gpuClientsConfig: {{ toYaml .Values.migManager.gpuClientsConfig | nindent 6 }}
@@ -608,7 +628,7 @@ spec:
     {{- if .Values.nodeStatusExporter.args }}
     args: {{ toYaml .Values.nodeStatusExporter.args | nindent 6 }}
     {{- end }}
-  {{- if .Values.gds.enabled }}
+  {{- if .Values.gds }}
   gds:
     enabled: {{ .Values.gds.enabled }}
     {{- if .Values.gds.repository }}

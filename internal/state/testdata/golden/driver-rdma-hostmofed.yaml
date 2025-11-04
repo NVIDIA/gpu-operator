@@ -156,6 +156,13 @@ spec:
               - -c
               - rm -f /run/nvidia/validations/.driver-ctr-ready
         name: nvidia-driver-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -230,6 +237,13 @@ spec:
           successThreshold: 1
           timeoutSeconds: 10
         name: nvidia-peermem-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -282,7 +296,7 @@ spec:
         - name: ENABLE_GPU_POD_EVICTION
           value: "true"
         - name: ENABLE_AUTO_DRAIN
-          value: "true"
+          value: "false"
         - name: DRAIN_USE_FORCE
           value: "false"
         - name: DRAIN_POD_SELECTOR_LABEL

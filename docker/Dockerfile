@@ -12,27 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG GOLANG_VERSION=x.x.x
+ARG CUDA_SAMPLES_VERSION=12.9
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS builder
+FROM golang:1.25.3 AS builder
 
-RUN dnf install -y wget make git gcc
-
-ARG GOLANG_VERSION=0.0.0
-RUN set -eux; \
-    \
-    arch="$(uname -m)"; \
-    case "${arch##*-}" in \
-        x86_64 | amd64) ARCH='amd64' ;; \
-        ppc64el | ppc64le) ARCH='ppc64le' ;; \
-        aarch64 | arm64) ARCH='arm64' ;; \
-        *) echo "unsupported architecture" ; exit 1 ;; \
-    esac; \
-    wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
-    | tar -C /usr/local -xz
-
-ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+ARG GOPROXY="https://proxy.golang.org,direct"
+ENV GOPROXY=$GOPROXY
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -55,38 +40,30 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS kubectl-downloader
+FROM registry.access.redhat.com/ubi9/ubi:latest AS sample-builder
 
-RUN dnf install -y --allowerasing \
-        curl \
-    && \
-        dnf clean all
+RUN ARCH=$(uname -m) && OS_ARCH=${ARCH/amd64/x86_64} && OS_ARCH=${ARCH/aarch64/sbsa} && OS_ARCH=${ARCH/arm64/sbsa} \
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$OS_ARCH/cuda-rhel9.repo
 
-WORKDIR /workspace
-
-# Install must-gather dependency: `kubectl`
-ARG TARGETARCH
-RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && \
-    curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl && \
-    chmod +x ./kubectl
-
-FROM nvcr.io/nvidia/cuda:12.9.1-base-ubi9 AS sample-builder
-
-RUN dnf install -y --allowerasing \
+ARG CUDA_SAMPLES_VERSION
+RUN CUDA_PACKAGE_VERSION=${CUDA_SAMPLES_VERSION/./-} && \
+    dnf install -y --allowerasing \
         cmake \
-        cuda-cudart-devel-12-9 \
-        cuda-nvcc-12-9 \
+        cuda-cudart-devel-${CUDA_PACKAGE_VERSION} \
+        cuda-compat-${CUDA_PACKAGE_VERSION} \
+        cuda-nvcc-${CUDA_PACKAGE_VERSION} \
         g++ \
         curl \
     && \
     dnf clean all
 
+ENV PATH=/usr/local/cuda/bin:${PATH}
+
 WORKDIR /build
 
 ARG SAMPLE_NAME=vectorAdd
 
-ARG CUDA_SAMPLES_VERSION=v12.9
-RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/${CUDA_SAMPLES_VERSION} | \
+RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${CUDA_SAMPLES_VERSION} | \
     tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* && \
     cd $(find /build/Samples -iname "${SAMPLE_NAME}") && \
     cmake . && \
@@ -95,7 +72,7 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/${C
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v3.1.10-dev
+FROM nvcr.io/nvidia/distroless/cc:v3.2.0-dev
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -113,13 +90,11 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
-COPY --from=kubectl-downloader /workspace/kubectl /usr/bin/
+COPY --from=builder /workspace/manage-crds /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
 COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
-# TODO: Copy the compat libs from the 'sample-builder' image instead.
-# The current 'sample-builder' image does not contain the compat libs in the ARM variant.
-# Once new sample images are published that contain the compat libs, we can update the below.
-COPY --from=builder /usr/local/cuda/compat /usr/local/cuda/compat
+ARG CUDA_SAMPLES_VERSION
+COPY --from=sample-builder /usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat /usr/local/cuda/compat
 
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests

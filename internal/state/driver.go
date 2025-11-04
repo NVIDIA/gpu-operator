@@ -19,7 +19,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -105,6 +104,7 @@ type driverRenderData struct {
 
 func NewStateDriver(
 	k8sClient client.Client,
+	namespace string,
 	scheme *runtime.Scheme,
 	manifestDir string) (State, error) {
 
@@ -119,6 +119,7 @@ func NewStateDriver(
 			name:        "state-driver",
 			description: "NVIDIA driver deployed in the cluster",
 			client:      k8sClient,
+			namespace:   namespace,
 			scheme:      scheme,
 			renderer:    renderer,
 		},
@@ -240,7 +241,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 	clusterInfo := info.(clusterinfo.Interface)
 
-	runtimeSpec, err := getRuntimeSpec(ctx, s.client, clusterInfo, &cr.Spec)
+	runtimeSpec, err := getRuntimeSpec(ctx, s.client, s.namespace, clusterInfo, &cr.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
 	}
@@ -607,7 +608,7 @@ func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrc
 	}, nil
 }
 
-func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
+func getRuntimeSpec(ctx context.Context, k8sClient client.Client, namespace string, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
 	k8sVersion, err := info.GetKubernetesVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
@@ -618,18 +619,13 @@ func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterin
 	}
 	openshift := (openshiftVersion != "")
 
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
-	}
-
 	nodePools, err := getNodePools(ctx, k8sClient, spec.NodeSelector, spec.UsePrecompiledDrivers(), openshift)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node pools: %v", err)
 	}
 
 	rs := &driverRuntimeSpec{
-		Namespace:         operatorNamespace,
+		Namespace:         namespace,
 		KubernetesVersion: k8sVersion,
 		OpenshiftVersion:  openshiftVersion,
 		NodePools:         nodePools,

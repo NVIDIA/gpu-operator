@@ -19,10 +19,10 @@ package state
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -61,19 +61,19 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: ptr.To(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -81,19 +81,19 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: newHostPathType(corev1.HostPathFile),
+				Type: ptr.To(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -101,13 +101,13 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: ptr.To(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -115,23 +115,16 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: newHostPathType(corev1.HostPathDirectory),
+				Type: ptr.To(corev1.HostPathDirectory),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: newHostPathType(corev1.HostPathFileOrCreate),
+				Type: ptr.To(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
-}
-
-// TODO: make this a public utils method
-func newHostPathType(pathType corev1.HostPathType) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = pathType
-	return hostPathType
 }
 
 func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alpha1.NVIDIADriver, info clusterinfo.Interface, pool nodePool) (*additionalConfigs, error) {
@@ -139,18 +132,13 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 
 	additionalCfgs := &additionalConfigs{}
 
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
-	}
-
 	if !cr.Spec.UsePrecompiledDrivers() {
 		if cr.Spec.IsRepoConfigEnabled() {
 			destinationDir, err := getRepoConfigPath(pool.osRelease)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 				cr.Spec.RepoConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %w", err)
@@ -165,7 +153,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 				cr.Spec.CertConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
@@ -218,7 +206,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	// mount any custom kernel module configuration parameters at /drivers
 	if cr.Spec.IsKernelModuleConfigEnabled() {
 		destinationDir := "/drivers"
-		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, operatorNamespace,
+		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
 			cr.Spec.KernelModuleConfig.Name, destinationDir)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
@@ -251,13 +239,23 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, nlsTokenVolMount)
 		}
 
-		licensingConfigVolumeSource := corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: cr.Spec.LicensingConfig.Name,
+		var licensingConfigVolumeSource corev1.VolumeSource
+		if cr.Spec.LicensingConfig.SecretName != "" {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cr.Spec.LicensingConfig.SecretName,
+					Items:      licenseItemsToInclude,
 				},
-				Items: licenseItemsToInclude,
-			},
+			}
+		} else {
+			licensingConfigVolumeSource = corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cr.Spec.LicensingConfig.Name,
+					},
+					Items: licenseItemsToInclude,
+				},
+			}
 		}
 		licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
 		additionalCfgs.Volumes = append(additionalCfgs.Volumes, licensingConfigVol)

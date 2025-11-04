@@ -193,6 +193,13 @@ spec:
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent
         name: nvidia-driver-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -245,6 +252,13 @@ spec:
         image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867
         imagePullPolicy: IfNotPresent
         name: openshift-driver-toolkit-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -316,6 +330,7 @@ spec:
         nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-vgpu-manager-openshift
+      terminationGracePeriodSeconds: 120
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu
