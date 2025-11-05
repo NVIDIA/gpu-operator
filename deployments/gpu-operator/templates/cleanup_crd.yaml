@@ -41,7 +41,7 @@ spec:
             - --filepath=/opt/gpu-operator/nvidia.com_clusterpolicies.yaml
             - --filepath=/opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
         {{- if .Values.nfd.enabled }}
-            - --filepath=/opt/gpu-operator/nfd-api-crds.yaml;
+            - --filepath=/opt/gpu-operator/nfd-api-crds.yaml
         {{- end }}
       restartPolicy: OnFailure
 {{- end }}
