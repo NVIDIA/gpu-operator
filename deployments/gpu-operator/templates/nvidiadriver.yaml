@@ -1,3 +1,4 @@
+{{- if .Values.driver.enabled }}
 {{- if and .Values.driver.nvidiaDriverCRD.enabled .Values.driver.nvidiaDriverCRD.deployDefaultCR }}
 apiVersion: nvidia.com/v1alpha1
 kind: NVIDIADriver
@@ -123,4 +124,5 @@ spec:
     args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
     {{- end  }}
   {{- end }}
+{{- end }}
 {{- end }}
