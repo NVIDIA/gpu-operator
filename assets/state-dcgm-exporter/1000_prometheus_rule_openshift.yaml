@@ -14,33 +14,33 @@ spec:
       expr: DCGM_FI_DEV_GPU_UTIL
       labels:
         vendor: "nvidia"
-    
+
     - record: accelerator_memory_used_bytes
       expr: DCGM_FI_DEV_MEM_COPY_UTIL
       labels:
         vendor: "nvidia"
-    
+
     - record: accelerator_memory_total_bytes
       expr: DCGM_FI_DEV_FB_TOTAL
       labels:
         vendor: "nvidia"
-    
+
     - record: accelerator_power_usage_watts
       expr: DCGM_FI_DEV_POWER_USAGE
       labels:
         vendor: "nvidia"
-    
-    - record: accelerator_temperature_celcius
+
+    - record: accelerator_temperature_celsius
       expr: DCGM_FI_DEV_GPU_TEMP
       labels:
         vendor: "nvidia"
-    
+
     - record: accelerator_sm_clock_hertz
       expr: DCGM_FI_DEV_SM_CLOCK
       labels:
         vendor: "nvidia"
-    
+
     - record: accelerator_memory_clock_hertz
       expr: DCGM_FI_DEV_MEM_CLOCK
       labels:
-        vendor: "nvidia" 
+        vendor: "nvidia"
