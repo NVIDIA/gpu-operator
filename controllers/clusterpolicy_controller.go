@@ -126,6 +126,17 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	err = clusterPolicyCtrl.addLabelsFinalizer(ctx, r, instance)
+	if err != nil {
+		// TODO Check if return error or continue
+		r.Log.Error(nil, err.Error())
+		condErr = r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error())
+		if condErr != nil {
+			r.Log.V(consts.LogLevelDebug).Error(nil, condErr.Error())
+		}
+		return ctrl.Result{}, err
+	}
+
 	err = clusterPolicyCtrl.init(ctx, r, instance)
 	if err != nil {
 		err = fmt.Errorf("failed to initialize ClusterPolicy controller: %v", err)
@@ -288,6 +299,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			return hasGPULabels(labels)
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
+
 			newLabels := e.ObjectNew.GetLabels()
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
@@ -323,6 +335,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"osTreeLabelChanged", osTreeLabelChanged,
 				)
 			}
+
 			return needsUpdate
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
