@@ -141,7 +141,6 @@ spec:
       env: []
       {{- end }}
     {{- end }}
-
   mig:
     {{- if .Values.mig.strategy }}
     strategy: {{ .Values.mig.strategy }}
@@ -150,7 +149,9 @@ spec:
     enabled: {{ .Values.psa.enabled }}
   cdi:
     enabled: {{ .Values.cdi.enabled }}
+    {{- if .Values.cdi.default }}
     default: {{ .Values.cdi.default }}
+    {{- end }}
   driver:
     enabled: {{ .Values.driver.enabled }}
     useNvidiaDriverCRD: {{ .Values.driver.nvidiaDriverCRD.enabled }}
@@ -411,7 +412,7 @@ spec:
     resources: {{ toYaml .Values.ccManager.resources | nindent 6 }}
     {{- end }}
     {{- if .Values.ccManager.env }}
-    env: {{ toYaml .Values.vfioManager.env | nindent 6 }}
+    env: {{ toYaml .Values.ccManager.env | nindent 6 }}
     {{- end }}
     {{- if .Values.ccManager.args }}
     args: {{ toYaml .Values.ccManager.args | nindent 6 }}
