@@ -1734,6 +1734,31 @@ func (v *VGPUDevices) validate() error {
 }
 
 func (v *VGPUDevices) runValidation() error {
+	nvpci := nvpci.New()
+	GPUDevices, err := nvpci.GetGPUs()
+	if err != nil {
+		return fmt.Errorf("error checking for GPU devices on the host: %w", err)
+	}
+
+	mdevBusPath := "/sys/class/mdev_bus"
+    entries, err := os.ReadDir(mdevBusPath)
+    if err != nil {
+        return fmt.Errorf("unable to read mdev_bus directory: %v", err)
+    }
+    
+    if len(entries) == 0 {
+		for _, device := range GPUDevices {
+			if device.SriovInfo.PhysicalFunction == nil {
+				continue
+			}
+			totalVF := int(device.SriovInfo.PhysicalFunction.TotalVFs)
+			if totalVF > 0 {
+				log.Infof("Found GPU device with SR-IOV VFs: %s (TotalVFs: %d)", device.Address, totalVF)
+				return nil
+			}
+		}
+	}
+
 	nvmdev := nvmdev.New()
 	vGPUDevices, err := nvmdev.GetAllDevices()
 	if err != nil {
@@ -1746,14 +1771,14 @@ func (v *VGPUDevices) runValidation() error {
 			return fmt.Errorf("no vGPU devices found")
 		}
 
-		log.Infof("Found %d vGPU devices", numDevices)
+		log.Infof("Found %d MDEV vGPU devices", numDevices)
 		return nil
 	}
 
 	for {
 		numDevices := len(vGPUDevices)
 		if numDevices > 0 {
-			log.Infof("Found %d vGPU devices", numDevices)
+			log.Infof("Found %d MDEV vGPU devices", numDevices)
 			return nil
 		}
 		log.Infof("No vGPU devices found, retrying after %d seconds", sleepIntervalSecondsFlag)
