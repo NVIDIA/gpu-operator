@@ -492,6 +492,8 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		node := node
+
+		nodeOriginal := node.DeepCopy()
 		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
@@ -566,7 +568,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 
 		// update node with the latest labels
 		if updateLabels {
-			err = n.client.Update(ctx, &node)
+			err = n.client.Patch(ctx, &node, client.MergeFrom(nodeOriginal))
 			if err != nil {
 				return false, 0, fmt.Errorf("unable to label node %s for the GPU Operator deployment, err %s",
 					node.Name, err.Error())
