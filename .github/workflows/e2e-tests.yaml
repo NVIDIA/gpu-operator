@@ -28,6 +28,18 @@ on:
       operator_version:
         required: true
         type: string
+      toolkit_image:
+        required: false
+        type: string
+        description: 'Full container-toolkit image path (e.g., ghcr.io/nvidia/container-toolkit:v1.18.0)'
+      device_plugin_image:
+        required: false
+        type: string
+        description: 'Full device-plugin image path'
+      mig_manager_image:
+        required: false
+        type: string
+        description: 'Full mig-manager image path'
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -35,6 +47,10 @@ on:
         required: true
       AWS_SSH_KEY:
         required: true
+      SLACK_BOT_TOKEN:
+        required: false
+      SLACK_CHANNEL_ID:
+        required: false
   workflow_dispatch:
     inputs:
       operator_image:
@@ -45,6 +61,18 @@ on:
         description: 'Operator version to test (override)'
         required: false
         type: string
+      toolkit_image:
+        description: 'Override container-toolkit image'
+        required: false
+        type: string
+      device_plugin_image:
+        description: 'Override device-plugin image'
+        required: false
+        type: string
+      mig_manager_image:
+        description: 'Override mig-manager image'
+        required: false
+        type: string
 
 jobs:
   variables:
@@ -52,6 +80,9 @@ jobs:
     outputs:
       operator_version: ${{ steps.vars.outputs.operator_version }}
       operator_image: ${{ steps.vars.outputs.operator_image }}
+      toolkit_image: ${{ steps.vars.outputs.toolkit_image }}
+      device_plugin_image: ${{ steps.vars.outputs.device_plugin_image }}
+      mig_manager_image: ${{ steps.vars.outputs.mig_manager_image }}
     steps:
       - name: Checkout code
         if: ${{ github.event_name != 'workflow_call' }}
@@ -74,12 +105,29 @@ jobs:
             OPERATOR_IMAGE="ghcr.io/nvidia/gpu-operator"
           fi
           
+          # Component images (optional, use inputs if provided)
+          TOOLKIT_IMAGE="${{ inputs.toolkit_image }}"
+          DEVICE_PLUGIN_IMAGE="${{ inputs.device_plugin_image }}"
+          MIG_MANAGER_IMAGE="${{ inputs.mig_manager_image }}"
+          
           # Output all variables
           echo "operator_version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
           echo "operator_image=${OPERATOR_IMAGE}" >> $GITHUB_OUTPUT
+          echo "toolkit_image=${TOOLKIT_IMAGE}" >> $GITHUB_OUTPUT
+          echo "device_plugin_image=${DEVICE_PLUGIN_IMAGE}" >> $GITHUB_OUTPUT
+          echo "mig_manager_image=${MIG_MANAGER_IMAGE}" >> $GITHUB_OUTPUT
           
           # Display for debugging
           echo "::notice::Testing operator: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
+          if [[ -n "${TOOLKIT_IMAGE}" ]]; then
+            echo "::notice::Using custom toolkit: ${TOOLKIT_IMAGE}"
+          fi
+          if [[ -n "${DEVICE_PLUGIN_IMAGE}" ]]; then
+            echo "::notice::Using custom device-plugin: ${DEVICE_PLUGIN_IMAGE}"
+          fi
+          if [[ -n "${MIG_MANAGER_IMAGE}" ]]; then
+            echo "::notice::Using custom mig-manager: ${MIG_MANAGER_IMAGE}"
+          fi
 
   e2e-tests-containerd:
     needs: [variables]
@@ -110,6 +158,9 @@ jobs:
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          TOOLKIT_CONTAINER_IMAGE: ${{ needs.variables.outputs.toolkit_image }}
+          DEVICE_PLUGIN_IMAGE: ${{ needs.variables.outputs.device_plugin_image }}
+          MIG_MANAGER_IMAGE: ${{ needs.variables.outputs.mig_manager_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
@@ -156,6 +207,9 @@ jobs:
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          TOOLKIT_CONTAINER_IMAGE: ${{ needs.variables.outputs.toolkit_image }}
+          DEVICE_PLUGIN_IMAGE: ${{ needs.variables.outputs.device_plugin_image }}
+          MIG_MANAGER_IMAGE: ${{ needs.variables.outputs.mig_manager_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
