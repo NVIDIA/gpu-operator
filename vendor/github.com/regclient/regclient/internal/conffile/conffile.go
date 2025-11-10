@@ -19,7 +19,7 @@ type Opt func(*File)
 
 // New returns a new File
 func New(opts ...Opt) *File {
-	f := File{perms: 0600}
+	f := File{perms: 0o600}
 	for _, fn := range opts {
 		fn(&f)
 	}
@@ -82,7 +82,7 @@ func (f *File) Open() (io.ReadCloser, error) {
 func (f *File) Write(rdr io.Reader) error {
 	// create temp file/open
 	dir := filepath.Dir(f.fullname)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(dir, filepath.Base(f.fullname))
@@ -108,7 +108,7 @@ func (f *File) Write(rdr io.Reader) error {
 	}
 
 	// adjust file ownership/permissions
-	mode := os.FileMode(0600)
+	mode := os.FileMode(0o600)
 	uid := os.Getuid()
 	gid := os.Getgid()
 	// adjust defaults based on existing file if available

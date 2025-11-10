@@ -117,7 +117,7 @@ type ReferrerOpts func(*ReferrerConfig)
 // WithReferrerMatchOpt filters results using [descriptor.MatchOpt].
 func WithReferrerMatchOpt(mo descriptor.MatchOpt) ReferrerOpts {
 	return func(config *ReferrerConfig) {
-		config.MatchOpt = mo
+		config.MatchOpt = config.MatchOpt.Merge(mo)
 	}
 }
 
@@ -140,35 +140,28 @@ func WithReferrerSource(r ref.Ref) ReferrerOpts {
 // WithReferrerAT filters by a specific artifactType value.
 //
 // Deprecated: replace with [WithReferrerMatchOpt].
+//
+//go:fix inline
 func WithReferrerAT(at string) ReferrerOpts {
-	return func(config *ReferrerConfig) {
-		config.MatchOpt.ArtifactType = at
-	}
+	return WithReferrerMatchOpt(descriptor.MatchOpt{ArtifactType: at})
 }
 
 // WithReferrerAnnotations filters by a list of annotations, all of which must match.
 //
 // Deprecated: replace with [WithReferrerMatchOpt].
+//
+//go:fix inline
 func WithReferrerAnnotations(annotations map[string]string) ReferrerOpts {
-	return func(config *ReferrerConfig) {
-		if config.MatchOpt.Annotations == nil {
-			config.MatchOpt.Annotations = annotations
-		} else {
-			for k, v := range annotations {
-				config.MatchOpt.Annotations[k] = v
-			}
-		}
-	}
+	return WithReferrerMatchOpt(descriptor.MatchOpt{Annotations: annotations})
 }
 
 // WithReferrerSort orders the resulting referrers listing according to a specified annotation.
 //
 // Deprecated: replace with [WithReferrerMatchOpt].
+//
+//go:fix inline
 func WithReferrerSort(annotation string, desc bool) ReferrerOpts {
-	return func(config *ReferrerConfig) {
-		config.MatchOpt.SortAnnotation = annotation
-		config.MatchOpt.SortDesc = desc
-	}
+	return WithReferrerMatchOpt(descriptor.MatchOpt{SortAnnotation: annotation, SortDesc: desc})
 }
 
 // ReferrerFilter filters the referrer list according to the config.

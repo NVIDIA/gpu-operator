@@ -7,14 +7,18 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"strings"
 
 	"github.com/regclient/regclient/internal/conffile"
+	"github.com/regclient/regclient/types/errs"
 )
 
 const (
 	// dockerEnv is the environment variable used to look for Docker's config.json.
 	dockerEnv = "DOCKER_CONFIG"
+	// dockerEnvConfig is used to inject the config as an environment variable.
+	dockerEnvConfig = "DOCKER_AUTH_CONFIG"
 	// dockerDir is the directory name for Docker's config (inside the users home directory).
 	dockerDir = ".docker"
 	// dockerConfFile is the name of Docker's config file.
@@ -59,26 +63,65 @@ type dockerAuthConfig struct {
 }
 
 // DockerLoad returns a slice of hosts from the users docker config.
+// This will search for the config.json in either the DOCKER_CONFIG identified directory or the default .docker directory.
+// It also includes hosts extracted from the DOCKER_AUTH_CONFIG variable.
+// If the config file is missing and no value is injected using an environment variable, an empty list is returned.
 func DockerLoad() ([]Host, error) {
+	hosts := []Host{}
+	errList := []error{}
+	// load from a file
 	cf := conffile.New(conffile.WithDirName(dockerDir, dockerConfFile), conffile.WithEnvDir(dockerEnv, dockerConfFile))
-	return dockerParse(cf)
+	rdr, err := cf.Open()
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		errList = append(errList, err)
+	} else if err == nil {
+		defer rdr.Close()
+		hostsFile, err := dockerParse(rdr)
+		if err != nil {
+			errList = append(errList, err)
+		} else {
+			hosts = append(hosts, hostsFile...)
+		}
+	}
+	// load from an env var
+	hostsEnv, err := DockerLoadEnv(dockerEnvConfig)
+	if err != nil && !errors.Is(err, errs.ErrNotFound) {
+		errList = append(errList, err)
+	} else if err == nil {
+		hosts = append(hosts, hostsEnv...)
+	}
+	// return the concatenated result, only wrapping an error list if necessary
+	if len(errList) == 1 {
+		return hosts, errList[0]
+	} else {
+		return hosts, errors.Join(errList...)
+	}
 }
 
 // DockerLoadFile returns a slice of hosts from a named docker config file.
 func DockerLoadFile(fname string) ([]Host, error) {
-	cf := conffile.New(conffile.WithFullname(fname))
-	return dockerParse(cf)
-}
-
-// dockerParse parses a docker config into a slice of Hosts.
-func dockerParse(cf *conffile.File) ([]Host, error) {
-	rdr, err := cf.Open()
+	//#nosec G304 scoping file operations to a directory is not yet a feature of regclient.
+	rdr, err := os.Open(fname)
 	if err != nil && errors.Is(err, fs.ErrNotExist) {
 		return []Host{}, nil
 	} else if err != nil {
 		return nil, err
 	}
 	defer rdr.Close()
+	return dockerParse(rdr)
+}
+
+// DockerLoadEnv returns a slice of hosts extracted from the config injected in an environment variable.
+func DockerLoadEnv(envName string) ([]Host, error) {
+	envVal := os.Getenv(envName)
+	if envVal == "" {
+		return []Host{}, errs.ErrNotFound
+	}
+	return dockerParse(strings.NewReader(envVal))
+}
+
+// dockerParse parses a docker config into a slice of Hosts.
+func dockerParse(rdr io.Reader) ([]Host, error) {
 	dc := dockerConfig{}
 	if err := json.NewDecoder(rdr).Decode(&dc); err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
