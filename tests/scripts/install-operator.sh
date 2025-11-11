@@ -26,6 +26,20 @@ if [[ -n "${TOOLKIT_CONTAINER_IMAGE}" ]]; then
 TOOLKIT_CONTAINER_OPTIONS="${TOOLKIT_CONTAINER_OPTIONS} --set toolkit.repository=\"\" --set toolkit.version=\"\" --set toolkit.image=\"${TOOLKIT_CONTAINER_IMAGE}\""
 fi
 
+# We set up the options for the device plugin
+: ${DEVICE_PLUGIN_OPTIONS:=""}
+
+if [[ -n "${DEVICE_PLUGIN_IMAGE}" ]]; then
+DEVICE_PLUGIN_OPTIONS="${DEVICE_PLUGIN_OPTIONS} --set devicePlugin.repository=\"\" --set devicePlugin.version=\"\" --set devicePlugin.image=\"${DEVICE_PLUGIN_IMAGE}\""
+fi
+
+# We set up the options for the MIG manager
+: ${MIG_MANAGER_OPTIONS:=""}
+
+if [[ -n "${MIG_MANAGER_IMAGE}" ]]; then
+MIG_MANAGER_OPTIONS="${MIG_MANAGER_OPTIONS} --set migManager.repository=\"\" --set migManager.version=\"\" --set migManager.image=\"${MIG_MANAGER_IMAGE}\""
+fi
+
 # Create the test namespace
 kubectl create namespace "${TEST_NAMESPACE}"
 
@@ -48,4 +62,6 @@ ${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
 	-n "${TEST_NAMESPACE}" \
 	${OPERATOR_OPTIONS} \
 	${TOOLKIT_CONTAINER_OPTIONS} \
+	${DEVICE_PLUGIN_OPTIONS} \
+	${MIG_MANAGER_OPTIONS} \
 		--wait
