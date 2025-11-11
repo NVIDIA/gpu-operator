@@ -249,7 +249,7 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 	// create manifest CAS file
 	dir := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String())
 	//#nosec G301 defer to user umask settings
-	err = os.MkdirAll(dir, 0777)
+	err = os.MkdirAll(dir, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", dir, err)
 	}

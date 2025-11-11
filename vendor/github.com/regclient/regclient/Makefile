@@ -36,14 +36,15 @@ ifeq "$(strip $(VER_BUMP))" ''
 		$(VER_BUMP_CONTAINER)
 endif
 MARKDOWN_LINT_VER?=v0.18.1
+GOFUMPT_VER?=v0.9.2
 GOMAJOR_VER?=v0.15.0
-GOSEC_VER?=v2.22.8
+GOSEC_VER?=v2.22.10
 GO_VULNCHECK_VER?=v1.1.4
-OSV_SCANNER_VER?=v2.2.2
+OSV_SCANNER_VER?=v2.2.4
 SYFT?=$(shell command -v syft 2>/dev/null)
 SYFT_CMD_VER:=$(shell [ -x "$(SYFT)" ] && echo "v$$($(SYFT) version | awk '/^Version: / {print $$2}')" || echo "0")
-SYFT_VERSION?=v1.32.0
-SYFT_CONTAINER?=anchore/syft:v1.32.0@sha256:b6a6da626d98f5cb92e28934176709003cce6cdcf674816959c7d84845d94045
+SYFT_VERSION?=v1.37.0
+SYFT_CONTAINER?=anchore/syft:v1.37.0@sha256:48d679480c6d272c1801cf30460556959c01d4826795be31d4fd8b53750b7d91
 ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 	SYFT=docker run --rm \
 		-v "$(shell pwd)/:$(shell pwd)/" -w "$(shell pwd)" \
@@ -52,17 +53,21 @@ ifneq "$(SYFT_CMD_VER)" "$(SYFT_VERSION)"
 endif
 STATICCHECK_VER?=v0.6.1
 CI_DISTRIBUTION_VER?=3.0.0
-CI_ZOT_VER?=v2.1.7
+CI_ZOT_VER?=v2.1.10
 
 .PHONY: .FORCE
 .FORCE:
 
 .PHONY: all
-all: fmt goimports vet test lint binaries ## Full build of Go binaries (including fmt, vet, test, and lint)
+all: fmt gofumpt goimports vet test lint binaries ## Full build of Go binaries (including fmt, vet, test, and lint)
 
 .PHONY: fmt
 fmt: ## go fmt
 	go fmt ./...
+
+.PHONY: gofumpt
+gofumpt: $(GOPATH)/bin/gofumpt ## gofumpt is a stricter alternative to go fmt
+	gofumpt -l -w .
 
 goimports: $(GOPATH)/bin/goimports
 	$(GOPATH)/bin/goimports -w -format-only -local github.com/regclient .
@@ -79,8 +84,9 @@ test: ## go test
 lint: lint-go lint-goimports lint-md lint-gosec ## Run all linting
 
 .PHONY: lint-go
-lint-go: $(GOPATH)/bin/staticcheck .FORCE ## Run linting for Go
+lint-go: $(GOPATH)/bin/gofumpt $(GOPATH)/bin/staticcheck .FORCE ## Run linting for Go
 	$(GOPATH)/bin/staticcheck -checks all ./...
+	$(GOPATH)/bin/gofumpt -l -d .
 
 lint-goimports: $(GOPATH)/bin/goimports
 	@if [ -n "$$($(GOPATH)/bin/goimports -l -format-only -local github.com/regclient .)" ]; then \
@@ -228,6 +234,11 @@ util-version-check: ## check all dependencies for updates
 .PHONY: util-version-update
 util-version-update: ## update versions on all dependencies
 	$(VER_BUMP) update
+
+$(GOPATH)/bin/gofumpt: .FORCE
+	@[ -f "$(GOPATH)/bin/gofumpt" ] \
+	&& [ "$$($(GOPATH)/bin/gofumpt -version | cut -f 1 -d ' ')" = "$(GOFUMPT_VER)" ] \
+	|| go install mvdan.cc/gofumpt@$(GOFUMPT_VER)
 
 $(GOPATH)/bin/gomajor: .FORCE
 	@[ -f "$(GOPATH)/bin/gomajor" ] \
