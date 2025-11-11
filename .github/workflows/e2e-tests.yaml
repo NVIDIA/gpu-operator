@@ -76,58 +76,13 @@ on:
 
 jobs:
   variables:
-    runs-on: ubuntu-latest
-    outputs:
-      operator_version: ${{ steps.vars.outputs.operator_version }}
-      operator_image: ${{ steps.vars.outputs.operator_image }}
-      toolkit_image: ${{ steps.vars.outputs.toolkit_image }}
-      device_plugin_image: ${{ steps.vars.outputs.device_plugin_image }}
-      mig_manager_image: ${{ steps.vars.outputs.mig_manager_image }}
-    steps:
-      - name: Checkout code
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: actions/checkout@v5
-      - name: Calculate test variables
-        id: vars
-        run: |
-          # Use inputs from workflow_call if available
-          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
-            OPERATOR_IMAGE="${{ inputs.operator_image }}"
-            OPERATOR_VERSION="${{ inputs.operator_version }}"
-          # Use workflow_dispatch inputs if provided
-          elif [[ -n "${{ inputs.operator_version }}" && -n "${{ inputs.operator_image }}" ]]; then
-            OPERATOR_VERSION="${{ inputs.operator_version }}"
-            OPERATOR_IMAGE="${{ inputs.operator_image }}"
-          else
-            # Calculate for standalone runs
-            COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
-            OPERATOR_VERSION="${COMMIT_SHORT_SHA}"
-            OPERATOR_IMAGE="ghcr.io/nvidia/gpu-operator"
-          fi
-          
-          # Component images (optional, use inputs if provided)
-          TOOLKIT_IMAGE="${{ inputs.toolkit_image }}"
-          DEVICE_PLUGIN_IMAGE="${{ inputs.device_plugin_image }}"
-          MIG_MANAGER_IMAGE="${{ inputs.mig_manager_image }}"
-          
-          # Output all variables
-          echo "operator_version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
-          echo "operator_image=${OPERATOR_IMAGE}" >> $GITHUB_OUTPUT
-          echo "toolkit_image=${TOOLKIT_IMAGE}" >> $GITHUB_OUTPUT
-          echo "device_plugin_image=${DEVICE_PLUGIN_IMAGE}" >> $GITHUB_OUTPUT
-          echo "mig_manager_image=${MIG_MANAGER_IMAGE}" >> $GITHUB_OUTPUT
-          
-          # Display for debugging
-          echo "::notice::Testing operator: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
-          if [[ -n "${TOOLKIT_IMAGE}" ]]; then
-            echo "::notice::Using custom toolkit: ${TOOLKIT_IMAGE}"
-          fi
-          if [[ -n "${DEVICE_PLUGIN_IMAGE}" ]]; then
-            echo "::notice::Using custom device-plugin: ${DEVICE_PLUGIN_IMAGE}"
-          fi
-          if [[ -n "${MIG_MANAGER_IMAGE}" ]]; then
-            echo "::notice::Using custom mig-manager: ${MIG_MANAGER_IMAGE}"
-          fi
+    uses: ./.github/workflows/variables.yaml
+    with:
+      operator_image: ${{ inputs.operator_image }}
+      operator_version: ${{ inputs.operator_version }}
+      toolkit_image: ${{ inputs.toolkit_image }}
+      device_plugin_image: ${{ inputs.device_plugin_image }}
+      mig_manager_image: ${{ inputs.mig_manager_image }}
 
   e2e-tests-containerd:
     needs: [variables]
@@ -226,4 +181,3 @@ jobs:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
           retention-days: 15
-

@@ -128,4 +128,4 @@ jobs:
               • MIG Manager: `${{ needs.fetch-latest-images.outputs.mig_manager_image }}`
               
               *Details:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Run>
-              <@D044YE2MBAR> | <@D051KR3TAQN> | <@D04D866RKLH> | <@D045R30QRPS> 
+              <@S095E7BNGJU> 
