@@ -79,7 +79,7 @@ operator:
   initContainer:
     repository: nvcr.io/nvidia
     image: cuda
-    version: 13.0.1-base-ubi9
+    version: 13.0.2-base-ubi9
     imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/master"
@@ -452,7 +452,7 @@ vfioManager:
   enabled: true
   repository: nvcr.io/nvidia
   image: cuda
-  version: 13.0.1-base-ubi9
+  version: 13.0.2-base-ubi9
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
