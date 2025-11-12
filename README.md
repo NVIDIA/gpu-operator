@@ -17,6 +17,57 @@ Note that the GPU Operator is specifically useful for scenarios where the Kubern
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html).
 
+## Quick Start
+
+Make sure your k8s cluster meets the pre-requisites as listed in the platform support page:
+
+https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html
+
+
+Step1: Install Helm locally:
+```
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 \
+    && chmod 700 get_helm.sh \
+    && ./get_helm.sh
+```
+
+
+Step2: Deploy GPU operator:
+```
+helm install --wait --generate-name \
+    -n gpu-operator --create-namespace \
+    nvidia/gpu-operator \
+    --version=v25.10.0
+```
+
+That's all.
+
+GPU Operator and its operands should be up and running as shown below:
+```
+gpu-operator        gpu-feature-discovery-98x9m                                       1/1     Running     0          22h
+gpu-operator        gpu-operator-1762903711-node-feature-discovery-gc-5c458899bbwpk   1/1     Running     0          22h
+gpu-operator        gpu-operator-1762903711-node-feature-discovery-master-856b8tvqs   1/1     Running     0          22h
+gpu-operator        gpu-operator-1762903711-node-feature-discovery-worker-m5jdr       1/1     Running     0          22h
+gpu-operator        gpu-operator-5b685fc9c9-wntlj                                     1/1     Running     0          22h
+gpu-operator        nvidia-container-toolkit-daemonset-c7c6f                          1/1     Running     0          22h
+gpu-operator        nvidia-cuda-validator-zt45l                                       0/1     Completed   0          22h
+gpu-operator        nvidia-dcgm-exporter-px9hw                                        1/1     Running     0          22h
+gpu-operator        nvidia-device-plugin-daemonset-cd4hp                              1/1     Running     0          22h
+gpu-operator        nvidia-driver-daemonset-xkqnp                                     1/1     Running     0          22h
+gpu-operator        nvidia-mig-manager-jrthj                                          1/1     Running     0          22h
+gpu-operator        nvidia-operator-validator-5kq7z                                   1/1     Running     0          22h
+```
+
+## Roadmap
+### High-level overview of the main priorities for 2026
+* Latest data center drivers
+* Latest NVIDIA GPU platforms
+* Heterogenous cluster (NVIDIADriver CR) from Tech Preview to GA mode
+* DRA integration
+* GPU Health Check
+* Confidential Containers
+* Scalability
+
 ## Webinar
 [How to easily use GPUs on Kubernetes](https://info.nvidia.com/how-to-use-gpus-on-kubernetes-webinar.html)
 
