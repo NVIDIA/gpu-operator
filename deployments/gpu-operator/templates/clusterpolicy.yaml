@@ -539,6 +539,9 @@ spec:
     {{- if .Values.dcgmExporter.hostPID }}
     hostPID: {{ .Values.dcgmExporter.hostPID }}
     {{- end }}
+    {{- if .Values.dcgmExporter.hpcJobMapping }}
+    hpcJobMapping: {{ toYaml .Values.dcgmExporter.hpcJobMapping | nindent 6 }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}
