@@ -293,6 +293,11 @@ dcgmExporter:
   env: []
   resources: {}
   hostPID: false
+  # HPC job mapping configuration for correlating GPU metrics with HPC workload manager jobs
+  # This is used by HPC workload managers like Slurm to label GPU metrics with job IDs
+  # hpcJobMapping:
+  #   enabled: true
+  #   directory: /var/lib/dcgm-exporter/job-mapping
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:

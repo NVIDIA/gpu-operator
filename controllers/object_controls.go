@@ -1715,6 +1715,31 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.HostPID = true
 	}
 
+	// configure HPC job mapping if enabled
+	if config.DCGMExporter.IsHPCJobMappingEnabled() {
+		jobMappingDir := config.DCGMExporter.GetHPCJobMappingDirectory()
+		if jobMappingDir == "" {
+			jobMappingDir = gpuv1.DefaultDCGMJobMappingDir
+		}
+
+		// set environment variable for DCGM Exporter
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_HPC_JOB_MAPPING_DIR", jobMappingDir)
+
+		// add volumeMount to main container
+		jobMappingVolMount := corev1.VolumeMount{Name: "hpc-job-mapping", ReadOnly: true, MountPath: jobMappingDir}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, jobMappingVolMount)
+
+		// add volume
+		jobMappingVolumeSource := corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: jobMappingDir,
+				Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+			},
+		}
+		jobMappingVol := corev1.Volume{Name: "hpc-job-mapping", VolumeSource: jobMappingVolumeSource}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, jobMappingVol)
+	}
+
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
 		metricsConfigVolMount := corev1.VolumeMount{Name: "metrics-config", ReadOnly: true, MountPath: MetricsConfigMountPath, SubPath: MetricsConfigFileName}

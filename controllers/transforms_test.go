@@ -1325,6 +1325,49 @@ func TestTransformDCGMExporter(t *testing.T) {
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").
 				WithConfigMapVolume("init-config", "nvidia-dcgm-exporter", int32(0700)),
 		},
+		{
+			description: "transform dcgm exporter with HPC job mapping enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+					HPCJobMapping: &gpuv1.DCGMExporterHPCJobMappingConfig{
+						Enabled:   newBoolPtr(true),
+						Directory: "/run/nvidia/dcgm-job-mapping",
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_HPC_JOB_MAPPING_DIR", Value: "/run/nvidia/dcgm-job-mapping"},
+					{Name: "foo", Value: "bar"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "hpc-job-mapping", ReadOnly: true, MountPath: "/run/nvidia/dcgm-job-mapping"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia").
+				WithHostPathVolume("hpc-job-mapping", "/run/nvidia/dcgm-job-mapping", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
 	}
 
 	for _, tc := range testCases {
