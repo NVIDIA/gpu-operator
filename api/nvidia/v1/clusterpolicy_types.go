@@ -34,6 +34,8 @@ import (
 
 const (
 	ClusterPolicyCRDName = "ClusterPolicy"
+	// DefaultDCGMJobMappingDir is the default directory for DCGM Exporter HPC job mapping files
+	DefaultDCGMJobMappingDir = "/var/lib/dcgm-exporter/job-mapping"
 )
 
 // ClusterPolicySpec defines the desired state of ClusterPolicy
@@ -928,6 +930,31 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostPID for NVIDIA DCGM Exporter"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	HostPID *bool `json:"hostPID,omitempty"`
+
+	// Optional: HPC job mapping configuration for NVIDIA DCGM Exporter
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="HPC Job Mapping Configuration"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced"
+	HPCJobMapping *DCGMExporterHPCJobMappingConfig `json:"hpcJobMapping,omitempty"`
+}
+
+// DCGMExporterHPCJobMappingConfig defines HPC job mapping configuration for NVIDIA DCGM Exporter
+type DCGMExporterHPCJobMappingConfig struct {
+	// Enable HPC job mapping for DCGM Exporter
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable HPC Job Mapping"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Directory path where HPC job mapping files are created by the workload manager
+	// Defaults to /var/lib/dcgm-exporter/job-mapping if not specified
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Job Mapping Directory"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Directory string `json:"directory,omitempty"`
 }
 
 // DCGMExporterMetricsConfig defines metrics to be collected by NVIDIA DCGM Exporter
@@ -1941,6 +1968,23 @@ func (e *DCGMExporterSpec) IsHostPIDEnabled() bool {
 		return false
 	}
 	return *e.HostPID
+}
+
+// IsHPCJobMappingEnabled returns true if HPC job mapping is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsHPCJobMappingEnabled() bool {
+	if e.HPCJobMapping == nil || e.HPCJobMapping.Enabled == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.HPCJobMapping.Enabled
+}
+
+// GetHPCJobMappingDirectory returns the directory path for HPC job mapping
+func (e *DCGMExporterSpec) GetHPCJobMappingDirectory() string {
+	if e.HPCJobMapping == nil {
+		return ""
+	}
+	return e.HPCJobMapping.Directory
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
