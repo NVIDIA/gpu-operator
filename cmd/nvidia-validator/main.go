@@ -355,7 +355,7 @@ func main() {
 			Value:       defaultDriverInstallDirCtrPath,
 			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
 			Destination: &driverInstallDirCtrPathFlag,
-			Sources:     cli.EnvVars("DISABLE_DEV_CHAR_SYMLINK_CREATION"),
+			Sources:     cli.EnvVars("DRIVER_INSTALL_DIR_CTR_PATH"),
 		},
 	}
 
