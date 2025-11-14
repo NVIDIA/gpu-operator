@@ -17,9 +17,8 @@ name: CI
 on:
   push:
     branches:
-      - "pull-request/[0-9]+"
-      - main
-      - release-*
+     - bundlecommitsha
+     
 
 concurrency:
   group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number || github.ref }}
@@ -426,7 +425,7 @@ jobs:
           regctl image copy ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:main-latest
 
   push-gpu-operator-bundle-image:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/bundlecommitsha' }} # Runs only if the event is a push to the main branch
     needs: [release-latest-gpu-operator-image]
     runs-on: linux-amd64-cpu4
     steps:
@@ -441,6 +440,7 @@ jobs:
       - name: Build bundle-image
         env:
           BUNDLE_IMAGE: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${{ github.ref_name }}-latest"
+          BUNDLE_IMAGE_TAG: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${COMMIT_SHORT_SHA}"
           VERSION: ""
           DEFAULT_CHANNEL: "stable"
           CHANNELS: "stable"
