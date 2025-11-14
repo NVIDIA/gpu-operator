@@ -22,9 +22,21 @@ jobs:
           exempt-issue-labels: 'lifecycle/frozen'
           exempt-pr-labels: 'lifecycle/frozen'
           days-before-stale: 90
-          close-issue-message: 'This issue was automatically closed due to inactivity.'
+          close-issue-message: |
+            👋 This issue or feature request was automatically closed due to inactivity.
+
+            It has been open for over 90 days without recent updates, and the information may now be outdated.
+
+            If this is still relevant with the latest version of the **NVIDIA GPU Operator**, please feel free to reopen it or open a new issue with updated details, such as:
+            - The GPU Operator version in use
+            - Your Kubernetes version and environment
+            - Logs, error messages, or a clear description of the request or problem
+
+            Thank you for helping us keep the issue tracker clean and focused on current and actionable topics.
+
+            — *NVIDIA GPU Operator Team*
           close-pr-message: 'This pull request was automatically closed due to inactivity.'
-          days-before-issue-close: 30
+          days-before-issue-close: 0
           days-before-pr-close: 30
           remove-stale-when-updated: true
           operations-per-run: 1000
