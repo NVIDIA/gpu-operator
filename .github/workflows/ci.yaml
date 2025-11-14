@@ -438,9 +438,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set environment variables
+        id: vars
+        run: |
+          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
       - name: Build bundle-image
         env:
           BUNDLE_IMAGE: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${{ github.ref_name }}-latest"
+          BUNDLE_IMAGE_TAG: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${{ env.COMMIT_SHORT_SHA }}"
+          OPERATOR_IMAGE_TAG: "ghcr.io/nvidia/gpu-operator:${{ env.COMMIT_SHORT_SHA }}"
           VERSION: ""
           DEFAULT_CHANNEL: "stable"
           CHANNELS: "stable"
