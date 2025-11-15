@@ -399,7 +399,7 @@ jobs:
           retention-days: 15
 
   release-latest-gpu-operator-image:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Runs only if the event is a push to the main branch
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/bundlecommitsha' }} # Runs only if the event is a push to the main branch
     needs: [e2e-tests-containerd, e2e-tests-nvidiadriver]
     runs-on: linux-amd64-cpu4
     steps:
@@ -422,7 +422,7 @@ jobs:
       - name: Retag gpu-operator
         run: |
           regctl registry login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.GITHUB_TOKEN }}
-          regctl image copy ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:main-latest
+          # regctl image copy ${OPERATOR_IMAGE}:${OPERATOR_VERSION} ${OPERATOR_IMAGE}:main-latest
 
   push-gpu-operator-bundle-image:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/bundlecommitsha' }} # Runs only if the event is a push to the main branch
