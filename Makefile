@@ -60,6 +60,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # BUNDLE_IMAGE defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMAGE=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMAGE ?= gpu-operator-bundle:$(VERSION)
+BUNDLE_IMAGE_TAG ?= gpu-operator-bundle:$(VERSION)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -131,11 +132,12 @@ build-bundle-image:
 	$(DOCKER) build \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
-	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
+	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) -t $(BUNDLE_IMAGE_TAG) .
 
 # Push the bundle image.
 push-bundle-image: build-bundle-image
 	$(DOCKER) push $(BUNDLE_IMAGE)
+	$(DOCKER) push $(BUNDLE_IMAGE_TAG)
 
 # Define local and dockerized golang targets
 
