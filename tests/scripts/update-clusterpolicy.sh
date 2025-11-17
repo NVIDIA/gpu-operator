@@ -10,6 +10,7 @@ source ${SCRIPT_DIR}/.definitions.sh
 
 # Import the check definitions
 source ${SCRIPT_DIR}/checks.sh
+source ${SCRIPT_DIR}/collect-logs.sh
 
 # Test updates to Images used in Daemonsets in ClusterPolicy
 test_image_updates() {
@@ -27,6 +28,7 @@ test_image_updates() {
     UPDATED_IMAGE=$(kubectl get daemonset -lapp="nvidia-driver-daemonset" -n $TEST_NAMESPACE -o json | jq '.items[0].spec.template.spec.containers[0].image')
     if [[ "$UPDATED_IMAGE" != *"$TARGET_DRIVER_VERSION"* ]]; then
         echo "Image update failed for driver daemonset to version $TARGET_DRIVER_VERSION"
+        collect_logs
         exit 1
     fi
 
@@ -59,6 +61,7 @@ test_env_updates() {
     UPDATED_ENV_NAME=$(echo $UPDATED_ENV_MAP | jq --arg n $ENV_NAME 'if .name == $n then .name else empty end' | tr -d '"')
     if [ "$UPDATED_ENV_NAME" != "$ENV_NAME" ]; then
         echo "Env update failed for device-plugin daemonset to set $ENV_NAME, got $UPDATED_ENV_NAME"
+        collect_logs
         exit 1
     fi
     echo "Env $ENV_NAME for device-plugin daemonset updated successfully"
@@ -66,6 +69,7 @@ test_env_updates() {
     UPDATED_ENV_VALUE=$(echo $UPDATED_ENV_MAP | jq --arg v $ENV_VALUE 'if .value == $v then .value else empty end' | tr -d '"')
     if [ "$UPDATED_ENV_VALUE" != "$ENV_VALUE" ]; then
         echo "Env update failed for device-plugin daemonset to set $ENV_NAME:$ENV_VALUE, got $UPDATED_ENV_VALUE"
+        collect_logs
         exit 1
     fi
     echo "Env $ENV_NAME for device-plugin daemonset updated successfully to value $ENV_VALUE"
@@ -82,6 +86,7 @@ test_mig_strategy_updates() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/mig/strategy", "value": '$MIG_STRATEGY'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot update MIG strategy to value $MIG_STRATEGY with ClusterPolicy"
+        collect_logs
         exit 1
     fi
 
@@ -92,11 +97,13 @@ test_mig_strategy_updates() {
     kubectl get daemonsets -lapp=gpu-feature-discovery -n $TEST_NAMESPACE  -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="MIG_STRATEGY")]}{"\n"}{end}' | grep MIG_STRATEGY.*$MIG_STRATEGY
     if [ "$?" -ne 0 ]; then
         echo "cannot update MIG strategy to value $MIG_STRATEGY with GFD Daemonset"
+        collect_logs
         exit 1
     fi
     kubectl get daemonsets -lapp=nvidia-device-plugin-daemonset -n $TEST_NAMESPACE  -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[*].env[?(@.name=="MIG_STRATEGY")]}{"\n"}{end}' | grep MIG_STRATEGY.*$MIG_STRATEGY
     if [ "$?" -ne 0 ]; then
         echo "cannot update MIG strategy to value $MIG_STRATEGY with Device-Plugin Daemonset"
+        collect_logs
         exit 1
     fi
     echo "MIG strategy successfully updated to $MIG_STRATEGY"
@@ -107,6 +114,7 @@ test_enable_dcgm() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgm/enabled", "value": 'true'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot enable standalone DCGM engine with ClusterPolicy update"
+        collect_logs
         exit 1
     fi
     # Verify that standalone nvidia-dcgm and exporter pods are running successfully after update
@@ -124,8 +132,8 @@ test_enable_dcgm() {
 test_gpu_sharing() {
     echo "updating device-plugin with custom config for enabling gpu sharing"
     # Apply device-plugin config for GPU sharing
-    kubectl create configmap plugin-config --from-file=${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
-    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "plugin-config.yaml"}}]'
+    kubectl apply -f ${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "time-slicing"}}]'
 
     # sleep for 10 seconds for operator to apply changes to plugin pods
     sleep 10
@@ -151,6 +159,7 @@ test_gpu_sharing() {
     if [ $? -ne 0 ]; then
         echo "cannot run parallel pods with GPU sharing enabled"
         kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
+        collect_logs
         exit 1
     fi
 
@@ -158,12 +167,14 @@ test_gpu_sharing() {
     replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]' | tr -d '"')
     if [ "$replica_count" != "10" ]; then
         echo "Required label nvidia.com/gpu.replicas is incorrect when GPU sharing is enabled - $replica_count"
+        collect_logs
         exit 1
     fi
 
     product_name=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.product"]' | tr -d '"')
     if [ "$product_name" != ${shared_product_name} ]; then
         echo "Label nvidia.com/gpu.product is incorrect when GPU sharing is enabled - $product_name"
+        collect_logs
         exit 1
     fi
 
@@ -171,10 +182,63 @@ test_gpu_sharing() {
     kubectl delete -f ${TEST_DIR}/plugin-test.yaml -n $TEST_NAMESPACE
 }
 
+test_mps() {
+    echo "updating device-plugin with custom config for enabling mps"
+    # Apply device-plugin config for MPS
+    kubectl apply -f ${TEST_DIR}/plugin-config.yaml -n $TEST_NAMESPACE
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/devicePlugin/config", "value": {"name": "plugin-config", "default": "mps"}}]'
+
+    # Ensure the 'single' MIG strategy is configured as currently MPS support in the plugin does not support 'mixed' MIG strategy
+    kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/mig/strategy", "value": '$MIG_STRATEGY'}]'
+
+    # sleep for 10 seconds for operator to apply changes to plugin pods
+    sleep 10
+
+    # Wait for device-plugin, mps-daemon, and gfd to be ready
+    check_pod_ready "nvidia-device-plugin-daemonset" 5
+    check_pod_ready "nvidia-device-plugin-mps-control-daemon" 5
+    check_pod_ready "gpu-feature-discovery" 5
+
+    echo "validating workloads on GPU using MPS"
+
+    # set the operator validator image version in the plugin test spec
+    sed -i "s/image: nvcr.io\/nvidia\/cloud-native\/gpu-operator-validator:v1.10.1/image: ${VALIDATOR_IMAGE//\//\\/}:${VALIDATOR_VERSION}/g" ${TEST_DIR}/plugin-mps-test.yaml
+
+    # Deploy test-pod to validate GPU sharing using MPS
+    kubectl apply -f ${TEST_DIR}/plugin-mps-test.yaml -n $TEST_NAMESPACE
+
+    kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-mps-test -n $TEST_NAMESPACE
+    if [ $? -ne 0 ]; then
+        echo "cannot run parallel pods with MPS enabled"
+        kubectl get pods -l app=nvidia-plugin-mps-test -n $TEST_NAMESPACE
+        collect_logs
+        exit 1
+    fi
+
+    # Verify GFD labels
+    replica_count=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/gpu.replicas"]' | tr -d '"')
+    if [ "$replica_count" != "4" ]; then
+        echo "Required label nvidia.com/gpu.replicas is incorrect when MPS is enabled - $replica_count"
+        collect_logs
+        exit 1
+    fi
+
+    mps_capable=$(kubectl  get node -o json | jq '.items[0].metadata.labels["nvidia.com/mps.capable"]' | tr -d '"')
+    if [ "$mps_capable" != "true" ]; then
+        echo "Label nvidia.com/mps.capable is incorrect with MPS is enabled - $mps_capable"
+        collect_logs
+        exit 1
+    fi
+
+    # Cleanup plugin test pod.
+    kubectl delete -f ${TEST_DIR}/plugin-mps-test.yaml -n $TEST_NAMESPACE
+}
+
 test_disable_enable_dcgm_exporter() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgmExporter/enabled", "value": 'false'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot disable DCGM Exporter with ClusterPolicy update"
+        collect_logs
         exit 1
     fi
     # Verify that dcgm-exporter pod is deleted after disabling
@@ -183,6 +247,7 @@ test_disable_enable_dcgm_exporter() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/dcgmExporter/enabled", "value": 'true'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot enable DCGM Exporter with ClusterPolicy update"
+        collect_logs
         exit 1
     fi
     # Verify that dcgm-exporter pod is running after re-enabling
@@ -193,6 +258,7 @@ test_disable_enable_gfd() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/gfd/enabled", "value": 'false'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot disable GFD with ClusterPolicy update"
+        collect_logs
         exit 1
     fi
      # Verify that gpu-feature-discovery pod is deleted after disabling
@@ -201,6 +267,7 @@ test_disable_enable_gfd() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/gfd/enabled", "value": 'true'}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot enable GFD with ClusterPolicy update"
+        collect_logs
         exit 1
     fi
      # Verify that gpu-feature-discovery pod is running after re-enabling
@@ -211,12 +278,14 @@ test_custom_toolkit_dir() {
     kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "replace", "path": "/spec/toolkit/installDir", "value": "/opt/nvidia"}]'
     if [ "$?" -ne 0 ]; then
         echo "cannot update toolkit install directory to /opt/nvidia"
+        collect_logs
         exit 1
     fi
     # Verify that cuda-validation/plugin-validation is successful by restarting operator-validator 
     kubectl delete pod -l app=nvidia-operator-validator -n $TEST_NAMESPACE
     if [ "$?" -ne 0 ]; then
         echo "cannot delete operator-validator pod for toolkit-validation"
+        collect_logs
         exit 1
     fi
     check_pod_ready "nvidia-container-toolkit-daemonset"
@@ -227,6 +296,7 @@ test_custom_labels_override() {
   if ! kubectl patch clusterpolicy/cluster-policy --type='json' -p='[{"op": "add", "path": "/spec/daemonsets/labels", "value": {"cloudprovider": "aws", "platform": "kubernetes"}}]';
   then
     echo "cannot update the labels of the ClusterPolicy resource"
+    collect_logs
     exit 1
   fi
 
@@ -248,11 +318,13 @@ test_custom_labels_override() {
       cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
       if [ "$cp_label_value" != "aws" ]; then
           echo "Custom Label cloudprovider is incorrect when clusterpolicy labels are overridden - $pod"
+          collect_logs
           exit 1
       fi
       platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
       if [ "$platform_label_value" != "kubernetes" ]; then
           echo "Custom Label platform is incorrect when clusterpolicy labels are overridden - $pod"
+          collect_logs
           exit 1
       fi
     done
@@ -265,6 +337,7 @@ test_env_updates
 test_mig_strategy_updates
 test_enable_dcgm
 test_gpu_sharing
+test_mps
 test_disable_enable_gfd
 test_disable_enable_dcgm_exporter
 test_custom_labels_override
