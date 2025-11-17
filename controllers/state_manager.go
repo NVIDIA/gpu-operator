@@ -289,9 +289,35 @@ func hasMIGCapableGPU(labels map[string]string) bool {
 
 	// check product label if mig.capable label does not exist
 	if value, exists := labels[gpuProductLabelKey]; exists {
-		if strings.Contains(strings.ToLower(value), "h100") ||
-			strings.Contains(strings.ToLower(value), "a100") ||
-			strings.Contains(strings.ToLower(value), "a30") {
+		return isMIGCapableGPUProduct(value)
+	}
+
+	return false
+}
+
+// isMIGCapableGPUProduct checks if a GPU product supports MIG based on its name
+func isMIGCapableGPUProduct(productName string) bool {
+	if productName == "" {
+		return false
+	}
+
+	lowerProduct := strings.ToLower(productName)
+
+	// Define MIG-capable GPU patterns
+	migCapablePatterns := []string{
+		// Hopper architecture
+		"h100", "h800", "h200", "h20", "gh200",
+		// Ampere architecture
+		"a100", "a800", "a30",
+		// Blackwell architecture
+		"gb200", "b200", "gb300", "b300",
+		// Professional workstation GPUs
+		"rtx-pro-6000", "rtx-pro-5000",
+		"rtx pro 6000", "rtx pro 5000",
+	}
+
+	for _, pattern := range migCapablePatterns {
+		if strings.Contains(lowerProduct, pattern) {
 			return true
 		}
 	}
