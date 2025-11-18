@@ -47,7 +47,7 @@ RUN ARCH=$(uname -m) && OS_ARCH=${ARCH/amd64/x86_64} && OS_ARCH=${ARCH/aarch64/s
 
 ARG CUDA_SAMPLES_VERSION
 RUN CUDA_PACKAGE_VERSION=${CUDA_SAMPLES_VERSION/./-} && \
-    dnf install -y --allowerasing \
+    dnf install -y --allowerasing --setopt=install_weak_deps=False \
         cmake \
         cuda-cudart-devel-${CUDA_PACKAGE_VERSION} \
         cuda-compat-${CUDA_PACKAGE_VERSION} \
@@ -55,7 +55,7 @@ RUN CUDA_PACKAGE_VERSION=${CUDA_SAMPLES_VERSION/./-} && \
         g++ \
         curl \
     && \
-    dnf clean all
+    dnf clean all && rm -rf /var/cache/dnf
 
 ENV PATH=/usr/local/cuda/bin:${PATH}
 
