@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-operator
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
