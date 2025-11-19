@@ -28,6 +28,7 @@ files:
       - gha-alpine-digest
   "Makefile":
     processors:
+      - makefile-gofumpt
       - makefile-gomajor
       - makefile-go-vulncheck
       - makefile-markdown-lint
@@ -105,6 +106,13 @@ processors:
       regexp: '^ARG ECR_HELPER_VER=(?P<Version>v?\d+\.\d+\.\d+)\s*$'
     sourceArgs:
       url: "https://github.com/awslabs/amazon-ecr-credential-helper.git"
+    # temp hack to back rev due to missing tag on sub-module
+    sort:
+      method: "semver"
+      offset: 1
+    # TODO: support templating the output of a filter in version-bump so versions on the sub-module can be used
+    # filter:
+    #   expr: '^ecr-login/v?\d+\.\d+\.\d+$'
   docker-arg-gcr:
     <<: *git-tag-semver
     scanArgs:
@@ -152,6 +160,8 @@ processors:
       regexp: '^\s*cosign-release: "(?P<Version>v?[0-9\.]+)"\s*$'
     sourceArgs:
       url: "https://github.com/sigstore/cosign.git"
+    filter:
+      expr: '^v?2\.\d+\.\d+$' # pin to v2 pending cosign-installer upgrade
   gha-golang-matrix:
     <<: *registry-tag-semver
     key: "golang-matrix"
@@ -222,6 +232,12 @@ processors:
       regexp: '^CI_ZOT_VER\?=(?P<Version>v?[0-9\.]+)\s*$'
     sourceArgs:
       repo: "ghcr.io/project-zot/zot-linux-amd64"
+  makefile-gofumpt:
+    <<: *git-tag-semver
+    scanArgs:
+      regexp: '^GOFUMPT_VER\?=(?P<Version>v?[0-9\.]+)\s*$'
+    sourceArgs:
+      url: "https://github.com/mvdan/gofumpt.git"
   makefile-gomajor:
     <<: *git-tag-semver
     scanArgs:
