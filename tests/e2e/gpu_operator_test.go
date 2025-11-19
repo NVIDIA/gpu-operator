@@ -28,8 +28,8 @@ import (
 
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
 	e2elog "github.com/NVIDIA/gpu-operator/tests/e2e/framework/logs"
-	k8stest "github.com/NVIDIA/gpu-operator/tests/e2e/kubernetes"
-	"github.com/NVIDIA/gpu-operator/tests/e2e/operator"
+
+	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
 
 var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
@@ -38,21 +38,21 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 
 	Describe("GPU Operator ClusterPolicy", func() {
 		Context("When deploying gpu-operator", Ordered, func() {
-			if tcfg.helmChart == "" {
-				Fail("No helm-chart for gpu-operator specified")
-			}
-
 			// Init global suite vars vars
 			var (
-				operatorClient  *operator.Client
+				operatorClient  *helpers.OperatorClient
 				helmReleaseName string
-				k8sClient       *k8stest.Client
+				k8sClient       *helpers.PodClient
 				testNamespace   *corev1.Namespace
 			)
 
 			BeforeAll(func(ctx context.Context) {
+				if tcfg.helmChart == "" {
+					Fail("No helm-chart for gpu-operator specified")
+				}
+
 				var err error
-				k8sClient = k8stest.NewClient(f.ClientSet.CoreV1())
+				k8sClient = helpers.NewPodClient(f.ClientSet.CoreV1())
 				nsLabels := map[string]string{
 					"e2e-run": string(framework.RunID),
 				}
@@ -62,10 +62,10 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 					Fail(fmt.Sprintf("failed to create gpu operator namespace %s: %v", tcfg.namespace, err))
 				}
 
-				operatorClient, err = operator.NewClient(
-					operator.WithNamespace(testNamespace.Name),
-					operator.WithKubeConfig(framework.TestContext.KubeConfig),
-					operator.WithChart(tcfg.helmChart),
+				operatorClient, err = helpers.NewOperatorClient(
+					helpers.WithNamespace(testNamespace.Name),
+					helpers.WithKubeConfig(framework.TestContext.KubeConfig),
+					helpers.WithChart(tcfg.helmChart),
 				)
 				if err != nil {
 					Fail(fmt.Sprintf("failed to instantiate gpu operator client: %v", err))
@@ -79,7 +79,7 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 					fmt.Sprintf("validator.image=%s", tcfg.validatorImage),
 					fmt.Sprintf("validator.version=%s", tcfg.validatorVersion),
 				}
-				helmReleaseName, err = operatorClient.Install(ctx, values, operator.ChartOptions{
+				helmReleaseName, err = operatorClient.Install(ctx, values, helpers.ChartOptions{
 					CleanupOnFail: true,
 					GenerateName:  true,
 					Timeout:       5 * time.Minute,
@@ -157,8 +157,12 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 						hasRestarts, err := k8sClient.EnsureNoPodRestarts(ctx, pod.Name, pod.Namespace)
 						Expect(err).NotTo(HaveOccurred())
 						if !hasRestarts {
-							errLogs := k8sClient.GetPodLogs(ctx, pod)
-							e2elog.Logf("printing logs from the pod %s/%s: %s", pod.Namespace, pod.Name, errLogs)
+							errLogs, err := k8sClient.GetPodLogs(ctx, pod)
+							if err != nil {
+								e2elog.Logf("WARN: failed to retrieve logs from pod %s/%s: %v", pod.Namespace, pod.Name, err)
+							} else {
+								e2elog.Logf("printing logs from the pod %s/%s: %s", pod.Namespace, pod.Name, errLogs)
+							}
 							e2elog.Failf("pod %s/%s has unexpected restarts", pod.Namespace, pod.Name)
 						}
 					}
