@@ -38,12 +38,15 @@ type docker1SignedManifest struct {
 func (m *docker1Manifest) GetConfig() (descriptor.Descriptor, error) {
 	return descriptor.Descriptor{}, fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1Manifest) GetConfigDigest() (digest.Digest, error) {
 	return "", fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1SignedManifest) GetConfig() (descriptor.Descriptor, error) {
 	return descriptor.Descriptor{}, fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1SignedManifest) GetConfigDigest() (digest.Digest, error) {
 	return "", fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -51,6 +54,7 @@ func (m *docker1SignedManifest) GetConfigDigest() (digest.Digest, error) {
 func (m *docker1Manifest) GetManifestList() ([]descriptor.Descriptor, error) {
 	return []descriptor.Descriptor{}, fmt.Errorf("platform descriptor list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1SignedManifest) GetManifestList() ([]descriptor.Descriptor, error) {
 	return []descriptor.Descriptor{}, fmt.Errorf("platform descriptor list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -68,6 +72,7 @@ func (m *docker1Manifest) GetLayers() ([]descriptor.Descriptor, error) {
 	}
 	return dl, nil
 }
+
 func (m *docker1SignedManifest) GetLayers() ([]descriptor.Descriptor, error) {
 	if !m.manifSet {
 		return []descriptor.Descriptor{}, errs.ErrManifestNotSet
@@ -85,6 +90,7 @@ func (m *docker1SignedManifest) GetLayers() ([]descriptor.Descriptor, error) {
 func (m *docker1Manifest) GetOrig() any {
 	return m.Manifest
 }
+
 func (m *docker1SignedManifest) GetOrig() any {
 	return m.SignedManifest
 }
@@ -92,6 +98,7 @@ func (m *docker1SignedManifest) GetOrig() any {
 func (m *docker1Manifest) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
 	return nil, fmt.Errorf("platform lookup not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1SignedManifest) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
 	return nil, fmt.Errorf("platform lookup not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -99,6 +106,7 @@ func (m *docker1SignedManifest) GetPlatformDesc(p *platform.Platform) (*descript
 func (m *docker1Manifest) GetPlatformList() ([]*platform.Platform, error) {
 	return nil, fmt.Errorf("platform list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker1SignedManifest) GetPlatformList() ([]*platform.Platform, error) {
 	return nil, fmt.Errorf("platform list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -150,6 +158,7 @@ func (m *docker1Manifest) MarshalPretty() ([]byte, error) {
 	err := tw.Flush()
 	return buf.Bytes(), err
 }
+
 func (m *docker1SignedManifest) MarshalPretty() ([]byte, error) {
 	if m == nil {
 		return []byte{}, nil

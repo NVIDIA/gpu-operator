@@ -27,9 +27,7 @@ import (
 	"github.com/regclient/regclient/types/warning"
 )
 
-var (
-	zeroDig = digest.SHA256.FromBytes([]byte{})
-)
+var zeroDig = digest.SHA256.FromBytes([]byte{})
 
 // BlobDelete removes a blob from the repository
 func (reg *Reg) BlobDelete(ctx context.Context, r ref.Ref, d descriptor.Descriptor) error {

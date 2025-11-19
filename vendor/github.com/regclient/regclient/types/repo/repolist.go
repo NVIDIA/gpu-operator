@@ -71,16 +71,19 @@ func WithHeaders(header http.Header) Opts {
 		c.header = header
 	}
 }
+
 func WithHost(host string) Opts {
 	return func(c *repoConfig) {
 		c.host = host
 	}
 }
+
 func WithMT(mt string) Opts {
 	return func(c *repoConfig) {
 		c.mt = mt
 	}
 }
+
 func WithRaw(raw []byte) Opts {
 	return func(c *repoConfig) {
 		c.raw = raw

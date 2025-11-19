@@ -8,11 +8,13 @@ import (
 	"github.com/regclient/regclient/types/errs"
 )
 
-type Links []Link
-type Link struct {
-	URI   string
-	Param map[string]string
-}
+type (
+	Links []Link
+	Link  struct {
+		URI   string
+		Param map[string]string
+	}
+)
 
 type charLU byte
 
