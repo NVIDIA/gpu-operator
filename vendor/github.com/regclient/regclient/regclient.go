@@ -2,11 +2,10 @@
 package regclient
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"time"
-
-	"fmt"
 
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/version"
@@ -43,7 +42,7 @@ type Opt func(*RegClient)
 
 // New returns a registry client.
 func New(opts ...Opt) *RegClient {
-	var rc = RegClient{
+	rc := RegClient{
 		hosts:     map[string]*config.Host{},
 		userAgent: DefaultUserAgent,
 		regOpts:   []reg.Opts{},
@@ -93,28 +92,28 @@ func New(opts ...Opt) *RegClient {
 // WithBlobLimit sets the max size for chunked blob uploads which get stored in memory.
 //
 // Deprecated: replace with WithRegOpts(reg.WithBlobLimit(limit)), see [WithRegOpts] and [reg.WithBlobLimit].
+//
+//go:fix inline
 func WithBlobLimit(limit int64) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithBlobLimit(limit))
-	}
+	return WithRegOpts(reg.WithBlobLimit(limit))
 }
 
 // WithBlobSize overrides default blob sizes.
 //
 // Deprecated: replace with WithRegOpts(reg.WithBlobSize(chunk, max)), see [WithRegOpts] and [reg.WithBlobSize].
+//
+//go:fix inline
 func WithBlobSize(chunk, max int64) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithBlobSize(chunk, max))
-	}
+	return WithRegOpts(reg.WithBlobSize(chunk, max))
 }
 
 // WithCertDir adds a path of certificates to trust similar to Docker's /etc/docker/certs.d.
 //
 // Deprecated: replace with WithRegOpts(reg.WithCertDirs(path)), see [WithRegOpts] and [reg.WithCertDirs].
+//
+//go:fix inline
 func WithCertDir(path ...string) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithCertDirs(path))
-	}
+	return WithRegOpts(reg.WithCertDirs(path))
 }
 
 // WithConfigHost adds a list of config host settings.
@@ -134,13 +133,15 @@ func WithConfigHostDefault(configHost config.Host) Opt {
 // WithConfigHosts adds a list of config host settings.
 //
 // Deprecated: replace with [WithConfigHost].
+//
+//go:fix inline
 func WithConfigHosts(configHosts []config.Host) Opt {
 	return WithConfigHost(configHosts...)
 }
 
 // WithDockerCerts adds certificates trusted by docker in /etc/docker/certs.d.
 func WithDockerCerts() Opt {
-	return WithCertDir(DockerCertDir)
+	return WithRegOpts(reg.WithCertDirs([]string{DockerCertDir}))
 }
 
 // WithDockerCreds adds configuration from users docker config with registry logins.
@@ -184,19 +185,19 @@ func WithRegOpts(opts ...reg.Opts) Opt {
 // WithRetryDelay specifies the time permitted for retry delays.
 //
 // Deprecated: replace with WithRegOpts(reg.WithDelay(delayInit, delayMax)), see [WithRegOpts] and [reg.WithDelay].
+//
+//go:fix inline
 func WithRetryDelay(delayInit, delayMax time.Duration) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithDelay(delayInit, delayMax))
-	}
+	return WithRegOpts(reg.WithDelay(delayInit, delayMax))
 }
 
 // WithRetryLimit specifies the number of retries for non-fatal errors.
 //
 // Deprecated: replace with WithRegOpts(reg.WithRetryLimit(retryLimit)), see [WithRegOpts] and [reg.WithRetryLimit].
+//
+//go:fix inline
 func WithRetryLimit(retryLimit int) Opt {
-	return func(rc *RegClient) {
-		rc.regOpts = append(rc.regOpts, reg.WithRetryLimit(retryLimit))
-	}
+	return WithRegOpts(reg.WithRetryLimit(retryLimit))
 }
 
 // WithSlog configures the slog Logger.
