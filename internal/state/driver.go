@@ -545,7 +545,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	nvidiaDriverName := getDriverName(cr, nodePool.getOS())
 	nvidiaDriverAppName := getDriverAppName(cr, nodePool)
 
-	spec := &cr.Spec
+	spec := cr.Spec.DeepCopy()
 	imagePath, err := getDriverImagePath(spec, nodePool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get driver image path: %v", err)
