@@ -911,3 +911,66 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 		require.Equal(t, test.expected, result)
 	}
 }
+
+func TestGetDriverSpecMultipleNodePools(t *testing.T) {
+	cr := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: apitypes.UID("test-uid-multipools"),
+		},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			DriverType:     nvidiav1alpha1.GPU,
+			UsePrecompiled: ptr.To(true),
+			Repository:     "nvcr.io/nvidia",
+			Image:          "driver",
+			Version:        "535.104.05",
+			Manager: nvidiav1alpha1.DriverManagerSpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "k8s-driver-manager",
+				Version:    "v0.6.2",
+			},
+		},
+	}
+
+	pool1 := nodePool{
+		osRelease: "ubuntu",
+		osVersion: "22.04",
+		kernel:    "5.15.0-generic",
+		nodeSelector: map[string]string{
+			"feature.node.kubernetes.io/kernel-version.full":          "5.15.0-generic",
+			"feature.node.kubernetes.io/system-os_release.VERSION_ID": "22.04",
+		},
+	}
+
+	pool2 := nodePool{
+		osRelease: "ubuntu",
+		osVersion: "20.04",
+		kernel:    "5.4.0-generic",
+		nodeSelector: map[string]string{
+			"feature.node.kubernetes.io/kernel-version.full":          "5.4.0-generic",
+			"feature.node.kubernetes.io/system-os_release.VERSION_ID": "20.04",
+		},
+	}
+
+	spec1, err := getDriverSpec(cr, pool1)
+	require.NoError(t, err)
+	spec2, err := getDriverSpec(cr, pool2)
+	require.NoError(t, err)
+
+	// Verify each spec has correct values
+	assert.Equal(t, "nvcr.io/nvidia/driver:535.104.05-5.15.0-generic-ubuntu22.04", spec1.ImagePath)
+	assert.Equal(t, "nvcr.io/nvidia/driver:535.104.05-5.4.0-generic-ubuntu20.04", spec2.ImagePath)
+	assert.Equal(t, "ubuntu22.04", spec1.OSVersion)
+	assert.Equal(t, "ubuntu20.04", spec2.OSVersion)
+
+	// Verify NodeSelectors are independent
+	assert.Equal(t, "5.15.0-generic", spec1.Spec.NodeSelector["feature.node.kubernetes.io/kernel-version.full"])
+	assert.Equal(t, "5.4.0-generic", spec2.Spec.NodeSelector["feature.node.kubernetes.io/kernel-version.full"])
+
+	// Verify specs have independent pointers
+	assert.NotEqual(t, spec1.Spec, spec2.Spec)
+
+	// Verify modifying one doesn't affect the other
+	spec1.Spec.NodeSelector["test-key"] = "test-value"
+	_, exists := spec2.Spec.NodeSelector["test-key"]
+	assert.False(t, exists)
+}
