@@ -43,6 +43,7 @@ rules:
   - clusterrolebindings
   verbs:
   - create
+  - get
   - list
   - watch
 - apiGroups:
@@ -51,7 +52,6 @@ rules:
   - clusterroles
   - clusterrolebindings
   verbs:
-  - get
   - update
   - patch
   - delete
