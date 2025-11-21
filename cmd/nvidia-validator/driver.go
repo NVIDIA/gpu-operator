@@ -44,9 +44,9 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 			isHostDriver:      true,
 			hostRoot:          hostRoot,
 			driverRoot:        hostRoot,
-			driverRootCtrPath: "/host",
+			driverRootCtrPath: hostMountPath,
 			devRoot:           hostRoot,
-			devRootCtrPath:    "/host",
+			devRootCtrPath:    hostMountPath,
 		}
 	}
 
@@ -56,7 +56,7 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 	devRoot = root(driverInstallDirCtrPath).getDevRoot()
 	if devRoot == "/" {
 		devRoot = hostRoot
-		devRootCtrPath = "/host"
+		devRootCtrPath = hostMountPath
 	} else {
 		devRoot = driverInstallDir
 		devRootCtrPath = "/driver-root"
