@@ -299,3 +299,35 @@ install-tools:
 	@echo Installing tools from tools.go
 	export GOBIN=$(PROJECT_DIR)/bin && \
 	grep '^\s*_' tools/tools.go | awk '{print $$2}' | xargs -tI % $(GO_CMD) install -mod=readonly -modfile=tools/go.mod %
+
+# Tilt integration
+# Usage: make tilt REGISTRY=docker.io/myuser REGISTRY_USERNAME=myuser REGISTRY_PASSWORD=mypassword
+.PHONY: tilt
+tilt:
+	@if [ -z "$(REGISTRY)" ]; then \
+		echo "REGISTRY is not set. Using default from tilt_config.json or Tiltfile."; \
+	fi
+	@TILT_ARGS="--"; \
+	if [ -n "$(REGISTRY)" ]; then \
+		TILT_ARGS="$${TILT_ARGS} --registry=$(REGISTRY)"; \
+	fi; \
+	if [ -n "$(REGISTRY_USERNAME)" ]; then \
+		TILT_ARGS="$${TILT_ARGS} --registry_username=$(REGISTRY_USERNAME)"; \
+	fi; \
+	if [ -n "$(REGISTRY_PASSWORD)" ]; then \
+		TILT_ARGS="$${TILT_ARGS} --registry_password=$(REGISTRY_PASSWORD)"; \
+	fi; \
+	tilt up $${TILT_ARGS}
+
+tilt-up: tilt
+
+tilt-down:
+	@echo "Running tilt down..."
+	@TILT_ARGS="--"; \
+	if [ -n "$(REGISTRY)" ]; then \
+		TILT_ARGS="$${TILT_ARGS} --registry=$(REGISTRY)"; \
+	fi; \
+	if [ -n "$(NAMESPACE)" ]; then \
+		TILT_ARGS="$${TILT_ARGS} --namespace=$(NAMESPACE)"; \
+	fi; \
+	tilt down $${TILT_ARGS}
