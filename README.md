@@ -25,3 +25,23 @@ For information on platform support and getting started, visit the official docu
 
 ## Support and Getting Help
 Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
+
+## vGPU License Visibility
+When the operator configures a node for `vm-vgpu` workloads it now reports the license state directly through the Kubernetes API:
+
+- Each vGPU node receives an annotation `nvidia.com/vgpu-license-statuses` that contains a JSON snapshot of the most recent `nvidia-smi vgpu -q` output, including per-device status and expiry timestamps.
+- The `ClusterPolicy` resource exposes a `Licensed` condition that summarizes the state of every vGPU node. It turns `False` if any device is unlicensed or nearing expiry, and `Unknown` if data from the node-status-exporter is missing.
+
+You can inspect the node-level data with:
+
+```bash
+kubectl get node <name> -o jsonpath='{.metadata.annotations.nvidia\.com/vgpu-license-statuses}'
+```
+
+and the cluster-level summary through:
+
+```bash
+kubectl get clusterpolicy gpu-cluster-policy -o jsonpath='{.status.conditions[?(@.type=="Licensed")]}'
+```
+
+This makes it easier for users and automation to diagnose misconfigured or expired licenses without shelling into the node.

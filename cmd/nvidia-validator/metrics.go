@@ -43,6 +43,8 @@ const (
 	driverValidationCheckDelaySeconds = 60
 	// pluginValidationCheckDelaySeconds indicates the delay between two checks of the device plugin validation, in seconds
 	pluginValidationCheckDelaySeconds = 30
+	// licenseStatusCheckDelaySeconds indicates how often license annotations are refreshed.
+	licenseStatusCheckDelaySeconds = 60
 )
 
 // NodeMetrics contains the port of the metrics server and the
@@ -308,6 +310,7 @@ func (nm *NodeMetrics) Run() error {
 	go nm.watchDriverValidation()
 	go nm.watchDevicePluginValidation()
 	go nm.watchNVIDIAPCI()
+	go nm.watchLicenseAnnotations()
 
 	log.Printf("Running the metrics server, listening on :%d/metrics", nm.port)
 	http.Handle("/metrics", promhttp.Handler())

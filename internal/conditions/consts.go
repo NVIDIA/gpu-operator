@@ -32,4 +32,17 @@ const (
 	OperandNotReady = "OperandNotReady"
 	// DriverNotReady indicates that the driver daemonset pods are not ready
 	DriverNotReady = "DriverNotReady"
+
+	// LicenseOK indicates all vGPU devices report healthy license information.
+	LicenseOK = "LicenseOK"
+	// LicenseNotRequired indicates that no nodes require vGPU licensing.
+	LicenseNotRequired = "LicenseNotRequired"
+	// LicenseInfoMissing indicates that license annotations are missing or stale.
+	LicenseInfoMissing = "LicenseInfoMissing"
+	// LicenseExpiringSoon indicates that at least one license is near expiry.
+	LicenseExpiringSoon = "LicenseExpiringSoon"
+	// LicenseNotReady indicates an expired or unlicensed vGPU.
+	LicenseNotReady = "LicenseNotReady"
+	// LicenseCollectionFailed indicates the operator could not evaluate license information.
+	LicenseCollectionFailed = "LicenseCollectionFailed"
 )
