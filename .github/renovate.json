@@ -27,36 +27,40 @@
   "recreateWhen": "always",
   "separateMultipleMajor": false,
   "separateMinorPatch": false,
+  "pruneStaleBranches": true,
+  "rebaseWhen": "always",
+  "force": {
+    "createPr": true,
+    "createPrEvenIfClosed": true
+  },
+
   "customManagers": [
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
-      ],
-      "matchStrings": [
-        "[-\\s]*value:\\s*\"?(?<depName>[^:\"]+)(?::(?<currentValue>[^@\"]+))?@(?<currentDigest>sha256:[a-f0-9]{64})\"?",
-        "[-\\s]*image: (?<depName>.*?)(?::(?<currentValue>.*?))?@(?<currentDigest>sha256:[a-f0-9]{64})",
-        "- name: (?<suffix>[\\w-]+)[-\\s]*image: (?<depName>.*?)(?::(?<currentValue>.*?))?@(?<currentDigest>sha256:[a-f0-9]{64})"
-      ],
-      "versioningTemplate": "{{depName}}{{#if newValue}}:{{newValue}}{{/if}}{{#if newDigest}}@{{newDigest}}{{/if}}",
-      "datasourceTemplate": "docker"
-    },
     {
       "customType": "regex",
       "managerFilePatterns": [
         "deployments/gpu-operator/values.yaml"
       ],
       "matchStrings": [
-       "[-\\s]*repository:\\s*(?<repo>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*image:\\s*(?<image>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*version:\\s*(?<currentValue>\\S+)"
+        "[-\\s]*repository:\\s*(?<repo>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*image:\\s*(?<image>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*version:\\s*(?<currentValue>\\S+)"
       ],
       "depNameTemplate": "{{repo}}/{{image}}",
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
+      ],
+      "matchStrings": [
+        "(?<depName>[^:\"]+):(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
+
   "packageRules": [
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
       "matchPackageNames": [
         "nvcr.io/nvidia/cloud-native/k8s-driver-manager",
         "nvcr.io/nvidia/cloud-native/k8s-kata-manager",
@@ -69,28 +73,30 @@
       "separateMajorMinor": false
     },
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
       "matchPackageNames": [
-       "nvcr.io/nvidia/k8s/container-toolkit",
-       "nvcr.io/nvidia/cloud-native/k8s-mig-manager"
+        "nvcr.io/nvidia/cloud-native/k8s-mig-manager"
       ],
-      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-ubuntu(?<ubuntu>\\d+\\.\\d+)$",
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-ubuntu(?<ubuntu>\\d+\\.\\d+))?$",
       "separateMajorMinor": false
     },
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
-      "matchPackageNames": [
-        "nvcr.io/nvidia/k8s/dcgm-exporter"
-      ],
-      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-distroless$",
-      "separateMajorMinor": false
-    },
-    {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
-      "matchPackageNames": [
-       "nvcr.io/nvidia/cuda"
-      ],
+      "matchPackageNames": ["nvcr.io/nvidia/cuda"],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-base-ubi9$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPackageNames": ["nvcr.io/nvidia/k8s/dcgm-exporter"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-\\d+\\.\\d+\\.\\d+-(?:ubuntu\\d+\\.\\d+|distroless)$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPackageNames": ["nvcr.io/nvidia/cloud-native/dcgm"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-ubuntu(?<ubuntu>\\d+\\.\\d+)$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPackageNames": ["nvcr.io/nvidia/k8s/container-toolkit"],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-rc\\.(?<build>\\d+))?$",
       "separateMajorMinor": false
     },
     {
@@ -98,8 +104,10 @@
       "enabled": false
     },
     {
-      "matchDatasources": ["*"],
-      "groupName": "{{depName}}"
+      "matchDatasources": ["docker"],
+      "groupName": "{{depName}}",
+      "branchTopic": "{{depName}}",
+      "commitMessageTopic": "{{depName}}"
     }
   ]
 }
