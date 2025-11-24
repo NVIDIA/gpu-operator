@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,6 +36,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 var mockClientMap map[string]client.Client
@@ -1821,6 +1824,8 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 		daemonset         Daemonset
 		clusterPolicySpec *gpuv1.ClusterPolicySpec
 		expectedDaemonset Daemonset
+		client            client.Client
+		verifyRestart     bool
 	}{
 		{
 			description: "transform vgpu device manager",
@@ -1860,13 +1865,71 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 					Resources: resources,
 				}).
 				WithPullSecret(secret),
+			client:        fake.NewFakeClient(),
+			verifyRestart: false,
+		},
+		{
+			description: "hash changes when workload config changes triggering restart",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VGPUDeviceManager: gpuv1.VGPUDeviceManagerSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "vgpu-device-manager",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+			},
+			expectedDaemonset: Daemonset{}, // Not used, we return early
+			client: fake.NewFakeClient(
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+						Labels: map[string]string{
+							vgpuDeviceManagerLabelKey: "true",
+							gpuWorkloadConfigLabelKey: "vm-passthrough",
+						},
+					},
+				},
+			),
+			verifyRestart: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := TransformVGPUDeviceManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
-			require.NoError(t, err)
+			controller := ClusterPolicyController{
+				logger: ctrl.Log.WithName("test"),
+				ctx:    context.Background(),
+				client: tc.client,
+			}
+			require.NoError(t, TransformVGPUDeviceManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, controller))
+
+			hash1 := tc.daemonset.Spec.Template.Annotations[VGPUDeviceManagerWorkloadConfigHashKey]
+			require.NotEmpty(t, hash1)
+
+			if tc.verifyRestart {
+				ds1Hash := utils.GetObjectHash(tc.daemonset.DaemonSet)
+
+				// Change node workload config
+				node := &corev1.Node{}
+				require.NoError(t, tc.client.Get(context.Background(), types.NamespacedName{Name: "test-node"}, node))
+				node.Labels[gpuWorkloadConfigLabelKey] = "vm-vgpu"
+				require.NoError(t, tc.client.Update(context.Background(), node))
+
+				// Transform again and verify hash changed
+				ds2 := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"})
+				require.NoError(t, TransformVGPUDeviceManager(ds2.DaemonSet, tc.clusterPolicySpec, controller))
+
+				hash2 := ds2.Spec.Template.Annotations[VGPUDeviceManagerWorkloadConfigHashKey]
+				require.NotEqual(t, hash1, hash2, "Hash should change when workload config changes")
+				require.NotEqual(t, ds1Hash, utils.GetObjectHash(ds2.DaemonSet),
+					"DaemonSet spec hash should change, triggering restart")
+				return
+			}
+
+			// Remove dynamic hash annotation for comparison
+			tc.daemonset.Spec.Template.Annotations = nil
 			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
 		})
 	}

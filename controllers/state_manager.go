@@ -44,6 +44,7 @@ const (
 	commonOperandsLabelValue            = "true"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
+	vgpuDeviceManagerLabelKey           = "nvidia.com/gpu.deploy.vgpu-device-manager"
 	migCapableLabelKey                  = "nvidia.com/mig.capable"
 	migCapableLabelValue                = "true"
 	migConfigLabelKey                   = "nvidia.com/mig.config"

@@ -42,6 +42,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -150,6 +151,8 @@ const (
 	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
 	// KataManagerAnnotationHashKey is the annotation indicating the hash of the kata-manager configuration
 	KataManagerAnnotationHashKey = "nvidia.com/kata-manager.last-applied-hash"
+	// VGPUDeviceManagerWorkloadConfigHashKey is the annotation indicating the hash of workload configs for nodes matching vgpu-device-manager daemonset
+	VGPUDeviceManagerWorkloadConfigHashKey = "nvidia.com/vgpu-device-manager.workload-config-hash"
 	// DefaultKataArtifactsDir is the default directory to store kata artifacts on the host
 	DefaultKataArtifactsDir = "/opt/nvidia-gpu-operator/artifacts/runtimeclasses/"
 	// PodControllerRevisionHashLabelKey is the annotation key for pod controller revision hash value
@@ -796,6 +799,14 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 			obj.Spec.Template.Annotations[annoKey] = annoVal
 		}
 	}
+}
+
+// setPodTemplateAnnotation sets an annotation on the pod template, initializing the annotations map if needed
+func setPodTemplateAnnotation(obj *appsv1.DaemonSet, key, value string) {
+	if obj.Spec.Template.Annotations == nil {
+		obj.Spec.Template.Annotations = make(map[string]string)
+	}
+	obj.Spec.Template.Annotations[key] = value
 }
 
 // Apply common config that is applicable for all Daemonsets
@@ -1982,11 +1993,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// If the kata config changes, a new revision of the daemonset will be
 	// created and thus the kata-manager pods will restart with the updated config.
 	hash := utils.GetObjectHash(config.KataManager.Config)
-
-	if obj.Spec.Template.Annotations == nil {
-		obj.Spec.Template.Annotations = make(map[string]string)
-	}
-	obj.Spec.Template.Annotations[KataManagerAnnotationHashKey] = hash
+	setPodTemplateAnnotation(obj, KataManagerAnnotationHashKey, hash)
 
 	if len(config.KataManager.Env) > 0 {
 		for _, env := range config.KataManager.Env {
@@ -2162,6 +2169,26 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	}
 	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DEFAULT_VGPU_CONFIG", defaultConfig)
 
+	// Compute hash of workload configs for nodes matching this daemonset's nodeSelector.
+	// This ensures pods restart when workload config changes (e.g., vm-passthrough -> vm-vgpu).
+	nodeList := &corev1.NodeList{}
+	if err := n.client.List(n.ctx, nodeList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			vgpuDeviceManagerLabelKey: "true",
+		}),
+	}); err != nil {
+		n.logger.Error(err, "Failed to list nodes for workload config hash")
+		return nil
+	}
+
+	workloadConfigs := make(map[string]string)
+	for _, node := range nodeList.Items {
+		if wlConfig := node.Labels[gpuWorkloadConfigLabelKey]; wlConfig != "" {
+			workloadConfigs[node.Name] = wlConfig
+		}
+	}
+	hash := utils.GetObjectHash(workloadConfigs)
+	setPodTemplateAnnotation(obj, VGPUDeviceManagerWorkloadConfigHashKey, hash)
 	return nil
 }
 
