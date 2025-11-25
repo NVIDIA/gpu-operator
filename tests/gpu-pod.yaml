@@ -3,6 +3,7 @@ kind: Pod
 metadata:
   name: gpu-operator-test
 spec:
+  runtimeClassName: nvidia
   restartPolicy: OnFailure
   containers:
     - name: cuda-vector-add
