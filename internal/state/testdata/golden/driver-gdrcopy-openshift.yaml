@@ -238,7 +238,7 @@ spec:
             command:
             - sh
             - -c
-            - nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready
+            - '[ -f /sys/module/nvidia/refcnt ] && nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready'
           failureThreshold: 120
           initialDelaySeconds: 60
           periodSeconds: 10
