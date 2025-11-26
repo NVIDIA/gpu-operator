@@ -21,7 +21,6 @@ This section provides a quick guide for deploying the GPU Operator with the data
 
 Make sure your Kubernetes cluster meets the [prerequisites](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html#prerequisites) and is listed on the [platform support page](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html#supported-operating-systems-and-kubernetes-platforms) (section Supported Operating Systems and Kubernetes Platforms).
 
-We assume Helm is already installed on your machine.
 
 **Step 1: Add the NVIDIA Helm repository**
 
