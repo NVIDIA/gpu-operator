@@ -331,7 +331,7 @@ spec:
         startupProbe:
           exec:
             command:
-              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
+              [sh, -c, '[ -f /sys/module/nvidia/refcnt ] && nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
           initialDelaySeconds: {{ .Driver.Spec.StartupProbe.InitialDelaySeconds }}
           failureThreshold: {{ .Driver.Spec.StartupProbe.FailureThreshold }}
           successThreshold: {{ .Driver.Spec.StartupProbe.SuccessThreshold }}
