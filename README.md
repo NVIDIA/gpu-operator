@@ -50,7 +50,7 @@ For information on platform support and getting started, visit the official docu
 ## Roadmap
 
 - Support the latest NVIDIA Data Center GPUs, systems, and drivers.
-- RHEL 10.
+- Support RHEL 10.
 - KubeVirt with Ubuntu 24.04.
 - Promote the NVIDIADriver CR to General Availability(GA). With the NVIDIADriver CR, users can deploy multiple driver daemon sets in the same cluster thus supporting multiple driver version and/or configuration deployments in the same cluster.
 - Integrate [NVIDIA’s DRA Driver for GPUs](https://github.com/NVIDIA/k8s-dra-driver-gpu) as a managed component of the GPU Operator.
