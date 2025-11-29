@@ -2818,6 +2818,16 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
+		if config.VGPUManager.KernelModuleConfig != nil && config.VGPUManager.KernelModuleConfig.Name != "" {
+			// note: transformVGPUManagerContainer() will have already created a Volume backed by the ConfigMap.
+			// Only add a VolumeMount for nvidia-vgpu-manager-ctr.
+			destinationDir := "/drivers"
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.VGPUManager.KernelModuleConfig.Name, destinationDir)
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for vGPU manager kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+		}
 		if config.Driver.Resources != nil {
 			obj.Spec.Template.Spec.Containers[i].Resources = corev1.ResourceRequirements{
 				Requests: config.Driver.Resources.Requests,
@@ -3616,6 +3626,7 @@ func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, sec
 }
 
 func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	podSpec := &obj.Spec.Template.Spec
 	container := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
 
 	if container == nil {
@@ -3661,6 +3672,17 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		for _, env := range config.VGPUManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// mount any custom kernel module configuration parameters at /drivers
+	if config.VGPUManager.KernelModuleConfig != nil && config.VGPUManager.KernelModuleConfig.Name != "" {
+		destinationDir := "/drivers"
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.VGPUManager.KernelModuleConfig.Name, destinationDir)
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
+		}
+		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.VGPUManager.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	return nil
