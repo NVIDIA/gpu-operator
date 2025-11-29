@@ -651,6 +651,11 @@ type VGPUManagerSpec struct {
 
 	// DriverManager represents configuration for NVIDIA Driver Manager initContainer
 	DriverManager DriverManagerSpec `json:"driverManager,omitempty"`
+
+	// Optional: Kernel module configuration parameters for the vGPU manager
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Kernel module configuration parameters for the vGPU manager"
+	KernelModuleConfig *KernelModuleConfigSpec `json:"kernelModuleConfig,omitempty"`
 }
 
 // ToolkitSpec defines the properties for NVIDIA Container Toolkit deployment

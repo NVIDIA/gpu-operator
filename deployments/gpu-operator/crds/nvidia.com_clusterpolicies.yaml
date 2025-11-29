@@ -2321,6 +2321,13 @@ spec:
                     items:
                       type: string
                     type: array
+                  kernelModuleConfig:
+                    description: 'Optional: Kernel module configuration parameters
+                      for the vGPU manager'
+                    properties:
+                      name:
+                        type: string
+                    type: object
                   repository:
                     description: NVIDIA vGPU Manager image repository
                     type: string
