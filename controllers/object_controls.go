@@ -175,6 +175,10 @@ const (
 	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
 	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
 	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
+
+	// driversDir is the name of the directory used by the driver-container to represent the path
+	// of the drivers directory mounted in the container
+	driversDir = "/drivers"
 )
 
 // ContainerProbe defines container probe types
@@ -2811,10 +2815,18 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-peermem-ctr.
-			destinationDir := "/drivers"
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, driversDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
+			}
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
+		}
+		if config.VGPUManager.KernelModuleConfig != nil && config.VGPUManager.KernelModuleConfig.Name != "" {
+			// note: transformVGPUManagerContainer() will have already created a Volume backed by the ConfigMap.
+			// Only add a VolumeMount for nvidia-vgpu-manager-ctr.
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.VGPUManager.KernelModuleConfig.Name, driversDir)
+			if err != nil {
+				return fmt.Errorf("failed to create ConfigMap VolumeMounts for vGPU manager kernel module configuration: %w", err)
 			}
 			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(obj.Spec.Template.Spec.Containers[i].VolumeMounts, volumeMounts...)
 		}
@@ -3481,8 +3493,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// mount any custom kernel module configuration parameters at /drivers
 	if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
-		destinationDir := "/drivers"
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, destinationDir)
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, driversDir)
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 		}
@@ -3613,6 +3624,7 @@ func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, sec
 }
 
 func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	podSpec := &obj.Spec.Template.Spec
 	container := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
 
 	if container == nil {
@@ -3658,6 +3670,16 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		for _, env := range config.VGPUManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// mount any custom kernel module configuration parameters at /drivers
+	if config.VGPUManager.KernelModuleConfig != nil && config.VGPUManager.KernelModuleConfig.Name != "" {
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.VGPUManager.KernelModuleConfig.Name, driversDir)
+		if err != nil {
+			return fmt.Errorf("failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
+		}
+		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.VGPUManager.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	return nil
