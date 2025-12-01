@@ -381,6 +381,7 @@ func TestTransformForRuntime(t *testing.T) {
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -392,11 +393,13 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -414,6 +417,7 @@ func TestTransformForRuntime(t *testing.T) {
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -426,11 +430,13 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -448,6 +454,7 @@ func TestTransformForRuntime(t *testing.T) {
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -460,11 +467,13 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -475,6 +484,7 @@ func TestTransformForRuntime(t *testing.T) {
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -483,10 +493,12 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -499,6 +511,7 @@ func TestTransformForRuntime(t *testing.T) {
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "nvidia-kata-manager",
 					Env: []corev1.EnvVar{
@@ -508,10 +521,12 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
 						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -522,6 +537,7 @@ func TestTransformForRuntime(t *testing.T) {
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume("docker-config", filepath.Dir(DefaultDockerConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("docker-socket", filepath.Dir(DefaultDockerSocketFile), nil).
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
@@ -530,10 +546,12 @@ func TestTransformForRuntime(t *testing.T) {
 						{Name: "DOCKER_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultDockerConfigFile))},
 						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
 						{Name: "DOCKER_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
+						{Name: "RUNTIME_NRI_SOCKET", Value: filepath.Join(DefaultRuntimeNRISocketTargetDir, filepath.Base(DefaultRuntimeNRISocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "docker-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "docker-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
 					},
 				}),
 		},
@@ -834,16 +852,19 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+						{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithPullSecret("pull-secret"),
 		},
 		{
@@ -913,16 +934,19 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
 						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
 						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+						{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithPullSecret("pull-secret"),
 		},
 		{
@@ -952,14 +976,17 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+						{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 		{
 			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi disabled",
@@ -988,14 +1015,17 @@ func TestTransformToolkit(t *testing.T) {
 						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
 						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
 						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+						{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 					},
 				}).
 				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 	}
 
@@ -1578,13 +1608,19 @@ func TestTransformKataManager(t *testing.T) {
 					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
 					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
 					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
 					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+					{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 				},
-			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
+			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).
+				WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 		{
 			description: "transform kata manager with custom container runtime socket",
@@ -1630,17 +1666,20 @@ func TestTransformKataManager(t *testing.T) {
 					{Name: "RUNTIME", Value: "containerd"},
 					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
 					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "RUNTIME_NRI_SOCKET", Value: "/runtime/nri-sock-dir/nri.sock"},
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
 					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+					{Name: "nri-socket", MountPath: "/runtime/nri-sock-dir/"},
 				},
 			}).WithPullSecret("pull-secret").
 				WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).
 				WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil),
+				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
+				WithHostPathVolume("nri-socket", "/var/run/nri", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
 	}
 
