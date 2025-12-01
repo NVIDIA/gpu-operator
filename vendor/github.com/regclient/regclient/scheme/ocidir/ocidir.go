@@ -150,7 +150,7 @@ func (o *OCIDir) initIndex(r ref.Ref, locked bool) error {
 		return nil
 	}
 	//#nosec G301 defer to user umask settings
-	err = os.MkdirAll(r.Path, 0777)
+	err = os.MkdirAll(r.Path, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
@@ -237,7 +237,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		defer o.mu.Unlock()
 	}
 	//#nosec G301 defer to user umask settings
-	err := os.MkdirAll(r.Path, 0777)
+	err := os.MkdirAll(r.Path, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
