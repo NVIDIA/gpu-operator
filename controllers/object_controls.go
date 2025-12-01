@@ -66,6 +66,8 @@ const (
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
+	// DefaultRuntimeNRISocketFile indicates the default container runtime NRI socket file
+	DefaultRuntimeNRISocketFile = "/var/run/nri/nri.sock"
 	// DefaultCRIOConfigFile indicates default config file path for cri-o. .
 	DefaultCRIOConfigFile = "/etc/crio/config.toml"
 	// DefaultCRIODropInConfigFile indicates the default path to the drop-in config file for cri-o
@@ -82,9 +84,11 @@ const (
 	DefaultRuntimeClass = "nvidia"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
 	DriverInstallPathVolName = "driver-install-path"
-	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeNRISocketTargetDir represents target directory where runtime NRI socket directory will be mounted
+	DefaultRuntimeNRISocketTargetDir = "/runtime/nri-sock-dir/"
+	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
-	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
 	// DefaultRuntimeDropInConfigTargetDir represents target directory where drop-in config directory will be mounted
 	DefaultRuntimeDropInConfigTargetDir = "/runtime/config-dir.d/"
@@ -1440,6 +1444,22 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
+
+	// setup mounts for the runtime NRI socket file
+	nriSocketFile := getContainerEnv(container, "RUNTIME_NRI_SOCKET")
+	if nriSocketFile == "" {
+		nriSocketFile = DefaultRuntimeNRISocketFile
+	}
+
+	setContainerEnv(container, "RUNTIME_NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
+
+	nriVolMountSocketName := "nri-socket"
+	nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
+	container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
+
+	nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
+
 	return nil
 }
 
