@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator/tests/e2e
 
-go 1.24.3
+go 1.25.0
 
 require (
 	github.com/mittwald/go-helm-client v0.12.18
