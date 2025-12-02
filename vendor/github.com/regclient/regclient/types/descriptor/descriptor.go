@@ -3,6 +3,7 @@ package descriptor
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -218,6 +219,42 @@ type MatchOpt struct {
 	Annotations    map[string]string  // Match each of the specified annotations and their value, an empty value verifies the key is set
 	SortAnnotation string             // Sort the results by an annotation, string based comparison, descriptors without the annotation are sorted last
 	SortDesc       bool               // Set to true to sort in descending order
+}
+
+// Merge applies changes to a MatchOpt, overwriting existing values, and returning a new MatchOpt.
+func (mo MatchOpt) Merge(changes MatchOpt) MatchOpt {
+	ret := MatchOpt{
+		ArtifactType:   changes.ArtifactType,
+		SortAnnotation: changes.SortAnnotation,
+		SortDesc:       changes.SortDesc,
+	}
+	if ret.ArtifactType == "" {
+		ret.ArtifactType = mo.ArtifactType
+	}
+	if changes.Platform != nil {
+		p := *changes.Platform
+		ret.Platform = &p
+	} else if mo.Platform != nil {
+		p := *mo.Platform
+		ret.Platform = &p
+	}
+	if ret.SortAnnotation == "" {
+		ret.SortAnnotation = mo.SortAnnotation
+	}
+	if !ret.SortDesc {
+		ret.SortDesc = mo.SortDesc
+	}
+	if len(mo.Annotations) > 0 {
+		ret.Annotations = maps.Clone(mo.Annotations)
+	}
+	if len(changes.Annotations) > 0 {
+		if ret.Annotations == nil {
+			ret.Annotations = changes.Annotations
+		} else {
+			maps.Copy(ret.Annotations, changes.Annotations)
+		}
+	}
+	return ret
 }
 
 // Match returns true if the descriptor matches the options, including compatible platforms.
