@@ -28,6 +28,7 @@ files:
       - gha-alpine-digest
   "Makefile":
     processors:
+      - makefile-gofumpt
       - makefile-gomajor
       - makefile-go-vulncheck
       - makefile-markdown-lint
@@ -105,6 +106,14 @@ processors:
       regexp: '^ARG ECR_HELPER_VER=(?P<Version>v?\d+\.\d+\.\d+)\s*$'
     sourceArgs:
       url: "https://github.com/awslabs/amazon-ecr-credential-helper.git"
+    # get the version for the ecr-login nested package in the repo
+    filter:
+      expr: '^ecr-login/v?\d+\.\d+\.\d+$'
+    # sort and output only the version number without the package name prefix
+    sort:
+      method: "semver"
+      template: '{{ index (split . "/") 1 }}'
+    template: '{{ index (split .Version "/") 1 }}'
   docker-arg-gcr:
     <<: *git-tag-semver
     scanArgs:
@@ -152,6 +161,8 @@ processors:
       regexp: '^\s*cosign-release: "(?P<Version>v?[0-9\.]+)"\s*$'
     sourceArgs:
       url: "https://github.com/sigstore/cosign.git"
+    filter:
+      expr: '^v?3\.\d+\.\d+$' # pin to v3, v4 will remove support for older clients
   gha-golang-matrix:
     <<: *registry-tag-semver
     key: "golang-matrix"
@@ -222,6 +233,12 @@ processors:
       regexp: '^CI_ZOT_VER\?=(?P<Version>v?[0-9\.]+)\s*$'
     sourceArgs:
       repo: "ghcr.io/project-zot/zot-linux-amd64"
+  makefile-gofumpt:
+    <<: *git-tag-semver
+    scanArgs:
+      regexp: '^GOFUMPT_VER\?=(?P<Version>v?[0-9\.]+)\s*$'
+    sourceArgs:
+      url: "https://github.com/mvdan/gofumpt.git"
   makefile-gomajor:
     <<: *git-tag-semver
     scanArgs:
