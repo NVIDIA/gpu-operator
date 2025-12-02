@@ -3159,3 +3159,81 @@ func TestTransformDriverWithResources(t *testing.T) {
 		})
 	}
 }
+
+func TestTransformDriverRDMA(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithContainer(corev1.Container{Name: "nvidia-fs"}).
+		WithContainer(corev1.Container{Name: "nvidia-gdrcopy"}).
+		WithContainer(corev1.Container{Name: "nvidia-peermem"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "driver",
+			Version:    "570.172.08",
+			Manager: gpuv1.DriverManagerSpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "k8s-driver-manager",
+				Version:    "v0.8.0",
+			},
+			GPUDirectRDMA: &gpuv1.GPUDirectRDMASpec{
+				Enabled:      newBoolPtr(true),
+				UseHostMOFED: newBoolPtr(true),
+			},
+		},
+	}
+
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "nvidia-driver-ctr",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "GPU_DIRECT_RDMA_ENABLED",
+				Value: "true",
+			},
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:  "k8s-driver-manager",
+		Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "GPU_DIRECT_RDMA_ENABLED",
+				Value: "true",
+			},
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+		},
+	}).WithContainer(corev1.Container{
+		Name:  "nvidia-peermem",
+		Image: "nvcr.io/nvidia/driver:570.172.08-",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+		},
+	})
+
+	err := TransformDriver(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}
