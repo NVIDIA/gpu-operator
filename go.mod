@@ -1,13 +1,13 @@
 module github.com/NVIDIA/gpu-operator
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.8.1
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20251027171627-45ccd0c3dd32
-	github.com/NVIDIA/nvidia-container-toolkit v1.18.0
+	github.com/NVIDIA/nvidia-container-toolkit v1.18.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.27.2
