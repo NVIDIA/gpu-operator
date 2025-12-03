@@ -168,6 +168,11 @@ func (d Daemonset) WithHostNetwork(enabled bool) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithDNSPolicy(policy corev1.DNSPolicy) Daemonset {
+	d.Spec.Template.Spec.DNSPolicy = policy
+	return d
+}
+
 func (d Daemonset) WithHostPID(enabled bool) Daemonset {
 	d.Spec.Template.Spec.HostPID = enabled
 	return d
@@ -1271,6 +1276,133 @@ func TestTransformDCGMExporter(t *testing.T) {
 					{Name: "foo", Value: "bar"},
 				},
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostPID(false),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostNetwork:      newBoolPtr(true),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostNetwork:      newBoolPtr(false),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(false),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork unspecified",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(false),
+		},
+		{
+			description: "transform dcgm exporter with dcgm running on the host itself(DGX BaseOS)",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "dcgm-exporter",
+					Env:  []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+				}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(false),
+				},
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
 		},
 		{
 			description:      "transform dcgm exporter, openshift",
