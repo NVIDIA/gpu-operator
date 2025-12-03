@@ -52,7 +52,7 @@ jobs:
     needs: [variables, image-builds]
     uses: ./.github/workflows/e2e-tests.yaml
     with:
-      operator_image: ${{ needs.variables.outputs.operator_image_base }}
+      operator_image: ${{ needs.variables.outputs.operator_image }}
       operator_version: ${{ needs.variables.outputs.operator_version }}
     secrets: inherit
 

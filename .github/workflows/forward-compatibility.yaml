@@ -17,20 +17,7 @@ name: Forward Compatibility
 on:
   schedule:
     - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
-  workflow_dispatch:
-    inputs:
-      toolkit_image:
-        description: 'Override container-toolkit image'
-        required: false
-        type: string
-      device_plugin_image:
-        description: 'Override device-plugin image'
-        required: false
-        type: string
-      mig_manager_image:
-        description: 'Override mig-manager image'
-        required: false
-        type: string
+  workflow_dispatch:  # Manual trigger
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -59,32 +46,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use workflow_dispatch inputs if provided, otherwise fetch latest
-          if [[ -n "${{ inputs.toolkit_image }}" ]]; then
-            TOOLKIT="${{ inputs.toolkit_image }}"
-            echo "::notice::Using provided toolkit image: ${TOOLKIT}"
-          else
-            echo "::notice::Fetching latest container-toolkit image..."
-            TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
-          fi
+          # Fetch latest images from component repositories
+          echo "::notice::Fetching latest container-toolkit image..."
+          TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
           echo "toolkit_image=${TOOLKIT}" >> $GITHUB_OUTPUT
           
-          if [[ -n "${{ inputs.device_plugin_image }}" ]]; then
-            DEVICE_PLUGIN="${{ inputs.device_plugin_image }}"
-            echo "::notice::Using provided device-plugin image: ${DEVICE_PLUGIN}"
-          else
-            echo "::notice::Fetching latest device-plugin image..."
-            DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
-          fi
+          echo "::notice::Fetching latest device-plugin image..."
+          DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
           echo "device_plugin_image=${DEVICE_PLUGIN}" >> $GITHUB_OUTPUT
           
-          if [[ -n "${{ inputs.mig_manager_image }}" ]]; then
-            MIG_MANAGER="${{ inputs.mig_manager_image }}"
-            echo "::notice::Using provided mig-manager image: ${MIG_MANAGER}"
-          else
-            echo "::notice::Fetching latest mig-manager image..."
-            MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
-          fi
+          echo "::notice::Fetching latest mig-manager image..."
+          MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
           echo "mig_manager_image=${MIG_MANAGER}" >> $GITHUB_OUTPUT
           
           echo "::notice::=== Forward Compatibility Test Configuration ==="
