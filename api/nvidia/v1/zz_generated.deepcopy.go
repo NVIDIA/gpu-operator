@@ -404,6 +404,11 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.HostNetwork != nil {
+		in, out := &in.HostNetwork, &out.HostNetwork
+		*out = new(bool)
+		**out = **in
+	}
 	if in.HPCJobMapping != nil {
 		in, out := &in.HPCJobMapping, &out.HPCJobMapping
 		*out = new(DCGMExporterHPCJobMappingConfig)
