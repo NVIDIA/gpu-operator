@@ -23,18 +23,6 @@ on:
         description: 'Operator version to use (optional override)'
         required: false
         type: string
-      toolkit_image:
-        description: 'Full container-toolkit image path (optional)'
-        required: false
-        type: string
-      device_plugin_image:
-        description: 'Full device-plugin image path (optional)'
-        required: false
-        type: string
-      mig_manager_image:
-        description: 'Full mig-manager image path (optional)'
-        required: false
-        type: string
     outputs:
       commit_short_sha:
         description: "The short SHA to use as a version string"
@@ -57,15 +45,6 @@ on:
       operator_image:
         description: "The operator image (with override support)"
         value: ${{ jobs.variables.outputs.operator_image }}
-      toolkit_image:
-        description: "The container-toolkit image override"
-        value: ${{ jobs.variables.outputs.toolkit_image }}
-      device_plugin_image:
-        description: "The device-plugin image override"
-        value: ${{ jobs.variables.outputs.device_plugin_image }}
-      mig_manager_image:
-        description: "The mig-manager image override"
-        value: ${{ jobs.variables.outputs.mig_manager_image }}
 
 jobs:
   variables:
@@ -78,9 +57,6 @@ jobs:
       operator_image_base: ${{ steps.vars.outputs.operator_image_base }}
       operator_version: ${{ steps.vars.outputs.operator_version }}
       operator_image: ${{ steps.vars.outputs.operator_image }}
-      toolkit_image: ${{ steps.vars.outputs.toolkit_image }}
-      device_plugin_image: ${{ steps.vars.outputs.device_plugin_image }}
-      mig_manager_image: ${{ steps.vars.outputs.mig_manager_image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -124,11 +100,6 @@ jobs:
             OPERATOR_IMAGE="${OPERATOR_IMAGE_BASE}"
           fi
           
-          # Component images (optional overrides)
-          TOOLKIT_IMAGE="${{ inputs.toolkit_image }}"
-          DEVICE_PLUGIN_IMAGE="${{ inputs.device_plugin_image }}"
-          MIG_MANAGER_IMAGE="${{ inputs.mig_manager_image }}"
-          
           # Output all variables
           echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "repo_full_name=${REPO_FULL_NAME}" >> $GITHUB_OUTPUT
@@ -137,21 +108,9 @@ jobs:
           echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
           echo "operator_version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
           echo "operator_image=${OPERATOR_IMAGE}" >> $GITHUB_OUTPUT
-          echo "toolkit_image=${TOOLKIT_IMAGE}" >> $GITHUB_OUTPUT
-          echo "device_plugin_image=${DEVICE_PLUGIN_IMAGE}" >> $GITHUB_OUTPUT
-          echo "mig_manager_image=${MIG_MANAGER_IMAGE}" >> $GITHUB_OUTPUT
           
           # Display for debugging
           echo "::notice::Commit SHA: ${COMMIT_SHORT_SHA}"
           echo "::notice::Push on build: ${PUSH_ON_BUILD}"
           echo "::notice::Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
-          if [[ -n "${TOOLKIT_IMAGE}" ]]; then
-            echo "::notice::Using custom toolkit: ${TOOLKIT_IMAGE}"
-          fi
-          if [[ -n "${DEVICE_PLUGIN_IMAGE}" ]]; then
-            echo "::notice::Using custom device-plugin: ${DEVICE_PLUGIN_IMAGE}"
-          fi
-          if [[ -n "${MIG_MANAGER_IMAGE}" ]]; then
-            echo "::notice::Using custom mig-manager: ${MIG_MANAGER_IMAGE}"
-          fi
 

@@ -10,34 +10,68 @@ source ${SCRIPT_DIR}/.definitions.sh
 
 OPERATOR_REPOSITORY=$(dirname ${OPERATOR_IMAGE})
 
+# Determine if we should use values file approach or --set flags
+USE_VALUES_FILE=false
+if [[ -n "${VALUES_FILE:-}" ]]; then
+	USE_VALUES_FILE=true
+fi
+
+# Build operator options conditionally
 : ${OPERATOR_OPTIONS:=""}
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.repository=${OPERATOR_REPOSITORY} --set validator.repository=${OPERATOR_REPOSITORY}"
-
-if [[ -n "${OPERATOR_VERSION}" ]]; then
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION} --set validator.version=${OPERATOR_VERSION}"
+if [[ "${USE_VALUES_FILE}" == "false" ]]; then
+	# Traditional approach: build --set flags
+	OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.repository=${OPERATOR_REPOSITORY} --set validator.repository=${OPERATOR_REPOSITORY}"
+	
+	if [[ -n "${OPERATOR_VERSION}" ]]; then
+		OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION} --set validator.version=${OPERATOR_VERSION}"
+	fi
+	
+	OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.defaultRuntime=${CONTAINER_RUNTIME}"
 fi
 
-OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.defaultRuntime=${CONTAINER_RUNTIME}"
+if [[ "${USE_VALUES_FILE}" == "true" ]]; then
+	# Generate a temporary values file from environment variables
+	# and merge it with the provided VALUES_FILE
+	TEMP_ENV_VALUES=$(mktemp)
+	${SCRIPT_DIR}/env-to-values.sh "${TEMP_ENV_VALUES}"
+	
+	# If VALUES_FILE exists, merge it with env-generated values
+	# Otherwise just use the env-generated values
+	if [[ -f "${VALUES_FILE}" ]]; then
+		echo ""
+		echo "Using provided values file: ${VALUES_FILE}"
+		cat "${VALUES_FILE}"
+		echo ""
+		echo "Merged with environment-based values:"
+		cat "${TEMP_ENV_VALUES}"
+		# Create a combined values file
+		COMBINED_VALUES=$(mktemp)
+		cat "${VALUES_FILE}" "${TEMP_ENV_VALUES}" > "${COMBINED_VALUES}"
+		VALUES_FILE="${COMBINED_VALUES}"
+	else
+		VALUES_FILE="${TEMP_ENV_VALUES}"
+	fi
+	
+	# Clear individual options since we're using values file
+	TOOLKIT_CONTAINER_OPTIONS=""
+	DEVICE_PLUGIN_OPTIONS=""
+	MIG_MANAGER_OPTIONS=""
+else
+	# Traditional approach: use --set flags for backward compatibility
+	: ${TOOLKIT_CONTAINER_OPTIONS:=""}
+	if [[ -n "${TOOLKIT_CONTAINER_IMAGE:-}" ]]; then
+		TOOLKIT_CONTAINER_OPTIONS="${TOOLKIT_CONTAINER_OPTIONS} --set toolkit.repository=\"\" --set toolkit.version=\"\" --set toolkit.image=\"${TOOLKIT_CONTAINER_IMAGE}\""
+	fi
 
-# We set up the options for the toolkit container
-: ${TOOLKIT_CONTAINER_OPTIONS:=""}
+	: ${DEVICE_PLUGIN_OPTIONS:=""}
+	if [[ -n "${DEVICE_PLUGIN_IMAGE:-}" ]]; then
+		DEVICE_PLUGIN_OPTIONS="${DEVICE_PLUGIN_OPTIONS} --set devicePlugin.repository=\"\" --set devicePlugin.version=\"\" --set devicePlugin.image=\"${DEVICE_PLUGIN_IMAGE}\""
+	fi
 
-if [[ -n "${TOOLKIT_CONTAINER_IMAGE}" ]]; then
-TOOLKIT_CONTAINER_OPTIONS="${TOOLKIT_CONTAINER_OPTIONS} --set toolkit.repository=\"\" --set toolkit.version=\"\" --set toolkit.image=\"${TOOLKIT_CONTAINER_IMAGE}\""
-fi
-
-# We set up the options for the device plugin
-: ${DEVICE_PLUGIN_OPTIONS:=""}
-
-if [[ -n "${DEVICE_PLUGIN_IMAGE}" ]]; then
-DEVICE_PLUGIN_OPTIONS="${DEVICE_PLUGIN_OPTIONS} --set devicePlugin.repository=\"\" --set devicePlugin.version=\"\" --set devicePlugin.image=\"${DEVICE_PLUGIN_IMAGE}\""
-fi
-
-# We set up the options for the MIG manager
-: ${MIG_MANAGER_OPTIONS:=""}
-
-if [[ -n "${MIG_MANAGER_IMAGE}" ]]; then
-MIG_MANAGER_OPTIONS="${MIG_MANAGER_OPTIONS} --set migManager.repository=\"\" --set migManager.version=\"\" --set migManager.image=\"${MIG_MANAGER_IMAGE}\""
+	: ${MIG_MANAGER_OPTIONS:=""}
+	if [[ -n "${MIG_MANAGER_IMAGE:-}" ]]; then
+		MIG_MANAGER_OPTIONS="${MIG_MANAGER_OPTIONS} --set migManager.repository=\"\" --set migManager.version=\"\" --set migManager.image=\"${MIG_MANAGER_IMAGE}\""
+	fi
 fi
 
 # Create the test namespace
@@ -58,10 +92,26 @@ if [[ "${GPU_MODE}" == "vgpu" ]]; then
 fi
 
 # Run the helm install command
-${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
-	-n "${TEST_NAMESPACE}" \
-	${OPERATOR_OPTIONS} \
-	${TOOLKIT_CONTAINER_OPTIONS} \
-	${DEVICE_PLUGIN_OPTIONS} \
-	${MIG_MANAGER_OPTIONS} \
+echo ""
+echo "Installing GPU Operator with Helm..."
+echo "Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
+
+if [[ "${USE_VALUES_FILE}" == "true" ]]; then
+	echo "Using values file approach: ${VALUES_FILE}"
+	${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
+		-n "${TEST_NAMESPACE}" \
+		-f "${VALUES_FILE}" \
 		--wait
+	
+	# Cleanup temporary values files
+	rm -f "${TEMP_ENV_VALUES:-}" "${COMBINED_VALUES:-}"
+else
+	echo "Using --set flags approach"
+	${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
+		-n "${TEST_NAMESPACE}" \
+		${OPERATOR_OPTIONS} \
+		${TOOLKIT_CONTAINER_OPTIONS} \
+		${DEVICE_PLUGIN_OPTIONS} \
+		${MIG_MANAGER_OPTIONS} \
+		--wait
+fi

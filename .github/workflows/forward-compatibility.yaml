@@ -26,10 +26,6 @@ concurrency:
 jobs:
   fetch-latest-images:
     runs-on: ubuntu-latest
-    outputs:
-      toolkit_image: ${{ steps.images.outputs.toolkit_image }}
-      device_plugin_image: ${{ steps.images.outputs.device_plugin_image }}
-      mig_manager_image: ${{ steps.images.outputs.mig_manager_image }}
     steps:
       - uses: actions/checkout@v5
       
@@ -41,28 +37,33 @@ jobs:
           chmod +x bin/regctl
           echo "$(pwd)/bin" >> $GITHUB_PATH
       
-      - name: Get latest component images
-        id: images
+      - name: Get latest component images and generate values override file
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch latest images from component repositories
           echo "::notice::Fetching latest container-toolkit image..."
           TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
-          echo "toolkit_image=${TOOLKIT}" >> $GITHUB_OUTPUT
           
           echo "::notice::Fetching latest device-plugin image..."
           DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
-          echo "device_plugin_image=${DEVICE_PLUGIN}" >> $GITHUB_OUTPUT
           
           echo "::notice::Fetching latest mig-manager image..."
           MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
-          echo "mig_manager_image=${MIG_MANAGER}" >> $GITHUB_OUTPUT
           
-          echo "::notice::=== Forward Compatibility Test Configuration ==="
-          echo "::notice::Container Toolkit: ${TOOLKIT}"
-          echo "::notice::Device Plugin: ${DEVICE_PLUGIN}"
-          echo "::notice::MIG Manager: ${MIG_MANAGER}"
+          # Generate values override file
+          .github/scripts/generate-values-overrides.sh \
+            values-overrides.yaml \
+            "${TOOLKIT}" \
+            "${DEVICE_PLUGIN}" \
+            "${MIG_MANAGER}"
+      
+      - name: Upload values override file
+        uses: actions/upload-artifact@v5
+        with:
+          name: values-overrides
+          path: values-overrides.yaml
+          retention-days: 30
 
   run-e2e-tests:
     needs: [fetch-latest-images]
@@ -70,9 +71,7 @@ jobs:
     with:
       operator_image: ghcr.io/nvidia/gpu-operator
       operator_version: main-latest
-      toolkit_image: ${{ needs.fetch-latest-images.outputs.toolkit_image }}
-      device_plugin_image: ${{ needs.fetch-latest-images.outputs.device_plugin_image }}
-      mig_manager_image: ${{ needs.fetch-latest-images.outputs.mig_manager_image }}
+      use_values_override: true
     secrets: inherit
 
   notify-failure:
@@ -95,9 +94,7 @@ jobs:
               *Trigger:* ${{ github.event_name }}
               
               *Tested Components:*
-              • Container Toolkit: `${{ needs.fetch-latest-images.outputs.toolkit_image }}`
-              • Device Plugin: `${{ needs.fetch-latest-images.outputs.device_plugin_image }}`
-              • MIG Manager: `${{ needs.fetch-latest-images.outputs.mig_manager_image }}`
+              Download `values-overrides` artifact to see tested component versions
               
               *Details:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Run>
               <@S095E7BNGJU> 

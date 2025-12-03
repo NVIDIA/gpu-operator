@@ -28,18 +28,11 @@ on:
       operator_version:
         required: true
         type: string
-      toolkit_image:
+      use_values_override:
         required: false
-        type: string
-        description: 'Full container-toolkit image path (e.g., ghcr.io/nvidia/container-toolkit:v1.18.0)'
-      device_plugin_image:
-        required: false
-        type: string
-        description: 'Full device-plugin image path'
-      mig_manager_image:
-        required: false
-        type: string
-        description: 'Full mig-manager image path'
+        type: boolean
+        default: false
+        description: 'Use values-overrides artifact for component image configuration'
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -61,18 +54,6 @@ on:
         description: 'Operator version to test (override)'
         required: false
         type: string
-      toolkit_image:
-        description: 'Override container-toolkit image'
-        required: false
-        type: string
-      device_plugin_image:
-        description: 'Override device-plugin image'
-        required: false
-        type: string
-      mig_manager_image:
-        description: 'Override mig-manager image'
-        required: false
-        type: string
 
 jobs:
   variables:
@@ -80,9 +61,6 @@ jobs:
     with:
       operator_image: ${{ inputs.operator_image }}
       operator_version: ${{ inputs.operator_version }}
-      toolkit_image: ${{ inputs.toolkit_image }}
-      device_plugin_image: ${{ inputs.device_plugin_image }}
-      mig_manager_image: ${{ inputs.mig_manager_image }}
 
   e2e-tests-containerd:
     needs: [variables]
@@ -93,6 +71,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         name: Check out code
+      - name: Download values override file
+        if: ${{ inputs.use_values_override }}
+        uses: actions/download-artifact@v5
+        with:
+          name: values-overrides
+          path: ${{ github.workspace }}
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.2.17
         with:
@@ -109,13 +93,13 @@ jobs:
         run: |
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
+          if [[ "${{ inputs.use_values_override }}" == "true" ]]; then
+            echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> $GITHUB_ENV
+          fi
       - name: Run e2e tests
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
-          TOOLKIT_CONTAINER_IMAGE: ${{ needs.variables.outputs.toolkit_image }}
-          DEVICE_PLUGIN_IMAGE: ${{ needs.variables.outputs.device_plugin_image }}
-          MIG_MANAGER_IMAGE: ${{ needs.variables.outputs.mig_manager_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
@@ -142,6 +126,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         name: Check out code
+      - name: Download values override file
+        if: ${{ inputs.use_values_override }}
+        uses: actions/download-artifact@v5
+        with:
+          name: values-overrides
+          path: ${{ github.workspace }}
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.2.17
         with:
@@ -158,13 +148,13 @@ jobs:
         run: |
           echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
+          if [[ "${{ inputs.use_values_override }}" == "true" ]]; then
+            echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> $GITHUB_ENV
+          fi
       - name: Run e2e tests
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
-          TOOLKIT_CONTAINER_IMAGE: ${{ needs.variables.outputs.toolkit_image }}
-          DEVICE_PLUGIN_IMAGE: ${{ needs.variables.outputs.device_plugin_image }}
-          MIG_MANAGER_IMAGE: ${{ needs.variables.outputs.mig_manager_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
