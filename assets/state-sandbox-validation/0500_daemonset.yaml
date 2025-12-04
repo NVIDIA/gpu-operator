@@ -16,6 +16,9 @@ spec:
       labels:
         app: nvidia-sandbox-validator
         app.kubernetes.io/part-of: gpu-operator
+      annotations:
+        cdi-devices.noderesource.dev/container.nvidia-sandbox-validator: |
+          - management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.sandbox-validator: "true"
