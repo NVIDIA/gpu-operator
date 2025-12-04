@@ -248,6 +248,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: KERNEL_MODULE_TYPE
+          value: open
         - name: FOO
           value: foo
         - name: BAR
