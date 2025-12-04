@@ -188,6 +188,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_TYPE
+          value: vgpu-host-manager
         - name: OPENSHIFT_VERSION
           value: "4.13"
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0
@@ -307,6 +309,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_TYPE
+          value: vgpu-host-manager
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
