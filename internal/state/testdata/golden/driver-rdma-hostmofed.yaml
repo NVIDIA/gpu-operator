@@ -142,6 +142,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_TYPE
+          value: gpu
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         - name: USE_HOST_MOFED
@@ -309,6 +311,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_TYPE
+          value: gpu
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         - name: USE_HOST_MOFED
