@@ -12,8 +12,8 @@ github.com/Masterminds/sprig/v3 v3.3.0 h1:mQh0Yrg1XPo6vjYXgtf5OtijNAKJRNcTdOOGZe
 github.com/Masterminds/sprig/v3 v3.3.0/go.mod h1:Zy1iXRYNqNLUolqCpL4uhk6SHUMAOSCzdgBfDb35Lz0=
 github.com/Mellanox/maintenance-operator/api v0.2.2 h1:7bl/txeHv49NdubQ72AqC7tLXa9oJrZuqk27TG5CybM=
 github.com/Mellanox/maintenance-operator/api v0.2.2/go.mod h1:pkd4TxjMFItohSXT0D1JhXB/E3d8jE5asBzxNATwT2s=
-github.com/NVIDIA/go-nvlib v0.8.1 h1:OPEHVvn3zcV5OXB68A7WRpeCnYMRSPl7LdeJH/d3gZI=
-github.com/NVIDIA/go-nvlib v0.8.1/go.mod h1:7mzx9FSdO9fXWP9NKuZmWkCwhkEcSWQFe2tmFwtLb9c=
+github.com/NVIDIA/go-nvlib v0.9.0 h1:GKLIvLJ0uhCtTLLZp2Q8QIDRxOYH45MM4Y5OO3U5Rho=
+github.com/NVIDIA/go-nvlib v0.9.0/go.mod h1:7mzx9FSdO9fXWP9NKuZmWkCwhkEcSWQFe2tmFwtLb9c=
 github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDsO/q05LBo=
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20251027171627-45ccd0c3dd32 h1:TWudaaTt7QwN/cQwPOm1wgesGLOc8hoik9GubKgnph0=
