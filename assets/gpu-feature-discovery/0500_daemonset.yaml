@@ -16,6 +16,9 @@ spec:
       labels:
         app: gpu-feature-discovery
         app.kubernetes.io/part-of: nvidia-gpu
+      annotations:
+        cdi-devices.noderesource.dev/container.gpu-feature-discovery: |
+          - management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.gpu-feature-discovery: "true"

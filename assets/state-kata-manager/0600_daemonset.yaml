@@ -13,6 +13,9 @@ spec:
     metadata:
       labels:
         name: nvidia-kata-manager
+      annotations:
+        cdi-devices.noderesource.dev/container.nvidia-kata-manager: |
+          - management.nvidia.com/gpu=all
     spec:
       tolerations:
         - key: nvidia.com/gpu

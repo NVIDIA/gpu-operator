@@ -15,6 +15,9 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-exporter
+      annotations:
+        cdi-devices.noderesource.dev/container.nvidia-dcgm-exporter: |
+          - management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm-exporter: "true"

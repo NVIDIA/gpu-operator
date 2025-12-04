@@ -945,7 +945,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
@@ -1531,7 +1531,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
@@ -1611,7 +1611,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
@@ -1719,7 +1719,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set hostPID if specified for DCGM Exporter
 	if config.DCGMExporter.IsHostPIDEnabled() {
@@ -1869,7 +1869,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	return nil
 }
@@ -1911,7 +1911,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -2205,7 +2205,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		return fmt.Errorf("%v", err)
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
@@ -2579,13 +2579,13 @@ func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 	return DefaultRuntimeClass
 }
 
-func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
-	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
-		return
-	}
-	runtimeClassName := getRuntimeClassName(config)
-	podSpec.RuntimeClassName = &runtimeClassName
-}
+// func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
+//	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
+//		return
+//	}
+//	runtimeClassName := getRuntimeClassName(config)
+//	podSpec.RuntimeClassName = &runtimeClassName
+//}
 
 func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) {
 	var containerProbe *corev1.Probe
