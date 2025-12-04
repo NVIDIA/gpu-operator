@@ -101,6 +101,9 @@ spec:
 
   vgpuManager:
     enabled: true
+    # kernel module configuration for vGPU manager
+    kernelModuleConfig:
+      name: ""
 
   vgpuDeviceManager:
     enabled: true
