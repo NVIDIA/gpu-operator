@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   labels:
     app: nvidia-cuda-validator
+  annotations:
+    nvidia.cdi.k8s.io/container.cuda-validation: management.nvidia.com/gpu=all
   generateName: nvidia-cuda-validator-
   namespace: "FILLED_BY_THE_VALIDATOR"
 spec:

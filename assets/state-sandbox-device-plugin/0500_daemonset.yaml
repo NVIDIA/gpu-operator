@@ -15,6 +15,8 @@ spec:
     metadata:
       labels:
         app: nvidia-sandbox-device-plugin-daemonset
+      annotations:
+        nvidia.cdi.k8s.io/container.nvidia-sandbox-device-plugin-ctr: management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.sandbox-device-plugin: "true"
