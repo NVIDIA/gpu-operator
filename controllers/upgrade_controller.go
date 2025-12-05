@@ -130,7 +130,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	driverLabelKey := DriverLabelKey
 	driverLabelValue := DriverLabelValue
 
-	if clusterPolicy.Spec.Driver.UseNvdiaDriverCRDType() {
+	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
 		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
 		driverLabelKey = AppComponentLabelKey
 		driverLabelValue = AppComponentLabelValue
