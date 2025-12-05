@@ -1912,8 +1912,8 @@ func (d *DriverSpec) IsEnabled() bool {
 	return *d.Enabled
 }
 
-// UseNvdiaDriverCRDType returns true if the driver installation is managed by NVIDIADriver CRD type
-func (d *DriverSpec) UseNvdiaDriverCRDType() bool {
+// UseNvidiaDriverCRDType returns true if the driver installation is managed by NVIDIADriver CRD type
+func (d *DriverSpec) UseNvidiaDriverCRDType() bool {
 	if d.UseNvidiaDriverCRD == nil {
 		// default is false if not specified by user
 		return false
