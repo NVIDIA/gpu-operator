@@ -3572,19 +3572,16 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 
-	// skip proxy and env settings if not ocp cluster
-	if _, ok := release["OPENSHIFT_VERSION"]; !ok {
-		return nil
-	}
+	// apply proxy and env settings if this is an OpenShift cluster
+	if _, ok := release["OPENSHIFT_VERSION"]; ok {
+		setContainerEnv(driverContainer, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
 
-	ocpVersion := corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: release["OPENSHIFT_VERSION"]}
-	driverContainer.Env = append(driverContainer.Env, ocpVersion)
-
-	// Automatically apply proxy settings for OCP and inject custom CA if configured by user
-	// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
-	err = applyOCPProxySpec(n, podSpec)
-	if err != nil {
-		return err
+		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
+		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
+		err = applyOCPProxySpec(n, podSpec)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
