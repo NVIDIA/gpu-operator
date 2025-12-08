@@ -476,7 +476,7 @@ const (
 type NVIDIADriverStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	// +kubebuilder:validation:Enum=ignored;ready;notReady
+	// +kubebuilder:validation:Enum=ignored;ready;notReady;disabled
 	// State indicates status of NVIDIADriver instance
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator and driver are installed
