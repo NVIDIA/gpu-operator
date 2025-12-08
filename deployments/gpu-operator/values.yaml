@@ -445,9 +445,10 @@ vgpuDeviceManager:
 
 vfioManager:
   enabled: true
-  repository: nvcr.io/nvidia
-  image: cuda
-  version: 13.0.1-base-ubi9
+  # TODO: update to a k8s-driver-manager image from nvcr.io once the next version is published
+  repository: ghcr.io/nvidia
+  image: k8s-driver-manager
+  version: 0d30fa9c
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
