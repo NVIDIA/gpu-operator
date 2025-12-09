@@ -295,6 +295,18 @@ build-image:
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 
+##### Debug Container #####
+DEBUG_CONTAINER_IMAGE ?= ghcr.io/nvidia/gpu-operator-debug
+DEBUG_CONTAINER_TAG ?= latest
+
+.PHONY: build-debug-container push-debug-container
+
+build-debug-container:
+	$(DOCKER) build -t $(DEBUG_CONTAINER_IMAGE):$(DEBUG_CONTAINER_TAG) hack/debug-container/
+
+push-debug-container: build-debug-container
+	$(DOCKER) push $(DEBUG_CONTAINER_IMAGE):$(DEBUG_CONTAINER_TAG)
+
 install-tools:
 	@echo Installing tools from tools.go
 	export GOBIN=$(PROJECT_DIR)/bin && \

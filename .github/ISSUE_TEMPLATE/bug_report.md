@@ -43,6 +43,9 @@ Collecting full debug bundle (optional):
 curl -o must-gather.sh -L https://raw.githubusercontent.com/NVIDIA/gpu-operator/main/hack/must-gather.sh
 chmod +x must-gather.sh
 ./must-gather.sh
+
+# For extended diagnostics (includes system/PCI info):
+ENABLE_EXTENDED_DIAGNOSTICS=true ./must-gather.sh
 ```
 **NOTE**: please refer to the [must-gather](https://raw.githubusercontent.com/NVIDIA/gpu-operator/main/hack/must-gather.sh) script for debug data collected.
 
