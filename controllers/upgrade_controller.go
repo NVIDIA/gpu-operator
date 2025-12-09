@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -254,14 +255,20 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return getClusterPoliciesToReconcile(ctx, mgr.GetClient())
 	}
 
-	// Watch for changes to node labels
-	// TODO: only watch for changes to upgrade state label
+	// Only watch for changes to the upgrade state label
+	upgradeStateLabelPredicate := predicate.TypedFuncs[*corev1.Node]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
+			label := upgrade.GetUpgradeStateLabelKey()
+			return e.ObjectOld.Labels[label] != e.ObjectNew.Labels[label]
+		},
+	}
+
 	err = c.Watch(
 		source.Kind(
 			mgr.GetCache(),
 			&corev1.Node{},
 			handler.TypedEnqueueRequestsFromMapFunc[*corev1.Node](nodeMapFn),
-			predicate.TypedLabelChangedPredicate[*corev1.Node]{},
+			upgradeStateLabelPredicate,
 		),
 	)
 	if err != nil {
