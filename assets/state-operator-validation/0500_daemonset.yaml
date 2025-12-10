@@ -16,6 +16,9 @@ spec:
       labels:
         app: nvidia-operator-validator
         app.kubernetes.io/part-of: gpu-operator
+      annotations:
+        cdi-devices.noderesource.dev/container.toolkit-validation: |
+          - management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.operator-validator: "true"
