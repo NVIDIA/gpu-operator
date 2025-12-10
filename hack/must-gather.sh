@@ -3,6 +3,57 @@
 set -o nounset
 set -x
 
+# Set ENABLE_EXTENDED_DIAGNOSTICS=true to use a debug container for complete nvidia-bug-report collection
+ENABLE_EXTENDED_DIAGNOSTICS=${ENABLE_EXTENDED_DIAGNOSTICS:-false}
+DEBUG_CONTAINER_IMAGE=${DEBUG_CONTAINER_IMAGE:-ghcr.io/nvidia/gpu-operator-debug:latest}
+DEBUG_TIMEOUT_SECONDS=${DEBUG_TIMEOUT_SECONDS:-60}
+
+# Noise patterns from kubectl debug output that should be filtered
+KUBECTL_NOISE_PATTERN="^Targeting\|^Defaulting\|^Unable\|^warning:\|^All commands\|^If you don"
+
+# Filter out kubectl informational messages from output
+filter_kubectl_noise() {
+    grep -v "${KUBECTL_NOISE_PATTERN}" || true
+}
+
+# Append a section header to the bug report
+append_section_header() {
+    local file="$1"
+    local title="$2"
+    
+    {
+        echo ""
+        echo "____________________________________________"
+        echo ""
+        echo "${title}"
+        echo ""
+    } >> "${file}"
+}
+
+# Collect diagnostic output using debug container and append to bug report
+# Args: $1=pod_name, $2=node_name, $3=command, $4=command_args, $5=output_file
+collect_debug_diagnostic() {
+    local pod_name="$1"
+    local node_name="$2"
+    local cmd="$3"
+    local cmd_args="$4"
+    local output_file="$5"
+    
+    append_section_header "${output_file}" "${cmd} ${cmd_args} output (via must-gather extended diagnostics)"
+    
+    # Use -i to attach stdin (required to capture output)
+    if ! timeout "${DEBUG_TIMEOUT_SECONDS}" $K debug -n "${OPERATOR_NAMESPACE}" "${pod_name}" \
+        --image="${DEBUG_CONTAINER_IMAGE}" \
+        --target=nvidia-driver-ctr \
+        --profile=sysadmin \
+        -i \
+        -- ${cmd} ${cmd_args} 2>/dev/null | filter_kubectl_noise >> "${output_file}"; then
+        echo "Warning: Failed to collect ${cmd} from ${node_name} (timed out or failed)" >&2
+        echo "(collection failed or timed out after ${DEBUG_TIMEOUT_SECONDS}s)" >> "${output_file}"
+    fi
+}
+
+
 K=kubectl
 if ! $K version > /dev/null; then
     K=oc
@@ -262,18 +313,69 @@ echo "# nvidia-bug-report.sh"
 echo "#"
 echo ""
 
+if [[ "${ENABLE_EXTENDED_DIAGNOSTICS}" == "true" ]]; then
+    echo "==============================================================================="
+    echo "WARNING: Extended diagnostics enabled."
+    echo ""
+    echo "This will pull and run an external debug container (${DEBUG_CONTAINER_IMAGE})"
+    echo "with privileged access to collect system information (dmidecode, lspci)."
+    echo ""
+    echo "By enabling this option, you acknowledge:"
+    echo "  - An external container image will be pulled and executed in your cluster"
+    echo "  - The debug container requires privileged access (sysadmin profile)"
+    echo "  - System hardware information will be collected and included in the bug report"
+    echo ""
+    echo "To disable, unset ENABLE_EXTENDED_DIAGNOSTICS or set it to false."
+    echo "==============================================================================="
+    echo ""
+fi
+
 for pod in $($K get pods -lopenshift.driver-toolkit -oname -n "${OPERATOR_NAMESPACE}"; $K get pods -lapp=nvidia-driver-daemonset -oname -n "${OPERATOR_NAMESPACE}"; $K get pods -lapp=nvidia-vgpu-manager-daemonset -oname -n "${OPERATOR_NAMESPACE}");
 do
     pod_nodename=$($K get "${pod}" -ojsonpath={.spec.nodeName} -n "${OPERATOR_NAMESPACE}")
+    pod_name=$(basename "${pod}")
     echo "Saving nvidia-bug-report from ${pod_nodename} ..."
 
-    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- bash -c 'cd /tmp && nvidia-bug-report.sh' >&2 || \
-        (echo "Failed to collect nvidia-bug-report from ${pod_nodename}" && continue)
+    # Collect standard nvidia-bug-report from driver container
+    if ! $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- bash -c 'cd /tmp && nvidia-bug-report.sh' >&2; then
+        echo "Failed to collect nvidia-bug-report from ${pod_nodename}"
+        continue
+    fi
 
-    $K cp "${OPERATOR_NAMESPACE}"/$(basename "${pod}"):/tmp/nvidia-bug-report.log.gz /tmp/nvidia-bug-report.log.gz || \
-        (echo "Failed to save nvidia-bug-report from ${pod_nodename}" && continue)
+    # Clean up any existing temp file to avoid permission issues
+    rm -f /tmp/nvidia-bug-report.log.gz
+    
+    if ! $K cp "${OPERATOR_NAMESPACE}"/"${pod_name}":/tmp/nvidia-bug-report.log.gz /tmp/nvidia-bug-report.log.gz 2>/dev/null; then
+        echo "Failed to save nvidia-bug-report from ${pod_nodename}"
+        continue
+    fi
+
 
     mv /tmp/nvidia-bug-report.log.gz "${ARTIFACT_DIR}/nvidia-bug-report_${pod_nodename}.log.gz"
+
+    if [[ "${ENABLE_EXTENDED_DIAGNOSTICS}" == "true" ]]; then
+        echo "Collecting extended diagnostics (dmidecode/lspci) from ${pod_nodename}..."
+        
+        bug_report_file="${ARTIFACT_DIR}/nvidia-bug-report_${pod_nodename}.log"
+        
+        # Decompress the bug report to append data
+        if ! gunzip "${bug_report_file}.gz" 2>&1; then
+            echo "Warning: Failed to decompress bug report for ${pod_nodename}, skipping extended diagnostics"
+            continue
+        fi
+        
+        append_section_header "${bug_report_file}" "*** EXTENDED DIAGNOSTICS (from debug container) ***"
+        
+        collect_debug_diagnostic "${pod_name}" "${pod_nodename}" "dmidecode" "" "${bug_report_file}"
+        collect_debug_diagnostic "${pod_name}" "${pod_nodename}" "lspci" "-vvv" "${bug_report_file}"
+        
+        # Recompress the bug report
+        if ! gzip "${bug_report_file}" 2>&1; then
+            echo "Warning: Failed to recompress bug report for ${pod_nodename}"
+        fi
+    else
+        echo "NOTE: For extended diagnostics (dmidecode/lspci), set ENABLE_EXTENDED_DIAGNOSTICS=true"
+    fi
 done
 
 echo ""
