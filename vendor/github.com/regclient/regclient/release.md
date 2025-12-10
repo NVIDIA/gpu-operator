@@ -1,20 +1,19 @@
-# Release v0.9.2
+# Release v0.11.1
 
 Security:
 
-- xz upgrade fixes CVE-2025-58058 ([PR 989][pr-989])
+- Go 1.25.5 fixes CVE-2025-61729 ([PR 1025][pr-1025])
+- Go 1.25.5 fixes CVE-2025-61727 ([PR 1025][pr-1025])
 
-Miscellaneous:
+Fixes:
 
-- Fix CLI lint errors. ([PR 983][pr-983])
-- Cleanup version output. ([PR 985][pr-985])
-- Dockerfile cleanup. ([PR 986][pr-986])
+- Correct selection of previous tag for releases. ([PR 1023][pr-1023])
+- Make sure ContentLength is correctly set in the request. ([PR 1024][pr-1024])
 
 Contributors:
 
 - @sudo-bmitch
 
-[pr-983]: https://github.com/regclient/regclient/pull/983
-[pr-985]: https://github.com/regclient/regclient/pull/985
-[pr-986]: https://github.com/regclient/regclient/pull/986
-[pr-989]: https://github.com/regclient/regclient/pull/989
+[pr-1023]: https://github.com/regclient/regclient/pull/1023
+[pr-1024]: https://github.com/regclient/regclient/pull/1024
+[pr-1025]: https://github.com/regclient/regclient/pull/1025

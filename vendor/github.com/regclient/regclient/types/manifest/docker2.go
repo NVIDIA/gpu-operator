@@ -43,27 +43,32 @@ func (m *docker2Manifest) GetAnnotations() (map[string]string, error) {
 	}
 	return m.Annotations, nil
 }
+
 func (m *docker2Manifest) GetConfig() (descriptor.Descriptor, error) {
 	if !m.manifSet {
 		return descriptor.Descriptor{}, errs.ErrManifestNotSet
 	}
 	return m.Config, nil
 }
+
 func (m *docker2Manifest) GetConfigDigest() (digest.Digest, error) {
 	if !m.manifSet {
 		return digest.Digest(""), errs.ErrManifestNotSet
 	}
 	return m.Config.Digest, nil
 }
+
 func (m *docker2ManifestList) GetAnnotations() (map[string]string, error) {
 	if !m.manifSet {
 		return nil, errs.ErrManifestNotSet
 	}
 	return m.Annotations, nil
 }
+
 func (m *docker2ManifestList) GetConfig() (descriptor.Descriptor, error) {
 	return descriptor.Descriptor{}, fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker2ManifestList) GetConfigDigest() (digest.Digest, error) {
 	return "", fmt.Errorf("config digest not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -71,6 +76,7 @@ func (m *docker2ManifestList) GetConfigDigest() (digest.Digest, error) {
 func (m *docker2Manifest) GetManifestList() ([]descriptor.Descriptor, error) {
 	return []descriptor.Descriptor{}, fmt.Errorf("platform descriptor list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker2ManifestList) GetManifestList() ([]descriptor.Descriptor, error) {
 	if !m.manifSet {
 		return []descriptor.Descriptor{}, errs.ErrManifestNotSet
@@ -84,6 +90,7 @@ func (m *docker2Manifest) GetLayers() ([]descriptor.Descriptor, error) {
 	}
 	return m.Layers, nil
 }
+
 func (m *docker2ManifestList) GetLayers() ([]descriptor.Descriptor, error) {
 	return []descriptor.Descriptor{}, fmt.Errorf("layers are not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
@@ -91,6 +98,7 @@ func (m *docker2ManifestList) GetLayers() ([]descriptor.Descriptor, error) {
 func (m *docker2Manifest) GetOrig() any {
 	return m.Manifest
 }
+
 func (m *docker2ManifestList) GetOrig() any {
 	return m.ManifestList
 }
@@ -98,6 +106,7 @@ func (m *docker2ManifestList) GetOrig() any {
 func (m *docker2Manifest) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
 	return nil, fmt.Errorf("platform lookup not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker2ManifestList) GetPlatformDesc(p *platform.Platform) (*descriptor.Descriptor, error) {
 	if !m.manifSet {
 		return nil, errs.ErrManifestNotSet
@@ -115,6 +124,7 @@ func (m *docker2ManifestList) GetPlatformDesc(p *platform.Platform) (*descriptor
 func (m *docker2Manifest) GetPlatformList() ([]*platform.Platform, error) {
 	return nil, fmt.Errorf("platform list not available for media type %s%.0w", m.desc.MediaType, errs.ErrUnsupportedMediaType)
 }
+
 func (m *docker2ManifestList) GetPlatformList() ([]*platform.Platform, error) {
 	dl, err := m.GetManifestList()
 	if err != nil {
@@ -144,6 +154,7 @@ func (m *docker2Manifest) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal((m.Manifest))
 }
+
 func (m *docker2ManifestList) MarshalJSON() ([]byte, error) {
 	if !m.manifSet {
 		return []byte{}, errs.ErrManifestNotSet
@@ -200,6 +211,7 @@ func (m *docker2Manifest) MarshalPretty() ([]byte, error) {
 	err = tw.Flush()
 	return buf.Bytes(), err
 }
+
 func (m *docker2ManifestList) MarshalPretty() ([]byte, error) {
 	if m == nil {
 		return []byte{}, nil
@@ -255,6 +267,7 @@ func (m *docker2Manifest) SetAnnotation(key, val string) error {
 	}
 	return m.updateDesc()
 }
+
 func (m *docker2ManifestList) SetAnnotation(key, val string) error {
 	if !m.manifSet {
 		return errs.ErrManifestNotSet
@@ -335,6 +348,7 @@ func (m *docker2Manifest) updateDesc() error {
 	}
 	return nil
 }
+
 func (m *docker2ManifestList) updateDesc() error {
 	mj, err := json.Marshal(m.ManifestList)
 	if err != nil {
@@ -347,5 +361,4 @@ func (m *docker2ManifestList) updateDesc() error {
 		Size:      int64(len(mj)),
 	}
 	return nil
-
 }
