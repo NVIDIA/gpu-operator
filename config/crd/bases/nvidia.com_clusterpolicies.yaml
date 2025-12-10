@@ -339,6 +339,10 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostNetwork:
+                    description: HostNetwork allows the DCGM-Exporter daemon set to
+                      expose metrics port on the host's network namespace.
+                    type: boolean
                   hostPID:
                     description: HostPID allows the DCGM-Exporter daemon set to access
                       the host's PID namespace
