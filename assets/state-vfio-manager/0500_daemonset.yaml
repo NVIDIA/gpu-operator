@@ -62,7 +62,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
-            - /bin/vfio-manage.sh bind --all && sleep inf
+            - vfio-manage bind --all && while true; do sleep 86400; done
           resources:
             limits:
               memory: 200Mi
@@ -70,12 +70,11 @@ spec:
               cpu: 100m
               memory: 200Mi
           volumeMounts:
-          - name: nvidia-vfio-manager
-            readOnly: true
-            mountPath: /bin/vfio-manage.sh
-            subPath: vfio-manage.sh
           - name: host-sys
             mountPath: /sys
+          - name: host-lib-modules
+            mountPath: /lib/modules
+            readOnly: true
           - name: host-root
             mountPath: /host
           securityContext:
@@ -85,16 +84,16 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "/bin/vfio-manage.sh unbind --all"]
+                command: ["vfio-manage unbind --all"]
       terminationGracePeriodSeconds: 30
       volumes:
-        - name: nvidia-vfio-manager
-          configMap:
-            name: nvidia-vfio-manager
-            defaultMode: 448
         - name: host-sys
           hostPath:
             path: /sys
+            type: Directory
+        - name: host-lib-modules
+          hostPath:
+            path: /lib/modules
             type: Directory
         - name: run-nvidia
           hostPath:

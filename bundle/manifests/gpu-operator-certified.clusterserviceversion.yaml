@@ -224,8 +224,9 @@ spec:
       image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: k8s-driver-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:c549346eb993fda62e9bf665aabaacc88abc06b0b24e69635427d4d71c2d5ed4
+    # TODO: update to a k8s-driver-manager image from nvcr.io once the next version is published
     - name: vfio-manager-image
-      image: nvcr.io/nvidia/cuda@sha256:d19fe621624c4eb6ac931b8558daa3ecc0c3f07f1e2a52e0267e083d22dceade
+      image: ghcr.io/nvidia/k8s-driver-manager:0d30fa9c
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:119de9a331a47203858b99901f44d0c4a8052961b4e60327f4b100d0ab8c9df0
     - name: vgpu-device-manager-image
@@ -940,8 +941,9 @@ spec:
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8e0803d2f29776cd4cc0501381a20a0b04b2da507a794d66a15894c57beaadb5"
                   - name: "CUDA_BASE_IMAGE"
                     value: "nvcr.io/nvidia/cuda@sha256:d19fe621624c4eb6ac931b8558daa3ecc0c3f07f1e2a52e0267e083d22dceade"
+                  # TODO: update to a k8s-driver-manager image from nvcr.io once the next version is published
                   - name: "VFIO_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:d19fe621624c4eb6ac931b8558daa3ecc0c3f07f1e2a52e0267e083d22dceade"
+                    value: "ghcr.io/nvidia/k8s-driver-manager:0d30fa9c"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin@sha256:119de9a331a47203858b99901f44d0c4a8052961b4e60327f4b100d0ab8c9df0"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
