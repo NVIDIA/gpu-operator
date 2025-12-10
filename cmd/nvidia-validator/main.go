@@ -1541,7 +1541,10 @@ func (v *VfioPCI) runValidation() error {
 	}
 
 	for _, dev := range nvdevices {
-		if dev.Driver != "vfio-pci" {
+		// TODO: Do not hardcode a list of VFIO driver names. This would be possible if we
+		// added an API to go-nvlib which returns the most suitable VFIO driver for a GPU,
+		// using logic similar to https://github.com/NVIDIA/k8s-driver-manager/commit/874c8cd26d775db437f16a42c3e44e74301b3a35
+		if dev.Driver != "vfio-pci" && dev.Driver != "nvgrace_gpu_vfio_pci" {
 			return fmt.Errorf("device not bound to 'vfio-pci'; device: %s driver: '%s'", dev.Address, dev.Driver)
 		}
 	}
