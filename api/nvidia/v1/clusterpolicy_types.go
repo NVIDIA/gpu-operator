@@ -499,6 +499,15 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:select:auto,urn:alm:descriptor:com.tectonic.ui:select:open,urn:alm:descriptor:com.tectonic.ui:select:proprietary"
 	KernelModuleType string `json:"kernelModuleType,omitempty"`
 
+	// DriverType defines the type of NVIDIA driver to be deployed.
+	// Accepted values are gpu, vgpu, and vgpu-host-manager.
+	// +kubebuilder:validation:Enum=gpu;vgpu;vgpu-host-manager
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Driver Type"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.description="Driver Type"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:select:gpu,urn:alm:descriptor:com.tectonic.ui:select:vgpu,urn:alm:descriptor:com.tectonic.ui:select:vgpu-host-manager"
+	DriverType string `json:"driverType,omitempty"`
+
 	// Enabled indicates if deployment of NVIDIA Driver through operator is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NVIDIA Driver deployment through GPU Operator"
