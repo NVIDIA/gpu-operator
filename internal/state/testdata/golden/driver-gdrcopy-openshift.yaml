@@ -410,6 +410,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_VERSION
+          value: 525.85.03
         - name: DRIVER_TYPE
           value: gpu
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
