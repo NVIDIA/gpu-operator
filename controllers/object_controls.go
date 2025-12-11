@@ -206,11 +206,13 @@ var RepoConfigPathMap = map[string]string{
 // Where OCP mounts proxy certs on RHCOS nodes:
 // https://access.redhat.com/documentation/en-us/openshift_container_platform/4.3/html/authentication/ocp-certificates#proxy-certificates_ocp-certificates
 var CertConfigPathMap = map[string]string{
-	"centos": "/etc/pki/ca-trust/extracted/pem",
-	"debian": "/usr/local/share/ca-certificates",
-	"ubuntu": "/usr/local/share/ca-certificates",
-	"rhcos":  "/etc/pki/ca-trust/extracted/pem",
-	"rhel":   "/etc/pki/ca-trust/extracted/pem",
+	"centos":   "/etc/pki/ca-trust/extracted/pem",
+	"debian":   "/usr/local/share/ca-certificates",
+	"ubuntu":   "/usr/local/share/ca-certificates",
+	"rhcos":    "/etc/pki/ca-trust/extracted/pem",
+	"rhel":     "/etc/pki/ca-trust/extracted/pem",
+	"sles":     "/etc/pki/trust/anchors",
+	"sl-micro": "/etc/pki/trust/anchors",
 }
 
 // MountPathToVolumeSource maps a container mount path to a VolumeSource
