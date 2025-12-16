@@ -224,6 +224,8 @@ const (
 	wslNvidiaSMIPath = "/usr/lib/wsl/lib/nvidia-smi"
 	// shell indicates what shell to use when invoking commands in a subprocess
 	shell = "sh"
+	// path where host is mounted
+	hostMountPath = "/host"
 )
 
 func main() {
@@ -623,6 +625,18 @@ func runCommand(command string, args []string, silent bool) error {
 	return cmd.Run()
 }
 
+func getHostCommandPath(command string) (string, error) {
+	args := []string{hostMountPath, "/bin/sh", "-l", "-c", fmt.Sprintf("realpath $(which %s)", command)}
+	cmd := exec.Command("chroot", args...)
+
+	path, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(path)), nil
+}
+
 func runCommandWithWait(command string, args []string, sleepSeconds int, silent bool) error {
 	for {
 		cmd := exec.Command(command, args...)
@@ -713,20 +727,26 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 
 func validateHostDriver(silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
-	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
+	if fileInfo, err := os.Lstat(filepath.Join(hostMountPath, wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
 		log.Infof("WSL2 system detected, assuming driver is pre-installed")
 		disableDevCharSymlinkCreation = true
 		return nil
 	}
-	fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi")
+
+	nvidiaSMIPath, err := getHostCommandPath("nvidia-smi")
 	if err != nil {
-		return fmt.Errorf("no 'nvidia-smi' file present on the host: %w", err)
+		return fmt.Errorf("no 'nvidia-smi' executable present on the host $PATH: %w", err)
+	}
+
+	fileInfo, err := os.Lstat(filepath.Join(hostMountPath, nvidiaSMIPath))
+	if err != nil {
+		return fmt.Errorf("failed to stat 'nvidia-smi' path on the host: %w", err)
 	}
 	if fileInfo.Size() == 0 {
 		return fmt.Errorf("empty 'nvidia-smi' file found on the host")
 	}
 	command := "chroot"
-	args := []string{"/host", "nvidia-smi"}
+	args := []string{hostMountPath, nvidiaSMIPath}
 
 	return runCommand(command, args, silent)
 }
@@ -785,7 +805,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 	err := validateHostDriver(silent)
 	if err == nil {
 		log.Info("Detected a pre-installed driver on the host")
-		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
+		return getDriverInfo(true, hostRootFlag, hostRootFlag, hostMountPath), nil
 	}
 
 	err = validateDriverContainer(silent, d.ctx)
@@ -863,7 +883,7 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 	// either '/host' or '/driver-root', both paths would exist in the validation container.
 	driverRootCtrPath := driverInstallDirCtrPathFlag
 	if driverInfo.isHostDriver {
-		driverRootCtrPath = "/host"
+		driverRootCtrPath = hostMountPath
 	}
 
 	// We now create the symlinks in /dev/char.
@@ -1610,8 +1630,9 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
-		args = []string{"/host", "nvidia-smi"}
+	nvidiaSMIPath, err := getHostCommandPath("nvidia-smi")
+	if err == nil {
+		args = []string{hostMountPath, nvidiaSMIPath}
 		hostDriver = true
 	}
 
