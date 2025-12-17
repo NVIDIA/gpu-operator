@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -224,6 +225,8 @@ const (
 	wslNvidiaSMIPath = "/usr/lib/wsl/lib/nvidia-smi"
 	// shell indicates what shell to use when invoking commands in a subprocess
 	shell = "sh"
+	// defaultVFWaitTimeout is the default timeout for waiting for VFs to be created
+	defaultVFWaitTimeout = 5 * time.Minute
 )
 
 func main() {
@@ -1591,6 +1594,11 @@ func (v *VGPUManager) validate() error {
 		return err
 	}
 
+	log.Info("Waiting for VFs to be available...")
+	if err := waitForVFs(ctx, defaultVFWaitTimeout); err != nil {
+		return fmt.Errorf("vGPU Manager VFs not ready: %w", err)
+	}
+
 	statusFile := vGPUManagerStatusFile
 	if hostDriver {
 		statusFile = hostVGPUManagerStatusFile
@@ -1620,6 +1628,45 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	}
 
 	return hostDriver, runCommand(command, args, silent)
+}
+
+// waitForVFs waits for Virtual Functions to be created on all NVIDIA GPUs.
+// It polls sriov_numvfs until all GPUs have their full VF count enabled.
+func waitForVFs(ctx context.Context, timeout time.Duration) error {
+	pollInterval := time.Duration(sleepIntervalSecondsFlag) * time.Second
+	nvpciLib := nvpci.New()
+
+	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		gpus, err := nvpciLib.GetGPUs()
+		if err != nil {
+			log.Warnf("Error getting GPUs: %v", err)
+			return false, nil
+		}
+
+		var totalExpected, totalEnabled uint64
+		var pfCount int
+		for _, gpu := range gpus {
+			sriovInfo := gpu.SriovInfo
+			if sriovInfo.IsPF() {
+				pfCount++
+				totalExpected += sriovInfo.PhysicalFunction.TotalVFs
+				totalEnabled += sriovInfo.PhysicalFunction.NumVFs
+			}
+		}
+
+		if totalExpected == 0 {
+			log.Info("No SR-IOV capable GPUs found, skipping VF wait")
+			return true, nil
+		}
+
+		if totalEnabled == totalExpected {
+			log.Infof("All %d VF(s) enabled on %d NVIDIA GPU(s)", totalEnabled, pfCount)
+			return true, nil
+		}
+
+		log.Infof("Waiting for VFs: %d/%d enabled across %d GPU(s)", totalEnabled, totalExpected, pfCount)
+		return false, nil
+	})
 }
 
 func (c *CCManager) validate() error {
