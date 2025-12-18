@@ -596,7 +596,9 @@ spec:
     {{- end }}
     {{- if .Values.migManager.config }}
     config:
+      {{- if .Values.migManager.config.name }}
       name: {{ .Values.migManager.config.name }}
+      {{- end }}
       default: {{ .Values.migManager.config.default | quote }}
     {{- end }}
     {{- if .Values.migManager.gpuClientsConfig }}
