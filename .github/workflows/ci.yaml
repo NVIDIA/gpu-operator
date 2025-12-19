@@ -444,7 +444,7 @@ jobs:
           echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
       - name: Update bundle CSV
         run: |
-          sed -i '' -e 's|ghcr.io/nvidia/gpu-operator:[^ "]*|ghcr.io/nvidia/gpu-operator:${{ env.COMMIT_SHORT_SHA }}|g' bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+          sed -i -e 's|ghcr.io/nvidia/gpu-operator:[^ "]*|ghcr.io/nvidia/gpu-operator:${{ env.COMMIT_SHORT_SHA }}|g' bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
           echo "Bundle CSV updated successfully"
       - name: Build bundle-image
         env:
