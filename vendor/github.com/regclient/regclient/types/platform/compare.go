@@ -77,7 +77,7 @@ func (c *compare) Better(target, prev Platform) bool {
 // This accounts for Docker Desktop for Mac and Windows using a Linux VM.
 func (c *compare) Compatible(target Platform) bool {
 	(&target).normalize()
-	if c.host.OS == "linux" {
+	if c.host.OS == "linux" || c.host.OS == "freebsd" {
 		return c.host.OS == target.OS && c.host.Architecture == target.Architecture &&
 			variantCompatible(c.host.Variant, target.Variant)
 	} else if c.host.OS == "windows" {
@@ -109,7 +109,7 @@ func (c *compare) Match(target Platform) bool {
 	if c.host.OS != target.OS {
 		return false
 	}
-	if c.host.OS == "linux" {
+	if c.host.OS == "linux" || c.host.OS == "freebsd" {
 		return c.host.Architecture == target.Architecture && c.host.Variant == target.Variant
 	} else if c.host.OS == "windows" {
 		return c.host.Architecture == target.Architecture && c.host.Variant == target.Variant &&

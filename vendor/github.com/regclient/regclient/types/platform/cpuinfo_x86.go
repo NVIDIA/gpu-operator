@@ -95,6 +95,7 @@ func lookupCPUVariant() string {
 func bitSet(bitpos uint) uint32 {
 	return 1 << bitpos
 }
+
 func bitIsSet(bits, value uint32) bool {
 	return (value & bits) == bits
 }
