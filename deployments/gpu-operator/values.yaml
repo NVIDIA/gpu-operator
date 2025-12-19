@@ -339,9 +339,18 @@ migManager:
   env: []
   resources: {}
   # MIG configuration
-  # Use "name" to either point to an existing ConfigMap or to create a new one with a list of configurations(i.e with create=true).
-  # Use "data" to build an integrated ConfigMap from a set of configurations as
-  # part of this helm chart. An example of setting "data" might be:
+  # NOTE: MIG manager automatically generates configuration from hardware on each node.
+  # Only provide a custom config if you need settings that differ from hardware discovery.
+  #
+  # To use an existing ConfigMap:
+  #   - Set name="your-configmap-name" with create=false
+  #   - ConfigMap MUST have a key named "config.yaml"
+  #
+  # To create a new ConfigMap via Helm:
+  #   - Set create=true, name="your-configmap-name", and provide data below
+  #   - If create=true but data is empty, ConfigMap creation is skipped
+  #
+  # Example of creating a custom ConfigMap:
   # config:
   #   name: custom-mig-parted-configs
   #   create: true
@@ -373,9 +382,11 @@ migManager:
     default: "all-disabled"
     # Create a ConfigMap (default: false)
     create: false
-    # ConfigMap name (either existing or to create a new one with create=true above)
+    # ConfigMap name (either existing or to create with create=true)
+    # If name is provided, mig-manager will use this config instead of auto-generated one.
+    # REQUIREMENT: Custom ConfigMaps must contain a key named "config.yaml"
     name: ""
-    # Data section for the ConfigMap to create (i.e only applies when create=true)
+    # Data section for the ConfigMap (required only if create=true)
     data: {}
   gpuClientsConfig:
     name: ""

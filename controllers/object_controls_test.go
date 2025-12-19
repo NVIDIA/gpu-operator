@@ -59,6 +59,7 @@ const (
 	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
 	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
+	migManagerAssetsPath          = "assets/state-mig-manager/"
 	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
 	upgradedKernel                = "5.4.135-generic"
 )
@@ -425,6 +426,24 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DCGMExporter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for dcgm-exporter: %v", err)
+		}
+	case "MIGManager":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.MIGManager.Repository,
+			image:            cp.Spec.MIGManager.Image,
+			version:          cp.Spec.MIGManager.Version,
+			imagePullPolicy:  cp.Spec.MIGManager.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.MIGManager.ImagePullSecrets),
+			args:             cp.Spec.MIGManager.Args,
+			env:              cp.Spec.MIGManager.Env,
+			resources:        cp.Spec.MIGManager.Resources,
+		}
+		dsLabel = "nvidia-mig-manager"
+		mainCtrName = "nvidia-mig-manager"
+		manifestFile = filepath.Join(cfg.root, migManagerAssetsPath)
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.MIGManager)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for mig-manager: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid component for testDaemonsetCommon(): %s", component)
@@ -1731,6 +1750,139 @@ func TestRuntimeClasses(t *testing.T) {
 				require.Equal(t, expectedRuntimeClass, rcObject.Name)
 			}
 
+		})
+	}
+}
+
+// getMIGManagerTestInput returns a ClusterPolicy instance for a particular
+// MIG Manager test case. This function will grow as new test cases are added
+func getMIGManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	// Set default values for MIG Manager
+	cp.Spec.MIGManager.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.MIGManager.Image = "k8s-mig-manager"
+	cp.Spec.MIGManager.Version = "v0.5.0"
+	cp.Spec.MIGManager.ImagePullSecrets = []string{"ngc-secret"}
+
+	// Validator is required for all daemonset tests
+	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Validator.Image = "gpu-operator-validator"
+	cp.Spec.Validator.Version = "v1.11.0"
+	cp.Spec.Validator.ImagePullSecrets = []string{"ngc-secret"}
+
+	switch testCase {
+	case "default":
+		// No custom config
+	case "custom-config":
+		cp.Spec.MIGManager.Config = &gpuv1.MIGPartedConfigSpec{Name: "custom-mig-config"}
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getMIGManagerTestOutput returns a map containing expected output for
+// MIG Manager test case. This function will grow as new test cases are added
+func getMIGManagerTestOutput(testCase string) map[string]interface{} {
+	// default output
+	output := map[string]interface{}{
+		"numDaemonsets":          1,
+		"migManagerImage":        "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.5.0",
+		"imagePullSecret":        "ngc-secret",
+		"migConfigVolumePresent": false,
+		"env":                    map[string]string{},
+	}
+
+	switch testCase {
+	case "default":
+		// No config volume
+	case "custom-config":
+		output["migConfigVolumePresent"] = true
+		output["env"] = map[string]string{
+			"CONFIG_FILE": "/mig-parted-config/config.yaml",
+		}
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestMIGManager tests that the GPU Operator correctly deploys the mig-manager daemonset
+// under various scenarios/config options
+func TestMIGManager(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getMIGManagerTestInput("default"),
+			getMIGManagerTestOutput("default"),
+		},
+		{
+			"CustomConfig",
+			getMIGManagerTestInput("custom-config"),
+			getMIGManagerTestOutput("custom-config"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "MIGManager", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			migManagerImage := ""
+			mainCtrIdx := 0
+			migConfigVolumePresent := false
+
+			// Find nvidia-mig-manager container and check image
+			for i, container := range ds.Spec.Template.Spec.Containers {
+				if container.Name == "nvidia-mig-manager" {
+					migManagerImage = container.Image
+					mainCtrIdx = i
+					break
+				}
+			}
+
+			// Check for mig-parted-config volume
+			for _, vol := range ds.Spec.Template.Spec.Volumes {
+				if vol.Name == "mig-parted-config" {
+					migConfigVolumePresent = true
+					break
+				}
+			}
+
+			require.Equal(t, tc.output["migManagerImage"], migManagerImage, "Unexpected configuration for mig-manager image")
+			require.Equal(t, tc.output["migConfigVolumePresent"], migConfigVolumePresent, "Unexpected configuration for mig-parted-config volume")
+
+			// Check expected env vars
+			for key, value := range tc.output["env"].(map[string]string) {
+				envFound := false
+				for _, envVar := range ds.Spec.Template.Spec.Containers[mainCtrIdx].Env {
+					if envVar.Name == key && envVar.Value == value {
+						envFound = true
+					}
+				}
+				if !envFound {
+					t.Fatalf("Expected env is not set for daemonset mig-manager %s->%s", key, value)
+				}
+			}
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
 		})
 	}
 }

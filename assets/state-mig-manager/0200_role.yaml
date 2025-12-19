@@ -21,3 +21,13 @@ rules:
   - list
   - watch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - patch
