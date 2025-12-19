@@ -438,11 +438,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set environment variables
+        id: vars
+        run: |
+          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+      - name: Update bundle CSV
+        run: |
+          sed -i '' -e 's|ghcr.io/nvidia/gpu-operator:[^ "]*|ghcr.io/nvidia/gpu-operator:${{ env.COMMIT_SHORT_SHA }}|g' bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+          echo "Bundle CSV updated successfully"
       - name: Build bundle-image
         env:
-          BUNDLE_IMAGE: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:${{ github.ref_name }}-latest"
+          IMAGE_NAME: "ghcr.io/nvidia/gpu-operator/gpu-operator-bundle"
           VERSION: ""
           DEFAULT_CHANNEL: "stable"
           CHANNELS: "stable"
         run: |
-          make push-bundle-image
+          make push-bundle-image BUNDLE_IMAGE=${IMAGE_NAME}:${{ github.ref_name }}-latest
+          make push-bundle-image BUNDLE_IMAGE=${IMAGE_NAME}:${{ env.COMMIT_SHORT_SHA }}
