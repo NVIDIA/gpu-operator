@@ -1410,8 +1410,8 @@ spec:
                         - ""
                         type: string
                       name:
-                        default: default-mig-parted-config
-                        description: ConfigMap name
+                        description: ConfigMap name. If not specified, MIG configuration
+                          will be dynamically generated from hardware.
                         type: string
                     type: object
                   enabled:
