@@ -448,7 +448,7 @@ vfioManager:
   # TODO: update to a k8s-driver-manager image from nvcr.io once the next version is published
   repository: ghcr.io/nvidia
   image: k8s-driver-manager
-  version: 0d30fa9c
+  version: 69eec274
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
