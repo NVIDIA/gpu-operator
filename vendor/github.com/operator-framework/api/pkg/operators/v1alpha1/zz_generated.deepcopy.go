@@ -501,6 +501,7 @@ func (in *ClusterServiceVersionSpec) DeepCopyInto(out *ClusterServiceVersionSpec
 	*out = *in
 	in.InstallStrategy.DeepCopyInto(&out.InstallStrategy)
 	in.Version.DeepCopyInto(&out.Version)
+	in.Release.DeepCopyInto(&out.Release)
 	in.CustomResourceDefinitions.DeepCopyInto(&out.CustomResourceDefinitions)
 	in.APIServiceDefinitions.DeepCopyInto(&out.APIServiceDefinitions)
 	if in.WebhookDefinitions != nil {
