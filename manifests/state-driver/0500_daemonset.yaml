@@ -226,6 +226,22 @@ spec:
           value: "true"
         {{- end }}
       {{- end }}
+        {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
+        - name: GPU_DIRECT_RDMA_ENABLED
+          value: "true"
+        {{- if deref .GPUDirectRDMA.UseHostMOFED }}
+        - name: USE_HOST_MOFED
+          value: "true"
+        {{- end }}
+        {{- end }}
+        {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
+        - name: GDS_ENABLED
+          value: "true"
+        {{- end }}
+        {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+        - name: GDRCOPY_ENABLED
+          value: "true"
+        {{- end }}
       {{- if and (.Openshift) (.Runtime.OpenshiftVersion) }}
         - name: OPENSHIFT_VERSION
           value: {{ .Runtime.OpenshiftVersion | quote }}
