@@ -1719,7 +1719,9 @@ func TestTransformVFIOManager(t *testing.T) {
 					Name:            "k8s-driver-manager",
 					Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
-					Env:             mockEnvCore,
+					Env: append([]corev1.EnvVar{
+						{Name: DriverVersionEnvName, Value: "v1.0.0"},
+					}, mockEnvCore...),
 				}).
 				WithPullSecret(secret),
 		},
@@ -1937,10 +1939,12 @@ func newBoolPtr(b bool) *bool {
 
 func TestTransformDriverManagerInitContainer(t *testing.T) {
 	testCases := []struct {
-		description string
-		ds          Daemonset
-		cpSpec      *gpuv1.ClusterPolicySpec
-		expectedDs  Daemonset
+		description      string
+		ds               Daemonset
+		cpSpec           *gpuv1.ClusterPolicySpec
+		driverVersion    string
+		kernelModuleType string
+		expectedDs       Daemonset
 	}{
 		{
 			description: "transform k8s-driver-manager initContainer",
@@ -1963,6 +1967,8 @@ func TestTransformDriverManagerInitContainer(t *testing.T) {
 					},
 				},
 			},
+			driverVersion:    "",
+			kernelModuleType: "",
 			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
 				Name:            "k8s-driver-manager",
 				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
@@ -1974,11 +1980,39 @@ func TestTransformDriverManagerInitContainer(t *testing.T) {
 				},
 			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
 		},
+		{
+			description: "transform k8s-driver-manager initContainer with driver version and kernel module type",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:       "nvcr.io/nvidia/cloud-native",
+						Image:            "k8s-driver-manager",
+						Version:          "v1.0.0",
+						ImagePullPolicy:  "IfNotPresent",
+						ImagePullSecrets: []string{"pull-secret"},
+					},
+				},
+			},
+			driverVersion:    "550.90.12",
+			kernelModuleType: "open",
+			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: DriverVersionEnvName, Value: "550.90.12"},
+					{Name: KernelModuleTypeEnvName, Value: "open"},
+				},
+			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA)
+			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA, tc.driverVersion, tc.kernelModuleType, tc.cpSpec.Driver.DriverType)
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
@@ -2665,6 +2699,9 @@ func TestTransformDriver(t *testing.T) {
 			}).WithInitContainer(corev1.Container{
 				Name:  "k8s-driver-manager",
 				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				Env: []corev1.EnvVar{
+					{Name: DriverVersionEnvName, Value: "570.172.08"},
+				},
 			}),
 			errorExpected: false,
 		},
@@ -2962,6 +2999,9 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 				Name:            "k8s-driver-manager",
 				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: DriverVersionEnvName, Value: "570.172.08"},
+				},
 			}).WithVolume(corev1.Volume{
 				Name: "licensing-config",
 				VolumeSource: corev1.VolumeSource{
@@ -3016,6 +3056,9 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 				Name:            "k8s-driver-manager",
 				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: DriverVersionEnvName, Value: "570.172.08"},
+				},
 			}).WithVolume(corev1.Volume{
 				Name: "licensing-config",
 				VolumeSource: corev1.VolumeSource{
@@ -3140,6 +3183,9 @@ func TestTransformDriverWithResources(t *testing.T) {
 			}).WithInitContainer(corev1.Container{
 				Name:  "k8s-driver-manager",
 				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				Env: []corev1.EnvVar{
+					{Name: DriverVersionEnvName, Value: "570.172.08"},
+				},
 			}),
 			errorExpected: false,
 		},
@@ -3218,6 +3264,10 @@ func TestTransformDriverRDMA(t *testing.T) {
 			{
 				Name:  "USE_HOST_MOFED",
 				Value: "true",
+			},
+			{
+				Name:  "DRIVER_VERSION",
+				Value: "570.172.08",
 			},
 		},
 	}).WithContainer(corev1.Container{

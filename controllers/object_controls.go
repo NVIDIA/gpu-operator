@@ -160,6 +160,10 @@ const (
 	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
 	// KernelModuleTypeEnvName is the name of the driver-container envvar to set the desired kernel module type
 	KernelModuleTypeEnvName = "KERNEL_MODULE_TYPE"
+	// DriverTypeEnvName is the name of the driver-container envvar to set the driver type
+	DriverTypeEnvName = "DRIVER_TYPE"
+	// DriverVersionEnvName is the name of the envvar to set the desired driver version
+	DriverVersionEnvName = "DRIVER_VERSION"
 	// MPSRootEnvName is the name of the envvar for configuring the MPS root
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
@@ -1002,7 +1006,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// update driver-manager initContainer
-	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
+	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA, config.Driver.Version, config.Driver.KernelModuleType, config.Driver.DriverType)
 	if err != nil {
 		return err
 	}
@@ -1050,7 +1054,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 // TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager, nil)
+	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager, nil, config.VGPUManager.Version, "", "")
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for vGPU Manager: %v", err)
 	}
@@ -2009,7 +2013,7 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
+	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil, config.VFIOManager.Version, "", "")
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
 	}
@@ -2741,7 +2745,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	return nil
 }
 
-func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec) error {
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec, driverVersion string, kernelModuleType string, driverType string) error {
 	container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 
 	if container == nil {
@@ -2763,6 +2767,21 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpe
 		if rdmaSpec.IsHostMOFED() {
 			setContainerEnv(container, UseHostMOFEDEnvName, "true")
 		}
+	}
+
+	// set driver version for config change detection
+	if driverVersion != "" {
+		setContainerEnv(container, DriverVersionEnvName, driverVersion)
+	}
+
+	// set kernel module type for config change detection
+	if kernelModuleType != "" {
+		setContainerEnv(container, KernelModuleTypeEnvName, kernelModuleType)
+	}
+
+	// set driver type for config change detection
+	if driverType != "" {
+		setContainerEnv(container, DriverTypeEnvName, driverType)
 	}
 
 	// set/append environment variables for driver-manager initContainer
@@ -3422,6 +3441,10 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if config.Driver.OpenKernelModulesEnabled() {
 			setContainerEnv(driverContainer, OpenKernelModulesEnabledEnvName, "true")
 		}
+	}
+
+	if len(config.Driver.DriverType) > 0 {
+		setContainerEnv(driverContainer, DriverTypeEnvName, config.Driver.DriverType)
 	}
 
 	// set container probe timeouts

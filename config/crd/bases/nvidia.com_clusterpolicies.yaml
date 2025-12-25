@@ -643,6 +643,15 @@ spec:
                       name:
                         type: string
                     type: object
+                  driverType:
+                    description: |-
+                      DriverType defines the type of NVIDIA driver to be deployed.
+                      Accepted values are gpu, vgpu, and vgpu-host-manager.
+                    enum:
+                    - gpu
+                    - vgpu
+                    - vgpu-host-manager
+                    type: string
                   enabled:
                     description: Enabled indicates if deployment of NVIDIA Driver
                       through operator is enabled

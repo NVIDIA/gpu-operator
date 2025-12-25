@@ -627,6 +627,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 				LivenessProbe:  getDefaultContainerProbeSpec(),
 				ReadinessProbe: getDefaultContainerProbeSpec(),
 				DriverType:     nvidiav1alpha1.GPU,
+				Version:        "525.85.03",
 				Resources: &nvidiav1alpha1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("200m"),
