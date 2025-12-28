@@ -13,6 +13,8 @@ spec:
     metadata:
       labels:
         app: nvidia-mig-manager
+      annotations:
+        nvidia.cdi.k8s.io/container.nvidia-mig-manager: management.nvidia.com/gpu=all
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.mig-manager: "true"
