@@ -3435,6 +3435,15 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		setContainerProbe(driverContainer, config.Driver.ReadinessProbe, Readiness)
 	}
 
+	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
+		// set env indicating gdrcopy is enabled
+		setContainerEnv(driverContainer, GDRCopyEnabledEnvName, "true")
+	}
+	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
+		// set env indicating gds is enabled
+		setContainerEnv(driverContainer, GDSEnabledEnvName, "true")
+	}
+
 	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
 		// set env indicating nvidia-peermem is enabled to compile module with required ib_* interfaces
 		setContainerEnv(driverContainer, GPUDirectRDMAEnabledEnvName, "true")
