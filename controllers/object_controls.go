@@ -1698,6 +1698,11 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.HostNetwork = true
 		}
 	}
+	// set hostNetwork if specified for DCGM Exporter (if it is already enabled above,
+	// do not touch the value)
+	if config.DCGMExporter.IsHostNetworkEnabled() {
+		obj.Spec.Template.Spec.HostNetwork = true
+	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 

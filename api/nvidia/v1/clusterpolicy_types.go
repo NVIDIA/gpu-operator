@@ -931,6 +931,13 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	HostPID *bool `json:"hostPID,omitempty"`
 
+	// HostNetwork allows the DCGM-Exporter daemon set to expose metrics port on the host's network namespace.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostNetwork for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	HostNetwork *bool `json:"hostNetwork,omitempty"`
+
 	// Optional: HPC job mapping configuration for NVIDIA DCGM Exporter
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1968,6 +1975,15 @@ func (e *DCGMExporterSpec) IsHostPIDEnabled() bool {
 		return false
 	}
 	return *e.HostPID
+}
+
+// IsHostNetworkEnabled returns true if hostNetwork is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsHostNetworkEnabled() bool {
+	if e.HostNetwork == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.HostNetwork
 }
 
 // IsHPCJobMappingEnabled returns true if HPC job mapping is enabled for DCGM Exporter
