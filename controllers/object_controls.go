@@ -1696,7 +1696,14 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if remoteEngine != "" && strings.HasPrefix(remoteEngine, "localhost") {
 			// enable hostNetwork for communication with external DCGM using localhost
 			obj.Spec.Template.Spec.HostNetwork = true
+			obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 		}
+	}
+	// set hostNetwork if specified for DCGM Exporter (if it is already enabled above,
+	// do not touch the value)
+	if config.DCGMExporter.IsHostNetworkEnabled() {
+		obj.Spec.Template.Spec.HostNetwork = true
+		obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
