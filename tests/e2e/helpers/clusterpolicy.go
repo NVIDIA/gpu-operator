@@ -20,13 +20,14 @@ import (
 	"context"
 	"time"
 
-	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
-	gpuclientset "github.com/NVIDIA/gpu-operator/api/versioned"
-	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	gpuclientset "github.com/NVIDIA/gpu-operator/api/versioned"
+	"github.com/NVIDIA/gpu-operator/internal/conditions"
 )
 
 type ClusterPolicyClient struct {
@@ -127,4 +128,3 @@ func (h *ClusterPolicyClient) WaitForReady(ctx context.Context, name string, tim
 		return false, nil
 	})
 }
-

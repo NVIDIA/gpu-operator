@@ -17,112 +17,75 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
+	"os/exec"
 	"time"
-
-	helm "github.com/mittwald/go-helm-client"
-	helmValues "github.com/mittwald/go-helm-client/values"
 )
 
-type OperatorClientOption func(client *OperatorClient)
-
 type OperatorClient struct {
-	helmClient helm.Client
-	chart      string
-	namespace  string
-	kubeconfig string
-}
-
-func NewOperatorClient(opts ...OperatorClientOption) (*OperatorClient, error) {
-	operatorClient := &OperatorClient{}
-
-	for _, option := range opts {
-		option(operatorClient)
-	}
-
-	helmOptions := &helm.KubeConfClientOptions{
-		Options: &helm.Options{
-			Namespace:        operatorClient.namespace,
-			RepositoryCache:  os.TempDir() + "/.helmcache",
-			RepositoryConfig: os.TempDir() + "/.helmrepo",
-		},
-	}
-
-	kubeconfigBytes, err := os.ReadFile(operatorClient.kubeconfig)
-	if err != nil {
-		return nil, err
-	}
-	helmOptions.KubeConfig = kubeconfigBytes
-
-	helmClient, err := helm.NewClientFromKubeConf(helmOptions)
-	if err != nil {
-		return nil, err
-	}
-	operatorClient.helmClient = helmClient
-
-	return operatorClient, nil
-}
-
-func WithChart(chart string) OperatorClientOption {
-	return func(operatorClient *OperatorClient) {
-		operatorClient.chart = chart
-	}
-}
-
-func WithKubeConfig(kubeconfig string) OperatorClientOption {
-	return func(operatorClient *OperatorClient) {
-		operatorClient.kubeconfig = kubeconfig
-	}
-}
-
-func WithNamespace(namespace string) OperatorClientOption {
-	return func(operatorClient *OperatorClient) {
-		operatorClient.namespace = namespace
-	}
+	Chart      string
+	Namespace  string
+	Kubeconfig string
 }
 
 type ChartOptions struct {
 	CleanupOnFail bool
-	GenerateName  bool
 	ReleaseName   string
 	Timeout       time.Duration
 	Wait          bool
 }
 
 func (op *OperatorClient) Install(ctx context.Context, params []string, chartOpts ChartOptions) (string, error) {
-	values := helmValues.Options{
-		Values: params,
+	if op.Chart == "" {
+		return "", fmt.Errorf("chart must be provided")
+	}
+	if chartOpts.ReleaseName == "" {
+		return "", fmt.Errorf("release name must be provided")
 	}
 
-	chartSpec := helm.ChartSpec{
-		ChartName:     op.chart,
-		Namespace:     op.namespace,
-		GenerateName:  chartOpts.GenerateName,
-		Wait:          chartOpts.Wait,
-		Timeout:       chartOpts.Timeout,
-		CleanupOnFail: chartOpts.CleanupOnFail,
-		ValuesOptions: values,
+	args := []string{"install", chartOpts.ReleaseName, op.Chart}
+	args = append(args, "-n", op.Namespace, "--kubeconfig", op.Kubeconfig)
+
+	for _, param := range params {
+		args = append(args, "--set", param)
 	}
 
-	if !chartOpts.GenerateName {
-		if len(chartOpts.ReleaseName) == 0 {
-			return "", fmt.Errorf("release name must be provided when the GenerateName chart option is unset")
-		}
-		chartSpec.ReleaseName = chartOpts.ReleaseName
+	if chartOpts.Wait {
+		args = append(args, "--wait")
 	}
 
-	release, err := op.helmClient.InstallChart(ctx, &chartSpec, nil)
-
-	if err != nil {
-		return "", fmt.Errorf("error installing operator: %w", err)
+	if chartOpts.Timeout > 0 {
+		args = append(args, "--timeout", chartOpts.Timeout.String())
 	}
 
-	return release.Name, err
+	if chartOpts.CleanupOnFail {
+		args = append(args, "--cleanup-on-fail")
+	}
+
+	cmd := exec.CommandContext(ctx, "helm", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("error installing operator: %w: %s", err, stderr.String())
+	}
+
+	return chartOpts.ReleaseName, nil
 }
 
 func (op *OperatorClient) Uninstall(releaseName string) error {
-	return op.helmClient.UninstallReleaseByName(releaseName)
-}
+	args := []string{"uninstall", releaseName, "-n", op.Namespace, "--kubeconfig", op.Kubeconfig}
 
+	cmd := exec.Command("helm", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error uninstalling release %s: %w: %s", releaseName, err, stderr.String())
+	}
+
+	return nil
+}

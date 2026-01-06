@@ -113,4 +113,3 @@ func (c *PodClient) CreateNamespace(ctx context.Context, namespaceName string, l
 func (c *PodClient) DeleteNamespace(ctx context.Context, namespaceName string) error {
 	return c.k8sClient.Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
 }
-
