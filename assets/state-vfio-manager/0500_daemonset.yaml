@@ -63,6 +63,9 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - vfio-manage bind --all && while true; do sleep 86400; done
+          env:
+            - name: HOST_ROOT
+              value: "/host"
           resources:
             limits:
               memory: 200Mi
