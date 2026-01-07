@@ -511,6 +511,10 @@ ccManager:
       value: "0x2339,0x2331,0x2330,0x2324,0x2322,0x233d"
   resources: {}
 
+# Array of extra K8s manifests to deploy
+# Supports use of custom Helm templates
+extraObjects: []
+
 node-feature-discovery:
   priorityClassName: system-node-critical
   gc:
