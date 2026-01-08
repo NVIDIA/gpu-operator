@@ -155,7 +155,7 @@ const (
 	// defaultDriverInstallDirCtrPath indicates the default path where the NVIDIA driver install dir is mounted in the container
 	defaultDriverInstallDirCtrPath = "/run/nvidia/driver"
 	// additionalDriversFlagsFilePath indicates the path to the file which contains additional drivers status flags
-	additionalDriversFlagsFilePath = defaultDriverInstallDirCtrPath + "/.additional-drivers-flags"
+	additionalDriversFlagsFilePath = defaultStatusPath + "/.driver-ctr-ready"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
