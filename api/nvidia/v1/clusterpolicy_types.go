@@ -94,6 +94,8 @@ type ClusterPolicySpec struct {
 	CCManager CCManagerSpec `json:"ccManager,omitempty"`
 	// HostPaths defines various paths on the host needed by GPU Operator components
 	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
+	// FabricManager component spec
+	FabricManager FabricManagerSpec `json:"fabricManager,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -1724,6 +1726,38 @@ type CDIConfigSpec struct {
 	Default *bool `json:"default,omitempty"`
 }
 
+// FabricMode defines the Fabric Manager mode
+type FabricMode string
+
+const (
+	// FabricModeFullPassthrough indicates Full-passthrough mode (FABRIC_MODE=0)
+	FabricModeFullPassthrough FabricMode = "full-passthrough"
+	// FabricModeSharedNVSwitch indicates Shared NVSwitch Virtualization mode (FABRIC_MODE=1)
+	FabricModeSharedNVSwitch FabricMode = "shared-nvswitch"
+)
+
+func (f FabricMode) String() string {
+	switch f {
+	case FabricModeFullPassthrough:
+		return "full-passthrough"
+	case FabricModeSharedNVSwitch:
+		return "shared-nvswitch"
+	default:
+		return ""
+	}
+}
+
+// FabricManagerSpec defines the properties for NVIDIA Fabric Manager configuration
+type FabricManagerSpec struct {
+	// Mode indicates the Fabric Manager mode
+	// +kubebuilder:validation:Enum=full-passthrough;shared-nvswitch
+	// +kubebuilder:default=full-passthrough
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Fabric Manager Mode"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:select:full-passthrough,urn:alm:descriptor:com.tectonic.ui:select:shared-nvswitch"
+	Mode FabricMode `json:"mode,omitempty"`
+}
+
 // MIGStrategy indicates MIG mode
 type MIGStrategy string
 
@@ -2217,4 +2251,19 @@ func (c *MIGPartedConfigSpec) GetName() string {
 
 func (c *VGPUDevicesConfigSpec) GetName() string {
 	return ptr.Deref(c, VGPUDevicesConfigSpec{}).Name
+}
+
+// IsSharedNVSwitchMode returns true if Fabric Manager is configured for Shared NVSwitch mode
+func (f *FabricManagerSpec) IsSharedNVSwitchMode() bool {
+	return f.Mode == FabricModeSharedNVSwitch
+}
+
+// ValidateFabricManagerConfig validates the Fabric Manager configuration
+func (c *ClusterPolicySpec) ValidateFabricManagerConfig() error {
+	if c.SandboxWorkloads.DefaultWorkload == "vm-passthrough" &&
+		c.FabricManager.IsSharedNVSwitchMode() &&
+		!c.Driver.IsEnabled() {
+		return fmt.Errorf("driver must be enabled when using vm-passthrough with Fabric Manager Shared NVSwitch mode")
+	}
+	return nil
 }
