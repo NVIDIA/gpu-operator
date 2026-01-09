@@ -195,6 +195,7 @@ var rootUID = ptr.To(int64(0))
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
 	"centos": "/etc/yum.repos.d",
+	"debian": "/etc/apt/sources.list.d",
 	"ubuntu": "/etc/apt/sources.list.d",
 	"rhcos":  "/etc/yum.repos.d",
 	"rhel":   "/etc/yum.repos.d",
@@ -206,6 +207,7 @@ var RepoConfigPathMap = map[string]string{
 // https://access.redhat.com/documentation/en-us/openshift_container_platform/4.3/html/authentication/ocp-certificates#proxy-certificates_ocp-certificates
 var CertConfigPathMap = map[string]string{
 	"centos": "/etc/pki/ca-trust/extracted/pem",
+	"debian": "/usr/local/share/ca-certificates",
 	"ubuntu": "/usr/local/share/ca-certificates",
 	"rhcos":  "/etc/pki/ca-trust/extracted/pem",
 	"rhel":   "/etc/pki/ca-trust/extracted/pem",
