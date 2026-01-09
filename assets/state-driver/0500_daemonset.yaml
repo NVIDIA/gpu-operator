@@ -137,39 +137,39 @@ spec:
         startupProbe:
           exec:
             command:
-              - sh
-              - -c
-              - |
-                set -eu
+            - sh
+            - -c
+            - |
+              set -eu
 
-                VALIDATIONS_DIR="/run/nvidia/validations"
-                READY_FILE="${VALIDATIONS_DIR}/.driver-ctr-ready"
+              VALIDATIONS_DIR="/run/nvidia/validations"
+              READY_FILE="${VALIDATIONS_DIR}/.driver-ctr-ready"
 
-                mkdir -p "${VALIDATIONS_DIR}"
+              mkdir -p "${VALIDATIONS_DIR}"
 
-                if [ ! -f /sys/module/nvidia/refcnt ]; then
-                  echo "NVIDIA kernel module not loaded"
-                  exit 1
-                fi
+              if [ ! -f /sys/module/nvidia/refcnt ]; then
+                echo "NVIDIA kernel module not loaded"
+                exit 1
+              fi
 
-                if ! nvidia-smi >/dev/null 2>&1; then
-                  echo "nvidia-smi failed"
-                  exit 1
-                fi
+              if ! nvidia-smi; then
+                echo "nvidia-smi failed"
+                exit 1
+              fi
 
-                GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
-                GDS_ENABLED="${GDS_ENABLED:-false}"
-                GDRCOPY_ENABLED="${GDRCOPY_ENABLED:-false}"
+              GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
+              GDS_ENABLED="${GDS_ENABLED:-false}"
+              GDRCOPY_ENABLED="${GDRCOPY_ENABLED:-false}"
 
-                TMP_FILE="${READY_FILE}.tmp"
+              TMP_FILE="${READY_FILE}.tmp"
 
-                {
-                  echo "GDRCOPY_ENABLED: ${GDRCOPY_ENABLED}"
-                  echo "GDS_ENABLED: ${GDS_ENABLED}"
-                  echo "GPU_DIRECT_RDMA_ENABLED: ${GPU_DIRECT_RDMA_ENABLED}"
-                } > "$TMP_FILE"
+              {
+                echo "GDRCOPY_ENABLED: ${GDRCOPY_ENABLED}"
+                echo "GDS_ENABLED: ${GDS_ENABLED}"
+                echo "GPU_DIRECT_RDMA_ENABLED: ${GPU_DIRECT_RDMA_ENABLED}"
+              } > "$TMP_FILE"
 
-                mv "$TMP_FILE" "$READY_FILE"
+              mv "$TMP_FILE" "$READY_FILE"
           initialDelaySeconds: 60
           failureThreshold: 120
           successThreshold: 1

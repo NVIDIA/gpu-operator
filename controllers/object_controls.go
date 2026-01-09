@@ -2349,18 +2349,6 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}
-		case "nvidia-fs":
-			if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
-				// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
-				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-				return nil
-			}
-		case "gdrcopy":
-			if !config.IsGDRCopyEnabled() {
-				// remove gdrcopy init container from validator Daemonset if GDRCopy is not enabled
-				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-				return nil
-			}
 		case "cc-manager":
 			if !config.CCManager.IsEnabled() {
 				// remove  cc-manager init container from validator Daemonset if it is not enabled
