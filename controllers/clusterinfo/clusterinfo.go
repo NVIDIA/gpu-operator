@@ -19,7 +19,6 @@ package clusterinfo
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -29,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -41,30 +39,18 @@ import (
 // Interface to the clusterinfo package
 type Interface interface {
 	GetContainerRuntime() (string, error)
-	GetKubernetesVersion() (string, error)
 	GetOpenshiftVersion() (string, error)
-	GetRHCOSVersions(map[string]string) ([]string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
 	GetOpenshiftProxySpec() (*configv1.ProxySpec, error)
-	GetKernelVersions(map[string]string) ([]string, error)
 }
-
-const (
-	nfdOSTreeVersionLabelKey = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
-	nfdKernelLabelKey        = "feature.node.kubernetes.io/kernel-version.full"
-)
-
 type clusterInfo struct {
 	ctx     context.Context
 	config  *rest.Config
 	oneshot bool
 
 	containerRuntime             string
-	kubernetesVersion            string
 	openshiftVersion             string
-	rhcosVersions                []string
 	openshiftDriverToolkitImages map[string]string
-	kernelVersions               []string
 	proxySpec                    *configv1.ProxySpec
 }
 
@@ -93,33 +79,13 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	}
 	l.containerRuntime = containerRuntime
 
-	kubernetesVersion, err := getKubernetesVersion(l.config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %w", err)
-	}
-	l.kubernetesVersion = kubernetesVersion
-
 	openshiftVersion, err := getOpenshiftVersion(ctx, l.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %w", err)
 	}
 	l.openshiftVersion = openshiftVersion
 
-	l.rhcosVersions, err = getRHCOSVersions(ctx, l.config, map[string]string{
-		consts.GPUPresentLabel: "true",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list rhcos versions: %w", err)
-	}
-
 	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(ctx, l.config)
-
-	l.kernelVersions, err = getKernelVersions(ctx, l.config, map[string]string{
-		consts.GPUPresentLabel: "true",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kernel versions: %w", err)
-	}
 
 	return l, nil
 }
@@ -151,15 +117,6 @@ func (l *clusterInfo) GetContainerRuntime() (string, error) {
 	return getContainerRuntime(l.ctx, l.config)
 }
 
-// GetKubernetesVersion returns the k8s version detected in the cluster
-func (l *clusterInfo) GetKubernetesVersion() (string, error) {
-	if l.oneshot {
-		return l.kubernetesVersion, nil
-	}
-
-	return getKubernetesVersion(l.config)
-}
-
 // GetOpenshiftVersion returns the OpenShift version detected in the cluster.
 // An empty string, "", is returned if it is determined we are not running on OpenShift.
 func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
@@ -170,53 +127,6 @@ func (l *clusterInfo) GetOpenshiftVersion() (string, error) {
 	return getOpenshiftVersion(l.ctx, l.config)
 }
 
-// GetRHCOSVersions returns the list of RedHat CoreOS versions used in the Openshift Cluster
-func (l *clusterInfo) GetRHCOSVersions(labelSelector map[string]string) ([]string, error) {
-	if l.oneshot {
-		return l.rhcosVersions, nil
-	}
-
-	return getRHCOSVersions(l.ctx, l.config, labelSelector)
-}
-
-func getRHCOSVersions(ctx context.Context, config *rest.Config, selector map[string]string) ([]string, error) {
-	logger := log.FromContext(ctx)
-	var rhcosVersions []string
-
-	nodeSelector := map[string]string{
-		consts.GPUPresentLabel: "true",
-	}
-
-	// merge defaultSelector with user-input selector
-	maps.Copy(nodeSelector, selector)
-
-	k8sClient, err := corev1client.NewForConfig(config)
-	if err != nil {
-		logger.Error(err, "failed to build k8s core v1 client")
-		return nil, err
-	}
-
-	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
-	})
-
-	if err != nil {
-		logger.Error(err, "failed to list Nodes")
-		return nil, err
-	}
-
-	for _, node := range nodeList.Items {
-		node := node
-
-		nodeLabels := node.GetLabels()
-		if rhcosVersion, ok := nodeLabels[nfdOSTreeVersionLabelKey]; ok {
-			rhcosVersions = append(rhcosVersions, rhcosVersion)
-		}
-	}
-
-	return rhcosVersions, nil
-}
-
 // GetOpenshiftDriverToolkitImages returns a map of the Openshift DriverToolkit Images available for use in the
 // openshift cluster
 func (l *clusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
@@ -225,14 +135,6 @@ func (l *clusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
 	}
 
 	return getOpenshiftDTKImages(l.ctx, l.config)
-}
-
-func (l *clusterInfo) GetKernelVersions(labelSelector map[string]string) ([]string, error) {
-	if l.oneshot {
-		return l.kernelVersions, nil
-	}
-
-	return getKernelVersions(l.ctx, l.config, labelSelector)
 }
 
 func (l *clusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
@@ -290,20 +192,6 @@ func getContainerRuntime(ctx context.Context, config *rest.Config) (string, erro
 		runtime = consts.Containerd
 	}
 	return runtime, nil
-}
-
-func getKubernetesVersion(config *rest.Config) (string, error) {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return "", fmt.Errorf("error building discovery client: %w", err)
-	}
-
-	info, err := discoveryClient.ServerVersion()
-	if err != nil {
-		return "", fmt.Errorf("unable to fetch server version information: %v", err)
-	}
-
-	return info.GitVersion, nil
 }
 
 func getOpenshiftVersion(ctx context.Context, config *rest.Config) (string, error) {
@@ -381,43 +269,6 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 	// TODO: Add code to ensure OCP Namespace Monitoring setting
 
 	return rhcosDriverToolkitImages
-}
-
-func getKernelVersions(ctx context.Context, config *rest.Config, selector map[string]string) ([]string, error) {
-	logger := log.FromContext(ctx)
-	var kernelVersions []string
-
-	nodeSelector := map[string]string{
-		consts.GPUPresentLabel: "true",
-	}
-
-	// merge defaultSelector with user-input selector
-	maps.Copy(nodeSelector, selector)
-
-	k8sClient, err := corev1client.NewForConfig(config)
-	if err != nil {
-		logger.Error(err, "failed to build k8s core v1 client")
-		return nil, err
-	}
-
-	nodeList, err := k8sClient.Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(nodeSelector).String(),
-	})
-	if err != nil {
-		logger.Error(err, "failed to list nodes")
-		return nil, err
-	}
-
-	for _, node := range nodeList.Items {
-		node := node
-
-		nodeLabels := node.GetLabels()
-		if kernelVersion, ok := nodeLabels[nfdKernelLabelKey]; ok {
-			kernelVersions = append(kernelVersions, kernelVersion)
-		}
-	}
-
-	return kernelVersions, nil
 }
 
 func getOpenshiftProxySpec(ctx context.Context, cfg *rest.Config) (*configv1.ProxySpec, error) {

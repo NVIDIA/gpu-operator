@@ -29,13 +29,12 @@ type SyncingSource source.SyncingSource
 // driverSpec is a wrapper of NVIDIADriverSpec with an additional ImagePath field
 // which is to be populated with the fully-qualified image path.
 type driverSpec struct {
-	Spec              *nvidiav1alpha1.NVIDIADriverSpec
-	AppName           string
-	Name              string
-	ImagePath         string
-	ManagerImagePath  string
-	OCPToolkitEnabled bool
-	OSVersion         string
+	Spec             *nvidiav1alpha1.NVIDIADriverSpec
+	AppName          string
+	Name             string
+	ImagePath        string
+	ManagerImagePath string
+	OSVersion        string
 }
 
 // gdsDriverSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field

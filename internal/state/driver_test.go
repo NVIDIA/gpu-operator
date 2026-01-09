@@ -645,8 +645,7 @@ func getMinimalDriverRenderData() *driverRenderData {
 			OSVersion:        "ubuntu22.04",
 		},
 		Runtime: &driverRuntimeSpec{
-			Namespace:         "test-operator",
-			KubernetesVersion: "1.28.0",
+			Namespace: "test-operator",
 		},
 		HostRoot: "",
 	}

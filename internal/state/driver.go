@@ -67,12 +67,9 @@ var _ State = (*stateDriver)(nil)
 
 type driverRuntimeSpec struct {
 	Namespace                     string
-	KubernetesVersion             string
 	OpenshiftVersion              string
 	OpenshiftDriverToolkitEnabled bool
-	OpenshiftDriverToolkitImages  map[string]string
 	OpenshiftProxySpec            *configv1.ProxySpec
-	NodePools                     []nodePool
 }
 
 type openshiftSpec struct {
@@ -241,9 +238,15 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 	clusterInfo := info.(clusterinfo.Interface)
 
-	runtimeSpec, err := getRuntimeSpec(ctx, s.client, s.namespace, clusterInfo, &cr.Spec)
+	runtimeSpec, err := getRuntimeSpec(s.namespace, clusterInfo, &cr.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
+	}
+
+	isOpenshift := runtimeSpec.OpenshiftVersion != ""
+	nodePools, err := getNodePools(ctx, s.client, cr.Spec.NodeSelector, cr.Spec.UsePrecompiledDrivers(), isOpenshift)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node pools: %w", err)
 	}
 
 	gpuDirectRDMASpec := cr.Spec.GPUDirectRDMA
@@ -254,14 +257,16 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		HostRoot:      clusterPolicy.Spec.HostPaths.RootFS,
 	}
 
-	if len(runtimeSpec.NodePools) == 0 {
+	if len(nodePools) == 0 {
 		return nil, fmt.Errorf("no nodes matching the given node selector for %s", cr.Name)
 	}
+
+	openshiftDTKMap := clusterInfo.GetOpenshiftDriverToolkitImages()
 
 	// Render kubernetes objects for each node pool.
 	// We deploy one DaemonSet per node pool.
 	var objs []*unstructured.Unstructured
-	for _, nodePool := range runtimeSpec.NodePools {
+	for _, nodePool := range nodePools {
 		// Construct a unique driver spec per node pool. Each node pool
 		// should have a unique nodeSelector and name.
 		driverSpec, err := getDriverSpec(cr, nodePool)
@@ -292,7 +297,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {
 			renderData.Openshift = &openshiftSpec{
 				RHCOSVersion: nodePool.rhcosVersion,
-				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[nodePool.rhcosVersion],
+				ToolkitImage: openshiftDTKMap[nodePool.rhcosVersion],
 			}
 		}
 
@@ -608,27 +613,15 @@ func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrc
 	}, nil
 }
 
-func getRuntimeSpec(ctx context.Context, k8sClient client.Client, namespace string, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
-	k8sVersion, err := info.GetKubernetesVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
-	}
+func getRuntimeSpec(namespace string, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
 	openshiftVersion, err := info.GetOpenshiftVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %v", err)
 	}
-	openshift := (openshiftVersion != "")
-
-	nodePools, err := getNodePools(ctx, k8sClient, spec.NodeSelector, spec.UsePrecompiledDrivers(), openshift)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get node pools: %v", err)
-	}
 
 	rs := &driverRuntimeSpec{
-		Namespace:         namespace,
-		KubernetesVersion: k8sVersion,
-		OpenshiftVersion:  openshiftVersion,
-		NodePools:         nodePools,
+		Namespace:        namespace,
+		OpenshiftVersion: openshiftVersion,
 	}
 
 	// Only get information needed for Openshift DriverToolkit if we are
@@ -644,7 +637,6 @@ func getRuntimeSpec(ctx context.Context, k8sClient client.Client, namespace stri
 		openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
 
 		rs.OpenshiftDriverToolkitEnabled = len(openshiftDTKMap) > 0
-		rs.OpenshiftDriverToolkitImages = openshiftDTKMap
 	}
 
 	return rs, nil
