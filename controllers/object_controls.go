@@ -66,6 +66,8 @@ const (
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
+	// DefaultRuntimeNRISocketFile indicates the default container runtime NRI socket file
+	DefaultRuntimeNRISocketFile = "/var/run/nri/nri.sock"
 	// DefaultCRIOConfigFile indicates default config file path for cri-o. .
 	DefaultCRIOConfigFile = "/etc/crio/config.toml"
 	// DefaultCRIODropInConfigFile indicates the default path to the drop-in config file for cri-o
@@ -82,9 +84,11 @@ const (
 	DefaultRuntimeClass = "nvidia"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
 	DriverInstallPathVolName = "driver-install-path"
-	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeNRISocketTargetDir represents target directory where runtime NRI socket directory will be mounted
+	DefaultRuntimeNRISocketTargetDir = "/runtime/nri-sock-dir/"
+	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
-	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
 	// DefaultRuntimeDropInConfigTargetDir represents target directory where drop-in config directory will be mounted
 	DefaultRuntimeDropInConfigTargetDir = "/runtime/config-dir.d/"
@@ -941,7 +945,7 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
@@ -1440,6 +1444,22 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
+
+	// setup mounts for the runtime NRI socket file
+	nriSocketFile := getContainerEnv(container, "RUNTIME_NRI_SOCKET")
+	if nriSocketFile == "" {
+		nriSocketFile = DefaultRuntimeNRISocketFile
+	}
+
+	setContainerEnv(container, "RUNTIME_NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
+
+	nriVolMountSocketName := "nri-socket"
+	nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
+	container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
+
+	nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
+
 	return nil
 }
 
@@ -1511,7 +1531,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
@@ -1591,7 +1611,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		return err
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// update env required for MIG support
 	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
@@ -1706,7 +1726,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set hostPID if specified for DCGM Exporter
 	if config.DCGMExporter.IsHostPIDEnabled() {
@@ -1856,7 +1876,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	return nil
 }
@@ -1898,7 +1918,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Containers[0].Args = config.MIGManager.Args
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -2192,7 +2212,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		return fmt.Errorf("%v", err)
 	}
 
-	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	// setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
@@ -2566,13 +2586,13 @@ func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 	return DefaultRuntimeClass
 }
 
-func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
-	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
-		return
-	}
-	runtimeClassName := getRuntimeClassName(config)
-	podSpec.RuntimeClassName = &runtimeClassName
-}
+// func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
+//	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
+//		return
+//	}
+//	runtimeClassName := getRuntimeClassName(config)
+//	podSpec.RuntimeClassName = &runtimeClassName
+//}
 
 func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) {
 	var containerProbe *corev1.Probe
