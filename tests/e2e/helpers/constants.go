@@ -25,4 +25,3 @@ const (
 	// upgradeDoneState represents the state when a driver upgrade is complete
 	upgradeDoneState = "upgrade-done"
 )
-
