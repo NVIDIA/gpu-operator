@@ -317,6 +317,14 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			logger.Error(err, "error handling default images in manifests", "NodePool", nodePool.name)
 			return nil, err
 		}
+
+		// Compute digest from rendered DaemonSet and set it
+		err = s.setDigestInDaemonSet(ctx, manifestObjs)
+		if err != nil {
+			logger.Error(err, "error setting digest in DaemonSet", "NodePool", nodePool.name)
+			return nil, err
+		}
+
 		objs = append(objs, manifestObjs...)
 
 	}
@@ -682,6 +690,68 @@ func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace
 		})
 	}
 	return volumeMounts, itemsToInclude, nil
+}
+
+// setContainerEnv sets an environment variable in a container
+func setContainerEnv(c *corev1.Container, key, value string) {
+	for i, env := range c.Env {
+		if env.Name == key {
+			c.Env[i].Value = value
+			return
+		}
+	}
+	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
+}
+
+// findContainerByName finds a container by name in a slice of containers
+func findContainerByName(containers []corev1.Container, name string) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+// setDigestInDaemonSet computes a hash of the DaemonSet configuration and sets it
+// as DRIVER_CONFIG_DIGEST env var. This enables fast-path driver installation by
+// detecting when configuration hasn't changed, avoiding unnecessary reinstalls.
+// Used by k8s-driver-manager to decide if driver cleanup is needed and by
+// nvidia-driver container to skip full reinstall for matching configurations.
+func (s *stateDriver) setDigestInDaemonSet(ctx context.Context, objs []*unstructured.Unstructured) error {
+	// Find DaemonSet in rendered objects
+	dsObj, err := getObjectOfKind(objs, "DaemonSet")
+	if err != nil {
+		return fmt.Errorf("failed to find DaemonSet in rendered objects: %w", err)
+	}
+
+	// Convert to typed DaemonSet
+	ds := &appsv1.DaemonSet{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(dsObj.Object, ds)
+	if err != nil {
+		return fmt.Errorf("failed to convert unstructured to DaemonSet: %w", err)
+	}
+
+	digest := utils.GetObjectHash(ds.Spec)
+
+	driverManagerContainer := findContainerByName(ds.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+	if driverManagerContainer != nil {
+		setContainerEnv(driverManagerContainer, "DRIVER_CONFIG_DIGEST", digest)
+	}
+
+	driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	if driverContainer != nil {
+		setContainerEnv(driverContainer, "DRIVER_CONFIG_DIGEST", digest)
+	}
+
+	// Convert back to unstructured and update the object
+	updatedObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ds)
+	if err != nil {
+		return fmt.Errorf("failed to convert DaemonSet to unstructured: %w", err)
+	}
+	dsObj.Object = updatedObj
+
+	return nil
 }
 
 func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {

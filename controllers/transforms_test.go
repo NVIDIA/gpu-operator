@@ -2067,6 +2067,23 @@ func newBoolPtr(b bool) *bool {
 	return boolPtr
 }
 
+// removeDigestFromDaemonSet removes DRIVER_CONFIG_DIGEST env var from a DaemonSet
+func removeDigestFromDaemonSet(ds *appsv1.DaemonSet) {
+	removeDigestFromContainers := func(containers []corev1.Container) {
+		for i := range containers {
+			var filtered []corev1.EnvVar
+			for _, env := range containers[i].Env {
+				if env.Name != "DRIVER_CONFIG_DIGEST" {
+					filtered = append(filtered, env)
+				}
+			}
+			containers[i].Env = filtered
+		}
+	}
+	removeDigestFromContainers(ds.Spec.Template.Spec.Containers)
+	removeDigestFromContainers(ds.Spec.Template.Spec.InitContainers)
+}
+
 func TestTransformDriverManagerInitContainer(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -2812,6 +2829,9 @@ func TestTransformDriver(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			// Remove dynamically generated digest before comparison
+			removeDigestFromDaemonSet(tc.ds.DaemonSet)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
@@ -3178,6 +3198,9 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			// Remove dynamically generated digest before comparison
+			removeDigestFromDaemonSet(tc.ds.DaemonSet)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
@@ -3287,6 +3310,9 @@ func TestTransformDriverWithResources(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			// Remove dynamically generated digest before comparison
+			removeDigestFromDaemonSet(tc.ds.DaemonSet)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
@@ -3367,5 +3393,8 @@ func TestTransformDriverRDMA(t *testing.T) {
 		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
 			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
 	require.NoError(t, err)
+
+	// Remove dynamically generated digest before comparison
+	removeDigestFromDaemonSet(ds.DaemonSet)
 	require.EqualValues(t, expectedDs, ds)
 }
