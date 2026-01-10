@@ -32,6 +32,7 @@ import (
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert/yaml"
 	cli "github.com/urfave/cli/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -66,6 +67,9 @@ type NvidiaFs struct{}
 
 // GDRCopy driver component
 type GDRCopy struct{}
+
+// NvidiaPeermem driver component
+type NvidiaPeermem struct{}
 
 // CUDA represents spec to run cuda workload
 type CUDA struct {
@@ -150,12 +154,16 @@ const (
 	defaultDriverInstallDir = "/run/nvidia/driver"
 	// defaultDriverInstallDirCtrPath indicates the default path where the NVIDIA driver install dir is mounted in the container
 	defaultDriverInstallDirCtrPath = "/run/nvidia/driver"
+	// additionalDriversFlagsFilePath indicates the path to the file which contains additional drivers status flags
+	additionalDriversFlagsFilePath = defaultStatusPath + "/.driver-ctr-ready"
 	// driverStatusFile indicates status file for containerizeddriver readiness
 	driverStatusFile = "driver-ready"
 	// nvidiaFsStatusFile indicates status file for nvidia-fs driver readiness
 	nvidiaFsStatusFile = "nvidia-fs-ready"
 	// gdrCopyStatusFile indicates status file for GDRCopy driver (gdrdrv) readiness
 	gdrCopyStatusFile = "gdrcopy-ready"
+	// nvidiaPeermemStatusFile indicates status file for nvidia-peermem driver readiness
+	nvidiaPeermemStatusFile = "nvidia-peermem-ready"
 	// toolkitStatusFile indicates status file for toolkit readiness
 	toolkitStatusFile = "toolkit-ready"
 	// pluginStatusFile indicates status file for plugin readiness
@@ -445,6 +453,8 @@ func isValidComponent() bool {
 	case "nvidia-fs":
 		fallthrough
 	case "gdrcopy":
+		fallthrough
+	case "nvidia-peermem":
 		return true
 	default:
 		return false
@@ -509,6 +519,10 @@ func start(ctx context.Context, cli *cli.Command) error {
 		return err
 	}
 
+	return validateComponent(ctx, componentFlag)
+}
+
+func validateComponent(ctx context.Context, componentFlag string) error {
 	switch componentFlag {
 	case "driver":
 		driver := &Driver{
@@ -531,6 +545,13 @@ func start(ctx context.Context, cli *cli.Command) error {
 		err := gdrcopy.validate()
 		if err != nil {
 			return fmt.Errorf("error validating gdrcopy driver installation: %w", err)
+		}
+		return nil
+	case "nvidia-peermem":
+		nvidiaPeermem := &NvidiaPeermem{}
+		err := nvidiaPeermem.validate()
+		if err != nil {
+			return fmt.Errorf("error validating nvidia-peermem driver installation: %w", err)
 		}
 		return nil
 	case "toolkit":
@@ -795,7 +816,51 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 	if err != nil {
 		return driverInfo{}, err
 	}
+
+	err = validateAdditionalDriverComponents(d.ctx)
+	if err != nil {
+		return driverInfo{}, err
+	}
+
 	return getDriverInfo(false, hostRootFlag, driverInstallDirFlag, driverInstallDirCtrPathFlag), nil
+}
+
+func validateAdditionalDriverComponents(ctx context.Context) error {
+	data, err := os.ReadFile(additionalDriversFlagsFilePath)
+	if err != nil {
+		return err
+	}
+
+	supportedFeatures := map[string]string{
+		"GDRCOPY_ENABLED":         "gdrcopy",
+		"GDS_ENABLED":             "nvidia-fs",
+		"GPU_DIRECT_RDMA_ENABLED": "nvidia-peermem",
+	}
+
+	features := map[string]bool{}
+	if err := yaml.Unmarshal(data, &features); err != nil {
+		return err
+	}
+
+	for k, enabled := range features {
+		if !enabled {
+			log.Debugf("%s is set to %t, skipping checking it", k, enabled)
+			continue
+		}
+
+		component, ok := supportedFeatures[k]
+		if !ok {
+			log.Infof("unsupported feature flag: %s, skipping checking it", k)
+			continue
+		}
+
+		log.Infof("Validating additional enabled driver component: %s", component)
+		if err := validateComponent(ctx, component); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (d *Driver) validate() error {
@@ -987,6 +1052,38 @@ func (g *GDRCopy) runValidation(silent bool) error {
 	// check for gdrdrv module to be loaded
 	command := shell
 	args := []string{"-c", "lsmod | grep -E '^gdrdrv\\s'"}
+
+	if withWaitFlag {
+		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
+	}
+	return runCommand(command, args, silent)
+}
+
+func (n *NvidiaPeermem) validate() error {
+	// delete driver status file if already present
+	err := deleteStatusFile(outputDirFlag + "/" + nvidiaPeermemStatusFile)
+	if err != nil {
+		return err
+	}
+
+	err = n.runValidation(false)
+	if err != nil {
+		log.Info("nvidia-peermem driver is not ready")
+		return err
+	}
+
+	// create driver status file
+	err = createStatusFile(outputDirFlag + "/" + nvidiaPeermemStatusFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *NvidiaPeermem) runValidation(silent bool) error {
+	// check for nvidia_peermem module to be loaded
+	command := shell
+	args := []string{"-c", "lsmod | grep -E '^nvidia_peermem\\s'"}
 
 	if withWaitFlag {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
