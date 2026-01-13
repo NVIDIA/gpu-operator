@@ -1010,6 +1010,36 @@ func TestTransformToolkit(t *testing.T) {
 			expectedError: errors.New(`failed to find toolkit container "nvidia-container-toolkit-ctr"`),
 			expectedDs:    NewDaemonset(),
 		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container with no-runtime-config",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+					Env: []gpuv1.EnvVar{
+						{Name: "NO_RUNTIME_CONFIG", Value: "true"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "CDI_ENABLED", Value: "true"},
+						{Name: "NVIDIA_RUNTIME_SET_AS_DEFAULT", Value: "false"},
+						{Name: "NVIDIA_CONTAINER_RUNTIME_MODE", Value: "cdi"},
+						{Name: "CRIO_CONFIG_MODE", Value: "config"},
+						{Name: "NO_RUNTIME_CONFIG", Value: "true"},
+					},
+					VolumeMounts: nil,
+				}),
+		},
 	}
 
 	for _, tc := range testCases {
