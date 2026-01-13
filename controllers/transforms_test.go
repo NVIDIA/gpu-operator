@@ -3369,3 +3369,71 @@ func TestTransformDriverRDMA(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, expectedDs, ds)
 }
+
+func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "driver",
+			Version:    "570.172.08",
+			Manager: gpuv1.DriverManagerSpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "k8s-driver-manager",
+				Version:    "v0.8.0",
+			},
+			VirtualTopology: &gpuv1.VirtualTopologyConfigSpec{
+				Config: "sample-topology-config",
+			},
+		},
+	}
+
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "nvidia-driver-ctr",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "topology-config",
+				ReadOnly:  true,
+				MountPath: consts.VGPUTopologyConfigMountPath,
+				SubPath:   consts.VGPUTopologyConfigFileName,
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:  "k8s-driver-manager",
+		Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+	}).WithVolume(corev1.Volume{
+		Name: "topology-config",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "sample-topology-config",
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  consts.VGPUTopologyConfigFileName,
+						Path: consts.VGPUTopologyConfigFileName,
+					},
+				},
+			},
+		},
+	})
+
+	err := TransformDriver(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}

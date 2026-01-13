@@ -997,14 +997,8 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
-		return err
-	}
-
 	// update driver-manager initContainer
-	err = transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
+	err := transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
 	if err != nil {
 		return err
 	}
@@ -2416,12 +2410,6 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 
 // TransformNodeStatusExporter transforms the node-status-exporter daemonset with required config as per ClusterPolicy
 func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
-		return err
-	}
-
 	// update image
 	image, err := gpuv1.ImagePath(&config.NodeStatusExporter)
 	if err != nil {
