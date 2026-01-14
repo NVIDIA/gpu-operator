@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -132,5 +133,9 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 }
 
 func (n nodePool) getOS() string {
+	if n.osRelease == "rocky" {
+		// If the OS is RockyLinux, we will omit the RockyLinux minor version when constructing the os image tag
+		n.osVersion = strings.Split(n.osVersion, ".")[0]
+	}
 	return fmt.Sprintf("%s%s", n.osRelease, n.osVersion)
 }
