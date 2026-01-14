@@ -89,6 +89,48 @@ subjects:
   name: nvidia-gpu-driver-ubuntu22.04
   namespace: test-operator
 ---
+apiVersion: v1
+data:
+  startup-probe.sh: |-
+    #!/bin/sh
+    set -eu
+
+    VALIDATIONS_DIR="/run/nvidia/validations"
+    READY_FILE="${VALIDATIONS_DIR}/.driver-ctr-ready"
+
+    mkdir -p "${VALIDATIONS_DIR}"
+
+    if [ ! -f /sys/module/nvidia/refcnt ]; then
+      echo "NVIDIA kernel module not loaded"
+      exit 1
+    fi
+
+    if ! nvidia-smi; then
+      echo "nvidia-smi failed"
+      exit 1
+    fi
+
+    GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
+    GDS_ENABLED="${GDS_ENABLED:-false}"
+    GDRCOPY_ENABLED="${GDRCOPY_ENABLED:-false}"
+
+    TMP_FILE="${READY_FILE}.tmp"
+
+    {
+      echo "GDRCOPY_ENABLED: ${GDRCOPY_ENABLED}"
+      echo "GDS_ENABLED: ${GDS_ENABLED}"
+      echo "GPU_DIRECT_RDMA_ENABLED: ${GPU_DIRECT_RDMA_ENABLED}"
+    } > "$TMP_FILE"
+
+    mv "$TMP_FILE" "$READY_FILE"
+kind: ConfigMap
+metadata:
+  labels:
+    app: nvidia-gpu-driver-ubuntu22.04-646cdfdb96
+    app.kubernetes.io/component: nvidia-driver
+  name: nvidia-driver-startup-probe
+  namespace: test-operator
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -169,8 +211,7 @@ spec:
           exec:
             command:
             - sh
-            - -c
-            - '[ -f /sys/module/nvidia/refcnt ] && nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready'
+            - /usr/local/bin/startup-probe.sh
           failureThreshold: 120
           initialDelaySeconds: 60
           periodSeconds: 10
@@ -203,6 +244,9 @@ spec:
           name: sysfs-memory-online
         - mountPath: /lib/firmware
           name: nv-firmware
+        - mountPath: /usr/local/bin/startup-probe.sh
+          name: driver-startup-probe-script
+          subPath: startup-probe.sh
       hostPID: true
       initContainers:
       - args:
@@ -310,6 +354,10 @@ spec:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate
         name: nv-firmware
+      - configMap:
+          defaultMode: 493
+          name: nvidia-driver-startup-probe
+        name: driver-startup-probe-script
   updateStrategy:
     type: OnDelete
 ---
