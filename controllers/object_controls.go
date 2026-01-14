@@ -3624,6 +3624,28 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 
+	// Mount /lib/modules for SLES/SL-Micro
+	if release["ID"] == "sles" || release["ID"] == "sl-micro" {
+		n.logger.Info("Mounting /lib/modules into the driver container", "OS", release["ID"])
+		libModulesVolMount := corev1.VolumeMount{
+			Name:      "lib-modules",
+			MountPath: "/run/host/lib/modules",
+			ReadOnly:  true,
+		}
+		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, libModulesVolMount)
+
+		libModulesVol := corev1.Volume{
+			Name: "lib-modules",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/lib/modules",
+					Type: ptr.To(corev1.HostPathDirectory),
+				},
+			},
+		}
+		podSpec.Volumes = append(podSpec.Volumes, libModulesVol)
+	}
+
 	// apply proxy and env settings if this is an OpenShift cluster
 	if _, ok := release["OPENSHIFT_VERSION"]; ok {
 		setContainerEnv(driverContainer, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
