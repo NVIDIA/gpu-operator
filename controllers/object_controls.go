@@ -1042,6 +1042,14 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 			return fmt.Errorf("ERROR: failed to transform the pre-compiled Driver Daemonset: %s", err)
 		}
 	}
+
+	// add nodeSelector for MOFED wait label when GPUDirect RDMA is enabled
+	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
+		if obj.Spec.Template.Spec.NodeSelector == nil {
+			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
+		obj.Spec.Template.Spec.NodeSelector["network.nvidia.com/operator.mofed.wait"] = "false"
+	}
 	return nil
 }
 
