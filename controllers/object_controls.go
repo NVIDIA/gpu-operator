@@ -207,6 +207,7 @@ var RepoConfigPathMap = map[string]string{
 	"ubuntu":   "/etc/apt/sources.list.d",
 	"rhcos":    "/etc/yum.repos.d",
 	"rhel":     "/etc/yum.repos.d",
+	"rocky":    "/etc/yum.repos.d",
 	"sles":     "/etc/zypp/repos.d",
 	"sl-micro": "/etc/zypp/repos.d",
 }
@@ -221,6 +222,7 @@ var CertConfigPathMap = map[string]string{
 	"ubuntu":   "/usr/local/share/ca-certificates",
 	"rhcos":    "/etc/pki/ca-trust/extracted/pem",
 	"rhel":     "/etc/pki/ca-trust/extracted/pem",
+	"rocky":    "/etc/pki/ca-trust/extracted/pem",
 	"sles":     "/etc/pki/trust/anchors",
 	"sl-micro": "/etc/pki/trust/anchors",
 }
@@ -704,6 +706,12 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	if !ok {
 		return kFVersion, "", ""
 	}
+
+	if osName == "rocky" {
+		// If the OS is RockyLinux, we will omit the RockyLinux minor version when constructing the os image tag
+		osVersion = strings.Split(osVersion, ".")[0]
+	}
+
 	osTag := fmt.Sprintf("%s%s", osName, osVersion)
 
 	return kFVersion, osTag, osVersion
