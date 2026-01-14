@@ -1461,3 +1461,21 @@ func TestParseOSReleaseFromFile(t *testing.T) {
 		require.True(t, os.IsNotExist(err))
 	})
 }
+
+func TestCertConfigPathMap(t *testing.T) {
+	expectedPaths := map[string]string{
+		"centos":   "/etc/pki/ca-trust/extracted/pem",
+		"debian":   "/usr/local/share/ca-certificates",
+		"ubuntu":   "/usr/local/share/ca-certificates",
+		"rhcos":    "/etc/pki/ca-trust/extracted/pem",
+		"rhel":     "/etc/pki/ca-trust/extracted/pem",
+		"sles":     "/etc/pki/trust/anchors",
+		"sl-micro": "/etc/pki/trust/anchors",
+	}
+
+	for os, expectedPath := range expectedPaths {
+		path, ok := CertConfigPathMap[os]
+		require.True(t, ok, "OS %s not found in CertConfigPathMap", os)
+		require.Equal(t, expectedPath, path, "Incorrect path for OS %s", os)
+	}
+}
