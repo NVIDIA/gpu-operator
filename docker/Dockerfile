@@ -72,7 +72,7 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v3.2.2-dev
+FROM nvcr.io/nvidia/distroless/cc:v4.0.0-dev
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
