@@ -103,5 +103,36 @@ spec:
             matchExpressions:
               nvidia.com/gpu.family: {op: In, value: ["hopper"]}
               tdx.enabled: {op: IsTrue}
+---
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: nvidia-kernel-modules
+spec:
+  rules:
+    - name: kernel-module-gdrdrv
+      labels:
+        nvidia.com/gdrcopy.capable: "true"
+      matchFeatures:
+        - feature: kernel.loadedmodule
+          matchExpressions:
+            gdrdrv:
+              op: Exists
+    - name: kernel-module-nvidia_fs
+      labels:
+        nvidia.com/gds.capable: "true"
+      matchFeatures:
+        - feature: kernel.loadedmodule
+          matchExpressions:
+            nvidia_fs:
+              op: Exists
+    - name: kernel-module-nvidia_peermem
+      labels:
+        nvidia.com/peermem.capable: "true"
+      matchFeatures:
+        - feature: kernel.loadedmodule
+          matchExpressions:
+            nvidia_peermem:
+              op: Exists
 {{- end }}
 
