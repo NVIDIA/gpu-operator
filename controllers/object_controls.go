@@ -2354,18 +2354,6 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
 			}
-		case "nvidia-fs":
-			if config.GPUDirectStorage == nil || !config.GPUDirectStorage.IsEnabled() {
-				// remove  nvidia-fs init container from validator Daemonset if GDS is not enabled
-				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-				return nil
-			}
-		case "gdrcopy":
-			if !config.IsGDRCopyEnabled() {
-				// remove gdrcopy init container from validator Daemonset if GDRCopy is not enabled
-				podSpec.InitContainers = append(podSpec.InitContainers[:i], podSpec.InitContainers[i+1:]...)
-				return nil
-			}
 		case "cc-manager":
 			if !config.CCManager.IsEnabled() {
 				// remove  cc-manager init container from validator Daemonset if it is not enabled
@@ -3432,6 +3420,15 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 	if config.Driver.ReadinessProbe != nil {
 		setContainerProbe(driverContainer, config.Driver.ReadinessProbe, Readiness)
+	}
+
+	if config.GDRCopy != nil && config.GDRCopy.IsEnabled() {
+		// set env indicating gdrcopy is enabled
+		setContainerEnv(driverContainer, GDRCopyEnabledEnvName, "true")
+	}
+	if config.GPUDirectStorage != nil && config.GPUDirectStorage.IsEnabled() {
+		// set env indicating gds is enabled
+		setContainerEnv(driverContainer, GDSEnabledEnvName, "true")
 	}
 
 	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {

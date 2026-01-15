@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-driver-startup-probe
+  namespace: {{ .Runtime.Namespace }}
+  labels:
+    app: {{ .Driver.AppName }}
+    {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+    app.kubernetes.io/component: "nvidia-vgpu-host-manager"
+    {{- else }}
+    app.kubernetes.io/component: "nvidia-driver"
+    {{- end }}
+data:
+  startup-probe.sh: |-
+    #!/bin/sh
+    set -eu
+
+    VALIDATIONS_DIR="/run/nvidia/validations"
+    READY_FILE="${VALIDATIONS_DIR}/.driver-ctr-ready"
+
+    mkdir -p "${VALIDATIONS_DIR}"
+
+    if [ ! -f /sys/module/nvidia/refcnt ]; then
+      echo "NVIDIA kernel module not loaded"
+      exit 1
+    fi
+
+    if ! nvidia-smi; then
+      echo "nvidia-smi failed"
+      exit 1
+    fi
+
+    GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
+    GDS_ENABLED="${GDS_ENABLED:-false}"
+    GDRCOPY_ENABLED="${GDRCOPY_ENABLED:-false}"
+
+    TMP_FILE="${READY_FILE}.tmp"
+
+    {
+      echo "GDRCOPY_ENABLED: ${GDRCOPY_ENABLED}"
+      echo "GDS_ENABLED: ${GDS_ENABLED}"
+      echo "GPU_DIRECT_RDMA_ENABLED: ${GPU_DIRECT_RDMA_ENABLED}"
+    } > "$TMP_FILE"
+
+    mv "$TMP_FILE" "$READY_FILE"

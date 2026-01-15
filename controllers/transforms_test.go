@@ -2323,45 +2323,6 @@ func TestTransformValidatorComponent(t *testing.T) {
 			}),
 		},
 		{
-			description: "nvidia-fs validation",
-			pod:         NewPod().WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				Validator: gpuv1.ValidatorSpec{
-					Repository:      "nvcr.io/nvidia/cloud-native",
-					Image:           "gpu-operator-validator",
-					Version:         "v1.0.0",
-					ImagePullPolicy: "IfNotPresent",
-				},
-				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(true)},
-			},
-			component: "nvidia-fs",
-			expectedPod: NewPod().WithInitContainer(corev1.Container{
-				Name:            "nvidia-fs-validation",
-				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				SecurityContext: &corev1.SecurityContext{
-					RunAsUser: rootUID,
-				},
-			}),
-		},
-		{
-			description: "nvidia-fs validation is removed when gds is disabled",
-			pod: NewPod().
-				WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}).
-				WithInitContainer(corev1.Container{Name: "dummy"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				Validator: gpuv1.ValidatorSpec{
-					Repository:      "nvcr.io/nvidia/cloud-native",
-					Image:           "gpu-operator-validator",
-					Version:         "v1.0.0",
-					ImagePullPolicy: "IfNotPresent",
-				},
-				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(false)},
-			},
-			component:   "nvidia-fs",
-			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
-		},
-		{
 			description: "cc-manager validation",
 			pod:         NewPod().WithInitContainer(corev1.Container{Name: "cc-manager-validation"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
@@ -2774,6 +2735,16 @@ func TestTransformDriver(t *testing.T) {
 						},
 					},
 				}},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "GDRCOPY_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "GDS_ENABLED",
+						Value: "true",
+					},
+				},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-fs",
 				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-",
@@ -3254,6 +3225,16 @@ func TestTransformDriverWithResources(t *testing.T) {
 				Resources: corev1.ResourceRequirements{
 					Requests: resources.Requests,
 					Limits:   resources.Limits,
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "GDRCOPY_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "GDS_ENABLED",
+						Value: "true",
+					},
 				},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-fs",

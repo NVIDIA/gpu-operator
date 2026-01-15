@@ -134,10 +134,14 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+          - name: driver-startup-probe-script
+            mountPath: /usr/local/bin/startup-probe.sh
+            subPath: startup-probe.sh
         startupProbe:
           exec:
             command:
-              [sh, -c, '[ -f /sys/module/nvidia/refcnt ] && nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
+            - sh
+            - /usr/local/bin/startup-probe.sh
           initialDelaySeconds: 60
           failureThreshold: 120
           successThreshold: 1
@@ -323,3 +327,7 @@ spec:
           hostPath:
             path: /run/nvidia/driver/lib/firmware
             type: DirectoryOrCreate
+        - name: driver-startup-probe-script
+          configMap:
+            name: nvidia-driver-startup-probe
+            defaultMode: 0755
