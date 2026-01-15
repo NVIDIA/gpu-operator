@@ -150,6 +150,8 @@ const (
 	defaultMetricsPort = 0
 	// hostDevCharPath indicates the path in the container where the host '/dev/char' directory is mounted to
 	hostDevCharPath = "/host-dev-char"
+	// nvidiaModuleRefcntPath is the path to check if the nvidia kernel module is loaded
+	nvidiaModuleRefcntPath = "/sys/module/nvidia/refcnt"
 	// defaultDriverInstallDir indicates the default path on the host where the driver container installation is made available
 	defaultDriverInstallDir = "/run/nvidia/driver"
 	// defaultDriverInstallDirCtrPath indicates the default path where the NVIDIA driver install dir is mounted in the container
@@ -916,6 +918,20 @@ func (d *Driver) createStatusFile(driverInfo driverInfo) error {
 	return createStatusFileWithContent(outputDirFlag+"/"+driverStatusFile, statusFileContent)
 }
 
+// isNvidiaModuleLoaded checks if NVIDIA kernel module is already loaded in kernel memory.
+func isNvidiaModuleLoaded() bool {
+	// Check if the nvidia module is loaded by checking if nvidiaModuleRefcntPath exists
+	if _, err := os.Stat(nvidiaModuleRefcntPath); err == nil {
+		refcntData, err := os.ReadFile(nvidiaModuleRefcntPath)
+		if err == nil {
+			refcnt := strings.TrimSpace(string(refcntData))
+			log.Infof("NVIDIA kernel module already loaded in kernel memory (refcnt=%s)", refcnt)
+			return true
+		}
+	}
+	return false
+}
+
 // createDevCharSymlinks creates symlinks in /host-dev-char that point to all possible NVIDIA devices nodes.
 func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation bool) error {
 	if disableDevCharSymlinkCreation {
@@ -926,8 +942,16 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 
 	log.Info("creating symlinks under /dev/char that correspond to NVIDIA character devices")
 
-	// Only attempt to load NVIDIA kernel modules when we can chroot into driverRoot
-	loadKernelModules := driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot)
+	// Check if NVIDIA module is already loaded in kernel memory.
+	// If it is, we don't need to run modprobe (which would fail if modules aren't in /lib/modules/).
+	// This handles the case where the driver container performed a userspace-only install
+	// after detecting that module was already loaded from a previous boot.
+	moduleAlreadyLoaded := isNvidiaModuleLoaded()
+
+	// Only attempt to load NVIDIA kernel modules when:
+	// 1. Module is not already loaded in kernel memory, AND
+	// 2. We can chroot into driverRoot to run modprobe
+	loadKernelModules := !moduleAlreadyLoaded && (driverInfo.isHostDriver || (driverInfo.devRoot == driverInfo.driverRoot))
 
 	// driverRootCtrPath is the path of the driver install dir in the container. This will either be
 	// driverInstallDirCtrPathFlag or '/host'.

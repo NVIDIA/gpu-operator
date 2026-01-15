@@ -148,6 +148,8 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: DRIVER_CONFIG_DIGEST
+            value: {{ getObjectHash . | quote }}
         {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
           - name: GPU_DIRECT_RDMA_ENABLED
             value: "true"
@@ -217,6 +219,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_CONFIG_DIGEST
+          value: {{ getObjectHash . | quote }}
       {{- if .Driver.Spec.KernelModuleType }}
         - name: KERNEL_MODULE_TYPE
           value: {{ .Driver.Spec.KernelModuleType }}
@@ -578,6 +582,8 @@ spec:
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
+          - name: DRIVER_CONFIG_DIGEST
+            value: {{ getObjectHash . | quote }}
           {{- if not .Openshift.ToolkitImage }}
           - name: RHCOS_IMAGE_MISSING
             value: "true"
