@@ -186,6 +186,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2677257823"
         image: nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04
         imagePullPolicy: IfNotPresent
         lifecycle:
@@ -276,6 +278,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2677257823"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager

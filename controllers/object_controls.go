@@ -1042,6 +1042,32 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 			return fmt.Errorf("ERROR: failed to transform the pre-compiled Driver Daemonset: %s", err)
 		}
 	}
+
+	// Compute driver configuration digest after all transformations are complete.
+	// This digest enables fast-path driver installation by detecting when configuration
+	// hasn't changed, avoiding unnecessary driver reinstalls and pod evictions.
+	// Used by k8s-driver-manager to decide if driver cleanup is needed and by
+	// nvidia-driver container to skip full reinstall for matching configurations.
+	configDigest := utils.GetObjectHash(obj.Spec)
+
+	// Set the computed digest in driver-manager initContainer
+	driverManagerContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+	if driverManagerContainer != nil {
+		setContainerEnv(driverManagerContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+	}
+
+	// Set the computed digest in nvidia-driver container
+	driverContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	if driverContainer != nil {
+		setContainerEnv(driverContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+	}
+
+	// Used by dtk-build-driver to determine if fast path should be used (skip rebuild)
+	driverToolkitContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr")
+	if driverToolkitContainer != nil {
+		setContainerEnv(driverToolkitContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+	}
+
 	return nil
 }
 

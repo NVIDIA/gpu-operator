@@ -240,6 +240,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2675269488"
         - name: GDRCOPY_ENABLED
           value: "true"
         - name: OPENSHIFT_VERSION
@@ -392,6 +394,8 @@ spec:
           value: 413.92.202304252344-0
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2675269488"
         - name: GDRCOPY_ENABLED
           value: "true"
         image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867
@@ -454,6 +458,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2675269488"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
