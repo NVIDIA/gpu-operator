@@ -152,6 +152,9 @@ spec:
     {{- if .Values.cdi.default }}
     default: {{ .Values.cdi.default }}
     {{- end }}
+    {{- if and (.Values.cdi.enabled) (.Values.cdi.nriPluginEnabled) }}
+    nriPluginEnabled: {{ .Values.cdi.nriPluginEnabled }}
+    {{- end }}
   driver:
     enabled: {{ .Values.driver.enabled }}
     useNvidiaDriverCRD: {{ .Values.driver.nvidiaDriverCRD.enabled }}

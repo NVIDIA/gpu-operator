@@ -146,6 +146,12 @@ spec:
                       (CDI) should be used as the mechanism for making GPUs accessible
                       to containers.
                     type: boolean
+                  nriPluginEnabled:
+                    default: false
+                    description: NRIPluginEnabled indicates whether an NRI Plugin
+                      should be run as a means of injecting CDI devices to gpu management
+                      containers.
+                    type: boolean
                 type: object
               daemonsets:
                 description: Daemonset defines common configuration for all Daemonsets

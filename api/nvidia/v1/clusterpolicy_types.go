@@ -1722,6 +1722,14 @@ type CDIConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Deprecated: This field is no longer used"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch,urn:alm:descriptor:com.tectonic.ui:hidden"
 	Default *bool `json:"default,omitempty"`
+
+	// NRIPluginEnabled indicates whether an NRI Plugin should be run as a means of injecting CDI devices to gpu management containers.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable NRI as an additional mechanism for injecting CDI devices to gpu management containers."
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	NRIPluginEnabled *bool `json:"nriPluginEnabled,omitempty"`
 }
 
 // MIGStrategy indicates MIG mode
@@ -2174,6 +2182,15 @@ func (c *CDIConfigSpec) IsEnabled() bool {
 		return true
 	}
 	return *c.Enabled
+}
+
+// IsNRIPluginEnabled returns true if NRI Plugin is enabled as a mechanism for
+// injecting CDI devices to containers
+func (c *CDIConfigSpec) IsNRIPluginEnabled() bool {
+	if c.Enabled == nil || c.NRIPluginEnabled == nil {
+		return false
+	}
+	return *c.Enabled && *c.NRIPluginEnabled
 }
 
 // IsEnabled returns true if Kata Manager is enabled

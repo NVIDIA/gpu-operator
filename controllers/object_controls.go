@@ -66,6 +66,8 @@ const (
 	DefaultDockerConfigFile = "/etc/docker/daemon.json"
 	// DefaultDockerSocketFile indicates default docker socket file
 	DefaultDockerSocketFile = "/var/run/docker.sock"
+	// DefaultRuntimeNRISocketFile indicates the default container runtime NRI socket file
+	DefaultRuntimeNRISocketFile = "/var/run/nri/nri.sock"
 	// DefaultCRIOConfigFile indicates default config file path for cri-o. .
 	DefaultCRIOConfigFile = "/etc/crio/config.toml"
 	// DefaultCRIODropInConfigFile indicates the default path to the drop-in config file for cri-o
@@ -82,9 +84,11 @@ const (
 	DefaultRuntimeClass = "nvidia"
 	// DriverInstallPathVolName represents volume name for driver install path provided to toolkit
 	DriverInstallPathVolName = "driver-install-path"
-	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeNRISocketTargetDir represents target directory where runtime NRI socket directory will be mounted
+	DefaultRuntimeNRISocketTargetDir = "/runtime/nri-sock-dir/"
+	// DefaultRuntimeSocketTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeSocketTargetDir = "/runtime/sock-dir/"
-	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket dirctory will be mounted
+	// DefaultRuntimeConfigTargetDir represents target directory where runtime socket directory will be mounted
 	DefaultRuntimeConfigTargetDir = "/runtime/config-dir/"
 	// DefaultRuntimeDropInConfigTargetDir represents target directory where drop-in config directory will be mounted
 	DefaultRuntimeDropInConfigTargetDir = "/runtime/config-dir.d/"
@@ -144,6 +148,8 @@ const (
 	NvidiaCDIHookPathEnvName = "NVIDIA_CDI_HOOK_PATH"
 	// CRIOConfigModeEnvName is the name of the envvar controlling how the toolkit container updates the cri-o configuration
 	CRIOConfigModeEnvName = "CRIO_CONFIG_MODE"
+	// CDIEnableNRIPlugin is the name of the env var for enabling NRI Plugin in the toolkit
+	CDIEnableNRIPlugin = "ENABLE_NRI_PLUGIN"
 	// DeviceListStrategyEnvName is the name of the envvar for configuring the device-list-strategy in the device-plugin
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
@@ -175,6 +181,8 @@ const (
 	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
 	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
 	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
+	// NRIAnnotationDomain represents the domain name used for NRI annotations used for CDI device injections
+	NRIAnnotationDomain = "nvidia.cdi.k8s.io"
 )
 
 // ContainerProbe defines container probe types
@@ -946,11 +954,29 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
 
 	// update env required for MIG support
 	applyMIGConfiguration(&(obj.Spec.Template.Spec.Containers[0]), config.MIG.Strategy)
 
 	return nil
+}
+
+func setNRIPluginAnnotation(o *metav1.ObjectMeta, cdiConfig *gpuv1.CDIConfigSpec, containerName string) {
+	const (
+		managementCDIDevice = "management.nvidia.com/gpu=all"
+	)
+
+	if !cdiConfig.IsNRIPluginEnabled() {
+		return
+	}
+	annotations := o.Annotations
+	if len(annotations) == 0 {
+		annotations = make(map[string]string)
+	}
+	annotationKey := fmt.Sprintf("%s/container.%s", NRIAnnotationDomain, containerName)
+	annotations[annotationKey] = managementCDIDevice
+	o.Annotations = annotations
 }
 
 // parseOSRelease can be overridden in tests for mocking filesystem access.
@@ -1238,7 +1264,7 @@ func getProxyEnv(proxyConfig *apiconfigv1.Proxy) []corev1.EnvVar {
 	return envVars
 }
 
-func transformToolkitCtrForCDI(container *corev1.Container) {
+func transformToolkitCtrForCDI(container *corev1.Container, nriPluginEnabled bool) {
 	// When CDI is enabled in GPU Operator, we leverage native CDI support in containerd / cri-o
 	// to inject GPUs into workloads. We do not configure 'nvidia' as the default runtime. The
 	// 'nvidia' runtime will be set as the runtime class for our management containers so that
@@ -1252,6 +1278,10 @@ func transformToolkitCtrForCDI(container *corev1.Container) {
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
 	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
 	setContainerEnv(container, CRIOConfigModeEnvName, "config")
+
+	if nriPluginEnabled {
+		setContainerEnv(container, CDIEnableNRIPlugin, "true")
+	}
 }
 
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
@@ -1293,7 +1323,7 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
-		transformToolkitCtrForCDI(toolkitMainContainer)
+		transformToolkitCtrForCDI(toolkitMainContainer, config.CDI.IsNRIPluginEnabled())
 	} else if n.runtime == gpuv1.CRIO {
 		// (cdesiniotis) When CDI is not enabled and cri-o is the container runtime,
 		// we continue to install the OCI prestart hook as opposed to adding nvidia
@@ -1464,6 +1494,23 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
+
+	if config.CDI.IsNRIPluginEnabled() {
+		// setup mounts for the runtime NRI socket file
+		nriSocketFile := getContainerEnv(container, "NRI_SOCKET")
+		if nriSocketFile == "" {
+			nriSocketFile = DefaultRuntimeNRISocketFile
+		}
+		setContainerEnv(container, "NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
+
+		nriVolMountSocketName := "nri-socket"
+		nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
+		container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
+
+		nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
+	}
+
 	return nil
 }
 
@@ -1536,6 +1583,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, devicePluginContainerName)
 
 	// update env required for MIG support
 	applyMIGConfiguration(devicePluginMainContainer, config.MIG.Strategy)
@@ -1616,6 +1664,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, mpsControlMainContainer.Name)
 
 	// update env required for MIG support
 	applyMIGConfiguration(mpsControlMainContainer, config.MIG.Strategy)
@@ -1730,6 +1779,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	}
 
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	// set hostPID if specified for DCGM Exporter
@@ -1880,6 +1930,7 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 		}
 	}
 
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 
 	return nil
@@ -1923,6 +1974,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
 
 	// set ConfigMap name for "mig-parted-config" Volume
 	for i, vol := range obj.Spec.Template.Spec.Volumes {
@@ -2217,6 +2269,11 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
+
+	toolkitValidationCtr := findContainerByName(obj.Spec.Template.Spec.InitContainers, "toolkit-validation")
+	if toolkitValidationCtr != nil && len(toolkitValidationCtr.Name) > 0 {
+		setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, toolkitValidationCtr.Name)
+	}
 
 	var validatorErr error
 	// apply changes for individual component validators(initContainers)
@@ -2573,7 +2630,7 @@ func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {
 }
 
 func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpec, runtime gpuv1.Runtime) {
-	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO {
+	if !config.CDI.IsEnabled() && runtime == gpuv1.CRIO || config.CDI.IsNRIPluginEnabled() {
 		return
 	}
 	runtimeClassName := getRuntimeClassName(config)

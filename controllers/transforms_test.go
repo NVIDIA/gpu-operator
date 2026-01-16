@@ -2559,6 +2559,55 @@ func TestTransformValidator(t *testing.T) {
 				WithPullSecret("pull-secret").
 				WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "nri plugin enabled",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          newBoolPtr(true),
+					NRIPluginEnabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"nvidia.cdi.k8s.io/container.toolkit-validation": "management.nvidia.com/gpu=all",
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "toolkit-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				},
+				).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2834,12 +2883,33 @@ func TestTransformToolkitCtrForCDI(t *testing.T) {
 					},
 				}),
 		},
+		{
+			description: "cdi and nri plugin enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          newBoolPtr(true),
+					NRIPluginEnabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: CDIEnableNRIPlugin, Value: "true"},
+					},
+				}),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
-			transformToolkitCtrForCDI(mainContainer)
+			transformToolkitCtrForCDI(mainContainer, tc.cpSpec.CDI.IsNRIPluginEnabled())
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
