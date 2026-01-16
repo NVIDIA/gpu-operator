@@ -1,8 +1,8 @@
 ---
-name: Question
-about: Ask a question
+name: Question / General Discussion
+about: Ask a question or raise a discussion
 title: "[Question]: "
 labels: ["question"]
 ---
 
-<!-- Ask question(s) related to GPU Operator -->
+<!-- Ask question(s) or raise a discussion related to GPU Operator -->
