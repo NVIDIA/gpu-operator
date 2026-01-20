@@ -4,6 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gpu-operator-upgrade-crd-hook-sa
+  namespace: {{ .Release.Namespace }}
   annotations:
     helm.sh/hook: pre-upgrade
     helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
