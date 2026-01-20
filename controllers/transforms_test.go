@@ -2771,6 +2771,78 @@ func TestTransformDriver(t *testing.T) {
 			}),
 			errorExpected: false,
 		},
+		{
+			description: "driver with fabric manager shared-nvswitch mode",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "driver",
+					Version:    "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository: "nvcr.io/nvidia/cloud-native",
+						Image:      "k8s-driver-manager",
+						Version:    "v0.8.0",
+					},
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+			},
+			client: mockClientMap["secret-env-client"],
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "FABRIC_MANAGER_FABRIC_MODE",
+						Value: "1",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:  "k8s-driver-manager",
+				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "driver with fabric manager full-passthrough mode",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "driver",
+					Version:    "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository: "nvcr.io/nvidia/cloud-native",
+						Image:      "k8s-driver-manager",
+						Version:    "v0.8.0",
+					},
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeFullPassthrough,
+				},
+			},
+			client: mockClientMap["secret-env-client"],
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "FABRIC_MANAGER_FABRIC_MODE",
+						Value: "0",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:  "k8s-driver-manager",
+				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+			}),
+			errorExpected: false,
+		},
 	}
 
 	for _, tc := range testCases {

@@ -3492,6 +3492,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 
+	// Set Fabric Manager environment variable if configured
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		setContainerEnv(driverContainer, "FABRIC_MANAGER_FABRIC_MODE", "1")
+	} else if config.FabricManager.Mode == gpuv1.FabricModeFullPassthrough {
+		setContainerEnv(driverContainer, "FABRIC_MANAGER_FABRIC_MODE", "0")
+	}
+
 	// no further repo configuration required when using pre-compiled drivers, return here.
 	if config.Driver.UsePrecompiledDrivers() {
 		return nil
