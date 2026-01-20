@@ -69,6 +69,8 @@ spec:
               mountPath: /var/lib/kubelet/device-plugins
             - name: vfio
               mountPath: /dev/vfio
+            - name: cdi-root
+              mountPath: /var/run/cdi
       volumes:
         - name: device-plugin
           hostPath:
@@ -80,3 +82,8 @@ spec:
         - name: vfio
           hostPath:
             path: /dev/vfio
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+
