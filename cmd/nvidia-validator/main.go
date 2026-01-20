@@ -1740,23 +1740,14 @@ func (v *VGPUDevices) runValidation() error {
 		return fmt.Errorf("error checking for GPU devices on the host: %w", err)
 	}
 
-	mdevBusPath := "/sys/class/mdev_bus"
-    entries, err := os.ReadDir(mdevBusPath)
-    if err != nil {
-        return fmt.Errorf("unable to read mdev_bus directory: %v", err)
-    }
-    
-    if len(entries) == 0 {
-		for _, device := range GPUDevices {
-			if device.SriovInfo.PhysicalFunction == nil {
-				continue
-			}
-			totalVF := int(device.SriovInfo.PhysicalFunction.TotalVFs)
-			if totalVF > 0 {
-				log.Infof("Found GPU device with SR-IOV VFs: %s (TotalVFs: %d)", device.Address, totalVF)
-				return nil
-			}
-		}
+	for _, device := range GPUDevices {
+		creatableTypesFile := filepath.Join(device.Path, "virtfn0", "nvidia", "creatable_vgpu_types")
+
+		_, statErr := os.Stat(creatableTypesFile)
+	    if statErr == nil {
+		    log.Infof("Found creatable_vgpu_types file for device: %s", device.Address)
+			return nil
+	    }
 	}
 
 	nvmdev := nvmdev.New()
