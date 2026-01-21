@@ -1366,14 +1366,29 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		}
 	}
 
-	if len(config.Toolkit.Env) > 0 {
-		for _, env := range config.Toolkit.Env {
-			setContainerEnv(toolkitMainContainer, env.Name, env.Value)
-		}
-	}
-
 	// configure runtime
 	runtime := n.runtime.String()
+	var noRuntimeConfig bool
+	// Update the main container environment from the user-specified values.
+	for _, env := range config.Toolkit.Env {
+		switch env.Name {
+		case "RUNTIME":
+			// If the user has specified the runtime, we overide the detected
+			// value.
+			// TODO: Add logging.
+			runtime = env.Value
+		case "NO_RUNTIME_CONFIG":
+			noRuntimeConfig = func() bool {
+				v, _ := strconv.ParseBool(env.Value)
+				return v
+			}()
+		}
+		setContainerEnv(toolkitMainContainer, env.Name, env.Value)
+	}
+
+	if noRuntimeConfig {
+		return nil
+	}
 	err = transformForRuntime(obj, config, runtime, toolkitMainContainer)
 	if err != nil {
 		return fmt.Errorf("error transforming toolkit daemonset : %w", err)
