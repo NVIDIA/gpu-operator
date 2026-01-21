@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-vfio-manager-entrypoint
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-vfio-manager
+data:
+  init-entrypoint.sh: |-
+    #!/bin/sh
+
+    if [ "${FABRIC_MANAGER_MODE}" = "shared-nvswitch" ]; then
+      # In shared-nvswitch mode, wait for driver to be ready before unbinding devices
+      echo "Shared NVSwitch mode detected, waiting for driver readiness..."
+      until [ -f /run/nvidia/validations/driver-ready ]
+      do
+        echo "waiting for the driver validations to be ready..."
+        sleep 5
+      done
+
+      set -o allexport
+      cat /run/nvidia/validations/driver-ready
+      . /run/nvidia/validations/driver-ready
+
+      echo "Driver is ready, proceeding with device unbind"
+      exec vfio-manage unbind --all
+    else
+      # Default mode: uninstall the driver
+      exec driver-manager uninstall_driver
+    fi

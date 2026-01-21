@@ -1912,7 +1912,7 @@ func TestTransformVFIOManager(t *testing.T) {
 		expectedDaemonset Daemonset
 	}{
 		{
-			description: "transform vfio manager",
+			description: "transform vfio manager - normal mode",
 			daemonset: NewDaemonset().
 				WithContainer(corev1.Container{Name: "nvidia-vfio-manager"}).
 				WithContainer(corev1.Container{Name: "sidecar"}).
@@ -1935,6 +1935,9 @@ func TestTransformVFIOManager(t *testing.T) {
 						Env:             mockEnv,
 					},
 				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeFullPassthrough,
+				},
 			},
 			expectedDaemonset: NewDaemonset().
 				WithContainer(corev1.Container{
@@ -1954,6 +1957,67 @@ func TestTransformVFIOManager(t *testing.T) {
 					Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Env:             mockEnvCore,
+				}).
+				WithPullSecret(secret),
+		},
+		{
+			description: "transform vfio manager - shared-nvswitch mode",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vfio-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VFIOManager: gpuv1.VFIOManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "vfio-pci-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					Env:              mockEnv,
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-vfio-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/vfio-pci-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env:             mockEnvCore,
+					Resources:       resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "vfio-device-unbind",
+					Image:           "nvcr.io/nvidia/cloud-native/vfio-pci-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "FABRIC_MANAGER_MODE", Value: "shared-nvswitch"},
+						{Name: "HOST_ROOT", Value: "/host"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "nvidia-validations",
+							MountPath: "/run/nvidia/validations",
+							ReadOnly:  true,
+						},
+					},
+				}).
+				WithVolume(corev1.Volume{
+					Name: "nvidia-validations",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/run/nvidia/validations",
+							Type: &[]corev1.HostPathType{corev1.HostPathDirectoryOrCreate}[0],
+						},
+					},
 				}).
 				WithPullSecret(secret),
 		},

@@ -2029,10 +2029,47 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
-	if err != nil {
-		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+	// Check if we're in shared-nvswitch mode
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		// In shared-nvswitch mode, use the vfio-manager image for the init container
+		// and set FABRIC_MANAGER_MODE so the entrypoint script runs vfio-manage unbind
+		container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+
+		mainImage, err := gpuv1.ImagePath(&config.VFIOManager)
+		if err != nil {
+			return err
+		}
+
+		container.Name = "vfio-device-unbind"
+		container.Image = mainImage
+		container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.VFIOManager.ImagePullPolicy)
+
+		setContainerEnv(container, "FABRIC_MANAGER_MODE", "shared-nvswitch")
+		setContainerEnv(container, "HOST_ROOT", "/host")
+
+		// Add nvidia-validations volume mount for driver-ready file
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      "nvidia-validations",
+			MountPath: "/run/nvidia/validations",
+			ReadOnly:  true,
+		})
+
+		// Add nvidia-validations volume
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "nvidia-validations",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia/validations",
+					Type: &[]corev1.HostPathType{corev1.HostPathDirectoryOrCreate}[0],
+				},
+			},
+		})
+	} else {
+		// Default behavior: update k8s-driver-manager initContainer
+		err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
+		if err != nil {
+			return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+		}
 	}
 
 	// update image
