@@ -2286,9 +2286,24 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		"vgpu-devices",
 	}
 
+	// Add driver validation when FabricManager.Mode is shared-nvswitch
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		components = append(components, "driver")
+	}
+
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
 			validatorErr = errors.Join(validatorErr, err)
+		}
+	}
+
+	// Remove driver validation init container if NOT in shared-nvswitch mode
+	if !config.FabricManager.IsSharedNVSwitchMode() {
+		for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+			if initContainer.Name == "driver-validation" {
+				obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
+				break
+			}
 		}
 	}
 

@@ -2689,6 +2689,104 @@ func TestTransformSandboxValidator(t *testing.T) {
 				WithPullSecret("pull-secret").
 				WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "fabric manager shared-nvswitch mode - driver validation should be preserved",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation", Image: "old-image"}).
+				WithContainer(corev1.Container{
+					Name:  "dummy",
+					Image: "old-image",
+				}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gpu-operator-validator",
+					Version:    "v1.0.0",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:  "driver-validation",
+					Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}),
+		},
+		{
+			description: "fabric manager full-passthrough mode - driver validation should be removed",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation", Image: "old-image"}).
+				WithContainer(corev1.Container{
+					Name:  "dummy",
+					Image: "old-image",
+				}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gpu-operator-validator",
+					Version:    "v1.0.0",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeFullPassthrough,
+				},
+			},
+			expectedDs: func() Daemonset {
+				ds := NewDaemonset().
+					WithContainer(corev1.Container{
+						Name:            "dummy",
+						Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: &corev1.SecurityContext{
+							RunAsUser: rootUID,
+						},
+					})
+				// Set an empty InitContainers slice to match what happens after removal
+				ds.Spec.Template.Spec.InitContainers = []corev1.Container{}
+				return ds
+			}(),
+		},
+		{
+			description: "no fabric manager mode specified - driver validation should be removed",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation", Image: "old-image"}).
+				WithContainer(corev1.Container{
+					Name:  "dummy",
+					Image: "old-image",
+				}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gpu-operator-validator",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: func() Daemonset {
+				ds := NewDaemonset().
+					WithContainer(corev1.Container{
+						Name:            "dummy",
+						Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: &corev1.SecurityContext{
+							RunAsUser: rootUID,
+						},
+					})
+				// Set an empty InitContainers slice to match what happens after removal
+				ds.Spec.Template.Spec.InitContainers = []corev1.Container{}
+				return ds
+			}(),
+		},
 	}
 
 	for _, tc := range testCases {
