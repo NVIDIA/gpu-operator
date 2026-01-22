@@ -71,6 +71,10 @@ spec:
           value: "void"
         - name: TOOLKIT_PID_FILE
           value: "/run/nvidia/toolkit/toolkit.pid"
+        - name: NRI_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
         securityContext:
