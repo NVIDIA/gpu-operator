@@ -573,6 +573,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		Spec:             spec,
 		AppName:          nvidiaDriverAppName,
 		Name:             nvidiaDriverName,
+		CRName:           cr.Name,
 		ImagePath:        imagePath,
 		ManagerImagePath: managerImagePath,
 		OSVersion:        nodePool.getOS(),
