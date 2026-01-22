@@ -80,6 +80,9 @@ spec:
             readOnly: true
           - name: host-root
             mountPath: /host
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
+            mountPropagation: Bidirectional
           securityContext:
             privileged: true
             seLinuxOptions:
@@ -101,6 +104,10 @@ spec:
         - name: run-nvidia
           hostPath:
             path: /run/nvidia
+            type: DirectoryOrCreate
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
             type: DirectoryOrCreate
         - name: host-root
           hostPath:

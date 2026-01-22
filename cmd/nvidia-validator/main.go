@@ -1624,18 +1624,22 @@ func (v *VfioPCI) validate() error {
 		return err
 	}
 
-	err = v.runValidation()
-	if err != nil {
-		return err
-	}
-	log.Info("Validation completed successfully - all devices are bound to vfio-pci")
+	for {
+		log.Info("Attempting to validate that all device are bound to vfio-pci")
+		err := v.runValidation()
+		if err != nil {
+			if !withWaitFlag {
+				return fmt.Errorf("error validating vfio-pci: %w", err)
+			}
+			log.Warningf("failed to validate vfio-pci, retrying after %d seconds\n", sleepIntervalSecondsFlag)
+			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
+			continue
+		}
 
-	// delete status file is already present
-	err = createStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
-	if err != nil {
-		return err
+		log.Info("Validation completed successfully - all devices are bound to vfio-pci")
+
+		return createStatusFile(outputDirFlag + "/" + vfioPCIStatusFile)
 	}
-	return nil
 }
 
 func (v *VfioPCI) runValidation() error {
