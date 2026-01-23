@@ -268,7 +268,7 @@ func (s *stateSkel) createOrUpdateObjs(
 				if desiredObjectHash == currentObjHash {
 					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
-					return nil
+					continue
 				}
 			}
 		}
