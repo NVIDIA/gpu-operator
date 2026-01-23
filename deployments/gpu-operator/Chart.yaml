@@ -19,6 +19,6 @@ keywords:
 
 dependencies:
   - name: node-feature-discovery
-    version: 0.18.2
+    version: 0.18.3
     repository: oci://registry.k8s.io/nfd/charts
     condition: nfd.enabled
