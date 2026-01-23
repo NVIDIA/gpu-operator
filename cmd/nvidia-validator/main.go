@@ -762,12 +762,7 @@ func validateHostDriver(silent bool) error {
 	return runCommand(command, args, silent)
 }
 
-func validateDriverContainer(silent bool, ctx context.Context) error {
-	driverManagedByOperator, err := isDriverManagedByOperator(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
-	}
-
+func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 	if driverManagedByOperator {
 		log.Infof("Driver is not pre-installed on the host and is managed by GPU Operator. Checking driver container status.")
 		if err := assertDriverContainerReady(silent); err != nil {
@@ -819,19 +814,31 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
 	}
 
-	err = validateDriverContainer(silent, d.ctx)
+	log.Infof("No pre-installed driver detected on the host: %v", err)
+
+	log.Info("Validating containerized driver installation")
+
+	driverManagedByOperator, err := isDriverManagedByOperator(d.ctx)
+	if err != nil {
+		return driverInfo{}, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
+	}
+
+	err = validateDriverContainer(silent, driverManagedByOperator)
 	if err != nil {
 		return driverInfo{}, err
 	}
 
-	err = validateAdditionalDriverComponents(d.ctx, driverContainerStatusFilePath)
-	if err != nil {
-		return driverInfo{}, err
+	if driverManagedByOperator {
+		err = validateAdditionalDriverComponents(d.ctx, driverContainerStatusFilePath)
+		if err != nil {
+			return driverInfo{}, err
+		}
 	}
-
 	return getDriverInfo(false, hostRootFlag, driverInstallDirFlag, driverInstallDirCtrPathFlag), nil
 }
 
+// validateAdditionalDriverComponents validates additional driver components such as
+// gdrcopy, gds, nvidia-peermem(rdma) if they are enabled.
 func validateAdditionalDriverComponents(ctx context.Context, statusFilePath string) error {
 	data, err := os.ReadFile(statusFilePath)
 	if err != nil {
