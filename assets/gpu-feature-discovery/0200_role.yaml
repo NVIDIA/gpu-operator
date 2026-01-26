@@ -22,3 +22,9 @@ rules:
   - watch
   - create
   - update
+- apiGroups:
+  - ""
+  resources:
+  - "pods"
+  verbs:
+  - "get"
