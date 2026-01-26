@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator/tests/e2e
 
-go 1.25.0
+go 1.25.3
 
 require (
 	github.com/NVIDIA/gpu-operator v0.0.0-00010101000000-000000000000
