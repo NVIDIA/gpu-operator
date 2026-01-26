@@ -82,6 +82,15 @@ spec:
         ports:
           - name: metrics
             containerPort: 8080
+    {{- with .Values.operator.dnsConfig}}
+      dnsPolicy: "None"
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.operator.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: host-os-release
           hostPath:
