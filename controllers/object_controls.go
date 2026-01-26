@@ -940,6 +940,12 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 		obj.Spec.Template.Spec.Containers[0].Args = config.GPUFeatureDiscovery.Args
 	}
 
+	// If we are on an OpenShift cluster, we disable the NodeFeature API as a node feature label source
+	// We can remove this once OpenShift's NFD instances start supporting the NodeFeature API
+	if len(n.openshift) > 0 {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "USE_NODE_FEATURE_API", "false")
+	}
+
 	// set/append environment variables for exporter container
 	if len(config.GPUFeatureDiscovery.Env) > 0 {
 		for _, env := range config.GPUFeatureDiscovery.Env {

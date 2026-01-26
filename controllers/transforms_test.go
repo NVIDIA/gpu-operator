@@ -3518,3 +3518,125 @@ func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
 	removeDigestFromDaemonSet(ds.DaemonSet)
 	require.EqualValues(t, expectedDs, ds)
 }
+
+func TestTransformGPUDiscoveryPlugin(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "gpu-feature-discovery"}).
+		WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+		WithInitContainer(corev1.Container{Name: "config-manager-init"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		GPUFeatureDiscovery: gpuv1.GPUFeatureDiscoverySpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "k8s-device-plugin",
+			Version:    "v0.18.1",
+		},
+		Validator: gpuv1.ValidatorSpec{
+			Repository:       "nvcr.io/nvidia/cloud-native",
+			Image:            "gpu-operator-validator",
+			Version:          "v1.0.0",
+			ImagePullPolicy:  "IfNotPresent",
+			ImagePullSecrets: []string{"pull-secret"},
+			Toolkit: gpuv1.ToolkitValidatorSpec{
+				Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+			},
+		},
+	}
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "gpu-feature-discovery",
+		Image:           "nvcr.io/nvidia/k8s-device-plugin:v0.18.1",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "NVIDIA_MIG_MONITOR_DEVICES",
+				Value: "all",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:            "toolkit-validation",
+		Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: rootUID,
+		},
+	}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia")
+
+	err := TransformGPUDiscoveryPlugin(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+	require.NoError(t, err)
+	removeDigestFromDaemonSet(ds.DaemonSet)
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestTransformGPUDiscoveryPluginOCP(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ocp-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "5.14.0-284.43.1.el9_2.x86_64",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "gpu-feature-discovery"}).
+		WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+		WithInitContainer(corev1.Container{Name: "config-manager-init"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		GPUFeatureDiscovery: gpuv1.GPUFeatureDiscoverySpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "k8s-device-plugin",
+			Version:    "v0.18.1",
+		},
+		Validator: gpuv1.ValidatorSpec{
+			Repository:       "nvcr.io/nvidia/cloud-native",
+			Image:            "gpu-operator-validator",
+			Version:          "v1.0.0",
+			ImagePullPolicy:  "IfNotPresent",
+			ImagePullSecrets: []string{"pull-secret"},
+			Toolkit: gpuv1.ToolkitValidatorSpec{
+				Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+			},
+		},
+	}
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "gpu-feature-discovery",
+		Image:           "nvcr.io/nvidia/k8s-device-plugin:v0.18.1",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "USE_NODE_FEATURE_API",
+				Value: "false",
+			},
+			{
+				Name:  "NVIDIA_MIG_MONITOR_DEVICES",
+				Value: "all",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:            "toolkit-validation",
+		Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: rootUID,
+		},
+	}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia")
+
+	err := TransformGPUDiscoveryPlugin(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), openshift: "4.14"})
+	require.NoError(t, err)
+	removeDigestFromDaemonSet(ds.DaemonSet)
+	require.EqualValues(t, expectedDs, ds)
+}
