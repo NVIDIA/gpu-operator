@@ -62,13 +62,10 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 					Fail(fmt.Sprintf("failed to create gpu operator namespace %s: %v", tcfg.namespace, err))
 				}
 
-				operatorClient, err = helpers.NewOperatorClient(
-					helpers.WithNamespace(testNamespace.Name),
-					helpers.WithKubeConfig(framework.TestContext.KubeConfig),
-					helpers.WithChart(tcfg.helmChart),
-				)
-				if err != nil {
-					Fail(fmt.Sprintf("failed to instantiate gpu operator client: %v", err))
+				operatorClient = &helpers.OperatorClient{
+					Chart:      tcfg.helmChart,
+					Namespace:  testNamespace.Name,
+					Kubeconfig: framework.TestContext.KubeConfig,
 				}
 
 				values := []string{
@@ -79,9 +76,10 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 					fmt.Sprintf("validator.image=%s", tcfg.validatorImage),
 					fmt.Sprintf("validator.version=%s", tcfg.validatorVersion),
 				}
+				helmReleaseName = fmt.Sprintf("gpu-operator-%s", framework.RandomSuffix())
 				helmReleaseName, err = operatorClient.Install(ctx, values, helpers.ChartOptions{
 					CleanupOnFail: true,
-					GenerateName:  true,
+					ReleaseName:   helmReleaseName,
 					Timeout:       5 * time.Minute,
 					Wait:          true,
 				})

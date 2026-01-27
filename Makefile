@@ -233,11 +233,6 @@ validate-modules:
 	@echo "- [tools] Checking for any unused/missing packages in go.mod..."
 	go -C $(TOOLS_DIR) mod tidy
 	@git diff --exit-code -- $(TOOLS_DIR)/go.sum $(TOOLS_DIR)/go.mod
-	@echo "- [tests/e2e] Verifying that the dependencies have expected content..."
-	go -C $(E2E_TESTS_DIR) mod verify
-	@echo "- [tests/e2e] Checking for any unused/missing packages in go.mod..."
-	go -C $(E2E_TESTS_DIR) mod tidy
-	@git diff --exit-code -- $(E2E_TESTS_DIR)/go.sum $(E2E_TESTS_DIR)/go.mod
 
 validate-csv: cmds
 	./gpuop-cfg validate csv --input=./bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml

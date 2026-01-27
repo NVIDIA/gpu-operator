@@ -128,4 +128,3 @@ func (h *DaemonSetClient) CheckNoRestarts(ctx context.Context, namespace, name s
 
 	return nil
 }
-

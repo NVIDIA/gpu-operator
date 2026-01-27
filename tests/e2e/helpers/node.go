@@ -127,4 +127,3 @@ func (h *NodeClient) UnlabelAllNodes(ctx context.Context, key string) error {
 
 	return nil
 }
-
