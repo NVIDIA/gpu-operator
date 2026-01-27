@@ -44,64 +44,37 @@ spec:
         matchExpressions:
           sev.enabled:
             op: Exists
-    - name: "NVIDIA H100"
+    - name: "NVIDIA Hopper GPU"
       labels:
-        "nvidia.com/gpu.H100": "true"
         "nvidia.com/gpu.family": "hopper"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
             vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2339"]}
-    - name: "NVIDIA H100 PCIe"
+            # H100/H200/H800/GH100 (0x2300-0x23ff, 0x2600-0x27ff) from https://admin.pci-ids.ucw.cz/read/PC/10de
+            device: {op: InRegexp, value: ["^(23|2[67])[0-9a-f]{2}$"]}
+    - name: "NVIDIA Blackwell GPU"
       labels:
-        "nvidia.com/gpu.H100.pcie": "true"
-        "nvidia.com/gpu.family": "hopper"
+        "nvidia.com/gpu.family": "blackwell"
       matchFeatures:
         - feature: pci.device
           matchExpressions:
             vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2331"]}
-    - name: "NVIDIA H100 80GB HBM3"
-      labels:
-        "nvidia.com/gpu.H100.HBM3": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2330"]}
-    - name: "NVIDIA H800"
-      labels:
-        "nvidia.com/gpu.H800": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2324"]}
-    - name: "NVIDIA H800 PCIE"
-      labels:
-        "nvidia.com/gpu.H800.pcie": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2322"]}
+            # GB100-GB207, GB10x-GB12x (0x2900-0x33ff) from https://admin.pci-ids.ucw.cz/read/PC/10de
+            device: {op: InRegexp, value: ["^(2[9a-f]|3[0-3])[0-9a-f]{2}$"]}
     - name: "NVIDIA CC Enabled"
       labels:
         "nvidia.com/cc.capable": "true"
-      matchAny: # TDX/SEV + Hopper GPU
+      matchAny: # TDX/SEV + Hopper/Blackwell GPU
        - matchFeatures:
           - feature: rule.matched
             matchExpressions:
-              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
+              nvidia.com/gpu.family: {op: In, value: ["hopper", "blackwell"]}
               sev.snp.enabled: {op: IsTrue}
        - matchFeatures:
           - feature: rule.matched
             matchExpressions:
-              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
+              nvidia.com/gpu.family: {op: In, value: ["hopper", "blackwell"]}
               tdx.enabled: {op: IsTrue}
 ---
 apiVersion: nfd.k8s-sigs.io/v1alpha1
