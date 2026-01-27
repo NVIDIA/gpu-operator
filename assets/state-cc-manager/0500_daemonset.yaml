@@ -33,8 +33,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          - name: CC_CAPABLE_DEVICE_IDS
-            value: "0x2322,0x2331"
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
