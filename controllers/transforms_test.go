@@ -3665,3 +3665,109 @@ func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, expectedDs, ds)
 }
+
+func TestTransformSandboxDevicePlugin(t *testing.T) {
+	initMockK8sClients()
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "sandbox device plugin with fabric manager shared-nvswitch mode",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-sandbox-device-plugin-ctr"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				SandboxDevicePlugin: gpuv1.SandboxDevicePluginSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "kubevirt-device-plugin",
+					Version:    "v1.2.0",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gpu-operator-validator",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-sandbox-device-plugin-ctr",
+				Image:           "nvcr.io/nvidia/kubevirt-device-plugin:v1.2.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "ENABLE_FABRIC_MANAGER",
+						Value: "true",
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "run-nvidia-fabricmanager",
+						MountPath: "/run/nvidia-fabricmanager",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:  "toolkit-validation",
+				Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}).WithVolume(corev1.Volume{
+				Name: "run-nvidia-fabricmanager",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/run/nvidia-fabricmanager",
+						Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "sandbox device plugin without fabric manager shared-nvswitch mode",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-sandbox-device-plugin-ctr"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				SandboxDevicePlugin: gpuv1.SandboxDevicePluginSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "kubevirt-device-plugin",
+					Version:    "v1.2.0",
+				},
+				Validator: gpuv1.ValidatorSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gpu-operator-validator",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-sandbox-device-plugin-ctr",
+				Image:           "nvcr.io/nvidia/kubevirt-device-plugin:v1.2.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithInitContainer(corev1.Container{
+				Name:  "toolkit-validation",
+				Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformSandboxDevicePlugin(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}

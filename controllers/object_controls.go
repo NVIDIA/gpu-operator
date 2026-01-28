@@ -1647,6 +1647,31 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
+	// Set ENABLE_FABRIC_MANAGER environment variable if shared-nvswitch mode is configured
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "ENABLE_FABRIC_MANAGER", "true")
+
+		// Add fabric manager volume mount to the container
+		fabricManagerVolMount := corev1.VolumeMount{
+			Name:      "run-nvidia-fabricmanager",
+			MountPath: "/run/nvidia-fabricmanager",
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, fabricManagerVolMount)
+
+		// Add fabric manager volume to the pod spec
+		fabricManagerVol := corev1.Volume{
+			Name: "run-nvidia-fabricmanager",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia-fabricmanager",
+					Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, fabricManagerVol)
+	}
+
 	return nil
 }
 
