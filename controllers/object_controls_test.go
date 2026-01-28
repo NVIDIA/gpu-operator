@@ -104,15 +104,16 @@ var kubernetesResources = []client.Object{
 }
 
 type commonDaemonsetSpec struct {
-	repository       string
-	image            string
-	version          string
-	imagePullPolicy  string
-	imagePullSecrets []corev1.LocalObjectReference
-	args             []string
-	env              []gpuv1.EnvVar
-	resources        *gpuv1.ResourceRequirements
-	startupProbe     *gpuv1.ContainerProbeSpec
+	repository         string
+	image              string
+	version            string
+	imagePullPolicy    string
+	imagePullSecrets   []corev1.LocalObjectReference
+	args               []string
+	env                []gpuv1.EnvVar
+	resources          *gpuv1.ResourceRequirements
+	startupProbe       *gpuv1.ContainerProbeSpec
+	kernelModuleConfig *gpuv1.KernelModuleConfigSpec
 }
 
 func TestMain(m *testing.M) {
@@ -371,14 +372,15 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		}
 	case "VGPUManager":
 		spec = commonDaemonsetSpec{
-			repository:       cp.Spec.VGPUManager.Repository,
-			image:            cp.Spec.VGPUManager.Image,
-			version:          cp.Spec.VGPUManager.Version,
-			imagePullPolicy:  cp.Spec.VGPUManager.ImagePullPolicy,
-			imagePullSecrets: getImagePullSecrets(cp.Spec.VGPUManager.ImagePullSecrets),
-			args:             cp.Spec.VGPUManager.Args,
-			env:              cp.Spec.VGPUManager.Env,
-			resources:        cp.Spec.VGPUManager.Resources,
+			repository:         cp.Spec.VGPUManager.Repository,
+			image:              cp.Spec.VGPUManager.Image,
+			version:            cp.Spec.VGPUManager.Version,
+			imagePullPolicy:    cp.Spec.VGPUManager.ImagePullPolicy,
+			imagePullSecrets:   getImagePullSecrets(cp.Spec.VGPUManager.ImagePullSecrets),
+			args:               cp.Spec.VGPUManager.Args,
+			env:                cp.Spec.VGPUManager.Env,
+			resources:          cp.Spec.VGPUManager.Resources,
+			kernelModuleConfig: cp.Spec.VGPUManager.KernelModuleConfig,
 		}
 		dsLabel = "nvidia-vgpu-manager-daemonset"
 		mainCtrName = "nvidia-vgpu-manager-ctr"
@@ -765,7 +767,7 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp.Spec.VGPUManager.ImagePullSecrets = []string{"ngc-secret"}
 	cp.Spec.VGPUManager.DriverManager.ImagePullSecrets = []string{"ngc-secret"}
 	clusterPolicyController.sandboxEnabled = true
-
+	cp.Spec.VGPUManager.KernelModuleConfig = &gpuv1.KernelModuleConfigSpec{Name: "vgpu-manager-kernel-module-config"}
 	switch testCase {
 	case "default":
 		// Do nothing
@@ -785,6 +787,7 @@ func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
 		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu22.04",
 		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.3.0",
 		"imagePullSecret":    "ngc-secret",
+		"kernelModuleConfig": "vgpu-manager-kernel-module-config",
 	}
 
 	switch testCase {
@@ -814,6 +817,23 @@ func TestVGPUManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			// Create the kernel module ConfigMap
+			if tc.clusterPolicy.Spec.VGPUManager.KernelModuleConfig != nil && tc.clusterPolicy.Spec.VGPUManager.KernelModuleConfig.Name != "" {
+				cm := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tc.clusterPolicy.Spec.VGPUManager.KernelModuleConfig.Name,
+						Namespace: clusterPolicyController.operatorNamespace,
+					},
+					Data: map[string]string{
+						"nvidia.conf": "# Test vGPU manager kernel module configuration\n",
+					},
+				}
+				err := clusterPolicyController.client.Create(clusterPolicyController.ctx, cm)
+				if err != nil {
+					t.Fatalf("error creating kernel module ConfigMap: %v", err)
+				}
+			}
+
 			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "VGPUManager", tc.output["numDaemonsets"].(int))
 			if err != nil {
 				t.Fatalf("error in testDaemonsetCommon(): %v", err)
@@ -850,6 +870,9 @@ func TestVGPUManager(t *testing.T) {
 }
 
 func TestVGPUManagerAssets(t *testing.T) {
+	// Clear any KernelModuleConfig that might have been set by previous tests to avoid missing ConfigMap errors
+	clusterPolicyController.singleton.Spec.VGPUManager.KernelModuleConfig = nil
+
 	manifestPath := filepath.Join(cfg.root, vGPUManagerAssetsPath)
 	// add manifests
 	addState(&clusterPolicyController, manifestPath)

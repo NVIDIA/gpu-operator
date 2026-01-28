@@ -279,6 +279,9 @@ spec:
     {{- if .Values.vgpuManager.args }}
     args: {{ toYaml .Values.vgpuManager.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.vgpuManager.kernelModuleConfig }}
+    kernelModuleConfig: {{ toYaml .Values.vgpuManager.kernelModuleConfig | nindent 6 }}
+    {{- end }}
     driverManager:
       {{- if .Values.vgpuManager.driverManager.repository }}
       repository: {{ .Values.vgpuManager.driverManager.repository }}

@@ -432,6 +432,9 @@ vgpuManager:
     version: v0.9.1
     imagePullPolicy: IfNotPresent
     env: []
+   # kernel module configuration for vGPU manager
+  kernelModuleConfig:
+    name: ""
 
 vgpuDeviceManager:
   enabled: true
