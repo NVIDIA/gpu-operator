@@ -62,6 +62,17 @@ spec:
           imagePullPolicy: IfNotPresent
           name: nvidia-sandbox-device-plugin-ctr
           command: ["nvidia-kubevirt-gpu-device-plugin"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
           securityContext:
             privileged: true
           volumeMounts:
