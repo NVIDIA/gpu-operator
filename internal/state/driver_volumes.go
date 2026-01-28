@@ -32,11 +32,13 @@ import (
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
-	"centos": "/etc/yum.repos.d",
-	"debian": "/etc/apt/sources.list.d",
-	"ubuntu": "/etc/apt/sources.list.d",
-	"rhcos":  "/etc/yum.repos.d",
-	"rhel":   "/etc/yum.repos.d",
+	"centos":   "/etc/yum.repos.d",
+	"debian":   "/etc/apt/sources.list.d",
+	"ubuntu":   "/etc/apt/sources.list.d",
+	"rhcos":    "/etc/yum.repos.d",
+	"rhel":     "/etc/yum.repos.d",
+	"sles":     "/etc/zypp/repos.d",
+	"sl-micro": "/etc/zypp/repos.d",
 }
 
 // CertConfigPathMap indicates standard OS specific paths for ssl keys/certificates.

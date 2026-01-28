@@ -1479,3 +1479,19 @@ func TestCertConfigPathMap(t *testing.T) {
 		require.Equal(t, expectedPath, path, "Incorrect path for OS %s", os)
 	}
 }
+
+func TestRepoConfigPathMap(t *testing.T) {
+	expected := map[string]string{
+		"ubuntu":   "/etc/apt/sources.list.d",
+		"rhcos":    "/etc/yum.repos.d",
+		"rhel":     "/etc/yum.repos.d",
+		"sles":     "/etc/zypp/repos.d",
+		"sl-micro": "/etc/zypp/repos.d",
+	}
+
+	for os, path := range expected {
+		val, ok := RepoConfigPathMap[os]
+		require.True(t, ok, "Expected %s to be in RepoConfigPathMap", os)
+		require.Equal(t, path, val, "Expected path for %s to be %s", os, path)
+	}
+}
