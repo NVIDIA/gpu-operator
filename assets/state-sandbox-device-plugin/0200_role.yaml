@@ -12,3 +12,13 @@ rules:
   - use
   resourceNames:
   - privileged
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete

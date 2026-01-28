@@ -93,3 +93,13 @@ rules:
   - watch
   - create
   - update
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
