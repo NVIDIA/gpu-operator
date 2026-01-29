@@ -23,12 +23,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-
-	"path/filepath"
 
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -1731,6 +1730,31 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}
+
+	// Set ENABLE_FABRIC_MANAGER environment variable if shared-nvswitch mode is configured
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "ENABLE_FABRIC_MANAGER", "true")
+
+		// Add fabric manager volume mount to the container
+		fabricManagerVolMount := corev1.VolumeMount{
+			Name:      "run-nvidia-fabricmanager",
+			MountPath: "/run/nvidia-fabricmanager",
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, fabricManagerVolMount)
+
+		// Add fabric manager volume to the pod spec
+		fabricManagerVol := corev1.Volume{
+			Name: "run-nvidia-fabricmanager",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia-fabricmanager",
+					Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+				},
+			},
+		}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, fabricManagerVol)
+	}
+
 	return nil
 }
 
@@ -2099,10 +2123,65 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
-	if err != nil {
-		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+	// Check if we're in shared-nvswitch mode
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		// In shared-nvswitch mode, replace driver uninstall with device unbind
+		// Find the k8s-driver-manager init container and replace it with vfio-manage unbind
+		container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+
+		// Get the main container image for consistency
+		mainImage, err := gpuv1.ImagePath(&config.VFIOManager)
+		if err != nil {
+			return err
+		}
+
+		// Replace with synchronized vfio-manage unbind init container
+		container.Name = "vfio-device-unbind"
+		container.Image = mainImage
+		container.ImagePullPolicy = gpuv1.ImagePullPolicy(config.VFIOManager.ImagePullPolicy)
+		container.Command = []string{"/bin/sh"}
+		container.Args = []string{"-c", `
+# For shared-nvswitch mode, wait for driver to be ready before unbinding
+echo "Shared NVSwitch mode detected, waiting for driver readiness..."
+until [ -f /run/nvidia/validations/driver-ready ]
+do
+  echo "waiting for the driver validations to be ready..."
+  sleep 5
+done
+
+set -o allexport
+cat /run/nvidia/validations/driver-ready
+. /run/nvidia/validations/driver-ready
+
+echo "Driver is ready, proceeding with device unbind"
+exec vfio-manage unbind --all`}
+
+		// Add HOST_ROOT env var needed by vfio-manage
+		setContainerEnv(container, "HOST_ROOT", "/host")
+
+		// Add nvidia-validations volume mount for driver-ready file
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      "nvidia-validations",
+			MountPath: "/run/nvidia/validations",
+			ReadOnly:  true,
+		})
+
+		// Add nvidia-validations volume
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "nvidia-validations",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/run/nvidia/validations",
+					Type: &[]corev1.HostPathType{corev1.HostPathDirectoryOrCreate}[0],
+				},
+			},
+		})
+	} else {
+		// Default behavior: update k8s-driver-manager initContainer
+		err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
+		if err != nil {
+			return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
+		}
 	}
 
 	// update image
@@ -2323,9 +2402,24 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		"vgpu-devices",
 	}
 
+	// Add driver validation when FabricManager.Mode is shared-nvswitch
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		components = append(components, "driver")
+	}
+
 	for _, component := range components {
 		if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, component); err != nil {
 			validatorErr = errors.Join(validatorErr, err)
+		}
+	}
+
+	// Remove driver validation init container if NOT in shared-nvswitch mode
+	if !config.FabricManager.IsSharedNVSwitchMode() {
+		for i, initContainer := range obj.Spec.Template.Spec.InitContainers {
+			if initContainer.Name == "driver-validation" {
+				obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
+				break
+			}
 		}
 	}
 
@@ -3581,6 +3675,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		for _, env := range config.Driver.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// Set Fabric Manager environment variable if configured
+	if config.FabricManager.IsSharedNVSwitchMode() {
+		setContainerEnv(driverContainer, "FABRIC_MANAGER_FABRIC_MODE", "1")
+	} else if config.FabricManager.Mode == gpuv1.FabricModeFullPassthrough {
+		setContainerEnv(driverContainer, "FABRIC_MANAGER_FABRIC_MODE", "0")
 	}
 
 	// no further repo configuration required when using pre-compiled drivers, return here.
