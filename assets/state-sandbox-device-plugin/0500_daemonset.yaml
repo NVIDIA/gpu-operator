@@ -61,7 +61,6 @@ spec:
         - image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
           name: nvidia-sandbox-device-plugin-ctr
-          command: ["nvidia-kubevirt-gpu-device-plugin"]
           securityContext:
             privileged: true
           volumeMounts:
