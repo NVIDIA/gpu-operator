@@ -882,6 +882,8 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 	switch testCase {
 	case "default":
 		// Do nothing
+	case "fabric-manager-shared-nvswitch":
+		cp.Spec.FabricManager.Mode = gpuv1.FabricModeSharedNVSwitch
 	default:
 		return nil
 	}
@@ -897,11 +899,16 @@ func getSandboxDevicePluginTestOutput(testCase string) map[string]interface{} {
 		"numDaemonsets":   1,
 		"image":           "nvcr.io/nvidia/kubevirt-device-plugin:v1.1.0",
 		"imagePullSecret": "ngc-secret",
+		"env":             map[string]string{},
 	}
 
 	switch testCase {
 	case "default":
 		// Do nothing
+	case "fabric-manager-shared-nvswitch":
+		output["env"] = map[string]string{
+			"ENABLE_FABRIC_MANAGER": "true",
+		}
 	default:
 		return nil
 	}
@@ -922,6 +929,11 @@ func TestSandboxDevicePlugin(t *testing.T) {
 			getSandboxDevicePluginTestInput("default"),
 			getSandboxDevicePluginTestOutput("default"),
 		},
+		{
+			"FabricManagerSharedNVSwitch",
+			getSandboxDevicePluginTestInput("fabric-manager-shared-nvswitch"),
+			getSandboxDevicePluginTestOutput("fabric-manager-shared-nvswitch"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -935,14 +947,26 @@ func TestSandboxDevicePlugin(t *testing.T) {
 			}
 
 			image := ""
+			containerEnv := make(map[string]string)
 			for _, container := range ds.Spec.Template.Spec.Containers {
 				if strings.Contains(container.Name, "nvidia-sandbox-device-plugin-ctr") {
 					image = container.Image
+					for _, env := range container.Env {
+						containerEnv[env.Name] = env.Value
+					}
 					continue
 				}
 			}
 
 			require.Equal(t, tc.output["image"], image, "Unexpected configuration for nvidia-sandbox-device-plugin-ctr image")
+			
+			// Check environment variables
+			expectedEnv := tc.output["env"].(map[string]string)
+			for envName, expectedValue := range expectedEnv {
+				actualValue, found := containerEnv[envName]
+				require.True(t, found, "Expected environment variable %s not found", envName)
+				require.Equal(t, expectedValue, actualValue, "Unexpected value for environment variable %s", envName)
+			}
 
 			// cleanup by deleting all kubernetes objects
 			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)

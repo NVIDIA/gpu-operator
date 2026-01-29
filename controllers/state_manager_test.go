@@ -19,6 +19,8 @@ package controllers
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -184,5 +186,325 @@ func TestHasMIGCapableGPU(t *testing.T) {
 		if got := hasMIGCapableGPU(tc.labels); got != tc.want {
 			t.Errorf("hasMIGCapableGPU(%v) = %v, want %v", tc.labels, got, tc.want)
 		}
+	}
+}
+
+func TestGpuWorkloadConfiguration_ShouldDeployDriverForVMPassthrough(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        string
+		clusterPolicy *gpuv1.ClusterPolicy
+		expected      bool
+	}{
+		{
+			name:   "non-vm-passthrough workload",
+			config: gpuWorkloadConfigContainer,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeSharedNVSwitch,
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:          "vm-passthrough with nil cluster policy",
+			config:        gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: nil,
+			expected:      false,
+		},
+		{
+			name:   "vm-passthrough with shared-nvswitch mode",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeSharedNVSwitch,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:   "vm-passthrough with full-passthrough mode",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeFullPassthrough,
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:   "vm-passthrough with default (empty) fabric manager mode",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: "", // empty defaults to full-passthrough
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workloadConfig := &gpuWorkloadConfiguration{
+				config:        tt.config,
+				node:          "test-node",
+				log:           logr.Discard(),
+				clusterPolicy: tt.clusterPolicy,
+			}
+
+			result := workloadConfig.shouldDeployDriverForVMPassthrough()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGpuWorkloadConfiguration_AddGPUStateLabels(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         string
+		clusterPolicy  *gpuv1.ClusterPolicy
+		inputLabels    map[string]string
+		expectedLabels map[string]string
+		expectModified bool
+	}{
+		{
+			name:   "vm-passthrough with shared-nvswitch adds driver label",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeSharedNVSwitch,
+					},
+				},
+			},
+			inputLabels: map[string]string{},
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+				"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+				"nvidia.com/gpu.deploy.vfio-manager":          "true",
+				"nvidia.com/gpu.deploy.kata-manager":          "true",
+				"nvidia.com/gpu.deploy.cc-manager":            "true",
+				"nvidia.com/gpu.deploy.driver":                "true",
+			},
+			expectModified: true,
+		},
+		{
+			name:   "vm-passthrough with full-passthrough does not add driver label",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeFullPassthrough,
+					},
+				},
+			},
+			inputLabels: map[string]string{},
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+				"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+				"nvidia.com/gpu.deploy.vfio-manager":          "true",
+				"nvidia.com/gpu.deploy.kata-manager":          "true",
+				"nvidia.com/gpu.deploy.cc-manager":            "true",
+			},
+			expectModified: true,
+		},
+		{
+			name:   "container workload is not affected",
+			config: gpuWorkloadConfigContainer,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeSharedNVSwitch,
+					},
+				},
+			},
+			inputLabels: map[string]string{
+				"existing-label": "value",
+			},
+			expectedLabels: map[string]string{
+				"existing-label":                              "value",
+				"nvidia.com/gpu.deploy.driver":                "true",
+				"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
+				"nvidia.com/gpu.deploy.container-toolkit":     "true",
+				"nvidia.com/gpu.deploy.device-plugin":         "true",
+				"nvidia.com/gpu.deploy.dcgm":                  "true",
+				"nvidia.com/gpu.deploy.dcgm-exporter":         "true",
+				"nvidia.com/gpu.deploy.node-status-exporter":  "true",
+				"nvidia.com/gpu.deploy.operator-validator":    "true",
+			},
+			expectModified: true,
+		},
+		{
+			name:          "vm-passthrough with nil cluster policy does not add driver label",
+			config:        gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: nil,
+			inputLabels:   map[string]string{},
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+				"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+				"nvidia.com/gpu.deploy.vfio-manager":          "true",
+				"nvidia.com/gpu.deploy.kata-manager":          "true",
+				"nvidia.com/gpu.deploy.cc-manager":            "true",
+			},
+			expectModified: true,
+		},
+		{
+			name:   "driver label already exists - no modification",
+			config: gpuWorkloadConfigVMPassthrough,
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					FabricManager: gpuv1.FabricManagerSpec{
+						Mode: gpuv1.FabricModeSharedNVSwitch,
+					},
+				},
+			},
+			inputLabels: map[string]string{
+				"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+				"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+				"nvidia.com/gpu.deploy.vfio-manager":          "true",
+				"nvidia.com/gpu.deploy.kata-manager":          "true",
+				"nvidia.com/gpu.deploy.cc-manager":            "true",
+				"nvidia.com/gpu.deploy.driver":                "true",
+			},
+			expectedLabels: map[string]string{
+				"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
+				"nvidia.com/gpu.deploy.sandbox-validator":     "true",
+				"nvidia.com/gpu.deploy.vfio-manager":          "true",
+				"nvidia.com/gpu.deploy.kata-manager":          "true",
+				"nvidia.com/gpu.deploy.cc-manager":            "true",
+				"nvidia.com/gpu.deploy.driver":                "true",
+			},
+			expectModified: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workloadConfig := &gpuWorkloadConfiguration{
+				config:        tt.config,
+				node:          "test-node",
+				log:           logr.Discard(),
+				clusterPolicy: tt.clusterPolicy,
+			}
+
+			// Make a copy of input labels to avoid modifying the test data
+			labels := make(map[string]string)
+			for k, v := range tt.inputLabels {
+				labels[k] = v
+			}
+
+			modified := workloadConfig.addGPUStateLabels(labels)
+
+			assert.Equal(t, tt.expectModified, modified)
+			assert.Equal(t, tt.expectedLabels, labels)
+		})
+	}
+}
+
+func TestClusterPolicyValidateFabricManagerConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		clusterPolicy *gpuv1.ClusterPolicySpec
+		expectError   bool
+		errorMessage  string
+	}{
+		{
+			name: "valid configuration - vm-passthrough with shared-nvswitch and driver enabled",
+			clusterPolicy: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					DefaultWorkload: "vm-passthrough",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+				Driver: gpuv1.DriverSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid configuration - vm-passthrough with full-passthrough mode",
+			clusterPolicy: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					DefaultWorkload: "vm-passthrough",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeFullPassthrough,
+				},
+				Driver: gpuv1.DriverSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid configuration - container workload with any fabric manager mode",
+			clusterPolicy: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					DefaultWorkload: "container",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+				Driver: gpuv1.DriverSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid configuration - vm-passthrough with shared-nvswitch but driver disabled",
+			clusterPolicy: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					DefaultWorkload: "vm-passthrough",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+				Driver: gpuv1.DriverSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectError:  true,
+			errorMessage: "driver must be enabled when using vm-passthrough with Fabric Manager Shared NVSwitch mode",
+		},
+		{
+			name: "valid configuration - vm-passthrough with shared-nvswitch and driver not specified (defaults to enabled)",
+			clusterPolicy: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					DefaultWorkload: "vm-passthrough",
+				},
+				FabricManager: gpuv1.FabricManagerSpec{
+					Mode: gpuv1.FabricModeSharedNVSwitch,
+				},
+				Driver: gpuv1.DriverSpec{
+					// Enabled not specified, defaults to true
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.clusterPolicy.ValidateFabricManagerConfig()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }

@@ -1064,6 +1064,17 @@ spec:
                         type: string
                     type: object
                 type: object
+              fabricManager:
+                description: FabricManager component spec
+                properties:
+                  mode:
+                    default: full-passthrough
+                    description: Mode indicates the Fabric Manager mode
+                    enum:
+                    - full-passthrough
+                    - shared-nvswitch
+                    type: string
+                type: object
               gdrcopy:
                 description: GDRCopy component spec
                 properties:

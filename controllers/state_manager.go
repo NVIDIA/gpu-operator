@@ -42,6 +42,7 @@ const (
 	commonGPULabelValue                 = "true"
 	commonOperandsLabelKey              = "nvidia.com/gpu.deploy.operands"
 	commonOperandsLabelValue            = "true"
+	driverLabelKey                      = "nvidia.com/gpu.deploy.driver"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
 	migCapableLabelKey                  = "nvidia.com/mig.capable"
@@ -116,9 +117,10 @@ var gpuNodeLabels = map[string]string{
 }
 
 type gpuWorkloadConfiguration struct {
-	config string
-	node   string
-	log    logr.Logger
+	config        string
+	node          string
+	log           logr.Logger
+	clusterPolicy *gpuv1.ClusterPolicy
 }
 
 // OpenShiftDriverToolkit contains the values required to deploy
@@ -322,6 +324,15 @@ func isValidWorkloadConfig(workloadConfig string) bool {
 	return ok
 }
 
+// shouldDeployDriverForVMPassthrough returns true if driver should be deployed for vm-passthrough workload
+// based on Fabric Manager configuration
+func (w *gpuWorkloadConfiguration) shouldDeployDriverForVMPassthrough() bool {
+	if w.config != gpuWorkloadConfigVMPassthrough || w.clusterPolicy == nil {
+		return false
+	}
+	return w.clusterPolicy.Spec.FabricManager.IsSharedNVSwitchMode()
+}
+
 // getWorkloadConfig returns the GPU workload configured for the node.
 // If an error occurs when searching for the workload config,
 // return defaultGPUWorkloadConfig.
@@ -382,6 +393,16 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 			modified = true
 		}
 	}
+
+	// Add conditional driver deployment for vm-passthrough workload
+	if w.shouldDeployDriverForVMPassthrough() {
+		if _, ok := labels[driverLabelKey]; !ok {
+			w.log.Info("Setting node label for driver deployment in vm-passthrough with Fabric Manager shared-nvswitch mode", "NodeName", w.node, "Label", driverLabelKey, "Value", "true")
+			labels[driverLabelKey] = "true"
+			modified = true
+		}
+	}
+
 	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
 		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
 		labels[migManagerLabelKey] = migManagerLabelValue
@@ -506,7 +527,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
 		}
 		n.logger.Info("GPU workload configuration", "NodeName", node.Name, "GpuWorkloadConfig", config)
-		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.Name, n.logger}
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.Name, n.logger, n.singleton}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label

@@ -26,8 +26,14 @@ data:
     fi
 
     if ! nvidia-smi; then
-      echo "nvidia-smi failed"
-      exit 1
+      # For vm-passthrough with shared-nvswitch mode, nvidia-smi may fail due to unbound devices
+      # Fall back to checking if nvidia module is loaded when FABRIC_MANAGER_FABRIC_MODE=1
+      if [ "${FABRIC_MANAGER_FABRIC_MODE:-}" = "1" ] && lsmod | grep -q "^nvidia "; then
+        echo "nvidia-smi failed but nvidia module is loaded (vm-passthrough with shared-nvswitch mode)"
+      else
+        echo "nvidia-smi failed"
+        exit 1
+      fi
     fi
 
     GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
