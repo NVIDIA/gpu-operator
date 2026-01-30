@@ -507,6 +507,9 @@ func TestGetDriverAppName(t *testing.T) {
 		osRelease: "ubuntu",
 		osVersion: "20.04",
 	}
+	var err error
+	pool.osTag, err = getOSTag(pool.osRelease, pool.osVersion)
+	assert.NoError(t, err)
 
 	actual := getDriverAppName(cr, pool)
 	expected := "nvidia-gpu-driver-ubuntu20.04-67cc6dbb79"
@@ -522,6 +525,8 @@ func TestGetDriverAppName(t *testing.T) {
 	// Now set the osVersion to a really long string
 	pool.osRelease = "redhatCoreOS"
 	pool.osVersion = "4.14-414.92.202309282257"
+	pool.osTag, err = getOSTag(pool.osRelease, pool.osVersion)
+	assert.NoError(t, err)
 
 	actual = getDriverAppName(cr, pool)
 	expected = "nvidia-gpu-driver-redhatCoreOS4.14-414.92.2023092822-59b779bcc5"
@@ -544,6 +549,9 @@ func TestGetDriverAppNameRHCOS(t *testing.T) {
 		osVersion:    "4.14",
 		rhcosVersion: "414.92.202309282257",
 	}
+	var err error
+	pool.osTag, err = getOSTag(pool.osRelease, pool.osVersion)
+	assert.NoError(t, err)
 
 	actual := getDriverAppName(cr, pool)
 	expected := "nvidia-gpu-driver-rhcos4.14-6f4fc4fc6"
@@ -940,6 +948,10 @@ func TestGetDriverSpecMultipleNodePools(t *testing.T) {
 		},
 	}
 
+	var err error
+	pool1.osTag, err = getOSTag(pool1.osRelease, pool1.osVersion)
+	require.NoError(t, err)
+
 	pool2 := nodePool{
 		osRelease: "ubuntu",
 		osVersion: "20.04",
@@ -949,6 +961,9 @@ func TestGetDriverSpecMultipleNodePools(t *testing.T) {
 			"feature.node.kubernetes.io/system-os_release.VERSION_ID": "20.04",
 		},
 	}
+
+	pool2.osTag, err = getOSTag(pool2.osRelease, pool2.osVersion)
+	require.NoError(t, err)
 
 	spec1, err := getDriverSpec(cr, pool1)
 	require.NoError(t, err)
