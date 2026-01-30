@@ -1518,3 +1518,62 @@ func TestRepoConfigPathMap(t *testing.T) {
 		require.Equal(t, path, val, "Expected path for %s to be %s", os, path)
 	}
 }
+
+func TestKernelFullVersion(t *testing.T) {
+	tests := []struct {
+		node     *corev1.Node
+		expected map[string]string
+	}{
+		{
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						nfdOSReleaseIDLabelKey: "rocky",
+						nfdOSVersionIDLabelKey: "9.7",
+						nfdKernelLabelKey:      "5.14.0-611.5.1.el9_7.x86_64",
+						commonGPULabelKey:      "true",
+					},
+				},
+			},
+			expected: map[string]string{
+				"kernelFullVersion": "5.14.0-611.5.1.el9_7.x86_64",
+				"imageTagSuffix":    "rocky9",
+				"osVersionMajor":    "9",
+			},
+		},
+		{
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						nfdOSReleaseIDLabelKey: "ubuntu",
+						nfdOSVersionIDLabelKey: "24.04",
+						nfdKernelLabelKey:      "6.8.0-60-generic",
+						commonGPULabelKey:      "true",
+					},
+				},
+			},
+			expected: map[string]string{
+				"kernelFullVersion": "6.8.0-60-generic",
+				"imageTagSuffix":    "ubuntu24.04",
+				"osVersionMajor":    "24.04",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		mockClient := fake.NewFakeClient(test.node)
+
+		n := ClusterPolicyController{
+			ctx:    t.Context(),
+			client: mockClient,
+		}
+
+		kFVersion, osTag, osVersion := kernelFullVersion(n)
+
+		require.Equal(t, test.expected["kernelFullVersion"], kFVersion)
+		require.Equal(t, test.expected["imageTagSuffix"], osTag)
+		require.Equal(t, test.expected["osVersionMajor"], osVersion)
+	}
+}
