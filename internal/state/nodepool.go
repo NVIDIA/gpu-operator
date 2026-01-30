@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ type nodePool struct {
 	name         string
 	osRelease    string
 	osVersion    string
+	osTag        string
 	rhcosVersion string
 	kernel       string
 	nodeSelector map[string]string
@@ -94,7 +96,13 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 		nodePool.nodeSelector[nfdOSVersionIDLabelKey] = osVersion
 		nodePool.osRelease = osID
 		nodePool.osVersion = osVersion
-		nodePool.name = nodePool.getOS()
+
+		osTag, err := getOSTag(osID, osVersion)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get OS info for node %s: %w", node.Name, err)
+		}
+		nodePool.osTag = osTag
+		nodePool.name = osTag
 
 		if precompiled {
 			kernelVersion, ok := nodeLabels[nfdKernelLabelKey]
@@ -132,10 +140,19 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 	return nodePools, nil
 }
 
-func (n nodePool) getOS() string {
-	if n.osRelease == "rocky" {
-		// If the OS is RockyLinux, we will omit the RockyLinux minor version when constructing the os image tag
-		n.osVersion = strings.Split(n.osVersion, ".")[0]
+func getOSTag(osRelease, osVersion string) (string, error) {
+	osMajorVersion := strings.Split(osVersion, ".")[0]
+	osMajorNumber, err := strconv.Atoi(osMajorVersion)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse os version: %w", err)
 	}
-	return fmt.Sprintf("%s%s", n.osRelease, n.osVersion)
+
+	var osTagSuffix string
+	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
+	if osRelease == "rocky" || (osRelease == "rhel" && osMajorNumber >= 10) {
+		osTagSuffix = osMajorVersion
+	} else {
+		osTagSuffix = osVersion
+	}
+	return fmt.Sprintf("%s%s", osRelease, osTagSuffix), nil
 }

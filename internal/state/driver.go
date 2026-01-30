@@ -482,7 +482,7 @@ func getDriverAppName(cr *nvidiav1alpha1.NVIDIADriver, pool nodePool) string {
 
 	var hashBuilder strings.Builder
 
-	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.getOS())
+	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.osTag)
 	uid := string(cr.UID)
 
 	hashBuilder.WriteString(uid)
@@ -519,7 +519,7 @@ func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alph
 }
 
 func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
-	os := nodePool.getOS()
+	os := nodePool.osTag
 
 	if spec.UsePrecompiledDrivers() {
 		return spec.GetPrecompiledImagePath(os, nodePool.kernel)
@@ -547,7 +547,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		return nil, fmt.Errorf("no NVIDIADriver CR provided")
 	}
 
-	nvidiaDriverName := getDriverName(cr, nodePool.getOS())
+	nvidiaDriverName := getDriverName(cr, nodePool.osTag)
 	nvidiaDriverAppName := getDriverAppName(cr, nodePool)
 
 	spec := cr.Spec.DeepCopy()
@@ -575,7 +575,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		Name:             nvidiaDriverName,
 		ImagePath:        imagePath,
 		ManagerImagePath: managerImagePath,
-		OSVersion:        nodePool.getOS(),
+		OSVersion:        nodePool.osTag,
 	}, nil
 }
 
@@ -585,7 +585,7 @@ func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDrive
 		return nil, nil
 	}
 	gdsSpec := spec.GPUDirectStorage
-	imagePath, err := gdsSpec.GetImagePath(pool.getOS())
+	imagePath, err := gdsSpec.GetImagePath(pool.osTag)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +602,7 @@ func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrc
 		return nil, nil
 	}
 	gdrcopySpec := spec.GDRCopy
-	imagePath, err := gdrcopySpec.GetImagePath(pool.getOS())
+	imagePath, err := gdrcopySpec.GetImagePath(pool.osTag)
 	if err != nil {
 		return nil, err
 	}
