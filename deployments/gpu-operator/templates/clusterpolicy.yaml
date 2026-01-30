@@ -477,8 +477,8 @@ spec:
     {{- end }}
     {{- if .Values.devicePlugin.config.name }}
     config:
-      name: {{ .Values.devicePlugin.config.name }}
-      default: {{ .Values.devicePlugin.config.default }}
+      name: {{ .Values.devicePlugin.config.name | quote }}
+      default: {{ .Values.devicePlugin.config.default | quote }}
     {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
