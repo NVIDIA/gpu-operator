@@ -503,8 +503,8 @@ sandboxDevicePlugin:
   resources: {}
 
 ccManager:
-  enabled: false
-  defaultMode: "off"
+  enabled: true
+  defaultMode: "on"
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-cc-manager
   version: v0.1.1
