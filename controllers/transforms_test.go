@@ -3640,3 +3640,105 @@ func TestTransformGPUDiscoveryPluginOCP(t *testing.T) {
 	removeDigestFromDaemonSet(ds.DaemonSet)
 	require.EqualValues(t, expectedDs, ds)
 }
+
+func TestTransformVGPUManager(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+
+	kernelModuleConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vgpu-kernel-module-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"nvidia.conf": "options nvidia NVreg_EnableGpuFirmwareLogs=1\n",
+		},
+	}
+
+	mockClient := fake.NewFakeClient(node, kernelModuleConfigMap)
+
+	testCases := []struct {
+		description   string
+		daemonset     Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		errorExpected bool
+	}{
+		{
+			description: "transform vgpu manager with kernel module config",
+			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-manager-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				VGPUManager: gpuv1.VGPUManagerSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "vgpu-manager",
+					Version:         "550.90.07",
+					ImagePullPolicy: "IfNotPresent",
+					DriverManager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					KernelModuleConfig: &gpuv1.KernelModuleConfigSpec{
+						Name: "vgpu-kernel-module-config",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ctrl := ClusterPolicyController{
+				logger:            ctrl.Log.WithName("test"),
+				client:            tc.client,
+				operatorNamespace: "test-ns",
+			}
+			err := TransformVGPUManager(tc.daemonset.DaemonSet, tc.cpSpec, ctrl)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			// Verify only the vgpu-manager container has the kernel module config
+			container := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
+			require.NotNil(t, container)
+			require.Len(t, container.VolumeMounts, 1)
+			require.Equal(t, corev1.VolumeMount{
+				Name:      "vgpu-kernel-module-config",
+				ReadOnly:  true,
+				MountPath: "/drivers/nvidia.conf",
+				SubPath:   "nvidia.conf",
+			}, container.VolumeMounts[0])
+			// Verify the ConfigMap volume is added
+			require.Len(t, tc.daemonset.Spec.Template.Spec.Volumes, 1)
+			require.Equal(t, corev1.Volume{
+				Name: "vgpu-kernel-module-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "vgpu-kernel-module-config",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "nvidia.conf",
+								Path: "nvidia.conf",
+							},
+						},
+					},
+				},
+			}, tc.daemonset.Spec.Template.Spec.Volumes[0])
+		})
+	}
+}
