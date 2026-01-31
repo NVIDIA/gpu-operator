@@ -1434,9 +1434,8 @@ type GDRCopySpec struct {
 
 // MIGPartedConfigSpec defines custom mig-parted config for NVIDIA MIG Manager container
 type MIGPartedConfigSpec struct {
-	// ConfigMap name
+	// ConfigMap name. If not specified, MIG configuration will be dynamically generated from hardware.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=default-mig-parted-config
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
