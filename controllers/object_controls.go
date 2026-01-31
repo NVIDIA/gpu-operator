@@ -710,10 +710,15 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	if !ok {
 		return kFVersion, "", ""
 	}
+	osMajorVersion := strings.Split(osVersion, ".")[0]
+	osMajorNumber, err := strconv.Atoi(osMajorVersion)
+	if err != nil {
+		return kFVersion, "", ""
+	}
 
-	if osName == "rocky" {
-		// If the OS is RockyLinux, we will omit the RockyLinux minor version when constructing the os image tag
-		osVersion = strings.Split(osVersion, ".")[0]
+	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
+	if osName == "rocky" || (osName == "rhel" && osMajorNumber >= 10) {
+		osVersion = osMajorVersion
 	}
 
 	osTag := fmt.Sprintf("%s%s", osName, osVersion)
