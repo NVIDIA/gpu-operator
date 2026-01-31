@@ -277,7 +277,8 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	if len(nodePools) == 0 {
-		return nil, fmt.Errorf("no nodes matching the given node selector for %s", cr.Name)
+		logger.Info("No nodes matching the given node selector", "CR", cr.Name)
+		return []*unstructured.Unstructured{}, nil
 	}
 
 	openshiftDTKMap := clusterInfo.GetOpenshiftDriverToolkitImages()
