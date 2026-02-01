@@ -4840,7 +4840,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-func crdExists(n ClusterPolicyController, name string) (bool, error) {
+func objectExists(n ClusterPolicyController, name string) (bool, error) {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	err := n.client.Get(n.ctx, client.ObjectKey{Name: name}, crd)
 	if err != nil && apierrors.IsNotFound(err) {
@@ -4862,7 +4862,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	logger := n.logger.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if ServiceMonitor is a valid kind
-	serviceMonitorCRDExists, err := crdExists(n, ServiceMonitorCRDName)
+	serviceMonitorCRDExists, err := objectExists(n, ServiceMonitorCRDName)
 	if err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -5172,6 +5172,22 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if n.stateNames[state] == "state-kata-manager" {
 		return transformKataRuntimeClasses(n)
+	}
+
+	if n.stateNames[state] == "pre-requisites" && !n.isStateEnabled(n.stateNames[state]) {
+		for _, obj := range n.resources[state].RuntimeClasses {
+			var exists bool
+			var err error
+			if exists, err = objectExists(n, obj.Name); err != nil {
+				return gpuv1.NotReady, fmt.Errorf("error checking if RuntimeClass %s exists: %w", obj.Name, err)
+			}
+			if exists {
+				if err = n.client.Delete(n.ctx, &obj); err != nil {
+					return gpuv1.NotReady, fmt.Errorf("error deleting RuntimeClass %s: %w", obj.Name, err)
+				}
+			}
+		}
+		return gpuv1.Ready, nil
 	}
 
 	createRuntimeClassFunc := transformRuntimeClass
