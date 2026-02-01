@@ -5174,12 +5174,21 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		return transformKataRuntimeClasses(n)
 	}
 
+	nvidiaRuntimeClasses := n.resources[state].RuntimeClasses
+	if n.stateNames[state] == "pre-requisites" && !n.isStateEnabled(n.stateNames[state]) {
+		err := clearRuntimeClasses(n, nvidiaRuntimeClasses)
+		if err != nil {
+			return gpuv1.NotReady, fmt.Errorf("error clearing nvidia runtime classes: %w", err)
+		}
+		return gpuv1.Ready, nil
+	}
+
 	createRuntimeClassFunc := transformRuntimeClass
 	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
 		createRuntimeClassFunc = transformRuntimeClassLegacy
 	}
 
-	for _, obj := range n.resources[state].RuntimeClasses {
+	for _, obj := range nvidiaRuntimeClasses {
 		obj := obj
 		// When CDI is disabled, do not create the additional 'nvidia-cdi' and
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
@@ -5239,4 +5248,20 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 	return gpuv1.Ready, nil
+}
+
+func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.RuntimeClass) error {
+	for _, obj := range runtimeClasses {
+		// apply runtime class name as per ClusterPolicy
+		if obj.Name == "FILLED_BY_OPERATOR" {
+			obj.Name = getRuntimeClassName(&n.singleton.Spec)
+		}
+		logger := n.logger.WithValues("RuntimeClass", obj.Name)
+		err := n.client.Delete(n.ctx, &obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return err
+		}
+	}
+	return nil
 }
