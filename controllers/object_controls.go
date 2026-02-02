@@ -1856,58 +1856,9 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
 	}
 
-	if n.openshift != "" {
-		if err = transformDCGMExporterForOpenShift(obj, config); err != nil {
-			return fmt.Errorf("failed to transform dcgm-exporter for openshift: %w", err)
-		}
-	}
-
 	for _, env := range config.DCGMExporter.Env {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 	}
-
-	return nil
-}
-
-func transformDCGMExporterForOpenShift(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
-	// Add initContainer for OCP to set proper SELinux context on /var/lib/kubelet/pod-resources
-	initImage, err := gpuv1.ImagePath(&config.Operator.InitContainer)
-	if err != nil {
-		return err
-	}
-
-	initContainer := corev1.Container{}
-	if initImage != "" {
-		initContainer.Image = initImage
-	}
-	initContainer.Name = "init-pod-nvidia-node-status-exporter"
-	initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Operator.InitContainer.ImagePullPolicy)
-	initContainer.Command = []string{"/bin/entrypoint.sh"}
-
-	// need CAP_SYS_ADMIN privileges for collecting pod specific resources
-	privileged := true
-	securityContext := &corev1.SecurityContext{
-		Privileged: &privileged,
-	}
-
-	initContainer.SecurityContext = securityContext
-
-	// Disable all constraints on the configurations required by NVIDIA container toolkit
-	setContainerEnv(&initContainer, NvidiaDisableRequireEnvName, "true")
-
-	volMountSockName, volMountSockPath := "pod-gpu-resources", "/var/lib/kubelet/pod-resources"
-	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
-	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountSock)
-
-	volMountConfigName, volMountConfigPath, volMountConfigSubPath := "init-config", "/bin/entrypoint.sh", "entrypoint.sh"
-	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, ReadOnly: true, MountPath: volMountConfigPath, SubPath: volMountConfigSubPath}
-	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountConfig)
-
-	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
-
-	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
-	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
 
 	return nil
 }

@@ -1405,60 +1405,6 @@ func TestTransformDCGMExporter(t *testing.T) {
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
 		},
 		{
-			description:      "transform dcgm exporter, openshift",
-			openshiftVersion: "1.0.0",
-			ds: NewDaemonset().
-				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
-				WithContainer(corev1.Container{Name: "dummy"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				Operator: gpuv1.OperatorSpec{
-					InitContainer: gpuv1.InitContainerSpec{
-						Repository: "nvcr.io/nvidia",
-						Image:      "init-container",
-						Version:    "devel",
-					},
-				},
-				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Repository:       "nvcr.io/nvidia/cloud-native",
-					Image:            "dcgm-exporter",
-					Version:          "v1.0.0",
-					ImagePullPolicy:  "IfNotPresent",
-					ImagePullSecrets: []string{"pull-secret"},
-					Args:             []string{"--fail-on-init-error=false"},
-					Env: []gpuv1.EnvVar{
-						{Name: "foo", Value: "bar"},
-					},
-				},
-				DCGM: gpuv1.DCGMSpec{
-					Enabled: newBoolPtr(true),
-				},
-			},
-			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
-				Name:            "init-pod-nvidia-node-status-exporter",
-				Command:         []string{"/bin/entrypoint.sh"},
-				Image:           "nvcr.io/nvidia/init-container:devel",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				SecurityContext: &corev1.SecurityContext{
-					Privileged: newBoolPtr(true),
-				},
-				Env: []corev1.EnvVar{{Name: NvidiaDisableRequireEnvName, Value: "true"}},
-				VolumeMounts: []corev1.VolumeMount{
-					{Name: "pod-gpu-resources", MountPath: "/var/lib/kubelet/pod-resources"},
-					{Name: "init-config", ReadOnly: true, MountPath: "/bin/entrypoint.sh", SubPath: "entrypoint.sh"},
-				},
-			}).WithContainer(corev1.Container{
-				Name:            "dcgm-exporter",
-				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Args:            []string{"--fail-on-init-error=false"},
-				Env: []corev1.EnvVar{
-					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
-					{Name: "foo", Value: "bar"},
-				},
-			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").
-				WithConfigMapVolume("init-config", "nvidia-dcgm-exporter", int32(0700)),
-		},
-		{
 			description: "transform dcgm exporter with HPC job mapping enabled",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "dcgm-exporter"}).

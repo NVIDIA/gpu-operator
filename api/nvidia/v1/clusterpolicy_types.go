@@ -247,7 +247,7 @@ type DaemonsetsSpec struct {
 	RollingUpdate *RollingUpdateSpec `json:"rollingUpdate,omitempty"`
 }
 
-// InitContainerSpec describes configuration for initContainer image used with all components
+// Deprecated: InitContainerSpec describes configuration for initContainer image used with all components
 type InitContainerSpec struct {
 	// Repository represents image repository path
 	Repository string `json:"repository,omitempty"`
