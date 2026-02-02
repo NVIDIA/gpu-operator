@@ -30,9 +30,7 @@ metadata:
           "spec": {
             "operator": {
               "defaultRuntime": "crio",
-              "use_ocp_driver_toolkit": true,
-              "initContainer": {
-              }
+              "use_ocp_driver_toolkit": true
             },
             "cdi": {
               "enabled": true
@@ -218,8 +216,6 @@ spec:
       image: nvcr.io/nvidia/k8s-device-plugin@sha256:50ac011ab941ab0140d52f56aa0e2fdc553bca96836ab3b26be394fc823fd9e7
     - name: mig-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8e0803d2f29776cd4cc0501381a20a0b04b2da507a794d66a15894c57beaadb5
-    - name: init-container-image
-      image: nvcr.io/nvidia/cuda@sha256:d19fe621624c4eb6ac931b8558daa3ecc0c3f07f1e2a52e0267e083d22dceade
     - name: gpu-operator-validator-image
       image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: k8s-driver-manager-image
@@ -939,8 +935,6 @@ spec:
                     value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager@sha256:c549346eb993fda62e9bf665aabaacc88abc06b0b24e69635427d4d71c2d5ed4"
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager@sha256:8e0803d2f29776cd4cc0501381a20a0b04b2da507a794d66a15894c57beaadb5"
-                  - name: "CUDA_BASE_IMAGE"
-                    value: "nvcr.io/nvidia/cuda@sha256:d19fe621624c4eb6ac931b8558daa3ecc0c3f07f1e2a52e0267e083d22dceade"
                   # TODO: update to a k8s-driver-manager image from nvcr.io once the next version is published
                   - name: "VFIO_MANAGER_IMAGE"
                     value: "ghcr.io/nvidia/k8s-driver-manager:69eec274"

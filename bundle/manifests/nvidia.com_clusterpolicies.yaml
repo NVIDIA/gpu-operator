@@ -1586,8 +1586,8 @@ spec:
                     - containerd
                     type: string
                   initContainer:
-                    description: InitContainerSpec describes configuration for initContainer
-                      image used with all components
+                    description: 'Deprecated: InitContainerSpec describes configuration
+                      for initContainer image used with all components'
                     properties:
                       image:
                         description: Image represents image name

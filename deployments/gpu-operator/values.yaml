@@ -77,11 +77,6 @@ operator:
   # upgrade CRD on chart upgrade, requires --disable-openapi-validation flag
   # to be passed during helm upgrade.
   upgradeCRD: true
-  initContainer:
-    repository: nvcr.io/nvidia
-    image: cuda
-    version: 13.0.1-base-ubi9
-    imagePullPolicy: IfNotPresent
   tolerations:
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Equal"
