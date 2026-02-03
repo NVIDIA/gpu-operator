@@ -23,12 +23,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-
-	"path/filepath"
 
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
@@ -102,8 +101,6 @@ const (
 	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIME_CLASS"
 	// MigStrategyEnvName indicates env name for passing MIG strategy
 	MigStrategyEnvName = "MIG_STRATEGY"
-	// MigPartedDefaultConfigMapName indicates name of ConfigMap containing default mig-parted config
-	MigPartedDefaultConfigMapName = "default-mig-parted-config"
 	// MigDefaultGPUClientsConfigMapName indicates name of ConfigMap containing default gpu-clients
 	MigDefaultGPUClientsConfigMapName = "default-gpu-clients"
 	// DCGMRemoteEngineEnvName indicates env name to specify remote DCGM host engine ip:port
@@ -542,14 +539,6 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
-	}
-
-	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
-	if obj.Name == MigPartedDefaultConfigMapName {
-		if name, isCustom := gpuv1.GetConfigMapName(config.MIGManager.Config, MigPartedDefaultConfigMapName); isCustom {
-			logger.Info("Not creating resource, custom ConfigMap provided", "Name", name)
-			return gpuv1.Ready, nil
-		}
 	}
 
 	// avoid creating default 'gpu-clients' ConfigMap if custom one is provided
@@ -1947,15 +1936,25 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
 
-	// set ConfigMap name for "mig-parted-config" Volume
-	for i, vol := range obj.Spec.Template.Spec.Volumes {
-		if !strings.Contains(vol.Name, "mig-parted-config") {
-			continue
-		}
+	// mount custom mig-parted config if provided
+	hasCustomConfig := config.MIGManager.Config != nil && config.MIGManager.Config.Name != ""
+	if hasCustomConfig {
+		migConfigVolume := createConfigMapVolume(config.MIGManager.Config.Name, nil)
+		migConfigVolume.Name = "mig-parted-config"
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, migConfigVolume)
 
-		name, _ := gpuv1.GetConfigMapName(config.MIGManager.Config, MigPartedDefaultConfigMapName)
-		obj.Spec.Template.Spec.Volumes[i].ConfigMap.Name = name
-		break
+		migConfigMount := corev1.VolumeMount{
+			Name:      "mig-parted-config",
+			MountPath: "/mig-parted-config",
+			ReadOnly:  true,
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			obj.Spec.Template.Spec.Containers[0].VolumeMounts,
+			migConfigMount,
+		)
+
+		// NOTE: assumes ConfigMap has key "config.yaml"
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "CONFIG_FILE", "/mig-parted-config/config.yaml")
 	}
 
 	// set ConfigMap name for "gpu-clients" Volume

@@ -1602,6 +1602,98 @@ func TestTransformMigManager(t *testing.T) {
 				},
 			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "mig manager with custom config",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           &gpuv1.MIGPartedConfigSpec{Name: "custom-mig-config"},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "CONFIG_FILE", Value: "/mig-parted-config/config.yaml"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "mig-parted-config", MountPath: "/mig-parted-config", ReadOnly: true},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "custom-mig-config"},
+					},
+				},
+			}),
+		},
+		{
+			description: "mig manager without config (nil)",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           nil,
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "mig manager with empty config name",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           &gpuv1.MIGPartedConfigSpec{Name: ""},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
 	}
 
 	for _, tc := range testCases {
