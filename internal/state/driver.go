@@ -130,14 +130,14 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateError, fmt.Errorf("NVIDIADriver CR not provided as input to Sync()")
 	}
 
-	err := s.cleanupStaleDriverDaemonsets(ctx, cr)
-	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
-	}
-
 	objs, err := s.getManifestObjects(ctx, cr, infoCatalog)
 	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
+		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %w", err)
+	}
+
+	err = s.cleanupStaleDriverDaemonsets(ctx, cr, objs)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
 	}
 
 	// Create objects if they don't exist, Update objects if they do exist
@@ -176,9 +176,17 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 	return wr
 }
 
-func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, desiredObjs []*unstructured.Unstructured) error {
 	logger := log.FromContext(ctx)
 	logger.V(consts.LogLevelInfo).Info("Cleaning up stale driver DaemonSets")
+
+	// Build a set of desired DaemonSet names from the manifest objects
+	desiredDaemonSetNames := make(map[string]bool)
+	for _, obj := range desiredObjs {
+		if obj.GetKind() == "DaemonSet" {
+			desiredDaemonSetNames[obj.GetName()] = true
+		}
+	}
 
 	// List all DaemonSets owned by the CR instance
 	list := &appsv1.DaemonSetList{}
@@ -189,6 +197,17 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 
 	for _, ds := range list.Items {
 		ds := ds
+		// Delete DaemonSets that are not in the desired list. This handles the case where
+		// the CR's nodeSelector changes and certain node pools no longer match.
+		if _, exists := desiredDaemonSetNames[ds.Name]; !exists {
+			logger.V(consts.LogLevelInfo).Info("Deleting DaemonSet no longer managed by this CR", "Name", ds.Name)
+			err = s.client.Delete(ctx, &ds)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting DaemonSet %q: %w", ds.Name, err)
+			}
+			continue
+		}
+
 		// We consider a DaemonSet to be stale when all three conditions are true:
 		//
 		// 1. The desired number of pods reported by the DaemonSet controller is 0
@@ -212,8 +231,8 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 			}
 			logger.V(consts.LogLevelInfo).Info("Deleting inactive driver DaemonSet", "Name", ds.Name)
 			err = s.client.Delete(ctx, &ds)
-			if err != nil {
-				return fmt.Errorf("error deleting DaemonSet '%s': %w", ds.Name, err)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting DaemonSet %q: %w", ds.Name, err)
 			}
 			continue
 		}
@@ -258,7 +277,8 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	if len(nodePools) == 0 {
-		return nil, fmt.Errorf("no nodes matching the given node selector for %s", cr.Name)
+		logger.Info("No nodes matching the given node selector", "CR", cr.Name)
+		return []*unstructured.Unstructured{}, nil
 	}
 
 	openshiftDTKMap := clusterInfo.GetOpenshiftDriverToolkitImages()
