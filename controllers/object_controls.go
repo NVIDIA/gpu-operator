@@ -1109,7 +1109,9 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	}
 
 	// add nodeSelector for MOFED wait label when GPUDirect RDMA is enabled
-	if config.Driver.GPUDirectRDMA != nil && config.Driver.GPUDirectRDMA.IsEnabled() {
+	if config.Driver.GPUDirectRDMA != nil &&
+		config.Driver.GPUDirectRDMA.IsEnabled() &&
+		!config.Driver.GPUDirectRDMA.IsHostMOFED() {
 		if obj.Spec.Template.Spec.NodeSelector == nil {
 			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
 		}
