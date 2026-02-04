@@ -286,6 +286,9 @@ dcgmExporter:
   #   enabled: true
   #   directory: /var/lib/dcgm-exporter/job-mapping
   service:
+    type: ClusterIP
+    nodePort: null
+    externalTrafficPolicy: Cluster
     internalTrafficPolicy: Cluster
   serviceMonitor:
     enabled: false
