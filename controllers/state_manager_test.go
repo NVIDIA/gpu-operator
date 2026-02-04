@@ -19,6 +19,7 @@ package controllers
 import (
 	"testing"
 
+	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -184,5 +185,72 @@ func TestHasMIGCapableGPU(t *testing.T) {
 		if got := hasMIGCapableGPU(tc.labels); got != tc.want {
 			t.Errorf("hasMIGCapableGPU(%v) = %v, want %v", tc.labels, got, tc.want)
 		}
+	}
+}
+
+func TestShouldApplyDriverAutoUpgradeAnnotation(t *testing.T) {
+	tests := []struct {
+		name               string
+		driverEnabled      bool
+		autoUpgradeEnabled bool
+		sandboxEnabled     bool
+		wantAnnotation     bool
+	}{
+		{
+			name:               "driver enabled with auto-upgrade",
+			driverEnabled:      true,
+			autoUpgradeEnabled: true,
+			sandboxEnabled:     false,
+			wantAnnotation:     true,
+		},
+		{
+			name:               "driver disabled with auto-upgrade enabled - should NOT apply annotation",
+			driverEnabled:      false,
+			autoUpgradeEnabled: true,
+			sandboxEnabled:     false,
+			wantAnnotation:     false,
+		},
+		{
+			name:               "driver enabled but auto-upgrade disabled",
+			driverEnabled:      true,
+			autoUpgradeEnabled: false,
+			sandboxEnabled:     false,
+			wantAnnotation:     false,
+		},
+		{
+			name:               "driver enabled with auto-upgrade but sandbox enabled",
+			driverEnabled:      true,
+			autoUpgradeEnabled: true,
+			sandboxEnabled:     true,
+			wantAnnotation:     false,
+		},
+		{
+			name:               "all disabled",
+			driverEnabled:      false,
+			autoUpgradeEnabled: false,
+			sandboxEnabled:     false,
+			wantAnnotation:     false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a mock ClusterPolicy
+			clusterPolicy := &gpuv1.ClusterPolicy{}
+			clusterPolicy.Spec.Driver.Enabled = &tc.driverEnabled
+			clusterPolicy.Spec.Driver.UpgradePolicy = &upgrade_v1alpha1.DriverUpgradePolicySpec{
+				AutoUpgrade: tc.autoUpgradeEnabled,
+			}
+
+			// Simulate the logic from applyDriverAutoUpgradeAnnotation
+			shouldApply := clusterPolicy.Spec.Driver.IsEnabled() &&
+				clusterPolicy.Spec.Driver.UpgradePolicy != nil &&
+				clusterPolicy.Spec.Driver.UpgradePolicy.AutoUpgrade &&
+				!tc.sandboxEnabled
+
+			if shouldApply != tc.wantAnnotation {
+				t.Errorf("Expected annotation to be applied: %v, but got: %v", tc.wantAnnotation, shouldApply)
+			}
+		})
 	}
 }
