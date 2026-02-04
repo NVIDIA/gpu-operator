@@ -17,9 +17,12 @@
 package controllers
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -184,5 +187,45 @@ func TestHasMIGCapableGPU(t *testing.T) {
 		if got := hasMIGCapableGPU(tc.labels); got != tc.want {
 			t.Errorf("hasMIGCapableGPU(%v) = %v, want %v", tc.labels, got, tc.want)
 		}
+	}
+}
+
+func TestValidateClusterPolicySpec(t *testing.T) {
+	tests := []struct {
+		description string
+		spec        *gpuv1.ClusterPolicySpec
+		err         error
+	}{
+		{
+			description: "valid CDI object in spec",
+			spec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          ptr.To(true),
+					NRIPluginEnabled: ptr.To(true),
+				},
+			},
+		},
+		{
+			description: "invalid CDI object in spec",
+			spec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          ptr.To(false),
+					NRIPluginEnabled: ptr.To(true),
+				},
+			},
+			err: errors.New("the NRI Plugin cannot be enabled when CDI is disabled"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			err := validateClusterPolicySpec(tc.spec)
+			if tc.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Equal(t, tc.err.Error(), err.Error())
+			}
+		})
 	}
 }

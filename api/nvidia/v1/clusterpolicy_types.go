@@ -2191,10 +2191,10 @@ func (c *CDIConfigSpec) IsEnabled() bool {
 // IsNRIPluginEnabled returns true if NRI Plugin is enabled as a mechanism for
 // injecting CDI devices to containers
 func (c *CDIConfigSpec) IsNRIPluginEnabled() bool {
-	if c.Enabled == nil || c.NRIPluginEnabled == nil {
+	if c.NRIPluginEnabled == nil {
 		return false
 	}
-	return *c.Enabled && *c.NRIPluginEnabled
+	return *c.NRIPluginEnabled
 }
 
 // IsEnabled returns true if Kata Manager is enabled
