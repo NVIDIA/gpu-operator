@@ -103,6 +103,21 @@ fi
 
 echo
 echo "#"
+echo "# NVIDIADriver"
+echo "#"
+echo
+
+NVIDIA_DRIVERS=$($K get nvidiadrivers.nvidia.com -A -oname)
+
+if [[ "${NVIDIA_DRIVERS}" ]]; then
+    echo "Get NVIDIADriver resources"
+    $K get nvidiadrivers.nvidia.com -A -oyaml > "${ARTIFACT_DIR}/nvidiadrivers.yaml"
+else
+    echo "NVIDIADriver resource(s) not found in the cluster."
+fi
+
+echo
+echo "#"
 echo "# Nodes and machines"
 echo "#"
 echo
@@ -166,10 +181,12 @@ $K get "${OPERATOR_POD_NAME}" \
 echo "Get the GPU Operator Pod logs"
 $K logs "${OPERATOR_POD_NAME}" \
     -n "${OPERATOR_NAMESPACE}" \
+    --timestamps \
     > "${ARTIFACT_DIR}/gpu_operator_pod.log"
 
 $K logs "${OPERATOR_POD_NAME}" \
     -n "${OPERATOR_NAMESPACE}" \
+    --timestamps \
     --previous \
     > "${ARTIFACT_DIR}/gpu_operator_pod.previous.log"
 
@@ -212,11 +229,13 @@ do
     $K logs "${pod}" \
         -n "${OPERATOR_NAMESPACE}" \
         --all-containers --prefix \
+        --timestamps \
         > "${ARTIFACT_DIR}/gpu_operand_pod_$pod_name.log"
 
     $K logs "${pod}" \
         -n "${OPERATOR_NAMESPACE}" \
         --all-containers --prefix \
+        --timestamps \
         --previous \
         > "${ARTIFACT_DIR}/gpu_operand_pod_$pod_name.previous.log"
 
@@ -262,7 +281,16 @@ echo "# nvidia-bug-report.sh"
 echo "#"
 echo ""
 
-for pod in $($K get pods -lopenshift.driver-toolkit -oname -n "${OPERATOR_NAMESPACE}"; $K get pods -lapp=nvidia-driver-daemonset -oname -n "${OPERATOR_NAMESPACE}"; $K get pods -lapp=nvidia-vgpu-manager-daemonset -oname -n "${OPERATOR_NAMESPACE}");
+# Find driver pods using multiple label selectors to support different deployment methods
+driver_pods=""
+driver_pods="$driver_pods $($K get pods -lopenshift.driver-toolkit -oname -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true)"
+driver_pods="$driver_pods $($K get pods -lapp.kubernetes.io/component=nvidia-driver -oname -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true)"
+driver_pods="$driver_pods $($K get pods -lapp=nvidia-vgpu-manager-daemonset -oname -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true)"
+
+# Deduplicate and filter out empty entries
+driver_pods=$(echo "$driver_pods" | tr ' ' '\n' | grep -v '^$' | sort -u)
+
+for pod in $driver_pods;
 do
     pod_nodename=$($K get "${pod}" -ojsonpath={.spec.nodeName} -n "${OPERATOR_NAMESPACE}")
     echo "Saving nvidia-bug-report from ${pod_nodename} ..."
@@ -274,6 +302,53 @@ do
         (echo "Failed to save nvidia-bug-report from ${pod_nodename}" && continue)
 
     mv /tmp/nvidia-bug-report.log.gz "${ARTIFACT_DIR}/nvidia-bug-report_${pod_nodename}.log.gz"
+done
+
+echo ""
+echo "#"
+echo "# GPU device usage (nvidia-smi, lsof, fuser, ps)"
+echo "#"
+echo ""
+
+# Using driver pods list from above
+for pod in $driver_pods;
+do
+    pod_nodename=$($K get "${pod}" -ojsonpath={.spec.nodeName} -n "${OPERATOR_NAMESPACE}")
+    echo "Collecting GPU device usage info from ${pod_nodename} ..."
+
+    # Capture nvidia-smi output showing processes using GPUs
+    echo "# nvidia-smi output from ${pod_nodename}" > "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- nvidia-smi >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log" 2>&1 || \
+        echo "Failed to run nvidia-smi on ${pod_nodename}" >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+
+    # Capture lsof output for nvidia devices (run in host namespace)
+    echo -e "\n# lsof /run/nvidia/driver/dev/nvidia* output from ${pod_nodename}" >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- nsenter --target 1 --mount --pid -- bash -c 'lsof /run/nvidia/driver/dev/nvidia* 2>&1 || true' >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+
+    # Extract PIDs from lsof output and get detailed process information
+    echo -e "\n# Process details for PIDs using GPU devices from ${pod_nodename}" >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- nsenter --target 1 --mount --pid -- bash -c '
+        pids=$(lsof /run/nvidia/driver/dev/nvidia* 2>/dev/null | awk "NR>1 {print \$2}" | sort -u)
+        if [ -n "$pids" ]; then
+            echo "PIDs using GPU: $pids"
+            echo ""
+            for pid in $pids; do
+                echo "=== Process $pid ==="
+                ps -p $pid -o pid,ppid,user,stat,start,etime,pcpu,pmem,vsz,rss,args 2>&1 || echo "Process $pid not found"
+                echo ""
+            done
+        else
+            echo "No processes found using GPU devices"
+        fi
+    ' >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log" 2>&1 || true
+
+    # Capture fuser output for nvidia devices (run in host namespace)
+    echo -e "\n# fuser -v /run/nvidia/driver/dev/nvidia* output from ${pod_nodename}" >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- nsenter --target 1 --mount --pid -- bash -c 'fuser -v /run/nvidia/driver/dev/nvidia* 2>&1 || true' >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+
+    # List all nvidia device files
+    echo -e "\n# ls -la /run/nvidia/driver/dev/nvidia* output from ${pod_nodename}" >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
+    $K exec -n "${OPERATOR_NAMESPACE}" "${pod}" -- nsenter --target 1 --mount --pid -- bash -c 'ls -la /run/nvidia/driver/dev/nvidia* 2>&1 || true' >> "${ARTIFACT_DIR}/gpu_device_usage_${pod_nodename}.log"
 done
 
 echo ""
