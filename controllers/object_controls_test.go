@@ -1552,6 +1552,42 @@ func TestKernelFullVersion(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
 					Labels: map[string]string{
+						nfdOSReleaseIDLabelKey: "rhel",
+						nfdOSVersionIDLabelKey: "10.1",
+						nfdKernelLabelKey:      "6.12.0-124.8.1.el10_1.x86_64",
+						commonGPULabelKey:      "true",
+					},
+				},
+			},
+			expected: map[string]string{
+				"kernelFullVersion": "6.12.0-124.8.1.el10_1.x86_64",
+				"imageTagSuffix":    "rhel10",
+				"osVersion":         "10",
+			},
+		},
+		{
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						nfdOSReleaseIDLabelKey: "rhel",
+						nfdOSVersionIDLabelKey: "9.6",
+						nfdKernelLabelKey:      "5.14.0-570.78.1.el9_6.x86_64",
+						commonGPULabelKey:      "true",
+					},
+				},
+			},
+			expected: map[string]string{
+				"kernelFullVersion": "5.14.0-570.78.1.el9_6.x86_64",
+				"imageTagSuffix":    "rhel9.6",
+				"osVersion":         "9.6",
+			},
+		},
+		{
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
 						nfdOSReleaseIDLabelKey: "rocky",
 						nfdOSVersionIDLabelKey: "9.7",
 						nfdKernelLabelKey:      "5.14.0-611.5.1.el9_7.x86_64",
@@ -1562,7 +1598,7 @@ func TestKernelFullVersion(t *testing.T) {
 			expected: map[string]string{
 				"kernelFullVersion": "5.14.0-611.5.1.el9_7.x86_64",
 				"imageTagSuffix":    "rocky9",
-				"osVersionMajor":    "9",
+				"osVersion":         "9",
 			},
 		},
 		{
@@ -1580,7 +1616,7 @@ func TestKernelFullVersion(t *testing.T) {
 			expected: map[string]string{
 				"kernelFullVersion": "6.8.0-60-generic",
 				"imageTagSuffix":    "ubuntu24.04",
-				"osVersionMajor":    "24.04",
+				"osVersion":         "24.04",
 			},
 		},
 	}
@@ -1597,7 +1633,7 @@ func TestKernelFullVersion(t *testing.T) {
 
 		require.Equal(t, test.expected["kernelFullVersion"], kFVersion)
 		require.Equal(t, test.expected["imageTagSuffix"], osTag)
-		require.Equal(t, test.expected["osVersionMajor"], osVersion)
+		require.Equal(t, test.expected["osVersion"], osVersion)
 	}
 }
 
