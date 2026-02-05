@@ -23,9 +23,6 @@ on:
       commit_short_sha:
         required: true
         type: string
-      operator_version:
-        required: true
-        type: string
       operator_image_base:
         required: true
         type: string
