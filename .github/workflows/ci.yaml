@@ -62,6 +62,5 @@ jobs:
     uses: ./.github/workflows/release.yaml
     with:
       commit_short_sha: ${{ needs.variables.outputs.commit_short_sha }}
-      operator_version: ${{ needs.variables.outputs.operator_version }}
       operator_image_base: ${{ needs.variables.outputs.operator_image_base }}
     secrets: inherit
