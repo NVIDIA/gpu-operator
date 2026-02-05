@@ -1,0 +1,180 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      operator_image:
+        required: true
+        type: string
+      operator_version:
+        required: true
+        type: string
+      use_values_override:
+        required: false
+        type: boolean
+        default: false
+        description: 'Use values-overrides artifact for component image configuration'
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_SSH_KEY:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: false
+      SLACK_CHANNEL_ID:
+        required: false
+  workflow_dispatch:
+    inputs:
+      operator_image:
+        description: 'Operator image to test (override)'
+        required: false
+        type: string
+      operator_version:
+        description: 'Operator version to test (override)'
+        required: false
+        type: string
+
+jobs:
+  variables:
+    uses: ./.github/workflows/variables.yaml
+    with:
+      operator_image: ${{ inputs.operator_image }}
+      operator_version: ${{ inputs.operator_version }}
+
+  e2e-tests-containerd:
+    needs: [variables]
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Download values override file
+        if: ${{ inputs.use_values_override }}
+        uses: actions/download-artifact@v6
+        with:
+          name: values-overrides
+          path: ${{ github.workspace }}
+      - name: Set up Holodeck
+        uses: NVIDIA/holodeck@v0.2.17
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_ssh_key: ${{ secrets.AWS_SSH_KEY }}
+          holodeck_config: "tests/holodeck.yaml"
+      - name: Get public dns name
+        id: get_public_dns_name
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
+      - name: Set test environment
+        run: |
+          echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
+          echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+      - name: Copy values override file to remote
+        if: ${{ inputs.use_values_override }}
+        run: |
+          scp -i ${private_key} -o StrictHostKeyChecking=no \
+            ${{ github.workspace }}/values-overrides.yaml \
+            ${instance_hostname}:/tmp/values-overrides.yaml
+          echo "VALUES_FILE=/tmp/values-overrides.yaml" >> $GITHUB_ENV
+      - name: Run e2e tests
+        env:
+          OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
+          OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          GPU_PRODUCT_NAME: "Tesla-T4"
+          SKIP_LAUNCH: "true"
+          CONTAINER_RUNTIME: "containerd"
+          TEST_CASE: "./tests/cases/defaults.sh"
+        run: |
+          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
+          ./tests/scripts/pull.sh /tmp/logs logs
+          exit $rc
+      - name: Archive test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: containerd-e2e-test-logs
+          path: ./logs/
+          retention-days: 15
+
+  e2e-tests-nvidiadriver:
+    needs: [variables]
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Download values override file
+        if: ${{ inputs.use_values_override }}
+        uses: actions/download-artifact@v6
+        with:
+          name: values-overrides
+          path: ${{ github.workspace }}
+      - name: Set up Holodeck
+        uses: NVIDIA/holodeck@v0.2.17
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_ssh_key: ${{ secrets.AWS_SSH_KEY }}
+          holodeck_config: "tests/holodeck.yaml"
+      - name: Get public dns name
+        id: get_public_dns_name
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
+      - name: Set test environment
+        run: |
+          echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
+          echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+      - name: Copy values override file to remote
+        if: ${{ inputs.use_values_override }}
+        run: |
+          scp -i ${private_key} -o StrictHostKeyChecking=no \
+            ${{ github.workspace }}/values-overrides.yaml \
+            ${instance_hostname}:/tmp/values-overrides.yaml
+          echo "VALUES_FILE=/tmp/values-overrides.yaml" >> $GITHUB_ENV
+      - name: Run e2e tests
+        env:
+          OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
+          OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          GPU_PRODUCT_NAME: "Tesla-T4"
+          SKIP_LAUNCH: "true"
+          CONTAINER_RUNTIME: "containerd"
+          TEST_CASE: "./tests/cases/nvidia-driver.sh"
+        run: |
+          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
+          ./tests/scripts/pull.sh /tmp/logs logs
+          exit $rc
+      - name: Archive test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: nvidiadriver-e2e-test-logs
+          path: ./logs/
+          retention-days: 15

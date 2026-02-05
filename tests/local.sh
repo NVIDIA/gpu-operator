@@ -41,4 +41,5 @@ remote \
     TARGET_DRIVER_VERSION="${TARGET_DRIVER_VERSION}" \
     GPU_MODE="${GPU_MODE}" \
     NGC_API_KEY="${NGC_API_KEY}" \
+    VALUES_FILE="${VALUES_FILE:-}" \
         ${TEST_CASE}
