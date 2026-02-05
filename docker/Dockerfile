@@ -14,7 +14,7 @@
 
 ARG CUDA_SAMPLES_VERSION=12.9
 
-FROM golang:1.25.6 AS builder
+FROM golang:1.25.7 AS builder
 
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
