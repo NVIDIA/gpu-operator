@@ -1,0 +1,126 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Golang Checks
+
+on:
+  push:
+    branches:
+      - "pull-request/[0-9]+"
+      - main
+      - release-*
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  go-check:
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Checkout code
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          GOLANGCI_LINT_VERSION=$( grep "GOLANGCI_LINT_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
+          echo "GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION##GOLANGCI_LINT_VERSION ?= }" >> $GITHUB_ENV
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout 5m
+          skip-cache: true
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
+      - env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make check
+
+  go-test:
+    name: unit tests
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
+      - env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make coverage
+
+  go-build:
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Checkout code
+      - run: make docker-build
+
+  coverage:
+    needs: [go-test]
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Get Golang version
+        id: vars
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@main
+      - name: Generate coverage report
+        env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+        run: |
+          make cov-report
+      - name: Upload to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: lcov.info

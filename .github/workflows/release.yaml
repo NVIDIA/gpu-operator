@@ -1,0 +1,115 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_call:
+    inputs:
+      commit_short_sha:
+        required: true
+        type: string
+      operator_version:
+        required: true
+        type: string
+      operator_image_base:
+        required: true
+        type: string
+
+jobs:
+  variables:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_short_sha: ${{ steps.vars.outputs.commit_short_sha }}
+      operator_image_base: ${{ steps.vars.outputs.operator_image_base }}
+      operator_image_source: ${{ steps.vars.outputs.operator_image_source }}
+      operator_image_latest: ${{ steps.vars.outputs.operator_image_latest }}
+      bundle_image: ${{ steps.vars.outputs.bundle_image }}
+    steps:
+      - name: Checkout code
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v6
+      - name: Calculate release variables
+        id: vars
+        run: |
+          # Use inputs from workflow_call if available
+          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
+            COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
+            OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
+          else
+            # Calculate for standalone runs
+            COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
+            OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
+          fi
+          
+          # Calculate derived values
+          OPERATOR_IMAGE_SOURCE="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}"
+          OPERATOR_IMAGE_LATEST="${OPERATOR_IMAGE_BASE}:main-latest"
+          BUNDLE_IMAGE="ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:main-latest"
+          
+          # Output all variables
+          echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
+          echo "operator_image_source=${OPERATOR_IMAGE_SOURCE}" >> $GITHUB_OUTPUT
+          echo "operator_image_latest=${OPERATOR_IMAGE_LATEST}" >> $GITHUB_OUTPUT
+          echo "bundle_image=${BUNDLE_IMAGE}" >> $GITHUB_OUTPUT
+          
+          # Display for debugging
+          echo "::notice::Releasing: ${OPERATOR_IMAGE_SOURCE} → ${OPERATOR_IMAGE_LATEST}"
+
+  release-latest-gpu-operator-image:
+    needs: [variables]
+    runs-on: linux-amd64-cpu4
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Set-up regctl
+        run: |
+          export REGCTL_VERSION=v0.9.2
+          mkdir -p bin
+          curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
+          chmod a+x bin/regctl
+          echo "$(pwd)/bin" >> $GITHUB_PATH
+      - name: Retag gpu-operator
+        env:
+          OPERATOR_IMAGE_SOURCE: ${{ needs.variables.outputs.operator_image_source }}
+          OPERATOR_IMAGE_LATEST: ${{ needs.variables.outputs.operator_image_latest }}
+        run: |
+          regctl registry login ghcr.io -u $GITHUB_ACTOR -p ${{ secrets.GITHUB_TOKEN }}
+          regctl image copy ${OPERATOR_IMAGE_SOURCE} ${OPERATOR_IMAGE_LATEST}
+
+  push-gpu-operator-bundle-image:
+    needs: [variables, release-latest-gpu-operator-image]
+    runs-on: linux-amd64-cpu4
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build bundle-image
+        env:
+          BUNDLE_IMAGE: ${{ needs.variables.outputs.bundle_image }}
+          VERSION: ""
+          DEFAULT_CHANNEL: "stable"
+          CHANNELS: "stable"
+        run: |
+          make push-bundle-image
+
