@@ -1,0 +1,118 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: CI Variables
+
+on:
+  workflow_call:
+    inputs:
+      operator_image:
+        description: 'Operator image to use (optional override)'
+        required: false
+        type: string
+      operator_version:
+        description: 'Operator version to use (optional override)'
+        required: false
+        type: string
+    outputs:
+      commit_short_sha:
+        description: "The short SHA to use as a version string"
+        value: ${{ jobs.variables.outputs.commit_short_sha }}
+      repo_full_name:
+        description: "The full repository name"
+        value: ${{ jobs.variables.outputs.repo_full_name }}
+      label_image_source:
+        description: "The image source label URL"
+        value: ${{ jobs.variables.outputs.label_image_source }}
+      push_on_build:
+        description: "Whether to push images on build"
+        value: ${{ jobs.variables.outputs.push_on_build }}
+      operator_image_base:
+        description: "The base operator image name"
+        value: ${{ jobs.variables.outputs.operator_image_base }}
+      operator_version:
+        description: "The operator version"
+        value: ${{ jobs.variables.outputs.operator_version }}
+      operator_image:
+        description: "The operator image (with override support)"
+        value: ${{ jobs.variables.outputs.operator_image }}
+
+jobs:
+  variables:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_short_sha: ${{ steps.vars.outputs.commit_short_sha }}
+      repo_full_name: ${{ steps.vars.outputs.repo_full_name }}
+      label_image_source: ${{ steps.vars.outputs.label_image_source }}
+      push_on_build: ${{ steps.vars.outputs.push_on_build }}
+      operator_image_base: ${{ steps.vars.outputs.operator_image_base }}
+      operator_version: ${{ steps.vars.outputs.operator_version }}
+      operator_image: ${{ steps.vars.outputs.operator_image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Calculate all variables
+        id: vars
+        run: |
+          # Basic computed values
+          COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
+          
+          # Repository information
+          REPO_FULL_NAME="${{ github.event.pull_request.head.repo.full_name }}"
+          if [[ -z "${REPO_FULL_NAME}" ]]; then
+            REPO_FULL_NAME="${{ github.repository }}"
+          fi
+          LABEL_IMAGE_SOURCE="https://github.com/${REPO_FULL_NAME}"
+          
+          # Determine if we should push images
+          PUSH_ON_BUILD="false"
+          if [[ "${{ github.actor }}" != "dependabot[bot]" ]]; then
+            if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
+              PUSH_ON_BUILD="true"
+            elif [[ "${{ github.event_name }}" == "push" ]]; then
+              PUSH_ON_BUILD="true"
+            elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              PUSH_ON_BUILD="true"
+            fi
+          fi
+          
+          # Image and version information (with override support)
+          OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
+          if [[ -n "${{ inputs.operator_version }}" ]]; then
+            OPERATOR_VERSION="${{ inputs.operator_version }}"
+          else
+            OPERATOR_VERSION="${COMMIT_SHORT_SHA}"
+          fi
+          
+          if [[ -n "${{ inputs.operator_image }}" ]]; then
+            OPERATOR_IMAGE="${{ inputs.operator_image }}"
+          else
+            OPERATOR_IMAGE="${OPERATOR_IMAGE_BASE}"
+          fi
+          
+          # Output all variables
+          echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "repo_full_name=${REPO_FULL_NAME}" >> $GITHUB_OUTPUT
+          echo "label_image_source=${LABEL_IMAGE_SOURCE}" >> $GITHUB_OUTPUT
+          echo "push_on_build=${PUSH_ON_BUILD}" >> $GITHUB_OUTPUT
+          echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
+          echo "operator_version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
+          echo "operator_image=${OPERATOR_IMAGE}" >> $GITHUB_OUTPUT
+          
+          # Display for debugging
+          echo "::notice::Commit SHA: ${COMMIT_SHORT_SHA}"
+          echo "::notice::Push on build: ${PUSH_ON_BUILD}"
+          echo "::notice::Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
+
