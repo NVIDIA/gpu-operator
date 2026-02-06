@@ -42,7 +42,6 @@ OUTPUT_FILE="$1"
 # Start with header
 cat > "${OUTPUT_FILE}" <<EOF
 # Generated from environment variables by env-to-values.sh
-# Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 #
 # This file contains GPU Operator configuration derived from test
 # environment variables.
@@ -80,13 +79,15 @@ fi
 # Write operator configuration if any
 if [[ -n "${OPERATOR_CONFIG}" ]]; then
     echo "operator:" >> "${OUTPUT_FILE}"
-    echo -e "${OPERATOR_CONFIG}" >> "${OUTPUT_FILE}"
+    printf '%b' "${OPERATOR_CONFIG}" >> "${OUTPUT_FILE}"
+    echo "" >> "${OUTPUT_FILE}"
 fi
 
 # Write validator configuration if any
 if [[ -n "${VALIDATOR_CONFIG}" ]]; then
     echo "validator:" >> "${OUTPUT_FILE}"
-    echo -e "${VALIDATOR_CONFIG}" >> "${OUTPUT_FILE}"
+    printf '%b' "${VALIDATOR_CONFIG}" >> "${OUTPUT_FILE}"
+    echo "" >> "${OUTPUT_FILE}"
 fi
 
 # Container Toolkit configuration

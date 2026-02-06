@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright NVIDIA CORPORATION
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,7 +51,9 @@ esac
 
 echo "Fetching latest commit from ${GITHUB_REPO}..." >&2
 
-# Get the latest commit SHA from the main branch using GitHub API
+# Get the latest commit SHA from the main branch using GitHub API.
+# NOTE: We use 8-char truncated SHAs as image tags. This must match the
+# tag convention used by each component's CI pipeline when publishing images.
 GITHUB_API_URL="https://api.github.com/repos/${GITHUB_REPO}/commits/main"
 
 # Use GITHUB_TOKEN if available for authentication (higher rate limits)
