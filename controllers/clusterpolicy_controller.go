@@ -170,6 +170,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	if err := r.syncLicenseCondition(ctx, instance); err != nil {
+		r.Log.Error(err, "unable to update license condition")
+	}
+
 	// if any state is not ready, requeue for reconcile after 5 seconds
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
