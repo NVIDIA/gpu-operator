@@ -15,9 +15,6 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
   workflow_call:
     inputs:
       commit_short_sha:
@@ -37,34 +34,24 @@ jobs:
       operator_image_latest: ${{ steps.vars.outputs.operator_image_latest }}
       bundle_image: ${{ steps.vars.outputs.bundle_image }}
     steps:
-      - name: Checkout code
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: actions/checkout@v6
       - name: Calculate release variables
         id: vars
         run: |
-          # Use inputs from workflow_call if available
-          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
-            COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
-            OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
-          else
-            # Calculate for standalone runs
-            COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
-            OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
-          fi
-          
+          COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
+          OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
+
           # Calculate derived values
           OPERATOR_IMAGE_SOURCE="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}"
           OPERATOR_IMAGE_LATEST="${OPERATOR_IMAGE_BASE}:main-latest"
           BUNDLE_IMAGE="ghcr.io/nvidia/gpu-operator/gpu-operator-bundle:main-latest"
-          
+
           # Output all variables
           echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
           echo "operator_image_source=${OPERATOR_IMAGE_SOURCE}" >> $GITHUB_OUTPUT
           echo "operator_image_latest=${OPERATOR_IMAGE_LATEST}" >> $GITHUB_OUTPUT
           echo "bundle_image=${BUNDLE_IMAGE}" >> $GITHUB_OUTPUT
-          
+
           # Display for debugging
           echo "::notice::Releasing: ${OPERATOR_IMAGE_SOURCE} → ${OPERATOR_IMAGE_LATEST}"
 

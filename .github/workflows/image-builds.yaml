@@ -15,11 +15,6 @@
 name: Image Builds
 
 on:
-  push:
-    branches:
-      - "pull-request/[0-9]+"
-      - main
-      - release-*
   workflow_call:
     inputs:
       commit_short_sha:
@@ -34,7 +29,6 @@ on:
       operator_image_base:
         required: true
         type: string
-  workflow_dispatch:
 
 jobs:
   variables:
@@ -48,47 +42,19 @@ jobs:
       operator_image_amd64: ${{ steps.vars.outputs.operator_image_amd64 }}
       operator_image_multiarch: ${{ steps.vars.outputs.operator_image_multiarch }}
     steps:
-      - name: Checkout code
-        if: ${{ github.event_name != 'workflow_call' }}
-        uses: actions/checkout@v6
       - name: Calculate build variables
         id: vars
         run: |
-          # Use inputs from workflow_call if available, otherwise calculate
-          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
-            COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
-            LABEL_IMAGE_SOURCE="${{ inputs.label_image_source }}"
-            PUSH_ON_BUILD="${{ inputs.push_on_build }}"
-            OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
-          else
-            # Calculate for standalone runs
-            COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
-            
-            REPO_FULL_NAME="${{ github.event.pull_request.head.repo.full_name }}"
-            if [[ -z "${REPO_FULL_NAME}" ]]; then
-              REPO_FULL_NAME="${{ github.repository }}"
-            fi
-            LABEL_IMAGE_SOURCE="https://github.com/${REPO_FULL_NAME}"
-            
-            PUSH_ON_BUILD="false"
-            if [[ "${{ github.actor }}" != "dependabot[bot]" ]]; then
-              if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
-                PUSH_ON_BUILD="true"
-              elif [[ "${{ github.event_name }}" == "push" ]]; then
-                PUSH_ON_BUILD="true"
-              elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-                PUSH_ON_BUILD="true"
-              fi
-            fi
-            
-            OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
-          fi
-          
+          COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
+          LABEL_IMAGE_SOURCE="${{ inputs.label_image_source }}"
+          PUSH_ON_BUILD="${{ inputs.push_on_build }}"
+          OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
+
           # Calculate derived image names
           OPERATOR_IMAGE_ARM64="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}-arm64"
           OPERATOR_IMAGE_AMD64="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}-amd64"
           OPERATOR_IMAGE_MULTIARCH="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}"
-          
+
           # Output all variables
           echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "label_image_source=${LABEL_IMAGE_SOURCE}" >> $GITHUB_OUTPUT
@@ -97,7 +63,7 @@ jobs:
           echo "operator_image_arm64=${OPERATOR_IMAGE_ARM64}" >> $GITHUB_OUTPUT
           echo "operator_image_amd64=${OPERATOR_IMAGE_AMD64}" >> $GITHUB_OUTPUT
           echo "operator_image_multiarch=${OPERATOR_IMAGE_MULTIARCH}" >> $GITHUB_OUTPUT
-          
+
           # Display for debugging
           echo "::notice::Commit SHA: ${COMMIT_SHORT_SHA}"
           echo "::notice::Push on build: ${PUSH_ON_BUILD}"

@@ -49,6 +49,11 @@ on:
         description: 'Operator version to test (override)'
         required: false
         type: string
+      use_values_override:
+        description: 'Use values-overrides artifact for component image configuration'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   variables:
