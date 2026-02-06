@@ -48,13 +48,13 @@ if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 
 		# Create a combined values file using yq for proper YAML merging
 		COMBINED_VALUES=$(mktemp)
-		if command -v yq >/dev/null 2>&1; then
-			# yq merges YAML properly, with later files taking precedence
-			yq ea '. as $item ireduce ({}; . * $item )' "${VALUES_FILE}" "${TEMP_ENV_VALUES}" > "${COMBINED_VALUES}"
-		else
-			echo "Warning: yq not found, falling back to concatenation (may have issues with duplicate keys)" >&2
-			cat "${VALUES_FILE}" "${TEMP_ENV_VALUES}" > "${COMBINED_VALUES}"
+		if ! command -v yq >/dev/null 2>&1; then
+			echo "Error: yq is required to merge YAML values files but was not found in PATH." >&2
+			echo "Install yq: https://github.com/mikefarah/yq" >&2
+			exit 1
 		fi
+		# yq merges YAML properly, with later files taking precedence
+		yq ea '. as $item ireduce ({}; . * $item )' "${VALUES_FILE}" "${TEMP_ENV_VALUES}" > "${COMBINED_VALUES}"
 		VALUES_FILE="${COMBINED_VALUES}"
 	else
 		VALUES_FILE="${TEMP_ENV_VALUES}"

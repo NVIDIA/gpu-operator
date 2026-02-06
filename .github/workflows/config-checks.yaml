@@ -15,11 +15,6 @@
 name: Configuration Checks
 
 on:
-  push:
-    branches:
-      - "pull-request/[0-9]+"
-      - main
-      - release-*
   workflow_call:
   workflow_dispatch:
 
