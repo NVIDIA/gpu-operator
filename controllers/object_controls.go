@@ -2918,7 +2918,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-fs-ctr.
-			destinationDir, err := getRepoConfigPath()
+			destinationDir, err := n.getRepoConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
@@ -3011,7 +3011,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-gdrcopy-ctr.
-			destinationDir, err := getRepoConfigPath()
+			destinationDir, err := n.getRepoConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
@@ -3285,18 +3285,55 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	return image, nil
 }
 
-// getRepoConfigPath returns the standard OS specific path for repository configuration files
-func getRepoConfigPath() (string, error) {
-	release, err := parseOSRelease()
+// getGPUNodeOSID returns the OS ID of GPU worker nodes by reading NFD labels.
+// It lists all nodes with the common GPU label and reads the NFD OS release ID label.
+// Logs a warning if GPU nodes have different OS distributions.
+func (n ClusterPolicyController) getGPUNodeOSID() (string, error) {
+	opts := []client.ListOption{
+		client.MatchingLabels{commonGPULabelKey: commonGPULabelValue},
+	}
+	list := &corev1.NodeList{}
+	err := n.client.List(n.ctx, list, opts...)
+	if err != nil {
+		return "", fmt.Errorf("failed to list GPU nodes: %w", err)
+	}
+	if len(list.Items) == 0 {
+		return "", fmt.Errorf("no GPU nodes found with label %s=%s", commonGPULabelKey, commonGPULabelValue)
+	}
+
+	var osID string
+	for _, node := range list.Items {
+		labels := node.GetLabels()
+		id, ok := labels[nfdOSReleaseIDLabelKey]
+		if !ok || id == "" {
+			n.logger.Info("WARNING: GPU node missing NFD OS release label, is NFD installed?",
+				"NodeName", node.Name, "Label", nfdOSReleaseIDLabelKey)
+			continue
+		}
+		if osID == "" {
+			osID = id
+		} else if osID != id {
+			n.logger.Info("WARNING: GPU nodes have different OS distributions",
+				"expected", osID, "found", id, "NodeName", node.Name)
+		}
+	}
+	if osID == "" {
+		return "", fmt.Errorf("no GPU nodes have NFD OS release label %s, is NFD installed?", nfdOSReleaseIDLabelKey)
+	}
+	return osID, nil
+}
+
+// getRepoConfigPath returns the standard OS specific path for repository configuration files.
+// Uses NFD labels from GPU worker nodes to determine the OS distribution.
+func (n ClusterPolicyController) getRepoConfigPath() (string, error) {
+	osID, err := n.getGPUNodeOSID()
 	if err != nil {
 		return "", err
 	}
-
-	os := release["ID"]
-	if path, ok := RepoConfigPathMap[os]; ok {
+	if path, ok := RepoConfigPathMap[osID]; ok {
 		return path, nil
 	}
-	return "", fmt.Errorf("distribution not supported")
+	return "", fmt.Errorf("distribution %s not supported", osID)
 }
 
 // getCertConfigPath returns the standard OS specific path for ssl keys/certificates
@@ -3555,7 +3592,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set any custom repo configuration provided when using runfile based driver installation
 	if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
-		destinationDir, err := getRepoConfigPath()
+		destinationDir, err := n.getRepoConfigPath()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 		}
