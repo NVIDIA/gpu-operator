@@ -551,6 +551,9 @@ spec:
     {{- if .Values.dcgmExporter.hpcJobMapping }}
     hpcJobMapping: {{ toYaml .Values.dcgmExporter.hpcJobMapping | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.podMetrics }}
+    podMetrics: {{ toYaml .Values.dcgmExporter.podMetrics | nindent 6 }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}

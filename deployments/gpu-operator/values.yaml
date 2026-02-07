@@ -285,6 +285,11 @@ dcgmExporter:
   # hpcJobMapping:
   #   enabled: true
   #   directory: /var/lib/dcgm-exporter/job-mapping
+  # Pod metrics enrichment settings
+  podMetrics:
+    # Enable pod labels in metrics. When enabled, metrics will include labels from pods using GPUs.
+    # This requires cluster-wide read permissions to pods.
+    enablePodLabels: false
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:
