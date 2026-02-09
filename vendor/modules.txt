@@ -36,17 +36,17 @@ github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/crdutil
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
-# github.com/NVIDIA/nvidia-container-toolkit v1.19.0-rc.2
+# github.com/NVIDIA/nvidia-container-toolkit v1.19.0-rc.3
 ## explicit; go 1.25.0
 github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/info/proc/devices
 github.com/NVIDIA/nvidia-container-toolkit/internal/ldcache
 github.com/NVIDIA/nvidia-container-toolkit/internal/logger
-github.com/NVIDIA/nvidia-container-toolkit/internal/lookup
-github.com/NVIDIA/nvidia-container-toolkit/internal/lookup/symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/nvcaps
-github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvdevices
-github.com/NVIDIA/nvidia-container-toolkit/internal/system/nvmodules
+github.com/NVIDIA/nvidia-container-toolkit/pkg/lookup
+github.com/NVIDIA/nvidia-container-toolkit/pkg/lookup/symlinks
+github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvdevices
+github.com/NVIDIA/nvidia-container-toolkit/pkg/system/nvmodules
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
