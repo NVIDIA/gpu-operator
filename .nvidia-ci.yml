@@ -211,7 +211,7 @@ mock-image-publish:
     # TODO: Should these use the staging release instead?
     OPERATOR_VERSION: "${CI_COMMIT_SHORT_SHA}"
     OPERATOR_IMAGE: "${STAGING_REGISTRY}/gpu-operator"
-    TARGET_DRIVER_VERSION: "535.261.03"
+    TARGET_DRIVER_VERSION: "535.288.01"
 
 .e2e_tests:
   extends:
