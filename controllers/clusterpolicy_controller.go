@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 )
 
@@ -167,6 +168,19 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		if clusterPolicyCtrl.last() {
 			break
+		}
+	}
+
+	// Check for orphaned driver pods and label nodes AFTER step() completes
+	// This ensures labeling happens after any daemonset cleanup that might have orphaned pods
+	//
+	// Label nodes containing orphaned driver pods based on transition state:
+	// - When useNvidiaDriverCRD=false: Always label (NVIDIADriver → ClusterPolicy transition)
+	// - When useNvidiaDriverCRD=true: Only label if NVIDIADriver CRs exist (ClusterPolicy → NVIDIADriver transition)
+	if !clusterPolicyCtrl.singleton.Spec.Driver.UseNvidiaDriverCRDType() || clusterPolicyCtrl.hasNVIDIADriverCRs(ctx) {
+		if err := clusterPolicyCtrl.labelNodesWithOrphanedDriverPods(ctx); err != nil {
+			// Log error but don't fail reconciliation
+			r.Log.Error(err, "failed to label nodes with orphaned driver pods")
 		}
 	}
 
@@ -367,6 +381,33 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 
 	// Watch for changes to Node labels and requeue the owner ClusterPolicy
 	err = addWatchNewGPUNode(r, c, mgr)
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to NVIDIADriver CRs to trigger labeling of orphaned pods
+	// This is needed when NVIDIADriver CRs are created/updated/deleted during transitions
+	err = c.Watch(
+		source.Kind(mgr.GetCache(),
+			&nvidiav1alpha1.NVIDIADriver{},
+			handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, obj *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
+				// Trigger reconciliation of all ClusterPolicy instances
+				list := &gpuv1.ClusterPolicyList{}
+				if err := mgr.GetClient().List(ctx, list); err != nil {
+					return []reconcile.Request{}
+				}
+				requests := make([]reconcile.Request, len(list.Items))
+				for i, item := range list.Items {
+					requests[i] = reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name: item.GetName(),
+						},
+					}
+				}
+				return requests
+			}),
+		),
+	)
 	if err != nil {
 		return err
 	}

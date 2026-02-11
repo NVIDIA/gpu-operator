@@ -127,17 +127,16 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var driverLabel map[string]string
 
-	// initialize with common app=nvidia-driver-daemonset label
-	driverLabelKey := DriverLabelKey
-	driverLabelValue := DriverLabelValue
+	// Use common app.kubernetes.io/component=nvidia-driver label that works for both
+	// ClusterPolicy and NVIDIADriver managed daemonsets
+	driverLabelKey := AppComponentLabelKey
+	driverLabelValue := AppComponentLabelValue
 
-	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
-		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
-		driverLabelKey = AppComponentLabelKey
-		driverLabelValue = AppComponentLabelValue
-	} else if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
-		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
-		// based on rhcos version. Hence use DTK label instead
+	// Special case for OCP with DTK: the component label may not be stable across RHCOS versions
+	if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled &&
+		!clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
+		// For OCP, when DTK is enabled and using ClusterPolicy mode, app=nvidia-driver-daemonset
+		// label is not constant and changes based on rhcos version. Hence use DTK label instead
 		driverLabelKey = ocpDriverToolkitIdentificationLabel
 		driverLabelValue = ocpDriverToolkitIdentificationValue
 	}

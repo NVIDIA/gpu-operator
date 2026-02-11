@@ -50,6 +50,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -4068,7 +4069,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	return true, nil
 }
 
-func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context) error {
+func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context, orphanPods bool) error {
 	// Get all DaemonSets owned by ClusterPolicy
 	//
 	// (cdesiniotis) There is a limitation with the controller-runtime client where only a single field selector
@@ -4084,8 +4085,17 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 		ds := ds
 		// filter out DaemonSets which are not the NVIDIA driver/vgpu-manager
 		if strings.HasPrefix(ds.Name, commonDriverDaemonsetName) || strings.HasPrefix(ds.Name, commonVGPUManagerDaemonsetName) {
-			n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
-			err = n.client.Delete(ctx, &ds)
+			if orphanPods {
+				n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy with cascade=orphan", "Name", ds.Name)
+				// Delete with cascade=orphan to keep the driver pods running
+				propagationPolicy := metav1.DeletePropagationOrphan
+				err = n.client.Delete(ctx, &ds, &client.DeleteOptions{
+					PropagationPolicy: &propagationPolicy,
+				})
+			} else {
+				n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
+				err = n.client.Delete(ctx, &ds)
+			}
 			if err != nil {
 				return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
 			}
@@ -4093,6 +4103,182 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 	}
 
 	return nil
+}
+
+// cleanupNVIDIADriverOwnedDaemonSets deletes all driver daemonsets owned by any NVIDIADriver CR
+// This is used when ClusterPolicy has useNvidiaDriverCRD=false to clean up stale daemonsets
+func (n ClusterPolicyController) cleanupNVIDIADriverOwnedDaemonSets(ctx context.Context, orphanPods bool) error {
+	// List all DaemonSets in the namespace using component label
+	// This includes both NVIDIADriver-owned and orphaned driver daemonsets
+	list := &appsv1.DaemonSetList{}
+	err := n.client.List(ctx, list,
+		client.InNamespace(n.operatorNamespace),
+		client.MatchingLabels{"app.kubernetes.io/component": "nvidia-driver"},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to list driver daemonsets: %w", err)
+	}
+
+	for _, ds := range list.Items {
+		ds := ds
+
+		// Skip ClusterPolicy-owned daemonsets - only process NVIDIADriver or orphaned ones
+		isOwnedByClusterPolicy := false
+		for _, ownerRef := range ds.OwnerReferences {
+			if ownerRef.Kind == "ClusterPolicy" {
+				isOwnedByClusterPolicy = true
+				break
+			}
+		}
+		if isOwnedByClusterPolicy {
+			continue
+		}
+
+		// At this point, the daemonset is either:
+		// 1. Owned by NVIDIADriver (has NVIDIADriver owner reference)
+		// 2. Orphaned (no owner references)
+		// We clean up both cases when useNvidiaDriverCRD=false
+		n.logger.Info("Found NVIDIADriver-managed or orphaned driver daemonset", "Name", ds.Name, "OwnerReferences", len(ds.OwnerReferences))
+
+		if orphanPods {
+			if len(ds.OwnerReferences) > 0 {
+				n.logger.Info("Removing owner references and deleting NVIDIA driver daemonset with cascade=orphan", "Name", ds.Name)
+				// Remove owner references to prevent garbage collection from deleting with default cascade
+				// when the NVIDIADriver CR is deleted later
+				ds.OwnerReferences = nil
+				if err := n.client.Update(ctx, &ds); err != nil {
+					// Continue anyway and try to delete
+					n.logger.Error(err, "failed to remove owner references from daemonset", "Name", ds.Name)
+				}
+			} else {
+				n.logger.Info("Deleting orphaned NVIDIA driver daemonset with cascade=orphan", "Name", ds.Name)
+			}
+
+			// Delete with cascade=orphan to keep the driver pods running
+			propagationPolicy := metav1.DeletePropagationOrphan
+			err = n.client.Delete(ctx, &ds, &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			})
+		} else {
+			n.logger.Info("Deleting NVIDIADriver-managed or orphaned daemonset", "Name", ds.Name)
+			err = n.client.Delete(ctx, &ds)
+		}
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("error deleting NVIDIADriver-managed daemonset %s: %w", ds.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// labelNodesWithOrphanedDriverPods detects orphaned driver pods (pods without owner references)
+// and labels their nodes with nvidia.com/gpu-driver-upgrade-state=upgrade-required to trigger upgrade
+func (n ClusterPolicyController) labelNodesWithOrphanedDriverPods(ctx context.Context) error {
+	useNvidiaDriverCRD := n.singleton.Spec.Driver.UseNvidiaDriverCRDType()
+	return labelNodesWithOrphanedDriverPods(ctx, n.client, n.operatorNamespace, useNvidiaDriverCRD)
+}
+
+// labelNodesWithOrphanedDriverPods is a standalone function that can be used by both
+// ClusterPolicy and NVIDIADriver controllers to label nodes with orphaned driver pods
+// When useNvidiaDriverCRD=true: Only labels nodes if matching NVIDIADriver CR exists (ClusterPolicy→NVIDIADriver transition)
+// When useNvidiaDriverCRD=false: Labels all nodes with orphaned pods (NVIDIADriver→ClusterPolicy transition)
+func labelNodesWithOrphanedDriverPods(ctx context.Context, c client.Client, namespace string, useNvidiaDriverCRD bool) error {
+	// List all NVIDIADriver CRs to check nodeSelectors (only needed when useNvidiaDriverCRD=true)
+	var nvidiaDriverList *nvidiav1alpha1.NVIDIADriverList
+	if useNvidiaDriverCRD {
+		nvidiaDriverList = &nvidiav1alpha1.NVIDIADriverList{}
+		if err := c.List(ctx, nvidiaDriverList); err != nil {
+			return fmt.Errorf("failed to list NVIDIADriver CRs: %w", err)
+		}
+	}
+
+	// List all driver pods in the namespace
+	// Use app.kubernetes.io/component label which works for both ClusterPolicy and NVIDIADriver managed pods
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels{"app.kubernetes.io/component": "nvidia-driver"},
+	}
+	if err := c.List(ctx, podList, listOpts...); err != nil {
+		return fmt.Errorf("failed to list driver pods: %w", err)
+	}
+
+	// Find orphaned pods (pods without owner references)
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+
+		// Skip if pod has owner references (not orphaned)
+		if len(pod.OwnerReferences) > 0 {
+			continue
+		}
+
+		// Skip if pod is not running
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+
+		nodeName := pod.Spec.NodeName
+		if nodeName == "" {
+			continue
+		}
+
+		// Get the node
+		node := &corev1.Node{}
+		if err := c.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+			continue
+		}
+
+		// When useNvidiaDriverCRD=true: Check if at least one NVIDIADriver CR's nodeSelector matches this node
+		// When useNvidiaDriverCRD=false: Label all orphaned pods since ClusterPolicy will take over
+		if useNvidiaDriverCRD {
+			hasMatchingDriver := false
+			for _, nvDriver := range nvidiaDriverList.Items {
+				if nodeMatchesSelector(node, nvDriver.Spec.NodeSelector) {
+					hasMatchingDriver = true
+					break
+				}
+			}
+
+			// Only label if there's a matching NVIDIADriver that will create replacement pods
+			if !hasMatchingDriver {
+				continue
+			}
+		}
+
+		// Check if the node already has the upgrade label
+		upgradeLabel := "nvidia.com/gpu-driver-upgrade-state"
+		if node.Labels != nil && node.Labels[upgradeLabel] == "upgrade-required" {
+			continue
+		}
+
+		// Label the node
+		if node.Labels == nil {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[upgradeLabel] = "upgrade-required"
+		if err := c.Update(ctx, node); err != nil {
+			continue
+		}
+	}
+
+	return nil
+}
+
+// nodeMatchesSelector checks if a node's labels match the given selector
+func nodeMatchesSelector(node *corev1.Node, selector map[string]string) bool {
+	if len(selector) == 0 {
+		// Empty selector matches all nodes
+		return true
+	}
+
+	for key, value := range selector {
+		// Check if the key exists in node labels
+		nodeValue, exists := node.Labels[key]
+		if !exists || nodeValue != value {
+			return false
+		}
+	}
+	return true
 }
 
 // cleanupStalePrecompiledDaemonsets deletes stale driver daemonsets which can happen
