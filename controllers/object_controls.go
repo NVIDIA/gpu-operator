@@ -454,6 +454,16 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
+	// For dcgm-exporter, ClusterRole is only needed when pod labels are enabled
+	if n.stateNames[n.idx] == "state-dcgm-exporter" && !n.singleton.Spec.DCGMExporter.IsPodLabelsEnabled() {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -487,6 +497,16 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	// For dcgm-exporter, ClusterRoleBinding is only needed when pod labels are enabled
+	if n.stateNames[n.idx] == "state-dcgm-exporter" && !n.singleton.Spec.DCGMExporter.IsPodLabelsEnabled() {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
@@ -1848,6 +1868,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, metricsConfigVol)
 
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_COLLECTORS", MetricsConfigMountPath)
+	}
+
+	// configure Kubernetes pod label enrichment if enabled
+	if config.DCGMExporter.IsPodLabelsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", "true")
+		obj.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(true)
 	}
 
 	for _, env := range config.DCGMExporter.Env {
