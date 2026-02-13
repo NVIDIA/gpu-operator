@@ -26,21 +26,37 @@ concurrency:
   group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/heads/pull-request/') && github.ref || github.run_id }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   variables:
+    permissions:
+      contents: read
     uses: ./.github/workflows/variables.yaml
 
   code-scanning:
+    permissions:
+      security-events: write
+      packages: read
     uses: ./.github/workflows/code-scanning.yaml
 
   config-checks:
+    permissions:
+      contents: read
     uses: ./.github/workflows/config-checks.yaml
 
   golang-checks:
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/golang-checks.yaml
 
   image-builds:
     needs: [variables, config-checks, golang-checks]
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     uses: ./.github/workflows/image-builds.yaml
     with:
       commit_short_sha: ${{ needs.variables.outputs.commit_short_sha }}
@@ -50,6 +66,9 @@ jobs:
 
   e2e-tests:
     needs: [variables, image-builds]
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/e2e-tests.yaml
     with:
       operator_image: ${{ needs.variables.outputs.operator_image }}
@@ -59,6 +78,9 @@ jobs:
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [variables, e2e-tests]
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/release.yaml
     with:
       commit_short_sha: ${{ needs.variables.outputs.commit_short_sha }}
