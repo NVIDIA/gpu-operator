@@ -82,7 +82,7 @@ rules:
 - apiGroups:
     - ""
   resources:
-    - nodes/proxy
+    - nodes/configz
   verbs:
     - get
 - apiGroups:
@@ -117,12 +117,6 @@ rules:
   verbs:
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes/proxy
-  verbs:
-  - get
 - apiGroups:
   - topology.node.k8s.io
   resources:
