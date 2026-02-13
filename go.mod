@@ -16,7 +16,7 @@ require (
 	github.com/openshift/api v0.0.0-20260203111218-618697272d69
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
 	github.com/operator-framework/api v0.39.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.88.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.89.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/regclient/regclient v0.11.1
 	github.com/sirupsen/logrus v1.9.4
