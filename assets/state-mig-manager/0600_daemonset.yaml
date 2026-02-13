@@ -77,6 +77,8 @@ spec:
           mountPropagation: HostToContainer
         - mountPath: /gpu-clients
           name: gpu-clients
+        - mountPath: /mig-parted-config
+          name: mig-parted-config
         - name: driver-install-dir
           mountPath: /driver-root
           mountPropagation: HostToContainer
@@ -103,6 +105,9 @@ spec:
         hostPath:
           path: "/"
       - name: gpu-clients
+        configMap:
+          name: "FILLED_BY_OPERATOR"
+      - name: mig-parted-config
         configMap:
           name: "FILLED_BY_OPERATOR"
       - name: cdi-root

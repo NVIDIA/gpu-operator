@@ -1,0 +1,625 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-mig-parted-config
+  namespace: "FILLED BY THE OPERATOR"
+data:
+  config.yaml: |
+    version: v1
+    mig-configs:
+      all-disabled:
+        - devices: all
+          mig-enabled: false
+
+      all-enabled:
+        - devices: all
+          mig-enabled: true
+          mig-devices: {}
+
+      # A100-40GB, A800-40GB
+      all-1g.5gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.5gb": 7
+
+      all-1g.5gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.5gb+me": 1
+
+      all-2g.10gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.10gb": 3
+
+      all-3g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.20gb": 2
+
+      all-4g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.20gb": 1
+
+      all-7g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.40gb": 1
+
+      # RTX-PRO-6000-96GB
+      all-1g.24gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb+gfx": 4
+
+      all-1g.24gb.me.all:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb+me.all": 1
+      
+      all-1g.24gb-me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb-me": 4
+
+      all-2g.48gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb": 2
+
+      all-2g.48gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb+gfx": 2
+
+      all-2g.48gb.me.all:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb+me.all": 1
+
+      all-2g.48gb-me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.48gb-me": 2
+
+      all-4g.96gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.96gb": 1
+
+      all-4g.96gb.gfx:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.96gb+gfx": 1
+    
+      # H100-80GB, H800-80GB, A100-80GB, A800-80GB, A100-40GB, A800-40GB
+      all-1g.10gb:
+        # H100-80GB, H800-80GB, A100-80GB, A800-80GB
+        - device-filter: ["0x233010DE", "0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE", "0x232410DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 7
+
+        # A100-40GB, A800-40GB
+        - device-filter: ["0x20B010DE", "0x20B110DE", "0x20F110DE", "0x20F610DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 4
+
+      # H100-80GB, H800-80GB, A100-80GB, A800-80GB
+      all-1g.10gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb+me": 1
+
+      # H100-80GB, H800-80GB, A100-80GB, A800-80GB
+      all-1g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.20gb": 4
+
+      # GB200, B200
+      all-1g.23gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.23gb": 7
+
+      # GB200, B200
+      all-1g.23gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.23gb+me": 1
+
+      all-1g.24gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb+me": 1
+
+      all-2g.20gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.20gb": 3
+
+      all-3g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.40gb": 2
+
+      all-4g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.40gb": 1
+
+      all-7g.80gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+
+      # A30-24GB
+      all-1g.6gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.6gb": 4
+
+      all-1g.6gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.6gb+me": 1
+
+      all-2g.12gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.12gb": 2
+
+      all-2g.12gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.12gb+me": 1
+
+      all-4g.24gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.24gb": 1
+
+      # H100 NVL, H800 NVL, GH200
+      all-1g.12gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.12gb": 7
+
+      all-1g.12gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.12gb+me": 1
+
+      all-1g.24gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb": 4
+
+      all-1g.45gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.45gb": 4
+
+      all-1g.47gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.47gb": 4
+
+      all-2g.24gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.24gb": 3
+
+      all-2g.45gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.45gb": 3
+
+      all-2g.47gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.47gb": 3
+
+      # H100 NVL, H800 NVL
+      all-3g.47gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.47gb": 2
+
+      all-4g.47gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.47gb": 1
+
+      all-7g.94gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.94gb": 1
+
+      # H100-96GB, PG506-96GB, GH200
+      all-3g.48gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.48gb": 2
+
+      all-3g.90gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.90gb": 2
+
+      all-3g.93gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.93gb": 2
+
+      all-3g.95gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.95gb": 2
+
+      all-4g.48gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.48gb": 1
+
+      all-4g.90gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.90gb": 1
+
+      all-4g.93gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.93gb": 1
+
+      all-4g.95gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.95gb": 1
+
+      all-7g.96gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.96gb": 1
+
+      all-7g.180gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.180gb": 1
+
+      all-7g.186gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.186gb": 1
+
+      all-7g.189gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.189gb": 1
+
+      # GB200 HGX, B200, GH200 144G HBM3e, H200-141GB, H200 NVL, H100-96GB, GH200, H100 NVL, H800 NVL, H100-80GB, H800-80GB, A800-40GB, A800-80GB, A100-40GB, A100-80GB, A30-24GB, PG506-96GB
+      all-balanced:
+        # GB200 HGX
+        - device-filter: ["0x294110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.23gb": 2
+            "2g.47gb": 1
+            "3g.93gb": 1
+        
+        # RTX-PRO-6000-96GB
+        - device-filter: ["0x2BB510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.24gb": 2
+            "2g.48gb": 1
+
+        # B200
+        - device-filter: ["0x290110DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.23gb": 2
+            "2g.45gb": 1
+            "3g.90gb": 1
+
+        # GH200 144G HBM3e
+        - device-filter: ["0x234810DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.18gb": 2
+            "2g.36gb": 1
+            "3g.72gb": 1
+
+        # H200 141GB, H200 NVL
+        - device-filter: ["0x233510DE", "0x233B10DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.18gb": 2
+            "2g.35gb": 1
+            "3g.71gb": 1
+
+        # H100 NVL, H800 NVL
+        - device-filter: ["0x232110DE", "0x233A10DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.12gb": 2
+            "2g.24gb": 1
+            "3g.47gb": 1
+
+        # H100-80GB, H800-80GB, A100-80GB, A800-80GB
+        - device-filter: ["0x233010DE", "0x233110DE", "0x232210DE", "0x20B210DE", "0x20B510DE", "0x20F310DE", "0x20F510DE", "0x232410DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 2
+            "2g.20gb": 1
+            "3g.40gb": 1
+
+        # A100-40GB, A800-40GB
+        - device-filter: ["0x20B010DE", "0x20B110DE", "0x20F110DE", "0x20F610DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.5gb": 2
+            "2g.10gb": 1
+            "3g.20gb": 1
+
+        # A30-24GB
+        - device-filter: "0x20B710DE"
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.6gb": 2
+            "2g.12gb": 1
+
+        # H100-96GB, PG506-96GB, GH200, H20
+        - device-filter: ["0x234210DE", "0x233D10DE", "0x20B610DE", "0x232910DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.12gb": 2
+            "2g.24gb": 1
+            "3g.48gb": 1
+
+        # B300
+        - device-filter: ["0x318210DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.34gb": 2
+            "2g.67gb": 1
+            "3g.135gb": 1
+
+        # GB300
+        - device-filter: ["0x31C210DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.35gb": 2
+            "2g.70gb": 1
+            "3g.139gb": 1
+
+      # H200-141GB, GH200 144G HBM3e
+      all-1g.18gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.18gb": 7
+
+      all-1g.18gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.18gb+me": 1
+
+      all-1g.35gb:
+        # H200-141GB
+        - device-filter: ["0x233510DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.35gb": 4
+        # GB300
+        - device-filter: ["0x31C210DE"]
+          devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.35gb": 7
+
+      all-2g.35gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.35gb": 3
+
+      all-3g.71gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.71gb": 2
+
+      all-4g.71gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.71gb": 1
+
+      all-7g.141gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.141gb": 1
+
+      # GH200 144G HBM3e
+      all-1g.36gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.36gb": 4
+
+      all-2g.36gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.36gb": 3
+
+      all-3g.72gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.72gb": 2
+
+      all-4g.72gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.72gb": 1
+
+      all-7g.144gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.144gb": 1
+
+      # B300
+      all-1g.34gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.34gb": 7
+
+      all-1g.34gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.34gb+me": 1
+
+      all-1g.67gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.67gb": 4
+
+      all-2g.67gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.67gb": 3
+
+      all-3g.135gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.135gb": 2
+
+      all-4g.135gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.135gb": 1
+
+      all-7g.269gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.269gb": 1
+
+      # GB300
+      all-1g.35gb.me:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.35gb+me": 1
+
+      all-1g.70gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.70gb": 4
+
+      all-2g.70gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "2g.70gb": 3
+
+      all-3g.139gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.139gb": 2
+
+      all-4g.139gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "4g.139gb": 1
+
+      all-7g.278gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "7g.278gb": 1

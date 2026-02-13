@@ -1572,7 +1572,10 @@ func TestTransformMigManager(t *testing.T) {
 	}{
 		{
 			description: "transform mig manager",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				MIGManager: gpuv1.MIGManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1596,15 +1599,30 @@ func TestTransformMigManager(t *testing.T) {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Args:            []string{"--test-flag"},
 				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
 					{Name: CDIEnabledEnvName, Value: "true"},
 					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 					{Name: "foo", Value: "bar"},
 				},
-			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
 		},
 		{
 			description: "mig manager with custom config",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			ds: NewDaemonset().WithContainer(corev1.Container{
+				Name: "mig-manager",
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "mig-parted-config", MountPath: "/mig-parted-config", ReadOnly: true},
+				},
+			}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				MIGManager: gpuv1.MIGManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1633,16 +1651,17 @@ func TestTransformMigManager(t *testing.T) {
 				},
 			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
 				Name: "mig-parted-config",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "custom-mig-config"},
-					},
-				},
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "custom-mig-config"},
+				}},
 			}),
 		},
 		{
 			description: "mig manager without config (nil)",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				MIGManager: gpuv1.MIGManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1662,14 +1681,24 @@ func TestTransformMigManager(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
 					{Name: CDIEnabledEnvName, Value: "true"},
 					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 				},
-			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
 		},
 		{
 			description: "mig manager with empty config name",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}),
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				MIGManager: gpuv1.MIGManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1689,10 +1718,17 @@ func TestTransformMigManager(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
 					{Name: CDIEnabledEnvName, Value: "true"},
 					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
 				},
-			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
 		},
 	}
 
