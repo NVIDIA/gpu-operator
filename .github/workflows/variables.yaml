@@ -65,43 +65,50 @@ jobs:
       
       - name: Calculate all variables
         id: vars
+        env:
+          INPUT_OPERATOR_VERSION: ${{ inputs.operator_version }}
+          INPUT_OPERATOR_IMAGE: ${{ inputs.operator_image }}
+          PR_REPO_FULL_NAME: ${{ github.event.pull_request.head.repo.full_name }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_ACTOR: ${{ github.actor }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           # Basic computed values
           COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
-          
+
           # Repository information
-          REPO_FULL_NAME="${{ github.event.pull_request.head.repo.full_name }}"
+          REPO_FULL_NAME="${PR_REPO_FULL_NAME}"
           if [[ -z "${REPO_FULL_NAME}" ]]; then
-            REPO_FULL_NAME="${{ github.repository }}"
+            REPO_FULL_NAME="${GH_REPOSITORY}"
           fi
           LABEL_IMAGE_SOURCE="https://github.com/${REPO_FULL_NAME}"
-          
+
           # Determine if we should push images
           PUSH_ON_BUILD="false"
-          if [[ "${{ github.actor }}" != "dependabot[bot]" ]]; then
-            if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
+          if [[ "${GH_ACTOR}" != "dependabot[bot]" ]]; then
+            if [[ "${GH_EVENT_NAME}" == "pull_request" && "${PR_REPO_FULL_NAME}" == "${GH_REPOSITORY}" ]]; then
               PUSH_ON_BUILD="true"
-            elif [[ "${{ github.event_name }}" == "push" ]]; then
+            elif [[ "${GH_EVENT_NAME}" == "push" ]]; then
               PUSH_ON_BUILD="true"
-            elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            elif [[ "${GH_EVENT_NAME}" == "workflow_dispatch" ]]; then
               PUSH_ON_BUILD="true"
             fi
           fi
-          
+
           # Image and version information (with override support)
           OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
-          if [[ -n "${{ inputs.operator_version }}" ]]; then
-            OPERATOR_VERSION="${{ inputs.operator_version }}"
+          if [[ -n "${INPUT_OPERATOR_VERSION}" ]]; then
+            OPERATOR_VERSION="${INPUT_OPERATOR_VERSION}"
           else
             OPERATOR_VERSION="${COMMIT_SHORT_SHA}"
           fi
-          
-          if [[ -n "${{ inputs.operator_image }}" ]]; then
-            OPERATOR_IMAGE="${{ inputs.operator_image }}"
+
+          if [[ -n "${INPUT_OPERATOR_IMAGE}" ]]; then
+            OPERATOR_IMAGE="${INPUT_OPERATOR_IMAGE}"
           else
             OPERATOR_IMAGE="${OPERATOR_IMAGE_BASE}"
           fi
-          
+
           # Output all variables
           echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "repo_full_name=${REPO_FULL_NAME}" >> $GITHUB_OUTPUT
@@ -110,7 +117,7 @@ jobs:
           echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
           echo "operator_version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
           echo "operator_image=${OPERATOR_IMAGE}" >> $GITHUB_OUTPUT
-          
+
           # Display for debugging
           echo "::notice::Commit SHA: ${COMMIT_SHORT_SHA}"
           echo "::notice::Push on build: ${PUSH_ON_BUILD}"

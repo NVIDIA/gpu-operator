@@ -23,19 +23,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   fetch-latest-images:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
       
       - name: Install regctl
-        run: |
-          REGCTL_VERSION=v0.9.2
-          mkdir -p bin
-          curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
-          chmod +x bin/regctl
-          echo "$(pwd)/bin" >> $GITHUB_PATH
+        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        with:
+          release: v0.11.1
       
       - name: Get latest component images and generate values override file
         env:
@@ -76,6 +77,7 @@ jobs:
 
   notify-failure:
     runs-on: ubuntu-latest
+    permissions: {}
     needs: [fetch-latest-images, run-e2e-tests]
     if: ${{ always() && (needs.fetch-latest-images.result == 'failure' || needs.run-e2e-tests.result == 'failure') && secrets.SLACK_BOT_TOKEN != '' }}
     steps:

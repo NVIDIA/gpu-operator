@@ -86,16 +86,20 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@master
+        uses: mikefarah/yq@v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
+        env:
+          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
-          echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
+          echo "instance_hostname=ubuntu@${PUBLIC_DNS_NAME}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
       - name: Write SSH key
+        env:
+          AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
         run: |
-          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+          echo "${AWS_SSH_KEY}" > ${private_key} && chmod 400 ${private_key}
       - name: Copy values override file to remote
         if: ${{ inputs.use_values_override }}
         run: |
@@ -147,16 +151,20 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@master
+        uses: mikefarah/yq@v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
+        env:
+          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
-          echo "instance_hostname=ubuntu@${{ steps.get_public_dns_name.outputs.result }}" >> $GITHUB_ENV
+          echo "instance_hostname=ubuntu@${PUBLIC_DNS_NAME}" >> $GITHUB_ENV
           echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
       - name: Write SSH key
+        env:
+          AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
         run: |
-          echo "${{ secrets.AWS_SSH_KEY }}" > ${private_key} && chmod 400 ${private_key}
+          echo "${AWS_SSH_KEY}" > ${private_key} && chmod 400 ${private_key}
       - name: Copy values override file to remote
         if: ${{ inputs.use_values_override }}
         run: |
