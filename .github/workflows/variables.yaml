@@ -96,7 +96,8 @@ jobs:
           fi
 
           # Image and version information (with override support)
-          OPERATOR_IMAGE_BASE="ghcr.io/nvidia/gpu-operator"
+          LOWERCASE_REPO_OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | awk '{print tolower($0)}')
+          OPERATOR_IMAGE_BASE="ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator"
           if [[ -n "${INPUT_OPERATOR_VERSION}" ]]; then
             OPERATOR_VERSION="${INPUT_OPERATOR_VERSION}"
           else
