@@ -29,6 +29,7 @@ permissions: {}
 jobs:
   variables:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       commit_short_sha: ${{ steps.vars.outputs.commit_short_sha }}
       operator_image_base: ${{ steps.vars.outputs.operator_image_base }}
@@ -60,6 +61,7 @@ jobs:
   release-latest-gpu-operator-image:
     needs: [variables]
     runs-on: linux-amd64-cpu4
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write

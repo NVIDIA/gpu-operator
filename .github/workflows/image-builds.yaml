@@ -33,6 +33,7 @@ on:
 jobs:
   variables:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       commit_short_sha: ${{ steps.vars.outputs.commit_short_sha }}
       label_image_source: ${{ steps.vars.outputs.label_image_source }}
@@ -77,6 +78,7 @@ jobs:
   build-gpu-operator-arm64:
     needs: [variables]
     runs-on: linux-arm64-cpu4
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write
@@ -108,6 +110,7 @@ jobs:
   build-gpu-operator-amd64:
     needs: [variables]
     runs-on: linux-amd64-cpu4
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write
@@ -139,6 +142,7 @@ jobs:
   build-multi-arch-images:
     needs: [variables, build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         name: Check out code

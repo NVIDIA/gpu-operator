@@ -65,6 +65,7 @@ jobs:
   e2e-tests-containerd:
     needs: [variables]
     runs-on: linux-amd64-cpu4
+    timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
@@ -130,6 +131,7 @@ jobs:
   e2e-tests-nvidiadriver:
     needs: [variables]
     runs-on: linux-amd64-cpu4
+    timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
