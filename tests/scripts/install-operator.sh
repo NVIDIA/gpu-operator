@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 if [[ "${SKIP_INSTALL}" == "true" ]]; then
     echo "Skipping install: SKIP_INSTALL=${SKIP_INSTALL}"
@@ -6,9 +7,9 @@ if [[ "${SKIP_INSTALL}" == "true" ]]; then
 fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${SCRIPT_DIR}/.definitions.sh
+source "${SCRIPT_DIR}/.definitions.sh"
 
-OPERATOR_REPOSITORY=$(dirname ${OPERATOR_IMAGE})
+OPERATOR_REPOSITORY=$(dirname "${OPERATOR_IMAGE}")
 
 # Determine if we should use values file approach or --set flags
 USE_VALUES_FILE=false
