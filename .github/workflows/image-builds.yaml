@@ -44,11 +44,16 @@ jobs:
     steps:
       - name: Calculate build variables
         id: vars
+        env:
+          INPUT_COMMIT_SHORT_SHA: ${{ inputs.commit_short_sha }}
+          INPUT_LABEL_IMAGE_SOURCE: ${{ inputs.label_image_source }}
+          INPUT_PUSH_ON_BUILD: ${{ inputs.push_on_build }}
+          INPUT_OPERATOR_IMAGE_BASE: ${{ inputs.operator_image_base }}
         run: |
-          COMMIT_SHORT_SHA="${{ inputs.commit_short_sha }}"
-          LABEL_IMAGE_SOURCE="${{ inputs.label_image_source }}"
-          PUSH_ON_BUILD="${{ inputs.push_on_build }}"
-          OPERATOR_IMAGE_BASE="${{ inputs.operator_image_base }}"
+          COMMIT_SHORT_SHA="${INPUT_COMMIT_SHORT_SHA}"
+          LABEL_IMAGE_SOURCE="${INPUT_LABEL_IMAGE_SOURCE}"
+          PUSH_ON_BUILD="${INPUT_PUSH_ON_BUILD}"
+          OPERATOR_IMAGE_BASE="${INPUT_OPERATOR_IMAGE_BASE}"
 
           # Calculate derived image names
           OPERATOR_IMAGE_ARM64="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}-arm64"
