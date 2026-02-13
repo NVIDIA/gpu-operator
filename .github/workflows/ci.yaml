@@ -51,6 +51,13 @@ jobs:
       id-token: write
     uses: ./.github/workflows/golang-checks.yaml
 
+  coverage:
+    needs: [golang-checks]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/coverage.yaml
+
   image-builds:
     needs: [variables, config-checks, golang-checks]
     permissions:
