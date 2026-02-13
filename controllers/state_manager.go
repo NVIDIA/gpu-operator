@@ -488,11 +488,10 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	}
 
 	clusterHasNFDLabels := false
-	updateLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		node := node
-
+		updateLabels := false
 		nodeOriginal := node.DeepCopy()
 		// get node labels
 		labels := node.GetLabels()
