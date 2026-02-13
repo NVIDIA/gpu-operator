@@ -12,6 +12,8 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
+  resourceNames:
+  - privileged
 - apiGroups:
   - ""
   resources:
