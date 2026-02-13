@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ "${SKIP_INSTALL}" == "true" ]]; then
+if [[ "${SKIP_INSTALL:-}" == "true" ]]; then
     echo "Skipping install: SKIP_INSTALL=${SKIP_INSTALL}"
     exit 0
 fi
