@@ -1,0 +1,117 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      commit_short_sha:
+        required: true
+        type: string
+      operator_image_base:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  variables:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit_short_sha: ${{ steps.vars.outputs.commit_short_sha }}
+      operator_image_base: ${{ steps.vars.outputs.operator_image_base }}
+      operator_image_source: ${{ steps.vars.outputs.operator_image_source }}
+      operator_image_latest: ${{ steps.vars.outputs.operator_image_latest }}
+    steps:
+      - name: Calculate release variables
+        id: vars
+        env:
+          INPUT_COMMIT_SHORT_SHA: ${{ inputs.commit_short_sha }}
+          INPUT_OPERATOR_IMAGE_BASE: ${{ inputs.operator_image_base }}
+        run: |
+          COMMIT_SHORT_SHA="${INPUT_COMMIT_SHORT_SHA}"
+          OPERATOR_IMAGE_BASE="${INPUT_OPERATOR_IMAGE_BASE}"
+
+          # Calculate derived values
+          OPERATOR_IMAGE_SOURCE="${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}"
+          OPERATOR_IMAGE_LATEST="${OPERATOR_IMAGE_BASE}:main-latest"
+
+          # Output all variables
+          echo "commit_short_sha=${COMMIT_SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "operator_image_base=${OPERATOR_IMAGE_BASE}" >> $GITHUB_OUTPUT
+          echo "operator_image_source=${OPERATOR_IMAGE_SOURCE}" >> $GITHUB_OUTPUT
+          echo "operator_image_latest=${OPERATOR_IMAGE_LATEST}" >> $GITHUB_OUTPUT
+
+          # Display for debugging
+          echo "::notice::Releasing: ${OPERATOR_IMAGE_SOURCE} → ${OPERATOR_IMAGE_LATEST}"
+
+  release-latest-gpu-operator-image:
+    needs: [variables]
+    runs-on: linux-amd64-cpu4
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        with:
+          release: v0.11.1
+      - name: Retag gpu-operator
+        env:
+          OPERATOR_IMAGE_SOURCE: ${{ needs.variables.outputs.operator_image_source }}
+          OPERATOR_IMAGE_LATEST: ${{ needs.variables.outputs.operator_image_latest }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          regctl registry login ghcr.io -u $GITHUB_ACTOR -p ${GH_TOKEN}
+          regctl image copy ${OPERATOR_IMAGE_SOURCE} ${OPERATOR_IMAGE_LATEST}
+
+  push-gpu-operator-bundle-image:
+    needs: [variables, release-latest-gpu-operator-image]
+    runs-on: linux-amd64-cpu4
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Check out code
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update bundle CSV
+        env:
+          COMMIT_SHORT_SHA: ${{ needs.variables.outputs.commit_short_sha }}
+          OPERATOR_IMAGE_BASE: ${{ needs.variables.outputs.operator_image_base }}
+        run: |
+          sed -i -e "s|${OPERATOR_IMAGE_BASE}:[^ \"]*|${OPERATOR_IMAGE_BASE}:${COMMIT_SHORT_SHA}|g" bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+          echo "Bundle CSV updated successfully"
+      - name: Build bundle-image
+        env:
+          COMMIT_SHORT_SHA: ${{ needs.variables.outputs.commit_short_sha }}
+          VERSION: ""
+          DEFAULT_CHANNEL: "stable"
+          CHANNELS: "stable"
+        run: |
+          BUNDLE_IMAGE_BASE="ghcr.io/nvidia/gpu-operator/gpu-operator-bundle"
+          make push-bundle-image BUNDLE_IMAGE=${BUNDLE_IMAGE_BASE}:${{ github.ref_name }}-latest
+          make push-bundle-image BUNDLE_IMAGE=${BUNDLE_IMAGE_BASE}:${COMMIT_SHORT_SHA}
+
