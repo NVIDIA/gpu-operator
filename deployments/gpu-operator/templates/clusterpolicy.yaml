@@ -688,6 +688,9 @@ spec:
     {{- if .Values.sandboxWorkloads.defaultWorkload }}
     defaultWorkload: {{ .Values.sandboxWorkloads.defaultWorkload }}
     {{- end }}
+    {{- if .Values.sandboxWorkloads.mode }}
+    mode: {{ .Values.sandboxWorkloads.mode | quote }}
+    {{- end }}
   sandboxDevicePlugin:
     {{- if .Values.sandboxDevicePlugin.enabled }}
     enabled: {{ .Values.sandboxDevicePlugin.enabled }}
@@ -715,4 +718,29 @@ spec:
     {{- end }}
     {{- if .Values.sandboxDevicePlugin.args }}
     args: {{ toYaml .Values.sandboxDevicePlugin.args | nindent 6 }}
+    {{- end }}
+  kataSandboxDevicePlugin:
+    {{- if .Values.kataSandboxDevicePlugin.repository }}
+    repository: {{ .Values.kataSandboxDevicePlugin.repository }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.image }}
+    image: {{ .Values.kataSandboxDevicePlugin.image }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.version }}
+    version: {{ .Values.kataSandboxDevicePlugin.version | quote }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.kataSandboxDevicePlugin.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.kataSandboxDevicePlugin.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.resources }}
+    resources: {{ toYaml .Values.kataSandboxDevicePlugin.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.env }}
+    env: {{ toYaml .Values.kataSandboxDevicePlugin.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.args }}
+    args: {{ toYaml .Values.kataSandboxDevicePlugin.args | nindent 6 }}
     {{- end }}
