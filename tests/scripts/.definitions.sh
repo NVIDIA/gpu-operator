@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-[[ -z "${DEBUG}" ]] || set -x
+[[ -z "${DEBUG:-}" ]] || set -x
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TEST_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
