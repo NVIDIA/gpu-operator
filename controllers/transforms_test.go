@@ -143,6 +143,11 @@ func (d Daemonset) WithTolerations(tolerations []corev1.Toleration) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithPodSecurityContext(psc *corev1.PodSecurityContext) Daemonset {
+	d.Spec.Template.Spec.SecurityContext = psc
+	return d
+}
+
 func (d Daemonset) WithPodLabels(labels map[string]string) Daemonset {
 	d.Spec.Template.Labels = labels
 	return d
@@ -707,6 +712,24 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 					MaxUnavailable: "10%abc",
 				}},
 			errorExpected: true,
+		},
+		{
+			description: "podSecurityContext configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					RunAsUser:    ptr.To(int64(1000)),
+					RunAsGroup:   ptr.To(int64(3000)),
+					FSGroup:      ptr.To(int64(2000)),
+					RunAsNonRoot: ptr.To(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithPodSecurityContext(&corev1.PodSecurityContext{
+				RunAsUser:    ptr.To(int64(1000)),
+				RunAsGroup:   ptr.To(int64(3000)),
+				FSGroup:      ptr.To(int64(2000)),
+				RunAsNonRoot: ptr.To(true),
+			}),
 		},
 	}
 

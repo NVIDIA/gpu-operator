@@ -245,6 +245,9 @@ type DaemonsetsSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Rolling update configuration for all DaemonSet pods"
 	RollingUpdate *RollingUpdateSpec `json:"rollingUpdate,omitempty"`
+
+	// Optional: Set pod-level security context for all DaemonSet pods (applies as defaults to all containers)
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
 // Deprecated: InitContainerSpec describes configuration for initContainer image used with all components
