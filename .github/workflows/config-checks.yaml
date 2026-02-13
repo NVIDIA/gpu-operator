@@ -21,6 +21,7 @@ on:
 jobs:
   helm-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -31,6 +32,7 @@ jobs:
 
   validate-csv:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -47,6 +49,7 @@ jobs:
 
   validate-helm-values:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
