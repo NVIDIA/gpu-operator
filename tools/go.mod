@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/jandelgado/gcov2lcov v1.1.1
 	k8s.io/code-generator v0.35.0
-	sigs.k8s.io/controller-tools v0.20.0
+	sigs.k8s.io/controller-tools v0.20.1
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.0
 )
 
