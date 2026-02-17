@@ -135,10 +135,14 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
+    custom-annotation-1: custom-value-1
+    custom-annotation-2: custom-value-2
     openshift.io/scc: nvidia-gpu-driver-ubuntu22.04
   labels:
     app: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b
     app.kubernetes.io/component: nvidia-driver
+    custom-label-1: custom-value-1
+    custom-label-2: custom-value-2
     nvidia.com/node.os-version: ubuntu22.04
     nvidia.com/precompiled: "false"
   name: nvidia-gpu-driver-ubuntu22.04-7c6d7bd86b

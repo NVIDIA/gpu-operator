@@ -20,10 +20,16 @@ metadata:
     openshift.driver-toolkit.rhcos-image-missing: "true"
     {{- end }}
     {{- end }}
+    {{- if .Driver.Spec.Labels }}
+    {{- .Driver.Spec.Labels | yaml | nindent 4 }}
+    {{- end }}
   name: {{ .Driver.AppName }}
   namespace: {{ .Runtime.Namespace }}
   annotations:
     openshift.io/scc: {{ .Driver.Name }}
+    {{- if .Driver.Spec.Annotations }}
+    {{- .Driver.Spec.Annotations | yaml | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:
