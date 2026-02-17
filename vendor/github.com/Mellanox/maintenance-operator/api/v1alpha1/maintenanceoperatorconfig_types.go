@@ -52,8 +52,8 @@ type MaintenanceOperatorConfigSpec struct {
 	// MaxNodeMaintenanceTimeSeconds is the time from when a NodeMaintenance is marked as ready (phase: Ready)
 	// until the NodeMaintenance is considered stale and removed by the operator.
 	// should be less than idle time for any autoscaler that is running.
-	// default to 30m (1600 seconds)
-	// +kubebuilder:default=1600
+	// default to 60m (3600 seconds)
+	// +kubebuilder:default=3600
 	// +kubebuilder:validation:Minimum:=0
 	MaxNodeMaintenanceTimeSeconds int32 `json:"maxNodeMaintenanceTimeSeconds,omitempty"`
 }
