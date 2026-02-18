@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
 const (
@@ -950,11 +951,26 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		n.logger.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++
 		// Cleanup all driver daemonsets owned by ClusterPolicy.
-		err := n.cleanupAllDriverDaemonSets(n.ctx)
+		// Use orphanPods=true to keep driver pods running during the transition.
+		err := n.cleanupAllDriverDaemonSets(n.ctx, true)
 		if err != nil {
 			return gpuv1.NotReady, fmt.Errorf("failed to cleanup all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 		}
 		return gpuv1.Disabled, nil
+	}
+
+	// If NVIDIADriver CRD is NOT enabled, clean up any stale driver daemonsets owned by NVIDIADriver CRs
+	// This handles the case where NVIDIADriver was previously used but now ClusterPolicy manages drivers
+	if (n.stateNames[n.idx] == "state-driver" || n.stateNames[n.idx] == "state-vgpu-manager") &&
+		!n.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
+		n.logger.Info("NVIDIADriver CRD is disabled, cleaning up any stale NVIDIA driver daemonsets owned by NVIDIADriver CRs")
+		// Use orphanPods=true to keep driver pods running during the transition
+		err := n.cleanupNVIDIADriverOwnedDaemonSets(n.ctx, true)
+		if err != nil {
+			// Log error but don't fail - continue with ClusterPolicy-managed driver deployment
+			n.logger.Error(err, "failed to cleanup stale NVIDIA driver daemonsets owned by NVIDIADriver CRs")
+		}
+		// Note: Labeling nodes with orphaned driver pods is handled at the top-level reconciliation loop
 	}
 
 	for _, fs := range n.controls[n.idx] {
@@ -982,6 +998,17 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 
 func (n ClusterPolicyController) last() bool {
 	return n.idx == len(n.controls)
+}
+
+// hasNVIDIADriverCRs checks if there are any NVIDIADriver CRs in the cluster
+func (n ClusterPolicyController) hasNVIDIADriverCRs(ctx context.Context) bool {
+	list := &nvidiav1alpha1.NVIDIADriverList{}
+	err := n.client.List(ctx, list)
+	if err != nil {
+		n.logger.Error(err, "failed to list NVIDIADriver CRs")
+		return false
+	}
+	return len(list.Items) > 0
 }
 
 func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
