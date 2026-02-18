@@ -54,6 +54,10 @@
       "versioningTemplate": "loose"
     }
   ],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
   "packageRules": [
     {
       "matchPaths": ["deployments/gpu-operator/values.yaml"],
