@@ -197,6 +197,12 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PriorityClassName"
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Optional: Set pod-level security context for driver pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="PodSecurityContext"
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
 // ResourceRequirements describes the compute resource requirements.
