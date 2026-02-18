@@ -69,13 +69,11 @@ spec:
       terminationGracePeriodSeconds: 120
       {{- end }}
       nodeSelector:
+        nvidia.com/gpu.driver.managed-by: {{ .Driver.CRName }}
         {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
         nvidia.com/gpu.deploy.vgpu-manager: "true"
         {{- else }}
         nvidia.com/gpu.deploy.driver: "true"
-        {{- end }}
-        {{- if .Driver.Spec.NodeSelector }}
-        {{- .Driver.Spec.NodeSelector | yaml | nindent 8 }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         feature.node.kubernetes.io/system-os_release.OSTREE_VERSION: {{ .Openshift.RHCOSVersion | quote }}

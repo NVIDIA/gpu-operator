@@ -27,12 +27,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,6 +49,11 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
+)
+
+const (
+	nvidiaDriverNodeLabelFinalizer = "nvidia.com/nvidiadriver-node-labels"
+	managedByLabel                 = "nvidia.com/gpu.driver.managed-by"
 )
 
 // NVIDIADriverReconciler reconciles a NVIDIADriver object
@@ -95,6 +102,19 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, wrappedErr
+	}
+
+	// Handle deletion: cleanup labels and finalizer
+	if !instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, instance)
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(instance, nvidiaDriverNodeLabelFinalizer) {
+		if err := r.addFinalizer(ctx, instance); err != nil {
+			logger.Error(err, "failed to add finalizer")
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
@@ -149,6 +169,12 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
+	}
+
+	// Reconcile node labels
+	if err := r.reconcileNodeLabels(ctx, instance); err != nil {
+		logger.Error(err, "failed to reconcile node labels")
+		return reconcile.Result{}, err
 	}
 
 	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
@@ -218,6 +244,146 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, condErr
 	}
 	return reconcile.Result{}, nil
+}
+
+// addFinalizer adds a finalizer to the NVIDIADriver resource
+func (r *NVIDIADriverReconciler) addFinalizer(ctx context.Context, instance *nvidiav1alpha1.NVIDIADriver) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Adding finalizer to NVIDIADriver")
+	patch := client.MergeFrom(instance.DeepCopy())
+	controllerutil.AddFinalizer(instance, nvidiaDriverNodeLabelFinalizer)
+	if err := r.Patch(ctx, instance, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// reconcileDelete handles the deletion of a NVIDIADriver resource
+// It ensures that any node labels managed by this NVIDIADriver are cleaned up
+func (r *NVIDIADriverReconciler) reconcileDelete(ctx context.Context, instance *nvidiav1alpha1.NVIDIADriver) (reconcile.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if controllerutil.ContainsFinalizer(instance, nvidiaDriverNodeLabelFinalizer) {
+		logger.Info("NVIDIADriver is being deleted, cleaning up node labels")
+
+		// Remove node labels before deleting
+		if err := r.cleanupNodeLabels(ctx, instance); err != nil {
+			logger.Error(err, "failed to cleanup node labels")
+			return reconcile.Result{}, err
+		}
+
+		// Remove the finalizer
+		patch := client.MergeFrom(instance.DeepCopy())
+		controllerutil.RemoveFinalizer(instance, nvidiaDriverNodeLabelFinalizer)
+		if err := r.Patch(ctx, instance, patch); err != nil {
+			return reconcile.Result{}, err
+		}
+		logger.Info("Finalizer removed, NVIDIADriver will be deleted")
+	}
+	return reconcile.Result{}, nil
+}
+
+// reconcileNodeLabels ensures that the node labels for the NVIDIADriver resource are correctly set
+func (r *NVIDIADriverReconciler) reconcileNodeLabels(ctx context.Context, nvd *nvidiav1alpha1.NVIDIADriver) error {
+	logger := log.FromContext(ctx)
+
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		logger.Error(err, "failed to list nodes")
+		return err
+	}
+
+	selector := labels.SelectorFromSet(nvd.Spec.NodeSelector)
+
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+
+		nodeLabels := node.GetLabels()
+		if nodeLabels == nil {
+			nodeLabels = make(map[string]string)
+		}
+
+		matches := selector.Matches(labels.Set(nodeLabels))
+		current, exists := nodeLabels[managedByLabel]
+
+		var desired *string
+		if matches {
+			desired = &nvd.Name
+		}
+
+		// Only update if:
+		// 1. We want to add/change label and it doesn't exist or is different, OR
+		// 2. We want to remove label and it exists with OUR value
+		needsUpdate :=
+			(desired != nil && (!exists || current != *desired)) ||
+				(desired == nil && exists && current == nvd.Name)
+
+		if !needsUpdate {
+			continue
+		}
+
+		nodeCopy := node.DeepCopy()
+		newLabels := maps.Clone(nodeLabels)
+
+		if desired != nil {
+			logger.Info("Setting driver management node label",
+				"node", node.Name,
+				"label", managedByLabel,
+				"desired", *desired,
+			)
+			newLabels[managedByLabel] = *desired
+		} else {
+			logger.Info("Removing driver management node label",
+				"node", node.Name,
+				"label", managedByLabel,
+			)
+			delete(newLabels, managedByLabel)
+		}
+
+		node.SetLabels(newLabels)
+		if err := r.Patch(ctx, node, client.MergeFrom(nodeCopy)); err != nil {
+			logger.Error(err, "failed to update node label", "node", node.Name)
+			return err
+		}
+	}
+	return nil
+}
+
+// cleanupNodeLabels removes the managed-by label from all nodes managed by the given NVIDIADriver
+func (r *NVIDIADriverReconciler) cleanupNodeLabels(ctx context.Context, nvd *nvidiav1alpha1.NVIDIADriver) error {
+	logger := log.FromContext(ctx)
+
+	nodeList := &corev1.NodeList{}
+	if err := r.List(ctx, nodeList); err != nil {
+		logger.Error(err, "failed to list nodes during cleanup")
+		return err
+	}
+
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		nodeLabels := node.GetLabels()
+		if nodeLabels == nil {
+			continue
+		}
+
+		currentValue, hasLabel := nodeLabels[managedByLabel]
+		if hasLabel && currentValue == nvd.Name {
+			logger.Info("Removing driver management label from node during cleanup", "node", node.Name)
+			nodeCopy := node.DeepCopy()
+			// Clone the labels map to avoid modifying the original
+			newLabels := maps.Clone(nodeLabels)
+			delete(newLabels, managedByLabel)
+			node.SetLabels(newLabels)
+			patch := client.MergeFrom(nodeCopy)
+			if err := r.Patch(ctx, node, patch); err != nil {
+				logger.Error(err, "failed to remove label from node", "node", node.Name)
+				return err
+			}
+		}
+	}
+
+	logger.Info(fmt.Sprintf("Successfully cleaned up %s node labels for NVIDIADriver %s", managedByLabel, nvd.Name))
+	return nil
 }
 
 func (r *NVIDIADriverReconciler) updateCrStatus(
