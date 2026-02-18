@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.9.1-0.20251202135446-d0f42ba016dd
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20260215183545-a0a0256b9c5e
-	github.com/NVIDIA/nvidia-container-toolkit v1.19.0-rc.2
+	github.com/NVIDIA/nvidia-container-toolkit v1.19.0-rc.3
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
