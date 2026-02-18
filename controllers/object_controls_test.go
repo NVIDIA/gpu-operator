@@ -1790,8 +1790,7 @@ func TestRuntimeClasses(t *testing.T) {
 	}
 }
 
-// getMIGManagerTestInput returns a ClusterPolicy instance for a particular
-// MIG Manager test case. This function will grow as new test cases are added
+// getMIGManagerTestInput returns a ClusterPolicy instance for a given MIG Manager test case
 func getMIGManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp := clusterPolicy.DeepCopy()
 
@@ -1819,23 +1818,21 @@ func getMIGManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	return cp
 }
 
-// getMIGManagerTestOutput returns a map containing expected output for
-// MIG Manager test case. This function will grow as new test cases are added
+// getMIGManagerTestOutput returns expected output for a MIG Manager test case
 func getMIGManagerTestOutput(testCase string) map[string]interface{} {
-	// default output
 	output := map[string]interface{}{
 		"numDaemonsets":          1,
 		"migManagerImage":        "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.5.0",
 		"imagePullSecret":        "ngc-secret",
-		"migConfigVolumePresent": false,
-		"env":                    map[string]string{},
+		"migConfigVolumePresent": true,
+		"env": map[string]string{
+			"DEFAULT_CONFIG_FILE": "/mig-parted-config/config-default.yaml",
+		},
 	}
 
 	switch testCase {
 	case "default":
-		// No config volume
 	case "custom-config":
-		output["migConfigVolumePresent"] = true
 		output["env"] = map[string]string{
 			"CONFIG_FILE": "/mig-parted-config/config.yaml",
 		}
