@@ -56,10 +56,6 @@ spec:
             memory: 50Mi
         securityContext:
           allowPrivilegeEscalation: false
-        volumeMounts:
-          - mountPath: /host-etc/os-release
-            name: host-os-release
-            readOnly: true
         env:
           - name: OPERATOR_NAMESPACE
             valueFrom:
@@ -72,7 +68,3 @@ spec:
           - name: metrics
             containerPort: 8080
       terminationGracePeriodSeconds: 10
-      volumes:
-        - hostPath:
-            path: /etc/os-release
-          name: host-os-release

@@ -59,10 +59,6 @@ spec:
               fieldPath: metadata.namespace
         - name: "DRIVER_MANAGER_IMAGE"
           value: "{{ include "driver-manager.fullimage" . }}"
-        volumeMounts:
-          - name: host-os-release
-            mountPath: "/host-etc/os-release"
-            readOnly: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -82,10 +78,6 @@ spec:
         ports:
           - name: metrics
             containerPort: 8080
-      volumes:
-        - name: host-os-release
-          hostPath:
-            path: "/etc/os-release"
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
