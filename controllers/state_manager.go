@@ -438,7 +438,7 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 		updateRequired := false
 		value := "true"
 		annotationValue, annotationExists := node.Annotations[driverAutoUpgradeAnnotationKey]
-		if n.singleton.Spec.Driver.IsEnabled() &&
+		if (n.singleton.Spec.Driver.IsEnabled() || n.singleton.Spec.Driver.UseNvidiaDriverCRDType()) &&
 			n.singleton.Spec.Driver.UpgradePolicy != nil &&
 			n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade &&
 			!n.sandboxEnabled {
