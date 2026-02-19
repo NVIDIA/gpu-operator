@@ -17,11 +17,9 @@
 package controllers
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -1001,36 +999,6 @@ func setNRIPluginAnnotation(o *metav1.ObjectMeta, cdiConfig *gpuv1.CDIConfigSpec
 	annotationKey := fmt.Sprintf("%s/container.%s", NRIAnnotationDomain, containerName)
 	annotations[annotationKey] = managementCDIDevice
 	o.Annotations = annotations
-}
-
-// parseOSRelease can be overridden in tests for mocking filesystem access.
-// In production, it reads and parses /host-etc/os-release.
-var parseOSRelease = parseOSReleaseFromFile
-
-// osReleaseFilePath is the path to the os-release file, configurable for testing.
-var osReleaseFilePath = "/host-etc/os-release"
-
-// parseOSReleaseFromFile reads and parses the os-release file from the host filesystem.
-func parseOSReleaseFromFile() (map[string]string, error) {
-	release := map[string]string{}
-
-	f, err := os.Open(osReleaseFilePath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	re := regexp.MustCompile(`^(?P<key>\w+)=(?P<value>.+)`)
-
-	// Read line-by-line
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if m := re.FindStringSubmatch(line); m != nil {
-			release[m[1]] = strings.Trim(m[2], `"`)
-		}
-	}
-	return release, nil
 }
 
 func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPolicySpec) error {
@@ -3299,9 +3267,9 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	return image, nil
 }
 
-// gpuNodeOSID returns the base OS identifier (e.g. "rhel", "ubuntu", "rocky") for GPU
+// getGPUNodeOSID returns the base OS identifier (e.g. "rhel", "ubuntu", "rocky") for GPU
 // worker nodes by extracting the version suffix from the osTag obtained via NFD labels.
-func (n ClusterPolicyController) gpuNodeOSID() (string, string, error) {
+func (n ClusterPolicyController) getGPUNodeOSID() (string, string, error) {
 	_, osTag, _ := kernelFullVersion(n)
 	if osTag == "" {
 		return "", "", fmt.Errorf("unable to determine GPU node OS from NFD labels, is NFD installed?")
@@ -3314,7 +3282,7 @@ func (n ClusterPolicyController) gpuNodeOSID() (string, string, error) {
 
 // getRepoConfigPath returns the standard OS specific path for repository configuration files.
 func (n ClusterPolicyController) getRepoConfigPath() (string, error) {
-	osID, osTag, err := n.gpuNodeOSID()
+	osID, osTag, err := n.getGPUNodeOSID()
 	if err != nil {
 		return "", err
 	}
@@ -3326,7 +3294,7 @@ func (n ClusterPolicyController) getRepoConfigPath() (string, error) {
 
 // getCertConfigPath returns the standard OS specific path for ssl keys/certificates.
 func (n ClusterPolicyController) getCertConfigPath() (string, error) {
-	osID, osTag, err := n.gpuNodeOSID()
+	osID, osTag, err := n.getGPUNodeOSID()
 	if err != nil {
 		return "", err
 	}
@@ -3338,17 +3306,15 @@ func (n ClusterPolicyController) getCertConfigPath() (string, error) {
 
 // getSubscriptionPathsToVolumeSources returns the MountPathToVolumeSource map containing all
 // OS-specific subscription/entitlement paths that need to be mounted in the container.
-func getSubscriptionPathsToVolumeSources() (MountPathToVolumeSource, error) {
-	release, err := parseOSRelease()
+func (n ClusterPolicyController) getSubscriptionPathsToVolumeSources() (MountPathToVolumeSource, error) {
+	osID, osTag, err := n.getGPUNodeOSID()
 	if err != nil {
 		return nil, err
 	}
-
-	os := release["ID"]
-	if pathToVolumeSource, ok := SubscriptionPathMap[os]; ok {
+	if pathToVolumeSource, ok := SubscriptionPathMap[osID]; ok {
 		return pathToVolumeSource, nil
 	}
-	return nil, fmt.Errorf("distribution not supported")
+	return nil, fmt.Errorf("subscription paths not found for distribution %s", osTag)
 }
 
 // createConfigMapVolumeMounts creates a VolumeMount for each key
@@ -3612,15 +3578,14 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 
-	release, err := parseOSRelease()
+	osID, _, err := n.getGPUNodeOSID()
 	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
+		return fmt.Errorf("ERROR: failed to retrieve OS name of GPU Node: %w", err)
 	}
-
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
-	if (release["ID"] == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || release["ID"] == "sles" || release["ID"] == "sl-micro" {
-		n.logger.Info("Mounting subscriptions into the driver container", "OS", release["ID"])
-		pathToVolumeSource, err := getSubscriptionPathsToVolumeSources()
+	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
+		n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
+		pathToVolumeSource, err := n.getSubscriptionPathsToVolumeSources()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
 		}
@@ -3648,8 +3613,8 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	}
 
 	// apply proxy and env settings if this is an OpenShift cluster
-	if _, ok := release["OPENSHIFT_VERSION"]; ok {
-		setContainerEnv(driverContainer, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
+	if len(n.openshift) > 0 {
+		setContainerEnv(driverContainer, "OPENSHIFT_VERSION", n.openshift)
 
 		// Automatically apply proxy settings for OCP and inject custom CA if configured by user
 		// https://docs.openshift.com/container-platform/4.6/networking/configuring-a-custom-pki.html
@@ -3720,14 +3685,9 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		container.Args = config.VGPUManager.Args
 	}
 
-	release, err := parseOSRelease()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get os-release: %s", err)
-	}
-
 	// add env for OCP
-	if _, ok := release["OPENSHIFT_VERSION"]; ok {
-		setContainerEnv(container, "OPENSHIFT_VERSION", release["OPENSHIFT_VERSION"])
+	if len(n.openshift) > 0 {
+		setContainerEnv(container, "OPENSHIFT_VERSION", n.openshift)
 	}
 
 	if len(config.VGPUManager.Env) > 0 {

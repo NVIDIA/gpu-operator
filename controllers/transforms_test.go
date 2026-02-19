@@ -50,8 +50,10 @@ func initMockK8sClients() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -2866,7 +2868,7 @@ func TestTransformDriver(t *testing.T) {
 			client: mockClientMap["secret-env-client"],
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "nvidia-driver-ctr",
-				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
@@ -2887,7 +2889,7 @@ func TestTransformDriver(t *testing.T) {
 				},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-fs",
-				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-",
+				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-ubuntu20.04",
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -2897,7 +2899,7 @@ func TestTransformDriver(t *testing.T) {
 				}},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-gdrcopy",
-				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-",
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-ubuntu20.04",
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -3176,8 +3178,10 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -3215,7 +3219,7 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 			client: mockClient,
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "nvidia-driver-ctr",
-				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				VolumeMounts: []corev1.VolumeMount{
 					{
@@ -3269,7 +3273,7 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 			client: mockClient,
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "nvidia-driver-ctr",
-				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				VolumeMounts: []corev1.VolumeMount{
 					{
@@ -3326,8 +3330,10 @@ func TestTransformDriverWithResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -3387,7 +3393,7 @@ func TestTransformDriverWithResources(t *testing.T) {
 			client: mockClient,
 			expectedDs: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "nvidia-driver-ctr",
-				Image:           "nvcr.io/nvidia/driver:570.172.08-",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Resources: corev1.ResourceRequirements{
 					Requests: resources.Requests,
@@ -3405,14 +3411,14 @@ func TestTransformDriverWithResources(t *testing.T) {
 				},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-fs",
-				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-",
+				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-ubuntu20.04",
 				Resources: corev1.ResourceRequirements{
 					Requests: resources.Requests,
 					Limits:   resources.Limits,
 				},
 			}).WithContainer(corev1.Container{
 				Name:  "nvidia-gdrcopy",
-				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-",
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-ubuntu20.04",
 				Resources: corev1.ResourceRequirements{
 					Requests: resources.Requests,
 					Limits:   resources.Limits,
@@ -3448,8 +3454,10 @@ func TestTransformDriverRDMA(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -3478,7 +3486,7 @@ func TestTransformDriverRDMA(t *testing.T) {
 
 	expectedDs := NewDaemonset().WithContainer(corev1.Container{
 		Name:            "nvidia-driver-ctr",
-		Image:           "nvcr.io/nvidia/driver:570.172.08-",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env: []corev1.EnvVar{
 			{
@@ -3505,7 +3513,7 @@ func TestTransformDriverRDMA(t *testing.T) {
 		},
 	}).WithContainer(corev1.Container{
 		Name:  "nvidia-peermem",
-		Image: "nvcr.io/nvidia/driver:570.172.08-",
+		Image: "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 		Env: []corev1.EnvVar{
 			{
 				Name:  "USE_HOST_MOFED",
@@ -3529,8 +3537,10 @@ func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -3555,7 +3565,7 @@ func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
 
 	expectedDs := NewDaemonset().WithContainer(corev1.Container{
 		Name:            "nvidia-driver-ctr",
-		Image:           "nvcr.io/nvidia/driver:570.172.08-",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -3813,6 +3823,98 @@ func TestTransformVGPUManager(t *testing.T) {
 					},
 				},
 			}, tc.daemonset.Spec.Template.Spec.Volumes[0])
+		})
+	}
+}
+
+func TestTransformDriverWithAdditionalConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "24.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+
+	testCertConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cert",
+			Namespace: "test-ns",
+		},
+	}
+
+	mockClient := fake.NewFakeClient(node, testCertConfigMap)
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "transform driver with cert config",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					CertConfig: &gpuv1.DriverCertConfigSpec{
+						Name: "test-cert",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:580.126.16-ubuntu24.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithVolume(corev1.Volume{
+				Name: "test-cert",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cert",
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Remove dynamically generated digest before comparison
+			removeDigestFromDaemonSet(tc.ds.DaemonSet)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
 }
