@@ -2932,7 +2932,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-fs-ctr.
-			destinationDir, err := getRepoConfigPath()
+			destinationDir, err := n.getRepoConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
@@ -2945,7 +2945,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 		// set any custom ssl key/certificate configuration provided
 		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
-			destinationDir, err := getCertConfigPath()
+			destinationDir, err := n.getCertConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
 			}
@@ -3025,7 +3025,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-gdrcopy-ctr.
-			destinationDir, err := getRepoConfigPath()
+			destinationDir, err := n.getRepoConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
@@ -3038,7 +3038,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 		// set any custom ssl key/certificate configuration provided
 		if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
-			destinationDir, err := getCertConfigPath()
+			destinationDir, err := n.getCertConfigPath()
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
 			}
@@ -3299,32 +3299,41 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	return image, nil
 }
 
-// getRepoConfigPath returns the standard OS specific path for repository configuration files
-func getRepoConfigPath() (string, error) {
-	release, err := parseOSRelease()
-	if err != nil {
-		return "", err
+// gpuNodeOSID returns the base OS identifier (e.g. "rhel", "ubuntu", "rocky") for GPU
+// worker nodes by extracting the version suffix from the osTag obtained via NFD labels.
+func (n ClusterPolicyController) gpuNodeOSID() (string, string, error) {
+	_, osTag, _ := kernelFullVersion(n)
+	if osTag == "" {
+		return "", "", fmt.Errorf("unable to determine GPU node OS from NFD labels, is NFD installed?")
 	}
-
-	os := release["ID"]
-	if path, ok := RepoConfigPathMap[os]; ok {
-		return path, nil
-	}
-	return "", fmt.Errorf("distribution not supported")
+	// Extract base OS ID by stripping version suffix from osTag
+	// Examples: "rhel10" -> "rhel", "ubuntu22.04" -> "ubuntu", "rocky9" -> "rocky"
+	osID := strings.TrimRight(osTag, "0123456789.")
+	return osID, osTag, nil
 }
 
-// getCertConfigPath returns the standard OS specific path for ssl keys/certificates
-func getCertConfigPath() (string, error) {
-	release, err := parseOSRelease()
+// getRepoConfigPath returns the standard OS specific path for repository configuration files.
+func (n ClusterPolicyController) getRepoConfigPath() (string, error) {
+	osID, osTag, err := n.gpuNodeOSID()
 	if err != nil {
 		return "", err
 	}
-
-	os := release["ID"]
-	if path, ok := CertConfigPathMap[os]; ok {
+	if path, ok := RepoConfigPathMap[osID]; ok {
 		return path, nil
 	}
-	return "", fmt.Errorf("distribution not supported")
+	return "", fmt.Errorf("repository configuration not supported for distribution %s", osTag)
+}
+
+// getCertConfigPath returns the standard OS specific path for ssl keys/certificates.
+func (n ClusterPolicyController) getCertConfigPath() (string, error) {
+	osID, osTag, err := n.gpuNodeOSID()
+	if err != nil {
+		return "", err
+	}
+	if path, ok := CertConfigPathMap[osID]; ok {
+		return path, nil
+	}
+	return "", fmt.Errorf("certificate configuration not supported for distribution %s", osTag)
 }
 
 // getSubscriptionPathsToVolumeSources returns the MountPathToVolumeSource map containing all
@@ -3569,7 +3578,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set any custom repo configuration provided when using runfile based driver installation
 	if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" {
-		destinationDir, err := getRepoConfigPath()
+		destinationDir, err := n.getRepoConfigPath()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 		}
@@ -3583,9 +3592,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set any custom ssl key/certificate configuration provided
 	if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
-		destinationDir, err := getCertConfigPath()
+		destinationDir, err := n.getCertConfigPath()
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
+			return fmt.Errorf("ERROR: failed to get destination directory for custom cert config: %v", err)
 		}
 		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
 		if err != nil {
