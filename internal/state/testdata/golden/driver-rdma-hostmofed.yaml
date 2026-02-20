@@ -185,7 +185,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: DRIVER_CONFIG_DIGEST
-          value: "193112138"
+          value: "2598951297"
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         - name: USE_HOST_MOFED
@@ -356,7 +356,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DRIVER_CONFIG_DIGEST
-          value: "193112138"
+          value: "2598951297"
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         - name: USE_HOST_MOFED

@@ -799,14 +799,14 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 }
 
 // applyCommonDaemonsetMetadata adds additional labels and annotations to the daemonset podSpec if there are any specified
-// by the user in the podSpec
+// by the user in the podSpec.
 func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
 	if len(dsSpec.Labels) > 0 {
 		if obj.Spec.Template.Labels == nil {
 			obj.Spec.Template.Labels = make(map[string]string)
 		}
 		for labelKey, labelValue := range dsSpec.Labels {
-			// if the user specifies an override of the "app" or the ""app.kubernetes.io/part-of"" key, we skip it.
+			// if the user specifies an override of the "app" or the "app.kubernetes.io/part-of" key, we skip it.
 			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
 			// with the existing daemon set selectors.
 			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
@@ -842,6 +842,11 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	// set tolerations if specified
 	if len(config.Daemonsets.Tolerations) > 0 {
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
+	}
+
+	// set pod-level security context if specified (applies as defaults to all containers in the pod)
+	if config.Daemonsets.PodSecurityContext != nil {
+		obj.Spec.Template.Spec.SecurityContext = config.Daemonsets.PodSecurityContext
 	}
 	return nil
 }

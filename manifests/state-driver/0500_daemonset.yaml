@@ -104,6 +104,10 @@ spec:
       priorityClassName: {{ default "system-node-critical" .Driver.Spec.PriorityClassName }}
       serviceAccountName: {{ .Driver.Name }}
       hostPID: true
+      {{- if .Driver.Spec.PodSecurityContext }}
+      securityContext:
+        {{- .Driver.Spec.PodSecurityContext | yaml | nindent 8 }}
+      {{- end }}
       # Add any configured pull secrets
       {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) (and .GDRCopy .GDRCopy.Spec.ImagePullSecrets) }}
       imagePullSecrets:
