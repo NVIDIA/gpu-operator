@@ -2054,6 +2054,13 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
 	}
 
+	// Used to determine if GPUs are already bound to vfio-pci (avoids disrupting active VM workloads)
+	// Set to gpuWorkloadConfigVMPassthrough since VFIO Manager only runs on vm-passthrough nodes.
+	driverManagerContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+	if driverManagerContainer != nil {
+		setContainerEnv(driverManagerContainer, "GPU_WORKLOAD_CONFIG", gpuWorkloadConfigVMPassthrough)
+	}
+
 	// update image
 	image, err := gpuv1.ImagePath(&config.VFIOManager)
 	if err != nil {
