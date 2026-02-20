@@ -1086,6 +1086,15 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		setContainerEnv(driverToolkitContainer, "DRIVER_CONFIG_DIGEST", configDigest)
 	}
 
+	// add nodeSelector for MOFED wait label when GPUDirect RDMA is enabled
+	if config.Driver.GPUDirectRDMA != nil &&
+		config.Driver.GPUDirectRDMA.IsEnabled() &&
+		!config.Driver.GPUDirectRDMA.IsHostMOFED() {
+		if obj.Spec.Template.Spec.NodeSelector == nil {
+			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
+		obj.Spec.Template.Spec.NodeSelector["network.nvidia.com/operator.mofed.wait"] = "false"
+	}
 	return nil
 }
 
