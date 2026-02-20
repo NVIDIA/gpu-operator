@@ -14,22 +14,19 @@
 # limitations under the License.
 **/
 
-package utils
+package config
 
 import (
 	"sort"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
-// DriverInstallConfig lists all fields that affect driver installation.
+// DriverInstallState lists all fields that affect driver installation.
 // Changes to these fields trigger a driver reinstall.
 //
 // This struct is shared by two code paths:
-//   - ClusterPolicy (ExtractDriverInstallConfig): extracts fields from a
+//   - ClusterPolicy (extractDriverInstallConfig): extracts fields from a
 //     fully-transformed DaemonSet. Fields like KernelModuleType and proxy
 //     settings are captured implicitly through env vars and volumes rather than
 //     as top-level struct fields.
@@ -37,7 +34,7 @@ import (
 //     directly from the CR spec before the DaemonSet is rendered.
 //
 // Fields that are only relevant to one path are left zero-valued by the other.
-type DriverInstallConfig struct {
+type DriverInstallState struct {
 	// Container images
 	DriverImage        string
 	DriverManagerImage string
@@ -55,10 +52,10 @@ type DriverInstallConfig struct {
 	DriverArgs    []string
 
 	// Per-container environment variables (direct values only, not ValueFrom)
-	DriverEnv  []nvidiav1alpha1.EnvVar
-	ManagerEnv []nvidiav1alpha1.EnvVar
-	GDSEnv     []nvidiav1alpha1.EnvVar
-	GDRCopyEnv []nvidiav1alpha1.EnvVar
+	DriverEnv  []EnvVar
+	ManagerEnv []EnvVar
+	GDSEnv     []EnvVar
+	GDRCopyEnv []EnvVar
 
 	// Name of the Secret used as an EnvFrom source on the driver container
 	SecretEnvSource string
@@ -119,86 +116,21 @@ type VolumeMountConfig struct {
 	ReadOnly  bool
 }
 
-// ExtractDriverInstallConfig extracts driver-relevant fields from a
-// post-transformation DaemonSetSpec (ClusterPolicy path). Fields like
-// KernelModuleType and proxy settings are captured implicitly via the
-// per-container env var maps rather than as top-level struct fields.
-func ExtractDriverInstallConfig(spec *appsv1.DaemonSetSpec) *DriverInstallConfig {
-	config := &DriverInstallConfig{}
-	podSpec := spec.Template.Spec
-
-	for i := range podSpec.InitContainers {
-		c := &podSpec.InitContainers[i]
-		if c.Name == "k8s-driver-manager" {
-			config.DriverManagerImage = c.Image
-			config.ManagerEnv = extractEnvVars(c.Env)
-		}
-	}
-
-	for i := range podSpec.Containers {
-		c := &podSpec.Containers[i]
-		switch c.Name {
-		case "nvidia-driver-ctr":
-			config.DriverImage = c.Image
-			config.DriverCommand = c.Command
-			config.DriverArgs = c.Args
-			config.DriverEnv = extractEnvVars(c.Env)
-			for _, ef := range c.EnvFrom {
-				if ef.SecretRef != nil {
-					config.SecretEnvSource = ef.SecretRef.Name
-				}
-			}
-			config.AdditionalVolumeMounts = ExtractVolumeMounts(c.VolumeMounts)
-		case "nvidia-peermem-ctr":
-			config.PeermemImage = c.Image
-			config.GPUDirectRDMAEnabled = true
-		case "nvidia-fs-ctr":
-			config.GDSImage = c.Image
-			config.GDSEnabled = true
-			config.GDSEnv = extractEnvVars(c.Env)
-		case "nvidia-gdrcopy-ctr":
-			config.GDRCopyImage = c.Image
-			config.GDRCopyEnabled = true
-			config.GDRCopyEnv = extractEnvVars(c.Env)
-		case "openshift-driver-toolkit-ctr":
-			config.DTKImage = c.Image
-			config.DTKEnabled = true
-		}
-	}
-
-	config.AdditionalVolumes = ExtractVolumes(podSpec.Volumes)
-	for _, v := range podSpec.Volumes {
-		if v.Name == "host-root" && v.HostPath != nil {
-			config.HostRoot = v.HostPath.Path
-		}
-	}
-
-	return config
+// EnvVar mirrors the API EnvVar type to avoid a dependency on the API package.
+type EnvVar struct {
+	Name  string
+	Value string
 }
 
 // SortEnvVars returns a sorted copy of the given env vars for deterministic hashing.
-func SortEnvVars(envs []nvidiav1alpha1.EnvVar) []nvidiav1alpha1.EnvVar {
+func SortEnvVars(envs []EnvVar) []EnvVar {
 	if len(envs) == 0 {
 		return envs
 	}
-	sorted := make([]nvidiav1alpha1.EnvVar, len(envs))
+	sorted := make([]EnvVar, len(envs))
 	copy(sorted, envs)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	return sorted
-}
-
-// extractEnvVars extracts env vars with direct values, skipping ValueFrom
-// (FieldRef, etc.) since those are not part of the driver install configuration.
-// Results are sorted by name for deterministic hashing.
-func extractEnvVars(envs []corev1.EnvVar) []nvidiav1alpha1.EnvVar {
-	var result []nvidiav1alpha1.EnvVar
-	for _, e := range envs {
-		if e.ValueFrom != nil {
-			continue
-		}
-		result = append(result, nvidiav1alpha1.EnvVar{Name: e.Name, Value: e.Value})
-	}
-	return SortEnvVars(result)
 }
 
 // ExtractVolumeMounts converts corev1.VolumeMounts to a digest-stable

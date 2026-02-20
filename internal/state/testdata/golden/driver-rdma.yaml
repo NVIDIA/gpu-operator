@@ -185,7 +185,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: DRIVER_CONFIG_DIGEST
-          value: "801674241"
+          value: "687866737"
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
@@ -352,7 +352,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DRIVER_CONFIG_DIGEST
-          value: "801674241"
+          value: "687866737"
         - name: GPU_DIRECT_RDMA_ENABLED
           value: "true"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel

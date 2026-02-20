@@ -43,6 +43,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
 	"github.com/NVIDIA/gpu-operator/internal/render"
@@ -102,7 +103,7 @@ type driverRenderData struct {
 // ConfigDigest computes a hash of all driver-install-relevant fields.
 // Called automatically by the Go template via {{ .ConfigDigest }}.
 func (d *driverRenderData) ConfigDigest() string {
-	return utils.GetObjectHash(buildDriverInstallConfig(d))
+	return utils.GetObjectHashIgnoreEmptyKeys(buildDriverInstallConfig(d))
 }
 
 func NewStateDriver(
@@ -722,10 +723,19 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
 }
 
-// buildDriverInstallConfig maps render data fields to a DriverInstallConfig
+// toConfigEnvVars converts API EnvVar slices to the config package's EnvVar type.
+func toConfigEnvVars(envs []nvidiav1alpha1.EnvVar) []driverconfig.EnvVar {
+	result := make([]driverconfig.EnvVar, len(envs))
+	for i, e := range envs {
+		result[i] = driverconfig.EnvVar{Name: e.Name, Value: e.Value}
+	}
+	return result
+}
+
+// buildDriverInstallConfig maps render data fields to a DriverInstallState
 // for digest computation in the NVIDIADriver CRD path.
-func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig {
-	config := &utils.DriverInstallConfig{}
+func buildDriverInstallConfig(data *driverRenderData) *driverconfig.DriverInstallState {
+	config := &driverconfig.DriverInstallState{}
 
 	if data.Driver != nil {
 		config.DriverImage = data.Driver.ImagePath
@@ -735,8 +745,8 @@ func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig
 		config.DriverArgs = data.Driver.Spec.Args
 		config.SecretEnvSource = data.Driver.Spec.SecretEnv
 
-		config.DriverEnv = data.Driver.Spec.Env
-		config.ManagerEnv = data.Driver.Spec.Manager.Env
+		config.DriverEnv = toConfigEnvVars(data.Driver.Spec.Env)
+		config.ManagerEnv = toConfigEnvVars(data.Driver.Spec.Manager.Env)
 
 		if data.Driver.Spec.LicensingConfig != nil && data.Driver.Spec.LicensingConfig.SecretName != "" {
 			config.LicensingConfigName = data.Driver.Spec.LicensingConfig.SecretName
@@ -771,7 +781,7 @@ func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig
 			config.GDSEnabled = *data.GDS.Spec.Enabled
 		}
 		if data.GDS.Spec != nil {
-			config.GDSEnv = data.GDS.Spec.Env
+			config.GDSEnv = toConfigEnvVars(data.GDS.Spec.Env)
 		}
 	}
 
@@ -781,7 +791,7 @@ func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig
 			config.GDRCopyEnabled = *data.GDRCopy.Spec.Enabled
 		}
 		if data.GDRCopy.Spec != nil {
-			config.GDRCopyEnv = data.GDRCopy.Spec.Env
+			config.GDRCopyEnv = toConfigEnvVars(data.GDRCopy.Spec.Env)
 		}
 	}
 
@@ -809,17 +819,17 @@ func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig
 	}
 
 	if data.AdditionalConfigs != nil {
-		config.AdditionalVolumeMounts = utils.ExtractVolumeMounts(data.AdditionalConfigs.VolumeMounts)
-		config.AdditionalVolumes = utils.ExtractVolumes(data.AdditionalConfigs.Volumes)
+		config.AdditionalVolumeMounts = driverconfig.ExtractVolumeMounts(data.AdditionalConfigs.VolumeMounts)
+		config.AdditionalVolumes = driverconfig.ExtractVolumes(data.AdditionalConfigs.Volumes)
 	}
 
 	config.HostRoot = data.HostRoot
 
 	// Sort env var slices for deterministic hashing (copies to avoid mutating spec data).
-	config.DriverEnv = utils.SortEnvVars(config.DriverEnv)
-	config.ManagerEnv = utils.SortEnvVars(config.ManagerEnv)
-	config.GDSEnv = utils.SortEnvVars(config.GDSEnv)
-	config.GDRCopyEnv = utils.SortEnvVars(config.GDRCopyEnv)
+	config.DriverEnv = driverconfig.SortEnvVars(config.DriverEnv)
+	config.ManagerEnv = driverconfig.SortEnvVars(config.ManagerEnv)
+	config.GDSEnv = driverconfig.SortEnvVars(config.GDSEnv)
+	config.GDRCopyEnv = driverconfig.SortEnvVars(config.GDRCopyEnv)
 
 	return config
 }
