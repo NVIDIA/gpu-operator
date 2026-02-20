@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -779,11 +780,12 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 
 func TestTransformToolkit(t *testing.T) {
 	testCases := []struct {
-		description string
-		ds          Daemonset                // Input DaemonSet
-		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
-		runtime     gpuv1.Runtime
-		expectedDs  Daemonset // Expected output DaemonSet
+		description   string
+		ds            Daemonset                // Input DaemonSet
+		cpSpec        *gpuv1.ClusterPolicySpec // Input configuration
+		runtime       gpuv1.Runtime
+		expectedError error
+		expectedDs    Daemonset // Expected output DaemonSet
 	}{
 		{
 			description: "transform nvidia-container-toolkit-ctr container",
@@ -1004,6 +1006,42 @@ func TestTransformToolkit(t *testing.T) {
 				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
 		},
+		{
+			description:   "no nvidia-container-toolkit-ctr container",
+			ds:            NewDaemonset(),
+			expectedError: errors.New(`failed to find toolkit container "nvidia-container-toolkit-ctr"`),
+			expectedDs:    NewDaemonset(),
+		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container with no-runtime-config",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+					Env: []gpuv1.EnvVar{
+						{Name: "NO_RUNTIME_CONFIG", Value: "true"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "CDI_ENABLED", Value: "true"},
+						{Name: "NVIDIA_RUNTIME_SET_AS_DEFAULT", Value: "false"},
+						{Name: "NVIDIA_CONTAINER_RUNTIME_MODE", Value: "cdi"},
+						{Name: "CRIO_CONFIG_MODE", Value: "config"},
+						{Name: "NO_RUNTIME_CONFIG", Value: "true"},
+					},
+					VolumeMounts: nil,
+				}),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1014,7 +1052,7 @@ func TestTransformToolkit(t *testing.T) {
 			}
 
 			err := TransformToolkit(tc.ds.DaemonSet, tc.cpSpec, controller)
-			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedError, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
