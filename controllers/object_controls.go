@@ -1071,7 +1071,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// hasn't changed, avoiding unnecessary driver reinstalls and pod evictions.
 	// Used by k8s-driver-manager to decide if driver cleanup is needed and by
 	// nvidia-driver container to skip full reinstall for matching configurations.
-	configDigest := utils.GetObjectHash(obj.Spec)
+	driverConfig := utils.ExtractDriverInstallConfig(&obj.Spec)
+	configDigest := utils.GetObjectHash(driverConfig)
 
 	// Set the computed digest in driver-manager initContainer
 	driverManagerContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")

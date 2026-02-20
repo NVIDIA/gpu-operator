@@ -99,6 +99,12 @@ type driverRenderData struct {
 	HostRoot          string
 }
 
+// ConfigDigest computes a hash of all driver-install-relevant fields.
+// Called automatically by the Go template via {{ .ConfigDigest }}.
+func (d *driverRenderData) ConfigDigest() string {
+	return utils.GetObjectHash(buildDriverInstallConfig(d))
+}
+
 func NewStateDriver(
 	k8sClient client.Client,
 	namespace string,
@@ -714,4 +720,106 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 		},
 	}
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+}
+
+// buildDriverInstallConfig maps render data fields to a DriverInstallConfig
+// for digest computation in the NVIDIADriver CRD path.
+func buildDriverInstallConfig(data *driverRenderData) *utils.DriverInstallConfig {
+	config := &utils.DriverInstallConfig{}
+
+	if data.Driver != nil {
+		config.DriverImage = data.Driver.ImagePath
+		config.DriverManagerImage = data.Driver.ManagerImagePath
+		config.DriverType = string(data.Driver.Spec.DriverType)
+		config.KernelModuleType = data.Driver.Spec.KernelModuleType
+		config.DriverArgs = data.Driver.Spec.Args
+		config.SecretEnvSource = data.Driver.Spec.SecretEnv
+
+		config.DriverEnv = data.Driver.Spec.Env
+		config.ManagerEnv = data.Driver.Spec.Manager.Env
+
+		if data.Driver.Spec.LicensingConfig != nil && data.Driver.Spec.LicensingConfig.SecretName != "" {
+			config.LicensingConfigName = data.Driver.Spec.LicensingConfig.SecretName
+		}
+		if data.Driver.Spec.VirtualTopologyConfig != nil {
+			config.VirtualTopologyConfig = data.Driver.Spec.VirtualTopologyConfig.Name
+		}
+		if data.Driver.Spec.KernelModuleConfig != nil {
+			config.KernelModuleConfig = data.Driver.Spec.KernelModuleConfig.Name
+		}
+		if data.Driver.Spec.RepoConfig != nil {
+			config.RepoConfig = data.Driver.Spec.RepoConfig.Name
+		}
+		if data.Driver.Spec.CertConfig != nil {
+			config.CertConfig = data.Driver.Spec.CertConfig.Name
+		}
+	}
+
+	if data.GPUDirectRDMA != nil && data.GPUDirectRDMA.Enabled != nil && *data.GPUDirectRDMA.Enabled {
+		config.GPUDirectRDMAEnabled = true
+		if data.Driver != nil {
+			config.PeermemImage = data.Driver.ImagePath
+		}
+		if data.GPUDirectRDMA.UseHostMOFED != nil {
+			config.UseHostMOFED = *data.GPUDirectRDMA.UseHostMOFED
+		}
+	}
+
+	if data.GDS != nil {
+		config.GDSImage = data.GDS.ImagePath
+		if data.GDS.Spec != nil && data.GDS.Spec.Enabled != nil {
+			config.GDSEnabled = *data.GDS.Spec.Enabled
+		}
+		if data.GDS.Spec != nil {
+			config.GDSEnv = data.GDS.Spec.Env
+		}
+	}
+
+	if data.GDRCopy != nil {
+		config.GDRCopyImage = data.GDRCopy.ImagePath
+		if data.GDRCopy.Spec != nil && data.GDRCopy.Spec.Enabled != nil {
+			config.GDRCopyEnabled = *data.GDRCopy.Spec.Enabled
+		}
+		if data.GDRCopy.Spec != nil {
+			config.GDRCopyEnv = data.GDRCopy.Spec.Env
+		}
+	}
+
+	if data.Runtime != nil {
+		config.OpenshiftVersion = data.Runtime.OpenshiftVersion
+		config.DTKEnabled = data.Runtime.OpenshiftDriverToolkitEnabled
+		if data.Runtime.OpenshiftProxySpec != nil {
+			config.HTTPProxy = data.Runtime.OpenshiftProxySpec.HTTPProxy
+			config.HTTPSProxy = data.Runtime.OpenshiftProxySpec.HTTPSProxy
+			config.NoProxy = data.Runtime.OpenshiftProxySpec.NoProxy
+			if data.Runtime.OpenshiftProxySpec.TrustedCA.Name != "" {
+				config.TrustedCAConfigMapName = data.Runtime.OpenshiftProxySpec.TrustedCA.Name
+			}
+		}
+	}
+
+	if data.Openshift != nil {
+		config.DTKImage = data.Openshift.ToolkitImage
+		config.RHCOSVersion = data.Openshift.RHCOSVersion
+	}
+
+	if data.Precompiled != nil {
+		config.UsePrecompiled = true
+		config.KernelVersion = data.Precompiled.KernelVersion
+	}
+
+	if data.AdditionalConfigs != nil {
+		config.AdditionalVolumeMounts = utils.ExtractVolumeMounts(data.AdditionalConfigs.VolumeMounts)
+		config.AdditionalVolumes = utils.ExtractVolumes(data.AdditionalConfigs.Volumes)
+	}
+
+	config.HostRoot = data.HostRoot
+
+	// Sort env var slices for deterministic hashing (copies to avoid mutating spec data).
+	config.DriverEnv = utils.SortEnvVars(config.DriverEnv)
+	config.ManagerEnv = utils.SortEnvVars(config.ManagerEnv)
+	config.GDSEnv = utils.SortEnvVars(config.GDSEnv)
+	config.GDRCopyEnv = utils.SortEnvVars(config.GDRCopyEnv)
+
+	return config
 }
