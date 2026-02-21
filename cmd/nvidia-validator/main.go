@@ -1918,6 +1918,22 @@ func (v *VGPUDevices) validate() error {
 }
 
 func (v *VGPUDevices) runValidation() error {
+	nvpci := nvpci.New()
+	GPUDevices, err := nvpci.GetGPUs()
+	if err != nil {
+		return fmt.Errorf("error checking for GPU devices on the host: %w", err)
+	}
+
+	for _, device := range GPUDevices {
+		creatableTypesFile := filepath.Join(device.Path, "virtfn0", "nvidia", "creatable_vgpu_types")
+
+		_, statErr := os.Stat(creatableTypesFile)
+	    if statErr == nil {
+		    log.Infof("Found creatable_vgpu_types file for device: %s", device.Address)
+			return nil
+	    }
+	}
+
 	nvmdev := nvmdev.New()
 	vGPUDevices, err := nvmdev.GetAllDevices()
 	if err != nil {
@@ -1930,14 +1946,14 @@ func (v *VGPUDevices) runValidation() error {
 			return fmt.Errorf("no vGPU devices found")
 		}
 
-		log.Infof("Found %d vGPU devices", numDevices)
+		log.Infof("Found %d MDEV vGPU devices", numDevices)
 		return nil
 	}
 
 	for {
 		numDevices := len(vGPUDevices)
 		if numDevices > 0 {
-			log.Infof("Found %d vGPU devices", numDevices)
+			log.Infof("Found %d MDEV vGPU devices", numDevices)
 			return nil
 		}
 		log.Infof("No vGPU devices found, retrying after %d seconds", sleepIntervalSecondsFlag)
