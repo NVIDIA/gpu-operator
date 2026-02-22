@@ -1016,6 +1016,14 @@ func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
 	case "standalone-dcgm":
 		dcgmEnabled := true
 		cp.Spec.DCGM.Enabled = &dcgmEnabled
+	case "podLabelsAndAnnotations":
+		cp.Spec.DCGMExporter.PodAnnotations = map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/port":   "9400",
+		}
+		cp.Spec.DCGMExporter.PodLabels = map[string]string{
+			"team": "test",
+		}
 	default:
 		return nil
 	}
@@ -1031,14 +1039,24 @@ func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
 		"numDaemonsets":     1,
 		"dcgmExporterImage": "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu22.04",
 		"imagePullSecret":   "ngc-secret",
+		"env":               map[string]string{},
+		"podLabels":         map[string]string{},
+		"podAnnotations":    map[string]string{},
 	}
 
 	switch testCase {
 	case "default":
-		output["env"] = map[string]string{}
 	case "standalone-dcgm":
 		output["env"] = map[string]string{
 			"DCGM_REMOTE_HOSTENGINE_INFO": "nvidia-dcgm:5555",
+		}
+	case "podLabelsAndAnnotations":
+		output["podLabels"] = map[string]string{
+			"team": "test",
+		}
+		output["podAnnotations"] = map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/port":   "9400",
 		}
 	default:
 		return nil
@@ -1064,6 +1082,11 @@ func TestDCGMExporter(t *testing.T) {
 			"StandalongDCGM",
 			getDCGMExporterTestInput("standalone-dcgm"),
 			getDCGMExporterTestOutput("standalone-dcgm"),
+		},
+		{
+			"podLabelsAndAnnotations",
+			getDCGMExporterTestInput("podLabelsAndAnnotations"),
+			getDCGMExporterTestOutput("podLabelsAndAnnotations"),
 		},
 	}
 
@@ -1093,6 +1116,18 @@ func TestDCGMExporter(t *testing.T) {
 				}
 				if !envFound {
 					t.Fatalf("Expected env is not set for daemonset nvidia-dcgm-exporter %s->%s", key, value)
+				}
+			}
+			for key, value := range tc.output["podLabels"].(map[string]string) {
+				objLabelvalue, ok := ds.Spec.Template.Labels[key]
+				if !ok || objLabelvalue != value {
+					t.Fatalf("Expected label is not set for daemonset nvidia-dcgm-exporter %s->%s", key, value)
+				}
+			}
+			for key, value := range tc.output["podAnnotations"].(map[string]string) {
+				objAnnotationValue, ok := ds.Spec.Template.Annotations[key]
+				if !ok || objAnnotationValue != value {
+					t.Fatalf("Expected annotation is not set for daemonset nvidia-dcgm-exporter %s->%s", key, value)
 				}
 			}
 

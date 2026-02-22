@@ -276,6 +276,8 @@ dcgmExporter:
   image: dcgm-exporter
   version: 4.5.1-4.8.0-distroless
   imagePullPolicy: IfNotPresent
+  podAnnotations: {}
+  podLabels: {}
   env: []
   resources: {}
   hostPID: false

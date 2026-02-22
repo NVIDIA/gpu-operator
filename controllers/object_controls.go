@@ -1757,6 +1757,26 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.Containers[0].Args = config.DCGMExporter.Args
 	}
 
+	// set labels if specified for exporter container
+	if obj.Spec.Template.ObjectMeta.Labels == nil {
+		obj.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+	}
+	for labelKey, labelValue := range config.DCGMExporter.PodLabels {
+		// disallow setting app label
+		if labelKey == "app" {
+			continue
+		}
+		obj.Spec.Template.ObjectMeta.Labels[labelKey] = labelValue
+	}
+
+	// set annotations if specified for exporter container
+	if obj.Spec.Template.ObjectMeta.Annotations == nil {
+		obj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for annKey, annValue := range config.DCGMExporter.PodAnnotations {
+		obj.Spec.Template.ObjectMeta.Annotations[annKey] = annValue
+	}
+
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort))

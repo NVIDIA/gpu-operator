@@ -612,6 +612,16 @@ spec:
                     items:
                       type: string
                     type: array
+                  podAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: Optional Pod Annotations for the DCGM Exporter deployment
+                    type: object
+                  podLabels:
+                    additionalProperties:
+                      type: string
+                    description: Optional Pod Labels for the DCGM Exporter deployment
+                    type: object
                   repository:
                     description: NVIDIA DCGM Exporter image repository
                     type: string
