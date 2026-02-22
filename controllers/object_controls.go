@@ -1542,6 +1542,11 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 	devicePluginMainContainer.Image = image
 
+	// set privileged false if overriden
+	if config.Unprivileged {
+		obj.Spec.Template.Spec.Containers[0].SecurityContext.Privileged = false
+	}
+
 	// update image pull policy
 	devicePluginMainContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 
