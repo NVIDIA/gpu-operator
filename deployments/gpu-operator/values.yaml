@@ -19,6 +19,8 @@ cdi:
 sandboxWorkloads:
   enabled: false
   defaultWorkload: "container"
+  # Sandbox mode: "kubevirt" (default) or "kata". When "kata", the Kata device plugin is deployed on vm-passthrough nodes.
+  mode: "kubevirt"
 
 hostPaths:
   # rootFS represents the path to the root filesystem of the host.
@@ -502,6 +504,17 @@ sandboxDevicePlugin:
   repository: nvcr.io/nvidia
   image: kubevirt-gpu-device-plugin
   version: v1.4.0
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  args: []
+  env: []
+  resources: {}
+
+# Kata sandbox device plugin (used when sandboxWorkloads.mode is "kata"). No enabled flag — implied by mode.
+kataSandboxDevicePlugin:
+  repository: nvcr.io/nvidia
+  image: nvidia-sandbox-device-plugin
+  version: v0.0.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []

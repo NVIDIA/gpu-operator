@@ -747,23 +747,24 @@ func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Daemonset", obj.Name)
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-daemonset":                 TransformDriver,
-		"nvidia-vgpu-manager-daemonset":           TransformVGPUManager,
-		"nvidia-vgpu-device-manager":              TransformVGPUDeviceManager,
-		"nvidia-vfio-manager":                     TransformVFIOManager,
-		"nvidia-container-toolkit-daemonset":      TransformToolkit,
-		"nvidia-device-plugin-daemonset":          TransformDevicePlugin,
-		"nvidia-device-plugin-mps-control-daemon": TransformMPSControlDaemon,
-		"nvidia-sandbox-device-plugin-daemonset":  TransformSandboxDevicePlugin,
-		"nvidia-dcgm":                             TransformDCGM,
-		"nvidia-dcgm-exporter":                    TransformDCGMExporter,
-		"nvidia-node-status-exporter":             TransformNodeStatusExporter,
-		"gpu-feature-discovery":                   TransformGPUDiscoveryPlugin,
-		"nvidia-mig-manager":                      TransformMIGManager,
-		"nvidia-operator-validator":               TransformValidator,
-		"nvidia-sandbox-validator":                TransformSandboxValidator,
-		"nvidia-kata-manager":                     TransformKataManager,
-		"nvidia-cc-manager":                       TransformCCManager,
+		"nvidia-driver-daemonset":                     TransformDriver,
+		"nvidia-vgpu-manager-daemonset":               TransformVGPUManager,
+		"nvidia-vgpu-device-manager":                  TransformVGPUDeviceManager,
+		"nvidia-vfio-manager":                         TransformVFIOManager,
+		"nvidia-container-toolkit-daemonset":          TransformToolkit,
+		"nvidia-device-plugin-daemonset":              TransformDevicePlugin,
+		"nvidia-device-plugin-mps-control-daemon":     TransformMPSControlDaemon,
+		"nvidia-sandbox-device-plugin-daemonset":      TransformSandboxDevicePlugin,
+		"nvidia-kata-sandbox-device-plugin-daemonset": TransformKataDevicePlugin,
+		"nvidia-dcgm":                                 TransformDCGM,
+		"nvidia-dcgm-exporter":                        TransformDCGMExporter,
+		"nvidia-node-status-exporter":                 TransformNodeStatusExporter,
+		"gpu-feature-discovery":                       TransformGPUDiscoveryPlugin,
+		"nvidia-mig-manager":                          TransformMIGManager,
+		"nvidia-operator-validator":                   TransformValidator,
+		"nvidia-sandbox-validator":                    TransformSandboxValidator,
+		"nvidia-kata-manager":                         TransformKataManager,
+		"nvidia-cc-manager":                           TransformCCManager,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -1717,6 +1718,40 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	// set/append environment variables for device-plugin container
 	if len(config.SandboxDevicePlugin.Env) > 0 {
 		for _, env := range config.SandboxDevicePlugin.Env {
+			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+		}
+	}
+	return nil
+}
+
+// TransformKataDevicePlugin transforms kata-device-plugin daemonset with required config as per ClusterPolicy
+func TransformKataDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update validation init container image and settings
+	err := transformValidationInitContainer(obj, config)
+	if err != nil {
+		return err
+	}
+	image, err := gpuv1.ImagePath(&config.KataSandboxDevicePlugin)
+	if err != nil {
+		return err
+	}
+	obj.Spec.Template.Spec.Containers[0].Image = image
+
+	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.KataSandboxDevicePlugin.ImagePullPolicy)
+	if len(config.KataSandboxDevicePlugin.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.KataSandboxDevicePlugin.ImagePullSecrets)
+	}
+	if config.KataSandboxDevicePlugin.Resources != nil {
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.KataSandboxDevicePlugin.Resources.Requests
+			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.KataSandboxDevicePlugin.Resources.Limits
+		}
+	}
+	if len(config.KataSandboxDevicePlugin.Args) > 0 {
+		obj.Spec.Template.Spec.Containers[0].Args = config.KataSandboxDevicePlugin.Args
+	}
+	if len(config.KataSandboxDevicePlugin.Env) > 0 {
+		for _, env := range config.KataSandboxDevicePlugin.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
 	}

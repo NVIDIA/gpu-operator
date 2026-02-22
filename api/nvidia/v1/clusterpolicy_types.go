@@ -94,6 +94,8 @@ type ClusterPolicySpec struct {
 	CCManager CCManagerSpec `json:"ccManager,omitempty"`
 	// HostPaths defines various paths on the host needed by GPU Operator components
 	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
+	// KataSandboxDevicePlugin component spec
+	KataSandboxDevicePlugin KataDevicePluginSpec `json:"kataSandboxDevicePlugin,omitempty"`
 }
 
 // Runtime defines container runtime type
@@ -123,6 +125,16 @@ func (r Runtime) String() string {
 		return ""
 	}
 }
+
+// SandboxWorkloadsMode defines the mode for sandbox workloads
+type SandboxWorkloadsMode string
+
+const (
+	// kubevirt mode
+	KubeVirt SandboxWorkloadsMode = "kubevirt"
+	// kata more
+	Kata SandboxWorkloadsMode = "kata"
+)
 
 // OperatorSpec describes configuration options for the operator
 type OperatorSpec struct {
@@ -197,6 +209,10 @@ type SandboxWorkloadsSpec struct {
 	// +kubebuilder:validation:Enum=container;vm-passthrough;vm-vgpu
 	// +kubebuilder:default=container
 	DefaultWorkload string `json:"defaultWorkload,omitempty"`
+	// Mode indicates the sandbox mode (e.g. kubevirt vs kata)
+	// +kubebuilder:validation:Enum=kubevirt;kata
+	// +kubebuilder:default=kubevirt
+	Mode string `json:"mode,omitempty"`
 }
 
 // PSPSpec describes configuration for PodSecurityPolicies to apply for all Pods
@@ -1463,6 +1479,63 @@ type MIGGPUClientsConfigSpec struct {
 	Name string `json:"name,omitempty"`
 }
 
+// ImageSpec defines shared fields for component images
+type ImageSpec struct {
+	// NVIDIA component image repository
+	// +kubebuilder:validation:Optional
+	Repository string `json:"repository,omitempty"`
+
+	// NVIDIA component image name
+	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	Image string `json:"image,omitempty"`
+
+	// NVIDIA component image tag
+	// +kubebuilder:validation:Optional
+	Version string `json:"version,omitempty"`
+
+	// Image pull policy
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image Pull Policy"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:imagePullPolicy"
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+}
+
+// ComponentCommonSpec defines shared fields for components
+type ComponentCommonSpec struct {
+	// Image pull secrets
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Image pull secrets"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of arguments
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Arguments"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Args []string `json:"args,omitempty"`
+
+	// Optional: List of environment variables
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+}
+
+// KataDevicePluginSpec defines attributes for the kata device plugin.
+// The Kata device plugin is deployed when SandboxWorkloads is enabled and SandboxWorkloads.Mode is "kata".
+type KataDevicePluginSpec struct {
+	ImageSpec           `json:",inline"`
+	ComponentCommonSpec `json:",inline"`
+}
+
 // KataManagerSpec defines the configuration for the kata-manager which prepares NVIDIA-specific kata runtimes
 type KataManagerSpec struct {
 	// Enabled indicates if deployment of Kata Manager is enabled
@@ -1904,6 +1977,9 @@ func ImagePath(spec interface{}) (string, error) {
 	case *CCManagerSpec:
 		config := spec.(*CCManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "CC_MANAGER_IMAGE")
+	case *KataDevicePluginSpec:
+		config := spec.(*KataDevicePluginSpec)
+		return imagePath(config.Repository, config.Image, config.Version, "KATA_DEVICE_PLUGIN_IMAGE")
 	default:
 		return "", fmt.Errorf("invalid type to construct image path: %v", v)
 	}

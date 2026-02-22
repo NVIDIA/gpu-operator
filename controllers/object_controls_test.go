@@ -57,6 +57,7 @@ const (
 	driverAssetsPath              = "assets/state-driver/"
 	vGPUManagerAssetsPath         = "assets/state-vgpu-manager/"
 	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
+	kataDevicePluginAssetsPath    = "assets/state-kata-device-plugin"
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
 	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
 	migManagerAssetsPath          = "assets/state-mig-manager/"
@@ -393,6 +394,24 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.SandboxDevicePlugin)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for sandbox-device-plugin: %v", err)
+		}
+	case "KataDevicePlugin":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.KataSandboxDevicePlugin.Repository,
+			image:            cp.Spec.KataSandboxDevicePlugin.Image,
+			version:          cp.Spec.KataSandboxDevicePlugin.Version,
+			imagePullPolicy:  cp.Spec.KataSandboxDevicePlugin.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.KataSandboxDevicePlugin.ImagePullSecrets),
+			args:             cp.Spec.KataSandboxDevicePlugin.Args,
+			env:              cp.Spec.KataSandboxDevicePlugin.Env,
+			resources:        cp.Spec.KataSandboxDevicePlugin.Resources,
+		}
+		dsLabel = "nvidia-kata-sandbox-device-plugin-daemonset"
+		mainCtrName = "nvidia-kata-sandbox-device-plugin-ctr"
+		manifestFile = filepath.Join(cfg.root, kataDevicePluginAssetsPath)
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.KataSandboxDevicePlugin)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for kata-device-plugin: %v", err)
 		}
 	case "DCGMExporter":
 		spec = commonDaemonsetSpec{
@@ -896,6 +915,7 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 	// Until we create sample ClusterPolicies that have all fields
 	// set, hardcode some default values:
+	cp.Spec.SandboxWorkloads.Mode = "kubevirt"
 	cp.Spec.SandboxDevicePlugin.Repository = "nvcr.io/nvidia"
 	cp.Spec.SandboxDevicePlugin.Image = "kubevirt-device-plugin"
 	cp.Spec.SandboxDevicePlugin.Version = "v1.1.0"
@@ -984,6 +1004,110 @@ func TestSandboxDevicePlugin(t *testing.T) {
 
 func TestSandboxDevicePluginAssets(t *testing.T) {
 	manifestPath := filepath.Join(cfg.root, sandboxDevicePluginAssetsPath)
+	// add manifests
+	addState(&clusterPolicyController, manifestPath)
+
+	// create resources
+	_, err := clusterPolicyController.step()
+	if err != nil {
+		t.Errorf("error creating resources: %v", err)
+	}
+}
+
+// getKataDevicePluginTestInput returns a ClusterPolicy instance for a particular
+// kata device plugin test case. Kata device plugin is implied when sandboxWorkloads.mode is "kata".
+func getKataDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
+	cp := clusterPolicy.DeepCopy()
+
+	cp.Spec.KataSandboxDevicePlugin.Repository = "nvcr.io/nvidia"
+	cp.Spec.KataSandboxDevicePlugin.Image = "kata-gpu-device-plugin"
+	cp.Spec.KataSandboxDevicePlugin.Version = "v0.0.1"
+	clusterPolicyController.sandboxEnabled = true
+	cp.Spec.SandboxWorkloads.Enabled = boolTrue
+	cp.Spec.SandboxWorkloads.Mode = "kata"
+	cp.Spec.KataSandboxDevicePlugin.ImagePullSecrets = []string{"ngc-secret"}
+
+	cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	cp.Spec.Validator.Image = "gpu-operator-validator"
+	cp.Spec.Validator.Version = "v1.11.0"
+	cp.Spec.Validator.ImagePullSecrets = []string{"ngc-secret"}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return cp
+}
+
+// getKataDevicePluginTestOutput returns a map containing expected output for
+// kata device plugin test case.
+func getKataDevicePluginTestOutput(testCase string) map[string]interface{} {
+	output := map[string]interface{}{
+		"numDaemonsets":   1,
+		"image":           "nvcr.io/nvidia/kata-gpu-device-plugin:v0.0.1",
+		"imagePullSecret": "ngc-secret",
+	}
+
+	switch testCase {
+	case "default":
+		// Do nothing
+	default:
+		return nil
+	}
+
+	return output
+}
+
+// TestKataDevicePlugin tests that the GPU Operator correctly deploys the kata-device-plugin
+// daemonset when sandboxWorkloads.mode is "kata".
+func TestKataDevicePlugin(t *testing.T) {
+	testCases := []struct {
+		description   string
+		clusterPolicy *gpuv1.ClusterPolicy
+		output        map[string]interface{}
+	}{
+		{
+			"Default",
+			getKataDevicePluginTestInput("default"),
+			getKataDevicePluginTestOutput("default"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds, err := testDaemonsetCommon(t, tc.clusterPolicy, "KataDevicePlugin", tc.output["numDaemonsets"].(int))
+			if err != nil {
+				t.Fatalf("error in testDaemonsetCommon(): %v", err)
+			}
+			if ds == nil {
+				return
+			}
+
+			image := ""
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				if strings.Contains(container.Name, "nvidia-kata-sandbox-device-plugin-ctr") {
+					image = container.Image
+					continue
+				}
+			}
+
+			require.Equal(t, tc.output["image"], image, "Unexpected configuration for nvidia-kata-sandbox-device-plugin-ctr image")
+
+			// cleanup by deleting all kubernetes objects
+			err = removeState(&clusterPolicyController, clusterPolicyController.idx-1)
+			if err != nil {
+				t.Fatalf("error removing state %v:", err)
+			}
+			clusterPolicyController.idx--
+		})
+	}
+}
+
+func TestKataDevicePluginAssets(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, kataDevicePluginAssetsPath)
 	// add manifests
 	addState(&clusterPolicyController, manifestPath)
 

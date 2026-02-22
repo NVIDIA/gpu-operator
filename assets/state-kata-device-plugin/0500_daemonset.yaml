@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-kata-sandbox-device-plugin-daemonset
+  name: nvidia-kata-sandbox-device-plugin-daemonset
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    openshift.io/scc: nvidia-kata-sandbox-device-plugin
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-kata-sandbox-device-plugin-daemonset
+  template:
+    metadata:
+      labels:
+        app: nvidia-kata-sandbox-device-plugin-daemonset
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.deploy.kata-device-plugin: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-kata-sandbox-device-plugin
+      initContainers:
+        - name: kata-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args:
+            - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
+              if [ "$(</run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo kata not needed, skipping validation; exit 0; fi;
+              until [ -f /run/nvidia/validations/vfio-pci-ready ]; do echo waiting for vfio-pci driver ...; sleep 5; done;
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: void
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: HostToContainer
+      containers:
+        - image: "FILLED BY THE OPERATOR"
+          imagePullPolicy: IfNotPresent
+          name: nvidia-kata-sandbox-device-plugin-ctr
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: cdi-root
+              mountPath: /var/run/cdi
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+            type: DirectoryOrCreate
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
