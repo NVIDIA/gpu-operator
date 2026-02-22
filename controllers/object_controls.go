@@ -1588,6 +1588,15 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// update env required for CDI support
 	if config.CDI.IsEnabled() {
 		transformDevicePluginCtrForCDI(devicePluginMainContainer, config)
+	} else {
+		// remove the "cdi-validation" init container when CDI is not enabled
+		cdiValidationContainerName := "cdi-validation"
+		for i, container := range obj.Spec.Template.Spec.InitContainers {
+			if container.Name != cdiValidationContainerName {
+				continue
+			}
+			obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers[:i], obj.Spec.Template.Spec.InitContainers[i+1:]...)
+		}
 	}
 
 	// update MPS volumes and set MPS_ROOT env var if a custom MPS root is configured
