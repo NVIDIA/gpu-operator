@@ -648,10 +648,25 @@ spec:
                     description: 'Optional: Service configuration for NVIDIA DCGM
                       Exporter'
                     properties:
+                      externalTrafficPolicy:
+                        description: |- 
+                          Controls how external traffic is routed to the service. 
+                          Valid values are "Cluster" (default) and "Local". Applies to NodePort and LoadBalancer service types only.
+                        enum:
+                        - Cluster
+                        - Local
+                        type: string
                       internalTrafficPolicy:
                         description: InternalTrafficPolicy describes how nodes distribute
                           service traffic they receive on the ClusterIP.
                         type: string
+                      nodePort:
+                        description: |- 
+                          Custom port number to expose for the NodePort service.
+                          Must be between 30000 and 32767.
+                        minimum: 30000
+                        maximum: 32767
+                        type: integer
                       type:
                         description: Type represents the ServiceType which describes
                           ingress methods for a service
