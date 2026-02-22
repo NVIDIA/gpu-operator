@@ -1756,7 +1756,11 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if len(config.DCGMExporter.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.DCGMExporter.Args
 	}
-
+	// set kubeletPath if specified for exporter container
+	if len(config.DCGMExporter.kubeletPath) > 0 {
+		obj.Spec.Template.Spec.volumes[0].path = config.DCGMExporter.kubeletPath
+	}
+	
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort))
