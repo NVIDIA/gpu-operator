@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -1071,7 +1072,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// hasn't changed, avoiding unnecessary driver reinstalls and pod evictions.
 	// Used by k8s-driver-manager to decide if driver cleanup is needed and by
 	// nvidia-driver container to skip full reinstall for matching configurations.
-	configDigest := utils.GetObjectHash(obj.Spec)
+	driverConfig := extractDriverInstallConfig(&obj.Spec)
+	configDigest := utils.GetObjectHashIgnoreEmptyKeys(driverConfig)
 
 	// Set the computed digest in driver-manager initContainer
 	driverManagerContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
@@ -2582,6 +2584,77 @@ func findContainerByName(containers []corev1.Container, name string) *corev1.Con
 		}
 	}
 	return nil
+}
+
+// extractDriverInstallConfig extracts driver-relevant fields from a
+// post-transformation DaemonSetSpec (ClusterPolicy path). Fields like
+// KernelModuleType and proxy settings are captured implicitly via the
+// per-container env var maps rather than as top-level struct fields.
+func extractDriverInstallConfig(spec *appsv1.DaemonSetSpec) *driverconfig.DriverInstallState {
+	config := &driverconfig.DriverInstallState{}
+	podSpec := spec.Template.Spec
+
+	for i := range podSpec.InitContainers {
+		c := &podSpec.InitContainers[i]
+		if c.Name == "k8s-driver-manager" {
+			config.DriverManagerImage = c.Image
+			config.ManagerEnv = extractEnvVars(c.Env)
+		}
+	}
+
+	for i := range podSpec.Containers {
+		c := &podSpec.Containers[i]
+		switch c.Name {
+		case "nvidia-driver-ctr":
+			config.DriverImage = c.Image
+			config.DriverCommand = c.Command
+			config.DriverArgs = c.Args
+			config.DriverEnv = extractEnvVars(c.Env)
+			for _, ef := range c.EnvFrom {
+				if ef.SecretRef != nil {
+					config.SecretEnvSource = ef.SecretRef.Name
+				}
+			}
+			config.AdditionalVolumeMounts = driverconfig.ExtractVolumeMounts(c.VolumeMounts)
+		case "nvidia-peermem-ctr":
+			config.PeermemImage = c.Image
+			config.GPUDirectRDMAEnabled = true
+		case "nvidia-fs-ctr":
+			config.GDSImage = c.Image
+			config.GDSEnabled = true
+			config.GDSEnv = extractEnvVars(c.Env)
+		case "nvidia-gdrcopy-ctr":
+			config.GDRCopyImage = c.Image
+			config.GDRCopyEnabled = true
+			config.GDRCopyEnv = extractEnvVars(c.Env)
+		case "openshift-driver-toolkit-ctr":
+			config.DTKImage = c.Image
+			config.DTKEnabled = true
+		}
+	}
+
+	config.AdditionalVolumes = driverconfig.ExtractVolumes(podSpec.Volumes)
+	for _, v := range podSpec.Volumes {
+		if v.Name == "host-root" && v.HostPath != nil {
+			config.HostRoot = v.HostPath.Path
+		}
+	}
+
+	return config
+}
+
+// extractEnvVars extracts env vars with direct values, skipping ValueFrom
+// (FieldRef, etc.) since those are not part of the driver install configuration.
+// Results are sorted by name for deterministic hashing.
+func extractEnvVars(envs []corev1.EnvVar) []driverconfig.EnvVar {
+	var result []driverconfig.EnvVar
+	for _, e := range envs {
+		if e.ValueFrom != nil {
+			continue
+		}
+		result = append(result, driverconfig.EnvVar{Name: e.Name, Value: e.Value})
+	}
+	return driverconfig.SortEnvVars(result)
 }
 
 func getRuntimeClassName(config *gpuv1.ClusterPolicySpec) string {

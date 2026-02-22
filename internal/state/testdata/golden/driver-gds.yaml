@@ -185,7 +185,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: DRIVER_CONFIG_DIGEST
-          value: "2413833823"
+          value: "104507272"
         - name: GDS_ENABLED
           value: "true"
         image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
@@ -340,7 +340,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DRIVER_CONFIG_DIGEST
-          value: "2413833823"
+          value: "104507272"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager

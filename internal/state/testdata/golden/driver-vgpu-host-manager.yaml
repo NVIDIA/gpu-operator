@@ -185,7 +185,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: DRIVER_CONFIG_DIGEST
-          value: "994226001"
+          value: "495371686"
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-ubuntu22.04
         imagePullPolicy: IfNotPresent
         name: nvidia-driver-ctr
@@ -264,7 +264,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DRIVER_CONFIG_DIGEST
-          value: "994226001"
+          value: "495371686"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
