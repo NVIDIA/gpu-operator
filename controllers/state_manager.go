@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -161,6 +162,7 @@ type ClusterPolicyController struct {
 	ocpDriverToolkit OpenShiftDriverToolkit
 
 	runtime        gpuv1.Runtime
+	gpuNodeOSTag   string
 	hasGPUNodes    bool
 	hasNFDLabels   bool
 	sandboxEnabled bool
@@ -485,9 +487,8 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return false, 0, fmt.Errorf("unable to list nodes to check labels, err %s", err.Error())
+		return false, 0, fmt.Errorf("unable to list nodes to check labels: %w", err)
 	}
-
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
@@ -596,6 +597,45 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
 	}
 	return runtime, nil
+}
+
+func (n *ClusterPolicyController) getGPUNodeOSTag() (string, error) {
+	ctx := n.ctx
+	opts := []client.ListOption{
+		client.MatchingLabels(map[string]string{commonGPULabelKey: commonGPULabelValue}),
+		client.Limit(1),
+	}
+	nodeList := &corev1.NodeList{}
+	err := n.client.List(ctx, nodeList, opts...)
+	if err != nil {
+		return "", fmt.Errorf("unable to list nodes with GPU present: %w", err)
+	}
+	if len(nodeList.Items) == 0 {
+		return "", fmt.Errorf("no nodes found with GPU present")
+	}
+
+	labels := nodeList.Items[0].Labels
+	osName, ok := labels[nfdOSReleaseIDLabelKey]
+	if !ok {
+		return "", fmt.Errorf("unable to retrieve OS name from label %s", nfdOSReleaseIDLabelKey)
+	}
+	osVersion, ok := labels[nfdOSVersionIDLabelKey]
+	if !ok {
+		return "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
+	}
+	osMajorVersion := strings.Split(osVersion, ".")[0]
+	osMajorNumber, err := strconv.Atoi(osMajorVersion)
+	if err != nil {
+		return "", fmt.Errorf("error processing OS major version %s: %w", osMajorVersion, err)
+	}
+
+	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
+	if osName == "rocky" || (osName == "rhel" && osMajorNumber >= 10) {
+		osVersion = osMajorVersion
+	}
+	osTag := fmt.Sprintf("%s%s", osName, osVersion)
+
+	return osTag, nil
 }
 
 func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
@@ -859,6 +899,13 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
 
+	if n.hasGPUNodes {
+		gpuNodeOSTag, err := n.getGPUNodeOSTag()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve GPU node OS tag: %w", err)
+		}
+		n.gpuNodeOSTag = gpuNodeOSTag
+	}
 	// fetch all nodes and annotate gpu nodes
 	err = n.applyDriverAutoUpgradeAnnotation()
 	if err != nil {

@@ -662,67 +662,6 @@ func (n ClusterPolicyController) getKernelVersionsMap() (map[string]string, erro
 	return kernelVersionMap, nil
 }
 
-func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
-	ctx := n.ctx
-	logger := n.logger.WithValues("Request.Namespace", "default", "Request.Name", "Node")
-	// We need the node labels to fetch the correct container
-	opts := []client.ListOption{
-		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
-	}
-
-	list := &corev1.NodeList{}
-	err := n.client.List(ctx, list, opts...)
-	if err != nil {
-		logger.Info("Could not get NodeList", "ERROR", err)
-		return "", "", ""
-	}
-
-	if len(list.Items) == 0 {
-		// none of the nodes matched nvidia GPU label
-		// either the nodes do not have GPUs, or NFD is not running
-		logger.Info("Could not get any nodes to match nvidia.com/gpu.present label", "ERROR", "")
-		return "", "", ""
-	}
-
-	// Assuming all nodes are running the same kernel version,
-	// One could easily add driver-kernel-versions for each node.
-	node := list.Items[0]
-	labels := node.GetLabels()
-
-	var ok bool
-	kFVersion, ok := labels[nfdKernelLabelKey]
-	if ok {
-		logger.Info(kFVersion)
-	} else {
-		err := apierrors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"}, nfdKernelLabelKey)
-		logger.Info("Couldn't get kernelVersion, did you run the node feature discovery?", "Error", err)
-		return "", "", ""
-	}
-
-	osName, ok := labels[nfdOSReleaseIDLabelKey]
-	if !ok {
-		return kFVersion, "", ""
-	}
-	osVersion, ok := labels[nfdOSVersionIDLabelKey]
-	if !ok {
-		return kFVersion, "", ""
-	}
-	osMajorVersion := strings.Split(osVersion, ".")[0]
-	osMajorNumber, err := strconv.Atoi(osMajorVersion)
-	if err != nil {
-		return kFVersion, "", ""
-	}
-
-	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
-	if osName == "rocky" || (osName == "rhel" && osMajorNumber >= 10) {
-		osVersion = osMajorVersion
-	}
-
-	osTag := fmt.Sprintf("%s%s", osName, osVersion)
-
-	return kFVersion, osTag, osVersion
-}
-
 func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Service", obj.Name)
 	transformations := map[string]func(*corev1.Service, *gpuv1.ClusterPolicySpec) error{
@@ -3211,12 +3150,6 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 
 // resolveDriverTag resolves image tag based on the OS of the worker node
 func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string, error) {
-	// obtain os version
-	kvers, osTag, _ := kernelFullVersion(n)
-	if kvers == "" {
-		return "", fmt.Errorf("ERROR: Could not find kernel full version: ('%s', '%s')", kvers, osTag)
-	}
-
 	// obtain image path
 	var image string
 	var err error
@@ -3267,59 +3200,44 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	// if image digest is specified, use it directly
 	if !strings.Contains(image, "sha256:") {
 		// append os-tag to the provided driver version
-		image = fmt.Sprintf("%s-%s", image, osTag)
+		image = fmt.Sprintf("%s-%s", image, n.gpuNodeOSTag)
 	}
 	return image, nil
 }
 
-// getGPUNodeOSID returns the base OS identifier (e.g. "rhel", "ubuntu", "rocky") for GPU
-// worker nodes by extracting the version suffix from the osTag obtained via NFD labels.
-func (n ClusterPolicyController) getGPUNodeOSID() (string, string, error) {
-	_, osTag, _ := kernelFullVersion(n)
-	if osTag == "" {
-		return "", "", fmt.Errorf("unable to determine GPU node OS from NFD labels, is NFD installed?")
-	}
+func getOSName(osTag string) string {
 	// Extract base OS ID by stripping version suffix from osTag
 	// Examples: "rhel10" -> "rhel", "ubuntu22.04" -> "ubuntu", "rocky9" -> "rocky"
 	osID := strings.TrimRight(osTag, "0123456789.")
-	return osID, osTag, nil
+	return osID
 }
 
 // getRepoConfigPath returns the standard OS specific path for repository configuration files.
 func (n ClusterPolicyController) getRepoConfigPath() (string, error) {
-	osID, osTag, err := n.getGPUNodeOSID()
-	if err != nil {
-		return "", err
-	}
+	osID := getOSName(n.gpuNodeOSTag)
 	if path, ok := RepoConfigPathMap[osID]; ok {
 		return path, nil
 	}
-	return "", fmt.Errorf("repository configuration not supported for distribution %s", osTag)
+	return "", fmt.Errorf("repository configuration not supported for distribution %s", n.gpuNodeOSTag)
 }
 
 // getCertConfigPath returns the standard OS specific path for ssl keys/certificates.
 func (n ClusterPolicyController) getCertConfigPath() (string, error) {
-	osID, osTag, err := n.getGPUNodeOSID()
-	if err != nil {
-		return "", err
-	}
+	osID := getOSName(n.gpuNodeOSTag)
 	if path, ok := CertConfigPathMap[osID]; ok {
 		return path, nil
 	}
-	return "", fmt.Errorf("certificate configuration not supported for distribution %s", osTag)
+	return "", fmt.Errorf("certificate configuration not supported for distribution %s", n.gpuNodeOSTag)
 }
 
 // getSubscriptionPathsToVolumeSources returns the MountPathToVolumeSource map containing all
 // OS-specific subscription/entitlement paths that need to be mounted in the container.
 func (n ClusterPolicyController) getSubscriptionPathsToVolumeSources() (MountPathToVolumeSource, error) {
-	osID, osTag, err := n.getGPUNodeOSID()
-	if err != nil {
-		return nil, err
-	}
+	osID := getOSName(n.gpuNodeOSTag)
 	if pathToVolumeSource, ok := SubscriptionPathMap[osID]; ok {
 		return pathToVolumeSource, nil
 	}
-	return nil, fmt.Errorf("subscription paths not found for distribution %s", osTag)
+	return nil, fmt.Errorf("subscription paths not found for distribution %s", n.gpuNodeOSTag)
 }
 
 // createConfigMapVolumeMounts creates a VolumeMount for each key
@@ -3583,10 +3501,7 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 
-	osID, _, err := n.getGPUNodeOSID()
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to retrieve OS name of GPU Node: %w", err)
-	}
+	osID := getOSName(n.gpuNodeOSTag)
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
 		n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)

@@ -2942,7 +2942,7 @@ func TestTransformDriver(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
 				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
-					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -3334,7 +3334,7 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
 				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
-					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -3458,7 +3458,7 @@ func TestTransformDriverWithResources(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
 				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
-					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
 			if tc.errorExpected {
 				require.Error(t, err)
 				return
@@ -3547,7 +3547,7 @@ func TestTransformDriverRDMA(t *testing.T) {
 
 	err := TransformDriver(ds.DaemonSet, cpSpec,
 		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
-			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
 	require.NoError(t, err)
 
 	// Remove dynamically generated digest before comparison
@@ -3620,7 +3620,7 @@ func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
 
 	err := TransformDriver(ds.DaemonSet, cpSpec,
 		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
-			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
 	require.NoError(t, err)
 	removeDigestFromDaemonSet(ds.DaemonSet)
 	require.EqualValues(t, expectedDs, ds)
@@ -3753,8 +3753,10 @@ func TestTransformVGPUManager(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				nfdKernelLabelKey: "6.8.0-60-generic",
-				commonGPULabelKey: "true",
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "24.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
 			},
 		},
 	}
@@ -3870,7 +3872,14 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 		},
 	}
 
-	mockClient := fake.NewFakeClient(node, testCertConfigMap)
+	testRepoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+	}
+
+	mockClient := fake.NewFakeClient(node, testCertConfigMap, testRepoConfigMap)
 
 	testCases := []struct {
 		description   string
@@ -3879,6 +3888,7 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 		client        client.Client
 		expectedDs    Daemonset
 		errorExpected bool
+		errorMessage  string
 	}{
 		{
 			description: "transform driver with cert config",
@@ -3922,15 +3932,110 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 			}),
 			errorExpected: false,
 		},
+		{
+			description: "transform driver with cert config enabled and non-existent configmap",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					CertConfig: &gpuv1.DriverCertConfigSpec{
+						Name: "test-cert2",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: true,
+			errorMessage: "ERROR: failed to create ConfigMap VolumeMounts for custom certs: ERROR: could not get " +
+				"ConfigMap test-cert2 from client: configmaps \"test-cert2\" not found",
+		},
+		{
+			description: "transform driver with custom repo config",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					RepoConfig: &gpuv1.DriverRepoConfigSpec{
+						ConfigMapName: "test-repo-config",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:580.126.16-ubuntu24.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithVolume(corev1.Volume{
+				Name: "test-repo-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-repo-config",
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "transform driver with custom repo config and non-existent configmap",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					RepoConfig: &gpuv1.DriverRepoConfigSpec{
+						ConfigMapName: "test-repo-config2",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: true,
+			errorMessage: "ERROR: failed to create ConfigMap VolumeMounts for custom repo config: ERROR: could not get " +
+				"ConfigMap test-repo-config2 from client: configmaps \"test-repo-config2\" not found",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
 				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
-					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu24.04"})
 			if tc.errorExpected {
 				require.Error(t, err)
+				require.Equal(t, tc.errorMessage, err.Error())
 				return
 			}
 			require.NoError(t, err)
