@@ -142,6 +142,11 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
+# nvidia-validator requires CGO and is handled separately below.
+CGO_CMDS := nvidia-validator
+NOCGO_CMDS := $(filter-out $(CGO_CMDS), $(CMDS))
+NOCGO_CMD_TARGETS := $(patsubst %,cmd-%, $(NOCGO_CMDS))
+
 CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
@@ -208,9 +213,16 @@ build:
 	go build $(BUILD_FLAGS) ./...
 
 cmds: $(CMD_TARGETS)
-$(CMD_TARGETS): cmd-%:
+$(NOCGO_CMD_TARGETS): cmd-%:
 	CGO_ENABLED=0 GOOS=$(GOOS) \
 		go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
+
+# nvidia-validator uses go-nvml/pkg/dl which requires CGO (dlopen). Build it
+# with CGO enabled and lazy binding so the binary starts without libdl at startup time.
+VALIDATOR_LDFLAGS = -ldflags "-extldflags=-Wl,-z,lazy -s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
+cmd-nvidia-validator:
+	GOOS=$(GOOS) \
+		go build $(VALIDATOR_LDFLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/nvidia-validator
 
 sync-crds:
 	@echo "- Syncing CRDs into Helm and OLM packages..."
