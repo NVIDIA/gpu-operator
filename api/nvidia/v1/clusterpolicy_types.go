@@ -36,6 +36,8 @@ const (
 	ClusterPolicyCRDName = "ClusterPolicy"
 	// DefaultDCGMJobMappingDir is the default directory for DCGM Exporter HPC job mapping files
 	DefaultDCGMJobMappingDir = "/var/lib/dcgm-exporter/job-mapping"
+	// DefaultDCGMPodResourcesSocket is the default kubelet pod-resources socket path
+	DefaultDCGMPodResourcesSocket = "/var/lib/kubelet/pod-resources/kubelet.sock"
 )
 
 // ClusterPolicySpec defines the desired state of ClusterPolicy
@@ -969,6 +971,38 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="HPC Job Mapping Configuration"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced"
 	HPCJobMapping *DCGMExporterHPCJobMappingConfig `json:"hpcJobMapping,omitempty"`
+
+	// Optional: Per-pod GPU utilization metrics for CUDA time-slicing workloads.
+	// When enabled, dcgm-exporter emits dcgm_fi_dev_sm_util_per_pod gauges that
+	// attribute SM utilization to individual pods sharing a GPU via time-slicing.
+	// Requires dcgm-exporter v3.4.0+ built with --enable-per-pod-gpu-util support.
+	// See: https://github.com/NVIDIA/dcgm-exporter/issues/587
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Per-Pod GPU Utilization Metrics"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced"
+	PerPodGPUUtil *DCGMExporterPerPodGPUUtilConfig `json:"perPodGPUUtil,omitempty"`
+}
+
+// DCGMExporterPerPodGPUUtilConfig configures per-pod GPU SM utilization metrics.
+// This feature is useful when CUDA time-slicing is active and multiple pods share
+// one physical GPU — standard per-device metrics lose per-workload attribution.
+type DCGMExporterPerPodGPUUtilConfig struct {
+	// Enable per-pod GPU utilization collection via NVML process utilization API.
+	// Requires hostPID: true (automatically set when enabled).
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable Per-Pod GPU Utilization"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// PodResourcesSocketPath is the path to the kubelet pod-resources gRPC socket.
+	// Defaults to /var/lib/kubelet/pod-resources/kubelet.sock.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Pod Resources Socket Path"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	PodResourcesSocketPath string `json:"podResourcesSocketPath,omitempty"`
 }
 
 // DCGMExporterHPCJobMappingConfig defines HPC job mapping configuration for NVIDIA DCGM Exporter
@@ -2099,6 +2133,24 @@ func (e *DCGMExporterSpec) GetHPCJobMappingDirectory() string {
 		return ""
 	}
 	return e.HPCJobMapping.Directory
+}
+
+// IsPerPodGPUUtilEnabled returns true if per-pod GPU utilization metrics are enabled.
+// This feature attributes SM utilization to individual pods when CUDA time-slicing is active.
+func (e *DCGMExporterSpec) IsPerPodGPUUtilEnabled() bool {
+	if e.PerPodGPUUtil == nil || e.PerPodGPUUtil.Enabled == nil {
+		return false
+	}
+	return *e.PerPodGPUUtil.Enabled
+}
+
+// GetPerPodGPUUtilSocketPath returns the kubelet pod-resources socket path for per-pod GPU util.
+// Falls back to DefaultDCGMPodResourcesSocket if not explicitly configured.
+func (e *DCGMExporterSpec) GetPerPodGPUUtilSocketPath() string {
+	if e.PerPodGPUUtil == nil || e.PerPodGPUUtil.PodResourcesSocketPath == "" {
+		return DefaultDCGMPodResourcesSocket
+	}
+	return e.PerPodGPUUtil.PodResourcesSocketPath
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
