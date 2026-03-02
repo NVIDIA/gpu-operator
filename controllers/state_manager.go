@@ -1075,8 +1075,6 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	clusterPolicySpec := &n.singleton.Spec
 
 	switch stateName {
-	case "pre-requisites":
-		return !clusterPolicySpec.CDI.IsNRIPluginEnabled()
 	case "state-driver":
 		return clusterPolicySpec.Driver.IsEnabled()
 	case "state-container-toolkit":
