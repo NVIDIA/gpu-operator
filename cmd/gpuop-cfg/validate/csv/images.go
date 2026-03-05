@@ -26,8 +26,6 @@ import (
 	"github.com/regclient/regclient/types/ref"
 )
 
-var client = regclient.New()
-
 func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) error {
 	// validate all 'relatedImages'
 	images := csv.Spec.RelatedImages
@@ -63,6 +61,7 @@ func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) er
 }
 
 func validateImage(ctx context.Context, path string) error {
+	var client = regclient.New()
 	ref, err := ref.New(path)
 	if err != nil {
 		return fmt.Errorf("failed to construct an image reference: %v", err)
