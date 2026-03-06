@@ -22,11 +22,15 @@ import (
 	"io"
 	"os"
 
+	"log/slog"
+
+	"github.com/regclient/regclient"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate/registry"
 )
 
 type command struct {
@@ -83,7 +87,13 @@ func (m command) run(ctx context.Context, opts *options) error {
 		return fmt.Errorf("failed to load clusterpolicy spec: %v", err)
 	}
 
-	err = validateImages(ctx, &cp.Spec)
+	var rcOpts []regclient.Opt
+	if m.logger.GetLevel() >= logrus.DebugLevel {
+		rcOpts = append(rcOpts, regclient.WithSlog(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))))
+	}
+	client := registry.NewClient(rcOpts...)
+
+	err = validateImages(ctx, &cp.Spec, client)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
 	}
