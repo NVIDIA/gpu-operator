@@ -1011,9 +1011,11 @@ func createStatusFileWithContent(statusFile string, content string) error {
 		return fmt.Errorf("failed to write temporary status file: %w", err)
 	}
 	defer func() {
+		//nolint:gosec
 		_ = os.Remove(tmpFile.Name())
 	}()
 
+	//nolint:gosec
 	if err := os.Rename(tmpFile.Name(), statusFile); err != nil {
 		return fmt.Errorf("error moving temporary file to '%s': %w", statusFile, err)
 	}
