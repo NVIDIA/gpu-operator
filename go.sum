@@ -176,8 +176,8 @@ github.com/openshift/api v0.0.0-20260213204242-d34f11c515b3 h1:SZ8+jxtkMvpb4HDTj
 github.com/openshift/api v0.0.0-20260213204242-d34f11c515b3/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
 github.com/openshift/client-go v0.0.0-20260213141500-06efc6dce93b h1:7rTnxq+haKrzUFKQQDylkklyFRtGFox73dlawRlnTA8=
 github.com/openshift/client-go v0.0.0-20260213141500-06efc6dce93b/go.mod h1:V3s8weD4bKXGXaN7d9g3V1QS2gmlYBRI2i/lfIwmroM=
-github.com/operator-framework/api v0.40.0 h1:xTTKJM6Yv6sr/pLibiINlnaXy+iNClmCo5QJMeHwyuc=
-github.com/operator-framework/api v0.40.0/go.mod h1:cMF6TTZ2BgBoV/sDlO4Pm7G2jma7JlEsCYXjOOqwrnw=
+github.com/operator-framework/api v0.41.0 h1:B0nutndl95elbLXJGRlkFNTI8OuZIjSqvTEeORPhTKo=
+github.com/operator-framework/api v0.41.0/go.mod h1:Ouud+eqruzll9X3iv8wuAOTNAyyEncYXp4IVgbIlIdg=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
