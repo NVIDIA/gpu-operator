@@ -24,132 +24,25 @@ import (
 	"github.com/regclient/regclient/types/ref"
 
 	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/internal/images"
 )
 
 func validateImages(ctx context.Context, spec *v1.ClusterPolicySpec) error {
-	// Driver
-	path, err := v1.ImagePath(&spec.Driver)
+	operandImages, err := images.FromClusterPolicy(spec)
 	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-	// For driver, we must append the os-tag
-	path += "-ubuntu22.04"
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
+		return err
 	}
 
-	// Toolkit
-	path, err = v1.ImagePath(&spec.Toolkit)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// Device Plugin
-	path, err = v1.ImagePath(&spec.DevicePlugin)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// DCGMExporter
-	path, err = v1.ImagePath(&spec.DCGMExporter)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// DCGM
-	path, err = v1.ImagePath(&spec.DCGM)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// GPUFeatureDiscovery
-	path, err = v1.ImagePath(&spec.GPUFeatureDiscovery)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// MIGManager
-	path, err = v1.ImagePath(&spec.MIGManager)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// GPUDirectStorage
-	path, err = v1.ImagePath(spec.GPUDirectStorage)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-	// For GDS driver, we must append the os-tag
-	path += "-ubuntu22.04"
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// VFIOManager
-	path, err = v1.ImagePath(&spec.VFIOManager)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// SandboxDevicePlugin
-	path, err = v1.ImagePath(&spec.SandboxDevicePlugin)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
-	}
-
-	// VGPUDeviceManager
-	path, err = v1.ImagePath(&spec.VGPUDeviceManager)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
+	for _, op := range operandImages {
+		path := op.Image
+		// For Driver and GPUDirectStorage, we must append the os-tag
+		if op.Name == "Driver" || op.Name == "GPUDirectStorage" {
+			path += "-ubuntu22.04"
+		}
+		err = validateImage(ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to validate image %s: %v", path, err)
+		}
 	}
 
 	return nil
