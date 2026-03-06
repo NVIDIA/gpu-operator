@@ -30,7 +30,7 @@ spec:
           command: ['sh', '-c']
           args:
             - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
-              if [ "$(</run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo vfio-pci not needed, skipping validation; exit 0; fi;
+              if [ "$(cat /run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo vfio-pci not needed, skipping validation; exit 0; fi;
               until [ -f /run/nvidia/validations/vfio-pci-ready ]; do echo waiting for vfio-pci driver ...; sleep 5; done;
           env:
             - name: NVIDIA_VISIBLE_DEVICES
@@ -46,7 +46,7 @@ spec:
           command: ['sh', '-c']
           args:
             - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
-              if [ "$(</run/nvidia/validations/workload-type)" != "vm-vgpu" ]; then echo vgpu-devices not needed, skipping validation; exit 0; fi;
+              if [ "$(cat /run/nvidia/validations/workload-type)" != "vm-vgpu" ]; then echo vgpu-devices not needed, skipping validation; exit 0; fi;
               until [ -f /run/nvidia/validations/vgpu-devices-ready ]; do echo waiting for vGPU devices...; sleep 5; done;
           env:
             - name: NVIDIA_VISIBLE_DEVICES
