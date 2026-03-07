@@ -46,9 +46,30 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  - clusterrolebindings
+  verbs:
   - update
   - patch
   - delete
+  resourceNames:
+  - nvidia-cc-manager
+  - nvidia-device-plugin
+  - nvidia-device-plugin-mps-control-daemon
+  - nvidia-driver
+  - nvidia-gpu-feature-discovery
+  - nvidia-kata-manager
+  - nvidia-mig-manager
+  - nvidia-node-status-exporter
+  - nvidia-operator-validator
+  - nvidia-sandbox-device-plugin
+  - nvidia-sandbox-validator
+  - nvidia-vfio-manager
+  - nvidia-vgpu-device-manager
+  - nvidia-vgpu-manager
 - apiGroups:
   - ""
   resources:
