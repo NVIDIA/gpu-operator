@@ -152,6 +152,14 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// Clear stale upgrade labels from nodes that no longer have driver pods
+	// Use the built state to avoid duplicate API calls and to skip nodes actively being upgraded
+	// This is best-effort cleanup that runs every reconciliation
+	if err := r.clearStaleUpgradeLabels(ctx, state, driverLabel, clusterPolicyCtrl.operatorNamespace); err != nil {
+		// Log the error but continue with the upgrade process, as this is a best-effort cleanup and should not block upgrades
+		r.Log.V(consts.LogLevelWarning).Info("Failed to clear stale upgrade labels", "error", err)
+	}
+
 	reqLogger.Info("Propagate state to state manager")
 	reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state", "state", state)
 
@@ -196,6 +204,101 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
 	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
+}
+
+// clearStaleUpgradeLabels removes upgrade labels from nodes where driver pods are no longer scheduled.
+// This handles the case where a nodeSelector change causes pods to be terminated from certain nodes,
+// but the upgrade labels remain. It skips nodes that are actively being managed by the upgrade process.
+func (r *UpgradeReconciler) clearStaleUpgradeLabels(ctx context.Context, state *upgrade.ClusterUpgradeState, driverLabel map[string]string, namespace string) error {
+	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
+
+	// Build a set of nodes being actively managed by the upgrade process
+	// Managed nodes are those in ClusterUpgradeState.NodeStates, which are populated by BuildState()
+	// and represent nodes that currently have driver pods associated with them
+	managedNodes := make(map[string]bool)
+	for _, nodeStates := range state.NodeStates {
+		for _, nodeState := range nodeStates {
+			if nodeState.Node != nil {
+				managedNodes[nodeState.Node.Name] = true
+			}
+		}
+	}
+
+	// List only nodes that have the upgrade label
+	nodeList := &corev1.NodeList{}
+	if err := r.List(ctx, nodeList, client.HasLabels{upgradeStateLabel}); err != nil {
+		return fmt.Errorf("failed to list nodes with upgrade labels: %w", err)
+	}
+
+	if len(nodeList.Items) == 0 {
+		return nil
+	}
+
+	// Filter out nodes being actively managed by upgrade process (those with driver pods in state.NodeStates)
+	// This ensures we only clean up labels from nodes that truly have stale labels
+	var nodesToCheck []corev1.Node
+	for _, node := range nodeList.Items {
+		if !managedNodes[node.Name] {
+			nodesToCheck = append(nodesToCheck, node)
+		}
+	}
+
+	if len(nodesToCheck) == 0 {
+		return nil
+	}
+
+	// List driver DaemonSets to check which nodes should have pods
+	// This protects against removing labels during pod recreation (e.g., during rolling updates)
+	dsList := &appsv1.DaemonSetList{}
+	if err := r.List(ctx, dsList, client.InNamespace(namespace), client.MatchingLabels(driverLabel)); err != nil {
+		return fmt.Errorf("failed to list driver DaemonSets: %w", err)
+	}
+
+	// Build a set of nodes that DaemonSets would schedule to
+	// This protects nodes during pod recreation (e.g., rolling updates where pod is temporarily missing)
+	nodesSelected := make(map[string]bool)
+	for _, ds := range dsList.Items {
+		// DaemonSet nodeSelector is a map[string]string in spec.template.spec.nodeSelector
+		nodeSelector := ds.Spec.Template.Spec.NodeSelector
+		selector := labels.SelectorFromSet(nodeSelector)
+
+		for _, node := range nodesToCheck {
+			// Check if this DaemonSet would schedule to this node
+			if selector.Matches(labels.Set(node.Labels)) {
+				nodesSelected[node.Name] = true
+			}
+		}
+	}
+
+	// Clear upgrade label from nodes that aren't targeted by any DaemonSet
+	// nodesToCheck excludes nodes actively managed by the upgrade state machine (managedNodes filter)
+	// These managed nodes are in ClusterUpgradeState.NodeStates and have driver pods associated with them
+	// The nodesSelected check protects against removing labels during pod recreation
+	// (e.g., rolling updates where old pod is deleted but new pod not yet scheduled)
+	//
+	// Note: There is a small race condition window where a DaemonSet's nodeSelector is updated
+	// after we list DaemonSets but before we patch the node. This is acceptable because:
+	// 1. This is best-effort cleanup that runs every 2 minutes
+	// 2. The primary use case (nodeSelector narrowing to exclude nodes) is correctly handled
+	// 3. False negatives (not removing when we should) are safer than false positives
+	for i := range nodesToCheck {
+		node := &nodesToCheck[i]
+
+		// Only remove label from node if no DaemonSet intends to schedule a pod there
+		if _, exists := nodesSelected[node.Name]; !exists {
+			r.Log.Info("Clearing stale upgrade label from node", "node", node.Name)
+
+			nodeCopy := node.DeepCopy()
+			delete(nodeCopy.Labels, upgradeStateLabel)
+			if err := r.Patch(ctx, nodeCopy, client.MergeFrom(node)); err != nil {
+				r.Log.Error(err, "Failed to clear upgrade label from node", "node", node.Name)
+				// Continue with other nodes even if one fails
+				continue
+			}
+		}
+	}
+
+	return nil
 }
 
 // removeNodeUpgradeStateLabels loops over nodes in the cluster and removes "nvidia.com/gpu-driver-upgrade-state"
