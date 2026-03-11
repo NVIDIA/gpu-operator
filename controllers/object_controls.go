@@ -368,25 +368,27 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			existingRole := &rbacv1.Role{}
-			err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingRole)
+	existingRole := &rbacv1.Role{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingRole)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
 			if err != nil {
-				logger.Info("Couldn't get existing Role", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			obj.ResourceVersion = existingRole.ResourceVersion
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
+				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
 			}
 			return gpuv1.Ready, nil
 		}
 
-		logger.Info("Couldn't create", "Error", err)
+		logger.Info("Couldn't get existing Role", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingRole.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
 
@@ -426,25 +428,27 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			existingRoleBinding := &rbacv1.RoleBinding{}
-			err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingRoleBinding)
+	existingRoleBinding := &rbacv1.RoleBinding{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingRoleBinding)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
 			if err != nil {
-				logger.Info("Couldn't get existing RoleBinding", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			obj.ResourceVersion = existingRoleBinding.ResourceVersion
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
+				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
 			}
 			return gpuv1.Ready, nil
 		}
 
-		logger.Info("Couldn't create", "Error", err)
+		logger.Info("Couldn't get existing RoleBinding", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingRoleBinding.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
 
@@ -474,25 +478,27 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			existingClusterRole := &rbacv1.ClusterRole{}
-			err = n.client.Get(ctx, types.NamespacedName{Name: obj.Name}, existingClusterRole)
+	existingClusterRole := &rbacv1.ClusterRole{}
+	err := n.client.Get(ctx, types.NamespacedName{Name: obj.Name}, existingClusterRole)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
 			if err != nil {
-				logger.Info("Couldn't get existing ClusterRole", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			obj.ResourceVersion = existingClusterRole.ResourceVersion
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
+				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
 			}
 			return gpuv1.Ready, nil
 		}
 
-		logger.Info("Couldn't create", "Error", err)
+		logger.Info("Couldn't get existing ClusterRole", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingClusterRole.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
 
@@ -526,25 +532,27 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			existingClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-			err = n.client.Get(ctx, types.NamespacedName{Name: obj.Name}, existingClusterRoleBinding)
+	existingClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+	err := n.client.Get(ctx, types.NamespacedName{Name: obj.Name}, existingClusterRoleBinding)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
 			if err != nil {
-				logger.Info("Couldn't get existing ClusterRoleBinding", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			obj.ResourceVersion = existingClusterRoleBinding.ResourceVersion
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
+				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
 			}
 			return gpuv1.Ready, nil
 		}
 
-		logger.Info("Couldn't create", "Error", err)
+		logger.Info("Couldn't get existing ClusterRoleBinding", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingClusterRoleBinding.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
 
@@ -609,25 +617,28 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
+	existingConfigMap := &corev1.ConfigMap{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingConfigMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
+			if err != nil {
+				logger.Info("Couldn't create", "Error", err)
+				return gpuv1.NotReady, err
+			}
+			return gpuv1.Ready, nil
 		}
 
-		logger.Info("Found Resource, updating...")
-		existingConfigMap := &corev1.ConfigMap{}
-		err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingConfigMap)
-		if err != nil {
-			logger.Info("Couldn't get existing ConfigMap", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		obj.ResourceVersion = existingConfigMap.ResourceVersion
-		err = n.client.Update(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't update", "Error", err)
-			return gpuv1.NotReady, err
-		}
+		logger.Info("Couldn't get existing ConfigMap", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingConfigMap.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
+		return gpuv1.NotReady, err
 	}
 
 	return gpuv1.Ready, nil
@@ -4039,25 +4050,27 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			existingDeployment := &appsv1.Deployment{}
-			err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingDeployment)
+	existingDeployment := &appsv1.Deployment{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, existingDeployment)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = n.client.Create(ctx, obj)
 			if err != nil {
-				logger.Info("Couldn't get existing Deployment", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			obj.ResourceVersion = existingDeployment.ResourceVersion
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
+				logger.Info("Couldn't create", "Error", err)
 				return gpuv1.NotReady, err
 			}
 			return isDeploymentReady(obj.Name, n), nil
 		}
 
-		logger.Info("Couldn't create", "Error", err)
+		logger.Info("Couldn't get existing Deployment", "Error", err)
+		return gpuv1.NotReady, err
+	}
+
+	logger.Info("Found Resource, updating...")
+	obj.ResourceVersion = existingDeployment.ResourceVersion
+	err = n.client.Update(ctx, obj)
+	if err != nil {
+		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err
 	}
 
