@@ -29,11 +29,12 @@ Written for production and high-scale environments, with real commands and repre
 10. [ClusterPolicy and Operand State Issues](#10-symptom-clusterpolicy-and-operand-state-issues)
 11. [Driver Upgrade Failures](#11-symptom-driver-upgrade-failures)
 12. [GPU Feature Discovery Issues](#12-symptom-gpu-feature-discovery-issues)
-13. [High-Scale and Multi-Node Debugging](#13-high-scale-and-multi-node-debugging)
-14. [Recommended Debugging Flow](#14-recommended-debugging-flow)
-15. [Minimal Command Bundle for Incident Triage](#15-minimal-command-bundle-for-incident-triage)
-16. [Useful Node Labels Reference](#16-useful-node-labels-reference)
-17. [Notes for Maintainers](#17-notes-for-maintainers)
+13. [Operator Pods Timeout on MIG-Enabled Nodes](#13-symptom-operator-pods-fail-with-context-deadline-exceeded-on-mig-enabled-nodes)
+14. [Using the GPU Operator with Host-Installed Drivers](#14-using-the-gpu-operator-with-host-installed-drivers)
+15. [High-Scale and Multi-Node Debugging](#15-high-scale-and-multi-node-debugging)
+16. [Recommended Debugging Flow](#16-recommended-debugging-flow)
+17. [Minimal Command Bundle for Incident Triage](#17-minimal-command-bundle-for-incident-triage)
+18. [Useful Node Labels Reference](#18-useful-node-labels-reference)
 
 ---
 
@@ -1200,7 +1201,241 @@ nfd-worker-j8m3n                          1/1     Running   0          5d
 
 ---
 
-## 13. High-Scale and Multi-Node Debugging
+## 13. Symptom: Operator Pods Fail with Context Deadline Exceeded on MIG-Enabled Nodes
+
+When MIG is configured on GPUs with many instances (e.g., `1g.23gb` on B200, which creates up to 8 instances per GPU), operator pods such as `gpu-feature-discovery`, `nvidia-device-plugin`, or `nvidia-operator-validator` may fail with `context deadline exceeded` errors during startup.
+
+### Root cause
+
+The NVIDIA kernel driver uses internal locks to serialize access when processes query GPU state through NVML or `nvidia-smi`. With MIG enabled, each MIG instance is a separate device handle, multiplying the amount of work per query.
+
+When containerd is running, the `nvidia-container-runtime` plugin holds NVML handles to all GPU devices. This creates lock contention at the kernel driver level: any concurrent `nvidia-smi` or NVML call must wait for the lock.
+
+On a node with many MIG instances, this causes `nvidia-smi` execution time to increase significantly. For example, on B200 GPUs with `1g.23gb` MIG profile:
+
+- With containerd **stopped**: `nvidia-smi` completes in ~5 seconds
+- With containerd **running**: `nvidia-smi` takes ~44 seconds
+
+When the node starts and all GPU operator pods are scheduled simultaneously, they all query the driver at the same time — creating a "query storm" that pushes response times beyond the configured timeouts.
+
+### Diagnose the issue
+
+Measure `nvidia-smi` execution time on the affected node:
+
+```bash
+time nvidia-smi
+```
+
+If this takes more than 30 seconds, the node is likely affected by driver lock contention.
+
+Check for pods in `CrashLoopBackOff` or with `context deadline exceeded` in their logs:
+
+```bash
+kubectl get pods -n gpu-operator -o wide | grep -v Running
+kubectl logs -n gpu-operator -l app=gpu-feature-discovery --tail=50
+kubectl logs -n gpu-operator -l app=nvidia-device-plugin-daemonset --tail=50
+```
+
+Look for messages like:
+
+```
+context deadline exceeded
+nvidia-smi failed
+GPU resources are not discovered by the node
+```
+
+### Where the timeouts are defined
+
+The driver container startup probe runs `nvidia-smi` directly. The probe script is defined in `assets/state-driver/0400_configmap.yaml`:
+
+```sh
+if ! nvidia-smi; then
+  echo "nvidia-smi failed"
+  exit 1
+fi
+```
+
+The probe timeout defaults are set in `internal/state/driver.go` (`getDefaultStartupProbe()`):
+
+- `TimeoutSeconds: 60` — each probe attempt must complete within 60 seconds
+- `PeriodSeconds: 10` — probe runs every 10 seconds
+- `FailureThreshold: 120` — pod is killed after 120 consecutive failures
+
+When the startup probe succeeds, it writes `/run/nvidia/validations/.driver-ctr-ready`. Other components (GFD, device-plugin, DCGM, MIG manager) have init containers that poll for this file every 5 seconds with no upper timeout:
+
+```yaml
+args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+```
+
+The operator validator has a hard-coded GPU resource discovery timeout of 150 seconds (30 retries x 5 seconds), defined in `cmd/nvidia-validator/main.go`:
+
+```go
+gpuResourceDiscoveryWaitRetries     = 30
+gpuResourceDiscoveryIntervalSeconds = 5
+```
+
+If the device-plugin hasn't registered MIG resources within 2.5 minutes (because it is also waiting on slow NVML calls), the validator fails.
+
+### Workarounds
+
+**Increase startup probe timeouts via ClusterPolicy:**
+
+The `ClusterPolicy` CRD exposes probe configuration on the driver spec (`api/nvidia/v1/clusterpolicy_types.go`, `ContainerProbeSpec`):
+
+```yaml
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: cluster-policy
+spec:
+  driver:
+    startupProbe:
+      initialDelaySeconds: 120
+      timeoutSeconds: 120
+      periodSeconds: 15
+      failureThreshold: 180
+```
+
+**Stagger operator component startup:**
+
+Temporarily disable components on the node, let the driver/toolkit initialize first, then enable the rest:
+
+```bash
+# Disable components initially
+kubectl label node <gpu-node> nvidia.com/gpu.deploy.gpu-feature-discovery=false --overwrite
+kubectl label node <gpu-node> nvidia.com/gpu.deploy.device-plugin=false --overwrite
+
+# Wait for driver and toolkit pods to be Running
+kubectl get pods -n gpu-operator -l app=nvidia-driver-daemonset -w
+
+# Then enable components one at a time
+kubectl label node <gpu-node> nvidia.com/gpu.deploy.device-plugin=true --overwrite
+# Wait for device-plugin to be Running, then:
+kubectl label node <gpu-node> nvidia.com/gpu.deploy.gpu-feature-discovery=true --overwrite
+```
+
+**Staged MIG application (if MIG is managed outside the operator):**
+
+1. `kubectl cordon <node>`
+2. `systemctl stop kubelet && systemctl stop containerd`
+3. Apply MIG configuration
+4. `systemctl start containerd && systemctl start kubelet`
+5. `kubectl uncordon <node>`
+
+This avoids the concurrent pod startup storm since pods come up sequentially after the node rejoins.
+
+### Common causes and resolutions
+
+| Cause | Resolution |
+|---|---|
+| Many MIG instances causing slow `nvidia-smi` | Increase startup probe `timeoutSeconds` in ClusterPolicy |
+| All operator pods starting simultaneously | Stagger component startup using node labels |
+| Hard-coded 150s validator timeout too short | Apply MIG config before starting kubelet (staged approach) |
+| containerd + MIG lock contention | Cordon node, stop services, configure MIG, restart |
+
+---
+
+## 14. Using the GPU Operator with Host-Installed Drivers
+
+The GPU Operator does not require managing the NVIDIA driver. If you already have the NVIDIA driver installed directly on your nodes (e.g., via package manager, Base Command Manager, or a pre-built machine image), you can still use the operator for all the other components: container toolkit, device plugin, GPU feature discovery, DCGM, DCGM exporter, MIG manager, and the operator validator.
+
+### Configuration
+
+Disable the driver component in the `ClusterPolicy`:
+
+```yaml
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: cluster-policy
+spec:
+  driver:
+    enabled: false
+  # All other components remain enabled by default
+  toolkit:
+    enabled: true
+  devicePlugin:
+    enabled: true
+  dcgm:
+    enabled: true
+  dcgmExporter:
+    enabled: true
+  migManager:
+    enabled: true
+  gfd:
+    enabled: true
+```
+
+Or via Helm:
+
+```bash
+helm install gpu-operator nvidia/gpu-operator \
+  --set driver.enabled=false
+```
+
+### What you get
+
+With `driver.enabled=false`, the operator skips the driver DaemonSet but still deploys:
+
+- **nvidia-container-toolkit** — configures the container runtime (containerd/CRI-O) to expose GPUs inside containers
+- **nvidia-device-plugin** — registers GPU resources with the Kubernetes scheduler (`nvidia.com/gpu` or `nvidia.com/mig-*`)
+- **gpu-feature-discovery** — labels nodes with GPU properties (model, memory, compute capability, MIG status)
+- **dcgm / dcgm-exporter** — GPU health monitoring and Prometheus metrics
+- **nvidia-mig-manager** — manages MIG partition lifecycle
+- **nvidia-operator-validator** — validates the full stack is functional
+
+### Prerequisites
+
+When using host-installed drivers, ensure:
+
+1. The NVIDIA kernel module is loaded (`lsmod | grep nvidia`)
+2. `nvidia-smi` works on the host
+3. The driver version is compatible with the operator version (check the [GPU Operator compatibility matrix](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html))
+4. The NVIDIA device files exist under `/dev` (`/dev/nvidia0`, `/dev/nvidiactl`, `/dev/nvidia-uvm`, etc.)
+
+### Verify the setup
+
+```bash
+# Check that the driver is detected even though it's not managed by the operator
+kubectl get pods -n gpu-operator -l app=nvidia-driver-daemonset
+# Expected: no pods (driver DaemonSet is not deployed)
+
+# Verify the toolkit detects the host driver
+kubectl logs -n gpu-operator -l app=nvidia-container-toolkit-daemonset --tail=20
+
+# Confirm device plugin registered GPU resources
+kubectl get node <gpu-node> -o json | jq '.status.capacity | with_entries(select(.key | startswith("nvidia.com")))'
+```
+
+Expected output:
+
+```json
+{
+  "nvidia.com/gpu": "8"
+}
+```
+
+Or with MIG enabled:
+
+```json
+{
+  "nvidia.com/mig-1g.23gb": "8"
+}
+```
+
+### Troubleshooting
+
+If operator components fail with host-installed drivers, check:
+
+| Symptom | Check |
+|---|---|
+| Toolkit pod stuck or failing | `nvidia-smi` works on the host; driver device files exist under `/dev` |
+| Device plugin shows 0 GPUs | Toolkit pod is running; runtime is correctly configured (`/etc/nvidia-container-runtime/config.toml`) |
+| Validator init container stuck on `driver-validation` | Host driver is loaded and functional; `/run/nvidia/driver` is accessible |
+
+---
+
+## 15. High-Scale and Multi-Node Debugging
 
 In clusters with hundreds of GPU nodes, targeted debugging is essential.
 
@@ -1324,7 +1559,7 @@ gpu-node-04    NVIDIA-L4
 
 ---
 
-## 14. Recommended Debugging Flow
+## 16. Recommended Debugging Flow
 
 ```
 GPU workload failing or pending
@@ -1368,7 +1603,7 @@ Check node allocatable GPUs ─────────────────�
 
 ---
 
-## 15. Minimal Command Bundle for Incident Triage
+## 17. Minimal Command Bundle for Incident Triage
 
 Copy and run these commands in the first 5 minutes of any GPU incident. They cover operator pod overview, ClusterPolicy state, per-node GPU resources, workload events, component logs in dependency order, and recent events.
 
@@ -1396,7 +1631,7 @@ kubectl get events -n gpu-operator --sort-by=.lastTimestamp | tail -30
 
 ---
 
-## 16. Useful Node Labels Reference
+## 18. Useful Node Labels Reference
 
 Labels automatically managed by the GPU Operator and GPU Feature Discovery:
 
