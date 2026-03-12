@@ -61,6 +61,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMAGE=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMAGE ?= gpu-operator-bundle:$(VERSION)
 
+BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64,linux/arm64
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -129,6 +131,7 @@ bundle: manifests install-tools
 # Build the bundle image.
 build-bundle-image:
 	$(DOCKER) build \
+    $(BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
