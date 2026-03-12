@@ -934,8 +934,6 @@ spec:
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.18.2@sha256:b5788e29e7ae5272de8de863ebe386d6611e608421a6ecc5b4e7d5952aba637f"
                   - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:f8e3dc9111c5a7a0cfac73e87d03c0b7b3d1e11f3b61654cca5461847660aa2c"
-                  - name: "DRIVER_IMAGE-570"
-                    value: "nvcr.io/nvidia/driver@sha256:38d55e5d1de9a774da98754166d2ae0b114d308f1fc151fdd6b184f4f7fa2db7"
                   - name: "DRIVER_IMAGE-535"
                     value: "nvcr.io/nvidia/driver@sha256:659d9315957ffa2a3f2a003716f066f6a1b3c06ae5557192148ed410dc1b9a6e"
                   - name: "DRIVER_MANAGER_IMAGE"
