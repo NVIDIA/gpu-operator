@@ -1,0 +1,141 @@
+{{- if .Capabilities.APIVersions.Has "admissionregistration.k8s.io/v1/ValidatingAdmissionPolicy" }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: gpu-operator-runtimeclass-handler-policy
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - node.k8s.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - runtimeclasses
+  matchConditions:
+  - name: gpu-operator-service-account
+    expression: request.userInfo.username == 'system:serviceaccount:{{ .Release.Namespace }}:gpu-operator'
+  validations:
+  - expression: >-
+      object.handler in ['nvidia', 'nvidia-cdi', 'nvidia-legacy', '{{ .Values.operator.runtimeClass }}'{{- range $runtimeClass := (default (list) .Values.kataManager.config.runtimeClasses) }}{{- if $runtimeClass.name }}, '{{ $runtimeClass.name }}'{{- end }}{{- end }}]
+    message: runtimeclass handler must be one of the allowed runtime classes configured by the chart
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: gpu-operator-runtimeclass-handler-policy-binding
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  policyName: gpu-operator-runtimeclass-handler-policy
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: gpu-operator-namespace-label-policy
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - UPDATE
+      resources:
+      - namespaces
+  matchConditions:
+  - name: gpu-operator-service-account
+    expression: request.userInfo.username == 'system:serviceaccount:{{ .Release.Namespace }}:gpu-operator'
+  - name: target-namespace
+    expression: object.metadata.name in ['{{ .Release.Namespace }}', 'nvidia-gpu-operator']
+  validations:
+  - expression: >-
+      (!has(oldObject.metadata.labels) ||
+      oldObject.metadata.labels.all(k, v,
+        (has(object.metadata.labels) && k in object.metadata.labels && object.metadata.labels[k] == v) ||
+        k.startsWith('pod-security.kubernetes.io/') ||
+        k == 'openshift.io/cluster-monitoring'
+      )) &&
+      (!has(object.metadata.labels) ||
+      object.metadata.labels.all(k, v,
+        (has(oldObject.metadata.labels) && k in oldObject.metadata.labels && oldObject.metadata.labels[k] == v) ||
+        k.startsWith('pod-security.kubernetes.io/') ||
+        k == 'openshift.io/cluster-monitoring'
+      ))
+    message: only pod-security.kubernetes.io/* and openshift.io/cluster-monitoring labels may be added or modified by gpu-operator
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: gpu-operator-namespace-label-policy-binding
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  policyName: gpu-operator-namespace-label-policy
+  validationActions:
+  - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: gpu-operator-node-label-policy
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - UPDATE
+      resources:
+      - nodes
+  matchConditions:
+  - name: gpu-operator-service-account
+    expression: request.userInfo.username == 'system:serviceaccount:{{ .Release.Namespace }}:gpu-operator'
+  validations:
+  - expression: >-
+      (!has(oldObject.metadata.labels) ||
+      oldObject.metadata.labels.all(k, v,
+        (has(object.metadata.labels) && k in object.metadata.labels && object.metadata.labels[k] == v) ||
+        k.startsWith('nvidia.com/')
+      )) &&
+      (!has(object.metadata.labels) ||
+      object.metadata.labels.all(k, v,
+        (has(oldObject.metadata.labels) && k in oldObject.metadata.labels && oldObject.metadata.labels[k] == v) ||
+        k.startsWith('nvidia.com/')
+      ))
+    message: only nvidia.com/* labels may be added, modified, or removed by gpu-operator on nodes
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: gpu-operator-node-label-policy-binding
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  policyName: gpu-operator-node-label-policy
+  validationActions:
+  - Deny
+{{- end }}
