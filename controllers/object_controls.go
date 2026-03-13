@@ -1785,6 +1785,39 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, jobMappingVol)
 	}
 
+	// configure per-pod GPU utilization metrics when enabled (for CUDA time-slicing workloads)
+	// See: https://github.com/NVIDIA/dcgm-exporter/issues/587
+	if config.DCGMExporter.IsPerPodGPUUtilEnabled() {
+		// enable the feature flag in dcgm-exporter
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_ENABLE_PER_POD_GPU_UTIL", "true")
+
+		// resolve pod→GPU mapping via kubelet pod-resources gRPC API
+		socketPath := config.DCGMExporter.GetPerPodGPUUtilSocketPath()
+		socketDir := socketPath[:strings.LastIndex(socketPath, "/")]
+
+		podResourcesVolMount := corev1.VolumeMount{
+			Name:      "pod-resources",
+			ReadOnly:  true,
+			MountPath: socketDir,
+		}
+		obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			obj.Spec.Template.Spec.Containers[0].VolumeMounts, podResourcesVolMount)
+
+		podResourcesVol := corev1.Volume{
+			Name: "pod-resources",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: socketDir,
+					Type: ptr.To(corev1.HostPathDirectory),
+				},
+			},
+		}
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, podResourcesVol)
+
+		// per-pod attribution requires resolving PIDs via /proc/<pid>/cgroup
+		obj.Spec.Template.Spec.HostPID = true
+	}
+
 	// mount configmap for custom metrics if provided by user
 	if config.DCGMExporter.MetricsConfig != nil && config.DCGMExporter.MetricsConfig.Name != "" {
 		metricsConfigVolMount := corev1.VolumeMount{Name: "metrics-config", ReadOnly: true, MountPath: MetricsConfigMountPath, SubPath: MetricsConfigFileName}
