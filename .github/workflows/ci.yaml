@@ -407,7 +407,7 @@ jobs:
       - uses: actions/checkout@v6
         name: Check out code
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@c1f0aebc5919e68a6eb528c75c0410dc48fa392e
         with:
           release: v0.11.2
       - name: Set environment variables
