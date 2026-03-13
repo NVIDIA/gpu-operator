@@ -4065,13 +4065,14 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 }
 
 func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context) error {
-	// Get all DaemonSets owned by ClusterPolicy
-	//
-	// (cdesiniotis) There is a limitation with the controller-runtime client where only a single field selector
-	// is allowed when specifying ListOptions or DeleteOptions.
-	// See GH issue: https://github.com/kubernetes-sigs/controller-runtime/issues/612
+	// Get all DaemonSets owned by ClusterPolicy in operator namespace
 	list := &appsv1.DaemonSetList{}
-	err := n.client.List(ctx, list, client.MatchingFields{clusterPolicyControllerIndexKey: n.singleton.Name})
+	err := n.client.List(
+		ctx,
+		list,
+		client.MatchingFields{clusterPolicyControllerIndexKey: n.singleton.Name},
+		client.InNamespace(n.operatorNamespace),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to list all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 	}
@@ -4099,6 +4100,7 @@ func (n ClusterPolicyController) cleanupStalePrecompiledDaemonsets(ctx context.C
 		client.MatchingLabels{
 			precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
 		},
+		client.InNamespace(n.operatorNamespace),
 	}
 	list := &appsv1.DaemonSetList{}
 	err := n.client.List(ctx, list, opts...)
@@ -4243,6 +4245,7 @@ func (n ClusterPolicyController) ocpCleanupStaleDriverToolkitDaemonSets(ctx cont
 		client.MatchingLabels{
 			ocpDriverToolkitIdentificationLabel: ocpDriverToolkitIdentificationValue,
 		},
+		client.InNamespace(n.operatorNamespace),
 	}
 
 	list := &appsv1.DaemonSetList{}
@@ -4426,7 +4429,7 @@ func (n ClusterPolicyController) cleanupUnusedDriverDaemonSets(ctx context.Conte
 // pairs If no error happens, returns the number of Pods belonging to
 // the DaemonSet.
 func (n ClusterPolicyController) cleanupDriverDaemonsets(ctx context.Context, searchKey string, searchValue string, namePrefix string) (int, error) {
-	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}}
+	var opts = []client.ListOption{client.MatchingLabels{searchKey: searchValue}, client.InNamespace(n.operatorNamespace)}
 
 	dsList := &appsv1.DaemonSetList{}
 	if err := n.client.List(ctx, dsList, opts...); err != nil {
