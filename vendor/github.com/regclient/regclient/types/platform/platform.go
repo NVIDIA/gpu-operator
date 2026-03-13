@@ -26,9 +26,7 @@ import (
 	"github.com/regclient/regclient/types/errs"
 )
 
-var (
-	partRE = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-)
+var partRE = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Platform specifies a platform where a particular image manifest is applicable.
 type Platform struct {

@@ -8,11 +8,13 @@ import (
 	"github.com/regclient/regclient/types/errs"
 )
 
-type Links []Link
-type Link struct {
-	URI   string
-	Param map[string]string
-}
+type (
+	Links []Link
+	Link  struct {
+		URI   string
+		Param map[string]string
+	}
+)
 
 type charLU byte
 
@@ -25,7 +27,7 @@ const (
 )
 
 func init() {
-	for c := 0; c < 256; c++ {
+	for c := range 256 {
 		charLUs[c] = 0
 		if strings.ContainsRune(" \t\r\n", rune(c)) {
 			charLUs[c] |= isSpace

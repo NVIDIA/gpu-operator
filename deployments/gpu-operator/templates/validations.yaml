@@ -1,0 +1,3 @@
+{{- if and (eq .Values.cdi.enabled false) (eq .Values.cdi.nriPluginEnabled true) }}
+{{ fail "the NRI Plugin cannot be enabled when CDI is disabled" }}
+{{- end}}

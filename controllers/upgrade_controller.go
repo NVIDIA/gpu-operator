@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -86,7 +87,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	clusterPolicy := &gpuv1.ClusterPolicy{}
 	err := r.Get(ctx, req.NamespacedName, clusterPolicy)
 	if err != nil {
-		reqLogger.V(consts.LogLevelError).Error(err, "Error getting ClusterPolicy object")
+		reqLogger.Error(err, "Error getting ClusterPolicy object")
 		if clusterPolicyCtrl.operatorMetrics != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		}
@@ -130,7 +131,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	driverLabelKey := DriverLabelKey
 	driverLabelValue := DriverLabelValue
 
-	if clusterPolicy.Spec.Driver.UseNvdiaDriverCRDType() {
+	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
 		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
 		driverLabelKey = AppComponentLabelKey
 		driverLabelValue = AppComponentLabelValue
@@ -154,7 +155,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqLogger.Info("Propagate state to state manager")
 	reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state", "state", state)
 
-	totalNodes := r.StateManager.GetTotalManagedNodes(ctx, state)
+	totalNodes := r.StateManager.GetTotalManagedNodes(state)
 	maxUnavailable := totalNodes
 	if clusterPolicy.Spec.Driver.UpgradePolicy != nil && clusterPolicy.Spec.Driver.UpgradePolicy.MaxUnavailable != nil {
 		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(clusterPolicy.Spec.Driver.UpgradePolicy.MaxUnavailable, totalNodes, true)
@@ -177,11 +178,11 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// log metrics with the current state
 	if clusterPolicyCtrl.operatorMetrics != nil {
-		clusterPolicyCtrl.operatorMetrics.upgradesInProgress.Set(float64(r.StateManager.GetUpgradesInProgress(ctx, state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesDone.Set(float64(r.StateManager.GetUpgradesDone(ctx, state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesAvailable.Set(float64(r.StateManager.GetUpgradesAvailable(ctx, state, clusterPolicy.Spec.Driver.UpgradePolicy.MaxParallelUpgrades, maxUnavailable)))
-		clusterPolicyCtrl.operatorMetrics.upgradesFailed.Set(float64(r.StateManager.GetUpgradesFailed(ctx, state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesPending.Set(float64(r.StateManager.GetUpgradesPending(ctx, state)))
+		clusterPolicyCtrl.operatorMetrics.upgradesInProgress.Set(float64(r.StateManager.GetUpgradesInProgress(state)))
+		clusterPolicyCtrl.operatorMetrics.upgradesDone.Set(float64(r.StateManager.GetUpgradesDone(state)))
+		clusterPolicyCtrl.operatorMetrics.upgradesAvailable.Set(float64(r.StateManager.GetUpgradesAvailable(state, clusterPolicy.Spec.Driver.UpgradePolicy.MaxParallelUpgrades, maxUnavailable)))
+		clusterPolicyCtrl.operatorMetrics.upgradesFailed.Set(float64(r.StateManager.GetUpgradesFailed(state)))
+		clusterPolicyCtrl.operatorMetrics.upgradesPending.Set(float64(r.StateManager.GetUpgradesPending(state)))
 	}
 
 	err = r.StateManager.ApplyState(ctx, state, clusterPolicy.Spec.Driver.UpgradePolicy)
@@ -218,8 +219,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 			delete(node.Labels, upgradeStateLabel)
 			err = r.Update(ctx, node)
 			if err != nil {
-				r.Log.V(consts.LogLevelError).Error(
-					err, "Failed to reset upgrade state label from node", "node", node)
+				r.Log.Error(err, "Failed to reset upgrade state label from node", "node", node)
 				return err
 			}
 		}
@@ -255,14 +255,20 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return getClusterPoliciesToReconcile(ctx, mgr.GetClient())
 	}
 
-	// Watch for changes to node labels
-	// TODO: only watch for changes to upgrade state label
+	// Only watch for changes to the upgrade state label
+	upgradeStateLabelPredicate := predicate.TypedFuncs[*corev1.Node]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
+			label := upgrade.GetUpgradeStateLabelKey()
+			return e.ObjectOld.Labels[label] != e.ObjectNew.Labels[label]
+		},
+	}
+
 	err = c.Watch(
 		source.Kind(
 			mgr.GetCache(),
 			&corev1.Node{},
 			handler.TypedEnqueueRequestsFromMapFunc[*corev1.Node](nodeMapFn),
-			predicate.TypedLabelChangedPredicate[*corev1.Node]{},
+			upgradeStateLabelPredicate,
 		),
 	)
 	if err != nil {

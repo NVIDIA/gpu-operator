@@ -1,5 +1,4 @@
 //go:build 386 || amd64 || amd64p32
-// +build 386 amd64 amd64p32
 
 package platform
 
@@ -95,6 +94,7 @@ func lookupCPUVariant() string {
 func bitSet(bitpos uint) uint32 {
 	return 1 << bitpos
 }
+
 func bitIsSet(bits, value uint32) bool {
 	return (value & bits) == bits
 }

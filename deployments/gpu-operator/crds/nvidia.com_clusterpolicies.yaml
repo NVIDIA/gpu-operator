@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: clusterpolicies.nvidia.com
 spec:
   group: nvidia.com
@@ -136,13 +136,21 @@ spec:
                 properties:
                   default:
                     default: false
-                    description: Default indicates whether to use CDI as the default
-                      mechanism for providing GPU access to containers.
+                    description: 'Deprecated: This field is no longer used. Setting
+                      cdi.enabled=true will configure CDI as the default mechanism
+                      for making GPUs accessible to containers.'
                     type: boolean
                   enabled:
+                    default: true
+                    description: Enabled indicates whether the Container Device Interface
+                      (CDI) should be used as the mechanism for making GPUs accessible
+                      to containers.
+                    type: boolean
+                  nriPluginEnabled:
                     default: false
-                    description: Enabled indicates whether CDI can be used to make
-                      GPUs accessible to containers.
+                    description: NRIPluginEnabled indicates whether an NRI Plugin
+                      should be run as a means of injecting CDI devices to gpu management
+                      containers.
                     type: boolean
                 type: object
               daemonsets:
@@ -163,6 +171,239 @@ spec:
                       Optional: Map of string keys and values that can be used to organize and categorize
                       (scope and select) objects. May match selectors of replication controllers
                       and services.
+                    type: object
+                  podSecurityContext:
+                    description: 'Optional: Set pod-level security context for all
+                      DaemonSet pods (applies as defaults to all containers)'
+                    properties:
+                      appArmorProfile:
+                        description: |-
+                          appArmorProfile is the AppArmor options to use by the containers in this pod.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        properties:
+                          localhostProfile:
+                            description: |-
+                              localhostProfile indicates a profile loaded on the node that should be used.
+                              The profile must be preconfigured on the node to work.
+                              Must match the loaded name of the profile.
+                              Must be set if and only if type is "Localhost".
+                            type: string
+                          type:
+                            description: |-
+                              type indicates which kind of AppArmor profile will be applied.
+                              Valid options are:
+                                Localhost - a profile pre-loaded on the node.
+                                RuntimeDefault - the container runtime's default profile.
+                                Unconfined - no AppArmor enforcement.
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      fsGroup:
+                        description: |-
+                          A special supplemental group that applies to all containers in a pod.
+                          Some volume types allow the Kubelet to change the ownership of that volume
+                          to be owned by the pod:
+
+                          1. The owning GID will be the FSGroup
+                          2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
+                          3. The permission bits are OR'd with rw-rw----
+
+                          If unset, the Kubelet will not modify the ownership and permissions of any volume.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        format: int64
+                        type: integer
+                      fsGroupChangePolicy:
+                        description: |-
+                          fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+                          before being exposed inside Pod. This field will only apply to
+                          volume types which support fsGroup based ownership(and permissions).
+                          It will have no effect on ephemeral volume types such as: secret, configmaps
+                          and emptydir.
+                          Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        type: string
+                      runAsGroup:
+                        description: |-
+                          The GID to run the entrypoint of the container process.
+                          Uses runtime default if unset.
+                          May also be set in SecurityContext.  If set in both SecurityContext and
+                          PodSecurityContext, the value specified in SecurityContext takes precedence
+                          for that container.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        format: int64
+                        type: integer
+                      runAsNonRoot:
+                        description: |-
+                          Indicates that the container must run as a non-root user.
+                          If true, the Kubelet will validate the image at runtime to ensure that it
+                          does not run as UID 0 (root) and fail to start the container if it does.
+                          If unset or false, no such validation will be performed.
+                          May also be set in SecurityContext.  If set in both SecurityContext and
+                          PodSecurityContext, the value specified in SecurityContext takes precedence.
+                        type: boolean
+                      runAsUser:
+                        description: |-
+                          The UID to run the entrypoint of the container process.
+                          Defaults to user specified in image metadata if unspecified.
+                          May also be set in SecurityContext.  If set in both SecurityContext and
+                          PodSecurityContext, the value specified in SecurityContext takes precedence
+                          for that container.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        format: int64
+                        type: integer
+                      seLinuxChangePolicy:
+                        description: |-
+                          seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.
+                          It has no effect on nodes that do not support SELinux or to volumes does not support SELinux.
+                          Valid values are "MountOption" and "Recursive".
+
+                          "Recursive" means relabeling of all files on all Pod volumes by the container runtime.
+                          This may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.
+
+                          "MountOption" mounts all eligible Pod volumes with `-o context` mount option.
+                          This requires all Pods that share the same volume to use the same SELinux label.
+                          It is not possible to share the same volume among privileged and unprivileged Pods.
+                          Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
+                          whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
+                          CSIDriver instance. Other volumes are always re-labelled recursively.
+                          "MountOption" value is allowed only when SELinuxMount feature gate is enabled.
+
+                          If not specified and SELinuxMount feature gate is enabled, "MountOption" is used.
+                          If not specified and SELinuxMount feature gate is disabled, "MountOption" is used for ReadWriteOncePod volumes
+                          and "Recursive" for all other volumes.
+
+                          This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.
+
+                          All Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        type: string
+                      seLinuxOptions:
+                        description: |-
+                          The SELinux context to be applied to all containers.
+                          If unspecified, the container runtime will allocate a random SELinux context for each
+                          container.  May also be set in SecurityContext.  If set in
+                          both SecurityContext and PodSecurityContext, the value specified in SecurityContext
+                          takes precedence for that container.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        properties:
+                          level:
+                            description: Level is SELinux level label that applies
+                              to the container.
+                            type: string
+                          role:
+                            description: Role is a SELinux role label that applies
+                              to the container.
+                            type: string
+                          type:
+                            description: Type is a SELinux type label that applies
+                              to the container.
+                            type: string
+                          user:
+                            description: User is a SELinux user label that applies
+                              to the container.
+                            type: string
+                        type: object
+                      seccompProfile:
+                        description: |-
+                          The seccomp options to use by the containers in this pod.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        properties:
+                          localhostProfile:
+                            description: |-
+                              localhostProfile indicates a profile defined in a file on the node should be used.
+                              The profile must be preconfigured on the node to work.
+                              Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                              Must be set if type is "Localhost". Must NOT be set for any other type.
+                            type: string
+                          type:
+                            description: |-
+                              type indicates which kind of seccomp profile will be applied.
+                              Valid options are:
+
+                              Localhost - a profile defined in a file on the node should be used.
+                              RuntimeDefault - the container runtime default profile should be used.
+                              Unconfined - no profile should be applied.
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      supplementalGroups:
+                        description: |-
+                          A list of groups applied to the first process run in each container, in
+                          addition to the container's primary GID and fsGroup (if specified).  If
+                          the SupplementalGroupsPolicy feature is enabled, the
+                          supplementalGroupsPolicy field determines whether these are in addition
+                          to or instead of any group memberships defined in the container image.
+                          If unspecified, no additional groups are added, though group memberships
+                          defined in the container image may still be used, depending on the
+                          supplementalGroupsPolicy field.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        items:
+                          format: int64
+                          type: integer
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      supplementalGroupsPolicy:
+                        description: |-
+                          Defines how supplemental groups of the first container processes are calculated.
+                          Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+                          (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+                          and the container runtime must implement support for this feature.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        type: string
+                      sysctls:
+                        description: |-
+                          Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+                          sysctls (by the container runtime) might fail to launch.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        items:
+                          description: Sysctl defines a kernel parameter to be set
+                          properties:
+                            name:
+                              description: Name of a property to set
+                              type: string
+                            value:
+                              description: Value of a property to set
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      windowsOptions:
+                        description: |-
+                          The Windows specific settings applied to all containers.
+                          If unspecified, the options within a container's SecurityContext will be used.
+                          If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+                          Note that this field cannot be set when spec.os.name is linux.
+                        properties:
+                          gmsaCredentialSpec:
+                            description: |-
+                              GMSACredentialSpec is where the GMSA admission webhook
+                              (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+                              GMSA credential spec named by the GMSACredentialSpecName field.
+                            type: string
+                          gmsaCredentialSpecName:
+                            description: GMSACredentialSpecName is the name of the
+                              GMSA credential spec to use.
+                            type: string
+                          hostProcess:
+                            description: |-
+                              HostProcess determines if a container should be run as a 'Host Process' container.
+                              All of a Pod's containers must have the same effective HostProcess value
+                              (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+                              In addition, if HostProcess is true then HostNetwork must also be set to true.
+                            type: boolean
+                          runAsUserName:
+                            description: |-
+                              The UserName in Windows to run the entrypoint of the container process.
+                              Defaults to the user specified in image metadata if unspecified.
+                              May also be set in PodSecurityContext. If set in both SecurityContext and
+                              PodSecurityContext, the value specified in SecurityContext takes precedence.
+                            type: string
+                        type: object
                     type: object
                   priorityClassName:
                     type: string
@@ -193,9 +434,10 @@ spec:
                         operator:
                           description: |-
                             Operator represents a key's relationship to the value.
-                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                             Exists is equivalent to wildcard for value, so that a pod can
                             tolerate all taints of a particular category.
+                            Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                           type: string
                         tolerationSeconds:
                           description: |-
@@ -337,6 +579,27 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostNetwork:
+                    description: HostNetwork allows the DCGM-Exporter daemon set to
+                      expose metrics port on the host's network namespace.
+                    type: boolean
+                  hostPID:
+                    description: HostPID allows the DCGM-Exporter daemon set to access
+                      the host's PID namespace
+                    type: boolean
+                  hpcJobMapping:
+                    description: 'Optional: HPC job mapping configuration for NVIDIA
+                      DCGM Exporter'
+                    properties:
+                      directory:
+                        description: |-
+                          Directory path where HPC job mapping files are created by the workload manager
+                          Defaults to /var/lib/dcgm-exporter/job-mapping if not specified
+                        type: string
+                      enabled:
+                        description: Enable HPC job mapping for DCGM Exporter
+                        type: boolean
+                    type: object
                   image:
                     description: NVIDIA DCGM Exporter image name
                     pattern: '[a-zA-Z0-9\-]+'
@@ -381,6 +644,19 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  service:
+                    description: 'Optional: Service configuration for NVIDIA DCGM
+                      Exporter'
+                    properties:
+                      internalTrafficPolicy:
+                        description: InternalTrafficPolicy describes how nodes distribute
+                          service traffic they receive on the ClusterIP.
+                        type: string
+                      type:
+                        description: Type represents the ServiceType which describes
+                          ingress methods for a service
+                        type: string
+                    type: object
                   serviceMonitor:
                     description: 'Optional: ServiceMonitor configuration for NVIDIA
                       DCGM Exporter'
@@ -418,7 +694,7 @@ spec:
                             action:
                               default: replace
                               description: |-
-                                Action to perform based on the regex matching.
+                                action to perform based on the regex matching.
 
                                 `Uppercase` and `Lowercase` actions require Prometheus >= v2.36.0.
                                 `DropEqual` and `KeepEqual` actions require Prometheus >= v2.41.0.
@@ -450,41 +726,41 @@ spec:
                               type: string
                             modulus:
                               description: |-
-                                Modulus to take of the hash of the source label values.
+                                modulus to take of the hash of the source label values.
 
                                 Only applicable when the action is `HashMod`.
                               format: int64
                               type: integer
                             regex:
-                              description: Regular expression against which the extracted
-                                value is matched.
+                              description: regex defines the regular expression against
+                                which the extracted value is matched.
                               type: string
                             replacement:
                               description: |-
-                                Replacement value against which a Replace action is performed if the
+                                replacement value against which a Replace action is performed if the
                                 regular expression matches.
 
                                 Regex capture groups are available.
                               type: string
                             separator:
-                              description: Separator is the string between concatenated
+                              description: separator defines the string between concatenated
                                 SourceLabels.
                               type: string
                             sourceLabels:
                               description: |-
-                                The source labels select values from existing labels. Their content is
+                                sourceLabels defines the source labels select values from existing labels. Their content is
                                 concatenated using the configured Separator and matched against the
                                 configured regular expression.
                               items:
                                 description: |-
-                                  LabelName is a valid Prometheus label name which may only contain ASCII
-                                  letters, numbers, as well as underscores.
-                                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                  LabelName is a valid Prometheus label name.
+                                  For Prometheus 3.x, a label name is valid if it contains UTF-8 characters.
+                                  For Prometheus 2.x, a label name is only valid if it contains ASCII characters, letters, numbers, as well as underscores.
                                 type: string
                               type: array
                             targetLabel:
                               description: |-
-                                Label to which the resulting string is written in a replacement.
+                                targetLabel defines the label to which the resulting string is written in a replacement.
 
                                 It is mandatory for `Replace`, `HashMod`, `Lowercase`, `Uppercase`,
                                 `KeepEqual` and `DropEqual` actions.
@@ -666,11 +942,18 @@ spec:
                       licensing'
                     properties:
                       configMapName:
+                        description: 'Deprecated: ConfigMapName has been deprecated
+                          in favour of SecretName. Please use secrets to handle the
+                          licensing server configuration more securely'
                         type: string
                       nlsEnabled:
                         description: NLSEnabled indicates if NVIDIA Licensing System
                           is used for licensing.
                         type: boolean
+                      secretName:
+                        description: SecretName indicates the name of the secret containing
+                          the licensing token
+                        type: string
                     type: object
                   livenessProbe:
                     description: NVIDIA Driver container liveness probe settings
@@ -844,6 +1127,10 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  secretEnv:
+                    description: 'Optional: SecretEnv represents the name of the Kubernetes
+                      Secret with secret environment variables for the NVIDIA Driver'
+                    type: string
                   startupProbe:
                     description: NVIDIA Driver container startup probe settings
                     properties:
@@ -1328,6 +1615,82 @@ spec:
                     description: Kata Manager image tag
                     type: string
                 type: object
+              kataSandboxDevicePlugin:
+                description: KataSandboxDevicePlugin component spec
+                properties:
+                  args:
+                    description: 'Optional: List of arguments'
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled indicates if deployment of NVIDIA component
+                      through operator is enabled
+                    type: boolean
+                  env:
+                    description: 'Optional: List of environment variables'
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  image:
+                    description: NVIDIA component image name
+                    pattern: '[a-zA-Z0-9\-]+'
+                    type: string
+                  imagePullPolicy:
+                    description: Image pull policy
+                    type: string
+                  imagePullSecrets:
+                    description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    description: NVIDIA component image repository
+                    type: string
+                  resources:
+                    description: 'Optional: Define resources requests and limits for
+                      each pod'
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  version:
+                    description: NVIDIA component image tag
+                    type: string
+                type: object
               mig:
                 description: MIG spec
                 properties:
@@ -1361,8 +1724,8 @@ spec:
                         - ""
                         type: string
                       name:
-                        default: default-mig-parted-config
-                        description: ConfigMap name
+                        description: ConfigMap name. If not specified, MIG configuration
+                          will be dynamically generated from hardware.
                         type: string
                     type: object
                   enabled:
@@ -1529,16 +1892,12 @@ spec:
                       queryable and should be preserved when modifying objects.
                     type: object
                   defaultRuntime:
-                    default: docker
-                    description: Runtime defines container runtime type
-                    enum:
-                    - docker
-                    - crio
-                    - containerd
+                    description: 'Deprecated: DefaultRuntime is no longer used by
+                      the gpu-operator. This is instead, detected at runtime.'
                     type: string
                   initContainer:
-                    description: InitContainerSpec describes configuration for initContainer
-                      image used with all components
+                    description: 'Deprecated: InitContainerSpec describes configuration
+                      for initContainer image used with all components'
                     properties:
                       image:
                         description: Image represents image name
@@ -1575,8 +1934,6 @@ spec:
                       image should be used on OpenShift to build and install driver
                       modules
                     type: boolean
-                required:
-                - defaultRuntime
                 type: object
               psa:
                 description: PSA defines spec for PodSecurityAdmission configuration
@@ -1691,6 +2048,15 @@ spec:
                       Enabled indicates if the GPU Operator should manage additional operands required
                       for sandbox workloads (i.e. VFIO Manager, vGPU Manager, and additional device plugins)
                     type: boolean
+                  mode:
+                    default: kubevirt
+                    description: |-
+                      Mode indicates the sandbox mode. Accepted values are "kubevirt"
+                      and "kata". The default value is "kubevirt".
+                    enum:
+                    - kubevirt
+                    - kata
+                    type: string
                 type: object
               toolkit:
                 description: Toolkit component spec
@@ -2272,6 +2638,13 @@ spec:
                     items:
                       type: string
                     type: array
+                  kernelModuleConfig:
+                    description: 'Optional: Kernel module configuration parameters
+                      for the vGPU manager'
+                    properties:
+                      name:
+                        type: string
+                    type: object
                   repository:
                     description: NVIDIA vGPU Manager image repository
                     type: string

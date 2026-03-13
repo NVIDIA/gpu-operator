@@ -16,16 +16,13 @@ BUILD_MULTI_ARCH_IMAGES ?= false
 DOCKER ?= docker
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-BUILDX  =
-ifeq ($(BUILD_MULTI_ARCH_IMAGES),true)
-BUILDX = buildx
-endif
 
 ##### Global variables #####
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
 BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
+GOPROXY ?= https://proxy.golang.org,direct
 
 ifeq ($(IMAGE_NAME),)
 REGISTRY ?= nvcr.io/nvidia/cloud-native
@@ -64,14 +61,14 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMAGE=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMAGE ?= gpu-operator-bundle:$(VERSION)
 
+BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64,linux/arm64
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
-
-all: gpu-operator
 
 GOOS ?= linux
 VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
@@ -80,11 +77,7 @@ PWD = $(shell pwd)
 CLIENT_GEN = $(PWD)/bin/client-gen
 CONTROLLER_GEN = $(PWD)/bin/controller-gen
 KUSTOMIZE = $(PWD)/bin/kustomize
-
-# Build gpu-operator binary
-gpu-operator:
-	CGO_ENABLED=0 GOOS=$(GOOS) \
-		go build -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)" -o gpu-operator ./cmd/gpu-operator/...
+GCOV2LCOV ?= $(PWD)/bin/gcov2lcov
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate check manifests
@@ -138,7 +131,7 @@ bundle: manifests install-tools
 # Build the bundle image.
 build-bundle-image:
 	$(DOCKER) build \
-	--build-arg VERSION=$(VERSION) \
+    $(BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS) \
 	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 	-f docker/bundle.Dockerfile -t $(BUNDLE_IMAGE) .
@@ -213,18 +206,22 @@ goimports:
 lint:
 	golangci-lint run ./...
 
+BUILD_FLAGS = -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
+build:
+	go build $(BUILD_FLAGS) ./...
+
 cmds: $(CMD_TARGETS)
 $(CMD_TARGETS): cmd-%:
-	go build -ldflags "-s -w" $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
-
-build:
-	go build ./...
+	CGO_ENABLED=0 GOOS=$(GOOS) \
+		go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
 
 sync-crds:
 	@echo "- Syncing CRDs into Helm and OLM packages..."
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/deployments/gpu-operator/crds
 	cp $(PROJECT_DIR)/config/crd/bases/* $(PROJECT_DIR)/bundle/manifests
 
+TOOLS_DIR := $(PROJECT_DIR)/tools
+E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-modules:
 	@echo "- Verifying that the dependencies have expected content..."
 	go mod verify
@@ -234,6 +231,11 @@ validate-modules:
 	@echo "- Checking if the vendor dir is in sync..."
 	go mod vendor
 	@git diff --exit-code -- vendor
+	@echo "- [tools] Verifying that the dependencies have expected content..."
+	go -C $(TOOLS_DIR) mod verify
+	@echo "- [tools] Checking for any unused/missing packages in go.mod..."
+	go -C $(TOOLS_DIR) mod tidy
+	@git diff --exit-code -- $(TOOLS_DIR)/go.sum $(TOOLS_DIR)/go.mod
 
 validate-csv: cmds
 	./gpuop-cfg validate csv --input=./bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
@@ -245,7 +247,7 @@ validate-helm-values: cmds
 
 validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
-	@git diff --exit-code -- api config
+	@git diff --exit-code -- api config bundle deployments
 
 COVERAGE_FILE := coverage.out
 unit-test: build
@@ -256,13 +258,13 @@ coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
 	go tool cover -func=$(COVERAGE_FILE).no-mocks
 
-##### Public rules #####
-DISTRIBUTIONS := ubi9
-DEFAULT_PUSH_TARGET := ubi9
+cov-report: coverage install-tools
+	$(GCOV2LCOV) -infile $(COVERAGE_FILE) -outfile lcov.info
 
-PUSH_TARGETS := $(patsubst %,push-%, $(DISTRIBUTIONS))
-BUILD_TARGETS := $(patsubst %,build-%, $(DISTRIBUTIONS))
-TEST_TARGETS := $(patsubst %,test-%, $(DISTRIBUTIONS))
+##### Public rules #####
+PUSH_TARGETS := push-image
+BUILD_TARGETS := build-image
+TEST_TARGETS := test
 
 ifneq ($(BUILD_MULTI_ARCH_IMAGES),true)
 include $(CURDIR)/native-only.mk
@@ -270,36 +272,26 @@ else
 include $(CURDIR)/multi-arch.mk
 endif
 
-ALL_TARGETS := $(DISTRIBUTIONS) $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
+ALL_TARGETS := $(PUSH_TARGETS) $(BUILD_TARGETS) $(TEST_TARGETS) docker-image
 .PHONY: $(ALL_TARGETS)
-
-ifneq ($(SUBCOMPONENT),)
-# SUBCOMPONENT is set; assume this is the target folder
-$(ALL_TARGETS): %:
-	make -C $(SUBCOMPONENT) $(*)
-else
 
 build-%: DOCKERFILE = $(CURDIR)/docker/Dockerfile
 
-$(DISTRIBUTIONS): %: build-%
-$(BUILD_TARGETS): build-%:
-	DOCKER_BUILDKIT=1 \
-		$(DOCKER) $(BUILDX) build --pull \
+build-image:
+		$(DOCKER) build --pull \
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
-		--build-arg CVE_UPDATES="$(CVE_UPDATES)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
+		--build-arg GOPROXY="$(GOPROXY)" \
 		--file $(DOCKERFILE) $(CURDIR)
 
 # Provide a utility target to build the images to allow for use in external tools.
 # This includes https://github.com/openshift-psap/ci-artifacts
 docker-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-docker-image: ${DEFAULT_PUSH_TARGET}
-endif
 
 install-tools:
 	@echo Installing tools from tools.go

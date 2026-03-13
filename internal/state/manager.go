@@ -34,21 +34,23 @@ type Manager interface {
 }
 
 type stateManager struct {
-	states []State
-	client client.Client
+	states    []State
+	client    client.Client
+	namespace string
 }
 
 var _ Manager = (*stateManager)(nil)
 
-func NewManager(crdKind string, k8sClient client.Client, scheme *runtime.Scheme) (Manager, error) {
-	states, err := newStates(crdKind, k8sClient, scheme)
+func NewManager(crdKind string, namespace string, k8sClient client.Client, scheme *runtime.Scheme) (Manager, error) {
+	states, err := newStates(crdKind, namespace, k8sClient, scheme)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add states: %v", err)
 	}
 
 	manager := &stateManager{
-		states: states,
-		client: k8sClient,
+		namespace: namespace,
+		states:    states,
+		client:    k8sClient,
 	}
 	return manager, nil
 }
@@ -108,18 +110,18 @@ func (m *stateManager) SyncState(ctx context.Context, customResource interface{}
 	return managerResult
 }
 
-func newStates(crdKind string, k8sClient client.Client, scheme *runtime.Scheme) ([]State, error) {
+func newStates(crdKind string, namespace string, k8sClient client.Client, scheme *runtime.Scheme) ([]State, error) {
 	switch crdKind {
 	case nvidiav1alpha1.NVIDIADriverCRDName:
-		return newNVIDIADriverStates(k8sClient, scheme)
+		return newNVIDIADriverStates(k8sClient, namespace, scheme)
 	default:
 		break
 	}
 	return nil, fmt.Errorf("unsupported CRD for state manager factory: %s", crdKind)
 }
 
-func newNVIDIADriverStates(k8sClient client.Client, scheme *runtime.Scheme) ([]State, error) {
-	driverState, err := NewStateDriver(k8sClient, scheme, "/opt/gpu-operator/manifests/state-driver")
+func newNVIDIADriverStates(k8sClient client.Client, namespace string, scheme *runtime.Scheme) ([]State, error) {
+	driverState, err := NewStateDriver(k8sClient, namespace, scheme, "/opt/gpu-operator/manifests/state-driver")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NVIDIA driver state: %v", err)
 	}

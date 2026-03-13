@@ -1,9 +1,12 @@
 /*
 Copyright 2022 NVIDIA CORPORATION & AFFILIATES
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +21,7 @@ import (
 	"strings"
 	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 )
@@ -94,6 +98,11 @@ func SetDriverName(driver string) {
 	DriverName = driver
 }
 
+// GetUpgradeSkipDrainDriverPodSelector returns pod selector to skip drain for a given driver
+func GetUpgradeSkipDrainDriverPodSelector(driverName string) string {
+	return fmt.Sprintf(UpgradeSkipDrainDriverSelectorFmt+"!=true", driverName)
+}
+
 // GetUpgradeStateLabelKey returns state label key used for upgrades
 func GetUpgradeStateLabelKey() string {
 	return fmt.Sprintf(UpgradeStateLabelKeyFmt, DriverName)
@@ -114,6 +123,18 @@ func GetUpgradeDriverWaitForSafeLoadAnnotationKey() string {
 // externally (orphaned pod)
 func GetUpgradeRequestedAnnotationKey() string {
 	return fmt.Sprintf(UpgradeRequestedAnnotationKeyFmt, DriverName)
+}
+
+// GetUpgradeRequestorModeAnnotationKey returns the key for annotation used to mark node as requestor upgrade mode
+// in progress
+func GetUpgradeRequestorModeAnnotationKey() string {
+	return fmt.Sprintf(UpgradeRequestorModeAnnotationKeyFmt, DriverName)
+}
+
+// IsNodeInRequestorMode returns true if node is in requestor mode
+func IsNodeInRequestorMode(node *corev1.Node) bool {
+	_, ok := node.Annotations[GetUpgradeRequestorModeAnnotationKey()]
+	return ok
 }
 
 // GetUpgradeInitialStateAnnotationKey returns the key for annotation used to track initial state of the node
@@ -138,6 +159,7 @@ func GetEventReason() string {
 	return fmt.Sprintf("%sDriverUpgrade", strings.ToUpper(DriverName))
 }
 
+// logEventf logs a formatted event for a given kubernetes object
 func logEventf(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string,
 	args ...interface{}) {
 	if recorder != nil {
@@ -145,6 +167,7 @@ func logEventf(recorder record.EventRecorder, object runtime.Object, eventType s
 	}
 }
 
+// logEvent logs an event for a given kubernetes object
 func logEvent(recorder record.EventRecorder, object runtime.Object, eventType string, reason string,
 	messageFmt string) {
 	if recorder != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"sort"
@@ -29,7 +30,7 @@ type List struct {
 type tagCommon struct {
 	r         ref.Ref
 	mt        string
-	orig      interface{}
+	orig      any
 	rawHeader http.Header
 	rawBody   []byte
 	url       *url.URL
@@ -197,16 +198,14 @@ func (l *List) Append(add *List) error {
 		if l.Manifests == nil {
 			l.Manifests = add.Manifests
 		} else {
-			for k, v := range add.Manifests {
-				l.Manifests[k] = v
-			}
+			maps.Copy(l.Manifests, add.Manifests)
 		}
 	}
 	return nil
 }
 
 // GetOrig returns the underlying tag data structure if defined.
-func (t tagCommon) GetOrig() interface{} {
+func (t tagCommon) GetOrig() any {
 	return t.orig
 }
 

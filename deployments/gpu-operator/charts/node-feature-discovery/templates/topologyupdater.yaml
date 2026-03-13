@@ -29,14 +29,11 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "node-feature-discovery.topologyUpdater.serviceAccountName" . }}
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: {{ .Values.topologyUpdater.dnsPolicy }}
     {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
     {{- end }}
-    {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+      imagePullSecrets: {{ include "node-feature-discovery.imagePullSecrets" . }}
       securityContext:
         {{- toYaml .Values.topologyUpdater.podSecurityContext | nindent 8 }}
       hostNetwork: {{ .Values.topologyUpdater.hostNetwork }}
@@ -45,8 +42,9 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
         livenessProbe:
-          grpc:
-            port: {{ .Values.topologyUpdater.healthPort | default "8082" }}
+          httpGet:
+            path: /healthz
+            port: http
         {{- with .Values.topologyUpdater.livenessProbe.initialDelaySeconds }}
           initialDelaySeconds: {{ . }}
         {{- end }}
@@ -60,8 +58,9 @@ spec:
           timeoutSeconds: {{ . }}
         {{- end }}
         readinessProbe:
-          grpc:
-            port: {{ .Values.topologyUpdater.healthPort | default "8082" }}
+          httpGet:
+            path: /healthz
+            port: http
         {{- with .Values.topologyUpdater.readinessProbe.initialDelaySeconds }}
           initialDelaySeconds: {{ . }}
         {{- end }}
@@ -113,16 +112,13 @@ spec:
           # Disable kubelet state tracking by giving an empty path
           - "-kubelet-state-dir="
           {{- end }}
-          - "-metrics={{ .Values.topologyUpdater.metricsPort | default "8081"}}"
-          - "-grpc-health={{ .Values.topologyUpdater.healthPort | default "8082" }}"
+          - "-port={{ .Values.topologyUpdater.port | default "8080"}}"
           {{- with .Values.topologyUpdater.extraArgs }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
         ports:
-          - containerPort: {{ .Values.topologyUpdater.metricsPort | default "8081"}}
-            name: metrics
-          - containerPort: {{ .Values.topologyUpdater.healthPort | default "8082" }}
-            name: health
+          - containerPort: {{ .Values.topologyUpdater.port | default "8080"}}
+            name: http
         volumeMounts:
         {{- if .Values.topologyUpdater.kubeletConfigPath | empty | not }}
         - name: kubelet-config

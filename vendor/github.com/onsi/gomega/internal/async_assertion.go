@@ -145,10 +145,22 @@ func (assertion *AsyncAssertion) Should(matcher types.GomegaMatcher, optionalDes
 	return assertion.match(matcher, true, optionalDescription...)
 }
 
+func (assertion *AsyncAssertion) To(matcher types.GomegaMatcher, optionalDescription ...any) bool {
+	return assertion.Should(matcher, optionalDescription...)
+}
+
 func (assertion *AsyncAssertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Asynchronous assertion", optionalDescription...)
 	return assertion.match(matcher, false, optionalDescription...)
+}
+
+func (assertion *AsyncAssertion) ToNot(matcher types.GomegaMatcher, optionalDescription ...any) bool {
+	return assertion.ShouldNot(matcher, optionalDescription...)
+}
+
+func (assertion *AsyncAssertion) NotTo(matcher types.GomegaMatcher, optionalDescription ...any) bool {
+	return assertion.ShouldNot(matcher, optionalDescription...)
 }
 
 func (assertion *AsyncAssertion) buildDescription(optionalDescription ...any) string {
@@ -440,7 +452,7 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 				}
 			} else {
 				var fgErr formattedGomegaError
-				if errors.As(actualErr, &fgErr) {
+				if errors.As(matcherErr, &fgErr) {
 					message += fgErr.FormattedGomegaError() + "\n"
 				} else {
 					message += renderError(fmt.Sprintf("The matcher passed to %s returned the following error:", assertion.asyncType), matcherErr)

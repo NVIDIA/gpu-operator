@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"sync"
 
@@ -149,7 +150,7 @@ func (o *OCIDir) initIndex(r ref.Ref, locked bool) error {
 		return nil
 	}
 	//#nosec G301 defer to user umask settings
-	err = os.MkdirAll(r.Path, 0777)
+	err = os.MkdirAll(r.Path, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
@@ -236,7 +237,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		defer o.mu.Unlock()
 	}
 	//#nosec G301 defer to user umask settings
-	err := os.MkdirAll(r.Path, 0777)
+	err := os.MkdirAll(r.Path, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("failed creating %s: %w", r.Path, err)
 	}
@@ -280,6 +281,7 @@ func (o *OCIDir) writeIndex(r ref.Ref, i v1.Index, locked bool) error {
 		return fmt.Errorf("cannot close index: %w", errC)
 	}
 	indexFile := path.Join(r.Path, "index.json")
+	//#nosec G703 inputs are user controlled
 	err = os.Rename(path.Join(r.Path, tmpName), indexFile)
 	if err != nil {
 		return fmt.Errorf("cannot rename tmpfile to index: %w", err)
@@ -335,7 +337,7 @@ func indexCreate() v1.Index {
 
 func indexGet(index v1.Index, r ref.Ref) (descriptor.Descriptor, error) {
 	if r.Digest == "" && r.Tag == "" {
-		r.Tag = "latest"
+		r = r.SetTag("latest")
 	}
 	if r.Digest != "" {
 		for _, im := range index.Manifests {
@@ -395,7 +397,7 @@ func indexSet(index *v1.Index, r ref.Ref, d descriptor.Descriptor) error {
 			// prune entries without any tag and a matching digest
 			// or entries with a matching tag
 			if (name == "" && index.Manifests[i].Digest == d.Digest) || (r.Tag != "" && name == r.Tag) {
-				index.Manifests = append(index.Manifests[:i], index.Manifests[i+1:]...)
+				index.Manifests = slices.Delete(index.Manifests, i, i+1)
 			}
 		}
 	} else {

@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	yamlConverter "sigs.k8s.io/yaml"
+
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -109,6 +111,7 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 			}
 			return *b
 		},
+		"getObjectHash": utils.GetObjectHash,
 	})
 
 	if data.Funcs != nil {

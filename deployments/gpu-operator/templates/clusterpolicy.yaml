@@ -90,45 +90,58 @@ spec:
     plugin:
       {{- if .Values.validator.plugin.env }}
       env: {{ toYaml .Values.validator.plugin.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.cuda }}
     cuda:
       {{- if .Values.validator.cuda.env }}
       env: {{ toYaml .Values.validator.cuda.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.driver }}
     driver:
       {{- if .Values.validator.driver.env }}
       env: {{ toYaml .Values.validator.driver.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.toolkit }}
     toolkit:
       {{- if .Values.validator.toolkit.env }}
       env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vfioPCI }}
     vfioPCI:
       {{- if .Values.validator.vfioPCI.env }}
       env: {{ toYaml .Values.validator.vfioPCI.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuManager }}
     vgpuManager:
       {{- if .Values.validator.vgpuManager.env }}
       env: {{ toYaml .Values.validator.vgpuManager.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vgpuDevices }}
     vgpuDevices:
       {{- if .Values.validator.vgpuDevices.env }}
       env: {{ toYaml .Values.validator.vgpuDevices.env | nindent 8 }}
+      {{- else }}
+      env: []
       {{- end }}
     {{- end }}
-
   mig:
     {{- if .Values.mig.strategy }}
     strategy: {{ .Values.mig.strategy }}
@@ -137,7 +150,12 @@ spec:
     enabled: {{ .Values.psa.enabled }}
   cdi:
     enabled: {{ .Values.cdi.enabled }}
+    {{- if .Values.cdi.default }}
     default: {{ .Values.cdi.default }}
+    {{- end }}
+    {{- if and (.Values.cdi.enabled) (.Values.cdi.nriPluginEnabled) }}
+    nriPluginEnabled: {{ .Values.cdi.nriPluginEnabled }}
+    {{- end }}
   driver:
     enabled: {{ .Values.driver.enabled }}
     useNvidiaDriverCRD: {{ .Values.driver.nvidiaDriverCRD.enabled }}
@@ -201,6 +219,9 @@ spec:
     {{- if .Values.driver.kernelModuleConfig }}
     kernelModuleConfig: {{ toYaml .Values.driver.kernelModuleConfig | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.secretEnv }}
+    secretEnv: {{ .Values.driver.secretEnv }}
+    {{- end }}
     {{- if .Values.driver.resources }}
     resources: {{ toYaml .Values.driver.resources | nindent 6 }}
     {{- end }}
@@ -259,6 +280,9 @@ spec:
     {{- if .Values.vgpuManager.args }}
     args: {{ toYaml .Values.vgpuManager.args | nindent 6 }}
     {{- end }}
+    {{- if .Values.vgpuManager.kernelModuleConfig }}
+    kernelModuleConfig: {{ toYaml .Values.vgpuManager.kernelModuleConfig | nindent 6 }}
+    {{- end }}
     driverManager:
       {{- if .Values.vgpuManager.driverManager.repository }}
       repository: {{ .Values.vgpuManager.driverManager.repository }}
@@ -277,7 +301,9 @@ spec:
       {{- end }}
   kataManager:
     enabled: {{ .Values.kataManager.enabled }}
+    {{- if .Values.kataManager.config }}
     config: {{ toYaml .Values.kataManager.config | nindent 6 }}
+    {{- end }}
     {{- if .Values.kataManager.repository }}
     repository: {{ .Values.kataManager.repository }}
     {{- end }}
@@ -395,7 +421,7 @@ spec:
     resources: {{ toYaml .Values.ccManager.resources | nindent 6 }}
     {{- end }}
     {{- if .Values.ccManager.env }}
-    env: {{ toYaml .Values.vfioManager.env | nindent 6 }}
+    env: {{ toYaml .Values.ccManager.env | nindent 6 }}
     {{- end }}
     {{- if .Values.ccManager.args }}
     args: {{ toYaml .Values.ccManager.args | nindent 6 }}
@@ -454,8 +480,8 @@ spec:
     {{- end }}
     {{- if .Values.devicePlugin.config.name }}
     config:
-      name: {{ .Values.devicePlugin.config.name }}
-      default: {{ .Values.devicePlugin.config.default }}
+      name: {{ .Values.devicePlugin.config.name | quote }}
+      default: {{ .Values.devicePlugin.config.default | quote }}
     {{- end }}
   dcgm:
     enabled: {{ .Values.dcgm.enabled }}
@@ -516,6 +542,18 @@ spec:
     {{- if .Values.dcgmExporter.serviceMonitor }}
     serviceMonitor: {{ toYaml .Values.dcgmExporter.serviceMonitor | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.service }}
+    service: {{ toYaml .Values.dcgmExporter.service | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.hostPID }}
+    hostPID: {{ .Values.dcgmExporter.hostPID }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.hostNetwork }}
+    hostNetwork: {{ .Values.dcgmExporter.hostNetwork }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.hpcJobMapping }}
+    hpcJobMapping: {{ toYaml .Values.dcgmExporter.hpcJobMapping | nindent 6 }}
+    {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
     {{- if .Values.gfd.repository }}
@@ -570,8 +608,10 @@ spec:
     {{- end }}
     {{- if .Values.migManager.config }}
     config:
+      {{- if .Values.migManager.config.name }}
       name: {{ .Values.migManager.config.name }}
-      default: {{ .Values.migManager.config.default }}
+      {{- end }}
+      default: {{ .Values.migManager.config.default | quote }}
     {{- end }}
     {{- if .Values.migManager.gpuClientsConfig }}
     gpuClientsConfig: {{ toYaml .Values.migManager.gpuClientsConfig | nindent 6 }}
@@ -600,7 +640,7 @@ spec:
     {{- if .Values.nodeStatusExporter.args }}
     args: {{ toYaml .Values.nodeStatusExporter.args | nindent 6 }}
     {{- end }}
-  {{- if .Values.gds.enabled }}
+  {{- if .Values.gds }}
   gds:
     enabled: {{ .Values.gds.enabled }}
     {{- if .Values.gds.repository }}
@@ -651,6 +691,9 @@ spec:
     {{- if .Values.sandboxWorkloads.defaultWorkload }}
     defaultWorkload: {{ .Values.sandboxWorkloads.defaultWorkload }}
     {{- end }}
+    {{- if .Values.sandboxWorkloads.mode }}
+    mode: {{ .Values.sandboxWorkloads.mode | quote }}
+    {{- end }}
   sandboxDevicePlugin:
     {{- if .Values.sandboxDevicePlugin.enabled }}
     enabled: {{ .Values.sandboxDevicePlugin.enabled }}
@@ -678,4 +721,32 @@ spec:
     {{- end }}
     {{- if .Values.sandboxDevicePlugin.args }}
     args: {{ toYaml .Values.sandboxDevicePlugin.args | nindent 6 }}
+    {{- end }}
+  kataSandboxDevicePlugin:
+    {{- if ne .Values.kataSandboxDevicePlugin.enabled nil }}
+    enabled: {{ .Values.kataSandboxDevicePlugin.enabled }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.repository }}
+    repository: {{ .Values.kataSandboxDevicePlugin.repository }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.image }}
+    image: {{ .Values.kataSandboxDevicePlugin.image }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.version }}
+    version: {{ .Values.kataSandboxDevicePlugin.version | quote }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.kataSandboxDevicePlugin.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.kataSandboxDevicePlugin.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.resources }}
+    resources: {{ toYaml .Values.kataSandboxDevicePlugin.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.env }}
+    env: {{ toYaml .Values.kataSandboxDevicePlugin.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.kataSandboxDevicePlugin.args }}
+    args: {{ toYaml .Values.kataSandboxDevicePlugin.args | nindent 6 }}
     {{- end }}

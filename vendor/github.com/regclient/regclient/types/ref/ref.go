@@ -23,18 +23,29 @@ const (
 )
 
 var (
-	hostPartS   = `(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)`
-	hostPortS   = `(?:` + hostPartS + `(?:` + regexp.QuoteMeta(`.`) + hostPartS + `)*` + regexp.QuoteMeta(`.`) + `?` + regexp.QuoteMeta(`:`) + `[0-9]+)`
+	hostPartS = `(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)`
+	portS     = `(?:` + regexp.QuoteMeta(`:`) + `[0-9]+)`
+	ipv6PartS = `(?:[0-9a-fA-F]{1,4}:){0,7}[0-9a-fA-F]{1,4}`
+	ipv6S     = `(?:` + regexp.QuoteMeta(`[`) + `(?:` +
+		ipv6PartS + `|` + // uncompressed
+		regexp.QuoteMeta(`::`) + ipv6PartS + `|` + // prefix compressed
+		ipv6PartS + regexp.QuoteMeta(`::`) + ipv6PartS + `|` + // middle compressed
+		ipv6PartS + regexp.QuoteMeta(`::`) + // suffix compressed
+		`)` + regexp.QuoteMeta(`]`) + `)`
+	localhostS  = `localhost`
 	hostDomainS = `(?:` + hostPartS + `(?:(?:` + regexp.QuoteMeta(`.`) + hostPartS + `)+` + regexp.QuoteMeta(`.`) + `?|` + regexp.QuoteMeta(`.`) + `))`
 	hostUpperS  = `(?:[a-zA-Z0-9]*[A-Z][a-zA-Z0-9-]*[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[A-Z][a-zA-Z0-9]*)`
-	registryS   = `(?:` + hostDomainS + `|` + hostPortS + `|` + hostUpperS + `|localhost(?:` + regexp.QuoteMeta(`:`) + `[0-9]+)?)`
-	repoPartS   = `[a-z0-9]+(?:(?:\.|_|__|-+)[a-z0-9]+)*`
-	pathS       = `[/a-zA-Z0-9_\-. ~\+]+`
-	tagS        = `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`
-	digestS     = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
-	schemeRE    = regexp.MustCompile(`^([a-z]+)://(.+)$`)
-	registryRE  = regexp.MustCompile(`^(` + registryS + `)$`)
-	refRE       = regexp.MustCompile(`^(?:(` + registryS + `)` + regexp.QuoteMeta(`/`) + `)?` +
+	registryS   = `(?:` +
+		`(?:` + hostDomainS + `|` + hostUpperS + `|` + ipv6S + `|` + localhostS + `)` + portS + `?|` + // name with dotted domain, upper case, or IPv6 with optional port
+		hostPartS + portS + // a short name with required port
+		`)`
+	repoPartS  = `[a-z0-9]+(?:(?:\.|_|__|-+)[a-z0-9]+)*`
+	pathS      = `[/a-zA-Z0-9_\-. ~\+]+`
+	tagS       = `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`
+	digestS    = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
+	schemeRE   = regexp.MustCompile(`^([a-z]+)://(.+)$`)
+	registryRE = regexp.MustCompile(`^(` + registryS + `)$`)
+	refRE      = regexp.MustCompile(`^(?:(` + registryS + `)` + regexp.QuoteMeta(`/`) + `)?` +
 		`(` + repoPartS + `(?:` + regexp.QuoteMeta(`/`) + repoPartS + `)*)` +
 		`(?:` + regexp.QuoteMeta(`:`) + `(` + tagS + `))?` +
 		`(?:` + regexp.QuoteMeta(`@`) + `(` + digestS + `))?$`)
@@ -72,7 +83,7 @@ func New(parse string) (Ref, error) {
 	case "":
 		ret.Scheme = "reg"
 		matchRef := refRE.FindStringSubmatch(tail)
-		if matchRef == nil || len(matchRef) < 5 {
+		if len(matchRef) < 5 {
 			if refRE.FindStringSubmatch(strings.ToLower(tail)) != nil {
 				return Ref{}, fmt.Errorf("%w \"%s\", repo must be lowercase", errs.ErrInvalidReference, tail)
 			}
@@ -105,7 +116,7 @@ func New(parse string) (Ref, error) {
 
 	case "ocidir", "ocifile":
 		matchPath := ocidirRE.FindStringSubmatch(tail)
-		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
+		if len(matchPath) < 2 || matchPath[1] == "" {
 			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrInvalidReference, scheme, tail)
 		}
 		ret.Path = matchPath[1]
@@ -140,7 +151,7 @@ func NewHost(parse string) (Ref, error) {
 	case "":
 		ret.Scheme = "reg"
 		matchReg := registryRE.FindStringSubmatch(tail)
-		if matchReg == nil || len(matchReg) < 2 {
+		if len(matchReg) < 2 {
 			return Ref{}, fmt.Errorf("%w \"%s\"", errs.ErrParsingFailed, tail)
 		}
 		ret.Registry = matchReg[1]
@@ -150,7 +161,7 @@ func NewHost(parse string) (Ref, error) {
 
 	case "ocidir", "ocifile":
 		matchPath := ocidirRE.FindStringSubmatch(tail)
-		if matchPath == nil || len(matchPath) < 2 || matchPath[1] == "" {
+		if len(matchPath) < 2 || matchPath[1] == "" {
 			return Ref{}, fmt.Errorf("%w, invalid path for scheme \"%s\": %s", errs.ErrParsingFailed, scheme, tail)
 		}
 		ret.Path = matchPath[1]
@@ -159,6 +170,14 @@ func NewHost(parse string) (Ref, error) {
 		return Ref{}, fmt.Errorf("%w, unknown scheme \"%s\" in \"%s\"", errs.ErrParsingFailed, scheme, parse)
 	}
 	return ret, nil
+}
+
+// AddDigest returns a ref with the requested digest set.
+// The tag will NOT be unset and the reference value will be reset.
+func (r Ref) AddDigest(digest string) Ref {
+	r.Digest = digest
+	r.Reference = r.CommonName()
+	return r
 }
 
 // CommonName outputs a parsable name from a reference.

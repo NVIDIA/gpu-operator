@@ -2,106 +2,32 @@
 apiVersion: nfd.k8s-sigs.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
-  name: nvidia-nfd-nodefeaturerules
+  name: nvidia-kernel-modules
 spec:
   rules:
-    - name: "TDX rule"
+    - name: kernel-module-gdrdrv
       labels:
-        tdx.enabled: "true"
+        nvidia.com/gdrcopy.capable: "true"
       matchFeatures:
-        - feature: cpu.security
+        - feature: kernel.loadedmodule
           matchExpressions:
-              tdx.enabled: {op: IsTrue}
-    - name: "TDX total keys rule"
-      extendedResources:
-        tdx.total_keys: "@cpu.security.tdx.total_keys"
+            gdrdrv:
+              op: Exists
+    - name: kernel-module-nvidia_fs
+      labels:
+        nvidia.com/gds.capable: "true"
       matchFeatures:
-        - feature: cpu.security
+        - feature: kernel.loadedmodule
           matchExpressions:
-            tdx.enabled: {op: IsTrue}
-    - name: "SEV-SNP rule"
+            nvidia_fs:
+              op: Exists
+    - name: kernel-module-nvidia_peermem
       labels:
-        sev.snp.enabled: "true"
+        nvidia.com/peermem.capable: "true"
       matchFeatures:
-      - feature: cpu.security
-        matchExpressions:
-          sev.snp.enabled:
-            op: IsTrue
-    - name: "SEV-ES rule"
-      labels:
-        sev.es.enabled: "true"
-      matchFeatures:
-      - feature: cpu.security
-        matchExpressions:
-          sev.es.enabled:
-            op: IsTrue
-    - name: SEV system capacities
-      extendedResources:
-        sev_asids: '@cpu.security.sev.asids'
-        sev_es: '@cpu.security.sev.encrypted_state_ids'
-      matchFeatures:
-      - feature: cpu.security
-        matchExpressions:
-          sev.enabled:
-            op: Exists
-    - name: "NVIDIA H100"
-      labels:
-        "nvidia.com/gpu.H100": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
+        - feature: kernel.loadedmodule
           matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2339"]}
-    - name: "NVIDIA H100 PCIe"
-      labels:
-        "nvidia.com/gpu.H100.pcie": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2331"]}
-    - name: "NVIDIA H100 80GB HBM3"
-      labels:
-        "nvidia.com/gpu.H100.HBM3": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2330"]}
-    - name: "NVIDIA H800"
-      labels:
-        "nvidia.com/gpu.H800": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2324"]}
-    - name: "NVIDIA H800 PCIE"
-      labels:
-        "nvidia.com/gpu.H800.pcie": "true"
-        "nvidia.com/gpu.family": "hopper"
-      matchFeatures:
-        - feature: pci.device
-          matchExpressions:
-            vendor: {op: In, value: ["10de"]}
-            device: {op: In, value: ["2322"]}
-    - name: "NVIDIA CC Enabled"
-      labels:
-        "nvidia.com/cc.capable": "true"
-      matchAny: # TDX/SEV + Hopper GPU
-       - matchFeatures:
-          - feature: rule.matched
-            matchExpressions:
-              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
-              sev.snp.enabled: {op: IsTrue}
-       - matchFeatures:
-          - feature: rule.matched
-            matchExpressions:
-              nvidia.com/gpu.family: {op: In, value: ["hopper"]}
-              tdx.enabled: {op: IsTrue}
+            nvidia_peermem:
+              op: Exists
 {{- end }}
 

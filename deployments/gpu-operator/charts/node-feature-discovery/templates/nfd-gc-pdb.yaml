@@ -1,0 +1,17 @@
+{{- if .Values.gc.enable }}
+{{- if .Values.gc.podDisruptionBudget.enable -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name:  {{ include "node-feature-discovery.fullname" . }}-gc
+  namespace: {{ include "node-feature-discovery.namespace" . }}
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: gc
+{{- toYaml (omit .Values.gc.podDisruptionBudget "enable") | nindent 2 }}
+{{- end }}
+{{- end }}

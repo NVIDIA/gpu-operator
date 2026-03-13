@@ -43,6 +43,14 @@ spec:
         ports:
         - name: "dcgm"
           containerPort: 5555
+        livenessProbe:
+          tcpSocket:
+            port: 5555
+          initialDelaySeconds: 15
+        readinessProbe:
+          tcpSocket:
+            port: 5555
+          initialDelaySeconds: 15
       volumes:
         - name: run-nvidia
           hostPath:

@@ -1,5 +1,4 @@
 //go:build arm || arm64
-// +build arm arm64
 
 package platform
 

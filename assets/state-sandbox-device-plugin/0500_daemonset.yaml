@@ -30,7 +30,7 @@ spec:
           command: ['sh', '-c']
           args:
             - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
-              if [ "$(</run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo vfio-pci not needed, skipping validation; exit 0; fi;
+              if [ "$(cat /run/nvidia/validations/workload-type)" != "vm-passthrough" ]; then echo vfio-pci not needed, skipping validation; exit 0; fi;
               until [ -f /run/nvidia/validations/vfio-pci-ready ]; do echo waiting for vfio-pci driver ...; sleep 5; done;
           env:
             - name: NVIDIA_VISIBLE_DEVICES
@@ -46,7 +46,7 @@ spec:
           command: ['sh', '-c']
           args:
             - until [ -f /run/nvidia/validations/workload-type ]; do echo waiting for workload type status file; sleep 5; done;
-              if [ "$(</run/nvidia/validations/workload-type)" != "vm-vgpu" ]; then echo vgpu-devices not needed, skipping validation; exit 0; fi;
+              if [ "$(cat /run/nvidia/validations/workload-type)" != "vm-vgpu" ]; then echo vgpu-devices not needed, skipping validation; exit 0; fi;
               until [ -f /run/nvidia/validations/vgpu-devices-ready ]; do echo waiting for vGPU devices...; sleep 5; done;
           env:
             - name: NVIDIA_VISIBLE_DEVICES
@@ -61,7 +61,17 @@ spec:
         - image: "FILLED BY THE OPERATOR"
           imagePullPolicy: IfNotPresent
           name: nvidia-sandbox-device-plugin-ctr
-          command: ["nvidia-kubevirt-gpu-device-plugin"]
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
           securityContext:
             privileged: true
           volumeMounts:
@@ -69,6 +79,8 @@ spec:
               mountPath: /var/lib/kubelet/device-plugins
             - name: vfio
               mountPath: /dev/vfio
+            - name: cdi-root
+              mountPath: /var/run/cdi
       volumes:
         - name: device-plugin
           hostPath:
@@ -80,3 +92,8 @@ spec:
         - name: vfio
           hostPath:
             path: /dev/vfio
+        - name: cdi-root
+          hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+

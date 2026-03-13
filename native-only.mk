@@ -13,9 +13,11 @@
 # limitations under the License.
 
 PUSH_ON_BUILD ?= false
+ATTACH_ATTESTATIONS ?= false
 DOCKER_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64
 DOCKER_BUILD_OPTIONS = --output=type=image,push=$(PUSH_ON_BUILD) --provenance=$(ATTACH_ATTESTATIONS) --sbom=$(ATTACH_ATTESTATIONS)
-$(PUSH_TARGETS): OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
-$(PUSH_TARGETS): push-%:
+
+push-image: OUT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
+push-image:
 	$(DOCKER) tag "$(IMAGE_NAME):$(VERSION)-$(DEFAULT_PUSH_TARGET)" "$(OUT_IMAGE)"
 	$(DOCKER) push "$(OUT_IMAGE)"

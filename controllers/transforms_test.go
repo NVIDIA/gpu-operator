@@ -20,16 +20,53 @@ import (
 	"path/filepath"
 	"testing"
 
+	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
+
+var mockClientMap map[string]client.Client
+
+func initMockK8sClients() {
+	envSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-env-secret",
+			Namespace: "test-ns",
+		},
+	}
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+
+	secretEnvMockClient := fake.NewFakeClient(envSecret, node)
+
+	mockClientMap = map[string]client.Client{
+		"secret-env-client": secretEnvMockClient,
+	}
+}
 
 // Daemonset is a DaemonSet wrapper used for testing
 type Daemonset struct {
@@ -58,6 +95,22 @@ func (d Daemonset) WithHostPathVolume(name string, path string, hostPathType *co
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: path,
 				Type: hostPathType,
+			},
+		},
+	}
+	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
+	return d
+}
+
+func (d Daemonset) WithConfigMapVolume(name string, configMapName string, defaultMode int32) Daemonset {
+	volume := corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configMapName,
+				},
+				DefaultMode: &defaultMode,
 			},
 		},
 	}
@@ -95,6 +148,11 @@ func (d Daemonset) WithTolerations(tolerations []corev1.Toleration) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithPodSecurityContext(psc *corev1.PodSecurityContext) Daemonset {
+	d.Spec.Template.Spec.SecurityContext = psc
+	return d
+}
+
 func (d Daemonset) WithPodLabels(labels map[string]string) Daemonset {
 	d.Spec.Template.Labels = labels
 	return d
@@ -112,6 +170,26 @@ func (d Daemonset) WithPullSecret(secret string) Daemonset {
 
 func (d Daemonset) WithRuntimeClassName(name string) Daemonset {
 	d.Spec.Template.Spec.RuntimeClassName = &name
+	return d
+}
+
+func (d Daemonset) WithHostNetwork(enabled bool) Daemonset {
+	d.Spec.Template.Spec.HostNetwork = enabled
+	return d
+}
+
+func (d Daemonset) WithDNSPolicy(policy corev1.DNSPolicy) Daemonset {
+	d.Spec.Template.Spec.DNSPolicy = policy
+	return d
+}
+
+func (d Daemonset) WithHostPID(enabled bool) Daemonset {
+	d.Spec.Template.Spec.HostPID = enabled
+	return d
+}
+
+func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
+	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
 	return d
 }
 
@@ -135,6 +213,26 @@ func (p Pod) WithInitContainer(container corev1.Container) Pod {
 func (p Pod) WithRuntimeClassName(name string) Pod {
 	p.Spec.RuntimeClassName = &name
 	return p
+}
+
+func TestFindContainerByName(t *testing.T) {
+	containers := []corev1.Container{
+		{Name: "config"},
+		{Name: "target", Image: "initial"},
+	}
+
+	t.Run("found", func(t *testing.T) {
+		result := findContainerByName(containers, "target")
+		require.NotNil(t, result)
+		require.Equal(t, "target", result.Name)
+		result.Image = "updated"
+		require.Equal(t, "updated", containers[1].Image)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		result := findContainerByName(containers, "missing")
+		require.Nil(t, result)
+	})
 }
 
 func TestTransformForHostRoot(t *testing.T) {
@@ -383,10 +481,129 @@ func TestTransformForRuntime(t *testing.T) {
 			input: NewDaemonset().
 				WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
+			description: "containerd, file config source preferred over command source",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file,command"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file,command"},
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
+			description: "containerd, custom config source configured",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file=/path/to/custom/source/config.toml,command"},
+					},
+				}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME_CONFIG_SOURCE", Value: "file=/host/path/to/custom/source/config.toml,command"},
+						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+					},
+				}),
+		},
+		{
+			description: "crio",
+			runtime:     gpuv1.CRIO,
+			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithContainer(corev1.Container{
+					Name: "test-ctr",
+					Env: []corev1.EnvVar{
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}),
+		},
+		// Cover the kata-manager naming case
+		{
+			description: "containerd skips drop-in for kata manager",
+			runtime:     gpuv1.Containerd,
+			input: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
+				WithContainer(corev1.Container{
+					Name: "nvidia-kata-manager",
 					Env: []corev1.EnvVar{
 						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
 						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
@@ -402,20 +619,24 @@ func TestTransformForRuntime(t *testing.T) {
 				}),
 		},
 		{
-			description: "crio",
-			runtime:     gpuv1.CRIO,
+			description: "docker",
+			runtime:     gpuv1.Docker,
 			input:       NewDaemonset().WithContainer(corev1.Container{Name: "test-ctr"}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume("crio-config", filepath.Dir(DefaultCRIOConfigFile), newHostPathType(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("docker-config", filepath.Dir(DefaultDockerConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("docker-socket", filepath.Dir(DefaultDockerSocketFile), nil).
 				WithContainer(corev1.Container{
 					Name: "test-ctr",
 					Env: []corev1.EnvVar{
-						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
-						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
-						{Name: "CRIO_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultCRIOConfigFile))},
+						{Name: "RUNTIME", Value: gpuv1.Docker.String()},
+						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultDockerConfigFile))},
+						{Name: "DOCKER_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultDockerConfigFile))},
+						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
+						{Name: "DOCKER_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultDockerSocketFile))},
 					},
 					VolumeMounts: []corev1.VolumeMount{
-						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "docker-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "docker-socket", MountPath: DefaultRuntimeSocketTargetDir},
 					},
 				}),
 		},
@@ -424,7 +645,8 @@ func TestTransformForRuntime(t *testing.T) {
 	cp := &gpuv1.ClusterPolicySpec{Operator: gpuv1.OperatorSpec{RuntimeClass: DefaultRuntimeClass}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), "test-ctr")
+			// pass pointer to the target container
+			err := transformForRuntime(tc.input.DaemonSet, cp, tc.runtime.String(), &tc.input.Spec.Template.Spec.Containers[0])
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedOutput, tc.input)
 		})
@@ -584,6 +806,24 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 				}},
 			errorExpected: true,
 		},
+		{
+			description: "podSecurityContext configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					RunAsUser:    ptr.To(int64(1000)),
+					RunAsGroup:   ptr.To(int64(3000)),
+					FSGroup:      ptr.To(int64(2000)),
+					RunAsNonRoot: ptr.To(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithPodSecurityContext(&corev1.PodSecurityContext{
+				RunAsUser:    ptr.To(int64(1000)),
+				RunAsGroup:   ptr.To(int64(3000)),
+				FSGroup:      ptr.To(int64(2000)),
+				RunAsNonRoot: ptr.To(true),
+			}),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -651,6 +891,1309 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 	}
 }
 
+func TestTransformToolkit(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset                // Input DaemonSet
+		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
+		runtime     gpuv1.Runtime
+		expectedDs  Daemonset // Expected output DaemonSet
+	}{
+		{
+			description: "transform nvidia-container-toolkit-ctr container",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-container-toolkit",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "foo", Value: "bar"},
+						{Name: "RUNTIME", Value: "containerd"},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+					},
+				}).
+				WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", "/run/containerd", nil).
+				WithPullSecret("pull-secret"),
+		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container with custom ctr runtime socket",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-container-toolkit",
+					Version:          "v1.17.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []gpuv1.EnvVar{
+						{
+							Name: "CONTAINERD_CONFIG", Value: "/var/lib/rancher/k3s/agent/etc/containerd/config.toml",
+						},
+						{
+							Name: "CONTAINERD_SOCKET", Value: "/run/k3s/containerd/containerd.sock",
+						},
+						{
+							Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia",
+						},
+						{
+							Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true",
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.17.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+						{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+						{Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true"},
+						{Name: "RUNTIME", Value: "containerd"},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/containerd/conf.d/99-nvidia.toml"},
+						{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+					},
+				}).
+				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-drop-in-config", "/etc/containerd/conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil).
+				WithPullSecret("pull-secret"),
+		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.CRIO,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}).
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
+			description: "transform nvidia-container-toolkit-ctr container, cri-o runtime, cdi disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.CRIO,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-container-toolkit",
+					Version:    "v1.0.0",
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: CRIOConfigModeEnvName, Value: "hook"},
+						{Name: "RUNTIME", Value: gpuv1.CRIO.String()},
+						{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "CRIO_CONFIG", Value: "/runtime/config-dir/config.toml"},
+						{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/runtime/config-dir.d/99-nvidia.conf"},
+						{Name: "RUNTIME_DROP_IN_CONFIG_HOST_PATH", Value: "/etc/crio/crio.conf.d/99-nvidia.conf"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
+						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
+					},
+				}).
+				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			controller := ClusterPolicyController{
+				runtime: tc.runtime,
+				logger:  ctrl.Log.WithName("test"),
+			}
+
+			err := TransformToolkit(tc.ds.DaemonSet, tc.cpSpec, controller)
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePlugin(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset                // Input DaemonSet
+		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
+		expectedDs  Daemonset                // Expected output DaemonSet
+	}{
+		{
+			description: "transform device plugin",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-device-plugin",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+					{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform device plugin, gds and gdrcopy enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "nvidia-device-plugin",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+				GDRCopy: &gpuv1.GDRCopySpec{
+					Enabled: newBoolPtr(true),
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: GDSEnabledEnvName, Value: "true"},
+					{Name: MOFEDEnabledEnvName, Value: "true"},
+					{Name: GDRCopyEnabledEnvName, Value: "true"},
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+					{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDevicePlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformMPSControlDaemon(t *testing.T) {
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform mps control daemon",
+			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "mps-control-daemon-mounts"}).
+				WithContainer(corev1.Container{Name: "mps-control-daemon-ctr"}).
+				WithHostPathVolume("mps-root", "/run/nvidia/mps", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/run/nvidia/mps/shm", ptr.To(corev1.HostPathDirectoryOrCreate)),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:       "nvcr.io",
+					Image:            "mps",
+					Version:          "latest",
+					ImagePullPolicy:  string(corev1.PullAlways),
+					ImagePullSecrets: []string{"secret"},
+					MPS:              &gpuv1.MPSConfig{Root: "/var/mps"},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "mps-control-daemon-mounts",
+					Image:           "nvcr.io/mps:latest",
+					ImagePullPolicy: corev1.PullAlways,
+				}).
+				WithContainer(corev1.Container{
+					Name:            "mps-control-daemon-ctr",
+					Image:           "nvcr.io/mps:latest",
+					ImagePullPolicy: corev1.PullAlways,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					},
+				}).
+				WithHostPathVolume("mps-root", "/var/mps", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("mps-shm", "/var/mps/shm", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithPullSecret("secret").
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformMPSControlDaemon(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset.DaemonSet, tc.daemonset.DaemonSet)
+		})
+	}
+}
+
+func TestTransformDCGMExporter(t *testing.T) {
+	testCases := []struct {
+		description      string
+		ds               Daemonset                // Input DaemonSet
+		cpSpec           *gpuv1.ClusterPolicySpec // Input configuration
+		expectedDs       Daemonset                // Expected output DaemonSet
+		openshiftVersion string
+	}{
+		{
+			description: "transform dcgm exporter",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter with hostPID enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostPID:          newBoolPtr(true),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostPID(true),
+		},
+		{
+			description: "transform dcgm exporter with hostPID disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostPID:          newBoolPtr(false),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostPID(false),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostNetwork:      newBoolPtr(true),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					HostNetwork:      newBoolPtr(false),
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(false),
+		},
+		{
+			description: "transform dcgm exporter with hostNetwork unspecified",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(false),
+		},
+		{
+			description: "transform dcgm exporter with dcgm running on the host itself(DGX BaseOS)",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "dcgm-exporter",
+					Env:  []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+				}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(false),
+				},
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
+		},
+		{
+			description: "transform dcgm exporter with HPC job mapping enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm-exporter",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--fail-on-init-error=false"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+					HPCJobMapping: &gpuv1.DCGMExporterHPCJobMappingConfig{
+						Enabled:   newBoolPtr(true),
+						Directory: "/run/nvidia/dcgm-job-mapping",
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_HPC_JOB_MAPPING_DIR", Value: "/run/nvidia/dcgm-job-mapping"},
+					{Name: "foo", Value: "bar"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "hpc-job-mapping", ReadOnly: true, MountPath: "/run/nvidia/dcgm-job-mapping"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia").
+				WithHostPathVolume("hpc-job-mapping", "/run/nvidia/dcgm-job-mapping", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDCGMExporter(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test"), openshift: tc.openshiftVersion})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs.DaemonSet, tc.ds.DaemonSet)
+		})
+	}
+}
+
+func TestTransformDCGM(t *testing.T) {
+	limits := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("100m"),
+		corev1.ResourceMemory: resource.MustParse("128Mi"),
+	}
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("50m"),
+		corev1.ResourceMemory: resource.MustParse("64Mi"),
+	}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform dcgm fully configured",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "dcgm",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources:        &gpuv1.ResourceRequirements{Limits: limits, Requests: requests},
+					Args:             []string{"--foo"},
+					Env:              []gpuv1.EnvVar{{Name: "FOO", Value: "bar"}},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--foo"},
+					Env:             []corev1.EnvVar{{Name: "FOO", Value: "bar"}},
+					Resources:       corev1.ResourceRequirements{Limits: limits, Requests: requests},
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: corev1.ResourceRequirements{Limits: limits, Requests: requests},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm sets runtime class only when spec empty",
+			daemonset:   NewDaemonset().WithContainer(corev1.Container{Name: "dcgm"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				Operator: gpuv1.OperatorSpec{RuntimeClass: "nvidia"},
+				DCGM:     gpuv1.DCGMSpec{Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "dcgm enabled does not set remote engine env",
+			daemonset:   NewDaemonset().WithContainer(corev1.Container{Name: "dcgm"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "dcgm disabled with localhost env does not change hostNetwork",
+			daemonset: NewDaemonset().WithContainer(corev1.Container{
+				Name: "dcgm",
+				Env:  []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+			}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(false), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dcgm",
+					Image:           "nvcr.io/nvidia/cloud-native/dcgm:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env:             []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDCGM(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset.DaemonSet, tc.daemonset.DaemonSet)
+		})
+	}
+}
+
+func TestTransformMigManager(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform mig manager",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--test-flag"},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--test-flag"},
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+					{Name: "foo", Value: "bar"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
+		},
+		{
+			description: "mig manager with custom config",
+			ds: NewDaemonset().WithContainer(corev1.Container{
+				Name: "mig-manager",
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "mig-parted-config", MountPath: "/mig-parted-config", ReadOnly: true},
+				},
+			}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           &gpuv1.MIGPartedConfigSpec{Name: "custom-mig-config"},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "CONFIG_FILE", Value: "/mig-parted-config/config.yaml"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "mig-parted-config", MountPath: "/mig-parted-config", ReadOnly: true},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "custom-mig-config"},
+				}},
+			}),
+		},
+		{
+			description: "mig manager without config (nil)",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           nil,
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
+		},
+		{
+			description: "mig manager with empty config name",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "mig-manager"}).WithVolume(corev1.Volume{
+				Name:         "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+			}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				MIGManager: gpuv1.MIGManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "mig-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Config:           &gpuv1.MIGPartedConfigSpec{Name: ""},
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "mig-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/mig-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DEFAULT_CONFIG_FILE", Value: "/mig-parted-config/config-default.yaml"},
+					{Name: CDIEnabledEnvName, Value: "true"},
+					{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+				},
+			}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithVolume(corev1.Volume{
+				Name: "mig-parted-config",
+				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: MigPartedDefaultConfigMapName},
+					Items:                []corev1.KeyToPath{{Key: "config.yaml", Path: "config-default.yaml"}},
+				}},
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformMIGManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformKataManager(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform kata manager",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				KataManager: gpuv1.KataManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "kata-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--test-flag"},
+					Config: &kata_v1alpha1.Config{
+						ArtifactsDir: "/var/lib/kata",
+					},
+					Env: []gpuv1.EnvVar{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-kata-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/kata-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--test-flag"},
+				Env: []corev1.EnvVar{
+					{Name: "KATA_ARTIFACTS_DIR", Value: "/var/lib/kata"},
+					{Name: "foo", Value: "bar"},
+					{Name: "RUNTIME", Value: "containerd"},
+					{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
+					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+				},
+			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
+		},
+		{
+			description: "transform kata manager with custom container runtime socket",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				KataManager: gpuv1.KataManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "kata-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Args:             []string{"--test-flag"},
+					Config: &kata_v1alpha1.Config{
+						ArtifactsDir: "/var/lib/kata",
+					},
+					Env: []gpuv1.EnvVar{
+						{
+							Name: "CONTAINERD_CONFIG", Value: "/var/lib/rancher/k3s/agent/etc/containerd/config.toml",
+						},
+						{
+							Name: "CONTAINERD_SOCKET", Value: "/run/k3s/containerd/containerd.sock",
+						},
+						{
+							Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia",
+						},
+						{
+							Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true",
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-kata-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/kata-manager:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--test-flag"},
+				Env: []corev1.EnvVar{
+					{Name: "KATA_ARTIFACTS_DIR", Value: "/var/lib/kata"},
+					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+					{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
+					{Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true"},
+					{Name: "RUNTIME", Value: "containerd"},
+					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
+					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
+					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
+					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+				},
+			}).WithPullSecret("pull-secret").
+				WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).
+				WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformKataManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformVFIOManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+	mockEnvCore := []corev1.EnvVar{{Name: "foo", Value: "bar"}}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform vfio manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vfio-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VFIOManager: gpuv1.VFIOManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "vfio-pci-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					Env:              mockEnv,
+					DriverManager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						Version:         "v1.0.0",
+						ImagePullPolicy: "IfNotPresent",
+						Env:             mockEnv,
+					},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-vfio-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/vfio-pci-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env:             mockEnvCore,
+					Resources:       resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "k8s-driver-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env:             mockEnvCore,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformVFIOManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
+		})
+	}
+}
+
+func TestTransformCCManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+	defaultMode := "devtools"
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform cc manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-cc-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				CCManager: gpuv1.CCManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "k8s-cc-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					DefaultMode:      defaultMode,
+					Env:              mockEnv,
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-cc-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/k8s-cc-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env: []corev1.EnvVar{
+						{Name: "DEFAULT_CC_MODE", Value: defaultMode},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformCCManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
+		})
+	}
+}
+
+func TestTransformVGPUDeviceManager(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	secret := "pull-secret"
+	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
+
+	testCases := []struct {
+		description       string
+		daemonset         Daemonset
+		clusterPolicySpec *gpuv1.ClusterPolicySpec
+		expectedDaemonset Daemonset
+	}{
+		{
+			description: "transform vgpu device manager",
+			daemonset: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"}).
+				WithContainer(corev1.Container{Name: "sidecar"}),
+			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				VGPUDeviceManager: gpuv1.VGPUDeviceManagerSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "vgpu-device-manager",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					Args:             []string{"--test-flag"},
+					Env:              mockEnv,
+					Config: &gpuv1.VGPUDevicesConfigSpec{
+						Name:    "custom-vgpu-config",
+						Default: "perf",
+					},
+				},
+			},
+			expectedDaemonset: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "nvidia-vgpu-device-manager",
+					Image:           "nvcr.io/nvidia/cloud-native/vgpu-device-manager:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env: []corev1.EnvVar{
+						{Name: "foo", Value: "bar"},
+						{Name: "DEFAULT_VGPU_CONFIG", Value: "perf"},
+					},
+					Resources: resources,
+				}).
+				WithContainer(corev1.Container{
+					Name:      "sidecar",
+					Resources: resources,
+				}).
+				WithPullSecret(secret),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformVGPUDeviceManager(tc.daemonset.DaemonSet, tc.clusterPolicySpec, ClusterPolicyController{logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDaemonset, tc.daemonset)
+		})
+	}
+}
+
 func TestTransformValidationInitContainer(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -684,11 +2227,17 @@ func TestTransformValidationInitContainer(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithInitContainer(corev1.Container{
 				Name:            "toolkit-validation",
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
 		},
 	}
@@ -805,6 +2354,9 @@ func TestTransformValidatorShared(t *testing.T) {
 				},
 				Args: []string{"--test-flag"},
 				Env:  []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}).WithPullSecret("pull-secret"),
 		},
 	}
@@ -867,11 +2419,14 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
@@ -901,12 +2456,15 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "foo", Value: "bar"},
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorImagePullSecretsEnvName, Value: "pull-secret1,pull-secret2"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
 					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
@@ -949,43 +2507,10 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "foo", Value: "bar"},
 				},
-			}),
-		},
-		{
-			description: "nvidia-fs validation",
-			pod:         NewPod().WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				Validator: gpuv1.ValidatorSpec{
-					Repository:      "nvcr.io/nvidia/cloud-native",
-					Image:           "gpu-operator-validator",
-					Version:         "v1.0.0",
-					ImagePullPolicy: "IfNotPresent",
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
-				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(true)},
-			},
-			component: "nvidia-fs",
-			expectedPod: NewPod().WithInitContainer(corev1.Container{
-				Name:            "nvidia-fs-validation",
-				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
-				ImagePullPolicy: corev1.PullIfNotPresent,
 			}),
-		},
-		{
-			description: "nvidia-fs validation is removed when gds is disabled",
-			pod: NewPod().
-				WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}).
-				WithInitContainer(corev1.Container{Name: "dummy"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				Validator: gpuv1.ValidatorSpec{
-					Repository:      "nvcr.io/nvidia/cloud-native",
-					Image:           "gpu-operator-validator",
-					Version:         "v1.0.0",
-					ImagePullPolicy: "IfNotPresent",
-				},
-				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{Enabled: newBoolPtr(false)},
-			},
-			component:   "nvidia-fs",
-			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
 		},
 		{
 			description: "cc-manager validation",
@@ -1004,6 +2529,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Name:            "cc-manager-validation",
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -1045,6 +2573,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "foo", Value: "bar"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -1069,6 +2600,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}),
 		},
@@ -1095,6 +2629,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
 				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
 			}),
 		},
 		{
@@ -1119,6 +2656,9 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
 					{Name: "foo", Value: "bar"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
 				},
 			}),
 		},
@@ -1160,7 +2700,16 @@ func TestTransformValidator(t *testing.T) {
 			description: "valid validator spec",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
-				WithContainer(corev1.Container{Name: "dummy"}),
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Validator: gpuv1.ValidatorSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1176,9 +2725,61 @@ func TestTransformValidator(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
 				}).
 				WithPullSecret("pull-secret").
 				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "nri plugin enabled",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          newBoolPtr(true),
+					NRIPluginEnabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"nvidia.cdi.k8s.io/container.toolkit-validation": "management.nvidia.com/gpu=all",
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "toolkit-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				},
+				).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret"),
 		},
 	}
 
@@ -1218,7 +2819,16 @@ func TestTransformSandboxValidator(t *testing.T) {
 			description: "valid validator spec",
 			ds: NewDaemonset().
 				WithInitContainer(corev1.Container{Name: "dummy"}).
-				WithContainer(corev1.Container{Name: "dummy"}),
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				Validator: gpuv1.ValidatorSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
@@ -1234,8 +2844,12 @@ func TestTransformSandboxValidator(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
 				}).
-				WithPullSecret("pull-secret"),
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia"),
 		},
 	}
 
@@ -1250,4 +2864,1701 @@ func TestTransformSandboxValidator(t *testing.T) {
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
+}
+
+func TestTransformKataDevicePlugin(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+	}
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "transform kata device plugin",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "vfio-pci-validation"}).
+				WithContainer(corev1.Container{Name: "nvidia-kata-sandbox-device-plugin-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+				},
+				KataSandboxDevicePlugin: gpuv1.KataDevicePluginSpec{
+					ImageSpec: gpuv1.ImageSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "kata-sandbox-device-plugin",
+						Version:         "v1.0.0",
+						ImagePullPolicy: "IfNotPresent",
+					},
+					ComponentCommonSpec: gpuv1.ComponentCommonSpec{
+						ImagePullSecrets: []string{"pull-secret"},
+						Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+						Args:             []string{"--test-flag"},
+						Env:              []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "vfio-pci-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "nvidia-kata-sandbox-device-plugin-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/kata-sandbox-device-plugin:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"--test-flag"},
+					Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+					Resources:       resources,
+				}).
+				WithPullSecret("pull-secret"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformKataDevicePlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
+				runtime: gpuv1.Containerd,
+				logger:  ctrl.Log.WithName("test"),
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformNodeStatusExporter(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty node status exporter spec",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "valid node status exporter spec",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "node-status-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/node-status-exporter:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformNodeStatusExporter(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDriver(t *testing.T) {
+	initMockK8sClients()
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "driver spec with secret env",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithContainer(corev1.Container{Name: "nvidia-fs"}).
+				WithContainer(corev1.Container{Name: "nvidia-gdrcopy"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "driver",
+					Version:    "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository: "nvcr.io/nvidia/cloud-native",
+						Image:      "k8s-driver-manager",
+						Version:    "v0.8.0",
+					},
+					SecretEnv: "test-env-secret",
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-fs",
+					Version:    "2.20.5",
+				},
+				GDRCopy: &gpuv1.GDRCopySpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gdrdrv",
+					Version:    "v2.5",
+				},
+			},
+			client: mockClientMap["secret-env-client"],
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-env-secret",
+						},
+					},
+				}},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "GDRCOPY_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "GDS_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "4204546510",
+					},
+				},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-fs",
+				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-ubuntu20.04",
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-env-secret",
+						},
+					},
+				}},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-gdrcopy",
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-ubuntu20.04",
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-env-secret",
+						},
+					},
+				}},
+			}).WithInitContainer(corev1.Container{
+				Name:  "k8s-driver-manager",
+				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "4204546510",
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformToolkitCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "cdi enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+					},
+				}),
+		},
+		{
+			description: "cdi and nri plugin enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          newBoolPtr(true),
+					NRIPluginEnabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: CDIEnableNRIPlugin, Value: "true"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
+			transformToolkitCtrForCDI(mainContainer, tc.cpSpec.CDI.IsNRIPluginEnabled())
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDevicePluginCtrForCDI(t *testing.T) {
+	testCases := []struct {
+		description string
+		ds          Daemonset
+		cpSpec      *gpuv1.ClusterPolicySpec
+		expectedDs  Daemonset
+	}{
+		{
+			description: "toolkit disabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+					},
+				}),
+		},
+		{
+			description: "toolkit enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "main-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{
+					Enabled:    newBoolPtr(true),
+					InstallDir: "/path/to/install",
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(
+				corev1.Container{
+					Name: "main-ctr",
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"},
+						{Name: CDIAnnotationPrefixEnvName, Value: "cdi.k8s.io/"},
+						{Name: NvidiaCDIHookPathEnvName, Value: "/path/to/install/toolkit/nvidia-cdi-hook"},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mainContainer := &tc.ds.Spec.Template.Spec.Containers[0]
+			transformDevicePluginCtrForCDI(mainContainer, tc.cpSpec)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestGetRuntimeConfigFiles(t *testing.T) {
+	testCases := []struct {
+		description                string
+		container                  corev1.Container
+		runtime                    string
+		expectedTopLevelConfigFile string
+		expectedDropInConfigFile   string
+		errorExpected              bool
+	}{
+		{
+			description:   "invalid runtime",
+			container:     corev1.Container{},
+			runtime:       "foo",
+			errorExpected: true,
+		},
+		{
+			description:                "docker",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: DefaultDockerConfigFile,
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description: "docker, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/docker/daemon.json"},
+				},
+			},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: "/path/to/docker/daemon.json",
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description: "docker, config path overridden, DOCKER_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/docker/daemon.json"},
+					{Name: "DOCKER_CONFIG", Value: "/another/path/to/docker/daemon.json"},
+				},
+			},
+			runtime:                    gpuv1.Docker.String(),
+			expectedTopLevelConfigFile: "/another/path/to/docker/daemon.json",
+			expectedDropInConfigFile:   "",
+		},
+		{
+			description:                "containerd",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: DefaultContainerdConfigFile,
+			expectedDropInConfigFile:   DefaultContainerdDropInConfigFile,
+		},
+		{
+			description: "containerd, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/containerd/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/containerd/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: "/path/to/containerd/config.toml",
+			expectedDropInConfigFile:   "/path/to/containerd/drop-in/config.toml",
+		},
+		{
+			description: "containerd, config path overridden, CONTAINERD_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/containerd/config.toml"},
+					{Name: "CONTAINERD_CONFIG", Value: "/another/path/to/containerd/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/containerd/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.Containerd.String(),
+			expectedTopLevelConfigFile: "/another/path/to/containerd/config.toml",
+			expectedDropInConfigFile:   "/path/to/containerd/drop-in/config.toml",
+		},
+		{
+			description:                "crio",
+			container:                  corev1.Container{},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: DefaultCRIOConfigFile,
+			expectedDropInConfigFile:   DefaultCRIODropInConfigFile,
+		},
+		{
+			description: "crio, config path overridden",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/crio/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/crio/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: "/path/to/crio/config.toml",
+			expectedDropInConfigFile:   "/path/to/crio/drop-in/config.toml",
+		},
+		{
+			description: "crio, config path overridden, CRIO_CONFIG envvar has highest precedence",
+			container: corev1.Container{
+				Env: []corev1.EnvVar{
+					{Name: "RUNTIME_CONFIG", Value: "/path/to/crio/config.toml"},
+					{Name: "CRIO_CONFIG", Value: "/another/path/to/crio/config.toml"},
+					{Name: "RUNTIME_DROP_IN_CONFIG", Value: "/path/to/crio/drop-in/config.toml"},
+				},
+			},
+			runtime:                    gpuv1.CRIO.String(),
+			expectedTopLevelConfigFile: "/another/path/to/crio/config.toml",
+			expectedDropInConfigFile:   "/path/to/crio/drop-in/config.toml",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			topLevelConfigFile, dropInConfigFile, err := getRuntimeConfigFiles(&tc.container, tc.runtime)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedTopLevelConfigFile, topLevelConfigFile)
+			require.EqualValues(t, tc.expectedDropInConfigFile, dropInConfigFile)
+		})
+	}
+
+}
+
+func TestTransformDriverWithLicensingConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "transform driver dependent containers with secretName",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					LicensingConfig: &gpuv1.DriverLicensingConfigSpec{
+						SecretName: "test-secret",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: consts.VGPULicensingConfigMountPath,
+						SubPath:   consts.VGPULicensingFileName,
+					},
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "1164839178",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "1164839178",
+					},
+				},
+			}).WithVolume(corev1.Volume{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "test-secret",
+						Items: []corev1.KeyToPath{
+							{
+								Key:  consts.VGPULicensingFileName,
+								Path: consts.VGPULicensingFileName,
+							},
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "transform driver dependent containers with configMapName",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					LicensingConfig: &gpuv1.DriverLicensingConfigSpec{
+						ConfigMapName: "test-configmap",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: consts.VGPULicensingConfigMountPath,
+						SubPath:   consts.VGPULicensingFileName,
+					},
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "3123249180",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "3123249180",
+					},
+				},
+			}).WithVolume(corev1.Volume{
+				Name: "licensing-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-configmap",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  consts.VGPULicensingFileName,
+								Path: consts.VGPULicensingFileName,
+							},
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDriverWithResources(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+
+	resources := gpuv1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("400Mi"),
+		},
+	}
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "transform driver dependent containers with resources",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithContainer(corev1.Container{Name: "nvidia-fs"}).
+				WithContainer(corev1.Container{Name: "nvidia-gdrcopy"}).
+				WithContainer(corev1.Container{Name: "nvidia-peermem"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "driver",
+					Version:    "570.172.08",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository: "nvcr.io/nvidia/cloud-native",
+						Image:      "k8s-driver-manager",
+						Version:    "v0.8.0",
+					},
+					Resources: &resources,
+				},
+				GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-fs",
+					Version:    "2.20.5",
+				},
+				GDRCopy: &gpuv1.GDRCopySpec{
+					Enabled:    newBoolPtr(true),
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "gdrdrv",
+					Version:    "v2.5",
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "GDRCOPY_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "GDS_ENABLED",
+						Value: "true",
+					},
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "1378192953",
+					},
+				},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-fs",
+				Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5-ubuntu20.04",
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+			}).WithContainer(corev1.Container{
+				Name:  "nvidia-gdrcopy",
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5-ubuntu20.04",
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:  "k8s-driver-manager",
+				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "1378192953",
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDriverRDMA(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithContainer(corev1.Container{Name: "nvidia-fs"}).
+		WithContainer(corev1.Container{Name: "nvidia-gdrcopy"}).
+		WithContainer(corev1.Container{Name: "nvidia-peermem"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "driver",
+			Version:    "570.172.08",
+			Manager: gpuv1.DriverManagerSpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "k8s-driver-manager",
+				Version:    "v0.8.0",
+			},
+			GPUDirectRDMA: &gpuv1.GPUDirectRDMASpec{
+				Enabled:      newBoolPtr(true),
+				UseHostMOFED: newBoolPtr(true),
+			},
+		},
+	}
+
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "nvidia-driver-ctr",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "GPU_DIRECT_RDMA_ENABLED",
+				Value: "true",
+			},
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+			{
+				Name:  "DRIVER_CONFIG_DIGEST",
+				Value: "785503300",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:  "k8s-driver-manager",
+		Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "GPU_DIRECT_RDMA_ENABLED",
+				Value: "true",
+			},
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+			{
+				Name:  "DRIVER_CONFIG_DIGEST",
+				Value: "785503300",
+			},
+		},
+	}).WithContainer(corev1.Container{
+		Name:  "nvidia-peermem",
+		Image: "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "USE_HOST_MOFED",
+				Value: "true",
+			},
+		},
+	})
+
+	err := TransformDriver(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
+	require.NoError(t, err)
+
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestTransformDriverVGPUTopologyConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "20.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "driver",
+			Version:    "570.172.08",
+			Manager: gpuv1.DriverManagerSpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "k8s-driver-manager",
+				Version:    "v0.8.0",
+			},
+			VirtualTopology: &gpuv1.VirtualTopologyConfigSpec{
+				Config: "sample-topology-config",
+			},
+		},
+	}
+
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "nvidia-driver-ctr",
+		Image:           "nvcr.io/nvidia/driver:570.172.08-ubuntu20.04",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "topology-config",
+				ReadOnly:  true,
+				MountPath: consts.VGPUTopologyConfigMountPath,
+				SubPath:   consts.VGPUTopologyConfigFileName,
+			},
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "DRIVER_CONFIG_DIGEST",
+				Value: "1340033241",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:  "k8s-driver-manager",
+		Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "DRIVER_CONFIG_DIGEST",
+				Value: "1340033241",
+			},
+		},
+	}).WithVolume(corev1.Volume{
+		Name: "topology-config",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "sample-topology-config",
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  consts.VGPUTopologyConfigFileName,
+						Path: consts.VGPUTopologyConfigFileName,
+					},
+				},
+			},
+		},
+	})
+
+	err := TransformDriver(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu20.04"})
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestTransformGPUDiscoveryPlugin(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "6.8.0-60-generic",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "gpu-feature-discovery"}).
+		WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+		WithInitContainer(corev1.Container{Name: "config-manager-init"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		GPUFeatureDiscovery: gpuv1.GPUFeatureDiscoverySpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "k8s-device-plugin",
+			Version:    "v0.18.1",
+		},
+		Validator: gpuv1.ValidatorSpec{
+			Repository:       "nvcr.io/nvidia/cloud-native",
+			Image:            "gpu-operator-validator",
+			Version:          "v1.0.0",
+			ImagePullPolicy:  "IfNotPresent",
+			ImagePullSecrets: []string{"pull-secret"},
+			Toolkit: gpuv1.ToolkitValidatorSpec{
+				Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+			},
+		},
+	}
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "gpu-feature-discovery",
+		Image:           "nvcr.io/nvidia/k8s-device-plugin:v0.18.1",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "NVIDIA_MIG_MONITOR_DEVICES",
+				Value: "all",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:            "toolkit-validation",
+		Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: rootUID,
+		},
+	}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia")
+
+	err := TransformGPUDiscoveryPlugin(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test")})
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestTransformGPUDiscoveryPluginOCP(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ocp-node",
+			Labels: map[string]string{
+				nfdKernelLabelKey: "5.14.0-284.43.1.el9_2.x86_64",
+				commonGPULabelKey: "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "gpu-feature-discovery"}).
+		WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+		WithInitContainer(corev1.Container{Name: "config-manager-init"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		GPUFeatureDiscovery: gpuv1.GPUFeatureDiscoverySpec{
+			Repository: "nvcr.io/nvidia",
+			Image:      "k8s-device-plugin",
+			Version:    "v0.18.1",
+		},
+		Validator: gpuv1.ValidatorSpec{
+			Repository:       "nvcr.io/nvidia/cloud-native",
+			Image:            "gpu-operator-validator",
+			Version:          "v1.0.0",
+			ImagePullPolicy:  "IfNotPresent",
+			ImagePullSecrets: []string{"pull-secret"},
+			Toolkit: gpuv1.ToolkitValidatorSpec{
+				Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+			},
+		},
+	}
+	expectedDs := NewDaemonset().WithContainer(corev1.Container{
+		Name:            "gpu-feature-discovery",
+		Image:           "nvcr.io/nvidia/k8s-device-plugin:v0.18.1",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "USE_NODE_FEATURE_API",
+				Value: "false",
+			},
+			{
+				Name:  "NVIDIA_MIG_MONITOR_DEVICES",
+				Value: "all",
+			},
+		},
+	}).WithInitContainer(corev1.Container{
+		Name:            "toolkit-validation",
+		Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: rootUID,
+		},
+	}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia")
+
+	err := TransformGPUDiscoveryPlugin(ds.DaemonSet, cpSpec,
+		ClusterPolicyController{client: mockClient, runtime: gpuv1.Containerd,
+			operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), openshift: "4.14"})
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestTransformVGPUManager(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "24.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+
+	kernelModuleConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vgpu-kernel-module-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"nvidia.conf": "options nvidia NVreg_EnableGpuFirmwareLogs=1\n",
+		},
+	}
+
+	mockClient := fake.NewFakeClient(node, kernelModuleConfigMap)
+
+	testCases := []struct {
+		description   string
+		daemonset     Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		errorExpected bool
+	}{
+		{
+			description: "transform vgpu manager with kernel module config",
+			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-manager-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				VGPUManager: gpuv1.VGPUManagerSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "vgpu-manager",
+					Version:         "550.90.07",
+					ImagePullPolicy: "IfNotPresent",
+					DriverManager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					KernelModuleConfig: &gpuv1.KernelModuleConfigSpec{
+						Name: "vgpu-kernel-module-config",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ctrl := ClusterPolicyController{
+				logger:            ctrl.Log.WithName("test"),
+				client:            tc.client,
+				operatorNamespace: "test-ns",
+			}
+			err := TransformVGPUManager(tc.daemonset.DaemonSet, tc.cpSpec, ctrl)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			// Verify only the vgpu-manager container has the kernel module config
+			container := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
+			require.NotNil(t, container)
+			require.Len(t, container.VolumeMounts, 1)
+			require.Equal(t, corev1.VolumeMount{
+				Name:      "vgpu-kernel-module-config",
+				ReadOnly:  true,
+				MountPath: "/drivers/nvidia.conf",
+				SubPath:   "nvidia.conf",
+			}, container.VolumeMounts[0])
+			// Verify the ConfigMap volume is added
+			require.Len(t, tc.daemonset.Spec.Template.Spec.Volumes, 1)
+			require.Equal(t, corev1.Volume{
+				Name: "vgpu-kernel-module-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "vgpu-kernel-module-config",
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  "nvidia.conf",
+								Path: "nvidia.conf",
+							},
+						},
+					},
+				},
+			}, tc.daemonset.Spec.Template.Spec.Volumes[0])
+		})
+	}
+}
+
+func TestTransformDriverWithAdditionalConfig(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "24.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+
+	testCertConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cert",
+			Namespace: "test-ns",
+		},
+	}
+
+	testRepoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+	}
+
+	mockClient := fake.NewFakeClient(node, testCertConfigMap, testRepoConfigMap)
+
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		client        client.Client
+		expectedDs    Daemonset
+		errorExpected bool
+		errorMessage  string
+	}{
+		{
+			description: "transform driver with cert config",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					CertConfig: &gpuv1.DriverCertConfigSpec{
+						Name: "test-cert",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:580.126.16-ubuntu24.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "963428473",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "963428473",
+					},
+				},
+			}).WithVolume(corev1.Volume{
+				Name: "test-cert",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cert",
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "transform driver with cert config enabled and non-existent configmap",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					CertConfig: &gpuv1.DriverCertConfigSpec{
+						Name: "test-cert2",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: true,
+			errorMessage: "ERROR: failed to create ConfigMap VolumeMounts for custom certs: ERROR: could not get " +
+				"ConfigMap test-cert2 from client: configmaps \"test-cert2\" not found",
+		},
+		{
+			description: "transform driver with custom repo config",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					RepoConfig: &gpuv1.DriverRepoConfigSpec{
+						ConfigMapName: "test-repo-config",
+					},
+				},
+			},
+			client: mockClient,
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-driver-ctr",
+				Image:           "nvcr.io/nvidia/driver:580.126.16-ubuntu24.04",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "2050622367",
+					},
+				},
+			}).WithInitContainer(corev1.Container{
+				Name:            "k8s-driver-manager",
+				Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "DRIVER_CONFIG_DIGEST",
+						Value: "2050622367",
+					},
+				},
+			}).WithVolume(corev1.Volume{
+				Name: "test-repo-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-repo-config",
+						},
+					},
+				},
+			}),
+			errorExpected: false,
+		},
+		{
+			description: "transform driver with custom repo config and non-existent configmap",
+			ds: NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					RepoConfig: &gpuv1.DriverRepoConfigSpec{
+						ConfigMapName: "test-repo-config2",
+					},
+				},
+			},
+			client:        mockClient,
+			errorExpected: true,
+			errorMessage: "ERROR: failed to create ConfigMap VolumeMounts for custom repo config: ERROR: could not get " +
+				"ConfigMap test-repo-config2 from client: configmaps \"test-repo-config2\" not found",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDriver(tc.ds.DaemonSet, tc.cpSpec,
+				ClusterPolicyController{client: tc.client, runtime: gpuv1.Containerd,
+					operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"), gpuNodeOSTag: "ubuntu24.04"})
+			if tc.errorExpected {
+				require.Error(t, err)
+				require.Equal(t, tc.errorMessage, err.Error())
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+// baseDriverDaemonSetSpec returns a minimal DaemonSetSpec representative of
+// the post-transformation driver DaemonSet in the ClusterPolicy path.
+// Only fields relevant to extractDriverInstallConfig extraction are
+// populated; non-digest fields are omitted for brevity.
+func baseDriverDaemonSetSpec() *appsv1.DaemonSetSpec {
+	return &appsv1.DaemonSetSpec{
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app": "nvidia-gpu-driver"},
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector:       map[string]string{"nvidia.com/gpu.deploy.driver": "true"},
+				PriorityClassName:  "system-node-critical",
+				ServiceAccountName: "nvidia-gpu-driver",
+				HostPID:            true,
+				InitContainers: []corev1.Container{{
+					Name:  "k8s-driver-manager",
+					Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.6.2",
+					Env: []corev1.EnvVar{
+						{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+						}},
+						{Name: "NVIDIA_VISIBLE_DEVICES", Value: "void"},
+					},
+				}},
+				Containers: []corev1.Container{{
+					Name:    "nvidia-driver-ctr",
+					Image:   "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+					Command: []string{"nvidia-driver"},
+					Args:    []string{"init"},
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_VISIBLE_DEVICES", Value: "void"},
+						{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+						}},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "run-nvidia", MountPath: "/run/nvidia"},
+					},
+				}},
+				Volumes: []corev1.Volume{
+					{Name: "run-nvidia", VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Path: "/run/nvidia"},
+					}},
+					{Name: "host-root", VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+					}},
+				},
+			},
+		},
+	}
+}
+
+// TestDriverConfigDigest verifies that non-driver-relevant field changes
+// (wantChange=false) do NOT alter the digest, while driver-relevant changes
+// (wantChange=true) DO alter it.
+func TestDriverConfigDigest(t *testing.T) {
+	baseDigest := utils.GetObjectHashIgnoreEmptyKeys(extractDriverInstallConfig(&baseDriverDaemonSetSpec().Template.Spec))
+
+	tests := []struct {
+		name       string
+		wantChange bool
+		modify     func(*appsv1.DaemonSetSpec)
+	}{
+		// Non-driver-relevant fields: digest must NOT change.
+		{"resource limits", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("4"),
+			}
+		}},
+		{"startup probe", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].StartupProbe = &corev1.Probe{InitialDelaySeconds: 5}
+		}},
+		{"tolerations", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Tolerations = []corev1.Toleration{{Key: "custom", Effect: "NoExecute"}}
+		}},
+		{"node selector", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.NodeSelector["custom-label"] = "v"
+		}},
+		{"container security context", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{}
+		}},
+		{"pod security context", false, func(s *appsv1.DaemonSetSpec) {
+			runAsUser := int64(1000)
+			s.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
+				RunAsUser: &runAsUser,
+			}
+		}},
+		{"image pull policy", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].ImagePullPolicy = corev1.PullAlways
+		}},
+		{"priority class", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.PriorityClassName = "custom-priority"
+		}},
+		{"service account", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.ServiceAccountName = "different-sa"
+		}},
+		{"hostPID", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.HostPID = false
+		}},
+		{"pod labels", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Labels["extra"] = "v"
+		}},
+		{"init container resources", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.InitContainers[0].Resources.Limits = corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("2"),
+			}
+		}},
+		{"FieldRef env var added", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Env = append(s.Template.Spec.Containers[0].Env,
+				corev1.EnvVar{Name: "NODE_IP", ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+				}})
+		}},
+		{"unrecognized container", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers = append(s.Template.Spec.Containers,
+				corev1.Container{Name: "sidecar", Image: "example.com/sidecar:v1"})
+		}},
+		{"unrecognized init container", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.InitContainers = append(s.Template.Spec.InitContainers,
+				corev1.Container{Name: "extra-init", Image: "example.com/init:v1"})
+		}},
+		{"pod annotation", false, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Annotations = map[string]string{"k": "v"}
+		}},
+
+		// Driver-relevant fields: digest MUST change.
+		{"driver image", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Image = "nvcr.io/nvidia/driver:535.104.05-ubuntu22.04"
+		}},
+		{"driver manager image", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.InitContainers[0].Image = "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.7.0"
+		}},
+		{"env var added", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Env = append(s.Template.Spec.Containers[0].Env,
+				corev1.EnvVar{Name: "KERNEL_MODULE_TYPE", Value: "open"})
+		}},
+		{"env var modified", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Env[0].Value = "modified"
+		}},
+		{"args change", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Args = []string{"init", "--extra-arg"}
+		}},
+		{"peermem container (RDMA)", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers = append(s.Template.Spec.Containers,
+				corev1.Container{Name: "nvidia-peermem-ctr", Image: "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04"})
+		}},
+		{"GDS container", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers = append(s.Template.Spec.Containers,
+				corev1.Container{Name: "nvidia-fs-ctr", Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1"})
+		}},
+		{"GDRCopy container", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers = append(s.Template.Spec.Containers,
+				corev1.Container{Name: "nvidia-gdrcopy-ctr", Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1"})
+		}},
+		{"config volume (licensing)", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Volumes = append(s.Template.Spec.Volumes, corev1.Volume{
+				Name: "licensing-config", VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "licensing-configmap"},
+					},
+				},
+			})
+		}},
+		{"volume source changed", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Volumes = append(s.Template.Spec.Volumes, corev1.Volume{
+				Name: "licensing-config", VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{SecretName: "licensing-secret"},
+				},
+			})
+		}},
+		{"volume mount added", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].VolumeMounts = append(s.Template.Spec.Containers[0].VolumeMounts,
+				corev1.VolumeMount{Name: "kernel-module-config", MountPath: "/drivers"})
+		}},
+		{"host root changed", true, func(s *appsv1.DaemonSetSpec) {
+			for i := range s.Template.Spec.Volumes {
+				if s.Template.Spec.Volumes[i].Name == "host-root" {
+					s.Template.Spec.Volumes[i].HostPath.Path = "/custom-root"
+				}
+			}
+		}},
+		{"driver command", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].Command = []string{"ocp_dtk_entrypoint"}
+		}},
+		{"secret env source", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.Containers[0].EnvFrom = []corev1.EnvFromSource{
+				{SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "driver-secret"},
+				}},
+			}
+		}},
+		{"manager env var added", true, func(s *appsv1.DaemonSetSpec) {
+			s.Template.Spec.InitContainers[0].Env = append(s.Template.Spec.InitContainers[0].Env,
+				corev1.EnvVar{Name: "GPU_DIRECT_RDMA_ENABLED", Value: "true"})
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := baseDriverDaemonSetSpec()
+			tc.modify(spec)
+			digest := utils.GetObjectHashIgnoreEmptyKeys(extractDriverInstallConfig(&spec.Template.Spec))
+			if tc.wantChange {
+				assert.NotEqual(t, baseDigest, digest, "digest SHOULD change")
+			} else {
+				assert.Equal(t, baseDigest, digest, "digest should NOT change")
+			}
+		})
+	}
+}
+
+// TestExtractDriverInstallConfigExtraction verifies that the extractor
+// correctly populates fields from the DaemonSet spec.
+func TestExtractDriverInstallConfigExtraction(t *testing.T) {
+	spec := baseDriverDaemonSetSpec()
+	spec.Template.Spec.Containers = append(spec.Template.Spec.Containers,
+		corev1.Container{
+			Name:  "openshift-driver-toolkit-ctr",
+			Image: "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:abc123",
+		})
+	spec.Template.Spec.Containers[0].Env = append(spec.Template.Spec.Containers[0].Env,
+		corev1.EnvVar{Name: "KERNEL_MODULE_TYPE", Value: "open"},
+		corev1.EnvVar{Name: "OPENSHIFT_VERSION", Value: "4.13"},
+	)
+	spec.Template.Spec.Containers[0].EnvFrom = []corev1.EnvFromSource{
+		{SecretRef: &corev1.SecretEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "test-secret"},
+		}},
+	}
+
+	cfg := extractDriverInstallConfig(&spec.Template.Spec)
+
+	assert.Equal(t, "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04", cfg.DriverImage)
+	assert.Equal(t, "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.6.2", cfg.DriverManagerImage)
+	assert.Equal(t, []string{"nvidia-driver"}, cfg.DriverCommand)
+	assert.Equal(t, []string{"init"}, cfg.DriverArgs)
+	// KernelModuleType and OpenshiftVersion are captured in DriverEnv (not
+	// as top-level fields) via the DaemonSet extraction path.
+	assert.Contains(t, cfg.DriverEnv, driverconfig.EnvVar{Name: "KERNEL_MODULE_TYPE", Value: "open"})
+	assert.Contains(t, cfg.DriverEnv, driverconfig.EnvVar{Name: "OPENSHIFT_VERSION", Value: "4.13"})
+	assert.Equal(t, "test-secret", cfg.SecretEnvSource)
+	assert.True(t, cfg.DTKEnabled)
+	assert.Equal(t, "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:abc123", cfg.DTKImage)
+	assert.Equal(t, "/", cfg.HostRoot)
+
+	// FieldRef env vars should be excluded.
+	for _, ev := range cfg.DriverEnv {
+		assert.NotEqual(t, "NODE_NAME", ev.Name, "FieldRef env vars should be excluded")
+	}
+}
+
+// TestHashDriverInstallConfigZeroFieldInvariant verifies that adding a new
+// zero-valued field to DriverInstallState does not change the digest.
+//
+// We simulate "adding a field" by defining a local struct that embeds all
+// of DriverInstallState's fields plus an extra one, then running the same
+// reflection-based hashing logic on both. Since the extra field is zero-valued,
+// the hash must be identical.
+func TestHashDriverInstallConfigZeroFieldInvariant(t *testing.T) {
+	// Extended struct: same fields as DriverInstallState + a hypothetical new field.
+	type ExtendedConfig struct {
+		driverconfig.DriverInstallState
+		FutureNewField string
+	}
+
+	cfg := &driverconfig.DriverInstallState{
+		DriverImage:        "nvcr.io/nvidia/driver:525.85.03-ubuntu22.04",
+		DriverManagerImage: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.6.2",
+		GDSEnabled:         true,
+	}
+	originalDigest := utils.GetObjectHashIgnoreEmptyKeys(cfg)
+
+	extended := &ExtendedConfig{
+		DriverInstallState: *cfg,
+		FutureNewField:     "", // zero-valued — should not affect the hash
+	}
+	extendedDigest := utils.GetObjectHashIgnoreEmptyKeys(extended)
+
+	assert.Equal(t, originalDigest, extendedDigest,
+		"adding a zero-valued field to the struct must not change the digest")
+
+	// Sanity check: setting the new field to a non-zero value SHOULD change the hash.
+	extended.FutureNewField = "something"
+	changedDigest := utils.GetObjectHashIgnoreEmptyKeys(extended)
+	assert.NotEqual(t, originalDigest, changedDigest,
+		"a non-zero new field should change the digest")
 }

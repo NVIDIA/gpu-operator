@@ -17,10 +17,140 @@
 package utils
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestGetObjectHash(t *testing.T) {
+	type simple struct {
+		Name  string
+		Count int
+	}
+
+	t.Run("deterministic", func(t *testing.T) {
+		obj := simple{Name: "a", Count: 1}
+		assert.Equal(t, GetObjectHash(obj), GetObjectHash(obj))
+	})
+
+	t.Run("different values produce different hashes", func(t *testing.T) {
+		obj1 := simple{Name: "a", Count: 1}
+		obj2 := simple{Name: "b", Count: 1}
+		assert.NotEqual(t, GetObjectHash(obj1), GetObjectHash(obj2))
+	})
+
+	t.Run("zero-valued field affects hash", func(t *testing.T) {
+		withZero := simple{Name: "a", Count: 0}
+		withNonZero := simple{Name: "a", Count: 1}
+		assert.NotEqual(t, GetObjectHash(withZero), GetObjectHash(withNonZero))
+	})
+
+}
+
+func TestGetObjectHashIgnoreEmptyKeys(t *testing.T) {
+	type simple struct {
+		Name  string
+		Count int
+	}
+
+	t.Run("deterministic", func(t *testing.T) {
+		obj := simple{Name: "a", Count: 1}
+		assert.Equal(t, GetObjectHashIgnoreEmptyKeys(&obj), GetObjectHashIgnoreEmptyKeys(&obj))
+	})
+
+	t.Run("different values produce different hashes", func(t *testing.T) {
+		obj1 := simple{Name: "a", Count: 1}
+		obj2 := simple{Name: "b", Count: 1}
+		assert.NotEqual(t, GetObjectHashIgnoreEmptyKeys(&obj1), GetObjectHashIgnoreEmptyKeys(&obj2))
+	})
+
+	t.Run("zero-valued field does not affect hash", func(t *testing.T) {
+		type base struct {
+			Name string
+		}
+		type extended struct {
+			Name       string
+			ExtraField string
+		}
+		fewer := base{Name: "a"}
+		withZeroExtra := extended{Name: "a", ExtraField: ""}
+		assert.Equal(t, GetObjectHashIgnoreEmptyKeys(&fewer), GetObjectHashIgnoreEmptyKeys(&withZeroExtra))
+	})
+
+	t.Run("non-zero field changes hash", func(t *testing.T) {
+		type extended struct {
+			Name       string
+			ExtraField string
+		}
+		withZeroExtra := extended{Name: "a", ExtraField: ""}
+		withSetExtra := extended{Name: "a", ExtraField: "set"}
+		assert.NotEqual(t, GetObjectHashIgnoreEmptyKeys(&withZeroExtra), GetObjectHashIgnoreEmptyKeys(&withSetExtra))
+	})
+
+	t.Run("nil slice and empty slice produce same hash", func(t *testing.T) {
+		type withSlice struct {
+			Name  string
+			Items []string
+		}
+		nilSlice := withSlice{Name: "a", Items: nil}
+		emptySlice := withSlice{Name: "a", Items: []string{}}
+		assert.Equal(t, GetObjectHashIgnoreEmptyKeys(&nilSlice), GetObjectHashIgnoreEmptyKeys(&emptySlice))
+	})
+
+	t.Run("nil map and empty map produce same hash", func(t *testing.T) {
+		type withMap struct {
+			Name   string
+			Labels map[string]string
+		}
+		nilMap := withMap{Name: "a", Labels: nil}
+		emptyMap := withMap{Name: "a", Labels: map[string]string{}}
+		assert.Equal(t, GetObjectHashIgnoreEmptyKeys(&nilMap), GetObjectHashIgnoreEmptyKeys(&emptyMap))
+	})
+
+	t.Run("embedded struct fields are flattened", func(t *testing.T) {
+		type inner struct {
+			X string
+		}
+		type outer struct {
+			inner
+			Y string
+		}
+		type flat struct {
+			X string
+			Y string
+		}
+		nested := outer{inner: inner{X: "a"}, Y: "b"}
+		flattened := flat{X: "a", Y: "b"}
+		assert.Equal(t, GetObjectHashIgnoreEmptyKeys(&nested), GetObjectHashIgnoreEmptyKeys(&flattened))
+	})
+}
+
+func TestIsEffectivelyZero(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    interface{}
+		expected bool
+	}{
+		{"zero int", 0, true},
+		{"non-zero int", 1, false},
+		{"empty string", "", true},
+		{"non-empty string", "a", false},
+		{"false bool", false, true},
+		{"true bool", true, false},
+		{"nil slice", ([]string)(nil), true},
+		{"empty slice", []string{}, true},
+		{"non-empty slice", []string{"a"}, false},
+		{"nil map", (map[string]string)(nil), true},
+		{"empty map", map[string]string{}, true},
+		{"non-empty map", map[string]string{"k": "v"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, isEffectivelyZero(reflect.ValueOf(tc.value)))
+		})
+	}
+}
 
 func TestGetStringHash(t *testing.T) {
 	type test struct {

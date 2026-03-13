@@ -4,6 +4,7 @@ package warning
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"sync"
 )
 
@@ -20,11 +21,8 @@ type Warning struct {
 func (w *Warning) Handle(ctx context.Context, slog *slog.Logger, msg string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	// dedup
-	for _, entry := range w.List {
-		if entry == msg {
-			return
-		}
+	if slices.Contains(w.List, msg) {
+		return
 	}
 	w.List = append(w.List, msg)
 	// handle new warning if hook defined

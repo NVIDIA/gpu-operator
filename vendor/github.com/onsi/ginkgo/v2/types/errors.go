@@ -432,6 +432,33 @@ func (g ginkgoErrors) InvalidEmptyLabel(cl CodeLocation) error {
 	}
 }
 
+func (g ginkgoErrors) InvalidSemVerConstraint(semVerConstraint, errMsg string, cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid SemVerConstraint",
+		Message:      fmt.Sprintf("'%s' is an invalid SemVerConstraint: %s", semVerConstraint, errMsg),
+		CodeLocation: cl,
+		DocLink:      "spec-semantic-version-filtering",
+	}
+}
+
+func (g ginkgoErrors) InvalidEmptySemVerConstraint(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid Empty SemVerConstraint",
+		Message:      "SemVerConstraint cannot be empty",
+		CodeLocation: cl,
+		DocLink:      "spec-semantic-version-filtering",
+	}
+}
+
+func (g ginkgoErrors) InvalidEmptyComponentForSemVerConstraint(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Invalid Empty Component for ComponentSemVerConstraint",
+		Message:      "ComponentSemVerConstraint requires a non-empty component name",
+		CodeLocation: cl,
+		DocLink: "spec-semantic-version-filtering",
+	}
+}
+
 /* Table errors */
 func (g ginkgoErrors) MultipleEntryBodyFunctionsForTable(cl CodeLocation) error {
 	return GinkgoError{
@@ -639,7 +666,7 @@ func (g ginkgoErrors) ExpectFilenameNotPath(flag string, path string) error {
 func (g ginkgoErrors) FlagAfterPositionalParameter() error {
 	return GinkgoError{
 		Heading: "Malformed arguments - detected a flag after the package liste",
-		Message: "Make sure all flags appear {{bold}}after{{/}} the Ginkgo subcommand and {{bold}}before{{/}} your list of packages (or './...').\n{{gray}}e.g. 'ginkgo run -p my_package' is valid but `ginkgo -p run my_package` is not.\n{{gray}}e.g. 'ginkgo -p -vet ./...' is valid but 'ginkgo -p ./... -vet' is not{{/}}",
+		Message: "Make sure all flags appear {{bold}}after{{/}} the Ginkgo subcommand and {{bold}}before{{/}} your list of packages (or './...').\n{{gray}}e.g. 'ginkgo run -p my_package' is valid but `ginkgo -p run my_package` is not.\n{{gray}}e.g. 'ginkgo -p -vet=\"\" ./...' is valid but 'ginkgo -p ./... -vet=\"\"' is not{{/}}",
 	}
 }
 

@@ -12,3 +12,23 @@ rules:
   - use
   resourceNames:
   - privileged
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - nfd.k8s-sigs.io
+  resources:
+  - nodefeatures
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update

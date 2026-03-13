@@ -50,6 +50,8 @@ var (
 	ErrMismatch = errors.New("content does not match")
 	// ErrMountReturnedLocation when a blob mount fails but a location header is received
 	ErrMountReturnedLocation = errors.New("blob mount returned a location to upload")
+	// ErrNoLogin indicates there is no user login defined for a registry
+	ErrNoLogin = errors.New("no login found")
 	// ErrNoNewChallenge indicates a challenge update did not result in any change
 	ErrNoNewChallenge = errors.New("no new challenge")
 	// ErrNotFound isn't there, search for your value elsewhere

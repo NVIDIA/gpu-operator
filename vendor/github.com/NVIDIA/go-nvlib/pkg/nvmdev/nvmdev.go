@@ -226,14 +226,27 @@ func (m mdev) Type() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to read mdev_type name for mdev %s: %v", m, err)
 	}
-	// file in the format: [NVIDIA|GRID] <vGPU type>
-	mdevTypeStr := strings.TrimSpace(string(mdevType))
-	mdevTypeSplit := strings.SplitN(mdevTypeStr, " ", 2)
-	if len(mdevTypeSplit) != 2 {
-		return "", fmt.Errorf("unable to parse mdev_type name %s for mdev %s", mdevTypeStr, m)
+	typeName, err := parseMdevTypeName(string(mdevType))
+	if err != nil {
+		return "", fmt.Errorf("unable to parse mdev_type name for mdev %s: %v", m, err)
 	}
 
-	return mdevTypeSplit[1], nil
+	return typeName, nil
+}
+
+// parseMdevTypeName extracts the vGPU type name from a string that may contain
+// product prefixes.
+// Examples:
+//   - "NVIDIA A100-4C" -> "A100-4C".
+//   - "NVIDIA RTX Pro 6000 Blackwell DC-48C" -> "DC-48C"
+func parseMdevTypeName(rawName string) (string, error) {
+	nameStr := strings.TrimSpace(rawName)
+	nameSplit := strings.Split(nameStr, " ")
+	typeName := nameSplit[len(nameSplit)-1]
+	if typeName == "" {
+		return "", fmt.Errorf("unable to parse mdev_type name from: %s", rawName)
+	}
+	return typeName, nil
 }
 
 func (m mdev) driver() (string, error) {
@@ -280,13 +293,10 @@ func (m *nvmdev) NewParentDevice(devicePath string) (*ParentDevice, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to read file %s: %v", path, err)
 		}
-		// file in the format: [NVIDIA|GRID] <vGPU type>
-		nameStr := strings.TrimSpace(string(name))
-		nameSplit := strings.SplitN(nameStr, " ", 2)
-		if len(nameSplit) != 2 {
-			return nil, fmt.Errorf("unable to parse mdev_type name %s at path %s", nameStr, path)
+		nameStr, err := parseMdevTypeName(string(name))
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse mdev_type name at path %s: %v", path, err)
 		}
-		nameStr = nameSplit[len(nameSplit)-1]
 
 		mdevTypesMap[nameStr] = filepath.Dir(path)
 	}

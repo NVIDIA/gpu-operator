@@ -19,8 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -66,16 +66,18 @@ const (
 	precompiledIdentificationLabelValue = "true"
 	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
 	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
-	ocpSuggestedNamespace          = "nvidia-gpu-operator"
-	gpuWorkloadConfigLabelKey      = "nvidia.com/gpu.workload.config"
-	gpuWorkloadConfigContainer     = "container"
-	gpuWorkloadConfigVMPassthrough = "vm-passthrough"
-	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
-	podSecurityLabelPrefix         = "pod-security.kubernetes.io/"
-	podSecurityLevelPrivileged     = "privileged"
-	driverAutoUpgradeAnnotationKey = "nvidia.com/gpu-driver-upgrade-enabled"
-	commonDriverDaemonsetName      = "nvidia-driver-daemonset"
-	commonVGPUManagerDaemonsetName = "nvidia-vgpu-manager-daemonset"
+	ocpSuggestedNamespace              = "nvidia-gpu-operator"
+	gpuWorkloadConfigLabelKey          = "nvidia.com/gpu.workload.config"
+	gpuWorkloadConfigContainer         = "container"
+	gpuWorkloadConfigVMPassthrough     = "vm-passthrough"
+	gpuWorkloadConfigVMVgpu            = "vm-vgpu"
+	kubevirtDevicePluginDeployLabelKey = "nvidia.com/gpu.deploy.sandbox-device-plugin"
+	kataDevicePluginDeployLabelKey     = "nvidia.com/gpu.deploy.kata-sandbox-device-plugin"
+	podSecurityLabelPrefix             = "pod-security.kubernetes.io/"
+	podSecurityLevelPrivileged         = "privileged"
+	driverAutoUpgradeAnnotationKey     = "nvidia.com/gpu-driver-upgrade-enabled"
+	commonDriverDaemonsetName          = "nvidia-driver-daemonset"
+	commonVGPUManagerDaemonsetName     = "nvidia-vgpu-manager-daemonset"
 )
 
 var (
@@ -117,9 +119,10 @@ var gpuNodeLabels = map[string]string{
 }
 
 type gpuWorkloadConfiguration struct {
-	config string
-	node   string
-	log    logr.Logger
+	config      string
+	sandboxMode string // SandboxWorkloads.Mode (e.g. "kubevirt", "kata") — only affects vm-passthrough labels
+	node        string
+	log         logr.Logger
 }
 
 // OpenShiftDriverToolkit contains the values required to deploy
@@ -162,6 +165,7 @@ type ClusterPolicyController struct {
 	ocpDriverToolkit OpenShiftDriverToolkit
 
 	runtime        gpuv1.Runtime
+	gpuNodeOSTag   string
 	hasGPUNodes    bool
 	hasNFDLabels   bool
 	sandboxEnabled bool
@@ -339,6 +343,30 @@ func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, e
 	return defaultGPUWorkloadConfig, fmt.Errorf("no GPU workload config found")
 }
 
+// getEffectiveStateLabels returns the state labels to apply for the given workload config and sandbox mode.
+// When config is vm-passthrough and mode is "kata", returns labels with kata-device-plugin instead of sandbox-device-plugin.
+func getEffectiveStateLabels(config, mode string) map[string]string {
+	labels, ok := gpuStateLabels[config]
+	if !ok {
+		return nil
+	}
+
+	if config != gpuWorkloadConfigVMPassthrough {
+		return labels
+	}
+
+	// update labels for the sandbox modes for passthrough
+	switch gpuv1.SandboxWorkloadsMode(mode) {
+	case gpuv1.Kata:
+		delete(labels, kubevirtDevicePluginDeployLabelKey)
+		labels[kataDevicePluginDeployLabelKey] = "true"
+	case gpuv1.KubeVirt:
+		delete(labels, kataDevicePluginDeployLabelKey)
+		labels[kubevirtDevicePluginDeployLabelKey] = "true"
+	}
+	return labels
+}
+
 // removeAllGPUStateLabels removes all gpuStateLabels from the provided map of node labels.
 // removeAllGPUStateLabels returns true if the labels map has been modified.
 func removeAllGPUStateLabels(labels map[string]string) bool {
@@ -350,6 +378,10 @@ func removeAllGPUStateLabels(labels map[string]string) bool {
 				modified = true
 			}
 		}
+	}
+	if _, ok := labels[kataDevicePluginDeployLabelKey]; ok {
+		delete(labels, kataDevicePluginDeployLabelKey)
+		modified = true
 	}
 	if _, ok := labels[migManagerLabelKey]; ok {
 		delete(labels, migManagerLabelKey)
@@ -374,9 +406,11 @@ func (w *gpuWorkloadConfiguration) updateGPUStateLabels(labels map[string]string
 
 // addGPUStateLabels adds GPU state labels needed for the GPU workload configuration.
 // If a required state label already exists on the node, honor the current value.
+// For vm-passthrough, uses kata-device-plugin when mode is "kata", otherwise sandbox-device-plugin.
 func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) bool {
 	modified := false
-	for key, value := range gpuStateLabels[w.config] {
+	effective := getEffectiveStateLabels(w.config, w.sandboxMode)
+	for key, value := range effective {
 		if _, ok := labels[key]; !ok {
 			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
 			labels[key] = value
@@ -391,23 +425,27 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 	return modified
 }
 
-// removeGPUStateLabels removes GPU state labels not needed for the GPU workload configuration
+// removeGPUStateLabels removes GPU state labels not needed for the GPU workload configuration.
+// Uses effective labels for (config, mode) so vm-passthrough+kata keeps kata-device-plugin, not sandbox-device-plugin.
 func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
 	modified := false
-	for workloadConfig, labelsMap := range gpuStateLabels {
-		if workloadConfig == w.config {
+	effective := getEffectiveStateLabels(w.config, w.sandboxMode)
+	// Collect all keys that are ever used as state labels (from static map + mode-dependent key)
+	allStateKeys := make(map[string]bool)
+	for _, labelsMap := range gpuStateLabels {
+		for key := range labelsMap {
+			allStateKeys[key] = true
+		}
+	}
+	allStateKeys[kataDevicePluginDeployLabelKey] = true
+	for key := range labels {
+		if !allStateKeys[key] {
 			continue
 		}
-		for key := range labelsMap {
-			if _, ok := gpuStateLabels[w.config][key]; ok {
-				// skip label if it is in the set of states for workloadConfig
-				continue
-			}
-			if _, ok := labels[key]; ok {
-				w.log.Info("Deleting node label", "NodeName", w.node, "Label", key)
-				delete(labels, key)
-				modified = true
-			}
+		if _, keep := effective[key]; !keep {
+			w.log.Info("Deleting node label", "NodeName", w.node, "Label", key)
+			delete(labels, key)
+			modified = true
 		}
 	}
 	if w.config != gpuWorkloadConfigContainer {
@@ -439,7 +477,8 @@ func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
 		updateRequired := false
 		value := "true"
 		annotationValue, annotationExists := node.Annotations[driverAutoUpgradeAnnotationKey]
-		if n.singleton.Spec.Driver.UpgradePolicy != nil &&
+		if (n.singleton.Spec.Driver.IsEnabled() || n.singleton.Spec.Driver.UseNvidiaDriverCRDType()) &&
+			n.singleton.Spec.Driver.UpgradePolicy != nil &&
 			n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade &&
 			!n.sandboxEnabled {
 			// check if we need to add the annotation
@@ -485,14 +524,14 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	list := &corev1.NodeList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		return false, 0, fmt.Errorf("unable to list nodes to check labels, err %s", err.Error())
+		return false, 0, fmt.Errorf("unable to list nodes to check labels: %w", err)
 	}
-
 	clusterHasNFDLabels := false
-	updateLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
 		node := node
+		updateLabels := false
+		nodeOriginal := node.DeepCopy()
 		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
@@ -505,7 +544,8 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
 		}
 		n.logger.Info("GPU workload configuration", "NodeName", node.Name, "GpuWorkloadConfig", config)
-		gpuWorkloadConfig := &gpuWorkloadConfiguration{config, node.Name, n.logger}
+		mode := n.singleton.Spec.SandboxWorkloads.Mode
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config: config, sandboxMode: mode, node: node.Name, log: n.logger}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label
@@ -567,7 +607,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 
 		// update node with the latest labels
 		if updateLabels {
-			err = n.client.Update(ctx, &node)
+			err = n.client.Patch(ctx, &node, client.MergeFrom(nodeOriginal))
 			if err != nil {
 				return false, 0, fmt.Errorf("unable to label node %s for the GPU Operator deployment, err %s",
 					node.Name, err.Error())
@@ -595,6 +635,45 @@ func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
 		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
 	}
 	return runtime, nil
+}
+
+func (n *ClusterPolicyController) getGPUNodeOSTag() (string, error) {
+	ctx := n.ctx
+	opts := []client.ListOption{
+		client.MatchingLabels(map[string]string{commonGPULabelKey: commonGPULabelValue}),
+		client.Limit(1),
+	}
+	nodeList := &corev1.NodeList{}
+	err := n.client.List(ctx, nodeList, opts...)
+	if err != nil {
+		return "", fmt.Errorf("unable to list nodes with GPU present: %w", err)
+	}
+	if len(nodeList.Items) == 0 {
+		return "", fmt.Errorf("no nodes found with GPU present")
+	}
+
+	labels := nodeList.Items[0].Labels
+	osName, ok := labels[nfdOSReleaseIDLabelKey]
+	if !ok {
+		return "", fmt.Errorf("unable to retrieve OS name from label %s", nfdOSReleaseIDLabelKey)
+	}
+	osVersion, ok := labels[nfdOSVersionIDLabelKey]
+	if !ok {
+		return "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
+	}
+	osMajorVersion := strings.Split(osVersion, ".")[0]
+	osMajorNumber, err := strconv.Atoi(osMajorVersion)
+	if err != nil {
+		return "", fmt.Errorf("error processing OS major version %s: %w", osMajorVersion, err)
+	}
+
+	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
+	if osName == "rocky" || (osName == "rhel" && osMajorNumber >= 10) {
+		osVersion = osMajorVersion
+	}
+	osTag := fmt.Sprintf("%s%s", osName, osVersion)
+
+	return osTag, nil
 }
 
 func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
@@ -759,15 +838,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.scheme = reconciler.Scheme
 
 	if len(n.controls) == 0 {
-		clusterPolicyCtrl.operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-
-		if clusterPolicyCtrl.operatorNamespace == "" {
-			n.logger.Error(nil, "OPERATOR_NAMESPACE environment variable not set, cannot proceed")
-			// we cannot do anything without the operator namespace,
-			// let the operator Pod run into `CrashloopBackOff`
-
-			os.Exit(1)
-		}
+		clusterPolicyCtrl.operatorNamespace = reconciler.Namespace
 
 		version, err := OpenshiftVersion(ctx)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -784,6 +855,11 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		}
 		n.k8sVersion = k8sVersion
 		n.logger.Info("Kubernetes version detected", "version", k8sVersion)
+
+		err = validateClusterPolicySpec(&clusterPolicy.Spec)
+		if err != nil {
+			return fmt.Errorf("error validating clusterpolicy: %w", err)
+		}
 
 		n.operatorMetrics = initOperatorMetrics()
 		n.logger.Info("Operator metrics initialized.")
@@ -806,6 +882,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-sandbox-validation")
 		addState(n, "/opt/gpu-operator/state-vfio-manager")
 		addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
+		addState(n, "/opt/gpu-operator/state-kata-device-plugin")
 		addState(n, "/opt/gpu-operator/state-kata-manager")
 		addState(n, "/opt/gpu-operator/state-cc-manager")
 	}
@@ -861,6 +938,13 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
 
+	if n.hasGPUNodes {
+		gpuNodeOSTag, err := n.getGPUNodeOSTag()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve GPU node OS tag: %w", err)
+		}
+		n.gpuNodeOSTag = gpuNodeOSTag
+	}
 	// fetch all nodes and annotate gpu nodes
 	err = n.applyDriverAutoUpgradeAnnotation()
 	if err != nil {
@@ -949,7 +1033,7 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	//     before managing them. Clusterpolicy controller should not be creating /
 	//     updating / deleting objects owned by another controller.
 	if (n.stateNames[n.idx] == "state-driver" || n.stateNames[n.idx] == "state-vgpu-manager") &&
-		n.singleton.Spec.Driver.UseNvdiaDriverCRDType() {
+		n.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
 		n.logger.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++
 		// Cleanup all driver daemonsets owned by ClusterPolicy.
@@ -991,6 +1075,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	clusterPolicySpec := &n.singleton.Spec
 
 	switch stateName {
+	case "pre-requisites":
+		return !clusterPolicySpec.CDI.IsNRIPluginEnabled()
 	case "state-driver":
 		return clusterPolicySpec.Driver.IsEnabled()
 	case "state-container-toolkit":
@@ -1010,7 +1096,9 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	case "state-node-status-exporter":
 		return clusterPolicySpec.NodeStatusExporter.IsEnabled()
 	case "state-sandbox-device-plugin":
-		return n.sandboxEnabled && clusterPolicySpec.SandboxDevicePlugin.IsEnabled()
+		return n.sandboxEnabled && clusterPolicySpec.SandboxDevicePlugin.IsEnabled() && clusterPolicySpec.SandboxWorkloads.Mode == string(gpuv1.KubeVirt)
+	case "state-kata-device-plugin":
+		return n.sandboxEnabled && clusterPolicySpec.KataSandboxDevicePlugin.IsEnabled() && clusterPolicySpec.SandboxWorkloads.Mode == string(gpuv1.Kata)
 	case "state-kata-manager":
 		return n.sandboxEnabled && clusterPolicySpec.KataManager.IsEnabled()
 	case "state-vfio-manager":
@@ -1020,7 +1108,7 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	case "state-vgpu-manager":
 		return n.sandboxEnabled && clusterPolicySpec.VGPUManager.IsEnabled()
 	case "state-cc-manager":
-		return n.sandboxEnabled && clusterPolicySpec.CCManager.IsEnabled()
+		return n.sandboxEnabled && clusterPolicySpec.CCManager.IsEnabled() && clusterPolicySpec.SandboxWorkloads.Mode == string(gpuv1.Kata)
 	case "state-sandbox-validation":
 		return n.sandboxEnabled
 	case "state-operator-validation":
@@ -1031,4 +1119,11 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false
 	}
+}
+
+func validateClusterPolicySpec(spec *gpuv1.ClusterPolicySpec) error {
+	if !spec.CDI.IsEnabled() && spec.CDI.IsNRIPluginEnabled() {
+		return fmt.Errorf("the NRI Plugin cannot be enabled when CDI is disabled")
+	}
+	return nil
 }

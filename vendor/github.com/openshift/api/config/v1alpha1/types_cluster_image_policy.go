@@ -51,7 +51,7 @@ type ClusterImagePolicySpec struct {
 	// policy contains configuration to allow scopes to be verified, and defines how
 	// images not matching the verification policy will be treated.
 	// +required
-	Policy Policy `json:"policy"`
+	Policy ImageSigstoreVerificationPolicy `json:"policy"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -59,6 +59,7 @@ type ClusterImagePolicyStatus struct {
 	// conditions provide details on the status of this API Resource.
 	// +listType=map
 	// +listMapKey=type
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 

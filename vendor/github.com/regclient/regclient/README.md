@@ -10,81 +10,102 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/regclient/regclient)](https://goreportcard.com/report/github.com/regclient/regclient)
 [![GitHub Downloads](https://img.shields.io/github/downloads/regclient/regclient/total?label=GitHub%20downloads)](https://github.com/regclient/regclient/releases)
 
-Client interface for the registry API.
-This includes `regctl` for a command line interface to manage registries.
+regclient is a client interface to OCI conformant registries and content shipped with the OCI Image Layout.
+It includes a Go library and several CLI commands.
 
-![regctl demo](docs/demo.gif)
+## regclient Go Library Features
 
-## regclient Features
+- Runs without a container runtime and without privileged access to the local host.
+- Querying for a tag listing, repository listing, and remotely inspecting the contents of images.
+- Efficiently copying and retagging images, only pulling layers when required, and without changing the image digest.
+- Support for multi-platform images.
+- Support for querying, creating, and copying OCI Artifacts, allowing arbitrary data to be stored in an OCI registry.
+- Support for packaging OCI Artifacts with an Index of multiple artifacts, which can be used for platform specific artifacts.
+- Support for querying OCI referrers, copying referrers, and pushing content with an OCI subject field, associating artifacts with other content on the registry.
+- Support for the “digest tags” used by projects like sigstore/cosign, allowing the content to be included when copying images.
+- Efficiently query for an image digest.
+- Efficiently query for pull rate limits used by Docker Hub.
+- Import and export content into OCI Layouts and Docker formatted tar files.
+- Support OCI Layouts in all commands as a local disk equivalent of a repository.
+- Support for deleting tags, manifests, and blobs.
+- Ability to mutate existing images, including:
+  - Settings annotations or labels
+  - Deleting content from layers
+  - Changing timestamps for reproducibility
+  - Converting between Docker and OCI media types
+  - Replacing the base image layers
+  - Add or remove volumes and exposed ports
+  - Change digest algorithms
+- Support for registry warning headers, which may be used to notify users of issues with the server or content they are using.
+- Automatically import logins from the docker CLI, and registry certificates from the docker engine.
+- Automatic retry, and fallback to a chunked blob push, when network issues are encountered.
 
-- Provides a client interface to interacting with registries.
-- Images may be inspected without pulling the layers, allowing quick access to the image manifest and configuration.
-- Tags may be listed for a repository.
-- Repositories may be listed from a registry (if supported).
-- Copying an image only pulls layers when needed, allowing images to be quickly retagged or promoted across repositories.
-- Multi-platform images are supported, allowing all platforms to be copied between registries.
-- Digest tags used by projects like sigstore/cosign are supported, allowing signature, attestation, and SBOM metadata to be copied with the image.
-- OCI subject/referrers is supported for the standardized replacement of the "digest tags".
-- Digests may be queried for a tag without pulling the manifest.
-- Rate limits may be queried from the registry without pulling an image (useful for Docker Hub).
-- Images may be imported and exported to both OCI and Docker formatted tar files.
-- OCI Layout is supported for copying images to and from a local directory.
-- Delete APIs have been provided for tags, manifests, and blobs (the tag deletion will only delete a single tag even if multiple tags point to the same digest).
-- Registry logins are imported from docker when available
-- Self signed, insecure, and http-only registries are all supported.
-- Requests will retry and fall back to chunked uploads when network issues are encountered.
+The full Go references is available on [pkg.go.dev](https://pkg.go.dev/github.com/regclient/regclient).
 
 ## regctl Features
 
 `regctl` is a CLI interface to the `regclient` library.
 In addition to the features listed for `regclient`, `regctl` adds the following abilities:
 
-- Formatting output with templates.
-- Push and pull arbitrary artifacts.
+- Generating multi-platform manifests from multiple images that may have been separately built.
+- Repackage a multi-platform image with only the requested platforms.
+- Push and pull arbitrary OCI artifacts.
+- Recursively list all content associated with an image.
+- Extract files from a layer or image.
+- Compare images, showing the differences between manifests, the config, and layers.
+- Formatted output using Go templates.
+
+The project website includes [usage instructions](https://regclient.org/usage/regctl/) and a [CLI reference](https://regclient.org/cli/regctl/).
 
 ## regsync features
 
 `regsync` is an image mirroring tool.
 It will copy images between two locations with the following additional features:
 
+- Ability to run on a cron schedule, one time synchronization, or only report stale images.
 - Uses a yaml configuration.
-- The `regclient` copy is used to only pull needed layers, supporting multi-platform, and additional metadata.
-- Can use user's docker configuration for registry credentials.
-- Ability to run on a cron schedule, one time synchronization, or only check for stale images.
-- Ability to backup previous target image before overwriting.
-- Ability to postpone mirror step when rate limit is below a threshold.
+- Each source may be an entire registry (not recommended), a repository, or a single image, with the ability to filter repositories and tags.
+- Support for multi-platform images, OCI referrers, “digest tags”, and copying to or from an OCI Layout (for maintaining a mirror over an air-gap).
 - Ability to mirror multiple images concurrently.
+- Support for copying a single platform from multi-platform images.
+- Ability to backup an existing image before overwriting the tag.
+- Ability to postpone mirror step when rate limit (used by Docker Hub) is below a threshold.
+- Can use user’s docker configuration for user credentials and registry certificates.
+
+The project website includes [usage instructions](https://regclient.org/usage/regsync/) and a [CLI reference](https://regclient.org/cli/regsync/).
 
 ## regbot features
 
 `regbot` is a scripting tool on top of the `regclient` API with the following features:
 
-- Runs user provided scripts based on a yaml configuration.
+- Ability to run on a cron schedule, one time execution, or test with a dry-run mode.
+- Uses a yaml configuration.
 - Scripts are written in Lua and executed directly in Go.
-- Can run on a cron schedule or a one time execution.
-- Dry-run option can be used for testing.
 - Built-in functions include:
   - Repository list
   - Tag list
   - Image manifest (either head or get, and optional resolving multi-platform reference)
-  - Image config (this includes the creation time, labels, and other details shown in a `docker image inspect`)
+  - Image config (this includes the creation time, labels, and other details shown in a docker image inspect)
   - Image rate limit and a wait function to delay the script when rate limit remaining is below a threshold
   - Image copy
   - Manifest delete
   - Tag delete
 
+The project website includes [usage instructions](https://regclient.org/usage/regbot/) and a [CLI reference](https://regclient.org/cli/regbot/).
+
 ## Development Status
 
-This project is in active development.
-Various Go APIs may change, but efforts will be made to provide aliases and stubs for any removed API.
+This project is using v0 version numbers due to Go's backwards compatibility requirements of a v1 release.
+The library and commands are stable for external use.
+Minor version updates may contain breaking changes, however effort is made to first deprecate and provide warnings to give users time to move off of older APIs and commands.
 
 ## Installing
 
-See the [installation options](docs/install.md).
+See the [installation instructions](https://regclient.org/install/) on the project website for the various ways to download or build CLI binaries.
 
 ## Usage
 
-See the [project documentation](docs/README.md).
+See the [project documentation](https://regclient.org/usage/).
 
 ## Contributors
 

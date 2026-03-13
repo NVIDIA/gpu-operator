@@ -44,9 +44,10 @@ type stateSkel struct {
 	name        string
 	description string
 
-	client   client.Client
-	scheme   *runtime.Scheme
-	renderer render.Renderer
+	namespace string
+	client    client.Client
+	scheme    *runtime.Scheme
+	renderer  render.Renderer
 }
 
 // Name provides the State name

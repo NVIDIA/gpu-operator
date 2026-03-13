@@ -1,5 +1,4 @@
 //go:build go1.18
-// +build go1.18
 
 // Package cache is used to store values with limits.
 // Items are automatically pruned when too many entries are stored, or values become stale.

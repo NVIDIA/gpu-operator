@@ -25,7 +25,7 @@ stages:
   - e2e_tests
   - aws_kube_clean
   - release
-  - sign
+  - ngc-publish
 
 # Enable pipelines on merge requests, tags, and branches.
 # Avoid duplicate pipelines when pushing to a branch associated with an open MR.
@@ -81,25 +81,12 @@ trigger-pipeline:
 
     -  '[[ -n "${SKIP_QEMU_SETUP}" ]] || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes'
 
-# Define targets for the gpu-operator and gpu-operator-validator images
-.dist-ubi9:
-  variables:
-    DIST: ubi9
-    CVE_UPDATES: "cyrus-sasl-lib"
-
+# Define targets for the gpu-operator image
 .target-gpu-operator:
   variables:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}"
     IN_IMAGE_NAME: "gpu-operator"
     IMAGE_ARCHIVE: "gpu-operator.tar"
-
-.target-gpu-operator-validator:
-  variables:
-    SUBCOMPONENT: "validator"
-    IMAGE_NAME: "${CI_REGISTRY_IMAGE}/gpu-operator-validator"
-    IN_IMAGE_NAME: "gpu-operator-validator"
-    IMAGE_ARCHIVE: "gpu-operator-validator.tar"
-    IN_REGISTRY: "${STAGING_REGISTRY}/gpu-operator"
 
 # .release forms the base of the deployment jobs which push images to the CI registry.
 # This is extended with the version to be deployed (e.g. the SHA or TAG) and the
@@ -130,7 +117,7 @@ trigger-pipeline:
 
     # Since OUT_IMAGE_NAME and OUT_IMAGE_VERSION are set, this will push the CI image to the
     # Target
-    - make push-${DIST}
+    - make push-image
 
 .release-bundle:
   stage: release
@@ -150,7 +137,7 @@ trigger-pipeline:
 # Download the regctl binary for use in the release steps
 .regctl-setup:
   before_script:
-    - export REGCTL_VERSION=v0.8.2
+    - export REGCTL_VERSION=v0.11.2
     - apk add --no-cache curl
     - mkdir -p bin
     - curl -sSLo bin/regctl https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-amd64
@@ -175,55 +162,15 @@ trigger-pipeline:
   extends:
     - .release
   variables:
-    OUT_REGISTRY_USER: "${CI_REGISTRY_USER}"
-    OUT_REGISTRY_TOKEN: "${CI_REGISTRY_PASSWORD}"
-    OUT_REGISTRY: "${CI_REGISTRY}"
+    OUT_REGISTRY_USER: "${NGC_REGISTRY_USER}"
+    OUT_REGISTRY_TOKEN: "${NGC_REGISTRY_TOKEN}"
+    OUT_REGISTRY: "${NGC_REGISTRY}"
 
 release:staging-gpu-operator:
   extends:
     - .release:staging
-    - .dist-ubi9
     - .target-gpu-operator
   variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
-
-release:staging-gpu-operator-validator:
-  extends:
-    - .release:staging
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
-
-release:staging-latest-gpu-operator:
-  extends:
-    - .release:staging
-    - .dist-ubi9
-    - .target-gpu-operator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator"
-    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
-  rules:
-    - if: $CI_COMMIT_BRANCH
-
-release:staging-latest-gpu-operator-validator:
-  extends:
-    - .release:staging
-    - .dist-ubi9
-    - .target-gpu-operator-validator
-  variables:
-    OUT_IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-validator"
-    OUT_IMAGE_VERSION: ${CI_COMMIT_BRANCH}-latest
-  rules:
-    - if: $CI_COMMIT_BRANCH
-
-release:gpu-operator-bundle-image:
-  extends:
-    - .release-bundle
-  variables:
-    BUNDLE_IMAGE: "${CI_REGISTRY_IMAGE}/staging/gpu-operator-bundle:${CI_COMMIT_BRANCH}-latest"
-    VERSION: ""
-    DEFAULT_CHANNEL: "stable"
-    CHANNELS: "stable"
-  rules:
-    - if: $CI_COMMIT_BRANCH
+    OUT_IMAGE_NAME: "${NGC_STAGING_REGISTRY}/gpu-operator"
+  needs:
+    - image:gpu-operator

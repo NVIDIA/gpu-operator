@@ -2,6 +2,7 @@ package regclient
 
 import (
 	"archive/tar"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -54,23 +56,26 @@ type dockerTarManifest struct {
 	LayerSources map[digest.Digest]descriptor.Descriptor `json:",omitempty"`
 }
 
-type tarFileHandler func(header *tar.Header, trd *tarReadData) error
-type tarReadData struct {
-	tr          *tar.Reader
-	name        string
-	handleAdded bool
-	handlers    map[string]tarFileHandler
-	links       map[string][]string
-	processed   map[string]bool
-	finish      []func() error
-	// data processed from various handlers
-	manifests           map[digest.Digest]manifest.Manifest
-	ociIndex            v1.Index
-	ociManifest         manifest.Manifest
-	dockerManifestFound bool
-	dockerManifestList  []dockerTarManifest
-	dockerManifest      schema2.Manifest
-}
+type (
+	tarFileHandler func(header *tar.Header, trd *tarReadData) error
+	tarReadData    struct {
+		tr          *tar.Reader
+		name        string
+		handleAdded bool
+		handlers    map[string]tarFileHandler
+		links       map[string][]string
+		processed   map[string]bool
+		finish      []func() error
+		// data processed from various handlers
+		manifests           map[digest.Digest]manifest.Manifest
+		ociIndex            v1.Index
+		ociManifest         manifest.Manifest
+		dockerManifestFound bool
+		dockerManifestList  []dockerTarManifest
+		dockerManifest      schema2.Manifest
+	}
+)
+
 type tarWriteData struct {
 	tw    *tar.Writer
 	dirs  map[string]bool
@@ -102,6 +107,7 @@ type imageOpt struct {
 	mu              sync.Mutex
 	seen            map[string]*imageSeen
 	finalFn         []func(context.Context) error
+	blobReaderHook  func(*blob.BReader) (*blob.BReader, error)
 }
 
 type imageSeen struct {
@@ -111,6 +117,16 @@ type imageSeen struct {
 
 // ImageOpts define options for the Image* commands.
 type ImageOpts func(*imageOpt)
+
+// ImageWithBlobReaderHook calls the given function on every blob copy in [RegClient.ImageCopy].
+// The hook receives a [blob.BReader] from getting the blob from the source.
+// The returned [blob.BReader] will be used for pushing the blob to the target.
+// If the hook returns an error on any blob, the image copy may fail.
+func ImageWithBlobReaderHook(fn func(*blob.BReader) (*blob.BReader, error)) ImageOpts {
+	return func(opts *imageOpt) {
+		opts.blobReaderHook = fn
+	}
+}
 
 // ImageWithCallback provides progress data to a callback function.
 func ImageWithCallback(callback func(kind types.CallbackKind, instance string, state types.CallbackState, cur, total int64)) ImageOpts {
@@ -325,8 +341,7 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 		if err != nil {
 			return err
 		}
-		rp := r
-		rp.Digest = d.Digest.String()
+		rp := r.AddDigest(d.Digest.String())
 		m, err = rc.ManifestGet(ctx, rp)
 		if err != nil {
 			return err
@@ -342,9 +357,8 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 		if err != nil {
 			return err
 		}
-		rp := r
 		for _, d := range dl {
-			rp.Digest = d.Digest.String()
+			rp := r.AddDigest(d.Digest.String())
 			optP := append(opts, ImageWithPlatform(d.Platform.String()))
 			err = rc.ImageCheckBase(ctx, rp, optP...)
 			if err != nil {
@@ -374,9 +388,7 @@ func (rc *RegClient) ImageCheckBase(ctx context.Context, r ref.Ref, opts ...Imag
 		if err != nil {
 			return err
 		}
-		rp := baseR
-		rp.Digest = d.Digest.String()
-		baseM, err = rc.ManifestGet(ctx, rp)
+		baseM, err = rc.ManifestGet(ctx, baseR, WithManifestDesc(*d))
 		if err != nil {
 			return err
 		}
@@ -626,6 +638,9 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 	if opt.callback != nil {
 		bOpt = append(bOpt, BlobWithCallback(opt.callback))
 	}
+	if opt.blobReaderHook != nil {
+		bOpt = append(bOpt, BlobWithReaderHook(opt.blobReaderHook))
+	}
 	waitCh := make(chan error)
 	waitCount := 0
 	ctx, cancel := context.WithCancel(ctx)
@@ -656,7 +671,6 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 					continue
 				}
 			}
-			dEntry := dEntry
 			waitCount++
 			go func() {
 				var err error
@@ -737,7 +751,6 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 				continue
 			}
 			waitCount++
-			layerSrc := layerSrc
 			go func() {
 				rc.slog.Info("Copy layer",
 					slog.String("source", refSrc.Reference),
@@ -830,7 +843,6 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 			}
 			referrerSrc := referrerSrc.SetDigest(rDesc.Digest.String())
 			referrerTgt := referrerTgt.SetDigest(rDesc.Digest.String())
-			rDesc := rDesc
 			waitCount++
 			go func() {
 				err := rc.imageCopyOpt(ctx, referrerSrc, referrerTgt, rDesc, true, parentsNew, opt)
@@ -886,19 +898,11 @@ func (rc *RegClient) imageCopyOpt(ctx context.Context, refSrc ref.Ref, refTgt re
 		for _, tag := range opt.tagList {
 			if strings.HasPrefix(tag, prefix) {
 				// skip referrers that were copied above
-				found := false
-				for _, referrerTag := range referrerTags {
-					if referrerTag == tag {
-						found = true
-						break
-					}
-				}
-				if found {
+				if slices.Contains(referrerTags, tag) {
 					continue
 				}
 				refTagSrc := refSrc.SetTag(tag)
 				refTagTgt := refTgt.SetTag(tag)
-				tag := tag
 				waitCount++
 				go func() {
 					err := rc.imageCopyOpt(ctx, refTagSrc, refTagTgt, descriptor.Descriptor{}, false, parentsNew, opt)
@@ -1076,7 +1080,7 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 		tw:    tw,
 		dirs:  map[string]bool{},
 		files: map[string]bool{},
-		mode:  0644,
+		mode:  0o644,
 	}
 
 	// retrieve image manifest
@@ -1121,12 +1125,7 @@ func (rc *RegClient) ImageExport(ctx context.Context, r ref.Ref, outStream io.Wr
 			return err
 		}
 		refTag := opt.exportRef.ToReg()
-		if refTag.Digest != "" {
-			refTag.Digest = ""
-		}
-		if refTag.Tag == "" {
-			refTag.Tag = "latest"
-		}
+		refTag = refTag.SetTag(cmp.Or(refTag.Tag, "latest"))
 		dockerManifest := dockerTarManifest{
 			RepoTags:     []string{refTag.CommonName()},
 			Config:       tarOCILayoutDescPath(conf),
@@ -1384,14 +1383,9 @@ func (rc *RegClient) imageImportDockerAddLayerHandlers(ctx context.Context, r re
 		tags := []string{}
 		for i, entry := range trd.dockerManifestList {
 			tags = append(tags, entry.RepoTags...)
-			for _, tag := range entry.RepoTags {
-				if tag == trd.name {
-					index = i
-					found = true
-					break
-				}
-			}
-			if found {
+			if slices.Contains(entry.RepoTags, trd.name) {
+				index = i
+				found = true
 				break
 			}
 		}
@@ -1674,8 +1668,7 @@ func (rc *RegClient) imageImportOCIHandleManifest(ctx context.Context, r ref.Ref
 	// add a finish func to push the manifest, this gets skipped for the index.json
 	if push {
 		trd.finish = append(trd.finish, func() error {
-			mRef := r
-			mRef.Digest = string(m.GetDescriptor().Digest)
+			mRef := r.SetDigest(m.GetDescriptor().Digest.String())
 			_, err := rc.ManifestHead(ctx, mRef)
 			if err == nil {
 				return nil
@@ -1706,10 +1699,8 @@ func (rc *RegClient) imageImportOCIPushManifests(_ context.Context, _ ref.Ref, t
 func imagePlatformInList(target *platform.Platform, list []string) (bool, error) {
 	// special case for an unset platform
 	if target == nil || target.OS == "" {
-		for _, entry := range list {
-			if entry == "" {
-				return true, nil
-			}
+		if slices.Contains(list, "") {
+			return true, nil
 		}
 		return false, nil
 	}
@@ -1818,10 +1809,8 @@ func (trd *tarReadData) tarReadAll(rs io.ReadSeeker) error {
 }
 
 func (trd *tarReadData) linkAdd(src, tgt string) bool {
-	for _, entry := range trd.links[tgt] {
-		if entry == src {
-			return false
-		}
+	if slices.Contains(trd.links[tgt], src) {
+		return false
 	}
 	trd.links[tgt] = append(trd.links[tgt], src)
 	return true
@@ -1839,7 +1828,7 @@ func (trd *tarReadData) linkList(tgt string) ([]string, error) {
 }
 
 // tarReadFileJSON reads the current tar entry and unmarshals json into provided interface.
-func (trd *tarReadData) tarReadFileJSON(data interface{}) error {
+func (trd *tarReadData) tarReadFileJSON(data any) error {
 	b, err := io.ReadAll(trd.tr)
 	if err != nil {
 		return err
@@ -1865,7 +1854,7 @@ func (td *tarWriteData) tarWriteHeader(filename string, size int64) error {
 					Typeflag:   tar.TypeDir,
 					Name:       dirJoin + "/",
 					Size:       0,
-					Mode:       td.mode | 0511,
+					Mode:       td.mode | 0o511,
 					ModTime:    td.timestamp,
 					AccessTime: td.timestamp,
 					ChangeTime: td.timestamp,
@@ -1887,7 +1876,7 @@ func (td *tarWriteData) tarWriteHeader(filename string, size int64) error {
 		Typeflag:   tar.TypeReg,
 		Name:       filename,
 		Size:       size,
-		Mode:       td.mode | 0400,
+		Mode:       td.mode | 0o400,
 		ModTime:    td.timestamp,
 		AccessTime: td.timestamp,
 		ChangeTime: td.timestamp,
@@ -1895,7 +1884,7 @@ func (td *tarWriteData) tarWriteHeader(filename string, size int64) error {
 	return td.tw.WriteHeader(&header)
 }
 
-func (td *tarWriteData) tarWriteFileJSON(filename string, data interface{}) error {
+func (td *tarWriteData) tarWriteFileJSON(filename string, data any) error {
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return err

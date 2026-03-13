@@ -12,27 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG GOLANG_VERSION=x.x.x
+ARG CUDA_SAMPLES_VERSION=12.9
 
-FROM nvcr.io/nvidia/cuda:12.8.1-base-ubi9 as builder
+FROM golang:1.26.0 AS builder
 
-RUN dnf install -y wget make git gcc
-
-ARG GOLANG_VERSION=0.0.0
-RUN set -eux; \
-    \
-    arch="$(uname -m)"; \
-    case "${arch##*-}" in \
-        x86_64 | amd64) ARCH='amd64' ;; \
-        ppc64el | ppc64le) ARCH='ppc64le' ;; \
-        aarch64 | arm64) ARCH='arm64' ;; \
-        *) echo "unsupported architecture" ; exit 1 ;; \
-    esac; \
-    wget -nv -O - https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
-    | tar -C /usr/local -xz
-
-ENV GOPATH /go
-ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+ARG GOPROXY="https://proxy.golang.org,direct"
+ENV GOPROXY=$GOPROXY
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -53,12 +38,41 @@ COPY *.mk .
 # Build
 ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
-RUN make gpu-operator
+RUN make cmds
 
-FROM nvcr.io/nvidia/cuda:12.8.1-base-ubi9
+FROM registry.access.redhat.com/ubi9/ubi:latest AS sample-builder
 
-# Remove CUDA libs(compat etc) in favor of libs installed by the NVIDIA driver
-RUN dnf remove -y cuda-*
+RUN ARCH=$(uname -m) && OS_ARCH=${ARCH/amd64/x86_64} && OS_ARCH=${ARCH/aarch64/sbsa} && OS_ARCH=${ARCH/arm64/sbsa} \
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$OS_ARCH/cuda-rhel9.repo
+
+ARG CUDA_SAMPLES_VERSION
+RUN CUDA_PACKAGE_VERSION=${CUDA_SAMPLES_VERSION/./-} && \
+    dnf install -y --allowerasing --setopt=install_weak_deps=False \
+        cmake \
+        cuda-cudart-devel-${CUDA_PACKAGE_VERSION} \
+        cuda-compat-${CUDA_PACKAGE_VERSION} \
+        cuda-nvcc-${CUDA_PACKAGE_VERSION} \
+        g++ \
+        curl \
+    && \
+    dnf clean all && rm -rf /var/cache/dnf
+
+ENV PATH=/usr/local/cuda/bin:${PATH}
+
+WORKDIR /build
+
+ARG SAMPLE_NAME=vectorAdd
+
+RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${CUDA_SAMPLES_VERSION} | \
+    tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* && \
+    cd $(find /build/Samples -iname "${SAMPLE_NAME}") && \
+    cmake . && \
+    make && \
+    cp ${SAMPLE_NAME} /build/${SAMPLE_NAME}
+
+# The C/C++ distroless image is used as a base since the CUDA vectorAdd
+# sample application depends on C/C++ libraries.
+FROM nvcr.io/nvidia/distroless/cc:v4.0.2-dev
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -76,32 +90,25 @@ LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/manage-crds /usr/bin/
+COPY --from=builder /workspace/nvidia-validator /usr/bin/
+COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
+ARG CUDA_SAMPLES_VERSION
+COPY --from=sample-builder /usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat /usr/local/cuda/compat
 
-RUN mkdir -p /opt/gpu-operator/manifests
 COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
-RUN mkdir /licenses && mv /NGC-DL-CONTAINER-LICENSE /licenses/NGC-DL-CONTAINER-LICENSE
-COPY hack/must-gather.sh /usr/bin/gather
+COPY validator/manifests /opt/validator/manifests
 
-# Install must-gather dependency: `kubectl`
-ARG TARGETARCH
-RUN OS_ARCH=${TARGETARCH/x86_64/amd64} && OS_ARCH=${OS_ARCH/aarch64/arm64} && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl
-RUN chmod +x ./kubectl
-RUN mv ./kubectl /usr/local/bin
+COPY hack/must-gather.sh /usr/bin/gather
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
-# Install / upgrade packages here that are required to resolve CVEs
-ARG CVE_UPDATES
-RUN if [ -n "${CVE_UPDATES}" ]; then \
-        dnf update -y ${CVE_UPDATES} && \
-        rm -rf /var/cache/yum/*; \
-    fi
+USER 65532:65532
 
-RUN useradd gpu-operator
-USER gpu-operator
+COPY LICENSE /licenses/
 
 ENTRYPOINT ["/usr/bin/gpu-operator"]

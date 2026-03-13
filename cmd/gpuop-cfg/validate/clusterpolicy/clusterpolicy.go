@@ -17,12 +17,13 @@
 package clusterpolicy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -52,10 +53,10 @@ func (m command) build() *cli.Command {
 	c := cli.Command{
 		Name:  "clusterpolicy",
 		Usage: "Validate clusterpolicy",
-		Before: func(c *cli.Context) error {
-			return m.validateFlags(c, &opts)
+		Before: func(c context.Context, cli *cli.Command) (context.Context, error) {
+			return c, m.validateFlags(c, &opts)
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(c context.Context, cli *cli.Command) error {
 			return m.run(c, &opts)
 		},
 	}
@@ -72,17 +73,17 @@ func (m command) build() *cli.Command {
 	return &c
 }
 
-func (m command) validateFlags(c *cli.Context, opts *options) error {
+func (m command) validateFlags(ctx context.Context, opts *options) error {
 	return nil
 }
 
-func (m command) run(c *cli.Context, opts *options) error {
+func (m command) run(ctx context.Context, opts *options) error {
 	cp, err := opts.load()
 	if err != nil {
 		return fmt.Errorf("failed to load clusterpolicy spec: %v", err)
 	}
 
-	err = validateImages(c.Context, &cp.Spec)
+	err = validateImages(ctx, &cp.Spec)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
 	}

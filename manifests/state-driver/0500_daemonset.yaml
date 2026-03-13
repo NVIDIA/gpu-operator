@@ -20,10 +20,16 @@ metadata:
     openshift.driver-toolkit.rhcos-image-missing: "true"
     {{- end }}
     {{- end }}
+    {{- if .Driver.Spec.Labels }}
+    {{- .Driver.Spec.Labels | yaml | nindent 4 }}
+    {{- end }}
   name: {{ .Driver.AppName }}
   namespace: {{ .Runtime.Namespace }}
   annotations:
     openshift.io/scc: {{ .Driver.Name }}
+    {{- if .Driver.Spec.Annotations }}
+    {{- .Driver.Spec.Annotations | yaml | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:
@@ -59,6 +65,9 @@ spec:
         {{- .Driver.Spec.Labels | yaml | nindent 8 }}
         {{- end }}
     spec:
+      {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
+      terminationGracePeriodSeconds: 120
+      {{- end }}
       nodeSelector:
         {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
         nvidia.com/gpu.deploy.vgpu-manager: "true"
@@ -95,6 +104,10 @@ spec:
       priorityClassName: {{ default "system-node-critical" .Driver.Spec.PriorityClassName }}
       serviceAccountName: {{ .Driver.Name }}
       hostPID: true
+      {{- if .Driver.Spec.PodSecurityContext }}
+      securityContext:
+        {{- .Driver.Spec.PodSecurityContext | yaml | nindent 8 }}
+      {{- end }}
       # Add any configured pull secrets
       {{- if any .Driver.Spec.ImagePullSecrets .Driver.Spec.Manager.ImagePullSecrets (and .GDS .GDS.Spec.ImagePullSecrets) (and .GDRCopy .GDRCopy.Spec.ImagePullSecrets) }}
       imagePullSecrets:
@@ -132,11 +145,7 @@ spec:
           - name: ENABLE_GPU_POD_EVICTION
             value: "true"
           - name: ENABLE_AUTO_DRAIN
-          {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}
             value: "false"
-          {{- else }}
-            value: "true"
-          {{- end }}
           - name: DRAIN_USE_FORCE
             value: "false"
           - name: DRAIN_POD_SELECTOR_LABEL
@@ -149,6 +158,8 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: DRIVER_CONFIG_DIGEST
+            value: {{ .ConfigDigest | quote }}
         {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
           - name: GPU_DIRECT_RDMA_ENABLED
             value: "true"
@@ -201,6 +212,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+        - secretRef:
+            name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         env:
         # always use runc for driver containers
         - name: NVIDIA_VISIBLE_DEVICES
@@ -213,6 +229,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_CONFIG_DIGEST
+          value: {{ .ConfigDigest | quote }}
       {{- if .Driver.Spec.KernelModuleType }}
         - name: KERNEL_MODULE_TYPE
           value: {{ .Driver.Spec.KernelModuleType }}
@@ -221,6 +239,14 @@ spec:
         - name: OPEN_KERNEL_MODULES_ENABLED
           value: "true"
         {{- end }}
+      {{- end }}
+      {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
+        - name: GDS_ENABLED
+          value: "true"
+      {{- end }}
+      {{- if and (.GDRCopy) (deref .GDRCopy.Spec.Enabled) }}
+        - name: GDRCOPY_ENABLED
+          value: "true"
       {{- end }}
       {{- if and (.Openshift) (.Runtime.OpenshiftVersion) }}
         - name: OPENSHIFT_VERSION
@@ -299,6 +325,9 @@ spec:
             mountPath: /sys/devices/system/memory/auto_online_blocks
           - name: nv-firmware
             mountPath: /lib/firmware
+          - name: driver-startup-probe-script
+            mountPath: /usr/local/bin/startup-probe.sh
+            subPath: startup-probe.sh
           {{- if and .AdditionalConfigs .AdditionalConfigs.VolumeMounts }}
           {{- range .AdditionalConfigs.VolumeMounts }}
           - name: {{ .Name }}
@@ -320,15 +349,15 @@ spec:
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
           {{- end}}
-        {{- with .Driver.Spec.Resources }}
-        resources:
-          {{ . | yaml | nindent 10 }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         {{- if not (eq .Driver.Spec.DriverType "vgpu-host-manager") }}
         startupProbe:
           exec:
             command:
-              [sh, -c, 'nvidia-smi && touch /run/nvidia/validations/.driver-ctr-ready']
+            - sh
+            - /usr/local/bin/startup-probe.sh
           initialDelaySeconds: {{ .Driver.Spec.StartupProbe.InitialDelaySeconds }}
           failureThreshold: {{ .Driver.Spec.StartupProbe.FailureThreshold }}
           successThreshold: {{ .Driver.Spec.StartupProbe.SuccessThreshold }}
@@ -381,6 +410,9 @@ spec:
             {{- end }}
           {{- end }}
           {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
         startupProbe:
           exec:
             command:
@@ -425,6 +457,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -449,6 +486,9 @@ spec:
             readOnly: {{ .ReadOnly }}
             {{- end}}
         {{- end }}
+        {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         startupProbe:
           exec:
@@ -485,6 +525,11 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        {{- if .Driver.Spec.SecretEnv }}
+        envFrom:
+          - secretRef:
+              name: {{ .Driver.Spec.SecretEnv }}
+        {{- end }}
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
@@ -509,6 +554,9 @@ spec:
             readOnly: {{ .ReadOnly }}
             {{- end }}
         {{- end }}
+        {{- end }}
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
         startupProbe:
           exec:
@@ -544,6 +592,8 @@ spec:
           # always use runc for driver containers
           - name: NVIDIA_VISIBLE_DEVICES
             value: void
+          - name: DRIVER_CONFIG_DIGEST
+            value: {{ .ConfigDigest | quote }}
           {{- if not .Openshift.ToolkitImage }}
           - name: RHCOS_IMAGE_MISSING
             value: "true"
@@ -573,6 +623,9 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+        {{- if .Driver.Spec.Resources }}
+        resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
+        {{- end }}
       {{- end }}
       volumes:
         - name: run-nvidia
@@ -637,11 +690,14 @@ spec:
           hostPath:
             path: /run/nvidia/driver/lib/firmware
             type: DirectoryOrCreate
+        - name: driver-startup-probe-script
+          configMap:
+            name: nvidia-driver-startup-probe
+            defaultMode: 0755
         {{- if and .AdditionalConfigs .AdditionalConfigs.Volumes }}
         {{- range .AdditionalConfigs.Volumes }}
-        - name: {{ .Name }}
-          {{- if and .ConfigMap .ConfigMap.Items }}
-          configMap:
+        {{- if and .ConfigMap .ConfigMap.Items }}
+        - configMap:
             name: {{ .ConfigMap.Name }}
             items:
             {{- range .ConfigMap.Items }}
@@ -651,11 +707,27 @@ spec:
                 mode: {{ .Mode }}
               {{- end }}
             {{- end }}
-          {{- else if .HostPath }}
-          hostPath:
+          name: {{ .Name }}
+        {{- else if and .Secret .Secret.SecretName }}
+        - secret:
+            secretName: {{ .Secret.SecretName }}
+            {{- if .Secret.Items }}
+            items:
+            {{- range .Secret.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- if .Mode }}
+                mode: {{ .Mode }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          name: {{ .Name }}
+        {{- else if .HostPath }}
+        - hostPath:
             path: {{ .HostPath.Path }}
             type: {{ .HostPath.Type }}
-          {{- end }}
+          name: {{ .Name }}
+        {{- end }}
         {{- end }}
         {{- end }}
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}

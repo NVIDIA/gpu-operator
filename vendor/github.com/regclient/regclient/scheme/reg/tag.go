@@ -181,9 +181,8 @@ func (reg *Reg) TagDelete(ctx context.Context, r ref.Ref) error {
 		return fmt.Errorf("failed sending dummy manifest to delete %s: %w", r.CommonName(), err)
 	}
 
-	r.Digest = tempManifest.GetDescriptor().Digest.String()
-
 	// delete manifest by digest
+	r = r.AddDigest(tempManifest.GetDescriptor().Digest.String())
 	reg.slog.Debug("Deleting dummy manifest",
 		slog.String("ref", r.Reference),
 		slog.String("digest", r.Digest))

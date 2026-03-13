@@ -13,6 +13,10 @@ metadata:
   {{- end }}
 spec:
   revisionHistoryLimit: {{ .Values.worker.revisionHistoryLimit }}
+  {{- with .Values.worker.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end}}
   selector:
     matchLabels:
       {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
@@ -28,14 +32,11 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: {{ .Values.worker.dnsPolicy }}
     {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
     {{- end }}
-    {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+      imagePullSecrets: {{ include "node-feature-discovery.imagePullSecrets" . }}
       serviceAccountName: {{ include "node-feature-discovery.worker.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
@@ -47,8 +48,9 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         livenessProbe:
-          grpc:
-            port: {{ .Values.worker.healthPort | default "8082" }}
+          httpGet:
+            path: /healthz
+            port: http
         {{- with .Values.worker.livenessProbe.initialDelaySeconds }}
           initialDelaySeconds: {{ . }}
         {{- end }}
@@ -62,8 +64,9 @@ spec:
           timeoutSeconds: {{ . }}
         {{- end }}
         readinessProbe:
-          grpc:
-            port: {{ .Values.worker.healthPort | default "8082" }}
+          httpGet:
+            path: /healthz
+            port: http
         {{- with .Values.worker.readinessProbe.initialDelaySeconds }}
           initialDelaySeconds: {{ . }}
         {{- end }}
@@ -104,16 +107,13 @@ spec:
         {{- range $key, $value := .Values.featureGates }}
         - "-feature-gates={{ $key }}={{ $value }}"
         {{- end }}
-        - "-metrics={{ .Values.worker.metricsPort | default "8081"}}"
-        - "-grpc-health={{ .Values.worker.healthPort | default "8082" }}"
+        - "-port={{ .Values.worker.port | default "8080"}}"
         {{- with .Values.worker.extraArgs }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         ports:
-          - containerPort: {{ .Values.worker.metricsPort | default "8081"}}
-            name: metrics
-          - containerPort: {{ .Values.worker.healthPort | default "8082" }}
-            name: health
+          - containerPort: {{ .Values.worker.port | default "8080"}}
+            name: http
         volumeMounts:
         - name: host-boot
           mountPath: "/host-boot"

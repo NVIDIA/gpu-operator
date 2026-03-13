@@ -50,7 +50,7 @@ type ImagePolicySpec struct {
 	// policy contains configuration to allow scopes to be verified, and defines how
 	// images not matching the verification policy will be treated.
 	// +required
-	Policy Policy `json:"policy"`
+	Policy ImageSigstoreVerificationPolicy `json:"policy"`
 }
 
 // +kubebuilder:validation:XValidation:rule="size(self.split('/')[0].split('.')) == 1 ? self.split('/')[0].split('.')[0].split(':')[0] == 'localhost' : true",message="invalid image scope format, scope must contain a fully qualified domain name or 'localhost'"
@@ -59,8 +59,8 @@ type ImagePolicySpec struct {
 // +kubebuilder:validation:MaxLength=512
 type ImageScope string
 
-// Policy defines the verification policy for the items in the scopes list.
-type Policy struct {
+// ImageSigstoreVerificationPolicy defines the verification policy for the items in the scopes list.
+type ImageSigstoreVerificationPolicy struct {
 	// rootOfTrust specifies the root of trust for the policy.
 	// +required
 	RootOfTrust PolicyRootOfTrust `json:"rootOfTrust"`
@@ -78,22 +78,22 @@ type PolicyRootOfTrust struct {
 	// policyType serves as the union's discriminator. Users are required to assign a value to this field, choosing one of the policy types that define the root of trust.
 	// "PublicKey" indicates that the policy relies on a sigstore publicKey and may optionally use a Rekor verification.
 	// "FulcioCAWithRekor" indicates that the policy is based on the Fulcio certification and incorporates a Rekor verification.
-	// "PKI" is a DevPreview feature that indicates that the policy is based on the certificates from Bring Your Own Public Key Infrastructure (BYOPKI). This value is enabled by turning on the SigstoreImageVerificationPKI feature gate.
+	// "PKI" indicates that the policy is based on the certificates from Bring Your Own Public Key Infrastructure (BYOPKI). This value is enabled by turning on the SigstoreImageVerificationPKI feature gate.
 	// +unionDiscriminator
 	// +required
 	PolicyType PolicyType `json:"policyType"`
 	// publicKey defines the root of trust based on a sigstore public key.
 	// +optional
-	PublicKey *PublicKey `json:"publicKey,omitempty"`
+	PublicKey *ImagePolicyPublicKeyRootOfTrust `json:"publicKey,omitempty"`
 	// fulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key.
 	// For more information about Fulcio and Rekor, please refer to the document at:
 	// https://github.com/sigstore/fulcio and https://github.com/sigstore/rekor
 	// +optional
-	FulcioCAWithRekor *FulcioCAWithRekor `json:"fulcioCAWithRekor,omitempty"`
+	FulcioCAWithRekor *ImagePolicyFulcioCAWithRekorRootOfTrust `json:"fulcioCAWithRekor,omitempty"`
 	// pki defines the root of trust based on Bring Your Own Public Key Infrastructure (BYOPKI) Root CA(s) and corresponding intermediate certificates.
 	// +optional
 	// +openshift:enable:FeatureGate=SigstoreImageVerificationPKI
-	PKI *PKI `json:"pki,omitempty"`
+	PKI *ImagePolicyPKIRootOfTrust `json:"pki,omitempty"`
 }
 
 // +openshift:validation:FeatureGateAwareEnum:featureGate="",enum=PublicKey;FulcioCAWithRekor
@@ -106,8 +106,8 @@ const (
 	PKIRootOfTrust               PolicyType = "PKI"
 )
 
-// PublicKey defines the root of trust based on a sigstore public key.
-type PublicKey struct {
+// ImagePolicyPublicKeyRootOfTrust defines the root of trust based on a sigstore public key.
+type ImagePolicyPublicKeyRootOfTrust struct {
 	// keyData contains inline base64-encoded data for the PEM format public key.
 	// KeyData must be at most 8192 characters.
 	// +required
@@ -120,8 +120,8 @@ type PublicKey struct {
 	RekorKeyData []byte `json:"rekorKeyData,omitempty"`
 }
 
-// FulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key.
-type FulcioCAWithRekor struct {
+// ImagePolicyFulcioCAWithRekorRootOfTrust defines the root of trust based on the Fulcio certificate and the Rekor public key.
+type ImagePolicyFulcioCAWithRekorRootOfTrust struct {
 	// fulcioCAData contains inline base64-encoded data for the PEM format fulcio CA.
 	// fulcioCAData must be at most 8192 characters.
 	// +required
@@ -134,7 +134,7 @@ type FulcioCAWithRekor struct {
 	RekorKeyData []byte `json:"rekorKeyData"`
 	// fulcioSubject specifies OIDC issuer and the email of the Fulcio authentication configuration.
 	// +required
-	FulcioSubject PolicyFulcioSubject `json:"fulcioSubject,omitempty"`
+	FulcioSubject PolicyFulcioSubject `json:"fulcioSubject"`
 }
 
 // PolicyFulcioSubject defines the OIDC issuer and the email of the Fulcio authentication configuration.
@@ -151,8 +151,8 @@ type PolicyFulcioSubject struct {
 	SignedEmail string `json:"signedEmail"`
 }
 
-// PKI defines the root of trust based on Root CA(s) and corresponding intermediate certificates.
-type PKI struct {
+// ImagePolicyPKIRootOfTrust defines the root of trust based on Root CA(s) and corresponding intermediate certificates.
+type ImagePolicyPKIRootOfTrust struct {
 	// caRootsData contains base64-encoded data of a certificate bundle PEM file, which contains one or more CA roots in the PEM format. The total length of the data must not exceed 8192 characters.
 	// +required
 	// +kubebuilder:validation:MaxLength=8192
@@ -261,6 +261,7 @@ type ImagePolicyStatus struct {
 	// conditions provide details on the status of this API Resource.
 	// +listType=map
 	// +listMapKey=type
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 

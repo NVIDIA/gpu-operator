@@ -34,7 +34,6 @@ import (
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	_ "go.uber.org/automaxprocs"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +93,8 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logger)
 
 	ctrl.Log.Info(fmt.Sprintf("version: %s", info.GetVersionString()))
 
@@ -107,6 +107,15 @@ func main() {
 	})
 
 	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+
+	if operatorNamespace == "" {
+		logger.Error(nil, "OPERATOR_NAMESPACE environment variable not set, cannot proceed")
+		// we cannot do anything without the operator namespace,
+		// let the operator Pod run into `CrashloopBackOff`
+
+		os.Exit(1)
+	}
+
 	openshiftNamespace := consts.OpenshiftNamespace
 	cacheOptions := cache.Options{
 		DefaultNamespaces: map[string]cache.Config{
@@ -141,9 +150,10 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 	if err = (&controllers.ClusterPolicyReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
-		Scheme: mgr.GetScheme(),
+		Namespace: operatorNamespace,
+		Client:    mgr.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPolicy")
 		os.Exit(1)
@@ -155,7 +165,10 @@ func main() {
 	clusterUpgradeStateManager, err := upgrade.NewClusterUpgradeStateManager(
 		upgradeLogger,
 		mgr.GetConfig(),
+		// nolint:staticcheck
+		// TODO: update k8s-operator-libs to leverage events.EventRecorder instead
 		mgr.GetEventRecorderFor("nvidia-gpu-operator"),
+		upgrade.StateOptions{},
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create new ClusterUpdateStateManager", "controller", "Upgrade")
@@ -184,6 +197,7 @@ func main() {
 	}
 
 	if err = (&controllers.NVIDIADriverReconciler{
+		Namespace:   operatorNamespace,
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		ClusterInfo: clusterInfo,

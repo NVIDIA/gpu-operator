@@ -37,7 +37,7 @@ func (ch *credHelper) run(arg string, input io.Reader) ([]byte, error) {
 type credStore struct {
 	ServerURL string `json:"ServerURL"`
 	Username  string `json:"Username"`
-	Secret    string `json:"Secret"`
+	Secret    string `json:"Secret"` //#nosec G117 exported struct intentionally holds secrets
 }
 
 // get requests a credential from the helper for a given host.
@@ -86,6 +86,9 @@ func (ch *credHelper) list() ([]Host, error) {
 	}
 	hostList := []Host{}
 	for host, user := range credList {
+		if !HostValidate(host) {
+			continue
+		}
 		h := HostNewName(host)
 		h.User = user
 		h.CredHelper = ch.prog

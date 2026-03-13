@@ -19,7 +19,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -44,6 +43,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
 	"github.com/NVIDIA/gpu-operator/internal/render"
@@ -68,12 +68,9 @@ var _ State = (*stateDriver)(nil)
 
 type driverRuntimeSpec struct {
 	Namespace                     string
-	KubernetesVersion             string
 	OpenshiftVersion              string
 	OpenshiftDriverToolkitEnabled bool
-	OpenshiftDriverToolkitImages  map[string]string
 	OpenshiftProxySpec            *configv1.ProxySpec
-	NodePools                     []nodePool
 }
 
 type openshiftSpec struct {
@@ -103,8 +100,15 @@ type driverRenderData struct {
 	HostRoot          string
 }
 
+// ConfigDigest computes a hash of all driver-install-relevant fields.
+// Called automatically by the Go template via {{ .ConfigDigest }}.
+func (d *driverRenderData) ConfigDigest() string {
+	return utils.GetObjectHashIgnoreEmptyKeys(buildDriverInstallConfig(d))
+}
+
 func NewStateDriver(
 	k8sClient client.Client,
+	namespace string,
 	scheme *runtime.Scheme,
 	manifestDir string) (State, error) {
 
@@ -119,6 +123,7 @@ func NewStateDriver(
 			name:        "state-driver",
 			description: "NVIDIA driver deployed in the cluster",
 			client:      k8sClient,
+			namespace:   namespace,
 			scheme:      scheme,
 			renderer:    renderer,
 		},
@@ -132,14 +137,14 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateError, fmt.Errorf("NVIDIADriver CR not provided as input to Sync()")
 	}
 
-	err := s.cleanupStaleDriverDaemonsets(ctx, cr)
-	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
-	}
-
 	objs, err := s.getManifestObjects(ctx, cr, infoCatalog)
 	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %v", err)
+		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %w", err)
+	}
+
+	err = s.cleanupStaleDriverDaemonsets(ctx, cr, objs)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to cleanup stale driver DaemonSets: %w", err)
 	}
 
 	// Create objects if they don't exist, Update objects if they do exist
@@ -178,9 +183,17 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 	return wr
 }
 
-func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, desiredObjs []*unstructured.Unstructured) error {
 	logger := log.FromContext(ctx)
 	logger.V(consts.LogLevelInfo).Info("Cleaning up stale driver DaemonSets")
+
+	// Build a set of desired DaemonSet names from the manifest objects
+	desiredDaemonSetNames := make(map[string]bool)
+	for _, obj := range desiredObjs {
+		if obj.GetKind() == "DaemonSet" {
+			desiredDaemonSetNames[obj.GetName()] = true
+		}
+	}
 
 	// List all DaemonSets owned by the CR instance
 	list := &appsv1.DaemonSetList{}
@@ -191,14 +204,42 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 
 	for _, ds := range list.Items {
 		ds := ds
-		// We consider a daemonset to be stale only if it has no desired number of pods and no pods currently mis-scheduled
-		// As per the Kubernetes docs, a daemonset pod is mis-scheduled when an already scheduled pod no longer satisfies
-		// node affinity constraints or has un-tolerated taints, for e.g. "node.kubernetes.io/unreachable:NoSchedule"
+		// Delete DaemonSets that are not in the desired list. This handles the case where
+		// the CR's nodeSelector changes and certain node pools no longer match.
+		if _, exists := desiredDaemonSetNames[ds.Name]; !exists {
+			logger.V(consts.LogLevelInfo).Info("Deleting DaemonSet no longer managed by this CR", "Name", ds.Name)
+			err = s.client.Delete(ctx, &ds)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting DaemonSet %q: %w", ds.Name, err)
+			}
+			continue
+		}
+
+		// We consider a DaemonSet to be stale when all three conditions are true:
+		//
+		// 1. The desired number of pods reported by the DaemonSet controller is 0
+		// 2. The number of mis-scheduled pods is 0. As per the Kubernetes docs, a DaemonSet pod is mis-scheduled when an
+		//    already scheduled pod no longer satisfies node affinity constraints or has untolerated taints, e.g.
+		//    "node.kubernetes.io/unreachable:NoSchedule"
+		// 3. The DaemonSet's nodeSelector matches 0 nodes.
+		//
+		// #3 was added in response to https://github.com/NVIDIA/gpu-operator/issues/1368 where the NVIDIADriver controller
+		// entered an endless loop of creating and deleting a DaemonSet. The DaemonSet's nodeSelector matched one or more nodes,
+		// but DesiredNumberScheduled and NumberMisscheduled were both 0 because the DaemonSet did not tolerate a taint on all
+		// the nodes.
 		if ds.Status.DesiredNumberScheduled == 0 && ds.Status.NumberMisscheduled == 0 {
+			nodeList := &corev1.NodeList{}
+			err := s.client.List(ctx, nodeList, client.MatchingLabels(ds.Spec.Template.Spec.NodeSelector))
+			if err != nil {
+				return fmt.Errorf("failed to list nodes: %w", err)
+			}
+			if len(nodeList.Items) > 0 {
+				continue
+			}
 			logger.V(consts.LogLevelInfo).Info("Deleting inactive driver DaemonSet", "Name", ds.Name)
 			err = s.client.Delete(ctx, &ds)
-			if err != nil {
-				return fmt.Errorf("error deleting DaemonSet '%s': %w", ds.Name, err)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting DaemonSet %q: %w", ds.Name, err)
 			}
 			continue
 		}
@@ -223,9 +264,15 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 	clusterInfo := info.(clusterinfo.Interface)
 
-	runtimeSpec, err := getRuntimeSpec(ctx, s.client, clusterInfo, &cr.Spec)
+	runtimeSpec, err := getRuntimeSpec(s.namespace, clusterInfo, &cr.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cluster runtime spec: %w", err)
+	}
+
+	isOpenshift := runtimeSpec.OpenshiftVersion != ""
+	nodePools, err := getNodePools(ctx, s.client, cr.Spec.NodeSelector, cr.Spec.UsePrecompiledDrivers(), isOpenshift)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node pools: %w", err)
 	}
 
 	gpuDirectRDMASpec := cr.Spec.GPUDirectRDMA
@@ -236,14 +283,17 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		HostRoot:      clusterPolicy.Spec.HostPaths.RootFS,
 	}
 
-	if len(runtimeSpec.NodePools) == 0 {
-		return nil, fmt.Errorf("no nodes matching the given node selector for %s", cr.Name)
+	if len(nodePools) == 0 {
+		logger.Info("No nodes matching the given node selector", "CR", cr.Name)
+		return []*unstructured.Unstructured{}, nil
 	}
+
+	openshiftDTKMap := clusterInfo.GetOpenshiftDriverToolkitImages()
 
 	// Render kubernetes objects for each node pool.
 	// We deploy one DaemonSet per node pool.
 	var objs []*unstructured.Unstructured
-	for _, nodePool := range runtimeSpec.NodePools {
+	for _, nodePool := range nodePools {
 		// Construct a unique driver spec per node pool. Each node pool
 		// should have a unique nodeSelector and name.
 		driverSpec, err := getDriverSpec(cr, nodePool)
@@ -274,7 +324,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 		if !cr.Spec.UsePrecompiledDrivers() && runtimeSpec.OpenshiftDriverToolkitEnabled {
 			renderData.Openshift = &openshiftSpec{
 				RHCOSVersion: nodePool.rhcosVersion,
-				ToolkitImage: runtimeSpec.OpenshiftDriverToolkitImages[nodePool.rhcosVersion],
+				ToolkitImage: openshiftDTKMap[nodePool.rhcosVersion],
 			}
 		}
 
@@ -459,7 +509,7 @@ func getDriverAppName(cr *nvidiav1alpha1.NVIDIADriver, pool nodePool) string {
 
 	var hashBuilder strings.Builder
 
-	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.getOS())
+	appNamePrefix := fmt.Sprintf(appNamePrefixFormat, cr.Spec.DriverType, pool.osTag)
 	uid := string(cr.UID)
 
 	hashBuilder.WriteString(uid)
@@ -496,7 +546,7 @@ func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alph
 }
 
 func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
-	os := nodePool.getOS()
+	os := nodePool.osTag
 
 	if spec.UsePrecompiledDrivers() {
 		return spec.GetPrecompiledImagePath(os, nodePool.kernel)
@@ -524,10 +574,10 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		return nil, fmt.Errorf("no NVIDIADriver CR provided")
 	}
 
-	nvidiaDriverName := getDriverName(cr, nodePool.getOS())
+	nvidiaDriverName := getDriverName(cr, nodePool.osTag)
 	nvidiaDriverAppName := getDriverAppName(cr, nodePool)
 
-	spec := &cr.Spec
+	spec := cr.Spec.DeepCopy()
 	imagePath, err := getDriverImagePath(spec, nodePool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get driver image path: %v", err)
@@ -552,7 +602,7 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 		Name:             nvidiaDriverName,
 		ImagePath:        imagePath,
 		ManagerImagePath: managerImagePath,
-		OSVersion:        nodePool.getOS(),
+		OSVersion:        nodePool.osTag,
 	}, nil
 }
 
@@ -562,7 +612,7 @@ func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDrive
 		return nil, nil
 	}
 	gdsSpec := spec.GPUDirectStorage
-	imagePath, err := gdsSpec.GetImagePath(pool.getOS())
+	imagePath, err := gdsSpec.GetImagePath(pool.osTag)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +629,7 @@ func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrc
 		return nil, nil
 	}
 	gdrcopySpec := spec.GDRCopy
-	imagePath, err := gdrcopySpec.GetImagePath(pool.getOS())
+	imagePath, err := gdrcopySpec.GetImagePath(pool.osTag)
 	if err != nil {
 		return nil, err
 	}
@@ -590,32 +640,15 @@ func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrc
 	}, nil
 }
 
-func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
-	k8sVersion, err := info.GetKubernetesVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes version: %v", err)
-	}
+func getRuntimeSpec(namespace string, info clusterinfo.Interface, spec *nvidiav1alpha1.NVIDIADriverSpec) (*driverRuntimeSpec, error) {
 	openshiftVersion, err := info.GetOpenshiftVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get openshift version: %v", err)
 	}
-	openshift := (openshiftVersion != "")
-
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return nil, fmt.Errorf("OPERATOR_NAMESPACE environment variable not set")
-	}
-
-	nodePools, err := getNodePools(ctx, k8sClient, spec.NodeSelector, spec.UsePrecompiledDrivers(), openshift)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get node pools: %v", err)
-	}
 
 	rs := &driverRuntimeSpec{
-		Namespace:         operatorNamespace,
-		KubernetesVersion: k8sVersion,
-		OpenshiftVersion:  openshiftVersion,
-		NodePools:         nodePools,
+		Namespace:        namespace,
+		OpenshiftVersion: openshiftVersion,
 	}
 
 	// Only get information needed for Openshift DriverToolkit if we are
@@ -631,7 +664,6 @@ func getRuntimeSpec(ctx context.Context, k8sClient client.Client, info clusterin
 		openshiftDTKMap := info.GetOpenshiftDriverToolkitImages()
 
 		rs.OpenshiftDriverToolkitEnabled = len(openshiftDTKMap) > 0
-		rs.OpenshiftDriverToolkitImages = openshiftDTKMap
 	}
 
 	return rs, nil
@@ -689,4 +721,115 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 		},
 	}
 	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+}
+
+// toConfigEnvVars converts API EnvVar slices to the config package's EnvVar type.
+func toConfigEnvVars(envs []nvidiav1alpha1.EnvVar) []driverconfig.EnvVar {
+	result := make([]driverconfig.EnvVar, len(envs))
+	for i, e := range envs {
+		result[i] = driverconfig.EnvVar{Name: e.Name, Value: e.Value}
+	}
+	return result
+}
+
+// buildDriverInstallConfig maps render data fields to a DriverInstallState
+// for digest computation in the NVIDIADriver CRD path.
+func buildDriverInstallConfig(data *driverRenderData) *driverconfig.DriverInstallState {
+	config := &driverconfig.DriverInstallState{}
+
+	if data.Driver != nil {
+		config.DriverImage = data.Driver.ImagePath
+		config.DriverManagerImage = data.Driver.ManagerImagePath
+		config.DriverType = string(data.Driver.Spec.DriverType)
+		config.KernelModuleType = data.Driver.Spec.KernelModuleType
+		config.DriverArgs = data.Driver.Spec.Args
+		config.SecretEnvSource = data.Driver.Spec.SecretEnv
+
+		config.DriverEnv = toConfigEnvVars(data.Driver.Spec.Env)
+		config.ManagerEnv = toConfigEnvVars(data.Driver.Spec.Manager.Env)
+
+		if data.Driver.Spec.LicensingConfig != nil && data.Driver.Spec.LicensingConfig.SecretName != "" {
+			config.LicensingConfigName = data.Driver.Spec.LicensingConfig.SecretName
+		}
+		if data.Driver.Spec.VirtualTopologyConfig != nil {
+			config.VirtualTopologyConfig = data.Driver.Spec.VirtualTopologyConfig.Name
+		}
+		if data.Driver.Spec.KernelModuleConfig != nil {
+			config.KernelModuleConfig = data.Driver.Spec.KernelModuleConfig.Name
+		}
+		if data.Driver.Spec.RepoConfig != nil {
+			config.RepoConfig = data.Driver.Spec.RepoConfig.Name
+		}
+		if data.Driver.Spec.CertConfig != nil {
+			config.CertConfig = data.Driver.Spec.CertConfig.Name
+		}
+	}
+
+	if data.GPUDirectRDMA != nil && data.GPUDirectRDMA.Enabled != nil && *data.GPUDirectRDMA.Enabled {
+		config.GPUDirectRDMAEnabled = true
+		if data.Driver != nil {
+			config.PeermemImage = data.Driver.ImagePath
+		}
+		if data.GPUDirectRDMA.UseHostMOFED != nil {
+			config.UseHostMOFED = *data.GPUDirectRDMA.UseHostMOFED
+		}
+	}
+
+	if data.GDS != nil {
+		config.GDSImage = data.GDS.ImagePath
+		if data.GDS.Spec != nil && data.GDS.Spec.Enabled != nil {
+			config.GDSEnabled = *data.GDS.Spec.Enabled
+		}
+		if data.GDS.Spec != nil {
+			config.GDSEnv = toConfigEnvVars(data.GDS.Spec.Env)
+		}
+	}
+
+	if data.GDRCopy != nil {
+		config.GDRCopyImage = data.GDRCopy.ImagePath
+		if data.GDRCopy.Spec != nil && data.GDRCopy.Spec.Enabled != nil {
+			config.GDRCopyEnabled = *data.GDRCopy.Spec.Enabled
+		}
+		if data.GDRCopy.Spec != nil {
+			config.GDRCopyEnv = toConfigEnvVars(data.GDRCopy.Spec.Env)
+		}
+	}
+
+	if data.Runtime != nil {
+		config.OpenshiftVersion = data.Runtime.OpenshiftVersion
+		config.DTKEnabled = data.Runtime.OpenshiftDriverToolkitEnabled
+		if data.Runtime.OpenshiftProxySpec != nil {
+			config.HTTPProxy = data.Runtime.OpenshiftProxySpec.HTTPProxy
+			config.HTTPSProxy = data.Runtime.OpenshiftProxySpec.HTTPSProxy
+			config.NoProxy = data.Runtime.OpenshiftProxySpec.NoProxy
+			if data.Runtime.OpenshiftProxySpec.TrustedCA.Name != "" {
+				config.TrustedCAConfigMapName = data.Runtime.OpenshiftProxySpec.TrustedCA.Name
+			}
+		}
+	}
+
+	if data.Openshift != nil {
+		config.DTKImage = data.Openshift.ToolkitImage
+		config.RHCOSVersion = data.Openshift.RHCOSVersion
+	}
+
+	if data.Precompiled != nil {
+		config.UsePrecompiled = true
+		config.KernelVersion = data.Precompiled.KernelVersion
+	}
+
+	if data.AdditionalConfigs != nil {
+		config.AdditionalVolumeMounts = driverconfig.ExtractVolumeMounts(data.AdditionalConfigs.VolumeMounts)
+		config.AdditionalVolumes = driverconfig.ExtractVolumes(data.AdditionalConfigs.Volumes)
+	}
+
+	config.HostRoot = data.HostRoot
+
+	// Sort env var slices for deterministic hashing (copies to avoid mutating spec data).
+	config.DriverEnv = driverconfig.SortEnvVars(config.DriverEnv)
+	config.ManagerEnv = driverconfig.SortEnvVars(config.ManagerEnv)
+	config.GDSEnv = driverconfig.SortEnvVars(config.GDSEnv)
+	config.GDRCopyEnv = driverconfig.SortEnvVars(config.GDRCopyEnv)
+
+	return config
 }

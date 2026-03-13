@@ -23,7 +23,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/NVIDIA/nvidia-container-toolkit/internal/logger"
-	"github.com/NVIDIA/nvidia-container-toolkit/internal/lookup"
+	"github.com/NVIDIA/nvidia-container-toolkit/pkg/lookup"
 )
 
 type nodeLister interface {
@@ -38,10 +38,11 @@ type existing struct {
 // DeviceNodes returns a list of NVIDIA device nodes in the specified root.
 // The nvidia-nvswitch* and nvidia-nvlink devices are excluded.
 func (m existing) DeviceNodes() ([]deviceNode, error) {
-	locator := lookup.NewCharDeviceLocator(
-		lookup.WithLogger(m.logger),
-		lookup.WithRoot(m.devRoot),
-		lookup.WithOptional(true),
+	locator := lookup.AsOptional(
+		lookup.NewCharDeviceLocator(
+			lookup.WithLogger(m.logger),
+			lookup.WithRoot(m.devRoot),
+		),
 	)
 
 	devices, err := locator.Locate("/dev/nvidia*")

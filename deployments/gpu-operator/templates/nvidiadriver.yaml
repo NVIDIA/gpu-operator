@@ -1,3 +1,4 @@
+{{- if .Values.driver.enabled }}
 {{- if and .Values.driver.nvidiaDriverCRD.enabled .Values.driver.nvidiaDriverCRD.deployDefaultCR }}
 apiVersion: nvidia.com/v1alpha1
 kind: NVIDIADriver
@@ -48,7 +49,11 @@ spec:
   certConfig:
     name: {{ .Values.driver.certConfig.name }}
   {{- end }}
-  {{- if .Values.driver.licensingConfig.configMapName }}
+  {{- if .Values.driver.licensingConfig.secretName }}
+  licensingConfig:
+    secretName: {{ .Values.driver.licensingConfig.secretName }}
+    nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
+  {{- else if .Values.driver.licensingConfig.configMapName }}
   licensingConfig:
     name: {{ .Values.driver.licensingConfig.configMapName }}
     nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
@@ -60,6 +65,9 @@ spec:
   {{- if .Values.driver.kernelModuleConfig.name }}
   kernelModuleConfig:
     name: {{ .Values.driver.kernelModuleConfig.name }}
+  {{- end }}
+  {{- if .Values.driver.secretEnv }}
+  secretEnv: {{ .Values.driver.secretEnv }}
   {{- end }}
   {{- if .Values.driver.resources }}
   resources: {{ toYaml .Values.driver.resources | nindent 6 }}
@@ -116,4 +124,5 @@ spec:
     args: {{ toYaml .Values.gdrcopy.args | nindent 6 }}
     {{- end  }}
   {{- end }}
+{{- end }}
 {{- end }}

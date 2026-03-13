@@ -23,7 +23,8 @@ import (
 const blobCBFreq = time.Millisecond * 100
 
 type blobOpt struct {
-	callback func(kind types.CallbackKind, instance string, state types.CallbackState, cur, total int64)
+	callback   func(kind types.CallbackKind, instance string, state types.CallbackState, cur, total int64)
+	readerHook func(*blob.BReader) (*blob.BReader, error)
 }
 
 // BlobOpts define options for the Image* commands.
@@ -33,6 +34,15 @@ type BlobOpts func(*blobOpt)
 func BlobWithCallback(callback func(kind types.CallbackKind, instance string, state types.CallbackState, cur, total int64)) BlobOpts {
 	return func(opts *blobOpt) {
 		opts.callback = callback
+	}
+}
+
+// BlobWithReaderHook is called in [RegClient.BlobCopy] with the blob source.
+// The returned [blob.BReader] is pushed to the target.
+// If the hook returns an error, the copy will fail.
+func BlobWithReaderHook(hook func(*blob.BReader) (*blob.BReader, error)) BlobOpts {
+	return func(opts *blobOpt) {
+		opts.readerHook = hook
 	}
 }
 
@@ -161,6 +171,15 @@ func (rc *RegClient) BlobCopy(ctx context.Context, refSrc ref.Ref, refTgt ref.Re
 				}
 			}
 		}()
+	}
+	if opt.readerHook != nil {
+		blobIO, err = opt.readerHook(blobIO)
+		if err != nil {
+			rc.slog.Warn("Failed to apply reader hook to blob",
+				slog.String("src", refSrc.Reference),
+				slog.String("err", err.Error()))
+			return err
+		}
 	}
 	defer blobIO.Close()
 	if _, err := rc.BlobPut(ctx, refTgt, blobIO.GetDescriptor(), blobIO); err != nil {

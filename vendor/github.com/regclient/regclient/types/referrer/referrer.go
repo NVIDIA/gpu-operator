@@ -4,6 +4,8 @@ package referrer
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"slices"
 	"sort"
 	"text/tabwriter"
 
@@ -79,11 +81,7 @@ func (rl *ReferrerList) Delete(m manifest.Manifest) error {
 	found := false
 	for i := len(rlM.Manifests) - 1; i >= 0; i-- {
 		if rlM.Manifests[i].Digest == mDesc.Digest {
-			if i < len(rlM.Manifests)-1 {
-				rlM.Manifests = append(rlM.Manifests[:i], rlM.Manifests[i+1:]...)
-			} else {
-				rlM.Manifests = rlM.Manifests[:i]
-			}
+			rlM.Manifests = slices.Delete(rlM.Manifests, i, i+1)
 			found = true
 		}
 	}
@@ -154,12 +152,9 @@ func FallbackTag(r ref.Ref) (ref.Ref, error) {
 	if err != nil {
 		return r, fmt.Errorf("failed to parse digest for referrers: %w", err)
 	}
-	rr := r.SetTag(fmt.Sprintf("%s-%s", dig.Algorithm(), stringMax(dig.Hex(), 64)))
-	return rr, nil
-}
-func stringMax(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max]
+	replaceRE := regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+	algo := replaceRE.ReplaceAllString(string(dig.Algorithm()), "-")
+	hash := replaceRE.ReplaceAllString(string(dig.Hex()), "-")
+	rOut := r.SetTag(fmt.Sprintf("%.32s-%.64s", algo, hash))
+	return rOut, nil
 }

@@ -14,7 +14,7 @@ spec:
     - honorLabels: true
       interval: {{ .Values.prometheus.scrapeInterval }}
       path: /metrics
-      port: metrics
+      port: http
       scheme: http
   namespaceSelector:
     matchNames:

@@ -1,5 +1,4 @@
 //go:build !wasm
-// +build !wasm
 
 // Package sloghandle provides a transition handler for migrating from logrus to slog.
 package sloghandle

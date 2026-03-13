@@ -17,13 +17,14 @@
 package csv
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -51,10 +52,10 @@ func (m command) build() *cli.Command {
 	c := cli.Command{
 		Name:  "csv",
 		Usage: "Validate csv",
-		Before: func(c *cli.Context) error {
-			return m.validateFlags(c, &opts)
+		Before: func(c context.Context, cli *cli.Command) (context.Context, error) {
+			return c, m.validateFlags(c, &opts)
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(c context.Context, cli *cli.Command) error {
 			return m.run(c, &opts)
 		},
 	}
@@ -71,17 +72,17 @@ func (m command) build() *cli.Command {
 	return &c
 }
 
-func (m command) validateFlags(c *cli.Context, opts *options) error {
+func (m command) validateFlags(ctx context.Context, opts *options) error {
 	return nil
 }
 
-func (m command) run(c *cli.Context, opts *options) error {
+func (m command) run(ctx context.Context, opts *options) error {
 	csv, err := opts.load()
 	if err != nil {
 		return fmt.Errorf("failed to load csv yaml: %v", err)
 	}
 
-	err = validateImages(c.Context, csv)
+	err = validateImages(ctx, csv)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
 	}

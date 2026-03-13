@@ -222,7 +222,7 @@ func checkErr(err error, handleErr func(string, int)) {
 
 func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, 0, len(scs))
-	errorMsgs := sets.NewString()
+	errorMsgs := sets.New[string]()
 	for _, sc := range scs {
 		// check for duplicate error messages and skip them
 		msg := fmt.Sprintf("%s: %s", sc.Field, sc.Message)
@@ -425,13 +425,30 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
-	CmdPluginAsSubcommand   FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
-	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+	// owner: @ardaguclu
+	// kep: https://kep.k8s.io/3104
+	//
+	// Separate kubectl user preferences.
+	KubeRC FeatureGate = "KUBECTL_KUBERC"
+
+	// owner: @justinb
+	// kep: https://kep.k8s.io/3659
+	//
+	// Improved kubectl apply --prune behavior.
+	ApplySet FeatureGate = "KUBECTL_APPLYSET"
+
+	// owner: @seans
+	// kep: https://kep.k8s.io/4006
+	//
+	// Transition to WebSockets.
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	// DebugCustomProfile should be dropped in 1.34
-	DebugCustomProfile FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
+
+	// owner: @thockin
+	// kep: https://kep.k8s.io/5296
+	//
+	// Support KYAML output.
+	KYAMLOutput FeatureGate = "KUBECTL_KYAML"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
@@ -515,11 +532,11 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 
 func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 	cmd.Flags().Int64Var(value, "chunk-size", *value,
-		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
+		"Return large lists in chunks rather than all at once. Pass 0 to disable.")
 }
 
 func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
-	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 }
 
 func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, all *bool, applySetRef *string) {
@@ -538,7 +555,7 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 }
 
 func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s This flag is beta and may change in the future.", usage))
+	cmd.Flags().StringVar(subresource, "subresource", "", usage)
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		var commonSubresources = []string{"status", "scale", "resize"}
 		return commonSubresources, cobra.ShellCompDirectiveNoFileComp

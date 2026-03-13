@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,9 +36,11 @@ import (
 	"github.com/regclient/regclient/types/warning"
 )
 
-var defaultDelayInit, _ = time.ParseDuration("0.1s")
-var defaultDelayMax, _ = time.ParseDuration("30s")
-var warnRegexp = regexp.MustCompile(`^299\s+-\s+"([^"]+)"`)
+var (
+	defaultDelayInit, _ = time.ParseDuration("0.1s")
+	defaultDelayMax, _  = time.ParseDuration("30s")
+	warnRegexp          = regexp.MustCompile(`^299\s+-\s+"([^"]+)"`)
+)
 
 const (
 	DefaultRetryLimit = 5 // number of times a request will be retried
@@ -323,9 +326,14 @@ func (resp *Resp) next() error {
 				if h.config.TLS == config.TLSDisabled {
 					u.Scheme = "http"
 				}
+				query := url.Values{}
 				if req.Query != nil {
-					u.RawQuery = req.Query.Encode()
+					query = req.Query
 				}
+				if h.config.Hostname != reqHost.config.Hostname {
+					query.Set("ns", reqHost.config.Hostname)
+				}
+				u.RawQuery = query.Encode()
 			}
 			// close previous response
 			if resp.resp != nil && resp.resp.Body != nil {
@@ -421,8 +429,8 @@ func (resp *Resp) next() error {
 
 			// send request
 			hc := h.getHTTPClient(req.Repository)
+			//#nosec G704 inputs are user controlled and sanitized
 			resp.resp, err = hc.Do(httpReq)
-
 			if err != nil {
 				c.slog.Debug("Request failed",
 					slog.String("URL", u.String()),
@@ -528,7 +536,7 @@ func (resp *Resp) next() error {
 		}
 		err = loopErr
 		if dropHost {
-			hosts = append(hosts[:curHost], hosts[curHost+1:]...)
+			hosts = slices.Delete(hosts, curHost, curHost+1)
 		} else if !retryHost {
 			curHost++
 		}
@@ -643,9 +651,7 @@ func (resp *Resp) backoffGet() time.Time {
 	defer ch.mu.Unlock()
 	if ch.backoffCur > 0 {
 		delay := c.delayInit << ch.backoffCur
-		if delay > c.delayMax {
-			delay = c.delayMax
-		}
+		delay = min(delay, c.delayMax)
 		next := ch.backoffLast.Add(delay)
 		now := time.Now()
 		if now.After(next) {

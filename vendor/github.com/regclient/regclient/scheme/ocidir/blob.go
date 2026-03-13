@@ -111,7 +111,7 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 	dir := path.Join(r.Path, "blobs", d.DigestAlgo().String())
 	tmpPattern := "*.tmp"
 	//#nosec G301 defer to user umask settings
-	err = os.MkdirAll(dir, 0777)
+	err = os.MkdirAll(dir, 0o777)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return d, fmt.Errorf("failed creating %s: %w", dir, err)
 	}
@@ -144,6 +144,7 @@ func (o *OCIDir) BlobPut(ctx context.Context, r ref.Ref, d descriptor.Descriptor
 		return d, fmt.Errorf("unexpected blob length, expected %d, received %d", d.Size, i)
 	}
 	file := path.Join(r.Path, "blobs", d.Digest.Algorithm().String(), d.Digest.Encoded())
+	//#nosec G703 inputs are user controlled
 	err = os.Rename(path.Join(dir, tmpName), file)
 	if err != nil {
 		return d, fmt.Errorf("failed to write blob (rename tmp file %s to %s): %w", path.Join(dir, tmpName), file, err)

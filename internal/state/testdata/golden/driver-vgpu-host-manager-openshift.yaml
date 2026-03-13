@@ -89,6 +89,48 @@ subjects:
   name: nvidia-vgpu-manager-openshift
   namespace: test-operator
 ---
+apiVersion: v1
+data:
+  startup-probe.sh: |-
+    #!/bin/sh
+    set -eu
+
+    VALIDATIONS_DIR="/run/nvidia/validations"
+    READY_FILE="${VALIDATIONS_DIR}/.driver-ctr-ready"
+
+    mkdir -p "${VALIDATIONS_DIR}"
+
+    if [ ! -f /sys/module/nvidia/refcnt ]; then
+      echo "NVIDIA kernel module not loaded"
+      exit 1
+    fi
+
+    if ! nvidia-smi; then
+      echo "nvidia-smi failed"
+      exit 1
+    fi
+
+    GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
+    GDS_ENABLED="${GDS_ENABLED:-false}"
+    GDRCOPY_ENABLED="${GDRCOPY_ENABLED:-false}"
+
+    TMP_FILE="${READY_FILE}.tmp"
+
+    {
+      echo "GDRCOPY_ENABLED: ${GDRCOPY_ENABLED}"
+      echo "GDS_ENABLED: ${GDS_ENABLED}"
+      echo "GPU_DIRECT_RDMA_ENABLED: ${GPU_DIRECT_RDMA_ENABLED}"
+    } > "$TMP_FILE"
+
+    mv "$TMP_FILE" "$READY_FILE"
+kind: ConfigMap
+metadata:
+  labels:
+    app: nvidia-vgpu-manager-openshift-7c6d7bd86b
+    app.kubernetes.io/component: nvidia-vgpu-host-manager
+  name: nvidia-driver-startup-probe
+  namespace: test-operator
+---
 allowHostDirVolumePlugin: true
 allowHostIPC: false
 allowHostNetwork: false
@@ -188,11 +230,20 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2802043621"
         - name: OPENSHIFT_VERSION
           value: "4.13"
         image: nvcr.io/nvidia/vgpu-manager:525.85.03-rhel8.0
         imagePullPolicy: IfNotPresent
         name: nvidia-driver-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -228,6 +279,9 @@ spec:
           name: sysfs-memory-online
         - mountPath: /lib/firmware
           name: nv-firmware
+        - mountPath: /usr/local/bin/startup-probe.sh
+          name: driver-startup-probe-script
+          subPath: startup-probe.sh
         - mountPath: /mnt/shared-nvidia-driver-toolkit
           name: shared-nvidia-driver-toolkit
       - args:
@@ -242,9 +296,18 @@ spec:
           value: 413.92.202304252344-0
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2802043621"
         image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7fecaebc1d51b28bc3548171907e4d91823a031d7a6a694ab686999be2b4d867
         imagePullPolicy: IfNotPresent
         name: openshift-driver-toolkit-ctr
+        resources:
+          limits:
+            cpu: 500m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -293,6 +356,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: DRIVER_CONFIG_DIGEST
+          value: "2802043621"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
@@ -316,6 +381,7 @@ spec:
         nvidia.com/gpu.deploy.vgpu-manager: "true"
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-vgpu-manager-openshift
+      terminationGracePeriodSeconds: 120
       tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu
@@ -377,6 +443,10 @@ spec:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate
         name: nv-firmware
+      - configMap:
+          defaultMode: 493
+          name: nvidia-driver-startup-probe
+        name: driver-startup-probe-script
       - emptyDir: {}
         name: shared-nvidia-driver-toolkit
   updateStrategy:

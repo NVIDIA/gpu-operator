@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -55,14 +56,12 @@ func (u *clusterPolicyUpdater) SetConditionsError(ctx context.Context, cr any, r
 	return u.setConditions(ctx, clusterPolicyCr, Error, reason, message)
 }
 
-func (u *clusterPolicyUpdater) setConditions(ctx context.Context, cr *nvidiav1.ClusterPolicy, statusType, reason, message string) error {
-	reqLogger := log.FromContext(ctx)
+// updateConditions updates the conditions of the ClusterPolicy CR
+func (u *clusterPolicyUpdater) updateConditions(ctx context.Context, cr *nvidiav1.ClusterPolicy, statusType, reason, message string) error {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1.ClusterPolicy{}
-	err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance)
-	if err != nil {
-		reqLogger.Error(err, "Failed to get ClusterPolicy instance for status update", "name", cr.Name)
-		return err
+	if err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance); err != nil {
+		return fmt.Errorf("failed to get ClusterPolicy instance for status update: %w", err)
 	}
 
 	switch statusType {
@@ -93,9 +92,23 @@ func (u *clusterPolicyUpdater) setConditions(ctx context.Context, cr *nvidiav1.C
 			Message: message,
 		})
 	default:
-		reqLogger.Error(nil, "Unknown status type provided", "statusType", statusType)
 		return fmt.Errorf("unknown status type provided: %s", statusType)
 	}
 
 	return u.client.Status().Update(ctx, instance)
+}
+
+// setConditions updates the conditions of the ClusterPolicy CR
+// with retry on conflict to handle version mismatches
+func (u *clusterPolicyUpdater) setConditions(ctx context.Context, cr *nvidiav1.ClusterPolicy, statusType, reason, message string) error {
+	reqLogger := log.FromContext(ctx)
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return u.updateConditions(ctx, cr, statusType, reason, message)
+	})
+
+	if err != nil {
+		reqLogger.Error(err, "Failed to update ClusterPolicy status after retries", "name", cr.Name)
+	}
+	return err
 }

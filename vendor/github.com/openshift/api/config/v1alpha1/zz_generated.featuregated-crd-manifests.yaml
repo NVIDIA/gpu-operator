@@ -21,6 +21,29 @@ backups.config.openshift.io:
   - AutomatedEtcdBackup
   Version: v1alpha1
 
+criocredentialproviderconfigs.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/2557
+  CRDName: criocredentialproviderconfigs.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - CRIOCredentialProviderConfig
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: CRIOCredentialProviderConfig
+  Labels: {}
+  PluralName: criocredentialproviderconfigs
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - CRIOCredentialProviderConfig
+  Version: v1alpha1
+
 clusterimagepolicies.config.openshift.io:
   Annotations: {}
   ApprovedPRNumber: https://github.com/openshift/api/pull/1457
@@ -45,11 +68,11 @@ clusterimagepolicies.config.openshift.io:
   - SigstoreImageVerification
   Version: v1alpha1
 
-clustermonitoring.config.openshift.io:
+clustermonitorings.config.openshift.io:
   Annotations:
     description: Cluster Monitoring Operators configuration API
   ApprovedPRNumber: https://github.com/openshift/api/pull/1929
-  CRDName: clustermonitoring.config.openshift.io
+  CRDName: clustermonitorings.config.openshift.io
   Capability: ""
   Category: ""
   FeatureGates:
@@ -61,7 +84,7 @@ clustermonitoring.config.openshift.io:
   HasStatus: true
   KindName: ClusterMonitoring
   Labels: {}
-  PluralName: clustermonitoring
+  PluralName: clustermonitorings
   PrinterColumns: []
   Scope: Cluster
   ShortNames: null
@@ -97,7 +120,7 @@ insightsdatagathers.config.openshift.io:
   Annotations: {}
   ApprovedPRNumber: https://github.com/openshift/api/pull/1245
   CRDName: insightsdatagathers.config.openshift.io
-  Capability: ""
+  Capability: Insights
   Category: ""
   FeatureGates:
   - InsightsConfig

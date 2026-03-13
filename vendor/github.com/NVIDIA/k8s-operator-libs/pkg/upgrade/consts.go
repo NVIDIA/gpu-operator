@@ -21,6 +21,9 @@ const (
 	UpgradeStateLabelKeyFmt = "nvidia.com/%s-driver-upgrade-state"
 	// UpgradeSkipNodeLabelKeyFmt is the format of the node label boolean key indicating to skip driver upgrade
 	UpgradeSkipNodeLabelKeyFmt = "nvidia.com/%s-driver-upgrade.skip"
+	// UpgradeSkipDrainDriverSelectorFmt is the format of the pod selector key indicating to skip driver
+	// in upgrade drain spec
+	UpgradeSkipDrainDriverSelectorFmt = "nvidia.com/%s-driver-upgrade-drain.skip"
 	// UpgradeWaitForSafeDriverLoadAnnotationKeyFmt is the format of the node annotation key indicating that
 	// the driver is waiting for safe load. Meaning node should be cordoned and workloads should be removed from the
 	// node before the driver can continue to load.
@@ -39,6 +42,9 @@ const (
 	// (used for orphaned pods)
 	// Setting this label will trigger setting upgrade state to upgrade-required
 	UpgradeRequestedAnnotationKeyFmt = "nvidia.com/%s-driver-upgrade-requested"
+	// UpgradeRequestorModeAnnotationKeyFmt is the format of the node annotation indicating requestor driver upgrade
+	// mode is used for underlying node
+	UpgradeRequestorModeAnnotationKeyFmt = "nvidia.com/%s-driver-upgrade-requestor-mode"
 	// UpgradeStateUnknown Node has this state when the upgrade flow is disabled or the node hasn't been processed yet
 	UpgradeStateUnknown = ""
 	// UpgradeStateUpgradeRequired is set when the driver pod on the node is not up-to-date and required upgrade
@@ -53,6 +59,15 @@ const (
 	// UpgradeStateDrainRequired is set when the node is required to be scheduled for drain. After the drain the state
 	// is changed either to UpgradeStatePodRestartRequired or UpgradeStateFailed
 	UpgradeStateDrainRequired = "drain-required"
+	// UpgradeStateNodeMaintenanceRequired is set when the node is scheduled for node maintenance.
+	// The node maintenance operations, like cordon, drain, etc., are carried out by an external maintenance
+	// operator. This state is only ever used / valid when UseMaintenanceOperator is true and
+	// an external maintenance operator exists.
+	UpgradeStateNodeMaintenanceRequired = "node-maintenance-required"
+	// UpgradeStatePostMaintenanceRequired is set after node maintenance is completed by an
+	// external maintenance operator. This state indicates that the requestor is required to perform
+	// post-maintenance operations (e.g. restart driver pods).
+	UpgradeStatePostMaintenanceRequired = "post-maintenance-required"
 	// UpgradeStatePodRestartRequired is set when the driver pod on the node is scheduled for restart
 	// or when unblock of the driver loading is required (safe driver load)
 	UpgradeStatePodRestartRequired = "pod-restart-required"

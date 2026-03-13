@@ -7,7 +7,7 @@ spec:
   containers:
     - name: cuda-vector-add
       # https://catalog.ngc.nvidia.com/orgs/nvidia/teams/k8s/containers/cuda-sample
-      image: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.7.1-ubuntu20.04"
+      image: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04"
       resources:
         limits:
           nvidia.com/gpu: 1
