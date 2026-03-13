@@ -39,7 +39,9 @@ spec:
         imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
         command: ["gpu-operator"]
         args:
+        {{- if .Values.operator.leaderElection }}
         - --leader-elect
+        {{- end }}
       {{- if .Values.operator.logging.develMode }}
         - --zap-devel
       {{- else }}
