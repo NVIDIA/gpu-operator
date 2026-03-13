@@ -232,6 +232,14 @@ test_custom_labels_override() {
 
   operands="nvidia-driver-daemonset nvidia-container-toolkit-daemonset nvidia-operator-validator gpu-feature-discovery nvidia-dcgm-exporter nvidia-device-plugin-daemonset"
 
+  # Wait for the operator to update the DaemonSet pod templates with new labels (driver daemonset as representative).
+  echo "Waiting for DaemonSet pod template to be updated with new labels..."
+  kubectl wait daemonset -n "$TEST_NAMESPACE" nvidia-driver-daemonset --for=jsonpath='{.spec.template.metadata.labels.cloudprovider}'=aws --timeout=120s
+
+  # Delete driver pod to force recreation with updated labels. Existing pods are not automatically restarted due to the DaemonSet OnDelete updateStrategy.
+  echo "Deleting driver pod to trigger recreation with updated labels..."
+  kubectl delete pod -n "$TEST_NAMESPACE" -l app=nvidia-driver-daemonset --ignore-not-found
+
   # The labels override triggers a rollout of all gpu-operator operands, so we wait for the driver upgrade to transition to "upgrade-done" state.
   wait_for_driver_upgrade_done
 
