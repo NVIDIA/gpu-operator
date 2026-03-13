@@ -26,11 +26,11 @@ import (
 	"github.com/regclient/regclient/types/ref"
 )
 
-func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) error {
+func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion, client *regclient.RegClient) error {
 	// validate all 'relatedImages'
 	images := csv.Spec.RelatedImages
 	for _, image := range images {
-		err := validateImage(ctx, image.Image)
+		err := validateImage(ctx, client, image.Image)
 		if err != nil {
 			return fmt.Errorf("failed to validate image %s: %v", image.Name, err)
 		}
@@ -41,7 +41,7 @@ func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) er
 	ctr := deployment.Spec.Template.Spec.Containers[0]
 
 	// validate the gpu-operator image
-	err := validateImage(ctx, ctr.Image)
+	err := validateImage(ctx, client, ctr.Image)
 	if err != nil {
 		return fmt.Errorf("failed to validate image %s: %v", ctr.Image, err)
 	}
@@ -51,7 +51,7 @@ func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) er
 		if !strings.HasSuffix(env.Name, "_IMAGE") {
 			continue
 		}
-		err = validateImage(ctx, env.Value)
+		err = validateImage(ctx, client, env.Value)
 		if err != nil {
 			return fmt.Errorf("failed to validate image %s: %v", env.Name, err)
 		}
@@ -60,8 +60,7 @@ func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) er
 	return nil
 }
 
-func validateImage(ctx context.Context, path string) error {
-	var client = regclient.New()
+func validateImage(ctx context.Context, client *regclient.RegClient, path string) error {
 	ref, err := ref.New(path)
 	if err != nil {
 		return fmt.Errorf("failed to construct an image reference: %v", err)
