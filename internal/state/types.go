@@ -32,6 +32,7 @@ type driverSpec struct {
 	Spec             *nvidiav1alpha1.NVIDIADriverSpec
 	AppName          string
 	Name             string
+	CRName           string
 	ImagePath        string
 	ManagerImagePath string
 	OSVersion        string
