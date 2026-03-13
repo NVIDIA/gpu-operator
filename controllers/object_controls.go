@@ -172,11 +172,15 @@ const (
 	HostRootEnvName = "HOST_ROOT"
 	// DefaultDriverInstallDir represents the default path of a driver container installation
 	DefaultDriverInstallDir = "/run/nvidia/driver"
+	// DefaultKubeletRootDir represents the default path of a kubelet root directory
+	DefaultKubeletRootDir = "/var/lib/kubelet"
 	// DriverInstallDirEnvName is the name of the envvar used by the driver-validator to represent the driver install dir
 	DriverInstallDirEnvName = "DRIVER_INSTALL_DIR"
 	// DriverInstallDirCtrPathEnvName is the name of the envvar used by the driver-validator to represent the path
 	// of the driver install dir mounted in the container
 	DriverInstallDirCtrPathEnvName = "DRIVER_INSTALL_DIR_CTR_PATH"
+	// PodResourcesPath is the path to the pod resources directory
+	PodResourcesPath = "pod-resources"
 	// NvidiaRuntimeSetAsDefaultEnvName is the name of the toolkit container env for configuring NVIDIA Container Runtime as the default runtime
 	NvidiaRuntimeSetAsDefaultEnvName = "NVIDIA_RUNTIME_SET_AS_DEFAULT"
 	// NRIAnnotationDomain represents the domain name used for NRI annotations used for CDI device injections
@@ -726,6 +730,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	// transform the driver-root volume if a custom driver install dir is configured with the operator
 	transformForDriverInstallDir(obj, n.singleton.Spec.HostPaths.DriverInstallDir)
 
+	// transform the kubelet root dir if a custom kubelet root dir is configured with the operator
+	transformForKubeletRootDir(obj, n.singleton.Spec.HostPaths.KubeletRootDir)
+
 	// apply per operand Daemonset config
 	err = t(obj, &n.singleton.Spec, n)
 	if err != nil {
@@ -860,6 +867,40 @@ func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string
 		for i, volumeMount := range ctr.VolumeMounts {
 			if volumeMount.Name == "driver-install-dir" {
 				ctr.VolumeMounts[i].MountPath = driverInstallDir
+			}
+		}
+	}
+}
+
+// apply necessary transforms if a custom kubelet root directory is configured
+func transformForKubeletRootDir(obj *appsv1.DaemonSet, kubeletRootDir string) {
+	if kubeletRootDir == "" || kubeletRootDir == DefaultKubeletRootDir {
+		return
+	}
+
+	for i := range obj.Spec.Template.Spec.Volumes {
+		volume := &obj.Spec.Template.Spec.Volumes[i]
+		if volume.Name == "pod-gpu-resources" {
+			volume.HostPath.Path = filepath.Join(kubeletRootDir, "pod-resources")
+		}
+	}
+
+	// Update container volume mounts if needed
+	for i := range obj.Spec.Template.Spec.Containers {
+		for j := range obj.Spec.Template.Spec.Containers[i].VolumeMounts {
+			volumeMount := &obj.Spec.Template.Spec.Containers[i].VolumeMounts[j]
+			if volumeMount.Name == "pod-gpu-resources" {
+				volumeMount.MountPath = filepath.Join(kubeletRootDir, "pod-resources")
+			}
+		}
+	}
+
+	// Also update init containers if they have this mount
+	for i := range obj.Spec.Template.Spec.InitContainers {
+		for j := range obj.Spec.Template.Spec.InitContainers[i].VolumeMounts {
+			volumeMount := &obj.Spec.Template.Spec.InitContainers[i].VolumeMounts[j]
+			if volumeMount.Name == "pod-gpu-resources" {
+				volumeMount.MountPath = filepath.Join(kubeletRootDir, "pod-resources")
 			}
 		}
 	}
@@ -1812,6 +1853,31 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	for _, env := range config.DCGMExporter.Env {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 	}
+
+	initContainer.SecurityContext = securityContext
+
+	// Disable all constraints on the configurations required by NVIDIA container toolkit
+	setContainerEnv(&initContainer, NvidiaDisableRequireEnvName, "true")
+
+	// Use kubeletRootDir from config if provided, otherwise use default
+	kubeletDir := DefaultKubeletRootDir
+	if config.HostPaths.KubeletRootDir != "" {
+		kubeletDir = config.HostPaths.KubeletRootDir
+	}
+
+	volMountSockName, volMountSockPath := "pod-gpu-resources", filepath.Join(kubeletDir, PodResourcesPath)
+	volMountSock := corev1.VolumeMount{Name: volMountSockName, MountPath: volMountSockPath}
+	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountSock)
+
+	volMountConfigName, volMountConfigPath, volMountConfigSubPath := "init-config", "/bin/entrypoint.sh", "entrypoint.sh"
+	volMountConfig := corev1.VolumeMount{Name: volMountConfigName, ReadOnly: true, MountPath: volMountConfigPath, SubPath: volMountConfigSubPath}
+	initContainer.VolumeMounts = append(initContainer.VolumeMounts, volMountConfig)
+
+	obj.Spec.Template.Spec.InitContainers = append(obj.Spec.Template.Spec.InitContainers, initContainer)
+
+	volMountConfigKey, volMountConfigDefaultMode := "nvidia-dcgm-exporter", int32(0700)
+	initVol := corev1.Volume{Name: volMountConfigName, VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: volMountConfigKey}, DefaultMode: &volMountConfigDefaultMode}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, initVol)
 
 	return nil
 }
