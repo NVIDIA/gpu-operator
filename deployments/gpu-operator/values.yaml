@@ -487,7 +487,7 @@ sandboxDevicePlugin:
   enabled: true
   repository: nvcr.io/nvidia
   image: kubevirt-gpu-device-plugin
-  version: v1.4.0
+  version: v1.5.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []

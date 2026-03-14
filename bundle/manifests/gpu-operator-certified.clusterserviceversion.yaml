@@ -233,7 +233,7 @@ spec:
     - name: cc-manager-image
       image: ghcr.io/nvidia/k8s-cc-manager:125e77c7-distroless
     - name: sandbox-device-plugin-image
-      image: nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.4.0@sha256:119de9a331a47203858b99901f44d0c4a8052961b4e60327f4b100d0ab8c9df0
+      image: nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.5.0@sha256:98ff0ae43263b8ab4255197462f0b5d571eed9f263ec5f611f4b98e6fb2920d3
     - name: kata-sandbox-device-plugin-image
       image: ghcr.io/nvidia/nvidia-sandbox-device-plugin:3a8894b2
     - name: vgpu-device-manager-image
@@ -946,7 +946,7 @@ spec:
                   - name: "CC_MANAGER_IMAGE"
                     value: "ghcr.io/nvidia/k8s-cc-manager:125e77c7-distroless"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
-                    value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.4.0@sha256:119de9a331a47203858b99901f44d0c4a8052961b4e60327f4b100d0ab8c9df0"
+                    value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.5.0@sha256:98ff0ae43263b8ab4255197462f0b5d571eed9f263ec5f611f4b98e6fb2920d3"
                   - name: "KATA_SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "ghcr.io/nvidia/nvidia-sandbox-device-plugin:3a8894b2"
                   - name: "VGPU_DEVICE_MANAGER_IMAGE"
