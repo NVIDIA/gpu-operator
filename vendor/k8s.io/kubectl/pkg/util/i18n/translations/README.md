@@ -69,10 +69,10 @@ To use translations, you simply need to add:
 import pkg/i18n
 ...
 // Get a translated string
-translated := i18n.T("Your message in english here")
+translated := i18n.T("Your message in English here")
 
 // Get a translated plural string
-translated := i18n.T("You had %d items", items)
+translatedPlural := i18n.T("You had %d items", items)
 
 // Translated error
 return i18n.Error("Something bad happened")
