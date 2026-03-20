@@ -306,7 +306,15 @@ func (nm *NodeMetrics) Run() error {
 	go nm.watchStatusFile(&nm.cudaReady, cudaStatusFile)
 
 	go nm.watchDriverValidation()
-	go nm.watchDevicePluginValidation()
+	if os.Getenv("DEVICE_PLUGIN_ENABLED") != "false" {
+		go nm.watchDevicePluginValidation()
+	} else {
+		// Set to -1 so the alert (expr: == 0) does not fire.
+		// The gauge is auto-registered by promauto and defaults to 0,
+		// which would be a false positive.
+		nm.deviceCount.Set(-1)
+		log.Info("metrics: DevicePlugin is disabled in ClusterPolicy, skipping device plugin validation")
+	}
 	go nm.watchNVIDIAPCI()
 
 	log.Printf("Running the metrics server, listening on :%d/metrics", nm.port)

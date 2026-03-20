@@ -2891,6 +2891,35 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 					Name:            "dummy",
 					Image:           "nvcr.io/nvidia/cloud-native/node-status-exporter:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: DevicePluginEnabledEnvName, Value: "true"},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}),
+		},
+		{
+			description: "node status exporter with device plugin disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "node-status-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+				},
+				DevicePlugin: gpuv1.DevicePluginSpec{Enabled: newBoolPtr(false)},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/node-status-exporter:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: DevicePluginEnabledEnvName, Value: "false"},
+					},
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: rootUID,
 					},
