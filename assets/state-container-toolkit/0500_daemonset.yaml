@@ -81,6 +81,10 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/toolkit-ready"]
         volumeMounts:
           - name: nvidia-container-toolkit-entrypoint
             readOnly: true

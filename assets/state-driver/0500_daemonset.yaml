@@ -150,7 +150,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready /run/nvidia/validations/driver-ready"]
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: IfNotPresent
         name: nvidia-peermem-ctr
