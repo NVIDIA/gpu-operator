@@ -15,6 +15,10 @@
 name: Forward Compatibility
 
 on:
+  # TODO: revert to schedule-only before merging
+  push:
+    branches:
+      - "pull-request/[0-9]+"
   schedule:
     - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
   workflow_dispatch:  # Manual trigger
