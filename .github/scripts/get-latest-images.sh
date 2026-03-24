@@ -40,7 +40,7 @@ case "${COMPONENT}" in
         ;;
     mig-manager)
         IMAGE_REPO="ghcr.io/nvidia/k8s-mig-manager"
-        GITHUB_REPO="NVIDIA/k8s-mig-manager"
+        GITHUB_REPO="NVIDIA/mig-parted"
         ;;
     *)
         echo "Error: Unknown component '${COMPONENT}'" >&2
