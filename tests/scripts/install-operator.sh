@@ -34,30 +34,26 @@ if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 	# Generate a temporary values file from environment variables
 	# and merge it with the provided VALUES_FILE
 	TEMP_ENV_VALUES=$(mktemp)
-	trap 'rm -f "${TEMP_ENV_VALUES:-}" "${COMBINED_VALUES:-}"' EXIT
+	trap 'rm -f "${TEMP_ENV_VALUES:-}"' EXIT
 	${SCRIPT_DIR}/env-to-values.sh "${TEMP_ENV_VALUES}"
 
-	# If VALUES_FILE exists, merge it with env-generated values using yq
-	# Otherwise just use the env-generated values
+	# If VALUES_FILE exists, use both files with Helm's native multi-file
+	# support (-f). Helm merges values in order, with later files taking
+	# precedence — so env-generated values override the provided file.
 	if [[ -f "${VALUES_FILE}" ]]; then
 		echo ""
 		echo "Using provided values file: ${VALUES_FILE}"
 		cat "${VALUES_FILE}"
 		echo ""
-		echo "Merged with environment-based values:"
+		echo "Environment-based values (takes precedence):"
 		cat "${TEMP_ENV_VALUES}"
 
-		# Create a combined values file using yq for proper YAML merging
-		COMBINED_VALUES=$(mktemp)
-		if ! command -v yq >/dev/null 2>&1; then
-			echo "Error: yq is required to merge YAML values files but was not found in PATH." >&2
-			echo "Install yq: https://github.com/mikefarah/yq" >&2
-			exit 1
-		fi
-		# yq merges YAML properly, with later files taking precedence
-		yq ea '. as $item ireduce ({}; . * $item )' "${VALUES_FILE}" "${TEMP_ENV_VALUES}" > "${COMBINED_VALUES}"
-		VALUES_FILE="${COMBINED_VALUES}"
+		# Pass both files to helm; the env values file comes second
+		# so its values take precedence over the override file.
+		EXTRA_VALUES_FILES="-f ${VALUES_FILE}"
+		VALUES_FILE="${TEMP_ENV_VALUES}"
 	else
+		EXTRA_VALUES_FILES=""
 		VALUES_FILE="${TEMP_ENV_VALUES}"
 	fi
 	
@@ -113,6 +109,7 @@ if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 	echo "Using values file approach: ${VALUES_FILE}"
 	${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
 		-n "${TEST_NAMESPACE}" \
+		${EXTRA_VALUES_FILES} \
 		-f "${VALUES_FILE}" \
 		--wait
 else
