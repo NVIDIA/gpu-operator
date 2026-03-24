@@ -111,6 +111,7 @@ if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 		-n "${TEST_NAMESPACE}" \
 		${EXTRA_VALUES_FILES} \
 		-f "${VALUES_FILE}" \
+		${OPERATOR_OPTIONS} \
 		--wait
 else
 	echo "Using --set flags approach"
