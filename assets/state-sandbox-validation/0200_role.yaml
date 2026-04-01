@@ -12,3 +12,10 @@ rules:
   - use
   resourceNames:
   - privileged
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list

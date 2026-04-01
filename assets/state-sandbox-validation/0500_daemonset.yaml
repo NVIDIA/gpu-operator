@@ -26,6 +26,36 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-sandbox-validator
       initContainers:
+        - name: driver-validation
+          image: "FILLED BY THE OPERATOR"
+          command: ["sh", "-c"]
+          args: ["nvidia-validator"]
+          env:
+            - name: WITH_WAIT
+              value: "true"
+            - name: COMPONENT
+              value: driver
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: "s0"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: driver-install-path
+              mountPath: /run/nvidia/driver
+              mountPropagation: HostToContainer
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
+            - name: host-dev-char
+              mountPath: /host-dev-char
         - name: cc-manager-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
@@ -145,3 +175,6 @@ spec:
         - name: host-root
           hostPath:
             path: /
+        - name: host-dev-char
+          hostPath:
+            path: /dev/char

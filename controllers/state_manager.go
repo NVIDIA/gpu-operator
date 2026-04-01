@@ -43,6 +43,7 @@ const (
 	commonGPULabelValue                 = "true"
 	commonOperandsLabelKey              = "nvidia.com/gpu.deploy.operands"
 	commonOperandsLabelValue            = "true"
+	driverLabelKey                      = "nvidia.com/gpu.deploy.driver"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
 	migCapableLabelKey                  = "nvidia.com/mig.capable"
@@ -119,10 +120,11 @@ var gpuNodeLabels = map[string]string{
 }
 
 type gpuWorkloadConfiguration struct {
-	config      string
-	sandboxMode string // SandboxWorkloads.Mode (e.g. "kubevirt", "kata") — only affects vm-passthrough labels
-	node        string
-	log         logr.Logger
+	config        string
+	sandboxMode   string // SandboxWorkloads.Mode (e.g. "kubevirt", "kata") — only affects vm-passthrough labels
+	node          string
+	log           logr.Logger
+	clusterPolicy *gpuv1.ClusterPolicy
 }
 
 // OpenShiftDriverToolkit contains the values required to deploy
@@ -327,6 +329,15 @@ func isValidWorkloadConfig(workloadConfig string) bool {
 	return ok
 }
 
+// shouldDeployDriverForVMPassthrough returns true if driver should be deployed for vm-passthrough workload
+// based on Fabric Manager configuration
+func (w *gpuWorkloadConfiguration) shouldDeployDriverForVMPassthrough() bool {
+	if w.config != gpuWorkloadConfigVMPassthrough || w.clusterPolicy == nil {
+		return false
+	}
+	return w.clusterPolicy.Spec.FabricManager.IsSharedNVSwitchMode()
+}
+
 // getWorkloadConfig returns the GPU workload configured for the node.
 // If an error occurs when searching for the workload config,
 // return defaultGPUWorkloadConfig.
@@ -346,13 +357,19 @@ func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, e
 // getEffectiveStateLabels returns the state labels to apply for the given workload config and sandbox mode.
 // When config is vm-passthrough and mode is "kata", returns labels with kata-device-plugin instead of sandbox-device-plugin.
 func getEffectiveStateLabels(config, mode string) map[string]string {
-	labels, ok := gpuStateLabels[config]
+	base, ok := gpuStateLabels[config]
 	if !ok {
 		return nil
 	}
 
 	if config != gpuWorkloadConfigVMPassthrough {
-		return labels
+		return base
+	}
+
+	// Copy the base labels to avoid mutating the global map
+	labels := make(map[string]string, len(base))
+	for k, v := range base {
+		labels[k] = v
 	}
 
 	// update labels for the sandbox modes for passthrough
@@ -417,6 +434,16 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 			modified = true
 		}
 	}
+
+	// Add conditional driver deployment for vm-passthrough workload
+	if w.shouldDeployDriverForVMPassthrough() {
+		if _, ok := labels[driverLabelKey]; !ok {
+			w.log.Info("Setting node label for driver deployment in vm-passthrough with Fabric Manager shared-nvswitch mode", "NodeName", w.node, "Label", driverLabelKey, "Value", "true")
+			labels[driverLabelKey] = "true"
+			modified = true
+		}
+	}
+
 	if w.config == gpuWorkloadConfigContainer && hasMIGCapableGPU(labels) && !hasMIGManagerLabel(labels) {
 		w.log.Info("Setting node label", "NodeName", w.node, "Label", migManagerLabelKey, "Value", migManagerLabelValue)
 		labels[migManagerLabelKey] = migManagerLabelValue
@@ -545,7 +572,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		}
 		n.logger.Info("GPU workload configuration", "NodeName", node.Name, "GpuWorkloadConfig", config)
 		mode := n.singleton.Spec.SandboxWorkloads.Mode
-		gpuWorkloadConfig := &gpuWorkloadConfiguration{config: config, sandboxMode: mode, node: node.Name, log: n.logger}
+		gpuWorkloadConfig := &gpuWorkloadConfiguration{config: config, sandboxMode: mode, node: node.Name, log: n.logger, clusterPolicy: n.singleton}
 		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
 			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
 			// label the node with common Nvidia GPU label
