@@ -662,7 +662,7 @@ func (n *ClusterPolicyController) getGPUNodeOSTag() (string, error) {
 		return "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
 	}
 	osMajorVersion := strings.Split(osVersion, ".")[0]
-	osMajorNumber, err := strconv.Atoi(osMajorVersion)
+	osMajorNumber, err := strconv.Atoi(strings.TrimPrefix(osMajorVersion, "v"))
 	if err != nil {
 		return "", fmt.Errorf("error processing OS major version %s: %w", osMajorVersion, err)
 	}
