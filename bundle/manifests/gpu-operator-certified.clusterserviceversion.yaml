@@ -164,7 +164,7 @@ metadata:
             "driverType": "gpu",
             "repository": "nvcr.io/nvidia",
             "image": "driver",
-            "version": "sha256:3d7ae961d7bce5e193885aa99e91ba87421bccc3d187cd9997083faf021208be",
+            "version": "sha256:f8e3dc9111c5a7a0cfac73e87d03c0b7b3d1e11f3b61654cca5461847660aa2c",
             "nodeSelector": {},
             "manager": {},
             "repoConfig": {
@@ -211,9 +211,9 @@ spec:
       image: nvcr.io/nvidia/cloud-native/dcgm:4.5.2-1-ubi9@sha256:d7558fa75ed7b703665cbc6ba6360ef4e53ecdefe65c1881c165d2ac816c674a
     - name: container-toolkit-image
       image: nvcr.io/nvidia/k8s/container-toolkit:v1.19.0@sha256:62204e9fc0f817e6e3fd8edc18d0322feda3728cdf89270d20a8d01d7ef0edb5
-    - name: driver-image
+    - name: driver-image-595
       image: nvcr.io/nvidia/driver@sha256:3d7ae961d7bce5e193885aa99e91ba87421bccc3d187cd9997083faf021208be
-    - name: driver-image-580
+    - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:f8e3dc9111c5a7a0cfac73e87d03c0b7b3d1e11f3b61654cca5461847660aa2c
     - name: driver-image-535
       image: nvcr.io/nvidia/driver@sha256:659d9315957ffa2a3f2a003716f066f6a1b3c06ae5557192148ed410dc1b9a6e
@@ -931,9 +931,9 @@ spec:
                     value: "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.1-4.8.0-distroless@sha256:b5d8813707469c5717ce27a5fefb933a29e8ba6cd2fd7d93ad3dcd6ae18579ef"
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.19.0@sha256:75eff5962176618e486da18d73eae57870369b69f186fc8d193973166d1cfad9"
-                  - name: "DRIVER_IMAGE"
+                  - name: "DRIVER_IMAGE-595"
                     value: "nvcr.io/nvidia/driver@sha256:3d7ae961d7bce5e193885aa99e91ba87421bccc3d187cd9997083faf021208be"
-                  - name: "DRIVER_IMAGE-580"
+                  - name: "DRIVER_IMAGE"
                     value: "nvcr.io/nvidia/driver@sha256:f8e3dc9111c5a7a0cfac73e87d03c0b7b3d1e11f3b61654cca5461847660aa2c"
                   - name: "DRIVER_IMAGE-535"
                     value: "nvcr.io/nvidia/driver@sha256:659d9315957ffa2a3f2a003716f066f6a1b3c06ae5557192148ed410dc1b9a6e"
