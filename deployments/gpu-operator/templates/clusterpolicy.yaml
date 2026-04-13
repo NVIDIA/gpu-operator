@@ -540,6 +540,9 @@ spec:
     {{- end }}
   dcgmExporter:
     enabled: {{ .Values.dcgmExporter.enabled }}
+    {{- if .Values.dcgmExporter.annotations }}
+    annotations: {{ toYaml .Values.dcgmExporter.annotations | nindent 6 }}
+    {{- end }}
     {{- if .Values.dcgmExporter.repository }}
     repository: {{ .Values.dcgmExporter.repository }}
     {{- end }}

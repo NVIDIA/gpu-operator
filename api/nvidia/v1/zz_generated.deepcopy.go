@@ -430,6 +430,13 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))

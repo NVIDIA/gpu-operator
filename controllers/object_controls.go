@@ -1755,6 +1755,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
 		addPullSecrets(&obj.Spec.Template.Spec, config.DCGMExporter.ImagePullSecrets)
 	}
+
+	// merge extra annotations at the pod template level
+	if len(config.DCGMExporter.Annotations) > 0 {
+		addExtraAnnotations(obj, config.DCGMExporter.Annotations)
+	}
+
 	// set resource limits
 	if config.DCGMExporter.Resources != nil {
 		// apply resource limits to all containers
@@ -1849,6 +1855,15 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	return nil
+}
+
+func addExtraAnnotations(obj *appsv1.DaemonSet, annotations map[string]string) {
+	if obj.Spec.Template.Annotations == nil {
+		obj.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		obj.Spec.Template.Annotations[k] = v
+	}
 }
 
 // TransformDCGM transforms dcgm daemonset with required config as per ClusterPolicy

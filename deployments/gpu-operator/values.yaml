@@ -279,6 +279,7 @@ dcgm:
 
 dcgmExporter:
   enabled: true
+  annotations: {}
   repository: nvcr.io/nvidia/k8s
   image: dcgm-exporter
   version: 4.5.3-4.8.2-distroless
