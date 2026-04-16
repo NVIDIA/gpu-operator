@@ -947,11 +947,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.k8sVersion = k8sVersion
 		n.logger.Info("Kubernetes version detected", "version", k8sVersion)
 
-		err = validateClusterPolicySpec(&clusterPolicy.Spec)
-		if err != nil {
-			return fmt.Errorf("error validating clusterpolicy: %w", err)
-		}
-
 		draSupported, resourceGVR, err := IsDRASupported(n.logger)
 		if err != nil {
 			return fmt.Errorf("failed to detect if DRA is supported: %w", err)
@@ -988,8 +983,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		}
 	}
 
-	// TODO: combine this validation logic with the call to
-	// ValidateClusterPolicySpec() up above
 	err = n.validateClusterPolicy()
 	if err != nil {
 		return fmt.Errorf("ClusterPolicy validation failed: %w", err)
@@ -1233,16 +1226,4 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		n.logger.Error(nil, "invalid state passed", "stateName", stateName)
 		return false
 	}
-}
-
-func validateClusterPolicySpec(spec *gpuv1.ClusterPolicySpec) error {
-	if !spec.CDI.IsEnabled() && spec.CDI.IsNRIPluginEnabled() {
-		return fmt.Errorf("the NRI Plugin cannot be enabled when CDI is disabled")
-	}
-
-	if spec.CDI.IsNRIPluginEnabled() && !spec.Toolkit.IsEnabled() {
-		return fmt.Errorf("the NRI Plugin cannot be enabled when the Container Toolkit is disabled")
-	}
-
-	return nil
 }

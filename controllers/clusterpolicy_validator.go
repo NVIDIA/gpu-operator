@@ -23,23 +23,38 @@ import (
 )
 
 func (n *ClusterPolicyController) validateClusterPolicy() error {
-	err := validateDRA(n.singleton, n.draSupported)
-	if err != nil {
+	if err := validateDRA(&n.singleton.Spec, n.draSupported); err != nil {
 		return fmt.Errorf("failed to validate DRA: %w", err)
+	}
+
+	if err := validateNRIPlugin(&n.singleton.Spec); err != nil {
+		return fmt.Errorf("failed to validate the NRI Plugin: %w", err)
 	}
 	return nil
 }
 
-func validateDRA(clusterpolicy *gpuv1.ClusterPolicy, draSupported bool) error {
-	if !draSupported && clusterpolicy.Spec.DRADriver.IsEnabled() {
+func validateNRIPlugin(spec *gpuv1.ClusterPolicySpec) error {
+	if !spec.CDI.IsEnabled() && spec.CDI.IsNRIPluginEnabled() {
+		return fmt.Errorf("the NRI Plugin cannot be enabled when CDI is disabled")
+	}
+
+	if spec.CDI.IsNRIPluginEnabled() && !spec.Toolkit.IsEnabled() {
+		return fmt.Errorf("the NRI Plugin cannot be enabled when the Container Toolkit is disabled")
+	}
+
+	return nil
+}
+
+func validateDRA(spec *gpuv1.ClusterPolicySpec, draSupported bool) error {
+	if !draSupported && spec.DRADriver.IsEnabled() {
 		return fmt.Errorf("the NVIDIA DRA driver for GPUs is enabled in ClusterPolicy but Dynamic Resource Allocation is not enabled in the Kubernetes cluster")
 	}
 
-	if clusterpolicy.Spec.DevicePlugin.IsEnabled() && clusterpolicy.Spec.DRADriver.IsGPUsEnabled() {
+	if spec.DevicePlugin.IsEnabled() && spec.DRADriver.IsGPUsEnabled() {
 		return fmt.Errorf("the NVIDIA device plugin and the NVIDIA DRA driver for GPUs cannot both be enabled in ClusterPolicy")
 	}
 
-	if clusterpolicy.Spec.SandboxWorkloads.IsEnabled() && clusterpolicy.Spec.DRADriver.IsEnabled() {
+	if spec.SandboxWorkloads.IsEnabled() && spec.DRADriver.IsEnabled() {
 		return fmt.Errorf("sandboxWorkloads and the NVIDIA DRA driver for GPUs cannot both be enabled in ClusterPolicy")
 	}
 
