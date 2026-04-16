@@ -39,5 +39,9 @@ func validateDRA(clusterpolicy *gpuv1.ClusterPolicy, draSupported bool) error {
 		return fmt.Errorf("the NVIDIA device plugin and the NVIDIA DRA driver for GPUs cannot both be enabled in ClusterPolicy")
 	}
 
+	if clusterpolicy.Spec.SandboxWorkloads.IsEnabled() && clusterpolicy.Spec.DRADriver.IsEnabled() {
+		return fmt.Errorf("sandboxWorkloads and the NVIDIA DRA driver for GPUs cannot both be enabled in ClusterPolicy")
+	}
+
 	return nil
 }

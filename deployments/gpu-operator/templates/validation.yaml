@@ -12,3 +12,9 @@
 {{- $error = printf "%s\nCannot enable the NVIDIA DRA Driver for GPUs on a Kubernetes cluster that does not support DRA" $error }}
 {{- fail $error }}
 {{- end}}
+
+{{- if and ($draEnabled) (eq .Values.sandboxWorkloads.enabled true) }}
+{{- $error := "" }}
+{{- $error = printf "%s\nThe NVIDIA DRA Driver for GPUs and 'sandboxWorkloads' cannot both be enabled" $error }}
+{{- fail $error }}
+{{- end}}
