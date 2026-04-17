@@ -123,6 +123,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {
 		r.Log.Error(err, "unable to initialize ClusterPolicy controller")
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			r.Log.Error(condErr, "failed to set condition")
 		}

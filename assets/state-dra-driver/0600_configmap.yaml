@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin-entrypoint
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: nvidia-dra-driver-kubelet-plugin
+data:
+  entrypoint.sh: |-
+    #!/bin/bash
+
+    if [ "$#" -ne 1 ]; then
+      echo "Usage: $0 COMMAND"
+      exit 1
+    fi
+    
+    entrypoint=$1
+    
+    until [ -f /run/nvidia/validations/driver-ready ]
+    do
+      echo "waiting for the driver validations to be ready..."
+      sleep 5
+    done
+    
+    set -o allexport
+    cat /run/nvidia/validations/driver-ready
+    . /run/nvidia/validations/driver-ready
+    
+    # Conditionally mask the params file to prevent this container from
+    # recreating any missing GPU device nodes. This is necessary, for
+    # example, when running under nvkind to limit the set GPUs governed
+    # by the plugin even though it has cgroup access to all of them.
+    if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+      cp /proc/driver/nvidia/params root/gpu-params
+      sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' root/gpu-params
+      mount --bind root/gpu-params /proc/driver/nvidia/params
+    fi
+
+    echo "Starting the NVIDIA DRA Driver Kubelet Plugin"
+    exec $entrypoint
