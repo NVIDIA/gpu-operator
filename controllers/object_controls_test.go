@@ -1151,6 +1151,10 @@ func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
 	case "standalone-dcgm":
 		dcgmEnabled := true
 		cp.Spec.DCGM.Enabled = &dcgmEnabled
+	case "pod-labels-enabled":
+		cp.Spec.DCGMExporter.EnablePodLabels = ptr.To(true)
+	case "pod-uid-enabled":
+		cp.Spec.DCGMExporter.EnablePodUID = ptr.To(true)
 	default:
 		return nil
 	}
@@ -1166,6 +1170,7 @@ func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
 		"numDaemonsets":     1,
 		"dcgmExporterImage": "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu22.04",
 		"imagePullSecret":   "ngc-secret",
+		"clusterRoleExists": false,
 	}
 
 	switch testCase {
@@ -1175,6 +1180,16 @@ func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
 		output["env"] = map[string]string{
 			"DCGM_REMOTE_HOSTENGINE_INFO": "nvidia-dcgm:5555",
 		}
+	case "pod-labels-enabled":
+		output["env"] = map[string]string{
+			"DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS": "true",
+		}
+		output["clusterRoleExists"] = true
+	case "pod-uid-enabled":
+		output["env"] = map[string]string{
+			"DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID": "true",
+		}
+		output["clusterRoleExists"] = true
 	default:
 		return nil
 	}
@@ -1200,6 +1215,16 @@ func TestDCGMExporter(t *testing.T) {
 			getDCGMExporterTestInput("standalone-dcgm"),
 			getDCGMExporterTestOutput("standalone-dcgm"),
 		},
+		{
+			"PodLabelsEnabled",
+			getDCGMExporterTestInput("pod-labels-enabled"),
+			getDCGMExporterTestOutput("pod-labels-enabled"),
+		},
+		{
+			"PodUIDEnabled",
+			getDCGMExporterTestInput("pod-uid-enabled"),
+			getDCGMExporterTestOutput("pod-uid-enabled"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1220,15 +1245,25 @@ func TestDCGMExporter(t *testing.T) {
 				}
 			}
 			for key, value := range tc.output["env"].(map[string]string) {
-				envFound := false
-				for _, envVar := range ds.Spec.Template.Spec.Containers[0].Env {
-					if envVar.Name == key && envVar.Value == value {
-						envFound = true
-					}
-				}
-				if !envFound {
-					t.Fatalf("Expected env is not set for daemonset nvidia-dcgm-exporter %s->%s", key, value)
-				}
+				require.Equal(t, value, getContainerEnv(&ds.Spec.Template.Spec.Containers[0], key), "unexpected value for env var %s on daemonset nvidia-dcgm-exporter", key)
+			}
+
+			// Verify cluster-scoped RBAC and SA token mount match the feature toggle.
+			clusterRoleKey := client.ObjectKey{Name: "nvidia-dcgm-exporter-read-pods"}
+			clusterRole := &rbacv1.ClusterRole{}
+			clusterRoleGetErr := clusterPolicyController.client.Get(context.Background(), clusterRoleKey, clusterRole)
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+			clusterRoleBindingGetErr := clusterPolicyController.client.Get(context.Background(), clusterRoleKey, clusterRoleBinding)
+			if tc.output["clusterRoleExists"].(bool) {
+				require.NoError(t, clusterRoleGetErr, "ClusterRole should exist when pod metadata enrichment is enabled")
+				require.NoError(t, clusterRoleBindingGetErr, "ClusterRoleBinding should exist when pod metadata enrichment is enabled")
+				require.NotNil(t, ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be set when pod metadata enrichment is enabled")
+				require.True(t, *ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be true when pod metadata enrichment is enabled")
+			} else {
+				require.True(t, apierrors.IsNotFound(clusterRoleGetErr), "ClusterRole should not exist when pod metadata enrichment is disabled (got err=%v)", clusterRoleGetErr)
+				require.True(t, apierrors.IsNotFound(clusterRoleBindingGetErr), "ClusterRoleBinding should not exist when pod metadata enrichment is disabled (got err=%v)", clusterRoleBindingGetErr)
+				require.NotNil(t, ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be explicitly set false when pod metadata enrichment is disabled")
+				require.False(t, *ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be false when pod metadata enrichment is disabled")
 			}
 
 			require.Equal(t, tc.output["dcgmExporterImage"], dcgmExporterImage, "Unexpected configuration for dcgm-exporter image")
