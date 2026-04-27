@@ -714,7 +714,6 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-mig-manager":                          TransformMIGManager,
 		"nvidia-operator-validator":                   TransformValidator,
 		"nvidia-sandbox-validator":                    TransformSandboxValidator,
-		"nvidia-kata-manager":                         TransformKataManager,
 		"nvidia-cc-manager":                           TransformCCManager,
 	}
 
@@ -2019,83 +2018,6 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 	// set hostNetwork for mig-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.MIGManager.HostNetwork)
-
-	return nil
-}
-
-// TransformKataManager transforms Kata Manager daemonset with required config as per ClusterPolicy
-func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	// update image
-	image, err := gpuv1.ImagePath(&config.KataManager)
-	if err != nil {
-		return err
-	}
-	obj.Spec.Template.Spec.Containers[0].Image = image
-
-	// update image pull policy
-	obj.Spec.Template.Spec.Containers[0].ImagePullPolicy = gpuv1.ImagePullPolicy(config.KataManager.ImagePullPolicy)
-
-	// set image pull secrets
-	if len(config.KataManager.ImagePullSecrets) > 0 {
-		addPullSecrets(&obj.Spec.Template.Spec, config.KataManager.ImagePullSecrets)
-	}
-
-	// set resource limits
-	if config.KataManager.Resources != nil {
-		// apply resource limits to all containers
-		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.KataManager.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.KataManager.Resources.Limits
-		}
-	}
-
-	// set arguments if specified for mig-manager container
-	if len(config.KataManager.Args) > 0 {
-		obj.Spec.Template.Spec.Containers[0].Args = config.KataManager.Args
-	}
-
-	// mount artifactsDir
-	artifactsDir := DefaultKataArtifactsDir
-	if config.KataManager.Config.ArtifactsDir != "" {
-		artifactsDir = config.KataManager.Config.ArtifactsDir
-	}
-
-	// set env used by readinessProbe to determine path to kata-manager pid file.
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "KATA_ARTIFACTS_DIR", artifactsDir)
-
-	artifactsVolMount := corev1.VolumeMount{Name: "kata-artifacts", MountPath: artifactsDir}
-	obj.Spec.Template.Spec.Containers[0].VolumeMounts = append(obj.Spec.Template.Spec.Containers[0].VolumeMounts, artifactsVolMount)
-
-	artifactsVol := corev1.Volume{Name: "kata-artifacts", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: artifactsDir, Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, artifactsVol)
-
-	// Compute hash of kata manager config and add an annotation with the value.
-	// If the kata config changes, a new revision of the daemonset will be
-	// created and thus the kata-manager pods will restart with the updated config.
-	hash := utils.GetObjectHash(config.KataManager.Config)
-
-	if obj.Spec.Template.Annotations == nil {
-		obj.Spec.Template.Annotations = make(map[string]string)
-	}
-	obj.Spec.Template.Annotations[KataManagerAnnotationHashKey] = hash
-
-	if len(config.KataManager.Env) > 0 {
-		for _, env := range config.KataManager.Env {
-			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
-		}
-	}
-
-	// mount containerd config and socket
-	// setup mounts for runtime config file
-	runtime := n.runtime.String()
-	// kata manager is the only container in this daemonset
-	err = transformForRuntime(obj, config, runtime, &obj.Spec.Template.Spec.Containers[0])
-	if err != nil {
-		return fmt.Errorf("error transforming kata-manager daemonset : %w", err)
-	}
-
-	// set hostNetwork for kata-manager if specified
-	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.KataManager.HostNetwork)
 
 	return nil
 }
@@ -5156,115 +5078,13 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 	return gpuv1.Ready, nil
 }
 
-func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
-	state := n.idx
-	config := n.singleton.Spec
-
-	// Get all existing Kata RuntimeClasses
-	opts := []client.ListOption{&client.MatchingLabels{"nvidia.com/kata-runtime-class": "true"}}
-	list := &nodev1.RuntimeClassList{}
-	err := n.client.List(ctx, list, opts...)
-	if err != nil {
-		n.logger.Info("Could not get Kata RuntimeClassList", err)
-		return gpuv1.NotReady, fmt.Errorf("error getting kata RuntimeClassList: %v", err)
-	}
-	n.logger.V(1).Info("Kata RuntimeClasses", "Number", len(list.Items))
-
-	if !config.KataManager.IsEnabled() {
-		// Delete all Kata RuntimeClasses
-		n.logger.Info("Kata Manager disabled, deleting all Kata RuntimeClasses")
-		for _, rc := range list.Items {
-			rc := rc
-			n.logger.V(1).Info("Deleting Kata RuntimeClass", "Name", rc.Name)
-			err := n.client.Delete(ctx, &rc)
-			if err != nil {
-				return gpuv1.NotReady, fmt.Errorf("error deleting kata RuntimeClass '%s': %v", rc.Name, err)
-			}
-		}
-		return gpuv1.Ready, nil
-	}
-
-	// Get names of desired kata RuntimeClasses
-	rcNames := make(map[string]struct{})
-	for _, rc := range config.KataManager.Config.RuntimeClasses {
-		rcNames[rc.Name] = struct{}{}
-	}
-
-	// Delete any existing Kata RuntimeClasses that are no longer specified in KataManager configuration
-	for _, rc := range list.Items {
-		if _, ok := rcNames[rc.Name]; !ok {
-			rc := rc
-			n.logger.Info("Deleting Kata RuntimeClass", "Name", rc.Name)
-			err := n.client.Delete(ctx, &rc)
-			if err != nil {
-				return gpuv1.NotReady, fmt.Errorf("error deleting kata RuntimeClass '%s': %v", rc.Name, err)
-			}
-		}
-	}
-
-	// Using kata RuntimClass template, create / update RuntimeClass objects specified in KataManager configuration
-	template := n.resources[state].RuntimeClasses[0]
-	for _, rc := range config.KataManager.Config.RuntimeClasses {
-		logger := n.logger.WithValues("RuntimeClass", rc.Name)
-
-		if rc.Name == config.Operator.RuntimeClass {
-			return gpuv1.NotReady, fmt.Errorf("error creating kata runtimeclass '%s' as it conflicts with the runtimeclass used for the gpu-operator operand pods itself", rc.Name)
-		}
-
-		obj := nodev1.RuntimeClass{}
-		obj.Name = rc.Name
-		obj.Handler = rc.Name
-		obj.Labels = template.Labels
-		obj.Scheduling = &nodev1.Scheduling{}
-		nodeSelector := make(map[string]string)
-		for k, v := range template.Scheduling.NodeSelector {
-			nodeSelector[k] = v
-		}
-		if rc.NodeSelector != nil {
-			// append user provided selectors to default nodeSelector
-			for k, v := range rc.NodeSelector {
-				nodeSelector[k] = v
-			}
-		}
-		obj.Scheduling.NodeSelector = nodeSelector
-
-		if err := controllerutil.SetControllerReference(n.singleton, &obj, n.scheme); err != nil {
-			return gpuv1.NotReady, err
-		}
-
-		found := &nodev1.RuntimeClass{}
-		err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-		if err != nil && apierrors.IsNotFound(err) {
-			logger.Info("Not found, creating...")
-			err = n.client.Create(ctx, &obj)
-			if err != nil {
-				logger.Info("Couldn't create", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			continue
-		} else if err != nil {
-			return gpuv1.NotReady, err
-		}
-
-		logger.Info("Found Resource, updating...")
-		obj.ResourceVersion = found.ResourceVersion
-
-		err = n.client.Update(ctx, &obj)
-		if err != nil {
-			logger.Info("Couldn't update", "Error", err)
-			return gpuv1.NotReady, err
-		}
-	}
-	return gpuv1.Ready, nil
-}
-
 func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	status := gpuv1.Ready
 	state := n.idx
 
 	if n.stateNames[state] == "state-kata-manager" {
-		return transformKataRuntimeClasses(n)
+		// Kata Manager is deprecated, no need to process anything
+		return gpuv1.Ready, nil
 	}
 
 	nvidiaRuntimeClasses := n.resources[state].RuntimeClasses
