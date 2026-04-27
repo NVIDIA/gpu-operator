@@ -567,6 +567,16 @@ spec:
                           metrics to be collected by NVIDIA DCGM Exporter
                         type: string
                     type: object
+                  enablePodLabels:
+                    description: |-
+                      Enable Kubernetes pod labels as Prometheus label dimensions in DCGM exporter metrics.
+                      (Requires cluster-level read access to pods.)
+                    type: boolean
+                  enablePodUID:
+                    description: |-
+                      Enable Kubernetes pod UID as a Prometheus label dimension in DCGM exporter metrics.
+                      (Requires cluster-level read access to pods.)
+                    type: boolean
                   enabled:
                     description: Enabled indicates if deployment of NVIDIA DCGM Exporter
                       through operator is enabled
@@ -617,6 +627,13 @@ spec:
                     type: string
                   imagePullSecrets:
                     description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  podLabelAllowlistRegex:
+                    description: |-
+                      Regex list for filtering which Kubernetes pod labels are included in DCGM exporter metrics.
+                      Empty means all pod labels are included.
                     items:
                       type: string
                     type: array

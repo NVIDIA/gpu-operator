@@ -445,6 +445,20 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
+	"nvidia-dcgm-exporter-read-pods": func(config *gpuv1.ClusterPolicySpec) bool {
+		return config.DCGMExporter.IsKubernetesPodMetadataEnabled()
+	},
+}
+
+func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
+	gate, ok := rbacGates[name]
+	if !ok {
+		return true
+	}
+	return gate(config)
+}
+
 // ClusterRole creates ClusterRole resource
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
@@ -459,6 +473,15 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Error(err, "Couldn't delete")
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
@@ -500,6 +523,15 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Error(err, "Couldn't delete")
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
@@ -1818,6 +1850,26 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 		jobMappingVol := corev1.Volume{Name: "hpc-job-mapping", VolumeSource: jobMappingVolumeSource}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, jobMappingVol)
+	}
+
+	// Inject pod-metadata enrichment env vars; RBAC is provisioned via the
+	// 0210/0310 assets and the SA token is mounted below.
+	if config.DCGMExporter.IsPodLabelsEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", "true")
+	}
+	if config.DCGMExporter.IsPodUIDEnabled() {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID", "true")
+	}
+	if len(config.DCGMExporter.PodLabelAllowlistRegex) > 0 {
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]),
+			"DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX",
+			strings.Join(config.DCGMExporter.PodLabelAllowlistRegex, ","))
+	}
+
+	// Override the base asset's automountServiceAccountToken=false when
+	// enrichment is on so the pod informer has client-go credentials.
+	if config.DCGMExporter.IsKubernetesPodMetadataEnabled() {
+		obj.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(true)
 	}
 
 	// mount configmap for custom metrics if provided by user
