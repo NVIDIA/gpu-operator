@@ -905,7 +905,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-vfio-manager")
 		addState(n, "/opt/gpu-operator/state-sandbox-device-plugin")
 		addState(n, "/opt/gpu-operator/state-kata-device-plugin")
-		addState(n, "/opt/gpu-operator/state-kata-manager")
 		addState(n, "/opt/gpu-operator/state-cc-manager")
 	}
 
