@@ -1016,6 +1016,30 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="HPC Job Mapping Configuration"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced"
 	HPCJobMapping *DCGMExporterHPCJobMappingConfig `json:"hpcJobMapping,omitempty"`
+
+	// Enable Kubernetes pod labels as Prometheus label dimensions in DCGM exporter metrics.
+	// (Requires cluster-level read access to pods.)
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable pod-label enrichment"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	EnablePodLabels *bool `json:"enablePodLabels,omitempty"`
+
+	// Enable Kubernetes pod UID as a Prometheus label dimension in DCGM exporter metrics.
+	// (Requires cluster-level read access to pods.)
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable pod-UID enrichment"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	EnablePodUID *bool `json:"enablePodUID,omitempty"`
+
+	// Regex list for filtering which Kubernetes pod labels are included in DCGM exporter metrics.
+	// Empty means all pod labels are included.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Pod label allowlist regex"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	PodLabelAllowlistRegex []string `json:"podLabelAllowlistRegex,omitempty"`
 }
 
 // DCGMExporterHPCJobMappingConfig defines HPC job mapping configuration for NVIDIA DCGM Exporter
@@ -2209,6 +2233,30 @@ func (e *DCGMExporterSpec) GetHPCJobMappingDirectory() string {
 		return ""
 	}
 	return e.HPCJobMapping.Directory
+}
+
+// IsPodLabelsEnabled returns true if pod-label enrichment is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsPodLabelsEnabled() bool {
+	if e.EnablePodLabels == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.EnablePodLabels
+}
+
+// IsPodUIDEnabled returns true if pod-UID enrichment is enabled for DCGM Exporter
+func (e *DCGMExporterSpec) IsPodUIDEnabled() bool {
+	if e.EnablePodUID == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *e.EnablePodUID
+}
+
+// IsKubernetesPodMetadataEnabled returns true if any Kubernetes pod metadata
+// enrichment is enabled for DCGM Exporter.
+func (e *DCGMExporterSpec) IsKubernetesPodMetadataEnabled() bool {
+	return e.IsPodLabelsEnabled() || e.IsPodUIDEnabled()
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator
