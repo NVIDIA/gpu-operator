@@ -45,7 +45,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
@@ -161,8 +160,6 @@ const (
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
 	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
-	// KataManagerAnnotationHashKey is the annotation indicating the hash of the kata-manager configuration
-	KataManagerAnnotationHashKey = "nvidia.com/kata-manager.last-applied-hash"
 	// DefaultKataArtifactsDir is the default directory to store kata artifacts on the host
 	DefaultKataArtifactsDir = "/opt/nvidia-gpu-operator/artifacts/runtimeclasses/"
 	// PodControllerRevisionHashLabelKey is the annotation key for pod controller revision hash value
@@ -574,16 +571,6 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		if name, isCustom := gpuv1.GetConfigMapName(config.VGPUDeviceManager.Config, VgpuDMDefaultConfigMapName); isCustom {
 			logger.Info("Not creating resource, custom ConfigMap provided", "Name", name)
 			return gpuv1.Ready, nil
-		}
-	}
-
-	if obj.Name == "nvidia-kata-manager-config" {
-		data, err := yaml.Marshal(config.KataManager.Config)
-		if err != nil {
-			return gpuv1.NotReady, fmt.Errorf("failed to marshal kata manager config: %v", err)
-		}
-		obj.Data = map[string]string{
-			"config.yaml": string(data),
 		}
 	}
 
@@ -1391,13 +1378,7 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	}
 
 	// Handle the drop-in configs
-	// TODO: It's a bit of a hack to skip the `nvidia-kata-manager` container here.
-	// Ideally if the two projects are using the SAME API then this should be
-	// captured more rigorously.
-	// Note that we probably want to implement drop-in file support in the
-	// kata manager in any case -- in which case it will be good to use a
-	// similar implementation.
-	if dropInConfigFile != "" && container.Name != "nvidia-kata-manager" {
+	if dropInConfigFile != "" {
 		sourceConfigFileName := path.Base(dropInConfigFile)
 		sourceConfigDir := path.Dir(dropInConfigFile)
 		containerConfigDir := DefaultRuntimeDropInConfigTargetDir
@@ -5085,11 +5066,6 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	status := gpuv1.Ready
 	state := n.idx
-
-	if n.stateNames[state] == "state-kata-manager" {
-		// Kata Manager is deprecated, no need to process anything
-		return gpuv1.Ready, nil
-	}
 
 	nvidiaRuntimeClasses := n.resources[state].RuntimeClasses
 	if n.stateNames[state] == "pre-requisites" && !n.isStateEnabled(n.stateNames[state]) {

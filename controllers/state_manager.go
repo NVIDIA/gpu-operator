@@ -100,7 +100,6 @@ var gpuStateLabels = map[string]map[string]string{
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
 		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
 		"nvidia.com/gpu.deploy.vfio-manager":          "true",
-		"nvidia.com/gpu.deploy.kata-manager":          "true",
 		"nvidia.com/gpu.deploy.cc-manager":            "true",
 	},
 	gpuWorkloadConfigVMVgpu: {
