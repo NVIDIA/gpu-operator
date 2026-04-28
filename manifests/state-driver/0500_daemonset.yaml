@@ -87,6 +87,9 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
+        - key: nvidia.com/gpu-driver-update
+          operator: Exists
+          effect: NoSchedule
         {{- if .Driver.Spec.Tolerations }}
         {{- .Driver.Spec.Tolerations | yaml | nindent 8 }}
         {{- end }}
