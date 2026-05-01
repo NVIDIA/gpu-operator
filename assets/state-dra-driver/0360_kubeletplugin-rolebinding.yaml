@@ -1,12 +1,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: nvidia-dra-driver-openshift-privileged-role-binding-kubeletplugin
+  name: nvidia-dra-driver-role-binding-kubeletplugin
+  namespace: gpu-operator
 subjects:
 - kind: ServiceAccount
   name: nvidia-dra-driver-kubeletplugin
   namespace: gpu-operator
 roleRef:
-  kind: ClusterRole
-  name: system:openshift:scc:privileged
+  kind: Role
+  name: nvidia-dra-driver-role-kubeletplugin
   apiGroup: rbac.authorization.k8s.io

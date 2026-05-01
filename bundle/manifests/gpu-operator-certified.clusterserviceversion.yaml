@@ -259,7 +259,7 @@ spec:
     - name: gdrcopy-image
       image: nvcr.io/nvidia/cloud-native/gdrdrv@sha256:0460630559b0b932c8861237b62e69c2895dace42d37ad3cb02c87e5d751fafc
     - name: dra-driver-image
-      image: nvcr.io/nvidia/k8s-dra-driver-gpu@sha256:5dd583277c1f2825cb637c3c07d8208c6278b1e6ccb4231f0ac011dbf651d5a9
+      image: us-central1-docker.pkg.dev/k8s-staging-images/dra-driver-nvidia/dra-driver-nvidia-gpu:v26.4.0-dev-bef400ef
   customresourcedefinitions:
     owned:
     - name: nvidiadrivers.nvidia.com
@@ -1055,7 +1055,7 @@ spec:
                   - name: "GDRCOPY_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:0460630559b0b932c8861237b62e69c2895dace42d37ad3cb02c87e5d751fafc"
                   - name: "DRA_DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s-dra-driver-gpu@sha256:5dd583277c1f2825cb637c3c07d8208c6278b1e6ccb4231f0ac011dbf651d5a9"
+                    value: "us-central1-docker.pkg.dev/k8s-staging-images/dra-driver-nvidia/dra-driver-nvidia-gpu:v26.4.0-dev-bef400ef"
               terminationGracePeriodSeconds: 10
               serviceAccountName: gpu-operator
     strategy: deployment

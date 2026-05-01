@@ -374,11 +374,11 @@ func ServiceAccounts(n ClusterPolicyController) (gpuv1.State, error) {
 	return status, nil
 }
 
-// Role creates Role resource
-func Role(n ClusterPolicyController) (gpuv1.State, error) {
+// createRole creates a Role resource
+func createRole(n ClusterPolicyController, idx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].Role.DeepCopy()
+	obj := n.resources[state].Roles[idx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
@@ -413,6 +413,22 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return gpuv1.Ready, nil
+}
+
+// Role creates one or more Role resources
+func Role(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Ready
+	state := n.idx
+	for i := range n.resources[state].Roles {
+		stat, err := createRole(n, i)
+		if err != nil {
+			return stat, err
+		}
+		if stat == gpuv1.NotReady {
+			status = gpuv1.NotReady
+		}
+	}
+	return status, nil
 }
 
 // createRoleBinding creates a RoleBinding resource
@@ -1846,6 +1862,16 @@ func TransformDRADriverKubeletPlugin(obj *appsv1.DaemonSet, config *gpuv1.Cluste
 		return err
 	}
 
+	for i := range obj.Spec.Template.Spec.InitContainers {
+		if obj.Spec.Template.Spec.InitContainers[i].Name != "init-container" {
+			continue
+		}
+		obj.Spec.Template.Spec.InitContainers[i].Image = image
+		obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.DRADriver.ImagePullPolicy)
+	}
+
+	transformDRADriverRoot(obj, config)
+
 	var containers []corev1.Container
 	for i, container := range obj.Spec.Template.Spec.Containers {
 		// Skip the container if the resource type is not enabled.
@@ -1896,6 +1922,35 @@ func TransformDRADriverKubeletPlugin(obj *appsv1.DaemonSet, config *gpuv1.Cluste
 	obj.Spec.Template.Spec.Containers = containers
 
 	return nil
+}
+
+func transformDRADriverRoot(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) {
+	driverRoot := config.HostPaths.DriverInstallDir
+	if driverRoot == "" || driverRoot == DefaultDriverInstallDir {
+		return
+	}
+
+	driverRootParent := "/"
+	if driverRoot != "/" {
+		driverRootParent = filepath.Dir(strings.TrimRight(driverRoot, "/"))
+	}
+
+	for i := range obj.Spec.Template.Spec.InitContainers {
+		setContainerEnv(&obj.Spec.Template.Spec.InitContainers[i], "NVIDIA_DRIVER_ROOT", driverRoot)
+	}
+
+	for i := range obj.Spec.Template.Spec.Containers {
+		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], "NVIDIA_DRIVER_ROOT", driverRoot)
+	}
+
+	for i := range obj.Spec.Template.Spec.Volumes {
+		switch obj.Spec.Template.Spec.Volumes[i].Name {
+		case "driver-root":
+			obj.Spec.Template.Spec.Volumes[i].HostPath.Path = driverRoot
+		case "driver-root-parent":
+			obj.Spec.Template.Spec.Volumes[i].HostPath.Path = driverRootParent
+		}
+	}
 }
 
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
@@ -4278,14 +4333,14 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 func TransformDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPolicySpec) error {
 	var computeDomainsCtr *corev1.Container
 	for i, ctr := range obj.Spec.Template.Spec.Containers {
-		if ctr.Name == "compute-domains" {
+		if ctr.Name == "compute-domain" {
 			computeDomainsCtr = &obj.Spec.Template.Spec.Containers[i]
 			break
 		}
 	}
 
 	if computeDomainsCtr == nil {
-		return fmt.Errorf("failed to find 'compute-domains' container")
+		return fmt.Errorf("failed to find 'compute-domain' container")
 	}
 
 	config := spec.DRADriver

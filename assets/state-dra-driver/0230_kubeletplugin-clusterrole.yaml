@@ -1,30 +1,44 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: compute-domain-daemon-role
+  name: nvidia-dra-driver-clusterrole-kubeletplugin
 rules:
 - apiGroups:
   - resource.nvidia.com
   resources:
   - computedomains
-  - computedomains/status
   verbs:
   - get
   - list
   - watch
-  - update
-  - patch
 - apiGroups:
-  - resource.nvidia.com
+  - resource.k8s.io
   resources:
-  - computedomaincliques
+  - resourceclaims
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceslices
   verbs:
   - get
   - list
   - watch
   - create
   - update
-  - patch
+  - delete
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
 - apiGroups:
   - ''
   resources:
@@ -33,4 +47,3 @@ rules:
   - get
   - list
   - watch
-  - patch

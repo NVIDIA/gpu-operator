@@ -47,7 +47,7 @@ type assetsFromFile []byte
 // Resources indicates resources managed by GPU operator
 type Resources struct {
 	ServiceAccounts            []corev1.ServiceAccount
-	Role                       rbacv1.Role
+	Roles                      []rbacv1.Role
 	RoleBindings               []rbacv1.RoleBinding
 	ClusterRoles               []rbacv1.ClusterRole
 	ClusterRoleBindings        []rbacv1.ClusterRoleBinding
@@ -130,9 +130,14 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 				ctrl = append(ctrl, ServiceAccounts)
 			}
 		case "Role":
-			_, _, err := s.Decode(m, nil, &res.Role)
+			role := rbacv1.Role{}
+			_, _, err := s.Decode(m, nil, &role)
 			panicIfError(err)
-			ctrl = append(ctrl, Role)
+			res.Roles = append(res.Roles, role)
+			// only add the ctrl function when the first Role is added for this component
+			if len(res.Roles) == 1 {
+				ctrl = append(ctrl, Role)
+			}
 		case "RoleBinding":
 			roleBinding := rbacv1.RoleBinding{}
 			_, _, err := s.Decode(m, nil, &roleBinding)

@@ -281,9 +281,9 @@ devicePlugin:
   hostNetwork: false
 
 draDriver:
-  repository: ghcr.io/nvidia
-  image: k8s-dra-driver-gpu
-  version: v25.8.0-dev-124734f2
+  repository: us-central1-docker.pkg.dev/k8s-staging-images/dra-driver-nvidia
+  image: dra-driver-nvidia-gpu
+  version: v26.4.0-dev-bef400ef
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
 

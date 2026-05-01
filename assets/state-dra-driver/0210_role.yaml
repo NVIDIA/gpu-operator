@@ -1,19 +1,27 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nvidia-dra-driver
-  namespace: "FILLED BY THE OPERATOR"
+  name: nvidia-dra-driver-role-controller
+  namespace: gpu-operator
 rules:
-  - apiGroups:
-      - apps
-    resources:
-      - daemonsets
-      - deployments
-    verbs:
-      - get
-      - list
-      - watch
-      - create
-      - update
-      - patch
-      - delete
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomaincliques
+  verbs:
+  - get
+  - list
+  - watch
+  - update

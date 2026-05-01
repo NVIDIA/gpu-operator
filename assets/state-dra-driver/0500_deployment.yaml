@@ -2,42 +2,97 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nvidia-dra-driver-controller
-  namespace: "FILLED BY THE OPERATOR"
+  namespace: gpu-operator
   labels:
+    helm.sh/chart: nvidia-dra-driver-26.4.0-dev
+    app.kubernetes.io/version: 26.4.0-dev
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nvidia-dra-driver
+    app.kubernetes.io/instance: nvidia-dra-driver
     app: nvidia-dra-driver-controller
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nvidia-dra-driver-controller
+      nvidia-dra-driver-component: controller
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: nvidia-dra-driver
+        app.kubernetes.io/instance: nvidia-dra-driver
+        nvidia-dra-driver-component: controller
         app: nvidia-dra-driver-controller
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-dra-driver
+      serviceAccountName: nvidia-dra-driver-controller
+      securityContext: {}
       containers:
-        - name: compute-domains
-          image: "FILLED BY THE OPERATOR"
-          command: ["compute-domain-controller", "-v", "6"]
-          env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+      - name: compute-domain
+        securityContext: {}
+        image: FILLED BY THE OPERATOR
+        imagePullPolicy: IfNotPresent
+        command:
+        - compute-domain-controller
+        - "-v"
+        - "$(LOG_VERBOSITY)"
+        resources: {}
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8080"
+        - name: METRICS_PATH
+          value: "/metrics"
+        - name: PPROF_PATH
+          value: ''
+        - name: LOG_VERBOSITY
+          value: '4'
+        - name: LOG_VERBOSITY_CD_DAEMON
+          value: '4'
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: IMAGE_NAME
+          value: FILLED BY THE OPERATOR
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: LEADER_ELECTION_ENABLED
+          value: 'false'
+        - name: LEADER_ELECTION_LEASE_LOCK_NAME
+          value: nvidia-dra-driver-controller
+        - name: LEADER_ELECTION_LEASE_LOCK_NAMESPACE
+          value: gpu-operator
+        - name: LEADER_ELECTION_LEASE_DURATION
+          value: 15s
+        - name: LEADER_ELECTION_RENEW_DEADLINE
+          value: 10s
+        - name: LEADER_ELECTION_RETRY_PERIOD
+          value: 2s
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: "node-role.kubernetes.io/control-plane"
-                    operator: "Exists"
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+            weight: 100
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  nvidia-dra-driver-component: controller
+              topologyKey: kubernetes.io/hostname
+            weight: 100
       tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists

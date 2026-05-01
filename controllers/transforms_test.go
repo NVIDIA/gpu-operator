@@ -4986,6 +4986,50 @@ func TestTransformDRADriverKubeletPlugin(t *testing.T) {
 				}),
 		},
 		{
+			description: "custom driver root updates init container and volumes",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "init-container"}).
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithHostPathVolume("driver-root", DefaultDriverInstallDir, ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("driver-root-parent", "/run/nvidia", ptr.To(corev1.HostPathDirectoryOrCreate)),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				HostPaths: gpuv1.HostPathsSpec{DriverInstallDir: "/opt/nvidia/driver"},
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(true),
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(false),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "init-container",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_DRIVER_ROOT", Value: "/opt/nvidia/driver"},
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "gpus",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_DRIVER_ROOT", Value: "/opt/nvidia/driver"},
+						{Name: NvidiaCTKPathEnvName, Value: "toolkit/nvidia-ctk"},
+						{Name: "IMAGE_NAME", Value: "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0"},
+					},
+				}).
+				WithHostPathVolume("driver-root", "/opt/nvidia/driver", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("driver-root-parent", "/opt/nvidia", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
 			description: "gpus disabled, compute domains disabled",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "gpus"}).
@@ -5041,7 +5085,7 @@ func TestTransformDRADriverController(t *testing.T) {
 		{
 			description: "full dra driver spec",
 			deployment: NewDeployment().
-				WithContainer(corev1.Container{Name: "compute-domains"}),
+				WithContainer(corev1.Container{Name: "compute-domain"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
 				DRADriver: gpuv1.DRADriverSpec{
 					Repository:      "nvcr.io/nvidia",
@@ -5084,7 +5128,7 @@ func TestTransformDRADriverController(t *testing.T) {
 					},
 				}).
 				WithContainer(corev1.Container{
-					Name:            "compute-domains",
+					Name:            "compute-domain",
 					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Env: []corev1.EnvVar{

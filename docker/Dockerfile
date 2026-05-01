@@ -105,6 +105,8 @@ COPY hack/must-gather.sh /usr/bin/gather
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
+COPY deployments/gpu-operator/crds/resource.nvidia.com_computedomains.yaml /opt/gpu-operator/resource.nvidia.com_computedomains.yaml
+COPY deployments/gpu-operator/crds/resource.nvidia.com_computedomaincliques.yaml /opt/gpu-operator/resource.nvidia.com_computedomaincliques.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
 USER 65532:65532
