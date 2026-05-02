@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
@@ -169,7 +170,11 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// if the operator is evicted and can't be rescheduled to any other node, e.g. in a single-node cluster.
 	// It's safe to do because the goal of the node draining during the upgrade is to
 	// evict pods that might use driver and operator doesn't use in its own pod.
-	if clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector == "" {
+	if clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec == nil {
+		clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec = &upgrade_v1alpha1.DrainSpec{
+			PodSelector: UpgradeSkipDrainLabelSelector,
+		}
+	} else if clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector == "" {
 		clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector = UpgradeSkipDrainLabelSelector
 	} else {
 		clusterPolicy.Spec.Driver.UpgradePolicy.DrainSpec.PodSelector =
