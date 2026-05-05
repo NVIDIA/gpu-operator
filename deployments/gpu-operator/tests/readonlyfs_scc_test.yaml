@@ -1,0 +1,30 @@
+suite: openshift readonly-fs SCC
+templates:
+  - readonlyfs_scc.openshift.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: does not render on non-openshift clusters
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot on openshift
+    set:
+      platform:
+        openshift: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: scopes the SCC user to the release namespace
+    release:
+      name: gpu-operator
+      namespace: openshift-nvidia
+    set:
+      platform:
+        openshift: true
+    asserts:
+      - contains:
+          path: users
+          content: system:serviceaccount:openshift-nvidia:gpu-operator
