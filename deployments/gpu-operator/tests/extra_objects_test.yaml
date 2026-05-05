@@ -1,0 +1,54 @@
+suite: extraObjects
+templates:
+  - extra-objects.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: renders no extra objects by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot for an extra object provided as a structured map
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: extra-cm
+            namespace: "{{ .Release.Namespace }}"
+          data:
+            foo: bar
+    asserts:
+      - matchSnapshot: {}
+
+  - it: should match snapshot for an extra object provided as a templated string
+    set:
+      extraObjects:
+        - |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: extra-secret
+            namespace: {{ .Release.Namespace }}
+          type: Opaque
+          stringData:
+            release: {{ .Release.Name }}
+    asserts:
+      - matchSnapshot: {}
+
+  - it: renders multiple extra objects
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: extra-cm-1
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: extra-cm-2
+    asserts:
+      - hasDocuments:
+          count: 2

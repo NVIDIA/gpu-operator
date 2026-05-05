@@ -1,0 +1,101 @@
+should match snapshot:
+  1: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      labels:
+        app.kubernetes.io/component: gpu-operator
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: main-latest
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: gpu-operator
+      namespace: gpu-operator
+    rules:
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        resources:
+          - roles
+          - rolebindings
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - apps
+        resources:
+          - controllerrevisions
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - configmaps
+          - endpoints
+          - pods
+          - pods/eviction
+          - secrets
+          - services
+          - services/finalizers
+          - serviceaccounts
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - coordination.k8s.io
+        resources:
+          - leases
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - monitoring.coreos.com
+        resources:
+          - servicemonitors
+          - prometheusrules
+        verbs:
+          - get
+          - list
+          - create
+          - watch
+          - update
+          - delete
+      - apiGroups:
+          - nfd.k8s-sigs.io
+        resources:
+          - nodefeatures
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
