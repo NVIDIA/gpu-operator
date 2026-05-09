@@ -2888,3 +2888,7 @@ data:
               devices: all
               vgpu-devices:
                 6000D-84Q: 1
+- device-filter: "0x318210DE"
+  devices: all
+  vgpu-devices:
+    B300-SXM6-AC: 2
