@@ -3704,10 +3704,15 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
-		n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
-		pathToVolumeSource, err := n.getSubscriptionPathsToVolumeSources()
-		if err != nil {
-			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
+		pathToVolumeSource := MountPathToVolumeSource{}
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && osID == "rhel" {
+			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", osID)
+		} else {
+			n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
+			pathToVolumeSource, err = n.getSubscriptionPathsToVolumeSources()
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
+			}
 		}
 
 		// sort host path volumes to ensure ordering is preserved when adding to pod spec

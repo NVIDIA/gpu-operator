@@ -18,6 +18,7 @@ package state
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,8 +35,10 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 )
 
@@ -43,6 +46,27 @@ const (
 	manifestDir       = "../../manifests"
 	manifestResultDir = "./testdata/golden"
 )
+
+type testClusterInfo struct {
+	runtime          string
+	openshiftVersion string
+}
+
+func (i testClusterInfo) GetContainerRuntime() (string, error) {
+	return i.runtime, nil
+}
+
+func (i testClusterInfo) GetOpenshiftVersion() (string, error) {
+	return i.openshiftVersion, nil
+}
+
+func (i testClusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
+	return nil
+}
+
+func (i testClusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
+	return nil, nil
+}
 
 func getYAMLString(objs []*unstructured.Unstructured) (string, error) {
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
@@ -58,6 +82,35 @@ func getYAMLString(objs []*unstructured.Unstructured) (string, error) {
 		sb.WriteString("---\n")
 	}
 	return sb.String(), nil
+}
+
+func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
+	for _, volumeMount := range volumeMounts {
+		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
+			return true
+		}
+	}
+	return false
+}
+
+func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
+	t.Helper()
+
+	if expected == nil {
+		expected = map[string]corev1.HostPathType{}
+	}
+
+	actual := map[string]corev1.HostPathType{}
+	for _, volume := range volumes {
+		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+			continue
+		}
+		require.NotNil(t, volume.HostPath)
+		require.NotNil(t, volume.HostPath.Type)
+		actual[volume.HostPath.Path] = *volume.HostPath.Type
+	}
+
+	assert.Equal(t, expected, actual)
 }
 
 func TestDriverRenderMinimal(t *testing.T) {
@@ -438,6 +491,69 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
+}
+
+func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
+	repoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"redhat.repo": "[test-repo]",
+		},
+	}
+
+	testCases := []struct {
+		description                 string
+		osRelease                   string
+		repoConfigEnabled           bool
+		expectSubscriptionMounts    bool
+		expectedSubscriptionHostMap map[string]corev1.HostPathType
+	}{
+		{
+			description:              "rhel with repo config skips host subscription mounts",
+			osRelease:                "rhel",
+			repoConfigEnabled:        true,
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "rhel without repo config mounts host subscription paths",
+			osRelease:                "rhel",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			stateDriver := &stateDriver{
+				stateSkel: stateSkel{
+					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
+					namespace: "test-ns",
+				},
+			}
+			driver := &nvidiav1alpha1.NVIDIADriver{}
+			if tc.repoConfigEnabled {
+				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
+			}
+
+			configs, err := stateDriver.getDriverAdditionalConfigs(
+				context.Background(),
+				driver,
+				testClusterInfo{runtime: consts.Containerd},
+				nodePool{osRelease: tc.osRelease, osVersion: tc.osRelease},
+			)
+			require.NoError(t, err)
+
+			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
+			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
+		})
+	}
 }
 
 func TestDriverOpenshiftDriverToolkit(t *testing.T) {

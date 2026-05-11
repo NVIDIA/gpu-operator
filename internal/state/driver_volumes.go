@@ -182,10 +182,19 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 
 		// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 		if (pool.osRelease == "rhel" && openshiftVersion == "" && runtime != consts.CRIO) || pool.osRelease == "sles" || pool.osRelease == "sl-micro" {
-			logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
-			pathToVolumeSource, err := getSubscriptionPathsToVolumeSources(pool.osRelease)
-			if err != nil {
-				return nil, fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %v", err)
+			pathToVolumeSource := MountPathToVolumeSource{}
+			// Custom repo ConfigMap supplies yum repos in offline/air-gapped installs. Skip
+			// mounting host RHSM paths (/etc/pki/entitlement, redhat.repo, /etc/rhsm): they may
+			// be missing or not directories on minimal nodes, and are not needed when packages
+			// come only from the mounted repo ConfigMap.
+			if cr.Spec.IsRepoConfigEnabled() && pool.osRelease == "rhel" {
+				logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", pool.osVersion)
+			} else {
+				logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
+				pathToVolumeSource, err = getSubscriptionPathsToVolumeSources(pool.osRelease)
+				if err != nil {
+					return nil, fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
+				}
 			}
 
 			// sort host path volumes to ensure ordering is preserved when adding to pod spec

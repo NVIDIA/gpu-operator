@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
@@ -4345,6 +4346,115 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
+}
+
+func TestTransformDriverSubscriptionMounts(t *testing.T) {
+	repoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"redhat.repo": "[test-repo]",
+		},
+	}
+	mockClient := fake.NewFakeClient(repoConfigMap)
+
+	testCases := []struct {
+		description                 string
+		osRelease                   string
+		osTag                       string
+		repoConfigEnabled           bool
+		expectSubscriptionMounts    bool
+		expectedSubscriptionHostMap map[string]corev1.HostPathType
+	}{
+		{
+			description:              "rhel with repo config skips host subscription mounts",
+			osRelease:                "rhel",
+			osTag:                    "rhel8.10",
+			repoConfigEnabled:        true,
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "rhel without repo config mounts host subscription paths",
+			osRelease:                "rhel",
+			osTag:                    "rhel8.10",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				Driver: gpuv1.DriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "driver",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "580.126.16",
+					Manager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+				},
+			}
+			if tc.repoConfigEnabled {
+				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{ConfigMapName: "test-repo-config"}
+			}
+
+			err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
+				client:            mockClient,
+				runtime:           gpuv1.Containerd,
+				operatorNamespace: "test-ns",
+				logger:            ctrl.Log.WithName("test"),
+				gpuNodeOSRelease:  tc.osRelease,
+				gpuNodeOSTag:      tc.osTag,
+			})
+			require.NoError(t, err)
+
+			driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+			require.NotNil(t, driverContainer)
+			assertSubscriptionHostPathVolumesForTransform(t, ds.Spec.Template.Spec.Volumes, tc.expectedSubscriptionHostMap)
+			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMountForTransform(driverContainer.VolumeMounts))
+		})
+	}
+}
+
+func hasSubscriptionVolumeMountForTransform(volumeMounts []corev1.VolumeMount) bool {
+	for _, volumeMount := range volumeMounts {
+		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
+			return true
+		}
+	}
+	return false
+}
+
+func assertSubscriptionHostPathVolumesForTransform(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
+	t.Helper()
+
+	if expected == nil {
+		expected = map[string]corev1.HostPathType{}
+	}
+
+	actual := map[string]corev1.HostPathType{}
+	for _, volume := range volumes {
+		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+			continue
+		}
+		require.NotNil(t, volume.HostPath)
+		require.NotNil(t, volume.HostPath.Type)
+		actual[volume.HostPath.Path] = *volume.HostPath.Type
+	}
+
+	assert.Equal(t, expected, actual)
 }
 
 // baseDriverDaemonSetSpec returns a minimal DaemonSetSpec representative of
