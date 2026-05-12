@@ -1,36 +1,28 @@
-# Release v0.11.2
+# Release v0.11.4
+
+Security:
+
+- Validate server URL in token auth. ([PR 1075][pr-1075])
+- Upgrading Go fixes CVE-2026-33814  and CVE-2026-39836, other vulnerabilities fixed in 1.26.3 were not called by this project. ([PR 1084][pr-1084])
 
 Features:
 
-- Add support for regctl config in XDG and APPDATA. ([PR 1038][pr-1038])
-- Add `ImageWithBlobReaderHook` for callbacks per layer when copying an image. ([PR 1046][pr-1046])
+- Support scanning OCI Layout for referrers. ([PR 1074][pr-1074])
+- Add created timestamp in OCI Layout entries. ([PR 1081][pr-1081])
+- `tag.ls` now accepts the same pagination parameters as `repo.ls`. ([PR 1086][pr-1086])
 
 Fixes:
 
-- Do not sign released images multiple times. ([PR 1027][pr-1027])
-- regctl/action update for path fix. ([PR 1031][pr-1031])
-- Remove default values from regctl config. ([PR 1039][pr-1039])
-- Apply Go modernizations with `go fix` from 1.26.0. ([PR 1053][pr-1053])
-- Adjust test repo names to avoid races. ([PR 1054][pr-1054])
-- Automatically upgrade goimports and gorelease. ([PR 1056][pr-1056])
-
-Other Changes:
-
-- Add `REGCTL_CONFIG` to `regctl` help messages. ([PR 1037][pr-1037])
-- Go upgrade fixes CVE-2025-68121, govulncheck indicates this project is not vulnerable. ([PR 1047][pr-1047])
+- Push tags for minor and major releases on Docker Hub. ([PR 1087][pr-1087])
 
 Contributors:
 
+- @ffried
 - @sudo-bmitch
-- @vrajashkr
 
-[pr-1027]: https://github.com/regclient/regclient/pull/1027
-[pr-1031]: https://github.com/regclient/regclient/pull/1031
-[pr-1037]: https://github.com/regclient/regclient/pull/1037
-[pr-1038]: https://github.com/regclient/regclient/pull/1038
-[pr-1039]: https://github.com/regclient/regclient/pull/1039
-[pr-1047]: https://github.com/regclient/regclient/pull/1047
-[pr-1046]: https://github.com/regclient/regclient/pull/1046
-[pr-1053]: https://github.com/regclient/regclient/pull/1053
-[pr-1054]: https://github.com/regclient/regclient/pull/1054
-[pr-1056]: https://github.com/regclient/regclient/pull/1056
+[pr-1074]: https://github.com/regclient/regclient/pull/1074
+[pr-1075]: https://github.com/regclient/regclient/pull/1075
+[pr-1081]: https://github.com/regclient/regclient/pull/1081
+[pr-1084]: https://github.com/regclient/regclient/pull/1084
+[pr-1086]: https://github.com/regclient/regclient/pull/1086
+[pr-1087]: https://github.com/regclient/regclient/pull/1087

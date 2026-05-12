@@ -4,6 +4,7 @@ package referrer
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
+	"github.com/regclient/regclient/types/mediatype"
 	v1 "github.com/regclient/regclient/types/oci/v1"
 	"github.com/regclient/regclient/types/ref"
 )
@@ -28,8 +30,27 @@ type ReferrerList struct {
 	Tags        []string                `json:"-"`                     // tags matched when fetching referrers
 }
 
+func New(subject ref.Ref) ReferrerList {
+	rlM, _ := manifest.New(manifest.WithOrig(
+		v1.Index{
+			Versioned: v1.IndexSchemaVersion,
+			MediaType: mediatype.OCI1ManifestList,
+			Manifests: []descriptor.Descriptor{},
+		},
+	))
+	return ReferrerList{
+		Subject:     subject,
+		Descriptors: []descriptor.Descriptor{},
+		Annotations: map[string]string{},
+		Manifest:    rlM,
+	}
+}
+
 // Add appends an entry to rl.Manifest, used to modify the client managed Index
 func (rl *ReferrerList) Add(m manifest.Manifest) error {
+	if rl.Manifest == nil {
+		return fmt.Errorf("referrer list manifest is nil")
+	}
 	rlM, ok := rl.Manifest.GetOrig().(v1.Index)
 	if !ok {
 		return fmt.Errorf("referrer list manifest is not an OCI index for %s", rl.Subject.CommonName())
@@ -98,6 +119,9 @@ func (rl *ReferrerList) Delete(m manifest.Manifest) error {
 
 // IsEmpty reports if the returned Index contains no manifests
 func (rl ReferrerList) IsEmpty() bool {
+	if rl.Manifest == nil {
+		return true
+	}
 	rlM, ok := rl.Manifest.GetOrig().(v1.Index)
 	if !ok || len(rlM.Manifests) == 0 {
 		return true
@@ -144,6 +168,32 @@ func (rl ReferrerList) MarshalPretty() ([]byte, error) {
 	}
 	err := tw.Flush()
 	return buf.Bytes(), err
+}
+
+func (rl *ReferrerList) Merge(rlMerge ReferrerList) error {
+	if rl.Manifest == nil {
+		return fmt.Errorf("referrer list manifest is nil")
+	}
+	rlM, ok := rl.Manifest.GetOrig().(v1.Index)
+	if !ok {
+		return fmt.Errorf("referrer list manifest is not an OCI index for %s", rl.Subject.CommonName())
+	}
+	maps.Copy(rl.Annotations, rlMerge.Annotations)
+	rl.Tags = append(rl.Tags, rlMerge.Tags...)
+	for _, desc := range rlMerge.Descriptors {
+		if !slices.ContainsFunc(rl.Descriptors, func(e descriptor.Descriptor) bool {
+			return e.Digest == desc.Digest
+		}) {
+			rl.Descriptors = append(rl.Descriptors, desc)
+		}
+	}
+	rlM.Manifests = rl.Descriptors
+	rlM.Annotations = rl.Annotations
+	err := rl.Manifest.SetOrig(rlM)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // FallbackTag returns the ref that should be used when the registry does not support the referrers API

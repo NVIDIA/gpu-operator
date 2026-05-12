@@ -84,7 +84,7 @@ func Tar(ctx context.Context, path string, w io.Writer, opts ...TarOpts) error {
 
 		// open file and copy contents into tar writer
 		if header.Typeflag == tar.TypeReg && header.Size > 0 {
-			//#nosec G304 filename is limited to provided path directory
+			//#nosec G122 G304 filename is limited to provided path directory
 			f, err := os.Open(file)
 			if err != nil {
 				return err

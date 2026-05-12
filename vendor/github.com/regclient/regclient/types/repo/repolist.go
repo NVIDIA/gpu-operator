@@ -105,7 +105,7 @@ func (r repoCommon) MarshalJSON() ([]byte, error) {
 	}
 
 	if r.orig != nil {
-		return json.Marshal((r.orig))
+		return json.Marshal(r.orig)
 	}
 	return []byte{}, fmt.Errorf("JSON marshalling failed: %w", errs.ErrNotFound)
 }
