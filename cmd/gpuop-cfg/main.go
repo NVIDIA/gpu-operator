@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v3"
 
+	listimages "github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/list-images"
 	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate"
 )
 
@@ -66,6 +67,7 @@ func main() {
 	// Define the subcommands
 	c.Commands = []*cli.Command{
 		validate.NewCommand(logger),
+		listimages.NewCommand(logger),
 	}
 
 	err := c.Run(context.Background(), os.Args)
