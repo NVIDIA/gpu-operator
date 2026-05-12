@@ -71,7 +71,7 @@ jobs:
       - name: Install regctl
         uses: regclient/actions/regctl-installer@c70ad64367908075211b10dcd2ab9fad4bfa1816
         with:
-          release: v0.11.3
+          release: v0.11.4
       - name: Retag gpu-operator
         env:
           OPERATOR_IMAGE_SOURCE: ${{ needs.variables.outputs.operator_image_source }}
