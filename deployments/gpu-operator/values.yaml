@@ -309,6 +309,15 @@ dcgmExporter:
   # hpcJobMapping:
   #   enabled: true
   #   directory: /var/lib/dcgm-exporter/job-mapping
+  # Enrich GPU metrics with pod metadata (UID, labels).
+  # Both flags are opt-in. When either is true, the operator creates a
+  # cluster-scoped ClusterRole/ClusterRoleBinding granting pods get/list/watch.
+  # Use podLabelAllowlistRegex to bound Prometheus cardinality.
+  enablePodLabels: false
+  enablePodUID: false
+  # podLabelAllowlistRegex:
+  #   - "^app$"
+  #   - "^kueue\\.x-k8s\\.io/.*$"
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:

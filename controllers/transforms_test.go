@@ -189,6 +189,11 @@ func (d Daemonset) WithHostPID(enabled bool) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithAutomountServiceAccountToken(enabled bool) Daemonset {
+	d.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(enabled)
+	return d
+}
+
 func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
 	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
 	return d
@@ -1636,6 +1641,43 @@ func TestTransformDCGMExporter(t *testing.T) {
 				},
 			}).WithRuntimeClassName("nvidia").
 				WithHostPathVolume("pod-gpu-resources", "/custom-kubelet/pod-resources", nil),
+		},
+		{
+			description: "transform dcgm exporter with pod metadata enrichment fully configured",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:             "nvcr.io/nvidia/cloud-native",
+					Image:                  "dcgm-exporter",
+					Version:                "v1.0.0",
+					ImagePullPolicy:        "IfNotPresent",
+					ImagePullSecrets:       []string{"pull-secret"},
+					Args:                   []string{"--fail-on-init-error=false"},
+					EnablePodLabels:        newBoolPtr(true),
+					EnablePodUID:           newBoolPtr(true),
+					PodLabelAllowlistRegex: []string{"^app$", `^kueue\.x-k8s\.io/.*$`},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID", Value: "true"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX", Value: `^app$,^kueue\.x-k8s\.io/.*$`},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia").
+				WithAutomountServiceAccountToken(true),
 		},
 	}
 
