@@ -77,6 +77,10 @@ spec:
               fieldPath: metadata.namespace
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/toolkit-ready"]
         securityContext:
           privileged: true
           seLinuxOptions:

@@ -28,13 +28,20 @@ spec:
         - name: toolkit-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
-          args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container toolkit to be setup; sleep 5; done"]
+          args: ["nvidia-validator"]
+          env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: "all"
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: toolkit
           securityContext:
             privileged: true
           volumeMounts:
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
-              mountPropagation: HostToContainer
+              mountPropagation: Bidirectional
       containers:
       - name: nvidia-mig-manager
         image: "FILLED BY THE OPERATOR"
