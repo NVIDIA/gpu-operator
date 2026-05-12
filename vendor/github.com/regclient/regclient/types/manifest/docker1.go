@@ -128,7 +128,7 @@ func (m *docker1Manifest) MarshalJSON() ([]byte, error) {
 		return m.rawBody, nil
 	}
 
-	return json.Marshal((m.Manifest))
+	return json.Marshal(m.Manifest)
 }
 
 func (m *docker1SignedManifest) MarshalJSON() ([]byte, error) {

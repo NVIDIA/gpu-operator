@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -391,7 +392,7 @@ func parseAuthHeader(ah string) ([]challenge, error) {
 				cl = append(cl, *c)
 				stateSyntax = "end_auth_type"
 			} else if b == '=' && len(curElement) > 0 {
-				curKey = strings.ToLower((string(curElement)))
+				curKey = strings.ToLower(string(curElement))
 				stateSyntax = "param_value"
 			} else {
 				return nil, fmt.Errorf("expected auth type or param: %w", errs.ErrParsingFailed)
@@ -399,7 +400,7 @@ func parseAuthHeader(ah string) ([]challenge, error) {
 		case "end_auth_type":
 			// end_auth_type: (after reading auth_type) read param_key and equals (param_value) or just a comma (start)
 			if b == '=' && len(curElement) > 0 {
-				curKey = strings.ToLower((string(curElement)))
+				curKey = strings.ToLower(string(curElement))
 				stateSyntax = "param_value"
 			} else if b == ',' && len(curElement) == 0 {
 				// ignore white space between end of auth_type and comma
@@ -638,6 +639,18 @@ func (b *bearerHandler) UpdateRequest(req *http.Request) error {
 			return err
 		}
 		b.tokenURL = u
+	}
+	// verify tokenURL is allowed for request URL
+	if req.URL.Scheme == "https" && b.tokenURL.Scheme != "https" {
+		return fmt.Errorf("downgrading to an http token server from an https registry is not allowed%.0w", errs.ErrHTTPUnauthorized)
+	}
+	hostToken := b.tokenURL.Hostname()
+	hostReq := req.URL.Hostname()
+	ipToken := net.ParseIP(hostToken)
+	ipReq := net.ParseIP(hostReq)
+	if ipToken != nil && (ipToken.IsLoopback() || ipToken.IsLinkLocalUnicast() || ipToken.IsLinkLocalMulticast()) &&
+		(ipReq == nil || !(ipReq.IsLoopback() || ipReq.IsLinkLocalUnicast() || ipReq.IsLinkLocalMulticast())) {
+		return fmt.Errorf("requesting a local token server from a non-local registry is not allowed%.0w", errs.ErrHTTPUnauthorized)
 	}
 	// if unexpired token already exists, return it
 	if b.token.Token != "" && !b.isExpired() {

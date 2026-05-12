@@ -152,7 +152,7 @@ func (m *docker2Manifest) MarshalJSON() ([]byte, error) {
 	if len(m.rawBody) > 0 {
 		return m.rawBody, nil
 	}
-	return json.Marshal((m.Manifest))
+	return json.Marshal(m.Manifest)
 }
 
 func (m *docker2ManifestList) MarshalJSON() ([]byte, error) {
@@ -162,7 +162,7 @@ func (m *docker2ManifestList) MarshalJSON() ([]byte, error) {
 	if len(m.rawBody) > 0 {
 		return m.rawBody, nil
 	}
-	return json.Marshal((m.ManifestList))
+	return json.Marshal(m.ManifestList)
 }
 
 func (m *docker2Manifest) MarshalPretty() ([]byte, error) {

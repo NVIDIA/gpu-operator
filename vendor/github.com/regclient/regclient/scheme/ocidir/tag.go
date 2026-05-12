@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/regclient/regclient/scheme"
+	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/mediatype"
 	"github.com/regclient/regclient/types/ref"
@@ -33,7 +34,7 @@ func (o *OCIDir) tagDelete(_ context.Context, r ref.Ref) error {
 	}
 	changed := false
 	for i, desc := range index.Manifests {
-		if t, ok := desc.Annotations[aOCIRefName]; ok && t == r.Tag {
+		if t, ok := desc.Annotations[types.AnnotationRefName]; ok && t == r.Tag {
 			// remove matching entry from index
 			index.Manifests = slices.Delete(index.Manifests, i, i+1)
 			changed = true
@@ -60,7 +61,7 @@ func (o *OCIDir) TagList(ctx context.Context, r ref.Ref, opts ...scheme.TagOpts)
 	}
 	tl := []string{}
 	for _, desc := range index.Manifests {
-		if t, ok := desc.Annotations[aOCIRefName]; ok {
+		if t, ok := desc.Annotations[types.AnnotationRefName]; ok {
 			if i := strings.LastIndex(t, ":"); i >= 0 {
 				t = t[i+1:]
 			}
