@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/opencontainers/go-digest"
 
@@ -222,7 +224,6 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 	if w := warning.FromContext(ctx); w == nil {
 		ctx = warning.NewContext(ctx, &warning.Warning{Hook: warning.DefaultHook()})
 	}
-
 	// create the request body
 	mj, err := m.MarshalJSON()
 	if err != nil {
@@ -231,20 +232,35 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 			slog.String("err", err.Error()))
 		return fmt.Errorf("error marshalling manifest for %s: %w", r.CommonName(), err)
 	}
-
 	// limit length
 	if reg.manifestMaxPush > 0 && int64(len(mj)) > reg.manifestMaxPush {
 		return fmt.Errorf("manifest too large, calculated %d, limit %d: %s%.0w", len(mj), reg.manifestMaxPush, r.CommonName(), errs.ErrSizeLimitExceeded)
 	}
+	// if the ref provides a digest, verify it matches the manifest being pushed
+	desc := m.GetDescriptor()
+	if err := desc.Digest.Validate(); err != nil {
+		return fmt.Errorf("invalid digest for manifest: %s: %w", string(desc.Digest), err)
+	}
+	if r.Digest != "" && desc.Digest.String() != r.Digest {
+		// Digest algorithm may have changed, try recreating the manifest with the provided ref.
+		// This will fail if the ref digest does not match the manifest.
+		m, err = manifest.New(manifest.WithRef(r), manifest.WithRaw(mj))
+		if err != nil {
+			return fmt.Errorf("failed to rebuilding manifest with ref \"%s\": %w", r.CommonName(), err)
+		}
+	}
 
 	// build/send request
+	expectTags := []string{}
 	headers := http.Header{
 		"Content-Type": []string{manifest.GetMediaType(m)},
 	}
 	q := url.Values{}
 	if tagOrDigest == r.Tag && m.GetDescriptor().Digest.Algorithm() != digest.Canonical {
-		// TODO(bmitch): EXPERIMENTAL parameter, registry support and OCI spec change needed
-		q.Add(paramManifestDigest, m.GetDescriptor().Digest.String())
+		// TODO(bmitch): EXPERIMENTAL support for pushing tags with a digest: <https://github.com/opencontainers/distribution-spec/pull/600>
+		tagOrDigest = m.GetDescriptor().Digest.String()
+		q.Add("tag", r.Tag)
+		expectTags = append(expectTags, r.Tag)
 	}
 	req := &reghttp.Req{
 		MetaKind:   reqmeta.Manifest,
@@ -268,6 +284,55 @@ func (reg *Reg) ManifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest,
 	}
 	if resp.HTTPResponse().StatusCode != 201 {
 		return fmt.Errorf("failed to put manifest %s: %w", r.CommonName(), reghttp.HTTPError(resp.HTTPResponse().StatusCode))
+	}
+	// if Docker-Content-Digest header was returned, verify the digest matches
+	if dig := resp.HTTPResponse().Header.Get("Docker-Content-Digest"); dig != "" && dig != m.GetDescriptor().Digest.String() {
+		return fmt.Errorf("failed to put manifest, unexpected digest returned, expected %s, received %s", m.GetDescriptor().Digest.String(), dig)
+	}
+
+	// if pushing tags by digest fails, fall back to pushing individual tags
+	respTags := []string{}
+	for _, hv := range resp.HTTPResponse().Header.Values("OCI-Tag") {
+		for sv := range strings.SplitSeq(hv, ",") {
+			respTags = append(respTags, strings.TrimSpace(sv))
+		}
+	}
+	for _, t := range expectTags {
+		if slices.Contains(respTags, t) {
+			continue
+		}
+		q := url.Values{}
+		if m.GetDescriptor().Digest.Algorithm() != digest.Canonical {
+			// TODO(bmitch): EXPERIMENTAL parameter, registry support and OCI spec change needed: <https://github.com/opencontainers/distribution-spec/pull/543>
+			q.Add(paramManifestDigest, m.GetDescriptor().Digest.String())
+		}
+		req := &reghttp.Req{
+			MetaKind:   reqmeta.Manifest,
+			Host:       r.Registry,
+			NoMirrors:  true,
+			Method:     "PUT",
+			Repository: r.Repository,
+			Path:       "manifests/" + t,
+			Query:      q,
+			Headers:    headers,
+			BodyLen:    int64(len(mj)),
+			BodyBytes:  mj,
+		}
+		resp, err := reg.reghttp.Do(ctx, req)
+		if err != nil {
+			return fmt.Errorf("failed to put manifest %s: %w", r.CommonName(), err)
+		}
+		err = resp.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close request: %w", err)
+		}
+		if resp.HTTPResponse().StatusCode != 201 {
+			return fmt.Errorf("failed to put manifest %s: %w", r.CommonName(), reghttp.HTTPError(resp.HTTPResponse().StatusCode))
+		}
+		// if Docker-Content-Digest header was returned, verify the digest matches
+		if dig := resp.HTTPResponse().Header.Get("Docker-Content-Digest"); dig != "" && dig != m.GetDescriptor().Digest.String() {
+			return fmt.Errorf("failed to put manifest, unexpected digest returned, expected %s, received %s", m.GetDescriptor().Digest.String(), dig)
+		}
 	}
 
 	rCache := r.SetDigest(m.GetDescriptor().Digest.String())

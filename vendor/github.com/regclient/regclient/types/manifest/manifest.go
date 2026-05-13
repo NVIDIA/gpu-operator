@@ -306,7 +306,7 @@ func OCIIndexToAny(ociI v1.Index, origP any) error {
 		return fmt.Errorf("manifest output must be a pointer: %T", origP)
 	}
 	origR := rv.Interface()
-	switch orig := (origR).(type) {
+	switch orig := origR.(type) {
 	case schema2.ManifestList:
 		orig.Versioned = schema2.ManifestListSchemaVersion
 		orig.Manifests = ociI.Manifests
@@ -354,7 +354,7 @@ func OCIManifestToAny(ociM v1.Manifest, origP any) error {
 		return fmt.Errorf("manifest output must be a pointer: %T", origP)
 	}
 	origR := rv.Interface()
-	switch orig := (origR).(type) {
+	switch orig := origR.(type) {
 	case schema2.Manifest:
 		orig.Versioned = schema2.ManifestSchemaVersion
 		orig.Config = ociM.Config

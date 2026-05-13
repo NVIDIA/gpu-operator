@@ -106,9 +106,10 @@ func WithManifest(m manifest.Manifest) ManifestOpts {
 
 // ReferrerConfig is used by schemes to import [ReferrerOpts].
 type ReferrerConfig struct {
-	MatchOpt descriptor.MatchOpt // filter/sort results
-	Platform string              // get referrers for a specific platform
-	SrcRepo  ref.Ref             // repo used to query referrers
+	MatchOpt   descriptor.MatchOpt // filter/sort results
+	Platform   string              // get referrers for a specific platform
+	SlowSearch bool                // search every manifest in an OCI Layout index.json file
+	SrcRepo    ref.Ref             // repo used to query referrers
 }
 
 // ReferrerOpts is used to set options on referrer APIs.
@@ -126,6 +127,14 @@ func WithReferrerMatchOpt(mo descriptor.MatchOpt) ReferrerOpts {
 func WithReferrerPlatform(p string) ReferrerOpts {
 	return func(config *ReferrerConfig) {
 		config.Platform = p
+	}
+}
+
+// WithReferrerSlowSearch looks for referrers in ways that increases compatibility but takes longer.
+// When used with an OCI Layout, this searches every manifest for a subject for ORAS compatibility.
+func WithReferrerSlowSearch() ReferrerOpts {
+	return func(config *ReferrerConfig) {
+		config.SlowSearch = true
 	}
 }
 
