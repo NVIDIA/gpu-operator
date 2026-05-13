@@ -19,6 +19,7 @@ import (
 	"github.com/opencontainers/go-digest"
 
 	"github.com/regclient/regclient/scheme"
+	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/manifest"
 	"github.com/regclient/regclient/types/mediatype"
@@ -241,11 +242,11 @@ func (o *OCIDir) manifestPut(ctx context.Context, r ref.Ref, m manifest.Manifest
 			return fmt.Errorf("failed to rebuilding manifest with ref \"%s\": %w", r.CommonName(), err)
 		}
 	}
+	desc.Annotations = map[string]string{}
 	if r.Tag != "" {
-		desc.Annotations = map[string]string{
-			aOCIRefName: r.Tag,
-		}
+		desc.Annotations[types.AnnotationRefName] = r.Tag
 	}
+	// TODO: if the manifest contains a subject, option to add descriptor details and include entry in the index.json, config.child=false
 	// create manifest CAS file
 	dir := path.Join(r.Path, "blobs", desc.Digest.Algorithm().String())
 	//#nosec G301 defer to user umask settings

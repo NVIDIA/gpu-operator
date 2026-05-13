@@ -35,9 +35,7 @@ func (reg *Reg) ReferrerList(ctx context.Context, rSubject ref.Ref, opts ...sche
 	} else {
 		r = rSubject.SetDigest(rSubject.Digest)
 	}
-	rl := referrer.ReferrerList{
-		Tags: []string{},
-	}
+	rl := referrer.New(rSubject)
 	if rSubject.Digest == "" {
 		return rl, fmt.Errorf("digest required to query referrers %s", rSubject.CommonName())
 	}
@@ -92,10 +90,7 @@ func (reg *Reg) ReferrerList(ctx context.Context, rSubject ref.Ref, opts ...sche
 }
 
 func (reg *Reg) referrerListByAPI(ctx context.Context, r ref.Ref, config scheme.ReferrerConfig) (referrer.ReferrerList, error) {
-	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
-	}
+	rl := referrer.New(r)
 	var link *url.URL
 	// loop for paging
 	for {
@@ -103,10 +98,9 @@ func (reg *Reg) referrerListByAPI(ctx context.Context, r ref.Ref, config scheme.
 		if err != nil {
 			return rl, err
 		}
-		if rl.Manifest == nil {
-			rl = rlAdd
-		} else {
-			rl.Descriptors = append(rl.Descriptors, rlAdd.Descriptors...)
+		err = rl.Merge(rlAdd)
+		if err != nil {
+			return rl, err
 		}
 		if linkNext == nil {
 			break
@@ -117,10 +111,7 @@ func (reg *Reg) referrerListByAPI(ctx context.Context, r ref.Ref, config scheme.
 }
 
 func (reg *Reg) referrerListByAPIPage(ctx context.Context, r ref.Ref, config scheme.ReferrerConfig, link *url.URL) (referrer.ReferrerList, *url.URL, error) {
-	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
-	}
+	rl := referrer.New(r)
 	query := url.Values{}
 	if config.MatchOpt.ArtifactType != "" {
 		query.Set("artifactType", config.MatchOpt.ArtifactType)
@@ -172,7 +163,7 @@ func (reg *Reg) referrerListByAPIPage(ctx context.Context, r ref.Ref, config sch
 
 	// lookup next link
 	respHead := resp.HTTPResponse().Header
-	links, err := httplink.Parse((respHead.Values("Link")))
+	links, err := httplink.Parse(respHead.Values("Link"))
 	if err != nil {
 		return rl, nil, err
 	}
@@ -195,10 +186,7 @@ func (reg *Reg) referrerListByAPIPage(ctx context.Context, r ref.Ref, config sch
 }
 
 func (reg *Reg) referrerListByTag(ctx context.Context, r ref.Ref) (referrer.ReferrerList, error) {
-	rl := referrer.ReferrerList{
-		Subject: r,
-		Tags:    []string{},
-	}
+	rl := referrer.New(r)
 	rlTag, err := referrer.FallbackTag(r)
 	if err != nil {
 		return rl, err

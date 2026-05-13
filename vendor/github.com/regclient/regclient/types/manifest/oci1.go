@@ -186,7 +186,7 @@ func (m *oci1Manifest) MarshalJSON() ([]byte, error) {
 		return m.rawBody, nil
 	}
 
-	return json.Marshal((m.Manifest))
+	return json.Marshal(m.Manifest)
 }
 
 func (m *oci1Manifest) GetSubject() (*descriptor.Descriptor, error) {
@@ -219,7 +219,7 @@ func (m *oci1Index) MarshalJSON() ([]byte, error) {
 		return m.rawBody, nil
 	}
 
-	return json.Marshal((m.Index))
+	return json.Marshal(m.Index)
 }
 
 func (m *oci1Artifact) MarshalJSON() ([]byte, error) {
@@ -231,7 +231,7 @@ func (m *oci1Artifact) MarshalJSON() ([]byte, error) {
 		return m.rawBody, nil
 	}
 
-	return json.Marshal((m.ArtifactManifest))
+	return json.Marshal(m.ArtifactManifest)
 }
 
 func (m *oci1Manifest) MarshalPretty() ([]byte, error) {

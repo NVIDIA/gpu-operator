@@ -69,7 +69,8 @@ func New(opts ...Opt) *RegClient {
 	for _, h := range rc.hosts {
 		hostList = append(hostList, h)
 	}
-	rc.regOpts = append(rc.regOpts,
+	rc.regOpts = append(
+		rc.regOpts,
 		reg.WithConfigHosts(hostList),
 		reg.WithConfigHostDefault(rc.hostDefault),
 		reg.WithSlog(rc.slog),

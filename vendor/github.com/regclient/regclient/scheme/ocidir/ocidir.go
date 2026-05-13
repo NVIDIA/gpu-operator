@@ -13,9 +13,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/regclient/regclient/internal/pqueue"
+	"github.com/regclient/regclient/internal/reproducible"
 	"github.com/regclient/regclient/internal/reqmeta"
+	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/descriptor"
 	"github.com/regclient/regclient/types/errs"
 	"github.com/regclient/regclient/types/mediatype"
@@ -25,8 +28,6 @@ import (
 
 const (
 	imageLayoutFile = "oci-layout"
-	aOCIRefName     = "org.opencontainers.image.ref.name"
-	aCtrdImageName  = "io.containerd.image.name"
 	defThrottle     = 3
 )
 
@@ -347,13 +348,13 @@ func indexGet(index v1.Index, r ref.Ref) (descriptor.Descriptor, error) {
 		}
 	} else if r.Tag != "" {
 		for _, im := range index.Manifests {
-			if name, ok := im.Annotations[aOCIRefName]; ok && name == r.Tag {
+			if name, ok := im.Annotations[types.AnnotationRefName]; ok && name == r.Tag {
 				return im, nil
 			}
 		}
 		// fall back to support full image name in annotation
 		for _, im := range index.Manifests {
-			if name, ok := im.Annotations[aOCIRefName]; ok && strings.HasSuffix(name, ":"+r.Tag) {
+			if name, ok := im.Annotations[types.AnnotationRefName]; ok && strings.HasSuffix(name, ":"+r.Tag) {
 				return im, nil
 			}
 		}
@@ -365,11 +366,14 @@ func indexSet(index *v1.Index, r ref.Ref, d descriptor.Descriptor) error {
 	if index == nil {
 		return fmt.Errorf("index is nil")
 	}
+	if d.Annotations == nil {
+		d.Annotations = map[string]string{}
+	}
 	if r.Tag != "" {
-		if d.Annotations == nil {
-			d.Annotations = map[string]string{}
-		}
-		d.Annotations[aOCIRefName] = r.Tag
+		d.Annotations[types.AnnotationRefName] = r.Tag
+	}
+	if _, ok := d.Annotations[types.AnnotationCreated]; !ok {
+		d.Annotations[types.AnnotationCreated] = reproducible.TimeNow().Format(time.RFC3339)
 	}
 	if index.Manifests == nil {
 		index.Manifests = []descriptor.Descriptor{}
@@ -379,10 +383,17 @@ func indexSet(index *v1.Index, r ref.Ref, d descriptor.Descriptor) error {
 	for i := range index.Manifests {
 		var name string
 		if index.Manifests[i].Annotations != nil {
-			name = index.Manifests[i].Annotations[aOCIRefName]
+			name = index.Manifests[i].Annotations[types.AnnotationRefName]
 		}
-		if (name == "" && index.Manifests[i].Digest == d.Digest) || (r.Tag != "" && name == r.Tag) {
-			index.Manifests[i] = d
+		if r.Tag == "" && name == "" && index.Manifests[i].Digest == d.Digest {
+			// untagged entry already exists, no need to replace it
+			pos = i
+			break
+		} else if r.Tag != "" && name == r.Tag {
+			if index.Manifests[i].Digest != d.Digest {
+				// replace the tag with a new digest/descriptor
+				index.Manifests[i] = d
+			}
 			pos = i
 			break
 		}
@@ -392,11 +403,11 @@ func indexSet(index *v1.Index, r ref.Ref, d descriptor.Descriptor) error {
 		for i := len(index.Manifests) - 1; i > pos; i-- {
 			var name string
 			if index.Manifests[i].Annotations != nil {
-				name = index.Manifests[i].Annotations[aOCIRefName]
+				name = index.Manifests[i].Annotations[types.AnnotationRefName]
 			}
-			// prune entries without any tag and a matching digest
+			// prune untagged entries with a matching digest if we didn't push a tag
 			// or entries with a matching tag
-			if (name == "" && index.Manifests[i].Digest == d.Digest) || (r.Tag != "" && name == r.Tag) {
+			if (r.Tag == "" && name == "" && index.Manifests[i].Digest == d.Digest) || (r.Tag != "" && name == r.Tag) {
 				index.Manifests = slices.Delete(index.Manifests, i, i+1)
 			}
 		}
