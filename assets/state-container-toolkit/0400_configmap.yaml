@@ -23,7 +23,7 @@ data:
     # The below delay is a workaround for an issue affecting some versions
     # of containerd starting with 1.6.9. Staring with containerd 1.6.9 we
     # started seeing the toolkit container enter a crashloop whereby it
-    # would recieve a SIGTERM shortly after restarting containerd.
+    # would receive a SIGTERM shortly after restarting containerd.
     #
     # Refer to the commit message where this workaround was implemented
     # for additional details:
