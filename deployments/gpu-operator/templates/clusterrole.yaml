@@ -87,6 +87,7 @@ rules:
   - get
   - list
   - watch
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -178,6 +179,26 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomaincliques
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - create
+  - update
 - apiGroups:
   - resource.k8s.io
   resources:
