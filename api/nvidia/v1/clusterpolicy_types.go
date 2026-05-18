@@ -1015,6 +1015,16 @@ type DRADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:io.kubernetes:Secret"
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
+	// FeatureGates is a map of NVIDIA DRA Driver feature gate names to bool values,
+	// passed to the controller and both kubelet-plugin containers as the
+	// FEATURE_GATES environment variable. See the k8s-dra-driver-gpu project for
+	// the list of supported gate names.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Feature Gates"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced"
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
 	// GPUs defines configuration for GPUs in the NVIDIA DRA Driver
 	GPUs DRADriverGPUs `json:"gpus,omitempty"`
 

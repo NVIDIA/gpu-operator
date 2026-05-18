@@ -5161,3 +5161,64 @@ func TestTransformDRADriverController(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyDRAFeatureGates(t *testing.T) {
+	testCases := []struct {
+		description string
+		gates       map[string]bool
+		initialEnv  []corev1.EnvVar
+		expectedEnv []corev1.EnvVar
+	}{
+		{
+			description: "empty map is a no-op",
+			gates:       map[string]bool{},
+			initialEnv:  []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+			expectedEnv: []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+		},
+		{
+			description: "nil map is a no-op",
+			gates:       nil,
+			initialEnv:  []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+			expectedEnv: []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+		},
+		{
+			description: "single gate renders Key=true with trailing comma",
+			gates:       map[string]bool{"NVMLDeviceHealthCheck": true},
+			expectedEnv: []corev1.EnvVar{{Name: "FEATURE_GATES", Value: "NVMLDeviceHealthCheck=true,"}},
+		},
+		{
+			description: "multiple gates render in alphabetical order",
+			gates:       map[string]bool{"DynamicMIG": false, "NVMLDeviceHealthCheck": true, "MPSSupport": true},
+			expectedEnv: []corev1.EnvVar{{Name: "FEATURE_GATES", Value: "DynamicMIG=false,MPSSupport=true,NVMLDeviceHealthCheck=true,"}},
+		},
+		{
+			description: "overwrites existing FEATURE_GATES entry without duplicating",
+			gates:       map[string]bool{"DynamicMIG": true},
+			initialEnv: []corev1.EnvVar{
+				{Name: "FEATURE_GATES", Value: "stale=true,"},
+				{Name: "OTHER", Value: "preserved"},
+			},
+			expectedEnv: []corev1.EnvVar{
+				{Name: "FEATURE_GATES", Value: "DynamicMIG=true,"},
+				{Name: "OTHER", Value: "preserved"},
+			},
+		},
+		{
+			description: "appends FEATURE_GATES when not present, preserves siblings",
+			gates:       map[string]bool{"DynamicMIG": true},
+			initialEnv:  []corev1.EnvVar{{Name: "OTHER", Value: "preserved"}},
+			expectedEnv: []corev1.EnvVar{
+				{Name: "OTHER", Value: "preserved"},
+				{Name: "FEATURE_GATES", Value: "DynamicMIG=true,"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &corev1.Container{Env: tc.initialEnv}
+			applyDRAFeatureGates(c, tc.gates)
+			assert.Equal(t, tc.expectedEnv, c.Env)
+		})
+	}
+}

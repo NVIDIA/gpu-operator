@@ -1066,6 +1066,15 @@ spec:
                             type: object
                         type: object
                     type: object
+                  featureGates:
+                    additionalProperties:
+                      type: boolean
+                    description: |-
+                      FeatureGates is a map of NVIDIA DRA Driver feature gate names to bool values,
+                      passed to the controller and both kubelet-plugin containers as the
+                      FEATURE_GATES environment variable. See the k8s-dra-driver-gpu project for
+                      the list of supported gate names.
+                    type: object
                   gpus:
                     description: GPUs defines configuration for GPUs in the NVIDIA
                       DRA Driver

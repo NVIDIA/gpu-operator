@@ -1917,6 +1917,8 @@ func TransformDRADriverKubeletPlugin(obj *appsv1.DaemonSet, config *gpuv1.Cluste
 			}
 		}
 
+		applyDRAFeatureGates(&obj.Spec.Template.Spec.Containers[i], config.DRADriver.FeatureGates)
+
 		containers = append(containers, obj.Spec.Template.Spec.Containers[i])
 	}
 	obj.Spec.Template.Spec.Containers = containers
@@ -1951,6 +1953,27 @@ func transformDRADriverRoot(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySp
 			obj.Spec.Template.Spec.Volumes[i].HostPath.Path = driverRootParent
 		}
 	}
+}
+
+// applyDRAFeatureGates renders gates as the FEATURE_GATES env var on the
+// container. Format matches the upstream k8s-dra-driver-gpu Helm chart
+// (comma-separated Key=Value with trailing comma); keys are sorted so the
+// rendered string is a pure function of the input map and reconciles don't
+// churn the pod spec. No-op when empty.
+func applyDRAFeatureGates(container *corev1.Container, gates map[string]bool) {
+	if len(gates) == 0 {
+		return
+	}
+	names := make([]string, 0, len(gates))
+	for name := range gates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var value strings.Builder
+	for _, name := range names {
+		fmt.Fprintf(&value, "%s=%t,", name, gates[name])
+	}
+	setContainerEnv(container, "FEATURE_GATES", value.String())
 }
 
 // TransformDCGMExporter transforms dcgm exporter daemonset with required config as per ClusterPolicy
@@ -4367,6 +4390,8 @@ func TransformDRADriverController(obj *appsv1.Deployment, spec *gpuv1.ClusterPol
 			setContainerEnv(computeDomainsCtr, env.Name, env.Value)
 		}
 	}
+
+	applyDRAFeatureGates(computeDomainsCtr, config.FeatureGates)
 
 	if config.ComputeDomains.Controller.Resources != nil {
 		computeDomainsCtr.Resources.Requests = config.ComputeDomains.Controller.Resources.Requests

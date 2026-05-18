@@ -610,6 +610,13 @@ func (in *DRADriverSpec) DeepCopyInto(out *DRADriverSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.GPUs.DeepCopyInto(&out.GPUs)
 	in.ComputeDomains.DeepCopyInto(&out.ComputeDomains)
 }

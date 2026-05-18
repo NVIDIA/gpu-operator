@@ -287,6 +287,10 @@ draDriver:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
 
+  # Feature gates passed to all DRA driver containers as the FEATURE_GATES env var.
+  # Names defined in https://github.com/NVIDIA/k8s-dra-driver-gpu/blob/main/pkg/featuregates/featuregates.go
+  featureGates: {}
+
   gpus:
     enabled: false
     kubeletPlugin:

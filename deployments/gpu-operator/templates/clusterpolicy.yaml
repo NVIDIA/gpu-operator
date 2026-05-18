@@ -534,6 +534,9 @@ spec:
     {{- if .Values.draDriver.imagePullSecrets }}
     imagePullSecrets: {{ toYaml .Values.draDriver.imagePullSecrets | nindent 6 }}
     {{- end }}
+    {{- if .Values.draDriver.featureGates }}
+    featureGates: {{ toYaml .Values.draDriver.featureGates | nindent 6 }}
+    {{- end }}
     gpus:
       enabled: {{ .Values.draDriver.gpus.enabled }}
       kubeletPlugin:
