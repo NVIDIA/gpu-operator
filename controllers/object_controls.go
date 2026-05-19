@@ -1489,21 +1489,19 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
 	}
 
-	if config.CDI.IsNRIPluginEnabled() {
-		// setup mounts for the runtime NRI socket file
-		nriSocketFile := getContainerEnv(container, "NRI_SOCKET")
-		if nriSocketFile == "" {
-			nriSocketFile = DefaultRuntimeNRISocketFile
-		}
-		setContainerEnv(container, "NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
-
-		nriVolMountSocketName := "nri-socket"
-		nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
-		container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
-
-		nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
+	// setup mounts for the runtime NRI socket file
+	nriSocketFile := getContainerEnv(container, "NRI_SOCKET")
+	if nriSocketFile == "" {
+		nriSocketFile = DefaultRuntimeNRISocketFile
 	}
+	setContainerEnv(container, "NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
+
+	nriVolMountSocketName := "nri-socket"
+	nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
+	container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
+
+	nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
 
 	return nil
 }
@@ -2771,7 +2769,7 @@ func setRuntimeClassName(podSpec *corev1.PodSpec, config *gpuv1.ClusterPolicySpe
 		return
 	}
 	runtimeClassName := getRuntimeClassName(config)
-	podSpec.RuntimeClassName = &runtimeClassName
+	podSpec.RuntimeClassName = new(runtimeClassName)
 }
 
 func setContainerProbe(container *corev1.Container, probe *gpuv1.ContainerProbeSpec, probeType ContainerProbe) {
