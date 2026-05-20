@@ -70,9 +70,20 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
     make && \
     cp ${SAMPLE_NAME} /build/${SAMPLE_NAME}
 
+# Build a static busybox layout: one binary plus applet symlinks (sh, rm,
+# ln, sleep, cat, ...) so PATH-resolved commands in init-container wrappers
+# and lifecycle hooks keep working on the non-*-dev* distroless base.
+FROM debian:trixie-slim AS shell
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends busybox-static \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir /busybox \
+ && cp /bin/busybox /busybox/busybox \
+ && /busybox/busybox --install -s /busybox
+
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.0.6-dev
+FROM nvcr.io/nvidia/distroless/cc:v4.0.6
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
@@ -89,6 +100,12 @@ LABEL description="See summary"
 LABEL vsc-ref=${GIT_COMMIT}
 
 WORKDIR /
+
+COPY --from=shell /busybox /busybox
+USER 0:0
+RUN ["/busybox/ln", "-s", "/busybox/sh", "/bin/sh"]
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/busybox
+
 COPY --from=builder /workspace/gpu-operator /usr/bin/
 COPY --from=builder /workspace/manage-crds /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
