@@ -24,6 +24,7 @@ spec:
           effect: NoSchedule
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-dcgm-exporter
+      automountServiceAccountToken: false
       initContainers:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"

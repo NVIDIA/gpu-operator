@@ -445,6 +445,33 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
+var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
+	"nvidia-dcgm-exporter-read-pods": func(config *gpuv1.ClusterPolicySpec) bool {
+		return isDCGMExporterKubernetesPodMetadataEnabled(&config.DCGMExporter)
+	},
+}
+
+func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
+	gate, ok := rbacGates[name]
+	if !ok {
+		return true
+	}
+	return gate(config)
+}
+
+func isDCGMExporterKubernetesPodMetadataEnabled(config *gpuv1.DCGMExporterSpec) bool {
+	for _, env := range config.Env {
+		switch env.Name {
+		case "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID":
+			enabled, err := strconv.ParseBool(env.Value)
+			if err == nil && enabled {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ClusterRole creates ClusterRole resource
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
@@ -456,6 +483,15 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
@@ -497,6 +533,15 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		err := n.client.Delete(ctx, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			logger.Info("Couldn't delete", "Error", err)
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Disabled, nil
+	}
+
+	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
@@ -1818,6 +1863,10 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 		jobMappingVol := corev1.Volume{Name: "hpc-job-mapping", VolumeSource: jobMappingVolumeSource}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, jobMappingVol)
+	}
+
+	if isDCGMExporterKubernetesPodMetadataEnabled(&config.DCGMExporter) {
+		obj.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(true)
 	}
 
 	// mount configmap for custom metrics if provided by user
