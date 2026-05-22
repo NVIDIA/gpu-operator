@@ -1053,6 +1053,8 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 		}
 	}
 
+	applyMemoryHotplugAutoOnlineMount(&obj.Spec.Template.Spec, n.memoryHotplugAutoOnline)
+
 	// Compute driver configuration digest after all transformations are complete.
 	// This digest enables fast-path driver installation by detecting when configuration
 	// hasn't changed, avoiding unnecessary driver reinstalls and pod evictions.
@@ -3567,6 +3569,70 @@ func applyLicensingConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	}
 	licensingConfigVol := corev1.Volume{Name: "licensing-config", VolumeSource: licensingConfigVolumeSource}
 	podSpec.Volumes = append(podSpec.Volumes, licensingConfigVol)
+}
+
+func applyMemoryHotplugAutoOnlineMount(podSpec *corev1.PodSpec, enabled bool) {
+	const (
+		volumeName = "sysfs-memory-online"
+		mountPath  = "/sys/devices/system/memory/auto_online_blocks"
+	)
+
+	if enabled {
+		driverContainer := findContainerByName(podSpec.Containers, "nvidia-driver-ctr")
+		if driverContainer != nil && !hasVolumeMount(driverContainer.VolumeMounts, volumeName) {
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, corev1.VolumeMount{
+				Name:      volumeName,
+				MountPath: mountPath,
+			})
+		}
+		if !hasVolume(podSpec.Volumes, volumeName) {
+			podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{Path: mountPath},
+				},
+			})
+		}
+		return
+	}
+
+	for i := range podSpec.Containers {
+		volumeMounts := podSpec.Containers[i].VolumeMounts[:0]
+		for _, volumeMount := range podSpec.Containers[i].VolumeMounts {
+			if volumeMount.Name == volumeName {
+				continue
+			}
+			volumeMounts = append(volumeMounts, volumeMount)
+		}
+		podSpec.Containers[i].VolumeMounts = volumeMounts
+	}
+
+	volumes := podSpec.Volumes[:0]
+	for _, volume := range podSpec.Volumes {
+		if volume.Name == volumeName {
+			continue
+		}
+		volumes = append(volumes, volume)
+	}
+	podSpec.Volumes = volumes
+}
+
+func hasVolumeMount(volumeMounts []corev1.VolumeMount, name string) bool {
+	for _, volumeMount := range volumeMounts {
+		if volumeMount.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasVolume(volumes []corev1.Volume, name string) bool {
+	for _, volume := range volumes {
+		if volume.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {

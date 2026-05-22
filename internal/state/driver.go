@@ -89,15 +89,16 @@ type additionalConfigs struct {
 }
 
 type driverRenderData struct {
-	Driver            *driverSpec
-	GDS               *gdsDriverSpec
-	GPUDirectRDMA     *nvidiav1alpha1.GPUDirectRDMASpec
-	GDRCopy           *gdrcopyDriverSpec
-	Runtime           *driverRuntimeSpec
-	Openshift         *openshiftSpec
-	Precompiled       *precompiledSpec
-	AdditionalConfigs *additionalConfigs
-	HostRoot          string
+	Driver                  *driverSpec
+	GDS                     *gdsDriverSpec
+	GPUDirectRDMA           *nvidiav1alpha1.GPUDirectRDMASpec
+	GDRCopy                 *gdrcopyDriverSpec
+	Runtime                 *driverRuntimeSpec
+	Openshift               *openshiftSpec
+	Precompiled             *precompiledSpec
+	AdditionalConfigs       *additionalConfigs
+	HostRoot                string
+	MemoryHotplugAutoOnline bool
 }
 
 // ConfigDigest computes a hash of all driver-install-relevant fields.
@@ -301,6 +302,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			return nil, fmt.Errorf("failed to construct driver spec: %w", err)
 		}
 		renderData.Driver = driverSpec
+		renderData.MemoryHotplugAutoOnline = nodePool.memoryHotplugAutoOnline
 
 		if cr.Spec.UsePrecompiledDrivers() {
 			renderData.Precompiled = &precompiledSpec{

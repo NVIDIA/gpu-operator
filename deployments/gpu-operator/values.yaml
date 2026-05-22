@@ -584,6 +584,9 @@ node-feature-discovery:
       effect: NoSchedule
     config:
       sources:
+        kernel:
+          configOpts:
+          - "MEMORY_HOTPLUG"
         pci:
           deviceClassWhitelist:
           - "02"

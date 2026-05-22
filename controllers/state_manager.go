@@ -39,31 +39,32 @@ import (
 )
 
 const (
-	commonGPULabelKey                   = "nvidia.com/gpu.present"
-	commonGPULabelValue                 = "true"
-	commonOperandsLabelKey              = "nvidia.com/gpu.deploy.operands"
-	commonOperandsLabelValue            = "true"
-	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
-	migManagerLabelValue                = "true"
-	migCapableLabelKey                  = "nvidia.com/mig.capable"
-	migCapableLabelValue                = "true"
-	migConfigLabelKey                   = "nvidia.com/mig.config"
-	migConfigDisabledValue              = "all-disabled"
-	vgpuHostDriverLabelKey              = "nvidia.com/vgpu.host-driver-version"
-	gpuProductLabelKey                  = "nvidia.com/gpu.product"
-	nfdLabelPrefix                      = "feature.node.kubernetes.io/"
-	nfdKernelLabelKey                   = "feature.node.kubernetes.io/kernel-version.full"
-	nfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
-	nfdOSReleaseIDLabelKey              = "feature.node.kubernetes.io/system-os_release.ID"
-	nfdOSVersionIDLabelKey              = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
-	ocpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
-	ocpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
-	appLabelKey                         = "app"
-	ocpDriverToolkitIdentificationValue = "true"
-	ocpNamespaceMonitoringLabelKey      = "openshift.io/cluster-monitoring"
-	ocpNamespaceMonitoringLabelValue    = "true"
-	precompiledIdentificationLabelKey   = "nvidia.com/precompiled"
-	precompiledIdentificationLabelValue = "true"
+	commonGPULabelKey                    = "nvidia.com/gpu.present"
+	commonGPULabelValue                  = "true"
+	commonOperandsLabelKey               = "nvidia.com/gpu.deploy.operands"
+	commonOperandsLabelValue             = "true"
+	migManagerLabelKey                   = "nvidia.com/gpu.deploy.mig-manager"
+	migManagerLabelValue                 = "true"
+	migCapableLabelKey                   = "nvidia.com/mig.capable"
+	migCapableLabelValue                 = "true"
+	migConfigLabelKey                    = "nvidia.com/mig.config"
+	migConfigDisabledValue               = "all-disabled"
+	vgpuHostDriverLabelKey               = "nvidia.com/vgpu.host-driver-version"
+	gpuProductLabelKey                   = "nvidia.com/gpu.product"
+	nfdLabelPrefix                       = "feature.node.kubernetes.io/"
+	nfdKernelLabelKey                    = "feature.node.kubernetes.io/kernel-version.full"
+	nfdKernelConfigMemoryHotplugLabelKey = "feature.node.kubernetes.io/kernel-config.MEMORY_HOTPLUG"
+	nfdOSTreeVersionLabelKey             = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+	nfdOSReleaseIDLabelKey               = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOSVersionIDLabelKey               = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	ocpDriverToolkitVersionLabel         = "openshift.driver-toolkit.rhcos"
+	ocpDriverToolkitIdentificationLabel  = "openshift.driver-toolkit"
+	appLabelKey                          = "app"
+	ocpDriverToolkitIdentificationValue  = "true"
+	ocpNamespaceMonitoringLabelKey       = "openshift.io/cluster-monitoring"
+	ocpNamespaceMonitoringLabelValue     = "true"
+	precompiledIdentificationLabelKey    = "nvidia.com/precompiled"
+	precompiledIdentificationLabelValue  = "true"
 	// see bundle/manifests/gpu-operator.clusterserviceversion.yaml
 	//     --> ClusterServiceVersion.metadata.annotations.operatorframework.io/suggested-namespace
 	ocpSuggestedNamespace              = "nvidia-gpu-operator"
@@ -164,12 +165,13 @@ type ClusterPolicyController struct {
 	openshift        string
 	ocpDriverToolkit OpenShiftDriverToolkit
 
-	runtime          gpuv1.Runtime
-	gpuNodeOSTag     string
-	gpuNodeOSRelease string
-	hasGPUNodes      bool
-	hasNFDLabels     bool
-	sandboxEnabled   bool
+	runtime                 gpuv1.Runtime
+	gpuNodeOSTag            string
+	gpuNodeOSRelease        string
+	hasGPUNodes             bool
+	hasNFDLabels            bool
+	memoryHotplugAutoOnline bool
+	sandboxEnabled          bool
 }
 
 func addState(n *ClusterPolicyController, path string) {
@@ -529,6 +531,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	}
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
+	memoryHotplugAutoOnline := true
 	for _, node := range list.Items {
 		node := node
 		updateLabels := false
@@ -569,6 +572,10 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		}
 
 		if hasCommonGPULabel(labels) {
+			if labels[nfdKernelConfigMemoryHotplugLabelKey] != "true" {
+				memoryHotplugAutoOnline = false
+			}
+
 			// If node has GPU, then add state labels as per the workload type
 			n.logger.Info("Checking GPU state labels on the node", "NodeName", node.Name)
 			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
@@ -616,6 +623,7 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 		}
 	} // end node loop
 
+	n.memoryHotplugAutoOnline = gpuNodesTotal > 0 && memoryHotplugAutoOnline
 	n.logger.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
 	return clusterHasNFDLabels, gpuNodesTotal, nil

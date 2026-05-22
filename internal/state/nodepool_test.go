@@ -17,9 +17,14 @@
 package state
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestGetOSTag(t *testing.T) {
@@ -94,4 +99,45 @@ func TestGetOSTag(t *testing.T) {
 			require.Equal(t, test.expected, actual)
 		})
 	}
+}
+
+func TestGetNodePoolsMemoryHotplugAutoOnline(t *testing.T) {
+	nodeLabels := map[string]string{
+		"nvidia.com/gpu.present":             "true",
+		nfdOSReleaseIDLabelKey:               "ubuntu",
+		nfdOSVersionIDLabelKey:               "22.04",
+		nfdKernelConfigMemoryHotplugLabelKey: "true",
+	}
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-0", Labels: nodeLabels}}
+	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(node).Build()
+
+	pools, err := getNodePools(context.Background(), client, nil, false, false)
+	require.NoError(t, err)
+	require.Len(t, pools, 1)
+	require.True(t, pools[0].memoryHotplugAutoOnline)
+}
+
+func TestGetNodePoolsDisablesMemoryHotplugAutoOnlineForMixedPool(t *testing.T) {
+	baseLabels := map[string]string{
+		"nvidia.com/gpu.present": "true",
+		nfdOSReleaseIDLabelKey:   "ubuntu",
+		nfdOSVersionIDLabelKey:   "22.04",
+	}
+	nodeWithMemoryHotplug := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-0", Labels: map[string]string{}}}
+	for key, value := range baseLabels {
+		nodeWithMemoryHotplug.Labels[key] = value
+	}
+	nodeWithMemoryHotplug.Labels[nfdKernelConfigMemoryHotplugLabelKey] = "true"
+
+	nodeWithoutMemoryHotplug := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{}}}
+	for key, value := range baseLabels {
+		nodeWithoutMemoryHotplug.Labels[key] = value
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(nodeWithMemoryHotplug, nodeWithoutMemoryHotplug).Build()
+
+	pools, err := getNodePools(context.Background(), client, nil, false, false)
+	require.NoError(t, err)
+	require.Len(t, pools, 1)
+	require.False(t, pools[0].memoryHotplugAutoOnline)
 }

@@ -142,6 +142,28 @@ func TestDriverRenderMinimal(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverRenderSkipsMemoryHotplugMountWhenUnsupported(t *testing.T) {
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.MemoryHotplugAutoOnline = false
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	actual, err := getYAMLString(objs)
+	require.Nil(t, err)
+	require.NotContains(t, actual, "sysfs-memory-online")
+	require.NotContains(t, actual, "/sys/devices/system/memory/auto_online_blocks")
+}
+
 func TestDriverHostNetwork(t *testing.T) {
 	const (
 		testName = "driver-hostnetwork"
@@ -816,7 +838,8 @@ func getMinimalDriverRenderData() *driverRenderData {
 		Runtime: &driverRuntimeSpec{
 			Namespace: "test-operator",
 		},
-		HostRoot: "",
+		HostRoot:                "",
+		MemoryHotplugAutoOnline: true,
 	}
 }
 
