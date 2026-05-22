@@ -430,6 +430,13 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
@@ -464,6 +471,21 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		in, out := &in.HPCJobMapping, &out.HPCJobMapping
 		*out = new(DCGMExporterHPCJobMappingConfig)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.EnablePodLabels != nil {
+		in, out := &in.EnablePodLabels, &out.EnablePodLabels
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnablePodUID != nil {
+		in, out := &in.EnablePodUID, &out.EnablePodUID
+		*out = new(bool)
+		**out = **in
+	}
+	if in.PodLabelAllowlistRegex != nil {
+		in, out := &in.PodLabelAllowlistRegex, &out.PodLabelAllowlistRegex
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 }
 

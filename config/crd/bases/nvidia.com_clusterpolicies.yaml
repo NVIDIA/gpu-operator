@@ -553,6 +553,14 @@ spec:
               dcgmExporter:
                 description: DCGMExporter spec
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Optional: Annotations is an unstructured key value map stored with a resource that may be
+                      set by external tools to store and retrieve arbitrary metadata. They are not
+                      queryable and should be preserved when modifying objects.
+                    type: object
                   args:
                     description: 'Optional: List of arguments'
                     items:
@@ -567,6 +575,16 @@ spec:
                           metrics to be collected by NVIDIA DCGM Exporter
                         type: string
                     type: object
+                  enablePodLabels:
+                    description: |-
+                      Enable Kubernetes pod labels as Prometheus label dimensions in DCGM exporter metrics.
+                      (Requires cluster-level read access to pods.)
+                    type: boolean
+                  enablePodUID:
+                    description: |-
+                      Enable Kubernetes pod UID as a Prometheus label dimension in DCGM exporter metrics.
+                      (Requires cluster-level read access to pods.)
+                    type: boolean
                   enabled:
                     description: Enabled indicates if deployment of NVIDIA DCGM Exporter
                       through operator is enabled
@@ -617,6 +635,13 @@ spec:
                     type: string
                   imagePullSecrets:
                     description: Image pull secrets
+                    items:
+                      type: string
+                    type: array
+                  podLabelAllowlistRegex:
+                    description: |-
+                      Regex list for filtering which Kubernetes pod labels are included in DCGM exporter metrics.
+                      Empty means all pod labels are included.
                     items:
                       type: string
                     type: array

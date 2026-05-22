@@ -188,6 +188,11 @@ func (d Daemonset) WithHostPID(enabled bool) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithAutomountServiceAccountToken(enabled bool) Daemonset {
+	d.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(enabled)
+	return d
+}
+
 func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
 	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
 	return d
@@ -1511,6 +1516,138 @@ func TestTransformDCGMExporter(t *testing.T) {
 				WithPullSecret("pull-secret").
 				WithRuntimeClassName("nvidia").
 				WithHostPathVolume("hpc-job-mapping", "/run/nvidia/dcgm-job-mapping", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
+			description: "transform dcgm exporter with extra annotations adds it at pod template level",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository: "nvcr.io/nvidia/k8s",
+					Image:      "dcgm-exporter",
+					Version:    "v1.0.0",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+						"prometheus.io/port":   "8080",
+						"prometheus.io/path":   "/metrics",
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"prometheus.io/scrape": "true",
+					"prometheus.io/port":   "8080",
+					"prometheus.io/path":   "/metrics",
+				}).
+				WithContainer(corev1.Container{
+					Name:            "dcgm-exporter",
+					Image:           "nvcr.io/nvidia/k8s/dcgm-exporter:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					},
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter appends extra annotations to existing ones at pod template level",
+			ds: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"foo": "bar",
+				}).
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository: "nvcr.io/nvidia/k8s",
+					Image:      "dcgm-exporter",
+					Version:    "v1.0.0",
+					Annotations: map[string]string{
+						"prometheus.io/scrape": "true",
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"foo":                  "bar",
+					"prometheus.io/scrape": "true",
+				}).
+				WithContainer(corev1.Container{
+					Name:            "dcgm-exporter",
+					Image:           "nvcr.io/nvidia/k8s/dcgm-exporter:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					},
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter overrides annotation with same key at pod template level",
+			ds: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"foo": "bar",
+				}).
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository: "nvcr.io/nvidia/k8s",
+					Image:      "dcgm-exporter",
+					Version:    "v1.0.0",
+					Annotations: map[string]string{
+						"foo": "baz",
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithPodAnnotations(map[string]string{
+					"foo": "baz",
+				}).
+				WithContainer(corev1.Container{
+					Name:            "dcgm-exporter",
+					Image:           "nvcr.io/nvidia/k8s/dcgm-exporter:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					},
+				}).
+				WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter with pod metadata enrichment fully configured",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:             "nvcr.io/nvidia/cloud-native",
+					Image:                  "dcgm-exporter",
+					Version:                "v1.0.0",
+					ImagePullPolicy:        "IfNotPresent",
+					ImagePullSecrets:       []string{"pull-secret"},
+					Args:                   []string{"--fail-on-init-error=false"},
+					EnablePodLabels:        newBoolPtr(true),
+					EnablePodUID:           newBoolPtr(true),
+					PodLabelAllowlistRegex: []string{"^app$", `^kueue\.x-k8s\.io/.*$`},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Args:            []string{"--fail-on-init-error=false"},
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID", Value: "true"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX", Value: `^app$,^kueue\.x-k8s\.io/.*$`},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).
+				WithPullSecret("pull-secret").
+				WithRuntimeClassName("nvidia").
+				WithAutomountServiceAccountToken(true),
 		},
 	}
 

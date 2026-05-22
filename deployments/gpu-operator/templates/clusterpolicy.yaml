@@ -540,6 +540,9 @@ spec:
     {{- end }}
   dcgmExporter:
     enabled: {{ .Values.dcgmExporter.enabled }}
+    {{- if .Values.dcgmExporter.annotations }}
+    annotations: {{ toYaml .Values.dcgmExporter.annotations | nindent 6 }}
+    {{- end }}
     {{- if .Values.dcgmExporter.repository }}
     repository: {{ .Values.dcgmExporter.repository }}
     {{- end }}
@@ -582,6 +585,15 @@ spec:
     {{- end }}
     {{- if .Values.dcgmExporter.hpcJobMapping }}
     hpcJobMapping: {{ toYaml .Values.dcgmExporter.hpcJobMapping | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.enablePodLabels }}
+    enablePodLabels: {{ .Values.dcgmExporter.enablePodLabels }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.enablePodUID }}
+    enablePodUID: {{ .Values.dcgmExporter.enablePodUID }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.podLabelAllowlistRegex }}
+    podLabelAllowlistRegex: {{ toYaml .Values.dcgmExporter.podLabelAllowlistRegex | nindent 6 }}
     {{- end }}
   gfd:
     enabled: {{ .Values.gfd.enabled }}
