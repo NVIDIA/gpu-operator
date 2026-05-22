@@ -18,8 +18,8 @@ github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDs
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260505175649-fa6a3643c441 h1:U+1f77CBKtvJEL/wzze5mY2+Y3XQ5ZgRK0R2Ru2phz4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260505175649-fa6a3643c441/go.mod h1:L+aiCiTKN63AX9SWz/F8pv9Jw9FIfI+dAEr7VA+KowE=
-github.com/NVIDIA/nvidia-container-toolkit v1.19.1-0.20260512181421-f3d822e54693 h1:f0fxvFODhPudJqfiPNNvQ/UfXseivUmN7WQPvJJ0VYo=
-github.com/NVIDIA/nvidia-container-toolkit v1.19.1-0.20260512181421-f3d822e54693/go.mod h1:WMJdrwb3QWMjua4xAEg9n0NjyWCRKMSfCXF7lpPsdjg=
+github.com/NVIDIA/nvidia-container-toolkit v1.19.1 h1:1sV4ddFrBccqL9Lbzcdu50w2j5FhyNJpN5hXTfCsjps=
+github.com/NVIDIA/nvidia-container-toolkit v1.19.1/go.mod h1:yGsZ4s2lMjfE4r8/DMUPVpaFhRGkWvo2H++/Dy84nVc=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
