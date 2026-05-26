@@ -117,8 +117,6 @@ COPY assets /opt/gpu-operator/
 COPY manifests /opt/gpu-operator/manifests
 COPY validator/manifests /opt/validator/manifests
 
-COPY hack/must-gather.sh /usr/bin/gather
-
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
