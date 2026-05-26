@@ -141,6 +141,7 @@ jobs:
 
   build-multi-arch-images:
     needs: [variables, build-gpu-operator-arm64, build-gpu-operator-amd64]
+    if: needs.variables.outputs.push_on_build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -163,4 +164,3 @@ jobs:
             ${OPERATOR_IMAGE_AMD} \
             ${OPERATOR_IMAGE_ARM}
           docker manifest push ${OPERATOR_MULTIARCH_IMAGE}
-
