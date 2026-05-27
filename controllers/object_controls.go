@@ -5053,9 +5053,10 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			return gpuv1.Disabled, nil
 		}
 
+		// If Prometheus CRD is missing, skip gracefully
 		if !serviceMonitorCRDExists {
-			logger.Error(fmt.Errorf("couldn't find ServiceMonitor CRD"), "Install Prometheus and necessary CRDs for gathering GPU metrics!")
-			return gpuv1.NotReady, nil
+			logger.V(1).Info("ServiceMonitor CRD not found, skipping DCGM Exporter ServiceMonitor creation")
+			return gpuv1.Ready, nil
 		}
 
 		// Apply custom edits for DCGM Exporter

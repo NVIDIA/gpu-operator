@@ -321,7 +321,7 @@ dcgmExporter:
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:
-    enabled: false
+    enabled: true
     interval: 15s
     scrapeTimeout: 10s
     honorLabels: false
