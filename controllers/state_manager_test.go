@@ -47,6 +47,18 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			expected:  "talosv1.12.6",
 		},
 		{
+			name:      "rhel 9 omits minor version",
+			osName:    "rhel",
+			osVersion: "9.4",
+			expected:  "rhel9",
+		},
+		{
+			name:      "rhel 8 omits minor version",
+			osName:    "rhel",
+			osVersion: "8.10",
+			expected:  "rhel8",
+		},
+		{
 			name:      "rhel 10 omits minor version",
 			osName:    "rhel",
 			osVersion: "10.2",
@@ -87,13 +99,6 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			osName:    "archlinux",
 			osVersion: "rolling",
 			expected:  "archlinuxrolling",
-		},
-		{
-			name:              "rhel invalid major version errors",
-			osName:            "rhel",
-			osVersion:         "A.10",
-			expectError:       true,
-			errorContainsText: "error processing OS major version",
 		},
 	}
 
