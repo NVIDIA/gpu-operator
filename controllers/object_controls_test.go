@@ -1325,7 +1325,7 @@ func TestServiceMonitor(t *testing.T) {
 			expectedServiceMonitor: nil,
 		},
 		{
-			description: "dcgm-exporter SM enabled, CRD missing -> NotReady",
+			description: "dcgm-exporter SM explicitly enabled, CRD missing -> Ready (skip gracefully)",
 			stateName:   "state-dcgm-exporter",
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
@@ -1334,7 +1334,45 @@ func TestServiceMonitor(t *testing.T) {
 					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(true)},
 				},
 			},
-			expectedState:          gpuv1.NotReady,
+			expectedState:          gpuv1.Ready,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM nil config, CRD missing -> Ready (cleanup path; CRD absent)",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  nil,
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled: ptr.To(true),
+				},
+			},
+			expectedState:          gpuv1.Ready,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM provided but Enabled nil, CRD missing -> Ready (skip cleanup)",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  nil,
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{},
+				},
+			},
+			expectedState:          gpuv1.Ready,
+			expectedServiceMonitor: nil,
+		},
+		{
+			description: "dcgm-exporter SM provided but Enabled nil, CRD present -> Disabled (default false)",
+			stateName:   "state-dcgm-exporter",
+			k8sObjects:  []client.Object{serviceMonitorCRD},
+			clusterPolicySpec: gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Enabled:        ptr.To(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{},
+				},
+			},
+			expectedState:          gpuv1.Disabled,
 			expectedServiceMonitor: nil,
 		},
 		{
