@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -16,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/regclient/regclient/internal/regnet"
 	"github.com/regclient/regclient/types/errs"
 )
 
@@ -641,16 +641,8 @@ func (b *bearerHandler) UpdateRequest(req *http.Request) error {
 		b.tokenURL = u
 	}
 	// verify tokenURL is allowed for request URL
-	if req.URL.Scheme == "https" && b.tokenURL.Scheme != "https" {
-		return fmt.Errorf("downgrading to an http token server from an https registry is not allowed%.0w", errs.ErrHTTPUnauthorized)
-	}
-	hostToken := b.tokenURL.Hostname()
-	hostReq := req.URL.Hostname()
-	ipToken := net.ParseIP(hostToken)
-	ipReq := net.ParseIP(hostReq)
-	if ipToken != nil && (ipToken.IsLoopback() || ipToken.IsLinkLocalUnicast() || ipToken.IsLinkLocalMulticast()) &&
-		(ipReq == nil || !(ipReq.IsLoopback() || ipReq.IsLinkLocalUnicast() || ipReq.IsLinkLocalMulticast())) {
-		return fmt.Errorf("requesting a local token server from a non-local registry is not allowed%.0w", errs.ErrHTTPUnauthorized)
+	if err := regnet.AllowRedirect(*req.URL, *b.tokenURL); err != nil {
+		return err
 	}
 	// if unexpired token already exists, return it
 	if b.token.Token != "" && !b.isExpired() {
