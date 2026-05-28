@@ -1788,6 +1788,7 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 func waitForVFs(ctx context.Context, timeout time.Duration) error {
 	pollInterval := time.Duration(sleepIntervalSecondsFlag) * time.Second
 	nvpciLib := nvpci.New()
+	nvmdevLib := nvmdev.New()
 
 	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		gpus, err := nvpciLib.GetGPUs()
@@ -1810,6 +1811,23 @@ func waitForVFs(ctx context.Context, timeout time.Duration) error {
 		if totalExpected == 0 {
 			log.Info("No SR-IOV capable GPUs found, skipping VF wait")
 			return true, nil
+		}
+
+		// vGPU stack is ready when mdev parents are registered (PF on Turing,
+		// VFs on Ampere+ SR-IOV) or all SR-IOV VFs are enabled.
+		if _, statErr := os.Stat("/sys/class/mdev_bus"); statErr == nil {
+			parents, err := nvmdevLib.GetAllParentDevices()
+			if err != nil {
+				log.Warnf("Error listing mdev parent devices: %v", err)
+				return false, nil
+			}
+			if len(parents) > 0 {
+				log.Infof("vGPU stack ready: %d mdev parent device(s)", len(parents))
+				return true, nil
+			}
+		} else if !os.IsNotExist(statErr) {
+			log.Warnf("Error checking mdev_bus: %v", statErr)
+			return false, nil
 		}
 
 		if totalEnabled == totalExpected {
