@@ -973,6 +973,9 @@ func TransformGPUDiscoveryPlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	// set hostNetwork for gpu-feature-discovery if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.GPUFeatureDiscovery.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.GPUFeatureDiscovery.ExtraVolumes, config.GPUFeatureDiscovery.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1082,6 +1085,9 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// set hostNetwork for driver if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Driver.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.Driver.ExtraVolumes, config.Driver.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1107,6 +1113,9 @@ func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 
 	// set hostNetwork for vgpu-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.VGPUManager.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.VGPUManager.ExtraVolumes, config.VGPUManager.ExtraVolumeMounts)
 
 	return nil
 }
@@ -1373,6 +1382,9 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// set hostNetwork for toolkit if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Toolkit.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.Toolkit.ExtraVolumes, config.Toolkit.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1610,6 +1622,9 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set hostNetwork for device-plugin if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.DevicePlugin.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.DevicePlugin.ExtraVolumes, config.DevicePlugin.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1682,6 +1697,9 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	// set hostNetwork for mps-control-daemon if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.DevicePlugin.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts (shared with device-plugin via DevicePluginSpec)
+	applyExtraVolumes(obj, config.DevicePlugin.ExtraVolumes, config.DevicePlugin.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1727,6 +1745,9 @@ func TransformSandboxDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 	// set hostNetwork for sandbox-device-plugin if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.SandboxDevicePlugin.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.SandboxDevicePlugin.ExtraVolumes, config.SandboxDevicePlugin.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1764,6 +1785,9 @@ func TransformKataDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	// set hostNetwork for kata-device-plugin if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.KataSandboxDevicePlugin.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.KataSandboxDevicePlugin.ExtraVolumes, config.KataSandboxDevicePlugin.ExtraVolumeMounts)
 
 	return nil
 }
@@ -1920,6 +1944,9 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 	}
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.DCGMExporter.ExtraVolumes, config.DCGMExporter.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -1929,6 +1956,29 @@ func addExtraAnnotations(obj *appsv1.DaemonSet, annotations map[string]string) {
 	}
 	for k, v := range annotations {
 		obj.Spec.Template.Annotations[k] = v
+	}
+}
+
+// applyExtraVolumes appends user-supplied extra volumes to the daemonset's
+// pod spec and the corresponding extra volume mounts to every container in
+// the pod spec. Used by daemonset Transform functions to honor the optional
+// ExtraVolumes / ExtraVolumeMounts fields in the per-component spec.
+//
+// Init containers are intentionally NOT modified: mounts that callers want
+// in init containers should still be added via the existing transform logic
+// for those containers, since init containers are operator-owned setup steps
+// rather than user-facing application containers.
+func applyExtraVolumes(obj *appsv1.DaemonSet, vols []corev1.Volume, mounts []corev1.VolumeMount) {
+	if len(vols) > 0 {
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, vols...)
+	}
+	if len(mounts) > 0 {
+		for i := range obj.Spec.Template.Spec.Containers {
+			obj.Spec.Template.Spec.Containers[i].VolumeMounts = append(
+				obj.Spec.Template.Spec.Containers[i].VolumeMounts,
+				mounts...,
+			)
+		}
 	}
 }
 
@@ -1975,6 +2025,9 @@ func TransformDCGM(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n Clu
 
 	// set hostNetwork for dcgm if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.DCGM.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.DCGM.ExtraVolumes, config.DCGM.ExtraVolumeMounts)
 
 	return nil
 }
@@ -2072,6 +2125,9 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 	// set hostNetwork for mig-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.MIGManager.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.MIGManager.ExtraVolumes, config.MIGManager.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -2149,6 +2205,9 @@ func TransformKataManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// set hostNetwork for kata-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.KataManager.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.KataManager.ExtraVolumes, config.KataManager.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -2199,6 +2258,9 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	// set hostNetwork for vfio-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.VFIOManager.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.VFIOManager.ExtraVolumes, config.VFIOManager.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -2247,6 +2309,9 @@ func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 
 	// set hostNetwork for cc-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.CCManager.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.CCManager.ExtraVolumes, config.CCManager.ExtraVolumeMounts)
 
 	return nil
 }
@@ -2317,6 +2382,9 @@ func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 	// set hostNetwork for vgpu-device-manager if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.VGPUDeviceManager.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.VGPUDeviceManager.ExtraVolumes, config.VGPUDeviceManager.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -2371,6 +2439,9 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	// set hostNetwork for validator if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Validator.HostNetwork)
 
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.Validator.ExtraVolumes, config.Validator.ExtraVolumeMounts)
+
 	return nil
 }
 
@@ -2402,6 +2473,9 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 
 	// set hostNetwork for sandbox-validator if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Validator.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts (shared with validator via ValidatorSpec)
+	applyExtraVolumes(obj, config.Validator.ExtraVolumes, config.Validator.ExtraVolumeMounts)
 
 	return nil
 }
@@ -2602,6 +2676,9 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 
 	// set hostNetwork for node-status-exporter if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.NodeStatusExporter.HostNetwork)
+
+	// append user-supplied extra volumes and volume mounts
+	applyExtraVolumes(obj, config.NodeStatusExporter.ExtraVolumes, config.NodeStatusExporter.ExtraVolumeMounts)
 
 	return nil
 }
