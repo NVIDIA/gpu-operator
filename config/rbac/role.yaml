@@ -10,8 +10,6 @@ rules:
   - configmaps
   - endpoints
   - events
-  - namespaces
-  - nodes
   - persistentvolumeclaims
   - pods
   - pods/eviction
@@ -22,6 +20,23 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
   - get
   - list
   - patch
@@ -39,6 +54,7 @@ rules:
   - apps
   resources:
   - controllerrevisions
+  - daemonsets
   verbs:
   - get
   - list
@@ -46,7 +62,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - daemonsets
   - deployments
   - replicasets
   - statefulsets
@@ -163,7 +178,9 @@ rules:
   - rolebindings
   - roles
   verbs:
-  - '*'
+  - create
+  - delete
+  - update
 - apiGroups:
   - route.openshift.io
   resources:

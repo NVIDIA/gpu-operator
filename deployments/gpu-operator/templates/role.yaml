@@ -14,11 +14,7 @@ rules:
   - rolebindings
   verbs:
   - create
-  - get
-  - list
-  - watch
   - update
-  - patch
   - delete
 - apiGroups:
   - apps
@@ -50,7 +46,6 @@ rules:
   - secrets
   - services
   - services/finalizers
-  - serviceaccounts
   verbs:
   - create
   - get
@@ -59,6 +54,18 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - coordination.k8s.io
   resources:
