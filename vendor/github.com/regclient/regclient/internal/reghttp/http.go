@@ -30,6 +30,7 @@ import (
 	"github.com/regclient/regclient/config"
 	"github.com/regclient/regclient/internal/auth"
 	"github.com/regclient/regclient/internal/pqueue"
+	"github.com/regclient/regclient/internal/regnet"
 	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/errs"
@@ -401,7 +402,8 @@ func (resp *Resp) next() error {
 				}
 				// add auth headers
 				err = hAuth.UpdateRequest(httpReq)
-				if err != nil {
+				// abort on auth errors, but only after the first request has been attempted
+				if err != nil && resp.resp != nil {
 					if errors.Is(err, errs.ErrHTTPUnauthorized) {
 						dropHost = true
 					} else {
@@ -557,7 +559,7 @@ func (resp *Resp) HTTPResponse() *http.Response {
 
 // Read provides a retryable read from the body of the response.
 func (resp *Resp) Read(b []byte) (int, error) {
-	if resp.done {
+	if resp.done || resp.reader == nil {
 		return 0, io.EOF
 	}
 	if resp.resp == nil {
@@ -814,6 +816,11 @@ func (ch *clientHost) checkRedirect(repo string, orig func(req *http.Request, vi
 		if len(via) >= 10 {
 			return errors.New("stopped after 10 redirects")
 		}
+		// verify redirect is allowed
+		last := via[len(via)-1]
+		if err := regnet.AllowRedirect(*last.URL, *req.URL); err != nil {
+			return err
+		}
 		// add auth headers if appropriate for the target host
 		hAuth := ch.getAuth(repo)
 		err := hAuth.UpdateRequest(req)
@@ -851,8 +858,13 @@ func (ch *clientHost) AuthCreds() func(h string) auth.Cred {
 		return auth.DefaultCredsFn
 	}
 	return func(h string) auth.Cred {
-		hCred := ch.config.GetCred()
-		return auth.Cred{User: hCred.User, Password: hCred.Password, Token: hCred.Token}
+		// only return credentials to challenges from the registry server, not to any redirects
+		if h == ch.config.Hostname {
+			hCred := ch.config.GetCred()
+			return auth.Cred{User: hCred.User, Password: hCred.Password, Token: hCred.Token}
+		} else {
+			return auth.Cred{}
+		}
 	}
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/opencontainers/go-digest"
 
 	"github.com/regclient/regclient/internal/reghttp"
+	"github.com/regclient/regclient/internal/regnet"
 	"github.com/regclient/regclient/internal/reqmeta"
 	"github.com/regclient/regclient/types/blob"
 	"github.com/regclient/regclient/types/descriptor"
@@ -67,6 +68,11 @@ func (reg *Reg) BlobGet(ctx context.Context, r ref.Ref, d descriptor.Descriptor)
 			u, err = url.Parse(curURL)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse external url \"%s\": %w", curURL, err)
+			}
+			// refuse requests to local URLs unless registry is also local
+			// Note: the AllowRedirect check is not used because blobs could be hosted on an http CDN and data is content addressable
+			if regnet.IsLocal(u.Host) && !regnet.IsLocal(req.Host) {
+				return nil, fmt.Errorf("refusing to redirect blob request to a local URL: %s%.0w", curURL, errs.ErrHTTPRedirectRefused)
 			}
 			req = &reghttp.Req{
 				MetaKind:   reqmeta.Blob,
@@ -527,6 +533,9 @@ func (reg *Reg) blobPutUploadChunked(ctx context.Context, r ref.Ref, d descripto
 				resp.HTTPResponse().Header.Get("Location") != "" &&
 				resp.HTTPResponse().Header.Get("Range") != "" {
 				retryCur++
+				if retryCur > retryLimit {
+					return d, fmt.Errorf("failed to send blob (chunk), ref %s: http status: %w", r.CommonName(), reghttp.HTTPError(resp.HTTPResponse().StatusCode))
+				}
 				reg.slog.Debug("Recoverable chunk upload error",
 					slog.String("ref", r.CommonName()),
 					slog.Int64("chunkStart", chunkStart),
