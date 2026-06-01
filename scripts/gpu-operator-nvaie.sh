@@ -27,7 +27,7 @@
 #
 #   2. vGPU driver license have to be downloaded from the NVIDIA licensing portal in the current directory and saved as "client_configuration_token.tok"
 
-set -u
+set -euo pipefail
 
 NGC_API_KEY=${NGC_API_KEY:?"Missing NGC_API_KEY"}
 NGC_USER_EMAIL=${NGC_USER_EMAIL:?"Missing NGC_USER_EMAIL"}
