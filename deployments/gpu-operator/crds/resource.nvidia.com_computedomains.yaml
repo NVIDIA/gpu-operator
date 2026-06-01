@@ -1,0 +1,162 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: computedomains.resource.nvidia.com
+spec:
+  group: resource.nvidia.com
+  names:
+    kind: ComputeDomain
+    listKind: ComputeDomainList
+    plural: computedomains
+    singular: computedomain
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ComputeDomain prepares a set of nodes to run a multi-node workload
+          in.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ComputeDomainSpec provides the spec for a ComputeDomain.
+            properties:
+              channel:
+                description: ComputeDomainChannelSpec provides the spec for a channel
+                  used to run a workload inside a ComputeDomain.
+                properties:
+                  allocationMode:
+                    default: Single
+                    description: |-
+                      Allows for requesting all IMEX channels (the maximum per IMEX domain) or
+                      precisely one.
+                    enum:
+                    - All
+                    - Single
+                    type: string
+                  resourceClaimTemplate:
+                    description: ComputeDomainResourceClaimTemplate provides the details
+                      of the ResourceClaimTemplate to generate.
+                    properties:
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - resourceClaimTemplate
+                type: object
+              numNodes:
+                description: |-
+                  Intended number of IMEX daemons (i.e., individual compute nodes) in the
+                  ComputeDomain. Must be zero or greater.
+
+                  With `featureGates.IMEXDaemonsWithDNSNames=true` (the default), this is
+                  recommended to be set to zero. Workload must implement and consult its
+                  own source of truth for the number of workers online before trying to
+                  share GPU memory (and hence triggering IMEX interaction). When non-zero,
+                  `numNodes` is used only for automatically updating the global
+                  ComputeDomain `Status` (indicating `Ready` when the number of ready IMEX
+                  daemons equals `numNodes`). In this mode, a `numNodes` value greater than
+                  zero in particular does not gate the startup of IMEX daemons: individual
+                  IMEX daemons are started immediately without waiting for its peers, and
+                  any workload pod gets released right after its local IMEX daemon has
+                  started.
+
+                  With `featureGates.IMEXDaemonsWithDNSNames=false`, `numNodes` must be set
+                  to the expected number of worker nodes joining the ComputeDomain. In that
+                  mode, all workload pods are held back (with containers in state
+                  `ContainerCreating`) until the underlying IMEX domain has been joined by
+                  `numNodes` IMEX daemons. Pods from more than `numNodes` nodes trying to
+                  join the ComputeDomain may lead to unexpected behavior.
+
+                  The `numNodes` parameter is deprecated and will be removed in the next
+                  API version.
+                type: integer
+            required:
+            - channel
+            - numNodes
+            type: object
+            x-kubernetes-validations:
+            - message: A computeDomain.spec is immutable
+              rule: self == oldSelf
+          status:
+            description: |-
+              Global ComputeDomain status. Can be used to guide debugging efforts.
+              Workload however should not rely on inspecting this field at any point
+              during its lifecycle.
+            properties:
+              nodes:
+                items:
+                  description: ComputeDomainNode provides information about each node
+                    added to a ComputeDomain.
+                  properties:
+                    cliqueID:
+                      type: string
+                    index:
+                      description: |-
+                        The Index field is used to ensure a consistent IP-to-DNS name
+                        mapping across all machines within an IMEX domain. Each node's index
+                        directly determines its DNS name within a given NVLink partition
+                        (i.e. clique). In other words, the 2-tuple of (CliqueID, Index) will
+                        always be unique. This field is marked as optional (but not
+                        omitempty) in order to support downgrades and avoid an API bump.
+                      type: integer
+                    ipAddress:
+                      type: string
+                    name:
+                      type: string
+                    status:
+                      default: NotReady
+                      description: |-
+                        The Status field tracks the readiness of the IMEX daemon running on
+                        this node. It gets switched to Ready whenever the IMEX daemon is
+                        ready to broker GPU memory exchanges and switches to NotReady when
+                        it is not. It is marked as optional in order to support downgrades
+                        and avoid an API bump.
+                      enum:
+                      - Ready
+                      - NotReady
+                      type: string
+                  required:
+                  - cliqueID
+                  - ipAddress
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              status:
+                default: NotReady
+                enum:
+                - Ready
+                - NotReady
+                type: string
+            required:
+            - status
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
