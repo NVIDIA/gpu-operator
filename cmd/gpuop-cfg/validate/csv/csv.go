@@ -20,12 +20,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/regclient/regclient"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 	"sigs.k8s.io/yaml"
+
+	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/validate/registry"
 )
 
 type command struct {
@@ -82,7 +86,13 @@ func (m command) run(ctx context.Context, opts *options) error {
 		return fmt.Errorf("failed to load csv yaml: %v", err)
 	}
 
-	err = validateImages(ctx, csv)
+	var rcOpts []regclient.Opt
+	if m.logger.GetLevel() >= logrus.DebugLevel {
+		rcOpts = append(rcOpts, regclient.WithSlog(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))))
+	}
+	client := registry.NewClient(rcOpts...)
+
+	err = validateImages(ctx, csv, client)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
 	}
