@@ -31,6 +31,7 @@ import (
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
+	"github.com/cyphar/filepath-securejoin/pathrs-lite"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert/yaml"
 	cli "github.com/urfave/cli/v3"
@@ -742,6 +743,22 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+// resolveHostNvidiaSMI opens and stats nvidia-smi within the mounted host root.
+func resolveHostNvidiaSMI(hostRootCtrPath string) (os.FileInfo, error) {
+	f, err := pathrs.OpenInRoot(hostRootCtrPath, "/usr/bin/nvidia-smi")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open 'nvidia-smi' on the host: %w", err)
+	}
+	defer f.Close()
+
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat 'nvidia-smi' on the host: %w", err)
+	}
+
+	return fileInfo, nil
+}
+
 func validateHostDriver(silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
 	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
@@ -749,9 +766,10 @@ func validateHostDriver(silent bool) error {
 		disableDevCharSymlinkCreation = true
 		return nil
 	}
-	fileInfo, err := os.Lstat("/host/usr/bin/nvidia-smi")
+
+	fileInfo, err := resolveHostNvidiaSMI("/host")
 	if err != nil {
-		return fmt.Errorf("no 'nvidia-smi' file present on the host: %w", err)
+		return err
 	}
 	if fileInfo.Size() == 0 {
 		return fmt.Errorf("empty 'nvidia-smi' file found on the host")
@@ -1753,7 +1771,7 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := os.Lstat("/host/usr/bin/nvidia-smi"); err == nil {
+	if _, err := resolveHostNvidiaSMI("/host"); err == nil {
 		args = []string{"/host", "nvidia-smi"}
 		hostDriver = true
 	}
