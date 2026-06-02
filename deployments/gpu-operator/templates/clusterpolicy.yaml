@@ -161,9 +161,6 @@ spec:
     enabled: {{ .Values.psa.enabled }}
   cdi:
     enabled: {{ .Values.cdi.enabled }}
-    {{- if .Values.cdi.default }}
-    default: {{ .Values.cdi.default }}
-    {{- end }}
     {{- if and (.Values.cdi.enabled) (.Values.cdi.nriPluginEnabled) }}
     nriPluginEnabled: {{ .Values.cdi.nriPluginEnabled }}
     {{- end }}
