@@ -18,4 +18,6 @@
 
 package v1alpha1
 
+type GPUClusterConfigExpansion interface{}
+
 type NVIDIADriverExpansion interface{}

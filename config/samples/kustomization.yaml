@@ -2,4 +2,5 @@
 resources:
 - v1_clusterpolicy.yaml
 - nvidia_v1alpha1_nvidiadriver.yaml
+- nvidia_v1alpha1_gpuclusterconfig.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

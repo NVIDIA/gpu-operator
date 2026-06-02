@@ -28,12 +28,17 @@ import (
 
 type NvidiaV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	GPUClusterConfigsGetter
 	NVIDIADriversGetter
 }
 
 // NvidiaV1alpha1Client is used to interact with features provided by the nvidia group.
 type NvidiaV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *NvidiaV1alpha1Client) GPUClusterConfigs() GPUClusterConfigInterface {
+	return newGPUClusterConfigs(c)
 }
 
 func (c *NvidiaV1alpha1Client) NVIDIADrivers() NVIDIADriverInterface {
