@@ -4012,6 +4012,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	err := n.client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, ds)
 	if err != nil {
 		n.logger.Error(err, "could not get daemonset", "name", name)
+		return gpuv1.NotReady
 	}
 
 	if ds.Status.DesiredNumberScheduled == 0 {
@@ -4024,12 +4025,16 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		return gpuv1.NotReady
 	}
 
-	// if ds is running with "OnDelete" strategy, check if the revision matches for all pods
+	// RollingUpdate DaemonSets are ready only after the latest generation is observed and all desired pods
+	// are updated and available. OnDelete DaemonSets fall through to per-pod revision checks below.
 	if ds.Spec.UpdateStrategy.Type != appsv1.OnDeleteDaemonSetStrategyType {
-		return gpuv1.Ready
+		if isDaemonSetRollingUpdateComplete(ds) {
+			return gpuv1.Ready
+		}
+		return gpuv1.NotReady
 	}
 
-	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Template.Labels)}
+	opts := []client.ListOption{client.MatchingLabels(ds.Spec.Selector.MatchLabels)}
 
 	n.logger.V(2).Info("Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
@@ -4081,6 +4086,14 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 
 	// All containers are ready
 	return gpuv1.Ready
+}
+
+// isDaemonSetRollingUpdateComplete reports whether a RollingUpdate DaemonSet has observed its latest generation
+// and all desired pods are updated and available.
+func isDaemonSetRollingUpdateComplete(ds *appsv1.DaemonSet) bool {
+	return ds.Status.ObservedGeneration >= ds.Generation &&
+		ds.Status.UpdatedNumberScheduled == ds.Status.DesiredNumberScheduled &&
+		ds.Status.NumberAvailable == ds.Status.DesiredNumberScheduled
 }
 
 func getPodsOwnedbyDaemonset(ds *appsv1.DaemonSet, pods []corev1.Pod, n ClusterPolicyController) []corev1.Pod {
@@ -4776,6 +4789,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		if err != nil {
 			return gpuv1.NotReady, err
 		}
+		return gpuv1.NotReady, nil
 	} else {
 		logger.Info("DaemonSet identical, skipping update", "name", obj.Name)
 	}
