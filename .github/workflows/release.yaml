@@ -68,6 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         name: Check out code
+        with:
+          persist-credentials: false
       - name: Install regctl
         uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
         with:
@@ -91,6 +93,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         name: Check out code
+        with:
+          persist-credentials: false
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -114,4 +118,3 @@ jobs:
           BUNDLE_IMAGE_BASE="ghcr.io/nvidia/gpu-operator/gpu-operator-bundle"
           make push-bundle-image BUNDLE_IMAGE=${BUNDLE_IMAGE_BASE}:${{ github.ref_name }}-latest
           make push-bundle-image BUNDLE_IMAGE=${BUNDLE_IMAGE_BASE}:${COMMIT_SHORT_SHA}
-

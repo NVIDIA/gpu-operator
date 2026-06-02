@@ -33,12 +33,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      
+        with:
+          persist-credentials: false
+
       - name: Install regctl
         uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
         with:
           release: v0.11.3
-      
+
       - name: Get latest component images and generate values override file
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,20 +48,20 @@ jobs:
           # Fetch latest images from component repositories
           echo "::notice::Fetching latest container-toolkit image..."
           TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
-          
+
           echo "::notice::Fetching latest device-plugin image..."
           DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
-          
+
           echo "::notice::Fetching latest mig-manager image..."
           MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
-          
+
           # Generate values override file
           .github/scripts/generate-values-overrides.sh \
             values-overrides.yaml \
             "${TOOLKIT}" \
             "${DEVICE_PLUGIN}" \
             "${MIG_MANAGER}"
-      
+
       - name: Upload values override file
         uses: actions/upload-artifact@v7
         with:
