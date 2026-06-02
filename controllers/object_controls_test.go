@@ -136,6 +136,183 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func TestIsRollingUpdateDaemonSetReady(t *testing.T) {
+	tests := []struct {
+		name string
+		ds   appsv1.DaemonSet
+		want bool
+	}{
+		{
+			name: "ready when observed and all desired pods are updated and available",
+			ds: appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        3,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not ready when controller has not observed latest generation",
+			ds: appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     1,
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        3,
+				},
+			},
+		},
+		{
+			name: "not ready when rollout has available old pods but not all pods are updated",
+			ds: appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 2,
+					NumberAvailable:        3,
+				},
+			},
+		},
+		{
+			name: "not ready when all pods are updated but not all are available",
+			ds: appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        2,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isRollingUpdateDaemonSetReady(&tt.ds))
+		})
+	}
+}
+
+func TestIsDaemonSetReadyReturnsNotReadyWhenDaemonSetMissing(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	controller := ClusterPolicyController{
+		ctx:               context.Background(),
+		client:            k8sClient,
+		operatorNamespace: "test-namespace",
+		logger:            ctrl.Log.WithName("test"),
+	}
+
+	require.Equal(t, gpuv1.NotReady, isDaemonSetReady("missing-daemonset", controller))
+}
+
+func TestIsDaemonSetReadyUsesSelectorLabelsForOnDeletePods(t *testing.T) {
+	const (
+		namespace = "test-namespace"
+		dsName    = "nvidia-driver-daemonset"
+		oldHash   = "565dcf5cc9"
+		newHash   = "69b97fbcbf"
+	)
+
+	dsUID := types.UID("driver-daemonset-uid")
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsName,
+			Namespace: namespace,
+			UID:       dsUID,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": dsName}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":           dsName,
+						"helm.sh/chart": "gpu-operator-v26.3.2",
+					},
+				},
+			},
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.OnDeleteDaemonSetStrategyType},
+		},
+		Status: appsv1.DaemonSetStatus{
+			DesiredNumberScheduled: 3,
+			NumberUnavailable:      0,
+		},
+	}
+
+	oldPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "old-driver-pod",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":                             dsName,
+				"helm.sh/chart":                   "gpu-operator-v25.10.1",
+				PodControllerRevisionHashLabelKey: oldHash,
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+				Kind:       "DaemonSet",
+				Name:       dsName,
+				UID:        dsUID,
+			}},
+		},
+		Status: corev1.PodStatus{
+			Phase:             corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{Ready: true}},
+		},
+	}
+	newPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "new-driver-pod",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":                             dsName,
+				"helm.sh/chart":                   "gpu-operator-v26.3.2",
+				PodControllerRevisionHashLabelKey: newHash,
+			},
+			OwnerReferences: oldPod.OwnerReferences,
+		},
+		Status: corev1.PodStatus{
+			Phase:             corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{Ready: true}},
+		},
+	}
+	oldRevision := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsName + "-" + oldHash,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": dsName},
+		},
+		Revision: 1,
+	}
+	newRevision := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsName + "-" + newHash,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": dsName},
+		},
+		Revision: 2,
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(ds, oldPod, newPod, oldRevision, newRevision).
+		Build()
+	controller := ClusterPolicyController{
+		ctx:               context.Background(),
+		client:            k8sClient,
+		operatorNamespace: namespace,
+		logger:            ctrl.Log.WithName("test"),
+	}
+
+	require.Equal(t, gpuv1.NotReady, isDaemonSetReady(dsName, controller))
+}
+
 func getModuleRoot(dir string) (string, error) {
 	if dir == "" || dir == "/" {
 		return "", fmt.Errorf("module root not found")
