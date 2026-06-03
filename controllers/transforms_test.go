@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1072,6 +1073,65 @@ func TestTransformToolkit(t *testing.T) {
 				}).
 				WithHostPathVolume("crio-config", "/etc/crio", ptr.To(corev1.HostPathDirectoryOrCreate)).
 				WithHostPathVolume("crio-drop-in-config", "/etc/crio/crio.conf.d", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
+			description: "transform with NRI enabled has just the NRI socket mount",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"}),
+			runtime: gpuv1.Containerd,
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled:          new(true),
+					NRIPluginEnabled: new(true),
+				},
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "nvidia-container-toolkit",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithHostPathVolume("nri-socket", filepath.Dir(DefaultRuntimeNRISocketFile), new(corev1.HostPathDirectoryOrCreate)).
+				WithContainer(corev1.Container{
+					Name:            "nvidia-container-toolkit-ctr",
+					Image:           "nvcr.io/nvidia/cloud-native/nvidia-container-toolkit:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: CDIEnabledEnvName, Value: "true"},
+						{Name: NvidiaRuntimeSetAsDefaultEnvName, Value: "false"},
+						{Name: NvidiaCtrRuntimeModeEnvName, Value: "cdi"},
+						{Name: CRIOConfigModeEnvName, Value: "config"},
+						{Name: "ENABLE_NRI_PLUGIN", Value: "true"},
+						{Name: "RUNTIME", Value: "containerd"},
+						{Name: "NRI_SOCKET", Value: path.Join(DefaultRuntimeNRISocketTargetDir, path.Base(DefaultRuntimeNRISocketFile))},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "nri-socket", MountPath: DefaultRuntimeNRISocketTargetDir},
+					},
+				}).
+				WithPullSecret("pull-secret"),
 		},
 	}
 

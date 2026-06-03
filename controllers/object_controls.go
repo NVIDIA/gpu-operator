@@ -1379,11 +1379,50 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, runtime string, container *corev1.Container) error {
 	setContainerEnv(container, "RUNTIME", runtime)
 
-	if runtime == gpuv1.Containerd.String() {
-		// Set the runtime class name that is to be configured for containerd
-		setContainerEnv(container, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
+	// In NRI plugin mode the toolkit installer runs the noop runtime configurer
+	// (see nvidia-ctk-installer's NewConfigurer): it does not read or modify the
+	// container runtime configuration and does not restart the runtime. Mounting the
+	// runtime config files and socket is therefore unnecessary in this mode, and the
+	// hostPath mounts (e.g. /etc/containerd/conf.d with DirectoryOrCreate) break on
+	// read-only hosts such as Talos. Only the NRI socket mount (below) is required.
+	if config.CDI.IsNRIPluginEnabled() {
+		transformNRISocketMounts(obj, container)
+	} else {
+		if runtime == gpuv1.Containerd.String() {
+			// Set the runtime class name that is to be configured for containerd
+			setContainerEnv(container, "CONTAINERD_RUNTIME_CLASS", getRuntimeClassName(config))
+		}
+
+		if err := transformRuntimeConfigAndSocketMounts(obj, runtime, container); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+// transformNRISocketMounts adds the required NRI socket environment variable and
+// sets up the NRI socket mount
+func transformNRISocketMounts(obj *appsv1.DaemonSet, container *corev1.Container) {
+	// setup mounts for the runtime NRI socket file
+	nriSocketFile := getContainerEnv(container, "NRI_SOCKET")
+	if nriSocketFile == "" {
+		nriSocketFile = DefaultRuntimeNRISocketFile
+	}
+	setContainerEnv(container, "NRI_SOCKET", path.Join(DefaultRuntimeNRISocketTargetDir, path.Base(nriSocketFile)))
+
+	nriVolMountSocketName := "nri-socket"
+	nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
+	container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
+
+	nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
+}
+
+// transformRuntimeConfigAndSocketMounts configures the toolkit container with the
+// mounts and environment required for the toolkit installer to update the container
+// runtime configuration (top-level config, drop-in config, and runtime socket).
+func transformRuntimeConfigAndSocketMounts(obj *appsv1.DaemonSet, runtime string, container *corev1.Container) error {
 	// For runtime config files we have top-level configs and drop-in files.
 	// These are supported as follows:
 	//   * Docker only supports top-level config files.
@@ -1487,22 +1526,6 @@ func transformForRuntime(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
 		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, socketVol)
-	}
-
-	if config.CDI.IsNRIPluginEnabled() {
-		// setup mounts for the runtime NRI socket file
-		nriSocketFile := getContainerEnv(container, "NRI_SOCKET")
-		if nriSocketFile == "" {
-			nriSocketFile = DefaultRuntimeNRISocketFile
-		}
-		setContainerEnv(container, "NRI_SOCKET", DefaultRuntimeNRISocketTargetDir+path.Base(nriSocketFile))
-
-		nriVolMountSocketName := "nri-socket"
-		nriVolMountSocket := corev1.VolumeMount{Name: nriVolMountSocketName, MountPath: DefaultRuntimeNRISocketTargetDir}
-		container.VolumeMounts = append(container.VolumeMounts, nriVolMountSocket)
-
-		nriSocketVol := corev1.Volume{Name: nriVolMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(nriSocketFile), Type: ptr.To(corev1.HostPathDirectoryOrCreate)}}}
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, nriSocketVol)
 	}
 
 	return nil
