@@ -21,14 +21,17 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestGetGPUNodeOSInfo(t *testing.T) {
@@ -221,6 +224,77 @@ func TestHasNFDLabels(t *testing.T) {
 			t.Errorf("hasNFDLabels(%v) = %v, want %v", tc.labels, got, tc.want)
 		}
 	}
+}
+
+func TestReconcileOperandPodLabels(t *testing.T) {
+	const (
+		ns        = "gpu-operator"
+		managedBy = "gpu-operator"
+		oldChart  = "gpu-operator-v1.0.0"
+		newChart  = "gpu-operator-v1.0.1"
+	)
+
+	operandPod := func(name string, labels map[string]string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, Labels: labels},
+		}
+	}
+
+	stale := operandPod("driver-stale", map[string]string{
+		consts.AppManagedByLabelKey: managedBy,
+		consts.HelmChartLabelKey:    oldChart,
+	})
+	missing := operandPod("toolkit-missing", map[string]string{
+		consts.AppManagedByLabelKey: managedBy,
+	})
+	upToDate := operandPod("plugin-uptodate", map[string]string{
+		consts.AppManagedByLabelKey: managedBy,
+		consts.HelmChartLabelKey:    newChart,
+	})
+	// Not an operand (e.g. the operator's own pod, managed by Helm): must be left untouched.
+	foreign := operandPod("operator", map[string]string{
+		consts.AppManagedByLabelKey: "Helm",
+		consts.HelmChartLabelKey:    oldChart,
+	})
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(stale, missing, upToDate, foreign).
+		Build()
+
+	n := ClusterPolicyController{
+		ctx:               context.Background(),
+		client:            cl,
+		logger:            logr.Discard(),
+		operatorNamespace: ns,
+		singleton: &gpuv1.ClusterPolicy{
+			Spec: gpuv1.ClusterPolicySpec{
+				Daemonsets: gpuv1.DaemonsetsSpec{
+					Labels: map[string]string{
+						consts.AppManagedByLabelKey: managedBy,
+						consts.HelmChartLabelKey:    newChart,
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, n.reconcileOperandPodLabels(context.Background()))
+
+	get := func(name string) *corev1.Pod {
+		p := &corev1.Pod{}
+		require.NoError(t, cl.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: name}, p))
+		return p
+	}
+
+	// Operand pods (managed-by gpu-operator) are synced to the current chart version.
+	require.Equal(t, newChart, get("driver-stale").Labels[consts.HelmChartLabelKey], "stale label should be updated")
+	require.Equal(t, newChart, get("toolkit-missing").Labels[consts.HelmChartLabelKey], "missing label should be added")
+	require.Equal(t, newChart, get("plugin-uptodate").Labels[consts.HelmChartLabelKey], "up-to-date label should be unchanged")
+	// Non-operand pod is selected out and left as-is.
+	require.Equal(t, oldChart, get("operator").Labels[consts.HelmChartLabelKey], "foreign pod must not be touched")
 }
 
 func TestHasMIGManagerLabel(t *testing.T) {

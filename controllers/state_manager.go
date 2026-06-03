@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -619,6 +620,53 @@ func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
 	n.logger.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
 	return clusterHasNFDLabels, gpuNodesTotal, nil
+}
+
+// reconcileOperandPodLabels patches the current helm.sh/chart value onto running operand
+// pods. The label is kept off the pod template (see consts.HelmChartLabelKey) so a chart
+// upgrade does not change the pod-template hash and trigger a DaemonSet rollout; patching
+// the live pods instead preserves pod-level chart traceability without recreating them.
+// Pods are selected by app.kubernetes.io/managed-by (stable across releases) and the
+// desired value is read from the same daemonsets.labels applied to the DaemonSet metadata.
+func (n *ClusterPolicyController) reconcileOperandPodLabels(ctx context.Context) error {
+	managedBy := n.singleton.Spec.Daemonsets.Labels[consts.AppManagedByLabelKey]
+	if managedBy == "" {
+		// Without a stable selector we cannot safely target operand pods; nothing to do.
+		return nil
+	}
+	desiredChart := n.singleton.Spec.Daemonsets.Labels[consts.HelmChartLabelKey]
+
+	podList := &corev1.PodList{}
+	opts := []client.ListOption{
+		client.InNamespace(n.operatorNamespace),
+		client.MatchingLabels{consts.AppManagedByLabelKey: managedBy},
+	}
+	if err := n.client.List(ctx, podList, opts...); err != nil {
+		return fmt.Errorf("unable to list operand pods to reconcile %q label: %w", consts.HelmChartLabelKey, err)
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Labels[consts.HelmChartLabelKey] == desiredChart {
+			// Already up-to-date; avoid a needless write (and pod update event).
+			continue
+		}
+		original := pod.DeepCopy()
+		if desiredChart == "" {
+			delete(pod.Labels, consts.HelmChartLabelKey)
+		} else {
+			if pod.Labels == nil {
+				pod.Labels = map[string]string{}
+			}
+			pod.Labels[consts.HelmChartLabelKey] = desiredChart
+		}
+		if err := n.client.Patch(ctx, pod, client.MergeFrom(original)); err != nil {
+			return fmt.Errorf("unable to patch %q label on pod %s/%s: %w", consts.HelmChartLabelKey, pod.Namespace, pod.Name, err)
+		}
+		n.logger.V(consts.LogLevelInfo).Info("Reconciled chart label on operand pod",
+			"pod", pod.Name, "label", consts.HelmChartLabelKey, "value", desiredChart)
+	}
+	return nil
 }
 
 func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {

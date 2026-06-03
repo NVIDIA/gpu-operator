@@ -793,7 +793,9 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 			// if the user specifies an override of the "app" or the "app.kubernetes.io/part-of" key, we skip it.
 			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
 			// with the existing daemon set selectors.
-			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
+			// helm.sh/chart is also skipped to avoid churning the pod-template hash on chart upgrades
+			// (see consts.HelmChartLabelKey); it remains on the DaemonSet object metadata.
+			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" || labelKey == consts.HelmChartLabelKey {
 				continue
 			}
 			obj.Spec.Template.Labels[labelKey] = labelValue

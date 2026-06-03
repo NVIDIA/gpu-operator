@@ -61,8 +61,8 @@ spec:
         {{- else }}
         app.kubernetes.io/component: "nvidia-driver"
         {{- end }}
-        {{- if .Driver.Spec.Labels }}
-        {{- .Driver.Spec.Labels | yaml | nindent 8 }}
+        {{- if .Driver.PodTemplateLabels }}
+        {{- .Driver.PodTemplateLabels | yaml | nindent 8 }}
         {{- end }}
     spec:
       {{- if eq .Driver.Spec.DriverType "vgpu-host-manager" }}

@@ -158,12 +158,62 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 		return SyncStateNotReady, fmt.Errorf("failed to create/update objects: %v", err)
 	}
 
+	// Keep the helm.sh/chart label on running driver pods current without rolling them.
+	// Best-effort and cosmetic — the authoritative chart label lives on the DaemonSet object.
+	if err := s.reconcileDriverPodLabels(ctx, cr); err != nil {
+		log.FromContext(ctx).V(consts.LogLevelWarning).Info("failed to reconcile chart label on driver pods; continuing", "error", err)
+	}
+
 	// Check objects status
 	syncState, err := s.getSyncState(ctx, objs)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to get sync state: %v", err)
 	}
 	return syncState, nil
+}
+
+// reconcileDriverPodLabels patches the current helm.sh/chart value (from the CR labels) onto
+// running driver pods. The label is kept off the pod template (see podTemplateLabels) so a
+// chart upgrade does not change the pod-template hash and trigger a driver rollout; patching
+// the live pods instead preserves chart traceability without disrupting workloads. Pods are
+// located via the DaemonSets this CR owns.
+func (s *stateDriver) reconcileDriverPodLabels(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+	desiredChart := cr.Spec.Labels[consts.HelmChartLabelKey]
+
+	dsList := &appsv1.DaemonSetList{}
+	if err := s.client.List(ctx, dsList, client.MatchingFields{consts.NVIDIADriverControllerIndexKey: cr.Name}); err != nil {
+		return fmt.Errorf("failed to list driver DaemonSets owned by NVIDIADriver %q: %w", cr.Name, err)
+	}
+
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		podList := &corev1.PodList{}
+		if err := s.client.List(ctx, podList,
+			client.InNamespace(ds.Namespace),
+			client.MatchingLabels(ds.Spec.Selector.MatchLabels)); err != nil {
+			return fmt.Errorf("failed to list pods for driver DaemonSet %q: %w", ds.Name, err)
+		}
+		for j := range podList.Items {
+			pod := &podList.Items[j]
+			if pod.Labels[consts.HelmChartLabelKey] == desiredChart {
+				// Already up-to-date; avoid a needless write (and pod update event).
+				continue
+			}
+			original := pod.DeepCopy()
+			if desiredChart == "" {
+				delete(pod.Labels, consts.HelmChartLabelKey)
+			} else {
+				if pod.Labels == nil {
+					pod.Labels = map[string]string{}
+				}
+				pod.Labels[consts.HelmChartLabelKey] = desiredChart
+			}
+			if err := s.client.Patch(ctx, pod, client.MergeFrom(original)); err != nil {
+				return fmt.Errorf("failed to patch %q label on pod %s/%s: %w", consts.HelmChartLabelKey, pod.Namespace, pod.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {
@@ -597,13 +647,29 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 	spec.Labels = sanitizeDriverLabels(spec.Labels)
 
 	return &driverSpec{
-		Spec:             spec,
-		AppName:          nvidiaDriverAppName,
-		Name:             nvidiaDriverName,
-		ImagePath:        imagePath,
-		ManagerImagePath: managerImagePath,
-		OSVersion:        nodePool.osTag,
+		Spec:              spec,
+		AppName:           nvidiaDriverAppName,
+		Name:              nvidiaDriverName,
+		ImagePath:         imagePath,
+		ManagerImagePath:  managerImagePath,
+		OSVersion:         nodePool.osTag,
+		PodTemplateLabels: podTemplateLabels(spec.Labels),
 	}, nil
+}
+
+// podTemplateLabels copies labels for the pod template, excluding helm.sh/chart: its value
+// changes on every chart upgrade, and applying it to the pod template would change the
+// DaemonSet's controller revision hash and trigger an unnecessary (disruptive) rollout.
+// The full label set still lands on the DaemonSet object metadata via Spec.Labels.
+func podTemplateLabels(labels map[string]string) map[string]string {
+	podLabels := make(map[string]string, len(labels))
+	for k, v := range labels {
+		if k == consts.HelmChartLabelKey {
+			continue
+		}
+		podLabels[k] = v
+	}
+	return podLabels
 }
 
 func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDriverSpec, error) {

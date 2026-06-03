@@ -14,9 +14,8 @@ spec:
   {{- if .Values.daemonsets.annotations }}
   annotations: {{ toYaml .Values.daemonsets.annotations | nindent 6 }}
   {{- end }}
-  {{- if .Values.daemonsets.labels }}
-  labels: {{ toYaml .Values.daemonsets.labels | nindent 6 }}
-  {{- end }}
+  labels:
+    {{- include "gpu-operator.operand-labels" . | nindent 4 }}
   {{- if .Values.driver.nvidiaDriverCRD.nodeSelector }}
   nodeSelector: {{ toYaml .Values.driver.nvidiaDriverCRD.nodeSelector | nindent 6 }}
   {{- end }}

@@ -817,6 +817,9 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 				"key":                       "value",
 				"app":                       "value",
 				"app.kubernetes.io/part-of": "value",
+				// helm.sh/chart must not be propagated to the pod template, otherwise a
+				// chart-version change would churn the pod-template hash and trigger a rollout.
+				"helm.sh/chart": "gpu-operator-v1.2.3",
 			}},
 			expectedDs: NewDaemonset().WithPodLabels(map[string]string{
 				"key": "value",

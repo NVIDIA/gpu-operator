@@ -46,6 +46,14 @@ const (
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 
+	// HelmChartLabelKey is the standard Helm "<chart>-<version>" label. It is kept off operand
+	// pod templates (it changes every chart upgrade and would trigger a rollout) but retained on
+	// DaemonSet object metadata for chart traceability.
+	HelmChartLabelKey = "helm.sh/chart"
+	// AppManagedByLabelKey identifies the managing controller. Operand objects carry the stable
+	// value "gpu-operator", making it a safe selector for operand pods.
+	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
+
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 

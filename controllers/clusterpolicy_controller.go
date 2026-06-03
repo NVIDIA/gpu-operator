@@ -170,6 +170,12 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// Keep the helm.sh/chart label on running operand pods current. Best-effort: a failure
+	// must not fail the reconcile, since the authoritative chart label lives on the DaemonSets.
+	if err := clusterPolicyCtrl.reconcileOperandPodLabels(ctx); err != nil {
+		r.Log.Error(err, "failed to reconcile chart label on operand pods; continuing")
+	}
+
 	// if any state is not ready, requeue for reconcile after 5 seconds
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)

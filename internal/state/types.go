@@ -35,6 +35,9 @@ type driverSpec struct {
 	ImagePath        string
 	ManagerImagePath string
 	OSVersion        string
+	// PodTemplateLabels is Spec.Labels with helm.sh/chart removed (see podTemplateLabels), so a
+	// chart-version change does not churn the pod template and trigger a driver rollout.
+	PodTemplateLabels map[string]string
 }
 
 // gdsDriverSpec is a wrapper of GPUDirectStorageSpec with an additional ImagePath field

@@ -27,6 +27,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -315,6 +317,7 @@ func TestDriverSpec(t *testing.T) {
 
 	renderData := getMinimalDriverRenderData()
 	renderData.Driver.Spec = driverSpec
+	renderData.Driver.PodTemplateLabels = podTemplateLabels(driverSpec.Labels)
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
@@ -329,6 +332,119 @@ func TestDriverSpec(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
+}
+
+// TestDriverPodTemplateExcludesChartLabel verifies that the helm.sh/chart label is applied
+// to the rendered DaemonSet's object metadata (for chart traceability) but is excluded from
+// its pod template, so a chart-version change does not churn the pod-template revision hash.
+func TestDriverPodTemplateExcludesChartLabel(t *testing.T) {
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	labels := sanitizeDriverLabels(map[string]string{
+		"custom-label":           "custom-value",
+		consts.HelmChartLabelKey: "gpu-operator-v1.2.3",
+	})
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.Labels = labels
+	renderData.Driver.PodTemplateLabels = podTemplateLabels(labels)
+
+	objs, err := stateDriver.renderer.RenderObjects(&render.TemplatingData{Data: renderData})
+	require.Nil(t, err)
+
+	ds, err := getDaemonsetFromObjects(objs)
+	require.Nil(t, err)
+
+	// On the DaemonSet object metadata: chart label present.
+	require.Equal(t, "gpu-operator-v1.2.3", ds.Labels[consts.HelmChartLabelKey],
+		"helm.sh/chart should be retained on the DaemonSet object metadata")
+	require.Equal(t, "custom-value", ds.Labels["custom-label"])
+
+	// On the pod template: chart label excluded, other labels retained.
+	_, found := ds.Spec.Template.Labels[consts.HelmChartLabelKey]
+	require.False(t, found, "helm.sh/chart must not be propagated to the pod template")
+	require.Equal(t, "custom-value", ds.Spec.Template.Labels["custom-label"])
+}
+
+// TestReconcileDriverPodLabels verifies that the NVIDIADriver controller patches the current
+// helm.sh/chart value (from the CR labels) onto the live driver pods it owns, without touching
+// unrelated pods.
+func TestReconcileDriverPodLabels(t *testing.T) {
+	const (
+		ns       = "test-ns"
+		crName   = "test-driver"
+		appLabel = "nvidia-gpu-driver-ubuntu22.04-abc"
+		oldChart = "gpu-operator-v1.0.0"
+		newChart = "gpu-operator-v1.0.1"
+	)
+
+	cr := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: crName},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			Labels: map[string]string{consts.HelmChartLabelKey: newChart},
+		},
+	}
+
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      appLabel,
+			Namespace: ns,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+				Kind:       nvidiav1alpha1.NVIDIADriverCRDName,
+				Name:       crName,
+				Controller: ptr.To(true),
+			}},
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": appLabel}},
+		},
+	}
+
+	driverPod := func(name, chart string) *corev1.Pod {
+		labels := map[string]string{"app": appLabel}
+		if chart != "" {
+			labels[consts.HelmChartLabelKey] = chart
+		}
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, Labels: labels}}
+	}
+	stalePod := driverPod("driver-stale", oldChart)
+	missingPod := driverPod("driver-missing", "")
+	// A pod in the namespace that is not owned by this driver DaemonSet must be left untouched.
+	otherPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name: "other", Namespace: ns,
+		Labels: map[string]string{"app": "something-else", consts.HelmChartLabelKey: oldChart},
+	}}
+
+	// Mirror the DaemonSet ownership index registered by the NVIDIADriver controller.
+	indexFunc := func(rawObj client.Object) []string {
+		owner := metav1.GetControllerOf(rawObj.(*appsv1.DaemonSet))
+		if owner == nil || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
+			return nil
+		}
+		return []string{owner.Name}
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(ds, stalePod, missingPod, otherPod).
+		WithIndex(&appsv1.DaemonSet{}, consts.NVIDIADriverControllerIndexKey, indexFunc).
+		Build()
+
+	s := &stateDriver{stateSkel: stateSkel{client: cl, namespace: ns}}
+	require.NoError(t, s.reconcileDriverPodLabels(context.Background(), cr))
+
+	get := func(name string) *corev1.Pod {
+		p := &corev1.Pod{}
+		require.NoError(t, cl.Get(context.Background(), apitypes.NamespacedName{Namespace: ns, Name: name}, p))
+		return p
+	}
+	require.Equal(t, newChart, get("driver-stale").Labels[consts.HelmChartLabelKey], "stale label should be updated")
+	require.Equal(t, newChart, get("driver-missing").Labels[consts.HelmChartLabelKey], "missing label should be added")
+	require.Equal(t, oldChart, get("other").Labels[consts.HelmChartLabelKey], "non-driver pod must not be touched")
 }
 
 func TestDriverGDS(t *testing.T) {
