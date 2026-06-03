@@ -24,6 +24,8 @@ var (
 	ErrFileDeleted = errors.New("file deleted")
 	// ErrFileNotFound indicates a requested file is not found
 	ErrFileNotFound = fmt.Errorf("file not found%.0w", fs.ErrNotExist)
+	// ErrHTTPRedirectRefused indicates a request to redirect to a local host or from https to non-https
+	ErrHTTPRedirectRefused = fmt.Errorf("refusing to redirect to a local or non-https url")
 	// ErrHTTPStatus if the http status code was unexpected
 	ErrHTTPStatus = errors.New("unexpected http status code")
 	// ErrInvalidChallenge indicates an issue with the received challenge in the WWW-Authenticate header
