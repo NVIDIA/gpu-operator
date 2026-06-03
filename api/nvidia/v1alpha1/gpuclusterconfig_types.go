@@ -27,6 +27,11 @@ const (
 	GPUClusterConfigCRDName = "GPUClusterConfig"
 )
 
+const (
+	// Ignored marks a duplicate GPUClusterConfig that the singleton controller does not reconcile.
+	Ignored State = "ignored"
+)
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // GPUClusterConfigSpec defines the desired state of GPUClusterConfig, the DRA-based

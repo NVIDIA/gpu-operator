@@ -114,6 +114,8 @@ func newStates(crdKind string, namespace string, k8sClient client.Client, scheme
 	switch crdKind {
 	case nvidiav1alpha1.NVIDIADriverCRDName:
 		return newNVIDIADriverStates(k8sClient, namespace, scheme)
+	case nvidiav1alpha1.GPUClusterConfigCRDName:
+		return newGPUClusterConfigStates(k8sClient, namespace, scheme)
 	default:
 		break
 	}
@@ -127,4 +129,10 @@ func newNVIDIADriverStates(k8sClient client.Client, namespace string, scheme *ru
 	}
 
 	return []State{driverState}, nil
+}
+
+// newGPUClusterConfigStates returns the states reconciled for a GPUClusterConfig. No operands
+// exist yet; an empty set makes SyncState report ready, so the controller runs as a no-op.
+func newGPUClusterConfigStates(_ client.Client, _ string, _ *runtime.Scheme) ([]State, error) {
+	return []State{}, nil
 }

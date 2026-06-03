@@ -107,6 +107,9 @@ rules:
   - clusterpolicies
   - clusterpolicies/finalizers
   - clusterpolicies/status
+  - gpuclusterconfigs
+  - gpuclusterconfigs/finalizers
+  - gpuclusterconfigs/status
   - nvidiadrivers
   - nvidiadrivers/finalizers
   - nvidiadrivers/status

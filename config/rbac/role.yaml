@@ -132,6 +132,7 @@ rules:
   - nvidia.com
   resources:
   - '*'
+  - gpuclusterconfigs
   - nvidiadrivers
   verbs:
   - create
@@ -144,12 +145,14 @@ rules:
 - apiGroups:
   - nvidia.com
   resources:
+  - gpuclusterconfigs/finalizers
   - nvidiadrivers/finalizers
   verbs:
   - update
 - apiGroups:
   - nvidia.com
   resources:
+  - gpuclusterconfigs/status
   - nvidiadrivers/status
   verbs:
   - get
