@@ -450,6 +450,7 @@ gds:
 
 gdrcopy:
   enabled: false
+  usePrecompiled: false
   repository: nvcr.io/nvidia/cloud-native
   image: gdrdrv
   version: "v2.5.2"

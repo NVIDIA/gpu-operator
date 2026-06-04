@@ -1386,6 +1386,10 @@ spec:
                   repository:
                     description: NVIDIA GDRCopy driver image repository
                     type: string
+                  usePrecompiled:
+                    description: UsePrecompiled indicates if deployment of GDRCopy
+                      using pre-compiled modules is enabled
+                    type: boolean
                   version:
                     description: NVIDIA GDRCopy driver image tag
                     type: string
