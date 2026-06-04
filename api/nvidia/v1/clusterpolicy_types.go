@@ -1539,6 +1539,12 @@ type GDRCopySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// UsePrecompiled indicates if deployment of GDRCopy using pre-compiled modules is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GDRCopy deployment using pre-compiled modules"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
+
 	// NVIDIA GDRCopy driver image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -2426,6 +2432,14 @@ func (gdrcopy *GDRCopySpec) IsEnabled() bool {
 		return false
 	}
 	return *gdrcopy.Enabled
+}
+
+// UsePrecompiledDrivers returns true if usePrecompiled option is enabled in spec
+func (gdrcopy *GDRCopySpec) UsePrecompiledDrivers() bool {
+	if gdrcopy.UsePrecompiled == nil {
+		return false
+	}
+	return *gdrcopy.UsePrecompiled
 }
 
 // IsEnabled returns true if DCGM hostengine as a separate Pod is enabled through gpu-perator
