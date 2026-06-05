@@ -365,9 +365,9 @@ spec:
               dcgm:
                 description: |-
                   DCGM defines the spec for the standalone NVIDIA DCGM hostengine. Disabled by default;
-                  when disabled, dcgm-exporter uses its embedded nv-hostengine.
-                  NOTE: the reused enabled field carries no server-side default, so an omitted enabled
-                  is nil here; the controller is responsible for interpreting nil (see defaults handling).
+                  when disabled, dcgm-exporter uses its embedded nv-hostengine. NOTE: the reused enabled
+                  field carries no server-side default and its IsEnabled() treats nil as enabled, so the
+                  controller must default nil enabled to disabled here.
                 properties:
                   args:
                     description: 'Optional: List of arguments'
@@ -716,7 +716,7 @@ spec:
                     type: string
                 type: object
               draDriver:
-                description: DraDriver defines the spec for the NVIDIA DRA driver
+                description: DRADriver defines the spec for the NVIDIA DRA driver
                   stack (gpus + computeDomains).
                 properties:
                   computeDomains:
@@ -2794,6 +2794,13 @@ spec:
                               type: object
                             type: array
                         type: object
+                    type: object
+                  featureGates:
+                    additionalProperties:
+                      type: boolean
+                    description: |-
+                      FeatureGates is a map of feature gate names to a boolean enabling or disabling each.
+                      It is rendered as the FEATURE_GATES environment variable on the DRA driver containers.
                     type: object
                   gpus:
                     description: GPUs configures the gpu.nvidia.com capability of

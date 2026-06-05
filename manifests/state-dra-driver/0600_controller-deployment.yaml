@@ -1,0 +1,123 @@
+{{- if .DRADriver.Spec.IsComputeDomainsEnabled }}
+{{- $controller := .DRADriver.Spec.ComputeDomains.Controller }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: nvidia-dra-driver
+    app.kubernetes.io/component: nvidia-dra-driver-controller
+    app: nvidia-dra-driver-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nvidia-dra-driver-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nvidia-dra-driver
+        app.kubernetes.io/component: nvidia-dra-driver-controller
+        app: nvidia-dra-driver-controller
+    spec:
+      priorityClassName: {{ $controller.PriorityClassName | default "system-node-critical" }}
+      serviceAccountName: nvidia-dra-driver-controller
+      {{- if .DRADriver.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .DRADriver.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if $controller.NodeSelector }}
+      nodeSelector: {{ $controller.NodeSelector | toJson }}
+      {{- end }}
+      {{- if $controller.Affinity }}
+      affinity: {{ $controller.Affinity | toJson }}
+      {{- else }}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+            weight: 100
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: nvidia-dra-driver-controller
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      {{- end }}
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      {{- range $controller.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      containers:
+      - name: compute-domain
+        image: {{ .DRADriver.ImagePath }}
+        {{- if .DRADriver.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DRADriver.Spec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - compute-domain-controller
+        - -v
+        - "$(LOG_VERBOSITY)"
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8080"
+        - name: METRICS_PATH
+          value: /metrics
+        - name: PPROF_PATH
+          value: ""
+        - name: LOG_VERBOSITY
+          value: "4"
+        - name: LOG_VERBOSITY_CD_DAEMON
+          value: "4"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: IMAGE_NAME
+          value: {{ .DRADriver.ImagePath | quote }}
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: LEADER_ELECTION_ENABLED
+          value: "false"
+        - name: LEADER_ELECTION_LEASE_LOCK_NAME
+          value: nvidia-dra-driver-controller
+        - name: LEADER_ELECTION_LEASE_LOCK_NAMESPACE
+          value: {{ .Namespace | quote }}
+        - name: LEADER_ELECTION_LEASE_DURATION
+          value: 15s
+        - name: LEADER_ELECTION_RENEW_DEADLINE
+          value: 10s
+        - name: LEADER_ELECTION_RETRY_PERIOD
+          value: 2s
+        {{- if .FeatureGates }}
+        - name: FEATURE_GATES
+          value: {{ .FeatureGates | quote }}
+        {{- end }}
+        {{- range $controller.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        {{- if $controller.Resources }}
+        resources: {{ $controller.Resources | toJson }}
+        {{- end }}
+{{- end }}

@@ -122,7 +122,7 @@ func main() {
 		},
 	}
 
-	c.Before = func(ctx context.Context, cli *cli.Command) (context.Context, error) {
+	c.Before = func(ctx context.Context, _ *cli.Command) (context.Context, error) {
 		if debugFlag {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -287,22 +287,14 @@ func writeStatusFile(statusFile, content string) error {
 }
 
 func prependPathListEnvvar(envvar string, prepend ...string) string {
-	if len(prepend) == 0 {
-		return os.Getenv(envvar)
-	}
 	current := filepath.SplitList(os.Getenv(envvar))
 	return strings.Join(append(prepend, current...), string(filepath.ListSeparator))
 }
 
-// setEnvVar adds or updates an envar to the list of specified envvars and returns it.
 func setEnvVar(envvars []string, key, value string) []string {
-	var updated []string
-	for _, envvar := range envvars {
-		pair := strings.SplitN(envvar, "=", 2)
-		if pair[0] == key {
-			continue
-		}
-		updated = append(updated, envvar)
-	}
-	return append(updated, fmt.Sprintf("%s=%s", key, value))
+	envvars = slices.DeleteFunc(envvars, func(e string) bool {
+		k, _, _ := strings.Cut(e, "=")
+		return k == key
+	})
+	return append(envvars, key+"="+value)
 }

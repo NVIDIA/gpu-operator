@@ -39,13 +39,13 @@ const (
 // or the device-plugin; the driver is installed separately (host-installed or via an
 // NVIDIADriver CR) and GPUClusterConfig waits for driver readiness before proceeding.
 type GPUClusterConfigSpec struct {
-	// DraDriver defines the spec for the NVIDIA DRA driver stack (gpus + computeDomains).
-	DraDriver DraDriverSpec `json:"draDriver"`
+	// DRADriver defines the spec for the NVIDIA DRA driver stack (gpus + computeDomains).
+	DRADriver DRADriverSpec `json:"draDriver"`
 
 	// DCGM defines the spec for the standalone NVIDIA DCGM hostengine. Disabled by default;
-	// when disabled, dcgm-exporter uses its embedded nv-hostengine.
-	// NOTE: the reused enabled field carries no server-side default, so an omitted enabled
-	// is nil here; the controller is responsible for interpreting nil (see defaults handling).
+	// when disabled, dcgm-exporter uses its embedded nv-hostengine. NOTE: the reused enabled
+	// field carries no server-side default and its IsEnabled() treats nil as enabled, so the
+	// controller must default nil enabled to disabled here.
 	DCGM *nvidiav1.DCGMSpec `json:"dcgm,omitempty"`
 
 	// DCGMExporter defines the spec for NVIDIA DCGM Exporter. Enabled by default, but the
@@ -64,9 +64,9 @@ type GPUClusterConfigSpec struct {
 	Daemonsets nvidiav1.DaemonsetsSpec `json:"daemonsets,omitempty"`
 }
 
-// DraDriverSpec defines the spec for the NVIDIA DRA driver stack. There is no top-level
+// DRADriverSpec defines the spec for the NVIDIA DRA driver stack. There is no top-level
 // enabled toggle; enablement is per capability (gpus / computeDomains).
-type DraDriverSpec struct {
+type DRADriverSpec struct {
 	// NVIDIA DRA driver image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -87,45 +87,60 @@ type DraDriverSpec struct {
 	// +kubebuilder:validation:Optional
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
+	// FeatureGates is a map of feature gate names to a boolean enabling or disabling each.
+	// It is rendered as the FEATURE_GATES environment variable on the DRA driver containers.
+	// +kubebuilder:validation:Optional
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
 	// GPUs configures the gpu.nvidia.com capability of the DRA driver.
-	GPUs DraDriverGPUsSpec `json:"gpus,omitempty"`
+	GPUs DRADriverGPUsSpec `json:"gpus,omitempty"`
 
 	// ComputeDomains configures the compute-domain capability of the DRA driver.
-	ComputeDomains DraDriverComputeDomainsSpec `json:"computeDomains,omitempty"`
+	ComputeDomains DRADriverComputeDomainsSpec `json:"computeDomains,omitempty"`
 }
 
-// DraDriverGPUsSpec configures the gpus capability of the DRA driver. It maps onto the
+// IsGPUsEnabled returns true if the gpus capability of the DRA driver is enabled.
+func (d *DRADriverSpec) IsGPUsEnabled() bool {
+	return d.GPUs.Enabled != nil && *d.GPUs.Enabled
+}
+
+// IsComputeDomainsEnabled returns true if the computeDomains capability of the DRA driver is enabled.
+func (d *DRADriverSpec) IsComputeDomainsEnabled() bool {
+	return d.ComputeDomains.Enabled != nil && *d.ComputeDomains.Enabled
+}
+
+// DRADriverGPUsSpec configures the gpus capability of the DRA driver. It maps onto the
 // gpus container of the upstream kubelet-plugin DaemonSet.
-type DraDriverGPUsSpec struct {
+type DRADriverGPUsSpec struct {
 	// Enabled indicates if the gpus capability of the DRA driver is enabled.
 	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// KubeletPlugin configures the kubelet-plugin workload for the gpus capability.
-	KubeletPlugin DraDriverKubeletPluginSpec `json:"kubeletPlugin,omitempty"`
+	KubeletPlugin DRADriverKubeletPluginSpec `json:"kubeletPlugin,omitempty"`
 }
 
-// DraDriverComputeDomainsSpec configures the computeDomains capability of the DRA driver.
+// DRADriverComputeDomainsSpec configures the computeDomains capability of the DRA driver.
 // The kubeletPlugin maps onto the computeDomains container of the upstream kubelet-plugin
 // DaemonSet; the controller is a separate Deployment.
-type DraDriverComputeDomainsSpec struct {
+type DRADriverComputeDomainsSpec struct {
 	// Enabled indicates if the computeDomains capability of the DRA driver is enabled.
 	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Controller configures the compute-domain controller Deployment.
-	Controller DraDriverControllerSpec `json:"controller,omitempty"`
+	Controller DRADriverControllerSpec `json:"controller,omitempty"`
 
 	// KubeletPlugin configures the kubelet-plugin workload for the computeDomains capability.
-	KubeletPlugin DraDriverKubeletPluginSpec `json:"kubeletPlugin,omitempty"`
+	KubeletPlugin DRADriverKubeletPluginSpec `json:"kubeletPlugin,omitempty"`
 }
 
-// DraDriverKubeletPluginSpec defines configuration for a DRA driver kubelet-plugin container.
+// DRADriverKubeletPluginSpec defines configuration for a DRA driver kubelet-plugin container.
 // Per-component scheduling fields augment/override the shared daemonsets defaults for this
 // workload. The gpus and computeDomains kubelet-plugin blocks map onto the two containers of
 // a single kubelet-plugin DaemonSet, so the renderer reconciles pod-level scheduling when
 // both blocks set it.
-type DraDriverKubeletPluginSpec struct {
+type DRADriverKubeletPluginSpec struct {
 	// Optional: List of environment variables
 	// +kubebuilder:validation:Optional
 	Env []nvidiav1.EnvVar `json:"env,omitempty"`
@@ -156,10 +171,10 @@ type DraDriverKubeletPluginSpec struct {
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
-// DraDriverControllerSpec defines configuration for the compute-domain controller Deployment.
+// DRADriverControllerSpec defines configuration for the compute-domain controller Deployment.
 // As a Deployment (not a DaemonSet) it carries its own scheduling configuration rather than
 // inheriting the shared daemonsets defaults.
-type DraDriverControllerSpec struct {
+type DRADriverControllerSpec struct {
 	// Optional: List of environment variables
 	// +kubebuilder:validation:Optional
 	Env []nvidiav1.EnvVar `json:"env,omitempty"`

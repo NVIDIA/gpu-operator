@@ -131,8 +131,12 @@ func newNVIDIADriverStates(k8sClient client.Client, namespace string, scheme *ru
 	return []State{driverState}, nil
 }
 
-// newGPUClusterConfigStates returns the states reconciled for a GPUClusterConfig. No operands
-// exist yet; an empty set makes SyncState report ready, so the controller runs as a no-op.
-func newGPUClusterConfigStates(_ client.Client, _ string, _ *runtime.Scheme) ([]State, error) {
-	return []State{}, nil
+// newGPUClusterConfigStates returns the states reconciled for a GPUClusterConfig.
+func newGPUClusterConfigStates(k8sClient client.Client, namespace string, scheme *runtime.Scheme) ([]State, error) {
+	draDriverState, err := NewStateDRADriver(k8sClient, namespace, scheme, "/opt/gpu-operator/manifests/state-dra-driver")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DRA driver state: %v", err)
+	}
+
+	return []State{draDriverState}, nil
 }

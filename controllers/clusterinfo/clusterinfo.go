@@ -19,6 +19,7 @@ package clusterinfo
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -28,6 +29,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -42,6 +45,7 @@ type Interface interface {
 	GetOpenshiftVersion() (string, error)
 	GetOpenshiftDriverToolkitImages() map[string]string
 	GetOpenshiftProxySpec() (*configv1.ProxySpec, error)
+	GetDRAResourceGVR() (schema.GroupVersionResource, bool, error)
 }
 type clusterInfo struct {
 	ctx     context.Context
@@ -52,6 +56,8 @@ type clusterInfo struct {
 	openshiftVersion             string
 	openshiftDriverToolkitImages map[string]string
 	proxySpec                    *configv1.ProxySpec
+	draResourceGVR               schema.GroupVersionResource
+	draSupported                 bool
 }
 
 // New creates a new instance of clusterinfo API
@@ -86,6 +92,13 @@ func New(ctx context.Context, opts ...Option) (Interface, error) {
 	l.openshiftVersion = openshiftVersion
 
 	l.openshiftDriverToolkitImages = getOpenshiftDTKImages(ctx, l.config)
+
+	draResourceGVR, draSupported, err := getDRAResourceGVR(ctx, l.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine DRA support: %w", err)
+	}
+	l.draResourceGVR = draResourceGVR
+	l.draSupported = draSupported
 
 	return l, nil
 }
@@ -143,6 +156,59 @@ func (l *clusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
 	}
 
 	return getOpenshiftProxySpec(l.ctx, l.config)
+}
+
+// GetDRAResourceGVR returns the GroupVersionResource to use for resource.k8s.io
+// DeviceClass objects and whether DRA is supported in the cluster. When DRA is
+// not supported the returned bool is false and the GVR is empty.
+func (l *clusterInfo) GetDRAResourceGVR() (schema.GroupVersionResource, bool, error) {
+	if l.oneshot {
+		return l.draResourceGVR, l.draSupported, nil
+	}
+
+	return getDRAResourceGVR(l.ctx, l.config)
+}
+
+// getDRAResourceGVR discovers whether the cluster serves the resource.k8s.io
+// DeviceClass resource and, if so, the preferred version to use (v1 over v1beta2
+// over v1beta1).
+func getDRAResourceGVR(ctx context.Context, config *rest.Config) (schema.GroupVersionResource, bool, error) {
+	logger := log.FromContext(ctx)
+	var gvr schema.GroupVersionResource
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return gvr, false, fmt.Errorf("error building discovery client: %w", err)
+	}
+
+	apiResourceLists, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return gvr, false, fmt.Errorf("error getting server resources from discovery client: %w", err)
+	}
+
+	var groupVersions []string
+	for _, list := range apiResourceLists {
+		for _, resource := range list.APIResources {
+			if resource.Kind == "DeviceClass" {
+				groupVersions = append(groupVersions, list.GroupVersion)
+			}
+		}
+	}
+
+	if len(groupVersions) == 0 {
+		return gvr, false, nil
+	}
+	logger.V(consts.LogLevelInfo).Info("Discovered DeviceClass resource",
+		"groupVersions", strings.Join(groupVersions, ", "))
+
+	for _, version := range []string{"v1", "v1beta2", "v1beta1"} {
+		if slices.Contains(groupVersions, "resource.k8s.io/"+version) {
+			return schema.GroupVersionResource{Group: "resource.k8s.io", Version: version, Resource: "deviceclasses"}, true, nil
+		}
+	}
+
+	return gvr, false, fmt.Errorf("could not determine the GVR for the DeviceClass resource from discovered group/versions: %s",
+		strings.Join(groupVersions, ", "))
 }
 
 func getContainerRuntime(ctx context.Context, config *rest.Config) (string, error) {

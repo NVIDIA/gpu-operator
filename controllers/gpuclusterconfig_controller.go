@@ -68,7 +68,7 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Deleted; owned objects are garbage-collected, so there is nothing to clean up.
-			return reconcile.Result{}, nil
+			return ctrl.Result{}, nil
 		}
 		wrappedErr := fmt.Errorf("error getting GPUClusterConfig object: %w", err)
 		logger.Error(err, "error getting GPUClusterConfig object")
@@ -76,7 +76,7 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, wrappedErr.Error()); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
-		return reconcile.Result{}, wrappedErr
+		return ctrl.Result{}, wrappedErr
 	}
 
 	// Singleton, first-wins (mirroring ClusterPolicy): the first instance to reconcile
@@ -86,9 +86,9 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		logger.V(consts.LogLevelWarning).Info("Multiple GPUClusterConfig instances found, ignoring this one",
 			"name", instance.Name, "owner", r.singleton.Name)
 		if err := r.updateCrStatus(ctx, instance, nvidiav1alpha1.Ignored); err != nil {
-			return reconcile.Result{}, err
+			return ctrl.Result{}, err
 		}
-		return reconcile.Result{}, nil
+		return ctrl.Result{}, nil
 	}
 	r.singleton = instance
 
@@ -107,7 +107,7 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		for _, result := range managerStatus.StatesStatus {
 			if result.Status != state.SyncStateReady && result.ErrInfo != nil {
 				errorInfo = result.ErrInfo
-				if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo.Error())); condErr != nil {
+				if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo)); condErr != nil {
 					logger.Error(condErr, "failed to set condition")
 				}
 				break
@@ -119,14 +119,14 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				logger.Error(condErr, "failed to set condition")
 			}
 		}
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	if condErr := r.conditionUpdater.SetConditionsReady(ctx, instance, conditions.Reconciled, "All resources have been successfully reconciled"); condErr != nil {
 		logger.Error(condErr, "failed to set condition")
 		return ctrl.Result{}, condErr
 	}
-	return reconcile.Result{}, nil
+	return ctrl.Result{}, nil
 }
 
 // updateCrStatus writes desired to the CR's status, skipping the write when it is already current.
@@ -181,7 +181,7 @@ func (r *GPUClusterConfigReconciler) enqueueAllGPUClusterConfigs(ctx context.Con
 }
 
 func (r *GPUClusterConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	// No operands are rendered yet (empty state set).
+	// The state manager renders the DRA driver operand for the GPUClusterConfig.
 	stateManager, err := state.NewManager(
 		nvidiav1alpha1.GPUClusterConfigCRDName,
 		r.Namespace,

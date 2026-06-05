@@ -38,7 +38,7 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 		// Driver installed directly on the host root; the plugin reads it via /host.
 		return driverInfo{
 			driverRoot:        hostRoot,
-			driverRootCtrPath: "/host",
+			driverRootCtrPath: hostRootCtrPath,
 		}
 	}
 

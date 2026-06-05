@@ -268,7 +268,7 @@ func (s *stateSkel) createOrUpdateObjs(
 				if desiredObjectHash == currentObjHash {
 					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
-					return nil
+					continue
 				}
 			}
 		}
@@ -407,6 +407,12 @@ func (s *stateSkel) getSyncState(ctx context.Context, objs []*unstructured.Unstr
 				return SyncStateNotReady, err
 			}
 		}
+		if found.GetKind() == "Deployment" {
+			if ready, err := s.isDeploymentReady(found, reqLogger); err != nil || !ready {
+				reqLogger.V(consts.LogLevelInfo).Info("Object is not ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
+				return SyncStateNotReady, err
+			}
+		}
 		reqLogger.V(consts.LogLevelInfo).Info("Object is ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
 	}
 	return SyncStateReady, nil
@@ -439,6 +445,38 @@ func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger l
 	// TODO: Check if we can use another field maybe to indicate it was processed by the DaemonSet controller.
 	if ds.Status.DesiredNumberScheduled != 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberAvailable &&
 		ds.Status.UpdatedNumberScheduled == ds.Status.NumberAvailable {
+		return true, nil
+	}
+	return false, nil
+}
+
+// isDeploymentReady checks if a deployment is ready
+func (s *stateSkel) isDeploymentReady(ud *unstructured.Unstructured, reqLogger logr.Logger) (bool, error) {
+	buf, err := ud.MarshalJSON()
+	if err != nil {
+		return false, fmt.Errorf("failed to marshall unstructured deployment object: %w", err)
+	}
+
+	dep := &appsv1.Deployment{}
+	if err = json.Unmarshal(buf, dep); err != nil {
+		return false, fmt.Errorf("failed to unmarshall to deployment object: %w", err)
+	}
+
+	desired := int32(1)
+	if dep.Spec.Replicas != nil {
+		desired = *dep.Spec.Replicas
+	}
+
+	reqLogger.V(consts.LogLevelDebug).Info(
+		"Check deployment state",
+		"DesiredReplicas:", desired,
+		"UpdatedReplicas:", dep.Status.UpdatedReplicas,
+		"AvailableReplicas:", dep.Status.AvailableReplicas,
+		"ObservedGeneration:", dep.Status.ObservedGeneration)
+
+	if dep.Status.ObservedGeneration >= dep.Generation &&
+		dep.Status.UpdatedReplicas == desired &&
+		dep.Status.AvailableReplicas == desired {
 		return true, nil
 	}
 	return false, nil

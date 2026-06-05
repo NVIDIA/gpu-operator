@@ -30,10 +30,12 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
+// gpuClusterConfigUpdater is the Updater implementation for GPUClusterConfig conditions.
 type gpuClusterConfigUpdater struct {
 	client client.Client
 }
 
+// NewGPUClusterConfigUpdater returns an Updater that manages GPUClusterConfig status conditions.
 func NewGPUClusterConfigUpdater(client client.Client) Updater {
 	return &gpuClusterConfigUpdater{client: client}
 }
@@ -91,9 +93,9 @@ func (u *gpuClusterConfigUpdater) updateConditions(ctx context.Context, cr *nvid
 
 		if instance.Status.State == "" {
 			instance.Status.State = cr.Status.State
-			if instance.Status.State == "" {
-				instance.Status.State = nvidiav1alpha1.NotReady
-			}
+		}
+		if instance.Status.State == "" {
+			instance.Status.State = nvidiav1alpha1.NotReady
 		}
 	default:
 		return fmt.Errorf("unknown status type provided: %s", statusType)

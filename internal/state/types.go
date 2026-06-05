@@ -17,9 +17,11 @@
 package state
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
@@ -49,4 +51,33 @@ type gdsDriverSpec struct {
 type gdrcopyDriverSpec struct {
 	Spec      *nvidiav1alpha1.GDRCopySpec
 	ImagePath string
+}
+
+// draDriverSpec is a wrapper of DRADriverSpec with the fully-qualified image paths
+// populated: ImagePath for the DRA driver containers and InitImagePath for the
+// driver-validation init container (shipped in the gpu-operator image).
+type draDriverSpec struct {
+	Spec          *nvidiav1alpha1.DRADriverSpec
+	ImagePath     string
+	InitImagePath string
+}
+
+// draDriverRenderData is the templating data for the DRA driver manifests.
+type draDriverRenderData struct {
+	DRADriver  *draDriverSpec
+	HostPaths  *nvidiav1.HostPathsSpec
+	Daemonsets *nvidiav1.DaemonsetsSpec
+	Namespace  string
+	// DeviceClassAPIVersion is the apiVersion to render on DeviceClass objects,
+	// determined from the resource.k8s.io version served by the cluster.
+	DeviceClassAPIVersion string
+	// FeatureGates is the pre-rendered FEATURE_GATES env value (empty when none).
+	FeatureGates string
+	// The kubelet-plugin DaemonSet hosts both the gpus and computeDomains containers,
+	// so these pod-level scheduling fields are merged from the daemonsets defaults and
+	// the per-capability kubeletPlugin blocks (see mergeKubeletPluginScheduling).
+	KubeletPluginPriorityClassName string
+	KubeletPluginNodeSelector      map[string]string
+	KubeletPluginTolerations       []corev1.Toleration
+	KubeletPluginAffinity          *corev1.Affinity
 }

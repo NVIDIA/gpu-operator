@@ -49,16 +49,25 @@ func newGPUClusterConfigReconciler(t *testing.T, objs ...client.Object) (*GPUClu
 		WithStatusSubresource(&nvidiav1alpha1.GPUClusterConfig{}).
 		Build()
 
-	stateManager, err := state.NewManager(nvidiav1alpha1.GPUClusterConfigCRDName, "test-namespace", c, scheme)
-	require.NoError(t, err)
-
 	return &GPUClusterConfigReconciler{
 		Client:           c,
 		Scheme:           scheme,
 		Namespace:        "test-namespace",
-		stateManager:     stateManager,
+		stateManager:     &fakeStateManager{results: state.Results{Status: state.SyncStateReady}},
 		conditionUpdater: &FakeConditionUpdater{},
 	}, c
+}
+
+// fakeStateManager returns canned SyncState results so the controller tests don't load
+// real manifests. GetWatchSources is promoted from the embedded (nil) interface and is
+// never called here — only SetupWithManager calls it, which these tests skip.
+type fakeStateManager struct {
+	state.Manager
+	results state.Results
+}
+
+func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, _ state.InfoCatalog) state.Results {
+	return f.results
 }
 
 func gccReconcile(t *testing.T, r *GPUClusterConfigReconciler, name string) {
