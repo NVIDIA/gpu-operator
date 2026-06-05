@@ -109,6 +109,7 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/busybox
 COPY --from=builder /workspace/gpu-operator /usr/bin/
 COPY --from=builder /workspace/manage-crds /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
+COPY --from=builder /workspace/dra-driver-validator /usr/bin/
 COPY --from=sample-builder /build/vectorAdd /usr/bin/vectorAdd
 ARG CUDA_SAMPLES_VERSION
 COPY --from=sample-builder /usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat /usr/local/cuda/compat
