@@ -18,6 +18,35 @@ data:
     set -o allexport
     cat /run/nvidia/validations/driver-ready
     . /run/nvidia/validations/driver-ready
+    
+    extra_modules="gdrdrv nvidia_fs"
+    > feature-flags.env
+    for module in ${extra_modules}; do
+        if lsmod | grep -q "^$module "; then
+            case "$module" in
+                "gdrdrv")
+                  if [ -z "$GDRCOPY_ENABLED" ]; then
+                      echo "GDRCOPY_ENABLED=true" >> feature-flags.env
+                  fi
+                ;;
+                "nvidia_fs")
+                  if [ -z "$GDS_ENABLED" ]; then
+                      echo "GDS_ENABLED=true" >> feature-flags.env
+                  fi
+                  if [ -z "$MOFED_ENABLED" ]; then
+                      echo "MOFED_ENABLED=true" >> feature-flags.env
+                  fi
+                ;;
+            esac
+        fi
+    done
+    
+    if [ -s "feature-flags.env" ]; then
+        echo "Enabling nvidia-device-plugin feature flags..."
+        cat feature-flags.env
+        . ./feature-flags.env
+    fi
 
     echo "Starting nvidia-device-plugin"
     exec nvidia-device-plugin
+    
