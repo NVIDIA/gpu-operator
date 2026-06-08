@@ -28,7 +28,6 @@ set -euo pipefail
 #   - TOOLKIT_CONTAINER_IMAGE: container-toolkit image override
 #   - DEVICE_PLUGIN_IMAGE: device-plugin image override
 #   - MIG_MANAGER_IMAGE: mig-manager image override
-#   - CONTAINER_RUNTIME: default runtime (docker, containerd, crio)
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 OUTPUT_FILE" >&2
@@ -67,12 +66,6 @@ if [[ -n "${OPERATOR_VERSION:-}" ]]; then
     OPERATOR_CONFIG="${OPERATOR_CONFIG}  version: \"${OPERATOR_VERSION}\"\n"
     VALIDATOR_CONFIG="${VALIDATOR_CONFIG}  version: \"${OPERATOR_VERSION}\"\n"
     echo "Added operator.version: ${OPERATOR_VERSION}"
-    HAS_VALUES=true
-fi
-
-if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
-    OPERATOR_CONFIG="${OPERATOR_CONFIG}  defaultRuntime: \"${CONTAINER_RUNTIME}\"\n"
-    echo "Added operator.defaultRuntime: ${CONTAINER_RUNTIME}"
     HAS_VALUES=true
 fi
 
