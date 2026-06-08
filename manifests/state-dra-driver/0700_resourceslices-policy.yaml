@@ -1,0 +1,44 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: resourceslices-policy-nvidia-dra-driver
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["resource.k8s.io"]
+      apiVersions: ["v1", "v1beta1", "v1beta2"]
+      operations:  ["CREATE", "UPDATE", "DELETE"]
+      resources:   ["resourceslices"]
+  matchConditions:
+  - name: isRestrictedUser
+    expression: >-
+      request.userInfo.username == "system:serviceaccount:{{ .Namespace }}:nvidia-dra-driver-kubeletplugin"
+  variables:
+  - name: userNodeName
+    expression: >-
+      request.userInfo.extra[?'authentication.kubernetes.io/node-name'][0].orValue('')
+  - name: objectNodeName
+    expression: >-
+      (request.operation == "DELETE" ? oldObject : object).spec.?nodeName.orValue("")
+  - name: nodeSelectorValue
+    expression: >-
+      (request.operation == "DELETE" ? oldObject : object).spec.?nodeSelector.orValue(null)
+  - name: allNodesValue
+    expression: >-
+      (request.operation == "DELETE" ? oldObject : object).spec.?allNodes.orValue(false)
+  validations:
+  - expression: variables.userNodeName != ""
+    message: >-
+      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+  - expression: variables.userNodeName == variables.objectNodeName || variables.allNodesValue == true || variables.nodeSelectorValue != null
+    messageExpression: >-
+      "this user running on node '"+variables.userNodeName+"' may not modify cluster or node resourceslices"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: resourceslices-policy-nvidia-dra-driver
+spec:
+  policyName: resourceslices-policy-nvidia-dra-driver
+  validationActions: [Deny]

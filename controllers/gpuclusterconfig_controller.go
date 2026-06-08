@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
@@ -59,6 +60,7 @@ type GPUClusterConfigReconciler struct {
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nvidia.com,resources=clusterpolicies,verbs=get;list;watch
 
 func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -70,13 +72,28 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// Deleted; owned objects are garbage-collected, so there is nothing to clean up.
 			return ctrl.Result{}, nil
 		}
-		wrappedErr := fmt.Errorf("error getting GPUClusterConfig object: %w", err)
+		// instance was not populated by the failed Get, so there is no object to
+		// update status on; just surface the error for requeue.
 		logger.Error(err, "error getting GPUClusterConfig object")
-		instance.Status.State = nvidiav1alpha1.NotReady
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, wrappedErr.Error()); condErr != nil {
+		return ctrl.Result{}, fmt.Errorf("error getting GPUClusterConfig object: %w", err)
+	}
+
+	// GPUClusterConfig (DRA path) is mutually exclusive with ClusterPolicy: if one
+	// exists, yield to it rather than deploying the DRA stack alongside it.
+	clusterPolicies := &gpuv1.ClusterPolicyList{}
+	if err := r.List(ctx, clusterPolicies); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error listing ClusterPolicies: %w", err)
+	}
+	if len(clusterPolicies.Items) > 0 {
+		logger.V(consts.LogLevelWarning).Info("ClusterPolicy present, skipping mutually exclusive GPUClusterConfig")
+		if err := r.updateCrStatus(ctx, instance, nvidiav1alpha1.Disabled); err != nil {
+			return ctrl.Result{}, err
+		}
+		msg := "GPUClusterConfig is mutually exclusive with ClusterPolicy; remove the ClusterPolicy or disable GPUClusterConfig"
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, msg); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
-		return ctrl.Result{}, wrappedErr
+		return ctrl.Result{}, nil
 	}
 
 	// Singleton, first-wins (mirroring ClusterPolicy): the first instance to reconcile
@@ -103,21 +120,17 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if managerStatus.Status != state.SyncStateReady {
 		logger.Info("GPUClusterConfig instance is not ready")
-		var errorInfo error
 		for _, result := range managerStatus.StatesStatus {
 			if result.Status != state.SyncStateReady && result.ErrInfo != nil {
-				errorInfo = result.ErrInfo
-				if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, errorInfo)); condErr != nil {
+				if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Error syncing state %s: %v", result.StateName, result.ErrInfo)); condErr != nil {
 					logger.Error(condErr, "failed to set condition")
 				}
-				break
+				return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 			}
 		}
-		// if no errors are reported from any state, then we are waiting on operand pods
-		if errorInfo == nil {
-			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, "Waiting for operand pods to be ready"); condErr != nil {
-				logger.Error(condErr, "failed to set condition")
-			}
+		// no state reported an error, so we are waiting on operand pods
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, "Waiting for operand pods to be ready"); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
 		}
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
@@ -126,7 +139,10 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		logger.Error(condErr, "failed to set condition")
 		return ctrl.Result{}, condErr
 	}
-	return ctrl.Result{}, nil
+	// Resync periodically so out-of-band changes (a deleted DeviceClass/VAP, or a
+	// newly-created ClusterPolicy) are detected and reconciled even while ready;
+	// only DaemonSets are watched, and the ready path is otherwise event-driven.
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 // updateCrStatus writes desired to the CR's status, skipping the write when it is already current.
@@ -158,7 +174,7 @@ func (r *GPUClusterConfigReconciler) updateCrStatus(ctx context.Context, cr *nvi
 
 // enqueueAllGPUClusterConfigs enqueues every instance so each is reconciled when any
 // instance or owned resource changes.
-func (r *GPUClusterConfigReconciler) enqueueAllGPUClusterConfigs(ctx context.Context) []reconcile.Request {
+func (r *GPUClusterConfigReconciler) enqueueAllGPUClusterConfigs(ctx context.Context, _ *nvidiav1alpha1.GPUClusterConfig) []reconcile.Request {
 	logger := log.FromContext(ctx)
 	list := &nvidiav1alpha1.GPUClusterConfigList{}
 
@@ -203,14 +219,10 @@ func (r *GPUClusterConfigReconciler) SetupWithManager(ctx context.Context, mgr c
 		return err
 	}
 
-	gpuClusterConfigMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUClusterConfig) []reconcile.Request {
-		return r.enqueueAllGPUClusterConfigs(ctx)
-	}
-
 	err = c.Watch(source.Kind(
 		mgr.GetCache(),
 		&nvidiav1alpha1.GPUClusterConfig{},
-		handler.TypedEnqueueRequestsFromMapFunc(gpuClusterConfigMapFn),
+		handler.TypedEnqueueRequestsFromMapFunc(r.enqueueAllGPUClusterConfigs),
 		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUClusterConfig]{},
 	),
 	)

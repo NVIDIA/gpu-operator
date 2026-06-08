@@ -22,7 +22,7 @@ spec:
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
-      type: string
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -3850,7 +3850,7 @@ spec:
                     type: object
                   image:
                     description: NVIDIA DRA driver image name
-                    pattern: '[a-zA-Z0-9\-]+'
+                    pattern: ^[a-zA-Z0-9\-]+$
                     type: string
                   imagePullPolicy:
                     description: Image pull policy

@@ -4,9 +4,9 @@ metadata:
   name: gpuclusterconfig-sample
 spec:
   draDriver:
-    repository: nvcr.io/nvidia
-    image: k8s-dra-driver-gpu
-    version: v0.1.0
+    repository: registry.k8s.io/dra-driver-nvidia
+    image: dra-driver-nvidia-gpu
+    version: v0.4.0
     imagePullPolicy: IfNotPresent
     imagePullSecrets: []
     # NOTE: a driver-validation init container config block (e.g. `validator:`) is

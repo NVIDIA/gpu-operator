@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/state"
@@ -42,6 +43,7 @@ func newGPUClusterConfigReconciler(t *testing.T, objs ...client.Object) (*GPUClu
 
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
 
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -72,7 +74,7 @@ func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, _ state.I
 
 func gccReconcile(t *testing.T, r *GPUClusterConfigReconciler, name string) {
 	t.Helper()
-	_, err := r.Reconcile(context.Background(), gccRequest(name))
+	_, err := r.Reconcile(t.Context(), gccRequest(name))
 	require.NoError(t, err)
 }
 
@@ -83,7 +85,7 @@ func gccRequest(name string) ctrl.Request {
 func gccState(t *testing.T, c client.Client, name string) nvidiav1alpha1.State {
 	t.Helper()
 	instance := &nvidiav1alpha1.GPUClusterConfig{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: name}, instance))
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: name}, instance))
 	return instance.Status.State
 }
 
@@ -97,7 +99,7 @@ func TestGPUClusterConfigReconcileReady(t *testing.T) {
 	gccReconcile(t, r, cfg.Name)
 
 	instance := &nvidiav1alpha1.GPUClusterConfig{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: cfg.Name}, instance))
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cfg.Name}, instance))
 	require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
 	require.Equal(t, "test-namespace", instance.Status.Namespace)
 }
@@ -105,9 +107,21 @@ func TestGPUClusterConfigReconcileReady(t *testing.T) {
 func TestGPUClusterConfigReconcileNotFound(t *testing.T) {
 	r, _ := newGPUClusterConfigReconciler(t)
 
-	res, err := r.Reconcile(context.Background(), gccRequest("missing"))
+	res, err := r.Reconcile(t.Context(), gccRequest("missing"))
 	require.NoError(t, err)
 	require.Zero(t, res)
+}
+
+// A ClusterPolicy in the cluster disables the GPUClusterConfig: the two paths are
+// mutually exclusive, so the DRA stack is not deployed alongside ClusterPolicy.
+func TestGPUClusterConfigDisabledByClusterPolicy(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	r, c := newGPUClusterConfigReconciler(t, cfg, cp)
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, nvidiav1alpha1.Disabled, gccState(t, c, cfg.Name))
 }
 
 // First-reconciled wins (mirroring ClusterPolicy): whichever instance reconciles first
@@ -135,7 +149,7 @@ func TestGPUClusterConfigDuplicateNoCondition(t *testing.T) {
 	gccReconcile(t, r, duplicate.Name) // duplicate is ignored
 
 	instance := &nvidiav1alpha1.GPUClusterConfig{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: duplicate.Name}, instance))
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: duplicate.Name}, instance))
 	require.Equal(t, nvidiav1alpha1.Ignored, instance.Status.State)
 	require.Nil(t, meta.FindStatusCondition(instance.Status.Conditions, conditions.Error))
 	require.Nil(t, meta.FindStatusCondition(instance.Status.Conditions, conditions.Ready))
@@ -147,7 +161,7 @@ func TestEnqueueAllGPUClusterConfigs(t *testing.T) {
 		&nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config-b"}},
 	)
 
-	requests := r.enqueueAllGPUClusterConfigs(context.Background())
+	requests := r.enqueueAllGPUClusterConfigs(t.Context(), nil)
 
 	require.Len(t, requests, 2)
 	got := []string{requests[0].String(), requests[1].String()}

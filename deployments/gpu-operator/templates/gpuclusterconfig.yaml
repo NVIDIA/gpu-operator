@@ -1,0 +1,56 @@
+{{- if .Values.gpuClusterConfig.enabled }}
+{{- $dra := .Values.gpuClusterConfig.draDriver }}
+apiVersion: nvidia.com/v1alpha1
+kind: GPUClusterConfig
+metadata:
+  name: gpu-cluster-config
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+  {{- if .Values.operator.cleanupCRD }}
+  # CR cleanup is handled during pre-delete hook
+  # Add below annotation so that helm doesn't attempt to cleanup CR twice
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+spec:
+  draDriver:
+    repository: {{ $dra.repository }}
+    image: {{ $dra.image }}
+    version: {{ $dra.version }}
+    {{- if $dra.imagePullPolicy }}
+    imagePullPolicy: {{ $dra.imagePullPolicy }}
+    {{- end }}
+    {{- with $dra.imagePullSecrets }}
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $dra.featureGates }}
+    featureGates:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    gpus:
+      enabled: {{ $dra.gpus.enabled }}
+      {{- with $dra.gpus.kubeletPlugin }}
+      kubeletPlugin:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    computeDomains:
+      enabled: {{ $dra.computeDomains.enabled }}
+      {{- with $dra.computeDomains.controller }}
+      controller:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $dra.computeDomains.kubeletPlugin }}
+      kubeletPlugin:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  hostPaths:
+    rootFS: {{ .Values.hostPaths.rootFS }}
+    driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
+    {{- if .Values.hostPaths.kubeletRootDir }}
+    kubeletRootDir: {{ .Values.hostPaths.kubeletRootDir }}
+    {{- end }}
+  daemonsets:
+    {{- toYaml .Values.daemonsets | nindent 4 }}
+{{- end }}

@@ -68,28 +68,23 @@ type GPUClusterConfigSpec struct {
 // enabled toggle; enablement is per capability (gpus / computeDomains).
 type DRADriverSpec struct {
 	// NVIDIA DRA driver image repository
-	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
 
 	// NVIDIA DRA driver image name
-	// +kubebuilder:validation:Pattern=[a-zA-Z0-9\-]+
+	// +kubebuilder:validation:Pattern=^[a-zA-Z0-9\-]+$
 	Image string `json:"image,omitempty"`
 
 	// NVIDIA DRA driver image tag
-	// +kubebuilder:validation:Optional
 	Version string `json:"version,omitempty"`
 
 	// Image pull policy
-	// +kubebuilder:validation:Optional
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// Image pull secrets
-	// +kubebuilder:validation:Optional
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// FeatureGates is a map of feature gate names to a boolean enabling or disabling each.
 	// It is rendered as the FEATURE_GATES environment variable on the DRA driver containers.
-	// +kubebuilder:validation:Optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
 	// GPUs configures the gpu.nvidia.com capability of the DRA driver.
@@ -142,31 +137,24 @@ type DRADriverComputeDomainsSpec struct {
 // both blocks set it.
 type DRADriverKubeletPluginSpec struct {
 	// Optional: List of environment variables
-	// +kubebuilder:validation:Optional
 	Env []nvidiav1.EnvVar `json:"env,omitempty"`
 
 	// Optional: Define resources requests and limits for the kubelet-plugin container
-	// +kubebuilder:validation:Optional
 	Resources *nvidiav1.ResourceRequirements `json:"resources,omitempty"`
 
 	// HealthcheckPort is the port running a gRPC health service checked by a livenessProbe.
 	// Set to a negative value to disable the service and the probe.
-	// +kubebuilder:validation:Optional
 	HealthcheckPort *int32 `json:"healthcheckPort,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// PriorityClassName for the kubelet-plugin DaemonSet pods
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// NodeSelector for the kubelet-plugin DaemonSet pods
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// Tolerations for the kubelet-plugin DaemonSet pods
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// Affinity rules for the kubelet-plugin DaemonSet pods
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
@@ -176,26 +164,20 @@ type DRADriverKubeletPluginSpec struct {
 // inheriting the shared daemonsets defaults.
 type DRADriverControllerSpec struct {
 	// Optional: List of environment variables
-	// +kubebuilder:validation:Optional
 	Env []nvidiav1.EnvVar `json:"env,omitempty"`
 
 	// Optional: Define resources requests and limits for the controller container
-	// +kubebuilder:validation:Optional
 	Resources *nvidiav1.ResourceRequirements `json:"resources,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// PriorityClassName for the controller Deployment pods
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// NodeSelector for the controller Deployment pods
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// Tolerations for the controller Deployment pods
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// +kubebuilder:validation:Optional
 	// Affinity rules for the controller Deployment pods
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
@@ -217,7 +199,7 @@ type GPUClusterConfigStatus struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster,shortName={"gcc"}
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
-//+kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
+//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // GPUClusterConfig is the Schema for the gpuclusterconfigs API
 type GPUClusterConfig struct {

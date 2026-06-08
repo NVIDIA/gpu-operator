@@ -183,7 +183,13 @@ func getDRAResourceGVR(ctx context.Context, config *rest.Config) (schema.GroupVe
 
 	apiResourceLists, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return gvr, false, fmt.Errorf("error getting server resources from discovery client: %w", err)
+		// ServerPreferredResources can return partial results alongside an
+		// ErrGroupDiscoveryFailed when an unrelated API group is unreachable. Keep
+		// the partial results in that case so a flaky group can't mask resource.k8s.io.
+		if !discovery.IsGroupDiscoveryFailedError(err) {
+			return gvr, false, fmt.Errorf("error getting server resources from discovery client: %w", err)
+		}
+		logger.V(consts.LogLevelWarning).Info("partial API discovery failure; continuing with discovered groups", "error", err.Error())
 	}
 
 	var groupVersions []string

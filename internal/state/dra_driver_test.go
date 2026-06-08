@@ -100,7 +100,7 @@ func TestDRADriverRenderGPUsCut(t *testing.T) {
 	assert.Equal(t, 1, kinds["ServiceAccount"])
 	assert.Equal(t, 1, kinds["ClusterRole"])
 	assert.Equal(t, 1, kinds["ClusterRoleBinding"])
-	assert.Equal(t, 2, kinds["DeviceClass"], "expected gpu.nvidia.com and mig.nvidia.com")
+	assert.Equal(t, 3, kinds["DeviceClass"], "expected gpu.nvidia.com, mig.nvidia.com and vfio.gpu.nvidia.com")
 	assert.Equal(t, 1, kinds["DaemonSet"])
 
 	// DeviceClass apiVersion is injected from discovery, not hardcoded.
@@ -263,8 +263,8 @@ func TestDRADriverRenderComputeDomains(t *testing.T) {
 		kinds[o.GetKind()]++
 		names[o.GetKind()+"/"+o.GetName()] = true
 	}
-	// gpu + mig + compute-domain-daemon + compute-domain-default-channel
-	assert.Equal(t, 4, kinds["DeviceClass"])
+	// gpu + mig + vfio + compute-domain-daemon + compute-domain-default-channel
+	assert.Equal(t, 5, kinds["DeviceClass"])
 	assert.True(t, names["DeviceClass/compute-domain-daemon.nvidia.com"])
 	assert.True(t, names["DeviceClass/compute-domain-default-channel.nvidia.com"])
 	// compute-domain controller Deployment + its SA/RBAC and the daemon SA/RBAC

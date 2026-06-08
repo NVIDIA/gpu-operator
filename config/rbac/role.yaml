@@ -145,6 +145,14 @@ rules:
 - apiGroups:
   - nvidia.com
   resources:
+  - clusterpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nvidia.com
+  resources:
   - gpuclusterconfigs/finalizers
   - nvidiadrivers/finalizers
   verbs:

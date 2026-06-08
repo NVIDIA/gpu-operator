@@ -94,8 +94,9 @@ func (s *stateDRADriver) Sync(ctx context.Context, customResource interface{}, i
 	}
 
 	if len(objs) == 0 {
-		// No DRA capability is enabled; nothing to render.
-		return SyncStateIgnore, nil
+		// No DRA capability is enabled: surface a clear error rather than reporting
+		// ready, so a no-op configuration is visible in the CR status.
+		return SyncStateNotReady, fmt.Errorf("no DRA capability is enabled; set draDriver.gpus.enabled or draDriver.computeDomains.enabled to true")
 	}
 
 	// Create objects if they don't exist, update objects if they do exist. Owner

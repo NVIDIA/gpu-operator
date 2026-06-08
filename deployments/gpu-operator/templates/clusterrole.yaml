@@ -263,3 +263,16 @@ rules:
   - list
   - watch
   - patch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingadmissionpolicies
+  - validatingadmissionpolicybindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
