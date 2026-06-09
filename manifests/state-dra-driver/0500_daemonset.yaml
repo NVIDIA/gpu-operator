@@ -7,6 +7,15 @@ metadata:
     app.kubernetes.io/name: nvidia-dra-driver
     app.kubernetes.io/component: nvidia-dra-driver-kubelet-plugin
     app: nvidia-dra-driver-kubelet-plugin
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
 spec:
   selector:
     matchLabels:
@@ -21,6 +30,15 @@ spec:
         app.kubernetes.io/name: nvidia-dra-driver
         app.kubernetes.io/component: nvidia-dra-driver-kubelet-plugin
         app: nvidia-dra-driver-kubelet-plugin
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
     spec:
       priorityClassName: {{ .KubeletPluginPriorityClassName }}
       serviceAccountName: nvidia-dra-driver-kubeletplugin

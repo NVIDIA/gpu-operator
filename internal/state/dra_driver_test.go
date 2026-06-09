@@ -40,6 +40,7 @@ const draManifestDir = "../../manifests/state-dra-driver"
 
 func newTestDRAState(t *testing.T) *stateDRADriver {
 	t.Helper()
+	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s, err := NewStateDRADriver(fake.NewClientBuilder().Build(), "test-operator", runtime.NewScheme(), draManifestDir)
 	require.NoError(t, err)
 	return s.(*stateDRADriver)
@@ -86,7 +87,6 @@ func draSupportedCatalog() InfoCatalog {
 }
 
 func TestDRADriverRenderGPUsCut(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 
 	objs, err := s.getManifestObjects(context.Background(), sampleGPUClusterConfig(), draSupportedCatalog())
@@ -174,7 +174,6 @@ func TestDRADriverRenderGPUsDisabled(t *testing.T) {
 }
 
 func TestDRADriverRenderDRAUnsupported(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 
 	catalog := NewInfoCatalog()
@@ -216,6 +215,14 @@ func mountNames(mounts []corev1.VolumeMount) []string {
 	return names
 }
 
+func tolKeys(tols []corev1.Toleration) []string {
+	keys := make([]string, 0, len(tols))
+	for _, tol := range tols {
+		keys = append(keys, tol.Key)
+	}
+	return keys
+}
+
 func envMap(env []corev1.EnvVar) map[string]string {
 	m := make(map[string]string, len(env))
 	for _, e := range env {
@@ -249,7 +256,6 @@ func containerByName(t *testing.T, ds *appsv1.DaemonSet, name string) corev1.Con
 }
 
 func TestDRADriverRenderComputeDomains(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 	cr := sampleGPUClusterConfig()
 	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
@@ -287,7 +293,6 @@ func TestDRADriverRenderComputeDomains(t *testing.T) {
 }
 
 func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 	cr := sampleGPUClusterConfig()
 	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
@@ -298,8 +303,9 @@ func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
 	ds := findDaemonSet(t, objs)
 	cd := containerByName(t, ds, "compute-domains")
 	assert.Equal(t, "nvcr.io/nvidia/k8s-dra-driver-gpu:v0.1.0", cd.Image)
-	assert.Contains(t, strings.Join(cd.Args, "\n"), "source /run/nvidia/validations/driver-ready")
-	assert.Contains(t, strings.Join(cd.Args, "\n"), "exec compute-domain-kubelet-plugin")
+	args := strings.Join(cd.Args, "\n")
+	assert.Contains(t, args, "source /run/nvidia/validations/driver-ready")
+	assert.Contains(t, args, "exec compute-domain-kubelet-plugin")
 	assert.Equal(t, "51515", envMap(cd.Env)["HEALTHCHECK_PORT"])
 
 	dep := findDeployment(t, objs)
@@ -312,7 +318,6 @@ func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
 }
 
 func TestDRADriverComputeDomainsOnly(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 	cr := sampleGPUClusterConfig()
 	cr.Spec.DRADriver.GPUs.Enabled = ptr.To(false)
@@ -333,8 +338,73 @@ func TestDRADriverComputeDomainsOnly(t *testing.T) {
 	}
 }
 
+func TestDRADriverDaemonsetsLabels(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUClusterConfig()
+	cr.Spec.Daemonsets.Labels = map[string]string{"team": "platform", "env": "test"}
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	ds := findDaemonSet(t, objs)
+	assert.Equal(t, "platform", ds.Labels["team"])
+	assert.Equal(t, "test", ds.Labels["env"])
+	assert.Equal(t, "platform", ds.Spec.Template.Labels["team"])
+	assert.Equal(t, "test", ds.Spec.Template.Labels["env"])
+}
+
+func TestDRADriverDaemonsetsAnnotations(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUClusterConfig()
+	cr.Spec.Daemonsets.Annotations = map[string]string{"prometheus.io/scrape": "true"}
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	ds := findDaemonSet(t, objs)
+	assert.Equal(t, "true", ds.Annotations["prometheus.io/scrape"])
+	assert.Equal(t, "true", ds.Spec.Template.Annotations["prometheus.io/scrape"])
+}
+
+func TestDRADriverControllerInheritsGlobalConfig(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUClusterConfig()
+	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
+	cr.Spec.Daemonsets.Labels = map[string]string{"team": "platform"}
+	cr.Spec.Daemonsets.Annotations = map[string]string{"monitoring": "enabled"}
+	cr.Spec.Daemonsets.Tolerations = []corev1.Toleration{{
+		Key:      "nvidia.com/gpu",
+		Operator: corev1.TolerationOpExists,
+		Effect:   corev1.TaintEffectNoSchedule,
+	}}
+	cr.Spec.Daemonsets.PriorityClassName = "global-priority"
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	dep := findDeployment(t, objs)
+	// Global labels/annotations appear on both Deployment metadata and pod template.
+	assert.Equal(t, "platform", dep.Labels["team"])
+	assert.Equal(t, "platform", dep.Spec.Template.Labels["team"])
+	assert.Equal(t, "enabled", dep.Annotations["monitoring"])
+	assert.Equal(t, "enabled", dep.Spec.Template.Annotations["monitoring"])
+
+	// Global tolerations appear alongside the hardcoded control-plane tolerations.
+	assert.Contains(t, tolKeys(dep.Spec.Template.Spec.Tolerations), "nvidia.com/gpu")
+	assert.Contains(t, tolKeys(dep.Spec.Template.Spec.Tolerations), "node-role.kubernetes.io/control-plane")
+
+	// Global priorityClassName is used when no per-workload override is set.
+	assert.Equal(t, "global-priority", dep.Spec.Template.Spec.PriorityClassName)
+
+	// Per-workload controller.PriorityClassName overrides the global.
+	cr.Spec.DRADriver.ComputeDomains.Controller.PriorityClassName = "controller-priority"
+	objs2, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+	dep2 := findDeployment(t, objs2)
+	assert.Equal(t, "controller-priority", dep2.Spec.Template.Spec.PriorityClassName)
+}
+
 func TestDRADriverSchedulingMerge(t *testing.T) {
-	t.Setenv("VALIDATOR_IMAGE", "nvcr.io/nvidia/gpu-operator-validator:test")
 	s := newTestDRAState(t)
 	cr := sampleGPUClusterConfig()
 	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
@@ -346,12 +416,8 @@ func TestDRADriverSchedulingMerge(t *testing.T) {
 	require.NoError(t, err)
 	ds := findDaemonSet(t, objs)
 
-	keys := make([]string, 0, len(ds.Spec.Template.Spec.Tolerations))
-	for _, tol := range ds.Spec.Template.Spec.Tolerations {
-		keys = append(keys, tol.Key)
-	}
 	// union of daemonsets default + gpus + computeDomains tolerations
-	assert.Subset(t, keys, []string{"nvidia.com/gpu", "gpu-tol", "cd-tol"})
+	assert.Subset(t, tolKeys(ds.Spec.Template.Spec.Tolerations), []string{"nvidia.com/gpu", "gpu-tol", "cd-tol"})
 	// precedence computeDomains > gpus > daemonsets
 	assert.Equal(t, "cd-priority", ds.Spec.Template.Spec.PriorityClassName)
 }

@@ -9,6 +9,15 @@ metadata:
     app.kubernetes.io/name: nvidia-dra-driver
     app.kubernetes.io/component: nvidia-dra-driver-controller
     app: nvidia-dra-driver-controller
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
 spec:
   replicas: 1
   selector:
@@ -20,8 +29,17 @@ spec:
         app.kubernetes.io/name: nvidia-dra-driver
         app.kubernetes.io/component: nvidia-dra-driver-controller
         app: nvidia-dra-driver-controller
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
     spec:
-      priorityClassName: {{ $controller.PriorityClassName | default "system-node-critical" }}
+      priorityClassName: {{ $controller.PriorityClassName | default (.Daemonsets.PriorityClassName | default "system-node-critical") }}
       serviceAccountName: nvidia-dra-driver-controller
       {{- if .DRADriver.Spec.ImagePullSecrets }}
       imagePullSecrets:
@@ -61,6 +79,9 @@ spec:
         operator: Exists
       - key: CriticalAddonsOnly
         operator: Exists
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
       {{- range $controller.Tolerations }}
       - {{ . | toJson }}
       {{- end }}
