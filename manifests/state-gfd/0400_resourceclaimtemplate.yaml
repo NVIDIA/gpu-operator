@@ -1,0 +1,20 @@
+apiVersion: {{ .ResourceClaimAPIVersion }}
+kind: ResourceClaimTemplate
+metadata:
+  name: nvidia-gfd-admin
+  namespace: {{ .Namespace }}
+spec:
+  spec:
+    devices:
+      requests:
+      - name: admin-gpus
+        {{- if ne .ResourceClaimAPIVersion "resource.k8s.io/v1beta1" }}
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          allocationMode: All
+          adminAccess: true
+        {{- else }}
+        deviceClassName: gpu.nvidia.com
+        allocationMode: All
+        adminAccess: true
+        {{- end }}

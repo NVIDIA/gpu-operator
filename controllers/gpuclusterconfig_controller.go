@@ -61,6 +61,8 @@ type GPUClusterConfigReconciler struct {
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=nvidia.com,resources=clusterpolicies,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;update;patch
+//+kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaimtemplates,verbs=get;list;watch;create;update;delete
 
 func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)

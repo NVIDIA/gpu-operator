@@ -1,5 +1,6 @@
 {{- if .Values.gpuClusterConfig.enabled }}
 {{- $dra := .Values.gpuClusterConfig.draDriver }}
+{{- $gfd := .Values.gfd }}
 apiVersion: nvidia.com/v1alpha1
 kind: GPUClusterConfig
 metadata:
@@ -45,6 +46,28 @@ spec:
       kubeletPlugin:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  {{- with $gfd }}
+  gfd:
+    enabled: {{ .enabled }}
+    repository: {{ .repository }}
+    image: {{ .image }}
+    version: {{ .version }}
+    {{- if .imagePullPolicy }}
+    imagePullPolicy: {{ .imagePullPolicy }}
+    {{- end }}
+    {{- with .imagePullSecrets }}
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .env }}
+    env:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
   hostPaths:
     rootFS: {{ .Values.hostPaths.rootFS }}
     driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}

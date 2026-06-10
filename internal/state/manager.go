@@ -138,5 +138,10 @@ func newGPUClusterConfigStates(k8sClient client.Client, namespace string, scheme
 		return nil, fmt.Errorf("failed to create DRA driver state: %v", err)
 	}
 
-	return []State{draDriverState}, nil
+	gfdState, err := NewStateGFD(k8sClient, namespace, scheme, "/opt/gpu-operator/manifests/state-gfd")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GFD state: %v", err)
+	}
+
+	return []State{draDriverState, gfdState}, nil
 }

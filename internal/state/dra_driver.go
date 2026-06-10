@@ -23,23 +23,16 @@ import (
 	"sort"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
-	"github.com/NVIDIA/gpu-operator/internal/render"
-	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -63,23 +56,12 @@ func NewStateDRADriver(
 	scheme *runtime.Scheme,
 	manifestDir string) (State, error) {
 
-	files, err := utils.GetFilesWithSuffix(manifestDir, render.ManifestFileSuffix...)
+	skel, err := newStateSkel(k8sClient, namespace, scheme, manifestDir,
+		"state-dra-driver", "NVIDIA DRA driver deployed in the cluster")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get files from manifest directory: %v", err)
+		return nil, err
 	}
-
-	renderer := render.NewRenderer(files)
-	state := &stateDRADriver{
-		stateSkel: stateSkel{
-			name:        "state-dra-driver",
-			description: "NVIDIA DRA driver deployed in the cluster",
-			client:      k8sClient,
-			namespace:   namespace,
-			scheme:      scheme,
-			renderer:    renderer,
-		},
-	}
-	return state, nil
+	return &stateDRADriver{stateSkel: skel}, nil
 }
 
 func (s *stateDRADriver) Sync(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) (SyncState, error) {
@@ -99,35 +81,11 @@ func (s *stateDRADriver) Sync(ctx context.Context, customResource interface{}, i
 		return SyncStateNotReady, fmt.Errorf("no DRA capability is enabled; set draDriver.gpus.enabled or draDriver.computeDomains.enabled to true")
 	}
 
-	// Create objects if they don't exist, update objects if they do exist. Owner
-	// references make every object (including the cluster-scoped DeviceClasses and
-	// ClusterRoles) garbage-collected when the GPUClusterConfig CR is deleted.
-	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
-		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
-			return fmt.Errorf("failed to set controller reference for object: %w", err)
-		}
-		return nil
-	}, objs)
-	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to create/update objects: %w", err)
-	}
-
-	syncState, err := s.getSyncState(ctx, objs)
-	if err != nil {
-		return SyncStateNotReady, fmt.Errorf("failed to get sync state: %w", err)
-	}
-	return syncState, nil
+	return s.syncObjects(ctx, cr, objs)
 }
 
 func (s *stateDRADriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {
-	wr := make(map[string]SyncingSource)
-	wr["DaemonSet"] = source.Kind(
-		mgr.GetCache(),
-		&appsv1.DaemonSet{},
-		handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(),
-			&nvidiav1alpha1.GPUClusterConfig{}, handler.OnlyControllerOwner()),
-	)
-	return wr
+	return gpuClusterConfigDaemonSetSource(mgr)
 }
 
 func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.GPUClusterConfig, infoCatalog InfoCatalog) ([]*unstructured.Unstructured, error) {
@@ -139,19 +97,9 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		return []*unstructured.Unstructured{}, nil
 	}
 
-	info := infoCatalog.Get(InfoTypeClusterInfo)
-	if info == nil {
-		return nil, fmt.Errorf("failed to get cluster info from info catalog")
-	}
-	clusterInfo := info.(clusterinfo.Interface)
-
-	gvr, draSupported, err := clusterInfo.GetDRAResourceGVR()
+	apiVersion, err := draResourceAPIVersion(infoCatalog)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine DRA support: %w", err)
-	}
-	if !draSupported {
-		return nil, fmt.Errorf("the resource.k8s.io DeviceClass API is not served by the cluster; " +
-			"ensure Dynamic Resource Allocation is enabled on the API server and kubelet")
+		return nil, err
 	}
 
 	draDriverSpec, err := getDRADriverSpec(&cr.Spec.DRADriver)
@@ -167,7 +115,7 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		HostPaths:                      &hostPaths,
 		Daemonsets:                     &daemonsets,
 		Namespace:                      s.namespace,
-		DeviceClassAPIVersion:          gvr.Group + "/" + gvr.Version,
+		DeviceClassAPIVersion:          apiVersion,
 		FeatureGates:                   renderDRAFeatureGates(cr.Spec.DRADriver.FeatureGates),
 		KubeletPluginPriorityClassName: priorityClassName,
 		KubeletPluginNodeSelector:      nodeSelector,
@@ -175,26 +123,7 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		KubeletPluginAffinity:          affinity,
 	}
 
-	objs, err := s.renderManifestObjects(ctx, renderData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render manifests: %w", err)
-	}
-	return objs, nil
-}
-
-func (s *stateDRADriver) renderManifestObjects(ctx context.Context, renderData *draDriverRenderData) ([]*unstructured.Unstructured, error) {
-	logger := log.FromContext(ctx)
-	logger.V(consts.LogLevelDebug).Info("Rendering DRA driver objects", "data", renderData)
-
-	objs, err := s.renderer.RenderObjects(
-		&render.TemplatingData{
-			Data: renderData,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render kubernetes manifests: %w", err)
-	}
-	return objs, nil
+	return s.renderObjects(ctx, renderData)
 }
 
 // getDRADriverSpec builds the render-time DRA driver spec, resolving the DRA driver

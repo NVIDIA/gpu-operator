@@ -62,6 +62,22 @@ type draDriverSpec struct {
 	InitImagePath string
 }
 
+// gfdSpec is a wrapper of GPUFeatureDiscoverySpec with the resolved image path.
+type gfdSpec struct {
+	Spec      *nvidiav1.GPUFeatureDiscoverySpec
+	ImagePath string
+}
+
+// gfdRenderData is the templating data for the GFD manifests.
+type gfdRenderData struct {
+	GFD        *gfdSpec
+	Daemonsets *nvidiav1.DaemonsetsSpec
+	Namespace  string
+	// ResourceClaimAPIVersion is the apiVersion to render on ResourceClaimTemplate
+	// objects, determined from the resource.k8s.io version served by the cluster.
+	ResourceClaimAPIVersion string
+}
+
 // draDriverRenderData is the templating data for the DRA driver manifests.
 type draDriverRenderData struct {
 	DRADriver  *draDriverSpec

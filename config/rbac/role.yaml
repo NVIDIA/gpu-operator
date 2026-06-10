@@ -176,6 +176,17 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaimtemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes
