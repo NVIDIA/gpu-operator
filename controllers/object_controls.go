@@ -1064,19 +1064,19 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 	// Set the computed digest in driver-manager initContainer
 	driverManagerContainer := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 	if driverManagerContainer != nil {
-		setContainerEnv(driverManagerContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+		setContainerEnv(driverManagerContainer, driverconfig.DriverConfigDigestEnvName, configDigest)
 	}
 
 	// Set the computed digest in nvidia-driver container
 	driverContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
 	if driverContainer != nil {
-		setContainerEnv(driverContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+		setContainerEnv(driverContainer, driverconfig.DriverConfigDigestEnvName, configDigest)
 	}
 
 	// Used by dtk-build-driver to determine if fast path should be used (skip rebuild)
 	driverToolkitContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr")
 	if driverToolkitContainer != nil {
-		setContainerEnv(driverToolkitContainer, "DRIVER_CONFIG_DIGEST", configDigest)
+		setContainerEnv(driverToolkitContainer, driverconfig.DriverConfigDigestEnvName, configDigest)
 	}
 
 	// set hostNetwork for driver if specified
