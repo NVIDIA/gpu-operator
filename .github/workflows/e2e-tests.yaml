@@ -62,8 +62,18 @@ jobs:
       operator_image: ${{ inputs.operator_image }}
       operator_version: ${{ inputs.operator_version }}
 
-  e2e-tests-containerd:
+  publish-helm-oci-chart:
     needs: [variables]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-helm-oci-chart.yaml
+    with:
+      operator_image: ${{ needs.variables.outputs.operator_image }}
+      operator_version: ${{ needs.variables.outputs.operator_version }}
+
+  e2e-tests-containerd:
+    needs: [variables, publish-helm-oci-chart]
     runs-on: linux-amd64-cpu4
     timeout-minutes: 90
     permissions:
@@ -129,7 +139,7 @@ jobs:
           retention-days: 15
 
   e2e-tests-nvidiadriver:
-    needs: [variables]
+    needs: [variables, publish-helm-oci-chart]
     runs-on: linux-amd64-cpu4
     timeout-minutes: 90
     permissions:
