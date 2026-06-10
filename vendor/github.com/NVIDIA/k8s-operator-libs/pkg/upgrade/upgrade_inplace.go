@@ -18,7 +18,9 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
@@ -69,7 +71,8 @@ func (m *InplaceNodeStateManagerImpl) ProcessUpgradeRequiredNodes(
 		"maximum nodes that can be unavailable", maxUnavailable)
 
 	for _, nodeState := range currentClusterState.NodeStates[UpgradeStateUpgradeRequired] {
-		if m.IsUpgradeRequested(nodeState.Node) {
+		upgradeRequested := m.IsUpgradeRequested(nodeState.Node)
+		if upgradeRequested {
 			// Make sure to remove the upgrade-requested annotation
 			err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, nodeState.Node,
 				GetUpgradeRequestedAnnotationKey(), "null")
@@ -96,19 +99,82 @@ func (m *InplaceNodeStateManagerImpl) ProcessUpgradeRequiredNodes(
 			}
 		}
 
-		err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateCordonRequired)
+		targetState, terr := m.nextStateForUpgradeRequiredNode(ctx, nodeState, upgradeRequested)
+		if terr != nil {
+			// Keep the node in upgrade-required and retry on the next reconcile instead
+			// of starting a full upgrade.
+			m.Log.V(consts.LogLevelError).Error(terr,
+				"could not determine next upgrade state; node kept in upgrade-required for retry",
+				"node", nodeState.Node.Name)
+			logEventf(m.EventRecorder, nodeState.Node, corev1.EventTypeWarning, GetEventReason(),
+				"%v, will retry", terr)
+			continue
+		}
+
+		err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, targetState)
 		if err == nil {
 			upgradesAvailable--
-			m.Log.V(consts.LogLevelInfo).Info("Node waiting for cordon",
-				"node", nodeState.Node.Name)
+			m.Log.V(consts.LogLevelInfo).Info("Node moving to next upgrade state",
+				"node", nodeState.Node.Name, "state", targetState)
 		} else {
 			m.Log.V(consts.LogLevelError).Error(
-				err, "Failed to change node upgrade state", "state", UpgradeStateCordonRequired)
+				err, "Failed to change node upgrade state", "state", targetState)
 			return err
 		}
 	}
 
 	return nil
+}
+
+// nextStateForUpgradeRequiredNode determines the state a node in upgrade-required moves to.
+// It returns UpgradeStatePodRestartRequired when a registered restart-only predicate matches
+// (after cordoning the node), and UpgradeStateCordonRequired for the full upgrade flow otherwise.
+// A non-nil error means the decision could not be made; the caller keeps the node in
+// upgrade-required and retries on the next reconcile.
+func (m *InplaceNodeStateManagerImpl) nextStateForUpgradeRequiredNode(
+	ctx context.Context, nodeState *NodeUpgradeState, upgradeRequested bool) (string, error) {
+	restartOnly, err := m.shouldRestartOnly(ctx, nodeState, upgradeRequested)
+	if err != nil {
+		return "", err
+	}
+	if !restartOnly {
+		return UpgradeStateCordonRequired, nil
+	}
+	// Restart-only change: cordon the node so it stays unschedulable if the pod restart fails, as in
+	// the full upgrade flow, then restart the driver pod without evicting workloads.
+	m.Log.V(consts.LogLevelInfo).Info(
+		"Restart-only change detected; cordoning node and restarting driver pod in place, "+
+			"skipping pod-deletion and drain", "node", nodeState.Node.Name)
+	if err := m.CordonManager.Cordon(ctx, nodeState.Node); err != nil {
+		return "", fmt.Errorf("failed to cordon node for restart-only upgrade: %w", err)
+	}
+	return UpgradeStatePodRestartRequired, nil
+}
+
+// shouldRestartOnly reports whether the node qualifies for an in-place driver pod restart instead
+// of the full upgrade flow. It is false when no predicate is registered, for orphaned pods, for
+// nodes that explicitly requested an upgrade, and for nodes waiting for safe driver load (which
+// must take the full flow so workloads are evicted before the load is unblocked at
+// pod-restart-required).
+func (m *InplaceNodeStateManagerImpl) shouldRestartOnly(
+	ctx context.Context, nodeState *NodeUpgradeState, upgradeRequested bool) (bool, error) {
+	if m.restartOnlyPredicate == nil || upgradeRequested || nodeState.IsOrphanedPod() ||
+		nodeState.DriverPod == nil {
+		return false, nil
+	}
+	waitingForSafeLoad, err := m.SafeDriverLoadManager.IsWaitingForSafeDriverLoad(ctx, nodeState.Node)
+	if err != nil {
+		return false, fmt.Errorf("failed to check safe driver load status: %w", err)
+	}
+	if waitingForSafeLoad {
+		return false, nil
+	}
+	restartOnly, err := m.restartOnlyPredicate(&nodeState.DriverPod.Spec,
+		&nodeState.DriverDaemonSet.Spec.Template.Spec)
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate restart-only predicate: %w", err)
+	}
+	return restartOnly, nil
 }
 
 // ProcessNodeMaintenanceRequiredNodes is a used to satisfy ProcessNodeStateManager interface

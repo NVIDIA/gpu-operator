@@ -40,6 +40,9 @@ type ClusterUpgradeStateManager interface {
 	// WithValidationEnabled provides an option to enable the optional 'validation' state
 	// and pass a podSelector to specify which pods are performing the validation
 	WithValidationEnabled(podSelector string) ClusterUpgradeStateManager
+	// WithRestartOnlyPredicate registers an optional predicate (see RestartOnlyPredicate);
+	// a nil predicate, the default, keeps the full upgrade flow for every out-of-sync node.
+	WithRestartOnlyPredicate(predicate RestartOnlyPredicate) ClusterUpgradeStateManager
 	// BuildState builds a point-in-time snapshot of the driver upgrade state in the cluster.
 	BuildState(ctx context.Context, namespace string,
 		driverLabels map[string]string) (*ClusterUpgradeState, error)
@@ -346,6 +349,14 @@ func (m *ClusterUpgradeStateManagerImpl) WithValidationEnabled(podSelector strin
 	m.ValidationManager = NewValidationManager(m.K8sInterface, m.Log, m.EventRecorder, m.NodeUpgradeStateProvider,
 		podSelector)
 	m.validationStateEnabled = true
+	return m
+}
+
+// WithRestartOnlyPredicate registers an optional restart-only predicate; a nil predicate
+// preserves the default full upgrade flow for every out-of-sync node.
+func (m *ClusterUpgradeStateManagerImpl) WithRestartOnlyPredicate(
+	predicate RestartOnlyPredicate) ClusterUpgradeStateManager {
+	m.restartOnlyPredicate = predicate
 	return m
 }
 

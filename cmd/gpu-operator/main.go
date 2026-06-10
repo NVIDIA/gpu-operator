@@ -51,6 +51,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/info"
+	"github.com/NVIDIA/gpu-operator/internal/predicates"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -184,7 +185,10 @@ func main() {
 		setupLog.Error(err, "unable to create new ClusterUpdateStateManager", "controller", "Upgrade")
 		os.Exit(1)
 	}
-	clusterUpgradeStateManager = clusterUpgradeStateManager.WithPodDeletionEnabled(gpuPodSpecFilter).WithValidationEnabled("app=nvidia-operator-validator")
+	clusterUpgradeStateManager = clusterUpgradeStateManager.
+		WithPodDeletionEnabled(gpuPodSpecFilter).
+		WithValidationEnabled("app=nvidia-operator-validator").
+		WithRestartOnlyPredicate(predicates.DriverPodRestartOnly(upgradeLogger))
 
 	if err = (&controllers.UpgradeReconciler{
 		Client:          mgr.GetClient(),

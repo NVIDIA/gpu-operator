@@ -309,3 +309,81 @@ func TestExtractVolumes(t *testing.T) {
 		})
 	}
 }
+
+// containerWithConfigDigest builds a container carrying the DRIVER_CONFIG_DIGEST env
+// when digest is non-empty (matching how object_controls.go sets it).
+func containerWithConfigDigest(name, digest string) corev1.Container {
+	c := corev1.Container{Name: name}
+	if digest != "" {
+		c.Env = []corev1.EnvVar{{Name: DriverConfigDigestEnvName, Value: digest}}
+	}
+	return c
+}
+
+func TestDriverConfigDigestFromPodSpec(t *testing.T) {
+	tests := []struct {
+		name string
+		spec *corev1.PodSpec
+		want string
+	}{
+		{
+			name: "digest on k8s-driver-manager init container",
+			spec: &corev1.PodSpec{
+				InitContainers: []corev1.Container{containerWithConfigDigest("k8s-driver-manager", "abc123")},
+				Containers:     []corev1.Container{containerWithConfigDigest("nvidia-driver-ctr", "")},
+			},
+			want: "abc123",
+		},
+		{
+			name: "digest on nvidia-driver-ctr main container",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{containerWithConfigDigest("nvidia-driver-ctr", "def456")},
+			},
+			want: "def456",
+		},
+		{
+			name: "digest on OCP openshift-driver-toolkit-ctr",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{containerWithConfigDigest("openshift-driver-toolkit-ctr", "ocp789")},
+			},
+			want: "ocp789",
+		},
+		{
+			name: "init container digest takes precedence over main container",
+			spec: &corev1.PodSpec{
+				InitContainers: []corev1.Container{containerWithConfigDigest("k8s-driver-manager", "init-digest")},
+				Containers:     []corev1.Container{containerWithConfigDigest("nvidia-driver-ctr", "main-digest")},
+			},
+			want: "init-digest",
+		},
+		{
+			name: "empty init digest is skipped; main container value used",
+			spec: &corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name: "k8s-driver-manager",
+					Env:  []corev1.EnvVar{{Name: DriverConfigDigestEnvName, Value: ""}},
+				}},
+				Containers: []corev1.Container{containerWithConfigDigest("nvidia-driver-ctr", "main-digest")},
+			},
+			want: "main-digest",
+		},
+		{
+			name: "no digest anywhere",
+			spec: &corev1.PodSpec{
+				InitContainers: []corev1.Container{{Name: "k8s-driver-manager"}},
+				Containers:     []corev1.Container{{Name: "nvidia-driver-ctr"}},
+			},
+			want: "",
+		},
+		{
+			name: "nil spec",
+			spec: nil,
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, DriverConfigDigestFromPodSpec(tt.spec))
+		})
+	}
+}
