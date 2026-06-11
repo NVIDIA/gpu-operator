@@ -61,14 +61,17 @@ func newGPUClusterConfigReconciler(t *testing.T, objs ...client.Object) (*GPUClu
 }
 
 // fakeStateManager returns canned SyncState results so the controller tests don't load
-// real manifests. GetWatchSources is promoted from the embedded (nil) interface and is
-// never called here — only SetupWithManager calls it, which these tests skip.
+// real manifests. It records the last info catalog passed to SyncState so tests can
+// assert on its entries. GetWatchSources is promoted from the embedded (nil) interface
+// and is never called here — only SetupWithManager calls it, which these tests skip.
 type fakeStateManager struct {
 	state.Manager
-	results state.Results
+	results     state.Results
+	lastCatalog state.InfoCatalog
 }
 
-func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, _ state.InfoCatalog) state.Results {
+func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, catalog state.InfoCatalog) state.Results {
+	f.lastCatalog = catalog
 	return f.results
 }
 

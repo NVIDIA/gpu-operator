@@ -33,10 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
 
@@ -195,6 +197,96 @@ func TestReconcile(t *testing.T) {
 			if tc.expectedLog != "" {
 				require.Contains(t, logs, tc.expectedLog)
 			}
+		})
+	}
+}
+
+// TestReconcileStandalone covers the no-ClusterPolicy path: the controller falls back
+// to the GPUClusterConfig for the cluster-wide configuration, and fails early when
+// neither object exists.
+func TestReconcileStandalone(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{
+				UseNvidiaDriverCRD: ptr.To(true),
+			},
+			HostPaths: gpuv1.HostPathsSpec{RootFS: "/cp-root"},
+		},
+	}
+	gcc := &nvidiav1alpha1.GPUClusterConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "gpu-cluster-config"},
+		Spec: nvidiav1alpha1.GPUClusterConfigSpec{
+			HostPaths: gpuv1.HostPathsSpec{RootFS: "/gcc-root"},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		objects          []client.Object
+		expectedErr      string
+		expectedHostRoot string
+	}{
+		{
+			name:             "no ClusterPolicy, GPUClusterConfig provides the host root",
+			objects:          []client.Object{gcc},
+			expectedHostRoot: "/gcc-root",
+		},
+		{
+			name:             "ClusterPolicy preferred over GPUClusterConfig",
+			objects:          []client.Object{cp, gcc},
+			expectedHostRoot: "/cp-root",
+		},
+		{
+			name:        "neither ClusterPolicy nor GPUClusterConfig",
+			expectedErr: "no ClusterPolicy or GPUClusterConfig object found in the cluster",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			driver := &nvidiav1alpha1.NVIDIADriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+			}
+
+			c := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(append([]client.Object{driver}, tc.objects...)...).
+				WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).
+				Build()
+
+			updater := &FakeConditionUpdater{}
+			stateManager := &fakeStateManager{results: state.Results{Status: state.SyncStateReady}}
+
+			reconciler := &NVIDIADriverReconciler{
+				Client:                c,
+				Scheme:                scheme,
+				conditionUpdater:      updater,
+				nodeSelectorValidator: &FakeNodeSelectorValidator{},
+				stateManager:          stateManager,
+			}
+
+			req := ctrl.Request{NamespacedName: types.NamespacedName{Name: driver.Name}}
+			_, err := reconciler.Reconcile(context.Background(), req)
+
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+				require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+				return
+			}
+			require.NoError(t, err)
+
+			hostRoot, ok := stateManager.lastCatalog.Get(state.InfoTypeHostRoot).(string)
+			require.True(t, ok, "info catalog must hold a host root string")
+			require.Equal(t, tc.expectedHostRoot, hostRoot)
+
+			instance := &nvidiav1alpha1.NVIDIADriver{}
+			require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance))
+			require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
 		})
 	}
 }
