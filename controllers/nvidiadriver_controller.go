@@ -153,8 +153,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Add an entry for ClusterInfo, which was collected before the NVIDIADriver controller was started
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
 
-	// Add an entry for Clusterpolicy, which is needed to deploy the driver daemonset
-	infoCatalog.Add(state.InfoTypeClusterPolicyCR, clusterPolicyInstance)
+	// Add the host root, which is needed to deploy the driver daemonset
+	infoCatalog.Add(state.InfoTypeHostRoot, clusterPolicyInstance.Spec.HostPaths.RootFS)
 
 	// Verify the nodeSelector configured for this NVIDIADriver instance does
 	// not conflict with any other instances. This ensures only one driver
