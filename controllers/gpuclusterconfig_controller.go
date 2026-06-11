@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -62,6 +64,7 @@ type GPUClusterConfigReconciler struct {
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusterconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=nvidia.com,resources=clusterpolicies,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;update;patch
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaimtemplates,verbs=get;list;watch;create;update;delete
 
 func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -111,6 +114,10 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	r.singleton = instance
 
+	if err := r.labelGPUNodes(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error labeling GPU nodes: %w", err)
+	}
+
 	infoCatalog := state.NewInfoCatalog()
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
 
@@ -145,6 +152,51 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// newly-created ClusterPolicy) are detected and reconciled even while ready;
 	// only DaemonSets are watched, and the ready path is otherwise event-driven.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// labelGPUNodes labels nodes NFD discovered NVIDIA GPUs on with the common
+// nvidia.com/gpu.present label, and resets it to "false" when a node no longer has
+// GPUs. This is a slimmed version of the ClusterPolicy controller's labeler: the
+// operands match on the common label directly, so per-component state labels are
+// not managed — except the driver deploy label, which the driver DaemonSet
+// rendered for NVIDIADriver hardcodes in its nodeSelector and which only the
+// ClusterPolicy controller would otherwise apply.
+func (r *GPUClusterConfigReconciler) labelGPUNodes(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
+	list := &corev1.NodeList{}
+	if err := r.List(ctx, list); err != nil {
+		return fmt.Errorf("unable to list nodes to check labels: %w", err)
+	}
+	for i := range list.Items {
+		node := &list.Items[i]
+		labels := node.GetLabels()
+		patch := client.MergeFrom(node.DeepCopy())
+		modified := false
+		if hasGPULabels(labels) {
+			if !hasCommonGPULabel(labels) {
+				labels[commonGPULabelKey] = commonGPULabelValue
+				modified = true
+			}
+			if labels[driverDeployLabelKey] != "true" {
+				labels[driverDeployLabelKey] = "true"
+				modified = true
+			}
+		} else if hasCommonGPULabel(labels) {
+			labels[commonGPULabelKey] = "false"
+			delete(labels, driverDeployLabelKey)
+			modified = true
+		}
+		if !modified {
+			continue
+		}
+		node.SetLabels(labels)
+		logger.Info("Updating GPU node labels", "node", node.Name)
+		if err := r.Patch(ctx, node, patch); err != nil {
+			return fmt.Errorf("unable to label node %s: %w", node.Name, err)
+		}
+	}
+	return nil
 }
 
 // updateCrStatus writes desired to the CR's status, skipping the write when it is already current.
@@ -228,6 +280,34 @@ func (r *GPUClusterConfigReconciler) SetupWithManager(ctx context.Context, mgr c
 		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUClusterConfig]{},
 	),
 	)
+	if err != nil {
+		return err
+	}
+
+	// Watch Nodes so GPU nodes are labeled as NFD discovers GPUs (and the label is
+	// reset when they disappear). Only label transitions the labeler acts on trigger
+	// a reconcile; the 1-minute Ready resync covers any remaining drift.
+	nodeMapFn := func(ctx context.Context, _ *corev1.Node) []reconcile.Request {
+		return r.enqueueAllGPUClusterConfigs(ctx, nil)
+	}
+	nodePredicate := predicate.TypedFuncs[*corev1.Node]{
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
+			return hasGPULabels(e.Object.GetLabels())
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
+			labels := e.ObjectNew.GetLabels()
+			return hasCommonGPULabel(labels) != hasGPULabels(labels)
+		},
+		DeleteFunc: func(_ event.TypedDeleteEvent[*corev1.Node]) bool {
+			return false
+		},
+	}
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&corev1.Node{},
+		handler.TypedEnqueueRequestsFromMapFunc(nodeMapFn),
+		nodePredicate,
+	))
 	if err != nil {
 		return err
 	}

@@ -43,6 +43,7 @@ const (
 	commonGPULabelValue                 = "true"
 	commonOperandsLabelKey              = "nvidia.com/gpu.deploy.operands"
 	commonOperandsLabelValue            = "true"
+	driverDeployLabelKey                = "nvidia.com/gpu.deploy.driver"
 	migManagerLabelKey                  = "nvidia.com/gpu.deploy.mig-manager"
 	migManagerLabelValue                = "true"
 	migCapableLabelKey                  = "nvidia.com/mig.capable"

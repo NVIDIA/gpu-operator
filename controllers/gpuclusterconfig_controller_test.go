@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,7 @@ func newGPUClusterConfigReconciler(t *testing.T, objs ...client.Object) (*GPUClu
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -125,6 +127,75 @@ func TestGPUClusterConfigDisabledByClusterPolicy(t *testing.T) {
 	gccReconcile(t, r, cfg.Name)
 
 	require.Equal(t, nvidiav1alpha1.Disabled, gccState(t, c, cfg.Name))
+}
+
+func testNode(name string, labels map[string]string) *corev1.Node {
+	return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+}
+
+func nodeLabels(t *testing.T, c client.Client, name string) map[string]string {
+	t.Helper()
+	node := &corev1.Node{}
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: name}, node))
+	return node.GetLabels()
+}
+
+// Nodes NFD discovered GPUs on get the common GPU label and the driver deploy
+// label (the driver DaemonSet's nodeSelector requires it); nodes that lost their
+// GPUs get the common label reset to "false" and the driver label removed; other
+// nodes are untouched.
+func TestGPUClusterConfigLabelsGPUNodes(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	gpuNode := testNode("gpu-node", map[string]string{
+		"feature.node.kubernetes.io/pci-10de.present": "true",
+	})
+	plainNode := testNode("plain-node", map[string]string{
+		"kubernetes.io/hostname": "plain-node",
+	})
+	removedGPUNode := testNode("removed-gpu-node", map[string]string{
+		commonGPULabelKey:    commonGPULabelValue,
+		driverDeployLabelKey: "true",
+	})
+	r, c := newGPUClusterConfigReconciler(t, cfg, gpuNode, plainNode, removedGPUNode)
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, commonGPULabelValue, nodeLabels(t, c, gpuNode.Name)[commonGPULabelKey])
+	require.Equal(t, "true", nodeLabels(t, c, gpuNode.Name)[driverDeployLabelKey])
+	require.NotContains(t, nodeLabels(t, c, plainNode.Name), commonGPULabelKey)
+	require.Equal(t, "false", nodeLabels(t, c, removedGPUNode.Name)[commonGPULabelKey])
+	require.NotContains(t, nodeLabels(t, c, removedGPUNode.Name), driverDeployLabelKey)
+}
+
+// A GPU node that already has gpu.present but is missing the driver deploy label
+// (e.g. it was removed out of band) is converged back.
+func TestGPUClusterConfigRestoresDriverDeployLabel(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	gpuNode := testNode("gpu-node", map[string]string{
+		"feature.node.kubernetes.io/pci-10de.present": "true",
+		commonGPULabelKey: commonGPULabelValue,
+	})
+	r, c := newGPUClusterConfigReconciler(t, cfg, gpuNode)
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, "true", nodeLabels(t, c, gpuNode.Name)[driverDeployLabelKey])
+}
+
+// The mutually-exclusive ClusterPolicy path returns before node labeling, so the
+// GPUClusterConfig controller never touches nodes on clusters ClusterPolicy owns.
+func TestGPUClusterConfigNoNodeLabelingWhenClusterPolicyPresent(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	gpuNode := testNode("gpu-node", map[string]string{
+		"feature.node.kubernetes.io/pci-10de.present": "true",
+	})
+	r, c := newGPUClusterConfigReconciler(t, cfg, cp, gpuNode)
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, nvidiav1alpha1.Disabled, gccState(t, c, cfg.Name))
+	require.NotContains(t, nodeLabels(t, c, gpuNode.Name), commonGPULabelKey)
 }
 
 // First-reconciled wins (mirroring ClusterPolicy): whichever instance reconciles first
