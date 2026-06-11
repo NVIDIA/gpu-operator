@@ -20,7 +20,7 @@ type InfoType uint
 
 const (
 	InfoTypeClusterInfo = iota
-	InfoTypeClusterPolicyCR
+	InfoTypeHostRoot
 )
 
 func NewInfoCatalog() InfoCatalog {

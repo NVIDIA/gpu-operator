@@ -149,6 +149,20 @@ func TestDriverRenderMinimal(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverRenderMissingHostRoot(t *testing.T) {
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	catalog := NewInfoCatalog()
+	catalog.Add(InfoTypeClusterInfo, testClusterInfo{})
+
+	_, err = stateDriver.getManifestObjects(context.Background(), &nvidiav1alpha1.NVIDIADriver{}, catalog)
+	require.Error(t, err, "rendering must fail when no host root is in the catalog")
+	require.Contains(t, err.Error(), "host root")
+}
+
 func TestDriverHostNetwork(t *testing.T) {
 	const (
 		testName = "driver-hostnetwork"
