@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gpu-feature-discovery
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: gpu-feature-discovery
+    app.kubernetes.io/component: gpu-feature-discovery
+    app: gpu-feature-discovery
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: gpu-feature-discovery
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gpu-feature-discovery
+        app.kubernetes.io/component: gpu-feature-discovery
+        app: gpu-feature-discovery
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-gpu-feature-discovery
+      {{- if .GFD.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .GFD.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/pci-10de.present
+                operator: In
+                values:
+                - "true"
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/cpu-model.vendor_id
+                operator: In
+                values:
+                - NVIDIA
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: In
+                values:
+                - "true"
+      {{- if .Daemonsets.Tolerations }}
+      tolerations:
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      {{- end }}
+      resourceClaims:
+      - name: admin-gpus
+        resourceClaimTemplateName: nvidia-gfd-admin
+      containers:
+      - name: gpu-feature-discovery
+        image: {{ .GFD.ImagePath }}
+        {{- if .GFD.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .GFD.Spec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - gpu-feature-discovery
+        env:
+        - name: GFD_SLEEP_INTERVAL
+          value: 60s
+        - name: GFD_FAIL_ON_INIT_ERROR
+          value: "true"
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        {{- range .GFD.Spec.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        securityContext:
+          privileged: true
+        resources:
+          {{- if .GFD.Spec.Resources }}
+          {{- if .GFD.Spec.Resources.Limits }}
+          limits: {{ .GFD.Spec.Resources.Limits | toJson }}
+          {{- end }}
+          {{- if .GFD.Spec.Resources.Requests }}
+          requests: {{ .GFD.Spec.Resources.Requests | toJson }}
+          {{- end }}
+          {{- end }}
+          claims:
+          - name: admin-gpus
+        volumeMounts:
+        - name: output-dir
+          mountPath: /etc/kubernetes/node-feature-discovery/features.d
+        - name: host-sys
+          mountPath: /sys
+          readOnly: true
+      volumes:
+      - name: output-dir
+        hostPath:
+          path: /etc/kubernetes/node-feature-discovery/features.d
+      - name: host-sys
+        hostPath:
+          path: /sys

@@ -557,6 +557,59 @@ ccManager:
   resources: {}
   hostNetwork: false
 
+# gpuClusterConfig deploys the DRA-based GPU enablement stack (the NVIDIA DRA
+# driver for GPUs) via a GPUClusterConfig CR, as an alternative to the classic
+# device-plugin path. This is an alpha feature (nvidia.com/v1alpha1) and is
+# disabled by default.
+#
+# NOTE: when enabling this, the classic NVIDIA device plugin should be disabled
+# (devicePlugin.enabled=false) to avoid conflicts, and an NVIDIA driver (>= 580)
+# with CDI must be available (host-installed or via driver.enabled / an
+# NVIDIADriver CR). GPUClusterConfig does not manage the driver or device plugin
+# itself; it waits for driver readiness before deploying the DRA driver.
+gpuClusterConfig:
+  enabled: false
+  draDriver:
+    repository: registry.k8s.io/dra-driver-nvidia
+    image: dra-driver-nvidia-gpu
+    version: v0.4.0
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    # featureGates toggles DRA driver feature gates; rendered as FEATURE_GATES.
+    # e.g. featureGates: {MPSSupport: true, NVMLDeviceHealthCheck: true}
+    featureGates: {}
+    # gpus configures the gpu.nvidia.com / mig.nvidia.com / vfio.gpu.nvidia.com
+    # capability (the gpus container of the kubelet-plugin DaemonSet).
+    gpus:
+      enabled: true
+      # kubeletPlugin overrides scheduling/resources for the gpus container.
+      # All fields are optional:
+      kubeletPlugin: {}
+      #   env: []                          # list of {name, value}
+      #   resources: {}                    # requests/limits
+      #   healthcheckPort: 51000           # negative value disables the health probe
+      #   priorityClassName: system-node-critical
+      #   nodeSelector: {}
+      #   tolerations: []
+      #   affinity: {}
+    # computeDomains configures the Multi-Node NVLink (MNNVL) compute-domain
+    # capability: a controller Deployment plus the compute-domains kubelet-plugin
+    # container.
+    computeDomains:
+      enabled: true
+      # controller overrides scheduling/resources for the compute-domain
+      # controller Deployment. All fields are optional:
+      controller: {}
+      #   env: []
+      #   resources: {}
+      #   priorityClassName: system-node-critical
+      #   nodeSelector: {}
+      #   tolerations: []
+      #   affinity: {}
+      # kubeletPlugin overrides the compute-domains container (same fields as
+      # gpus.kubeletPlugin above).
+      kubeletPlugin: {}
+
 # Array of extra K8s manifests to deploy
 # Supports use of custom Helm templates
 extraObjects: []

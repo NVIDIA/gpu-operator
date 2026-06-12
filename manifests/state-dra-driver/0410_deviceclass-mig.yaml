@@ -1,0 +1,10 @@
+{{- if .DRADriver.Spec.IsGPUsEnabled }}
+apiVersion: {{ .DeviceClassAPIVersion }}
+kind: DeviceClass
+metadata:
+  name: mig.nvidia.com
+spec:
+  selectors:
+    - cel:
+        expression: "device.driver == 'gpu.nvidia.com' && device.attributes['gpu.nvidia.com'].type == 'mig'"
+{{- end }}

@@ -1,3 +1,5 @@
+{{- /* ClusterPolicy is mutually exclusive with the DRA path; skip it when gpuClusterConfig is enabled. */ -}}
+{{- if not .Values.gpuClusterConfig.enabled }}
 apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
@@ -812,3 +814,4 @@ spec:
     {{- if .Values.kataSandboxDevicePlugin.hostNetwork }}
     hostNetwork: {{ .Values.kataSandboxDevicePlugin.hostNetwork }}
     {{- end }}
+{{- end }}

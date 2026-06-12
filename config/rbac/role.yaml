@@ -132,6 +132,7 @@ rules:
   - nvidia.com
   resources:
   - '*'
+  - gpuclusterconfigs
   - nvidiadrivers
   verbs:
   - create
@@ -144,12 +145,22 @@ rules:
 - apiGroups:
   - nvidia.com
   resources:
+  - clusterpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nvidia.com
+  resources:
+  - gpuclusterconfigs/finalizers
   - nvidiadrivers/finalizers
   verbs:
   - update
 - apiGroups:
   - nvidia.com
   resources:
+  - gpuclusterconfigs/status
   - nvidiadrivers/status
   verbs:
   - get
@@ -164,6 +175,17 @@ rules:
   - roles
   verbs:
   - '*'
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaimtemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - route.openshift.io
   resources:
