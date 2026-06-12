@@ -1,0 +1,83 @@
+suite: nvidiadriver default CR
+templates:
+  - nvidiadriver.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: does not render the NVIDIADriver CR by default (nvidiaDriverCRD disabled)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render when driver.enabled is false even if nvidiaDriverCRD is enabled
+    set:
+      driver:
+        enabled: false
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render when nvidiaDriverCRD.deployDefaultCR is false
+    set:
+      driver:
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot when CRD mode is enabled with defaults
+    set:
+      driver:
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: applies driverType override
+    set:
+      driver:
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: true
+          driverType: vgpu
+    asserts:
+      - equal:
+          path: spec.driverType
+          value: vgpu
+
+  - it: should match snapshot with optional repoConfig, certConfig, kernelModuleConfig and licensing
+    set:
+      driver:
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: true
+        repoConfig:
+          configMapName: my-repo
+        certConfig:
+          name: my-cert
+        kernelModuleConfig:
+          name: my-kmod
+        licensingConfig:
+          secretName: my-secret
+    asserts:
+      - matchSnapshot: {}
+
+  - it: should match snapshot when gds and gdrcopy are enabled
+    set:
+      driver:
+        nvidiaDriverCRD:
+          enabled: true
+          deployDefaultCR: true
+      gds:
+        enabled: true
+      gdrcopy:
+        enabled: true
+    asserts:
+      - matchSnapshot: {}
