@@ -80,42 +80,19 @@ func (RetentionSizeConfig) SwaggerDoc() map[string]string {
 	return map_RetentionSizeConfig
 }
 
-var map_ClusterImagePolicy = map[string]string{
-	"":         "ClusterImagePolicy holds cluster-wide configuration for image signature verification\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "spec contains the configuration for the cluster image policy.",
-	"status":   "status contains the observed state of the resource.",
+var map_AdditionalAlertmanagerConfig = map[string]string{
+	"":               "AdditionalAlertmanagerConfig represents configuration for additional Alertmanager instances. The `AdditionalAlertmanagerConfig` resource defines settings for how a component communicates with additional Alertmanager instances.",
+	"name":           "name is a unique identifier for this Alertmanager configuration entry. The name must be a valid DNS subdomain (RFC 1123): lowercase alphanumeric characters, hyphens, or periods, and must start and end with an alphanumeric character. Minimum length is 1 character (empty string is invalid). Maximum length is 253 characters.",
+	"authorization":  "authorization configures the authentication method for Alertmanager connections. Supports bearer token authentication. When omitted, no authentication is used.",
+	"pathPrefix":     "pathPrefix defines an optional URL path prefix to prepend to the Alertmanager API endpoints. For example, if your Alertmanager is behind a reverse proxy at \"/alertmanager/\", set this to \"/alertmanager\" so requests go to \"/alertmanager/api/v1/alerts\" instead of \"/api/v1/alerts\". This is commonly needed when Alertmanager is deployed behind ingress controllers or load balancers. When no prefix is needed, omit this field; do not set it to \"/\" as that would produce paths with double slashes (e.g. \"//api/v1/alerts\"). Must start with \"/\", must not end with \"/\", and must not be exactly \"/\". Must not contain query strings (\"?\") or fragments (\"#\").",
+	"scheme":         "scheme defines the URL scheme to use when communicating with Alertmanager instances. Possible values are `HTTP` or `HTTPS`. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default value is `HTTP`.",
+	"staticConfigs":  "staticConfigs is a list of statically configured Alertmanager endpoints in the form of `<host>:<port>`. Each entry must be a valid hostname, IPv4 address, or IPv6 address (in brackets) followed by a colon and a valid port number (1-65535). Examples: \"alertmanager.example.com:9093\", \"192.168.1.100:9093\", \"[::1]:9093\" At least one endpoint must be specified (minimum 1, maximum 10 endpoints). Each entry must be unique and non-empty (empty string is invalid).",
+	"timeoutSeconds": "timeoutSeconds defines the timeout in seconds for requests to Alertmanager. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. Currently the default is 10 seconds. Minimum value is 1 second. Maximum value is 600 seconds (10 minutes).",
+	"tlsConfig":      "tlsConfig defines the TLS settings to use for Alertmanager connections. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
 }
 
-func (ClusterImagePolicy) SwaggerDoc() map[string]string {
-	return map_ClusterImagePolicy
-}
-
-var map_ClusterImagePolicyList = map[string]string{
-	"":         "ClusterImagePolicyList is a list of ClusterImagePolicy resources\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-}
-
-func (ClusterImagePolicyList) SwaggerDoc() map[string]string {
-	return map_ClusterImagePolicyList
-}
-
-var map_ClusterImagePolicySpec = map[string]string{
-	"":       "CLusterImagePolicySpec is the specification of the ClusterImagePolicy custom resource.",
-	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. If a scope is configured in both the ClusterImagePolicy and the ImagePolicy, or if the scope in ImagePolicy is nested under one of the scopes from the ClusterImagePolicy, only the policy from the ClusterImagePolicy will be applied. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
-	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
-}
-
-func (ClusterImagePolicySpec) SwaggerDoc() map[string]string {
-	return map_ClusterImagePolicySpec
-}
-
-var map_ClusterImagePolicyStatus = map[string]string{
-	"conditions": "conditions provide details on the status of this API Resource.",
-}
-
-func (ClusterImagePolicyStatus) SwaggerDoc() map[string]string {
-	return map_ClusterImagePolicyStatus
+func (AdditionalAlertmanagerConfig) SwaggerDoc() map[string]string {
+	return map_AdditionalAlertmanagerConfig
 }
 
 var map_AlertmanagerConfig = map[string]string{
@@ -129,14 +106,15 @@ func (AlertmanagerConfig) SwaggerDoc() map[string]string {
 }
 
 var map_AlertmanagerCustomConfig = map[string]string{
-	"":                          "AlertmanagerCustomConfig represents the configuration for a custom Alertmanager deployment. alertmanagerCustomConfig provides configuration options for the default Alertmanager instance that runs in the `openshift-monitoring` namespace. Use this configuration to control whether the default Alertmanager is deployed, how it logs, and how its pods are scheduled.",
-	"logLevel":                  "logLevel defines the verbosity of logs emitted by Alertmanager. This field allows users to control the amount and severity of logs generated, which can be useful for debugging issues or reducing noise in production environments. Allowed values are Error, Warn, Info, and Debug. When set to Error, only errors will be logged. When set to Warn, both warnings and errors will be logged. When set to Info, general information, warnings, and errors will all be logged. When set to Debug, detailed debugging information will be logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Info`.",
-	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`.",
-	"resources":                 "resources defines the compute resource requests and limits for the Alertmanager container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 10. Minimum length for this list is 1. Each resource name must be unique within this list.",
-	"secrets":                   "secrets defines a list of secrets that need to be mounted into the Alertmanager. The secrets must reside within the same namespace as the Alertmanager object. They will be added as volumes named secret-<secret-name> and mounted at /etc/alertmanager/secrets/<secret-name> within the 'alertmanager' container of the Alertmanager Pods.\n\nThese secrets can be used to authenticate Alertmanager with endpoint receivers. For example, you can use secrets to: - Provide certificates for TLS authentication with receivers that require private CA certificates - Store credentials for Basic HTTP authentication with receivers that require password-based auth - Store any other authentication credentials needed by your alert receivers\n\nThis field is optional. Maximum length for this list is 10. Minimum length for this list is 1. Entries in this list must be unique.",
-	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
-	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how Alertmanager Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
-	"volumeClaimTemplate":       "volumeClaimTemplate Defines persistent storage for Alertmanager. Use this setting to configure the persistent volume claim, including storage class, volume size, and name. If omitted, the Pod uses ephemeral storage and alert data will not persist across restarts. This field is optional.",
+	"":                                "AlertmanagerCustomConfig represents the configuration for a custom Alertmanager deployment. alertmanagerCustomConfig provides configuration options for the default Alertmanager instance that runs in the `openshift-monitoring` namespace. Use this configuration to control whether user-defined namespaces are selected for AlertmanagerConfig lookups, how it logs, and how its pods are scheduled.",
+	"userAlertmanagerConfigSelection": "userAlertmanagerConfigSelection is an optional field that controls whether user-defined namespaces can be selected for AlertmanagerConfig lookups on the platform Alertmanager instance in the `openshift-monitoring` namespace. Valid values are Selectable and None. When set to Selectable, the platform Alertmanager discovers AlertmanagerConfig resources in user-defined namespaces. This is equivalent to `enableUserAlertmanagerConfig: true` in the cluster-monitoring-config ConfigMap. When set to None, user-defined namespaces are not selected for AlertmanagerConfig lookups on the platform Alertmanager. This is equivalent to `enableUserAlertmanagerConfig: false` in the cluster-monitoring-config ConfigMap. This setting only applies when the user-workload monitoring Alertmanager is not enabled. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default value is `None`.",
+	"logLevel":                        "logLevel defines the verbosity of logs emitted by Alertmanager. This field allows users to control the amount and severity of logs generated, which can be useful for debugging issues or reducing noise in production environments. Allowed values are Error, Warn, Info, and Debug. When set to Error, only errors will be logged. When set to Warn, both warnings and errors will be logged. When set to Info, general information, warnings, and errors will all be logged. When set to Debug, detailed debugging information will be logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Info`.",
+	"nodeSelector":                    "nodeSelector defines the nodes on which the Pods are scheduled nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`.",
+	"resources":                       "resources defines the compute resource requests and limits for the Alertmanager container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"secrets":                         "secrets defines a list of secrets that need to be mounted into the Alertmanager. The secrets must reside within the same namespace as the Alertmanager object. They will be added as volumes named secret-<secret-name> and mounted at /etc/alertmanager/secrets/<secret-name> within the 'alertmanager' container of the Alertmanager Pods.\n\nThese secrets can be used to authenticate Alertmanager with endpoint receivers. For example, you can use secrets to: - Provide certificates for TLS authentication with receivers that require private CA certificates - Store credentials for Basic HTTP authentication with receivers that require password-based auth - Store any other authentication credentials needed by your alert receivers\n\nThis field is optional. Maximum length for this list is 10. Minimum length for this list is 1. Entries in this list must be unique.",
+	"tolerations":                     "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
+	"topologySpreadConstraints":       "topologySpreadConstraints defines rules for how Alertmanager Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+	"volumeClaimTemplate":             "volumeClaimTemplate defines persistent storage for Alertmanager. Use this setting to configure the persistent volume claim, including storage class and volume size. If omitted, the Pod uses ephemeral storage and alert data will not persist across restarts.",
 }
 
 func (AlertmanagerCustomConfig) SwaggerDoc() map[string]string {
@@ -150,6 +128,26 @@ var map_Audit = map[string]string{
 
 func (Audit) SwaggerDoc() map[string]string {
 	return map_Audit
+}
+
+var map_AuthorizationConfig = map[string]string{
+	"":            "AuthorizationConfig defines the authentication method for Alertmanager connections.",
+	"type":        "type specifies the authentication type to use. Valid value is \"BearerToken\" (bearer token authentication). When set to BearerToken, the bearerToken field must be specified.",
+	"bearerToken": "bearerToken defines the secret reference containing the bearer token. Required when type is \"BearerToken\", and forbidden otherwise. The secret must exist in the openshift-monitoring namespace.",
+}
+
+func (AuthorizationConfig) SwaggerDoc() map[string]string {
+	return map_AuthorizationConfig
+}
+
+var map_BasicAuth = map[string]string{
+	"":         "BasicAuth defines basic authentication settings for the remote write endpoint URL.",
+	"username": "username defines the secret reference containing the username for basic authentication. The secret must exist in the openshift-monitoring namespace.",
+	"password": "password defines the secret reference containing the password for basic authentication. The secret must exist in the openshift-monitoring namespace.",
+}
+
+func (BasicAuth) SwaggerDoc() map[string]string {
+	return map_BasicAuth
 }
 
 var map_ClusterMonitoring = map[string]string{
@@ -177,8 +175,16 @@ var map_ClusterMonitoringSpec = map[string]string{
 	"":                         "ClusterMonitoringSpec defines the desired state of Cluster Monitoring Operator",
 	"userDefined":              "userDefined set the deployment mode for user-defined monitoring in addition to the default platform monitoring. userDefined is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default value is `Disabled`.",
 	"alertmanagerConfig":       "alertmanagerConfig allows users to configure how the default Alertmanager instance should be deployed in the `openshift-monitoring` namespace. alertmanagerConfig is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `DefaultConfig`.",
+	"prometheusConfig":         "prometheusConfig provides configuration options for the default platform Prometheus instance that runs in the `openshift-monitoring` namespace. This configuration applies only to the platform Prometheus instance; user-workload Prometheus instances are configured separately.\n\nThis field allows you to customize how the platform Prometheus is deployed and operated, including:\n  - Pod scheduling (node selectors, tolerations, topology spread constraints)\n  - Resource allocation (CPU, memory requests/limits)\n  - Retention policies (how long metrics are stored)\n  - External integrations (remote write, additional alertmanagers)\n\nThis field is optional. When omitted, the platform chooses reasonable defaults, which may change over time.",
 	"metricsServerConfig":      "metricsServerConfig is an optional field that can be used to configure the Kubernetes Metrics Server that runs in the openshift-monitoring namespace. Specifically, it can configure how the Metrics Server instance is deployed, pod scheduling, its audit policy and log verbosity. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
 	"prometheusOperatorConfig": "prometheusOperatorConfig is an optional field that can be used to configure the Prometheus Operator component. Specifically, it can configure how the Prometheus Operator instance is deployed, pod scheduling, and resource allocation. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"prometheusOperatorAdmissionWebhookConfig": "prometheusOperatorAdmissionWebhookConfig is an optional field that can be used to configure the admission webhook component of Prometheus Operator that runs in the openshift-monitoring namespace. The admission webhook validates PrometheusRule and AlertmanagerConfig objects to ensure they are semantically valid, mutates PrometheusRule annotations, and converts AlertmanagerConfig objects between API versions. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"openShiftStateMetricsConfig":              "openShiftStateMetricsConfig is an optional field that can be used to configure the openshift-state-metrics agent that runs in the openshift-monitoring namespace. The openshift-state-metrics agent generates metrics about the state of OpenShift-specific Kubernetes objects, such as routes, builds, and deployments. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"telemeterClientConfig":                    "telemeterClientConfig is an optional field that can be used to configure the Telemeter Client component that runs in the openshift-monitoring namespace. The Telemeter Client collects selected monitoring metrics and forwards them to Red Hat for telemetry purposes. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. When set, at least one field must be specified within telemeterClientConfig.",
+	"thanosQuerierConfig":                      "thanosQuerierConfig is an optional field that can be used to configure the Thanos Querier component that runs in the openshift-monitoring namespace. The Thanos Querier provides a global query view by aggregating and deduplicating metrics from multiple Prometheus instances. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default deploys the Thanos Querier on linux nodes with 5m CPU and 12Mi memory requests, and no custom tolerations or topology spread constraints. When set, at least one field must be specified within thanosQuerierConfig.",
+	"nodeExporterConfig":                       "nodeExporterConfig is an optional field that can be used to configure the node-exporter agent that runs as a DaemonSet in the openshift-monitoring namespace. The node-exporter agent collects hardware and OS-level metrics from every node in the cluster. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"monitoringPluginConfig":                   "monitoringPluginConfig is an optional field that can be used to configure the monitoring plugin that runs as a dynamic plugin of the OpenShift web console. The monitoring plugin provides the monitoring UI in the OpenShift web console for visualizing metrics, alerts, and dashboards. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default deploys the monitoring-plugin as a single-replica Deployment on linux nodes with 10m CPU and 50Mi memory requests, and no custom tolerations or topology spread constraints. When set, at least one field must be specified within monitoringPluginConfig.",
+	"kubeStateMetricsConfig":                   "kubeStateMetricsConfig is an optional field that can be used to configure the kube-state-metrics agent that runs in the openshift-monitoring namespace. kube-state-metrics generates metrics about the state of Kubernetes objects such as Deployments, Nodes, and Pods. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
 }
 
 func (ClusterMonitoringSpec) SwaggerDoc() map[string]string {
@@ -196,12 +202,110 @@ func (ClusterMonitoringStatus) SwaggerDoc() map[string]string {
 var map_ContainerResource = map[string]string{
 	"":        "ContainerResource defines a single resource requirement for a container.",
 	"name":    "name of the resource (e.g. \"cpu\", \"memory\", \"hugepages-2Mi\"). This field is required. name must consist only of alphanumeric characters, `-`, `_` and `.` and must start and end with an alphanumeric character.",
-	"request": "request is the minimum amount of the resource required (e.g. \"2Mi\", \"1Gi\"). This field is optional. When limit is specified, request cannot be greater than limit.",
+	"request": "request is the minimum amount of the resource required (e.g. \"2Mi\", \"1Gi\"). This field is optional. When limit is specified, request cannot be greater than limit. The value must be greater than 0 when specified.",
 	"limit":   "limit is the maximum amount of the resource allowed (e.g. \"2Mi\", \"1Gi\"). This field is optional. When request is specified, limit cannot be less than request. The value must be greater than 0 when specified.",
 }
 
 func (ContainerResource) SwaggerDoc() map[string]string {
 	return map_ContainerResource
+}
+
+var map_DropEqualActionConfig = map[string]string{
+	"":            "DropEqualActionConfig configures the DropEqual action. Drops targets for which the concatenated source_labels do match the value of target_label. Requires Prometheus >= v2.41.0.",
+	"targetLabel": "targetLabel is the label name whose value is compared to the concatenated source_labels; targets that match are dropped. Must be between 1 and 128 characters in length.",
+}
+
+func (DropEqualActionConfig) SwaggerDoc() map[string]string {
+	return map_DropEqualActionConfig
+}
+
+var map_HashModActionConfig = map[string]string{
+	"":            "HashModActionConfig configures the HashMod action. target_label is set to the modulus of a hash of the concatenated source_labels (target = hash % modulus).",
+	"targetLabel": "targetLabel is the label name where the hash modulus result is written. Must be between 1 and 128 characters in length.",
+	"modulus":     "modulus is the divisor applied to the hash of the concatenated source label values (target = hash % modulus). Required when using the HashMod action so the intended behavior is explicit. Must be between 1 and 1000000.",
+}
+
+func (HashModActionConfig) SwaggerDoc() map[string]string {
+	return map_HashModActionConfig
+}
+
+var map_KeepEqualActionConfig = map[string]string{
+	"":            "KeepEqualActionConfig configures the KeepEqual action. Drops targets for which the concatenated source_labels do not match the value of target_label. Requires Prometheus >= v2.41.0.",
+	"targetLabel": "targetLabel is the label name whose value is compared to the concatenated source_labels; targets that do not match are dropped. Must be between 1 and 128 characters in length.",
+}
+
+func (KeepEqualActionConfig) SwaggerDoc() map[string]string {
+	return map_KeepEqualActionConfig
+}
+
+var map_KubeStateMetricsConfig = map[string]string{
+	"":                          "KubeStateMetricsConfig provides configuration options for the kube-state-metrics agent that runs in the `openshift-monitoring` namespace. kube-state-metrics generates metrics about the state of Kubernetes objects such as Deployments, Nodes, and Pods.",
+	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
+	"resources":                 "resources defines the compute resource requests and limits for the kube-state-metrics container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, no tolerations are applied. This default is subject to change over time. When specified, tolerations must contain at least 1 entry and must not contain more than 10 entries. Each toleration's operator, when specified, must be either \"Exists\" or \"Equal\". Each toleration's effect, when specified, must be one of \"NoSchedule\", \"PreferNoSchedule\", or \"NoExecute\". An empty or unset effect means match all effects.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how kube-state-metrics Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nThis field maps directly to the `topologySpreadConstraints` field in the Pod spec. When omitted, no topology spread constraints are applied. This default is subject to change over time. When specified, topologySpreadConstraints must contain at least 1 entry and must not contain more than 10 entries. Entries must have unique topologyKey and whenUnsatisfiable pairs. Each entry's whenUnsatisfiable must be either \"DoNotSchedule\" or \"ScheduleAnyway\". Each entry's maxSkew must be at least 1. When minDomains is specified, it must be at least 1 and whenUnsatisfiable must be \"DoNotSchedule\".",
+	"additionalResourceLabels":  "additionalResourceLabels defines additional Kubernetes resource labels to expose as metrics in kube-state-metrics. Currently, only \"Job\" and \"CronJob\" resources are supported due to cardinality concerns. Each entry specifies a resource name and a list of Kubernetes label names to expose. Use \"*\" in the labels list to expose all labels for a given resource. additionalResourceLabels is optional. When omitted, no additional Kubernetes object labels are exposed as metrics by kube-state-metrics beyond its built-in metric labels (e.g. namespace, job_name). Use this field to opt in to exposing specific Kubernetes labels as metric labels for the supported resource types. Minimum length for this list is 1. Maximum length for this list is 2. Each resource name must be unique within this list.",
+}
+
+func (KubeStateMetricsConfig) SwaggerDoc() map[string]string {
+	return map_KubeStateMetricsConfig
+}
+
+var map_KubeStateMetricsResourceLabels = map[string]string{
+	"":         "KubeStateMetricsResourceLabels defines which Kubernetes labels to expose as metrics for a given resource type in kube-state-metrics.",
+	"resource": "resource is the Kubernetes resource name whose labels should be exposed as metrics. Currently, only \"Job\" and \"CronJob\" are supported due to cardinality concerns. Valid values are \"Job\" and \"CronJob\". This field is required.",
+	"labels":   "labels is the list of Kubernetes label names to expose as metrics for this resource. Use \"*\" to expose all labels for the specified resource. When \"*\" is specified, it must be the only entry in the list; mixing \"*\" with specific label names is not allowed. This field is required. Each label name must be unique within this list. Minimum length for this list is 1. Maximum length for this list is 50.",
+}
+
+func (KubeStateMetricsResourceLabels) SwaggerDoc() map[string]string {
+	return map_KubeStateMetricsResourceLabels
+}
+
+var map_Label = map[string]string{
+	"":      "Label represents a key/value pair for external labels.",
+	"key":   "key is the name of the label. Prometheus supports UTF-8 label names, so any valid UTF-8 string is allowed. Must be between 1 and 128 characters in length.",
+	"value": "value is the value of the label. Must be between 1 and 128 characters in length.",
+}
+
+func (Label) SwaggerDoc() map[string]string {
+	return map_Label
+}
+
+var map_LabelMapActionConfig = map[string]string{
+	"":            "LabelMapActionConfig configures the LabelMap action. Regex is matched against all source label names (not just source_labels). Matching label values are copied to new label names given by replacement, with match group references (${1}, ${2}, ...) substituted.",
+	"replacement": "replacement is the template for new label names; match group references (${1}, ${2}, ...) are substituted from the matched label name. Required when using the LabelMap action so the intended behavior is explicit and the platform does not need to apply defaults. Use \"$1\" for the first capture group, \"$2\" for the second, etc. Must be between 1 and 255 characters in length. Empty string is invalid as it would produce invalid label names.",
+}
+
+func (LabelMapActionConfig) SwaggerDoc() map[string]string {
+	return map_LabelMapActionConfig
+}
+
+var map_LowercaseActionConfig = map[string]string{
+	"":            "LowercaseActionConfig configures the Lowercase action. Maps the concatenated source_labels to their lower case and writes to target_label. Requires Prometheus >= v2.36.0.",
+	"targetLabel": "targetLabel is the label name where the lower-cased value is written. Must be between 1 and 128 characters in length.",
+}
+
+func (LowercaseActionConfig) SwaggerDoc() map[string]string {
+	return map_LowercaseActionConfig
+}
+
+var map_MetadataConfig = map[string]string{
+	"":           "MetadataConfig defines whether and how to send series metadata to remote write storage.",
+	"sendPolicy": "sendPolicy specifies whether to send metadata and how it is configured. Default: send metadata using platform-chosen defaults (e.g. send interval 30 seconds). Custom: send metadata using the settings in the custom field.",
+	"custom":     "custom defines custom metadata send settings. Required when sendPolicy is Custom (must have at least one property), and forbidden when sendPolicy is Default.",
+}
+
+func (MetadataConfig) SwaggerDoc() map[string]string {
+	return map_MetadataConfig
+}
+
+var map_MetadataConfigCustom = map[string]string{
+	"":                    "MetadataConfigCustom defines custom settings for sending series metadata when sendPolicy is Custom. At least one property must be set when sendPolicy is Custom (e.g. sendIntervalSeconds).",
+	"sendIntervalSeconds": "sendIntervalSeconds is the interval in seconds at which metadata is sent. When omitted, the platform chooses a reasonable default (e.g. 30 seconds). Minimum value is 1 second. Maximum value is 86400 seconds (24 hours).",
+}
+
+func (MetadataConfigCustom) SwaggerDoc() map[string]string {
+	return map_MetadataConfigCustom
 }
 
 var map_MetricsServerConfig = map[string]string{
@@ -210,7 +314,7 @@ var map_MetricsServerConfig = map[string]string{
 	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`.",
 	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
 	"verbosity":                 "verbosity defines the verbosity of log messages for Metrics Server. Valid values are Errors, Info, Trace, TraceAll and omitted. When set to Errors, only critical messages and errors are logged. When set to Info, only basic information messages are logged. When set to Trace, information useful for general debugging is logged. When set to TraceAll, detailed information about metric scraping is logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Errors`",
-	"resources":                 "resources defines the compute resource requests and limits for the Metrics Server container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 10. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"resources":                 "resources defines the compute resource requests and limits for the Metrics Server container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
 	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how Metrics Server Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
 }
 
@@ -218,17 +322,434 @@ func (MetricsServerConfig) SwaggerDoc() map[string]string {
 	return map_MetricsServerConfig
 }
 
+var map_MonitoringPluginConfig = map[string]string{
+	"":                          "MonitoringPluginConfig provides configuration options for the monitoring plugin that runs as a dynamic plugin of the OpenShift web console. The monitoring plugin provides the monitoring UI in the OpenShift web console for visualizing metrics, alerts, and dashboards. At least one field must be specified; an empty monitoringPluginConfig object is not allowed.",
+	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
+	"resources":                 "resources defines the compute resource requests and limits for the monitoring-plugin container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 10m\n   - name: memory\n     request: 50Mi\n\nWhen specified, resources must contain at least 1 entry and must not exceed 5 entries.",
+	"tolerations":               "tolerations defines the tolerations required for the monitoring-plugin Pods. This field is optional.\n\nWhen omitted, the monitoring-plugin Pods will not have any tolerations, which means they will only be scheduled on nodes with no taints. When specified, tolerations must contain at least 1 entry and must not contain more than 10 entries.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how monitoring-plugin Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. When specified, this list must contain at least 1 entry and must not exceed 10 entries.",
+}
+
+func (MonitoringPluginConfig) SwaggerDoc() map[string]string {
+	return map_MonitoringPluginConfig
+}
+
+var map_NodeExporterCollectorBuddyInfoConfig = map[string]string{
+	"":                 "NodeExporterCollectorBuddyInfoConfig provides configuration for the buddyinfo collector of the node-exporter agent. The buddyinfo collector collects statistics about memory fragmentation from the node_buddyinfo_blocks metric using data from /proc/buddyinfo. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the buddyinfo collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the buddyinfo collector is active and memory fragmentation statistics are collected. When set to \"DoNotCollect\", the buddyinfo collector is inactive.",
+}
+
+func (NodeExporterCollectorBuddyInfoConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorBuddyInfoConfig
+}
+
+var map_NodeExporterCollectorConfig = map[string]string{
+	"":           "NodeExporterCollectorConfig defines settings for individual collectors of the node-exporter agent. Each collector can be individually set to collect or not collect metrics. At least one collector must be specified.",
+	"cpuFreq":    "cpuFreq configures the cpufreq collector, which collects CPU frequency statistics. cpuFreq is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Consider enabling when you need to observe CPU frequency scaling; expect higher CPU usage on many-core nodes when collectionPolicy is Collect.",
+	"tcpStat":    "tcpStat configures the tcpstat collector, which collects TCP connection statistics. tcpStat is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable when debugging TCP connection behavior or capacity at the node level.",
+	"ethtool":    "ethtool configures the ethtool collector, which collects ethernet device statistics. ethtool is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable when you need NIC driver-level ethtool metrics beyond generic netdev counters.",
+	"netDev":     "netDev configures the netdev collector, which collects network device statistics. netDev is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is enabled. Turn off if you must reduce per-interface metric cardinality on hosts with many virtual interfaces.",
+	"netClass":   "netClass configures the netclass collector, which collects information about network devices. netClass is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is enabled with netlink mode active. Use statsGatherer when sysfs vs netlink implementation matters or when matching node_exporter tuning.",
+	"buddyInfo":  "buddyInfo configures the buddyinfo collector, which collects statistics about memory fragmentation from the node_buddyinfo_blocks metric. This metric collects data from /proc/buddyinfo. buddyInfo is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable when investigating kernel memory fragmentation; typically for advanced troubleshooting only.",
+	"mountStats": "mountStats configures the mountstats collector, which collects statistics about NFS volume I/O activities. mountStats is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enabling this collector may produce metrics with high cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment for excessive memory usage. Enable when you care about per-mount NFS client statistics.",
+	"ksmd":       "ksmd configures the ksmd collector, which collects statistics from the kernel same-page merger daemon. ksmd is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable on nodes where KSM is in use and you want visibility into merging activity.",
+	"processes":  "processes configures the processes collector, which collects statistics from processes and threads running in the system. processes is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable for process/thread-level insight; can be expensive on busy nodes.",
+	"systemd":    "systemd configures the systemd collector, which collects statistics on the systemd daemon and its managed services. systemd is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enabling this collector with a long list of selected units may produce metrics with high cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment for excessive memory usage. Enable when you need metrics for specific units; scope units carefully.",
+	"softirqs":   "softirqs configures the softirqs collector, which exposes detailed softirq statistics from /proc/softirqs. softirqs is optional. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is disabled. Enable when you need visibility into kernel softirq processing across CPUs.",
+}
+
+func (NodeExporterCollectorConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorConfig
+}
+
+var map_NodeExporterCollectorCpufreqConfig = map[string]string{
+	"":                 "NodeExporterCollectorCpufreqConfig provides configuration for the cpufreq collector of the node-exporter agent. The cpufreq collector collects CPU frequency statistics. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the cpufreq collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the cpufreq collector is active and CPU frequency statistics are collected. When set to \"DoNotCollect\", the cpufreq collector is inactive.",
+}
+
+func (NodeExporterCollectorCpufreqConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorCpufreqConfig
+}
+
+var map_NodeExporterCollectorEthtoolConfig = map[string]string{
+	"":                 "NodeExporterCollectorEthtoolConfig provides configuration for the ethtool collector of the node-exporter agent. The ethtool collector collects ethernet device statistics. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the ethtool collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the ethtool collector is active and ethernet device statistics are collected. When set to \"DoNotCollect\", the ethtool collector is inactive.",
+}
+
+func (NodeExporterCollectorEthtoolConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorEthtoolConfig
+}
+
+var map_NodeExporterCollectorKSMDConfig = map[string]string{
+	"":                 "NodeExporterCollectorKSMDConfig provides configuration for the ksmd collector of the node-exporter agent. The ksmd collector collects statistics from the kernel same-page merger daemon. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the ksmd collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the ksmd collector is active and kernel same-page merger statistics are collected. When set to \"DoNotCollect\", the ksmd collector is inactive.",
+}
+
+func (NodeExporterCollectorKSMDConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorKSMDConfig
+}
+
+var map_NodeExporterCollectorMountStatsConfig = map[string]string{
+	"":                 "NodeExporterCollectorMountStatsConfig provides configuration for the mountstats collector of the node-exporter agent. The mountstats collector collects statistics about NFS volume I/O activities. It is disabled by default. Enabling this collector may produce metrics with high cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment for excessive memory usage.",
+	"collectionPolicy": "collectionPolicy declares whether the mountstats collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the mountstats collector is active and NFS volume I/O statistics are collected. When set to \"DoNotCollect\", the mountstats collector is inactive.",
+}
+
+func (NodeExporterCollectorMountStatsConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorMountStatsConfig
+}
+
+var map_NodeExporterCollectorNetClassCollectConfig = map[string]string{
+	"":              "NodeExporterCollectorNetClassCollectConfig holds configuration options for the netclass collector when it is actively collecting metrics. At least one field must be specified.",
+	"statsGatherer": "statsGatherer selects which implementation the netclass collector uses to gather statistics (sysfs or netlink). statsGatherer is optional. Valid values are \"Sysfs\" and \"Netlink\". When set to \"Netlink\", the netlink implementation is used; when set to \"Sysfs\", the sysfs implementation is used. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is Netlink.",
+}
+
+func (NodeExporterCollectorNetClassCollectConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorNetClassCollectConfig
+}
+
+var map_NodeExporterCollectorNetClassConfig = map[string]string{
+	"":                 "NodeExporterCollectorNetClassConfig provides configuration for the netclass collector of the node-exporter agent. The netclass collector collects information about network devices such as network speed, MTU, and carrier status. It is enabled by default. When collectionPolicy is DoNotCollect, the collect field must not be set.",
+	"collectionPolicy": "collectionPolicy declares whether the netclass collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the netclass collector is active and network class information is collected. When set to \"DoNotCollect\", the netclass collector is inactive and the corresponding metrics become unavailable. When set to \"DoNotCollect\", the collect field must not be set.",
+	"collect":          "collect contains configuration options that apply only when the netclass collector is actively collecting metrics (i.e. when collectionPolicy is Collect). collect is optional and may be omitted even when collectionPolicy is Collect. collect may only be set when collectionPolicy is Collect. When set, at least one field must be specified within collect.",
+}
+
+func (NodeExporterCollectorNetClassConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorNetClassConfig
+}
+
+var map_NodeExporterCollectorNetDevConfig = map[string]string{
+	"":                 "NodeExporterCollectorNetDevConfig provides configuration for the netdev collector of the node-exporter agent. The netdev collector collects network device statistics such as bytes, packets, errors, and drops per device. It is enabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the netdev collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the netdev collector is active and network device statistics are collected. When set to \"DoNotCollect\", the netdev collector is inactive and the corresponding metrics become unavailable.",
+}
+
+func (NodeExporterCollectorNetDevConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorNetDevConfig
+}
+
+var map_NodeExporterCollectorProcessesConfig = map[string]string{
+	"":                 "NodeExporterCollectorProcessesConfig provides configuration for the processes collector of the node-exporter agent. The processes collector collects statistics from processes and threads running in the system. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the processes collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the processes collector is active and process/thread statistics are collected. When set to \"DoNotCollect\", the processes collector is inactive.",
+}
+
+func (NodeExporterCollectorProcessesConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorProcessesConfig
+}
+
+var map_NodeExporterCollectorSoftirqsConfig = map[string]string{
+	"":                 "NodeExporterCollectorSoftirqsConfig provides configuration for the softirqs collector of the node-exporter agent. The softirqs collector exposes detailed softirq statistics from /proc/softirqs. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the softirqs collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the softirqs collector is active and softirq statistics are collected. When set to \"DoNotCollect\", the softirqs collector is inactive.",
+}
+
+func (NodeExporterCollectorSoftirqsConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorSoftirqsConfig
+}
+
+var map_NodeExporterCollectorSystemdCollectConfig = map[string]string{
+	"":      "NodeExporterCollectorSystemdCollectConfig holds configuration options for the systemd collector when it is actively collecting metrics. At least one field must be specified.",
+	"units": "units is a list of regular expression patterns that match systemd units to be included by the systemd collector. units is optional. By default, the list is empty, so the collector exposes no metrics for systemd units. Each entry is a regular expression pattern and must be at least 1 character and at most 1024 characters. Maximum length for this list is 50. Minimum length for this list is 1. Entries in this list must be unique.",
+}
+
+func (NodeExporterCollectorSystemdCollectConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorSystemdCollectConfig
+}
+
+var map_NodeExporterCollectorSystemdConfig = map[string]string{
+	"":                 "NodeExporterCollectorSystemdConfig provides configuration for the systemd collector of the node-exporter agent. The systemd collector collects statistics on the systemd daemon and its managed services. It is disabled by default. Enabling this collector with a long list of selected units may produce metrics with high cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment for excessive memory usage. When collectionPolicy is DoNotCollect, the collect field must not be set.",
+	"collectionPolicy": "collectionPolicy declares whether the systemd collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the systemd collector is active and systemd unit statistics are collected. When set to \"DoNotCollect\", the systemd collector is inactive and the collect field must not be set.",
+	"collect":          "collect contains configuration options that apply only when the systemd collector is actively collecting metrics (i.e. when collectionPolicy is Collect). collect is optional and may be omitted even when collectionPolicy is Collect. collect may only be set when collectionPolicy is Collect. When set, at least one field must be specified within collect.",
+}
+
+func (NodeExporterCollectorSystemdConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorSystemdConfig
+}
+
+var map_NodeExporterCollectorTcpStatConfig = map[string]string{
+	"":                 "NodeExporterCollectorTcpStatConfig provides configuration for the tcpstat collector of the node-exporter agent. The tcpstat collector collects TCP connection statistics. It is disabled by default.",
+	"collectionPolicy": "collectionPolicy declares whether the tcpstat collector collects metrics. This field is required. Valid values are \"Collect\" and \"DoNotCollect\". When set to \"Collect\", the tcpstat collector is active and TCP connection statistics are collected. When set to \"DoNotCollect\", the tcpstat collector is inactive.",
+}
+
+func (NodeExporterCollectorTcpStatConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterCollectorTcpStatConfig
+}
+
+var map_NodeExporterConfig = map[string]string{
+	"":                      "NodeExporterConfig provides configuration options for the node-exporter agent that runs as a DaemonSet in the `openshift-monitoring` namespace. The node-exporter agent collects hardware and OS-level metrics from every node in the cluster, including CPU, memory, disk, and network statistics. At least one field must be specified.",
+	"resources":             "resources defines the compute resource requests and limits for the node-exporter container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 8m\n     limit: null\n   - name: memory\n     request: 32Mi\n     limit: null",
+	"collectors":            "collectors configures which node-exporter metric collectors are enabled. collectors is optional. Each collector can be individually enabled or disabled. Some collectors may have additional configuration options.\n\nWhen omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"maxProcs":              "maxProcs sets the target number of CPUs on which the node-exporter process will run. maxProcs is optional. Use this setting to override the default value, which is set either to 4 or to the number of CPUs on the host, whichever is smaller. The default value is computed at runtime and set via the GOMAXPROCS environment variable before node-exporter is launched. If a kernel deadlock occurs or if performance degrades when reading from sysfs concurrently, you can change this value to 1, which limits node-exporter to running on one CPU. For nodes with a high CPU count, setting the limit to a low number saves resources by preventing Go routines from being scheduled to run on all CPUs. However, I/O performance degrades if the maxProcs value is set too low and there are many metrics to collect. The minimum value is 1 and the maximum value is 1024. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is min(4, number of host CPUs).",
+	"ignoredNetworkDevices": "ignoredNetworkDevices is a list of regular expression patterns that match network devices to be excluded from the relevant collector configuration such as netdev, netclass, and ethtool. ignoredNetworkDevices is optional.\n\nWhen omitted, the Cluster Monitoring Operator uses a predefined list of devices to be excluded to minimize the impact on memory usage. When set as an empty list, no devices are excluded. If you modify this setting, monitor the prometheus-k8s deployment closely for excessive memory usage. Maximum length for this list is 50. Each entry must be at least 1 character and at most 1024 characters long.",
+}
+
+func (NodeExporterConfig) SwaggerDoc() map[string]string {
+	return map_NodeExporterConfig
+}
+
+var map_OAuth2 = map[string]string{
+	"":               "OAuth2 defines OAuth2 authentication settings for the remote write endpoint.",
+	"clientId":       "clientId defines the secret reference containing the OAuth2 client ID. The secret must exist in the openshift-monitoring namespace.",
+	"clientSecret":   "clientSecret defines the secret reference containing the OAuth2 client secret. The secret must exist in the openshift-monitoring namespace.",
+	"tokenUrl":       "tokenUrl is the URL to fetch the token from. Must be a valid URL with http or https scheme. Must be between 1 and 2048 characters in length.",
+	"scopes":         "scopes is a list of OAuth2 scopes to request. When omitted, no scopes are requested. Maximum of 20 scopes can be specified. Each scope must be between 1 and 256 characters.",
+	"endpointParams": "endpointParams defines additional parameters to append to the token URL. When omitted, no additional parameters are sent. Maximum of 20 parameters can be specified. Entries must have unique names (name is the list key).",
+}
+
+func (OAuth2) SwaggerDoc() map[string]string {
+	return map_OAuth2
+}
+
+var map_OAuth2EndpointParam = map[string]string{
+	"":      "OAuth2EndpointParam defines a name/value parameter for the OAuth2 token URL.",
+	"name":  "name is the parameter name. Must be between 1 and 256 characters.",
+	"value": "value is the optional parameter value. When omitted, the query parameter is applied as ?name (no value). When set (including to the empty string), it is applied as ?name=value. Empty string may be used when the external system expects a parameter with an empty value (e.g. ?parameter=\"\"). Must be between 0 and 2048 characters when present (aligned with common URL length recommendations).",
+}
+
+func (OAuth2EndpointParam) SwaggerDoc() map[string]string {
+	return map_OAuth2EndpointParam
+}
+
+var map_OpenShiftStateMetricsConfig = map[string]string{
+	"":                          "OpenShiftStateMetricsConfig provides configuration options for the openshift-state-metrics agent that runs in the `openshift-monitoring` namespace. The openshift-state-metrics agent generates metrics about the state of OpenShift-specific Kubernetes objects, such as routes, builds, and deployments.",
+	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
+	"resources":                 "resources defines the compute resource requests and limits for the openshift-state-metrics container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 1m\n     limit: null\n   - name: memory\n     request: 32Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how openshift-state-metrics Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+}
+
+func (OpenShiftStateMetricsConfig) SwaggerDoc() map[string]string {
+	return map_OpenShiftStateMetricsConfig
+}
+
+var map_PrometheusConfig = map[string]string{
+	"":                              "PrometheusConfig provides configuration options for the Prometheus instance. Use this configuration to control Prometheus deployment, pod scheduling, resource allocation, retention policies, and external integrations.",
+	"additionalAlertmanagerConfigs": "additionalAlertmanagerConfigs configures additional Alertmanager instances that receive alerts from the Prometheus component. This is useful for organizations that need to:\n  - Send alerts to external monitoring systems (like PagerDuty, Slack, or custom webhooks)\n  - Route different types of alerts to different teams or systems\n  - Integrate with existing enterprise alerting infrastructure\n  - Maintain separate alert routing for compliance or organizational requirements\nWhen omitted, no additional Alertmanager instances are configured (default behavior). When provided, at least one configuration must be specified (minimum 1, maximum 10 items). Entries must have unique names (name is the list key).",
+	"enforcedBodySizeLimitBytes":    "enforcedBodySizeLimitBytes enforces a body size limit (in bytes) for Prometheus scraped metrics. If a scraped target's body response is larger than the limit, the scrape will fail. This helps protect Prometheus from targets that return excessively large responses. The value is specified in bytes (e.g., 4194304 for 4MB, 1073741824 for 1GB). When omitted, the Cluster Monitoring Operator automatically calculates an appropriate limit based on cluster capacity. Set an explicit value to override the automatic calculation. Minimum value is 10240 (10kB). Maximum value is 1073741824 (1GB).",
+	"externalLabels":                "externalLabels defines labels to be attached to time series and alerts when communicating with external systems such as federation, remote storage, and Alertmanager. These labels are not stored with metrics on disk; they are only added when data leaves Prometheus (e.g., during federation queries, remote write, or alert notifications). At least 1 label must be specified when set, with a maximum of 50 labels allowed. Each label key must be unique within this list. When omitted, no external labels are applied.",
+	"logLevel":                      "logLevel defines the verbosity of logs emitted by Prometheus. This field allows users to control the amount and severity of logs generated, which can be useful for debugging issues or reducing noise in production environments. Allowed values are Error, Warn, Info, and Debug. When set to Error, only errors will be logged. When set to Warn, both warnings and errors will be logged. When set to Info, general information, warnings, and errors will all be logged. When set to Debug, detailed debugging information will be logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Info`.",
+	"nodeSelector":                  "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least one key-value pair (minimum of 1) and must not contain more than 10 entries.",
+	"queryLogFile":                  "queryLogFile specifies the file to which PromQL queries are logged. This setting can be either a filename, in which case the queries are saved to an `emptyDir` volume at `/var/log/prometheus`, or a full path to a location where an `emptyDir` volume will be mounted and the queries saved. Writing to `/dev/stderr`, `/dev/stdout` or `/dev/null` is supported, but writing to any other `/dev/` path is not supported. Relative paths are also not supported. By default, PromQL queries are not logged. Must be an absolute path starting with `/` or a simple filename without path separators. Must not contain consecutive slashes, end with a slash, or include '..' path traversal. Must contain only alphanumeric characters, '.', '_', '-', or '/'. Must be between 1 and 255 characters in length.",
+	"remoteWrite":                   "remoteWrite defines the remote write configuration, including URL, authentication, and relabeling settings. Remote write allows Prometheus to send metrics it collects to external long-term storage systems. When omitted, no remote write endpoints are configured. When provided, at least one configuration must be specified (minimum 1, maximum 10 items). Entries must have unique names (name is the list key).",
+	"resources":                     "resources defines the compute resource requests and limits for the Prometheus container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"retention":                     "retention configures how long Prometheus retains metrics data and how much storage it can use. When omitted, the platform chooses reasonable defaults (currently 15d retention, no size limit).",
+	"tolerations":                   "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10 Minimum length for this list is 1",
+	"topologySpreadConstraints":     "topologySpreadConstraints defines rules for how Prometheus Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1 Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+	"collectionProfile":             "collectionProfile defines the metrics collection profile that Prometheus uses to collect metrics from the platform components. Supported values are `Full` or `Minimal`. In the `Full` profile (default), Prometheus collects all metrics that are exposed by the platform components. In the `Minimal` profile, Prometheus only collects metrics necessary for the default platform alerts, recording rules, telemetry and console dashboards. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is `Full`.",
+	"volumeClaimTemplate":           "volumeClaimTemplate defines persistent storage for Prometheus. Use this setting to configure the persistent volume claim, including storage class and volume size. If omitted, the Pod uses ephemeral storage and Prometheus data will not persist across restarts.",
+}
+
+func (PrometheusConfig) SwaggerDoc() map[string]string {
+	return map_PrometheusConfig
+}
+
+var map_PrometheusOperatorAdmissionWebhookConfig = map[string]string{
+	"":                          "PrometheusOperatorAdmissionWebhookConfig provides configuration options for the admission webhook component of Prometheus Operator that runs in the `openshift-monitoring` namespace. The admission webhook validates PrometheusRule and AlertmanagerConfig objects, mutates PrometheusRule annotations, and converts AlertmanagerConfig objects between API versions.",
+	"resources":                 "resources defines the compute resource requests and limits for the prometheus-operator-admission-webhook container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 5m\n     limit: null\n   - name: memory\n     request: 30Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how admission webhook Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+}
+
+func (PrometheusOperatorAdmissionWebhookConfig) SwaggerDoc() map[string]string {
+	return map_PrometheusOperatorAdmissionWebhookConfig
+}
+
 var map_PrometheusOperatorConfig = map[string]string{
 	"":                          "PrometheusOperatorConfig provides configuration options for the Prometheus Operator instance Use this configuration to control how the Prometheus Operator instance is deployed, how it logs, and how its pods are scheduled.",
 	"logLevel":                  "logLevel defines the verbosity of logs emitted by Prometheus Operator. This field allows users to control the amount and severity of logs generated, which can be useful for debugging issues or reducing noise in production environments. Allowed values are Error, Warn, Info, and Debug. When set to Error, only errors will be logged. When set to Warn, both warnings and errors will be logged. When set to Info, general information, warnings, and errors will all be logged. When set to Debug, detailed debugging information will be logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Info`.",
 	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
-	"resources":                 "resources defines the compute resource requests and limits for the Prometheus Operator container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 10. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"resources":                 "resources defines the compute resource requests and limits for the Prometheus Operator container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 4m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
 	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
 	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how Prometheus Operator Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
 }
 
 func (PrometheusOperatorConfig) SwaggerDoc() map[string]string {
 	return map_PrometheusOperatorConfig
+}
+
+var map_PrometheusRemoteWriteHeader = map[string]string{
+	"":      "PrometheusRemoteWriteHeader defines a custom HTTP header for remote write requests. The header name must not be one of the reserved headers set by Prometheus (Host, Authorization, Content-Encoding, Content-Type, X-Prometheus-Remote-Write-Version, User-Agent, Connection, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, WWW-Authenticate). Header names must contain only case-insensitive alphanumeric characters, hyphens (-), and underscores (_); other characters (e.g. emoji) are rejected by validation. Validation is enforced on the Headers field in RemoteWriteSpec.",
+	"name":  "name is the HTTP header name. Must not be a reserved header (see type documentation). Must contain only alphanumeric characters, hyphens, and underscores; invalid characters are rejected. Must be between 1 and 256 characters.",
+	"value": "value is the HTTP header value. Must be at most 4096 characters.",
+}
+
+func (PrometheusRemoteWriteHeader) SwaggerDoc() map[string]string {
+	return map_PrometheusRemoteWriteHeader
+}
+
+var map_QueueConfig = map[string]string{
+	"":                         "QueueConfig allows tuning configuration for remote write queue parameters. Configure this when you need to control throughput, backpressure, or retry behavior—for example to avoid overloading the remote endpoint, to reduce memory usage, or to tune for high-cardinality workloads. Consider capacity, maxShards, and batchSendDeadlineSeconds for throughput; minBackoffMilliseconds and maxBackoffMilliseconds for retries; and rateLimitedAction when the remote returns HTTP 429.",
+	"capacity":                 "capacity is the number of samples to buffer per shard before we start dropping them. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is 10000. Minimum value is 1. Maximum value is 1000000.",
+	"maxShards":                "maxShards is the maximum number of shards, i.e. amount of concurrency. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is 200. Minimum value is 1. Maximum value is 10000.",
+	"minShards":                "minShards is the minimum number of shards, i.e. amount of concurrency. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is 1. Minimum value is 1. Maximum value is 10000.",
+	"maxSamplesPerSend":        "maxSamplesPerSend is the maximum number of samples per send. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is 1000. Minimum value is 1. Maximum value is 100000.",
+	"batchSendDeadlineSeconds": "batchSendDeadlineSeconds is the maximum time in seconds a sample will wait in buffer before being sent. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. Minimum value is 1 second. Maximum value is 3600 seconds (1 hour).",
+	"minBackoffMilliseconds":   "minBackoffMilliseconds is the minimum retry delay in milliseconds. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. Minimum value is 1 millisecond. Maximum value is 3600000 milliseconds (1 hour).",
+	"maxBackoffMilliseconds":   "maxBackoffMilliseconds is the maximum retry delay in milliseconds. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. Minimum value is 1 millisecond. Maximum value is 3600000 milliseconds (1 hour).",
+	"rateLimitedAction":        "rateLimitedAction controls what to do when the remote write endpoint returns HTTP 429 (Too Many Requests). When omitted, no retries are performed on rate limit responses. When set to \"Retry\", Prometheus will retry such requests using the backoff settings above. Valid value when set is \"Retry\".",
+}
+
+func (QueueConfig) SwaggerDoc() map[string]string {
+	return map_QueueConfig
+}
+
+var map_RelabelActionConfig = map[string]string{
+	"":          "RelabelActionConfig represents the action to perform and its configuration. Exactly one action-specific configuration must be specified based on the action type.",
+	"type":      "type specifies the action to perform on the matched labels. Allowed values are Replace, Lowercase, Uppercase, Keep, Drop, KeepEqual, DropEqual, HashMod, LabelMap, LabelDrop, LabelKeep.\n\nWhen set to Replace, regex is matched against the concatenated source_labels; target_label is set to replacement with match group references (${1}, ${2}, ...) substituted. If regex does not match, no replacement takes place.\n\nWhen set to Lowercase, the concatenated source_labels are mapped to their lower case. Requires Prometheus >= v2.36.0.\n\nWhen set to Uppercase, the concatenated source_labels are mapped to their upper case. Requires Prometheus >= v2.36.0.\n\nWhen set to Keep, targets for which regex does not match the concatenated source_labels are dropped.\n\nWhen set to Drop, targets for which regex matches the concatenated source_labels are dropped.\n\nWhen set to KeepEqual, targets for which the concatenated source_labels do not match target_label are dropped. Requires Prometheus >= v2.41.0.\n\nWhen set to DropEqual, targets for which the concatenated source_labels do match target_label are dropped. Requires Prometheus >= v2.41.0.\n\nWhen set to HashMod, target_label is set to the modulus of a hash of the concatenated source_labels.\n\nWhen set to LabelMap, regex is matched against all source label names (not just source_labels); matching label values are copied to new names given by replacement with ${1}, ${2}, ... substituted.\n\nWhen set to LabelDrop, regex is matched against all label names; any label that matches is removed.\n\nWhen set to LabelKeep, regex is matched against all label names; any label that does not match is removed.",
+	"replace":   "replace configures the Replace action. Required when type is Replace, and forbidden otherwise.",
+	"hashMod":   "hashMod configures the HashMod action. Required when type is HashMod, and forbidden otherwise.",
+	"labelMap":  "labelMap configures the LabelMap action. Required when type is LabelMap, and forbidden otherwise.",
+	"lowercase": "lowercase configures the Lowercase action. Required when type is Lowercase, and forbidden otherwise. Requires Prometheus >= v2.36.0.",
+	"uppercase": "uppercase configures the Uppercase action. Required when type is Uppercase, and forbidden otherwise. Requires Prometheus >= v2.36.0.",
+	"keepEqual": "keepEqual configures the KeepEqual action. Required when type is KeepEqual, and forbidden otherwise. Requires Prometheus >= v2.41.0.",
+	"dropEqual": "dropEqual configures the DropEqual action. Required when type is DropEqual, and forbidden otherwise. Requires Prometheus >= v2.41.0.",
+}
+
+func (RelabelActionConfig) SwaggerDoc() map[string]string {
+	return map_RelabelActionConfig
+}
+
+var map_RelabelConfig = map[string]string{
+	"":             "RelabelConfig represents a relabeling rule.",
+	"name":         "name is a unique identifier for this relabel configuration. Must contain only alphanumeric characters, hyphens, and underscores. Must be between 1 and 63 characters in length.",
+	"sourceLabels": "sourceLabels specifies which label names to extract from each series for this relabeling rule. The values of these labels are joined together using the configured separator, and the resulting string is then matched against the regular expression. If a referenced label does not exist on a series, Prometheus substitutes an empty string. When omitted, the rule operates without extracting source labels (useful for actions like labelmap). Minimum of 1 and maximum of 10 source labels can be specified, each between 1 and 128 characters. Each entry must be unique. Label names beginning with \"__\" (two underscores) are reserved for internal Prometheus use and are not allowed. Label names SHOULD start with a letter (a-z, A-Z) or underscore (_), followed by zero or more letters, digits (0-9), or underscores for best compatibility. While Prometheus supports UTF-8 characters in label names (since v3.0.0), using the recommended character set ensures better compatibility with the wider ecosystem (tooling, third-party instrumentation, etc.).",
+	"separator":    "separator is the character sequence used to join source label values. Common examples: \";\", \",\", \"::\", \"|||\". When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is \";\". Must be between 1 and 5 characters in length when specified.",
+	"regex":        "regex is the regular expression to match against the concatenated source label values. Must be a valid RE2 regular expression (https://github.com/google/re2/wiki/Syntax). When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is \"(.*)\" to match everything. Must be between 1 and 1000 characters in length when specified.",
+	"action":       "action defines the action to perform on the matched labels and its configuration. Exactly one action-specific configuration must be specified based on the action type.",
+}
+
+func (RelabelConfig) SwaggerDoc() map[string]string {
+	return map_RelabelConfig
+}
+
+var map_RemoteWriteAuthorization = map[string]string{
+	"":                  "RemoteWriteAuthorization defines the authorization method for a remote write endpoint. Exactly one of the nested configs must be set according to the type discriminator.",
+	"type":              "type specifies the authorization method to use. Allowed values are BearerToken, BasicAuth, OAuth2, SigV4, SafeAuthorization, ServiceAccount.\n\nWhen set to BearerToken, the bearer token is read from a Secret referenced by the bearerToken field.\n\nWhen set to BasicAuth, HTTP basic authentication is used; the basicAuth field (username and password from Secrets) must be set.\n\nWhen set to OAuth2, OAuth2 client credentials flow is used; the oauth2 field (clientId, clientSecret, tokenUrl) must be set.\n\nWhen set to SigV4, AWS Signature Version 4 is used for authentication; the sigv4 field must be set.\n\nWhen set to SafeAuthorization, credentials are read from a single Secret key (Prometheus SafeAuthorization pattern). The secret key typically contains a Bearer token. Use the safeAuthorization field.\n\nWhen set to ServiceAccount, the pod's service account token is used for machine identity. No additional field is required; the operator configures the token path.",
+	"safeAuthorization": "safeAuthorization defines the secret reference containing the credentials for authentication (e.g. Bearer token). Required when type is \"SafeAuthorization\", and forbidden otherwise. Maps to Prometheus SafeAuthorization. The secret must exist in the openshift-monitoring namespace.",
+	"bearerToken":       "bearerToken defines the secret reference containing the bearer token. Required when type is \"BearerToken\", and forbidden otherwise.",
+	"basicAuth":         "basicAuth defines HTTP basic authentication credentials. Required when type is \"BasicAuth\", and forbidden otherwise.",
+	"oauth2":            "oauth2 defines OAuth2 client credentials authentication. Required when type is \"OAuth2\", and forbidden otherwise.",
+	"sigv4":             "sigv4 defines AWS Signature Version 4 authentication. Required when type is \"SigV4\", and forbidden otherwise.",
+}
+
+func (RemoteWriteAuthorization) SwaggerDoc() map[string]string {
+	return map_RemoteWriteAuthorization
+}
+
+var map_RemoteWriteSpec = map[string]string{
+	"":                     "RemoteWriteSpec represents configuration for remote write endpoints.",
+	"url":                  "url is the URL of the remote write endpoint. Must be a valid URL with http or https scheme and a non-empty hostname. Query parameters, fragments, and user information (e.g. user:password@host) are not allowed. Empty string is invalid. Must be between 1 and 2048 characters in length.",
+	"name":                 "name is a required identifier for this remote write configuration (name is the list key for the remoteWrite list). This name is used in metrics and logging to differentiate remote write queues. Must contain only alphanumeric characters, hyphens, and underscores. Must be between 1 and 63 characters in length.",
+	"authorization":        "authorization defines the authorization method for the remote write endpoint. When omitted, no authorization is performed. When set, type must be one of BearerToken, BasicAuth, OAuth2, SigV4, SafeAuthorization, or ServiceAccount; the corresponding nested config must be set (ServiceAccount has no config).",
+	"headers":              "headers specifies the custom HTTP headers to be sent along with each remote write request. Sending custom headers makes the configuration of a proxy in between optional and helps the receiver recognize the given source better. Clients MAY allow users to send custom HTTP headers; they MUST NOT allow users to configure them in such a way as to send reserved headers. Headers set by Prometheus cannot be overwritten. When omitted, no custom headers are sent. Maximum of 50 headers can be specified. Each header name must be unique. Each header name must contain only alphanumeric characters, hyphens, and underscores, and must not be a reserved Prometheus header (Host, Authorization, Content-Encoding, Content-Type, X-Prometheus-Remote-Write-Version, User-Agent, Connection, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, WWW-Authenticate).",
+	"metadataConfig":       "metadataConfig configures the sending of series metadata to remote storage. When omitted, no metadata is sent. When set to sendPolicy: Default, metadata is sent using platform-chosen defaults (e.g. send interval 30 seconds). When set to sendPolicy: Custom, metadata is sent using the settings in the custom field (e.g. custom.sendIntervalSeconds).",
+	"proxyUrl":             "proxyUrl defines an optional proxy URL. If the cluster-wide proxy is enabled, it replaces the proxyUrl setting. The cluster-wide proxy supports both HTTP and HTTPS proxies, with HTTPS taking precedence. When omitted, no proxy is used. Must be a valid URL with http or https scheme. Must be between 1 and 2048 characters in length.",
+	"queueConfig":          "queueConfig allows tuning configuration for remote write queue parameters. When omitted, default queue configuration is used.",
+	"remoteTimeoutSeconds": "remoteTimeoutSeconds defines the timeout in seconds for requests to the remote write endpoint. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. Minimum value is 1 second. Maximum value is 600 seconds (10 minutes).",
+	"exemplarsMode":        "exemplarsMode controls whether exemplars are sent via remote write. Valid values are \"Send\", \"DoNotSend\" and omitted. When set to \"Send\", Prometheus is configured to store a maximum of 100,000 exemplars in memory and send them with remote write. Note that this setting only applies to user-defined monitoring. It is not applicable to default in-cluster monitoring. When omitted or set to \"DoNotSend\", exemplars are not sent.",
+	"tlsConfig":            "tlsConfig defines TLS authentication settings for the remote write endpoint. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+	"writeRelabelConfigs":  "writeRelabelConfigs is a list of relabeling rules to apply before sending data to the remote endpoint. When omitted, no relabeling is performed and all metrics are sent as-is. Minimum of 1 and maximum of 10 relabeling rules can be specified. Each rule must have a unique name.",
+}
+
+func (RemoteWriteSpec) SwaggerDoc() map[string]string {
+	return map_RemoteWriteSpec
+}
+
+var map_ReplaceActionConfig = map[string]string{
+	"":            "ReplaceActionConfig configures the Replace action. Regex is matched against the concatenated source_labels; target_label is set to replacement with match group references (${1}, ${2}, ...) substituted. No replacement if regex does not match.",
+	"targetLabel": "targetLabel is the label name where the replacement result is written. Must be between 1 and 128 characters in length.",
+	"replacement": "replacement is the value written to target_label when regex matches; match group references (${1}, ${2}, ...) are substituted. Required when using the Replace action so the intended behavior is explicit and the platform does not need to apply defaults. Use \"$1\" for the first capture group, \"$2\" for the second, etc. Use an empty string (\"\") to explicitly clear the target label value. Must be between 0 and 255 characters in length.",
+}
+
+func (ReplaceActionConfig) SwaggerDoc() map[string]string {
+	return map_ReplaceActionConfig
+}
+
+var map_Retention = map[string]string{
+	"":         "Retention configures how long Prometheus retains metrics data and how much storage it can use.",
+	"duration": "duration is an optional field that specifies how long Prometheus retains metrics data. Valid values are Prometheus-style duration strings with unit suffixes y, w, d, h, m, s, or ms (for example, \"15d\", \"24h\", or \"5d1h30m\"). Each unit value must be a positive integer. Composite durations must follow the fixed unit order y, w, d, h, m, s, ms. Must be at least 1 character and at most 64 characters. When set to \"0\", time-based retention is disabled. This is the only supported form for disabling time-based retention; other zero-duration representations such as \"0d\", \"0h\", or \"0y\" are rejected. Prometheus automatically deletes data older than this duration. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default value is `15d`.",
+	"size":     "size is an optional field that specifies the maximum storage size that Prometheus can use for data blocks and the write-ahead log (WAL). Valid values are byte-size strings with an optional decimal prefix and a unit suffix B, KB, MB, GB, TB, EB, PB, or their binary equivalents KiB, MiB, GiB, TiB, EiB, PiB (for example, \"500MiB\", \"10GiB\"). The numeric value must be greater than zero. Must be at least 1 character and at most 32 characters. When set to \"0\", no size limit is enforced. This is the only supported form for disabling size-based retention; other zero-size representations such as \"0B\" or \"0MiB\" are rejected. When the limit is reached, Prometheus deletes oldest data first. When omitted, no size limit is enforced and Prometheus uses available PersistentVolume capacity.",
+}
+
+func (Retention) SwaggerDoc() map[string]string {
+	return map_Retention
+}
+
+var map_SecretKeySelector = map[string]string{
+	"":     "SecretKeySelector selects a key of a Secret in the `openshift-monitoring` namespace.",
+	"name": "name is the name of the secret in the `openshift-monitoring` namespace to select from. Must be a valid Kubernetes secret name (lowercase alphanumeric, '-' or '.', start/end with alphanumeric). Must be between 1 and 253 characters in length.",
+	"key":  "key is the key of the secret to select from. Must consist of alphanumeric characters, '-', '_', or '.'. Must be between 1 and 253 characters in length.",
+}
+
+func (SecretKeySelector) SwaggerDoc() map[string]string {
+	return map_SecretKeySelector
+}
+
+var map_Sigv4 = map[string]string{
+	"":          "Sigv4 defines AWS Signature Version 4 authentication settings. At least one of region, accessKey/secretKey, profile, or roleArn must be set so the platform can perform authentication.",
+	"region":    "region is the AWS region. When omitted, the region is derived from the environment or instance metadata. Must be between 1 and 128 characters.",
+	"accessKey": "accessKey defines the secret reference containing the AWS access key ID. The secret must exist in the openshift-monitoring namespace. When omitted, the access key is derived from the environment or instance metadata.",
+	"secretKey": "secretKey defines the secret reference containing the AWS secret access key. The secret must exist in the openshift-monitoring namespace. When omitted, the secret key is derived from the environment or instance metadata.",
+	"profile":   "profile is the named AWS profile used to authenticate. When omitted, the default profile is used. Must be between 1 and 128 characters.",
+	"roleArn":   "roleArn is the AWS Role ARN, an alternative to using AWS API keys. When omitted, API keys are used for authentication. Must be a valid AWS ARN format (e.g., \"arn:aws:iam::123456789012:role/MyRole\"). Must be between 1 and 512 characters.",
+}
+
+func (Sigv4) SwaggerDoc() map[string]string {
+	return map_Sigv4
+}
+
+var map_TLSConfig = map[string]string{
+	"":                        "TLSConfig represents TLS configuration for Alertmanager connections. At least one TLS configuration option must be specified. For mutual TLS (mTLS), both cert and key must be specified together, or both omitted.",
+	"ca":                      "ca is an optional CA certificate to use for TLS connections. When omitted, the system's default CA bundle is used.",
+	"cert":                    "cert is an optional client certificate to use for mutual TLS connections. When omitted, no client certificate is presented.",
+	"key":                     "key is an optional client key to use for mutual TLS connections. When omitted, no client key is used.",
+	"serverName":              "serverName is an optional server name to use for TLS connections. When specified, must be a valid DNS subdomain as per RFC 1123. When omitted, the server name is derived from the URL. Must be between 1 and 253 characters in length.",
+	"certificateVerification": "certificateVerification determines the policy for TLS certificate verification. Allowed values are \"Verify\" (performs certificate verification, secure) and \"SkipVerify\" (skips verification, insecure). When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The default value is \"Verify\".",
+}
+
+func (TLSConfig) SwaggerDoc() map[string]string {
+	return map_TLSConfig
+}
+
+var map_TelemeterClientConfig = map[string]string{
+	"":                          "TelemeterClientConfig provides configuration options for the Telemeter Client component that runs in the `openshift-monitoring` namespace. The Telemeter Client collects selected monitoring metrics and forwards them to Red Hat for telemetry purposes. At least one field must be specified.",
+	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
+	"resources":                 "resources defines the compute resource requests and limits for the Telemeter Client container. This includes CPU, memory and HugePages constraints to help control scheduling and resource usage. When not specified, defaults are used by the platform. Requests cannot exceed limits. This field is optional. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 1m\n     limit: null\n   - name: memory\n     request: 40Mi\n     limit: null\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how Telemeter Client Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Default is empty list. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+}
+
+func (TelemeterClientConfig) SwaggerDoc() map[string]string {
+	return map_TelemeterClientConfig
+}
+
+var map_ThanosQuerierConfig = map[string]string{
+	"":                          "ThanosQuerierConfig provides configuration options for the Thanos Querier component that runs in the `openshift-monitoring` namespace. At least one field must be specified; an empty thanosQuerierConfig object is not allowed.",
+	"logLevel":                  "logLevel defines the verbosity of logs emitted by Thanos Querier. logLevel is optional. Allowed values are Error, Warn, Info, and Debug. When set to Error, only errors will be logged. When set to Warn, both warnings and errors will be logged. When set to Info, general information, warnings, and errors will all be logged. When set to Debug, detailed debugging information will be logged. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is `Info`.",
+	"requestLogging":            "requestLogging configures request logging for Thanos Querier. requestLogging is optional. When provided, the policy field within is required. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default behavior is to not log any requests.",
+	"crossOriginRequestPolicy":  "crossOriginRequestPolicy configures the CORS (Cross-Origin Resource Sharing) policy for Thanos Querier's HTTP endpoints. crossOriginRequestPolicy is optional. Valid values are \"AllowAll\" and \"DenyAll\". When set to \"AllowAll\", CORS headers are added to responses, allowing cross-origin requests from any domain. When set to \"DenyAll\", no CORS headers are added and cross-origin requests are rejected by the browser. When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time. The current default value is \"DenyAll\".",
+	"nodeSelector":              "nodeSelector defines the nodes on which the Pods are scheduled. nodeSelector is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default value is `kubernetes.io/os: linux`. When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.",
+	"resources":                 "resources defines the compute resource requests and limits for the Thanos Querier container. resources is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Requests cannot exceed limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ This is a simplified API that maps to Kubernetes ResourceRequirements. The current default values are:\n  resources:\n   - name: cpu\n     request: 5m\n   - name: memory\n     request: 12Mi\nMaximum length for this list is 5. Minimum length for this list is 1. Each resource name must be unique within this list.",
+	"tolerations":               "tolerations defines tolerations for the pods. tolerations is optional.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1.",
+	"topologySpreadConstraints": "topologySpreadConstraints defines rules for how Thanos Querier Pods should be distributed across topology domains such as zones, nodes, or other user-defined labels. topologySpreadConstraints is optional. This helps improve high availability and resource efficiency by avoiding placing too many replicas in the same failure domain.\n\nWhen omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time. This field maps directly to the `topologySpreadConstraints` field in the Pod spec. Defaults are empty/unset. Maximum length for this list is 10. Minimum length for this list is 1. Entries must have unique topologyKey and whenUnsatisfiable pairs.",
+}
+
+func (ThanosQuerierConfig) SwaggerDoc() map[string]string {
+	return map_ThanosQuerierConfig
+}
+
+var map_ThanosQuerierRequestLoggingConfig = map[string]string{
+	"":       "ThanosQuerierRequestLoggingConfig configures request logging for Thanos Querier.",
+	"policy": "policy determines which HTTP and gRPC requests are logged by Thanos Querier. Valid values are \"AllRequests\" and \"NoRequests\". When set to \"AllRequests\", every request received by Thanos Querier is logged with method, path, and response status. The log level for request logs is derived from the logLevel field. When set to \"NoRequests\", request logging is turned off.",
+}
+
+func (ThanosQuerierRequestLoggingConfig) SwaggerDoc() map[string]string {
+	return map_ThanosQuerierRequestLoggingConfig
+}
+
+var map_UppercaseActionConfig = map[string]string{
+	"":            "UppercaseActionConfig configures the Uppercase action. Maps the concatenated source_labels to their upper case and writes to target_label. Requires Prometheus >= v2.36.0.",
+	"targetLabel": "targetLabel is the label name where the upper-cased value is written. Must be between 1 and 128 characters in length.",
+}
+
+func (UppercaseActionConfig) SwaggerDoc() map[string]string {
+	return map_UppercaseActionConfig
 }
 
 var map_UserDefinedMonitoring = map[string]string{
@@ -276,146 +797,6 @@ var map_CRIOCredentialProviderConfigStatus = map[string]string{
 
 func (CRIOCredentialProviderConfigStatus) SwaggerDoc() map[string]string {
 	return map_CRIOCredentialProviderConfigStatus
-}
-
-var map_ImagePolicy = map[string]string{
-	"":         "ImagePolicy holds namespace-wide configuration for image signature verification\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "spec holds user settable values for configuration",
-	"status":   "status contains the observed state of the resource.",
-}
-
-func (ImagePolicy) SwaggerDoc() map[string]string {
-	return map_ImagePolicy
-}
-
-var map_ImagePolicyFulcioCAWithRekorRootOfTrust = map[string]string{
-	"":              "ImagePolicyFulcioCAWithRekorRootOfTrust defines the root of trust based on the Fulcio certificate and the Rekor public key.",
-	"fulcioCAData":  "fulcioCAData contains inline base64-encoded data for the PEM format fulcio CA. fulcioCAData must be at most 8192 characters.",
-	"rekorKeyData":  "rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters.",
-	"fulcioSubject": "fulcioSubject specifies OIDC issuer and the email of the Fulcio authentication configuration.",
-}
-
-func (ImagePolicyFulcioCAWithRekorRootOfTrust) SwaggerDoc() map[string]string {
-	return map_ImagePolicyFulcioCAWithRekorRootOfTrust
-}
-
-var map_ImagePolicyList = map[string]string{
-	"":         "ImagePolicyList is a list of ImagePolicy resources\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-}
-
-func (ImagePolicyList) SwaggerDoc() map[string]string {
-	return map_ImagePolicyList
-}
-
-var map_ImagePolicyPKIRootOfTrust = map[string]string{
-	"":                      "ImagePolicyPKIRootOfTrust defines the root of trust based on Root CA(s) and corresponding intermediate certificates.",
-	"caRootsData":           "caRootsData contains base64-encoded data of a certificate bundle PEM file, which contains one or more CA roots in the PEM format. The total length of the data must not exceed 8192 characters. ",
-	"caIntermediatesData":   "caIntermediatesData contains base64-encoded data of a certificate bundle PEM file, which contains one or more intermediate certificates in the PEM format. The total length of the data must not exceed 8192 characters. caIntermediatesData requires caRootsData to be set. ",
-	"pkiCertificateSubject": "pkiCertificateSubject defines the requirements imposed on the subject to which the certificate was issued.",
-}
-
-func (ImagePolicyPKIRootOfTrust) SwaggerDoc() map[string]string {
-	return map_ImagePolicyPKIRootOfTrust
-}
-
-var map_ImagePolicyPublicKeyRootOfTrust = map[string]string{
-	"":             "ImagePolicyPublicKeyRootOfTrust defines the root of trust based on a sigstore public key.",
-	"keyData":      "keyData contains inline base64-encoded data for the PEM format public key. KeyData must be at most 8192 characters.",
-	"rekorKeyData": "rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters.",
-}
-
-func (ImagePolicyPublicKeyRootOfTrust) SwaggerDoc() map[string]string {
-	return map_ImagePolicyPublicKeyRootOfTrust
-}
-
-var map_ImagePolicySpec = map[string]string{
-	"":       "ImagePolicySpec is the specification of the ImagePolicy CRD.",
-	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. If a scope is configured in both the ClusterImagePolicy and the ImagePolicy, or if the scope in ImagePolicy is nested under one of the scopes from the ClusterImagePolicy, only the policy from the ClusterImagePolicy will be applied. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
-	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
-}
-
-func (ImagePolicySpec) SwaggerDoc() map[string]string {
-	return map_ImagePolicySpec
-}
-
-var map_ImagePolicyStatus = map[string]string{
-	"conditions": "conditions provide details on the status of this API Resource.",
-}
-
-func (ImagePolicyStatus) SwaggerDoc() map[string]string {
-	return map_ImagePolicyStatus
-}
-
-var map_ImageSigstoreVerificationPolicy = map[string]string{
-	"":               "ImageSigstoreVerificationPolicy defines the verification policy for the items in the scopes list.",
-	"rootOfTrust":    "rootOfTrust specifies the root of trust for the policy.",
-	"signedIdentity": "signedIdentity specifies what image identity the signature claims about the image. The required matchPolicy field specifies the approach used in the verification process to verify the identity in the signature and the actual image identity, the default matchPolicy is \"MatchRepoDigestOrExact\".",
-}
-
-func (ImageSigstoreVerificationPolicy) SwaggerDoc() map[string]string {
-	return map_ImageSigstoreVerificationPolicy
-}
-
-var map_PKICertificateSubject = map[string]string{
-	"":         "PKICertificateSubject defines the requirements imposed on the subject to which the certificate was issued.",
-	"email":    "email specifies the expected email address imposed on the subject to which the certificate was issued, and must match the email address listed in the Subject Alternative Name (SAN) field of the certificate. The email should be a valid email address and at most 320 characters in length.",
-	"hostname": "hostname specifies the expected hostname imposed on the subject to which the certificate was issued, and it must match the hostname listed in the Subject Alternative Name (SAN) DNS field of the certificate. The hostname should be a valid dns 1123 subdomain name, optionally prefixed by '*.', and at most 253 characters in length. It should consist only of lowercase alphanumeric characters, hyphens, periods and the optional preceding asterisk.",
-}
-
-func (PKICertificateSubject) SwaggerDoc() map[string]string {
-	return map_PKICertificateSubject
-}
-
-var map_PolicyFulcioSubject = map[string]string{
-	"":            "PolicyFulcioSubject defines the OIDC issuer and the email of the Fulcio authentication configuration.",
-	"oidcIssuer":  "oidcIssuer contains the expected OIDC issuer. It will be verified that the Fulcio-issued certificate contains a (Fulcio-defined) certificate extension pointing at this OIDC issuer URL. When Fulcio issues certificates, it includes a value based on an URL inside the client-provided ID token. Example: \"https://expected.OIDC.issuer/\"",
-	"signedEmail": "signedEmail holds the email address the the Fulcio certificate is issued for. Example: \"expected-signing-user@example.com\"",
-}
-
-func (PolicyFulcioSubject) SwaggerDoc() map[string]string {
-	return map_PolicyFulcioSubject
-}
-
-var map_PolicyIdentity = map[string]string{
-	"":                "PolicyIdentity defines image identity the signature claims about the image. When omitted, the default matchPolicy is \"MatchRepoDigestOrExact\".",
-	"matchPolicy":     "matchPolicy sets the type of matching to be used. Valid values are \"MatchRepoDigestOrExact\", \"MatchRepository\", \"ExactRepository\", \"RemapIdentity\". When omitted, the default value is \"MatchRepoDigestOrExact\". If set matchPolicy to ExactRepository, then the exactRepository must be specified. If set matchPolicy to RemapIdentity, then the remapIdentity must be specified. \"MatchRepoDigestOrExact\" means that the identity in the signature must be in the same repository as the image identity if the image identity is referenced by a digest. Otherwise, the identity in the signature must be the same as the image identity. \"MatchRepository\" means that the identity in the signature must be in the same repository as the image identity. \"ExactRepository\" means that the identity in the signature must be in the same repository as a specific identity specified by \"repository\". \"RemapIdentity\" means that the signature must be in the same as the remapped image identity. Remapped image identity is obtained by replacing the \"prefix\" with the specified “signedPrefix” if the the image identity matches the specified remapPrefix.",
-	"exactRepository": "exactRepository is required if matchPolicy is set to \"ExactRepository\".",
-	"remapIdentity":   "remapIdentity is required if matchPolicy is set to \"RemapIdentity\".",
-}
-
-func (PolicyIdentity) SwaggerDoc() map[string]string {
-	return map_PolicyIdentity
-}
-
-var map_PolicyMatchExactRepository = map[string]string{
-	"repository": "repository is the reference of the image identity to be matched. The value should be a repository name (by omitting the tag or digest) in a registry implementing the \"Docker Registry HTTP API V2\". For example, docker.io/library/busybox",
-}
-
-func (PolicyMatchExactRepository) SwaggerDoc() map[string]string {
-	return map_PolicyMatchExactRepository
-}
-
-var map_PolicyMatchRemapIdentity = map[string]string{
-	"prefix":       "prefix is the prefix of the image identity to be matched. If the image identity matches the specified prefix, that prefix is replaced by the specified “signedPrefix” (otherwise it is used as unchanged and no remapping takes place). This useful when verifying signatures for a mirror of some other repository namespace that preserves the vendor’s repository structure. The prefix and signedPrefix values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces, or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form. For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.",
-	"signedPrefix": "signedPrefix is the prefix of the image identity to be matched in the signature. The format is the same as \"prefix\". The values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces, or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form. For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.",
-}
-
-func (PolicyMatchRemapIdentity) SwaggerDoc() map[string]string {
-	return map_PolicyMatchRemapIdentity
-}
-
-var map_PolicyRootOfTrust = map[string]string{
-	"":                  "PolicyRootOfTrust defines the root of trust based on the selected policyType.",
-	"policyType":        "policyType serves as the union's discriminator. Users are required to assign a value to this field, choosing one of the policy types that define the root of trust. \"PublicKey\" indicates that the policy relies on a sigstore publicKey and may optionally use a Rekor verification. \"FulcioCAWithRekor\" indicates that the policy is based on the Fulcio certification and incorporates a Rekor verification. \"PKI\" indicates that the policy is based on the certificates from Bring Your Own Public Key Infrastructure (BYOPKI). This value is enabled by turning on the SigstoreImageVerificationPKI feature gate.",
-	"publicKey":         "publicKey defines the root of trust based on a sigstore public key.",
-	"fulcioCAWithRekor": "fulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key. For more information about Fulcio and Rekor, please refer to the document at: https://github.com/sigstore/fulcio and https://github.com/sigstore/rekor",
-	"pki":               "pki defines the root of trust based on Bring Your Own Public Key Infrastructure (BYOPKI) Root CA(s) and corresponding intermediate certificates.",
-}
-
-func (PolicyRootOfTrust) SwaggerDoc() map[string]string {
-	return map_PolicyRootOfTrust
 }
 
 var map_GatherConfig = map[string]string{
@@ -484,6 +865,112 @@ var map_Storage = map[string]string{
 
 func (Storage) SwaggerDoc() map[string]string {
 	return map_Storage
+}
+
+var map_CertificateConfig = map[string]string{
+	"":    "CertificateConfig specifies configuration parameters for certificates. At least one property must be specified.",
+	"key": "key specifies the cryptographic parameters for the certificate's key pair. Currently this is the only configurable parameter. When omitted in an overrides entry, the key configuration from defaults is used.",
+}
+
+func (CertificateConfig) SwaggerDoc() map[string]string {
+	return map_CertificateConfig
+}
+
+var map_CustomPKIPolicy = map[string]string{
+	"": "CustomPKIPolicy contains administrator-specified cryptographic configuration. Administrators must specify defaults for all certificates and may optionally override specific categories of certificates.",
+}
+
+func (CustomPKIPolicy) SwaggerDoc() map[string]string {
+	return map_CustomPKIPolicy
+}
+
+var map_DefaultCertificateConfig = map[string]string{
+	"":    "DefaultCertificateConfig specifies the default certificate configuration parameters. All fields are required to ensure that defaults are fully specified for all certificates.",
+	"key": "key specifies the cryptographic parameters for the certificate's key pair. This field is required in defaults to ensure all certificates have a well-defined key configuration.",
+}
+
+func (DefaultCertificateConfig) SwaggerDoc() map[string]string {
+	return map_DefaultCertificateConfig
+}
+
+var map_ECDSAKeyConfig = map[string]string{
+	"":      "ECDSAKeyConfig specifies parameters for ECDSA key generation.",
+	"curve": "curve specifies the NIST elliptic curve for ECDSA keys. Valid values are \"P256\", \"P384\", and \"P521\".\n\nWhen set to P256, the NIST P-256 curve (also known as secp256r1) is used, providing 128-bit security.\n\nWhen set to P384, the NIST P-384 curve (also known as secp384r1) is used, providing 192-bit security.\n\nWhen set to P521, the NIST P-521 curve (also known as secp521r1) is used, providing 256-bit security.",
+}
+
+func (ECDSAKeyConfig) SwaggerDoc() map[string]string {
+	return map_ECDSAKeyConfig
+}
+
+var map_KeyConfig = map[string]string{
+	"":          "KeyConfig specifies cryptographic parameters for key generation.",
+	"algorithm": "algorithm specifies the key generation algorithm. Valid values are \"RSA\" and \"ECDSA\".\n\nWhen set to RSA, the rsa field must be specified and the generated key will be an RSA key with the configured key size.\n\nWhen set to ECDSA, the ecdsa field must be specified and the generated key will be an ECDSA key using the configured elliptic curve.",
+	"rsa":       "rsa specifies RSA key parameters. Required when algorithm is RSA, and forbidden otherwise.",
+	"ecdsa":     "ecdsa specifies ECDSA key parameters. Required when algorithm is ECDSA, and forbidden otherwise.",
+}
+
+func (KeyConfig) SwaggerDoc() map[string]string {
+	return map_KeyConfig
+}
+
+var map_PKI = map[string]string{
+	"":         "PKI configures cryptographic parameters for certificates generated internally by OpenShift components.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+}
+
+func (PKI) SwaggerDoc() map[string]string {
+	return map_PKI
+}
+
+var map_PKICertificateManagement = map[string]string{
+	"":       "PKICertificateManagement determines whether components use hardcoded defaults (Unmanaged), follow OpenShift best practices (Default), or use administrator-specified cryptographic parameters (Custom). This provides flexibility for organizations with specific compliance requirements or security policies while maintaining backwards compatibility for existing clusters.",
+	"mode":   "mode determines how PKI configuration is managed. Valid values are \"Unmanaged\", \"Default\", and \"Custom\".\n\nWhen set to Unmanaged, components use their existing hardcoded certificate generation behavior, exactly as if this feature did not exist. Each component generates certificates using whatever parameters it was using before this feature. While most components use RSA 2048, some may use different parameters. Use of this mode might prevent upgrading to the next major OpenShift release.\n\nWhen set to Default, OpenShift-recommended best practices for certificate generation are applied. The specific parameters may evolve across OpenShift releases to adopt improved cryptographic standards. In the initial release, this matches Unmanaged behavior for each component. In future releases, this may adopt ECDSA or larger RSA keys based on industry best practices. Recommended for most customers who want to benefit from security improvements automatically.\n\nWhen set to Custom, the certificate management parameters can be set explicitly. Use the custom field to specify certificate generation parameters.",
+	"custom": "custom contains administrator-specified cryptographic configuration. Use the defaults and category override fields to specify certificate generation parameters. Required when mode is Custom, and forbidden otherwise.",
+}
+
+func (PKICertificateManagement) SwaggerDoc() map[string]string {
+	return map_PKICertificateManagement
+}
+
+var map_PKIList = map[string]string{
+	"":         "PKIList is a collection of PKI resources.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is a list of PKI resources",
+}
+
+func (PKIList) SwaggerDoc() map[string]string {
+	return map_PKIList
+}
+
+var map_PKIProfile = map[string]string{
+	"":                    "PKIProfile defines the certificate generation parameters that OpenShift components use to create certificates. Category overrides take precedence over defaults.",
+	"defaults":            "defaults specifies the default certificate configuration that applies to all certificates unless overridden by a category override.",
+	"signerCertificates":  "signerCertificates optionally overrides certificate parameters for certificate authority (CA) certificates that sign other certificates. When set, these parameters take precedence over defaults for all signer certificates. When omitted, the defaults are used for signer certificates.",
+	"servingCertificates": "servingCertificates optionally overrides certificate parameters for TLS server certificates used to serve HTTPS endpoints. When set, these parameters take precedence over defaults for all serving certificates. When omitted, the defaults are used for serving certificates.",
+	"clientCertificates":  "clientCertificates optionally overrides certificate parameters for client authentication certificates used to authenticate to servers. When set, these parameters take precedence over defaults for all client certificates. When omitted, the defaults are used for client certificates.",
+}
+
+func (PKIProfile) SwaggerDoc() map[string]string {
+	return map_PKIProfile
+}
+
+var map_PKISpec = map[string]string{
+	"":                      "PKISpec holds the specification for PKI configuration.",
+	"certificateManagement": "certificateManagement specifies how PKI configuration is managed for internally-generated certificates. This controls the certificate generation approach for all OpenShift components that create certificates internally, including certificate authorities, serving certificates, and client certificates.",
+}
+
+func (PKISpec) SwaggerDoc() map[string]string {
+	return map_PKISpec
+}
+
+var map_RSAKeyConfig = map[string]string{
+	"":        "RSAKeyConfig specifies parameters for RSA key generation.",
+	"keySize": "keySize specifies the size of RSA keys in bits. Valid values are multiples of 1024 from 2048 to 8192.",
+}
+
+func (RSAKeyConfig) SwaggerDoc() map[string]string {
+	return map_RSAKeyConfig
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
