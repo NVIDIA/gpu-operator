@@ -1,0 +1,315 @@
+{{- $globalEnabled := .Values.networkPolicy.enabled | default false -}}
+{{- $globalFrom := .Values.networkPolicy.ingress.from | default (list) -}}
+{{- $globalPorts := .Values.networkPolicy.ingress.ports | default (list) -}}
+{{- $nfd := (index .Values "node-feature-discovery") | default dict -}}
+{{- $nfdName := (get $nfd "nameOverride") | default "node-feature-discovery" -}}
+{{- $state := dict "denyAll" false -}}
+
+{{- $operatorNP := .Values.operator.networkPolicy | default dict -}}
+{{- if or $globalEnabled ($operatorNP.enabled | default false) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $operatorIngress := $operatorNP.ingress | default dict -}}
+{{- $operatorFrom := concat $globalFrom ($operatorIngress.from | default (list)) -}}
+{{- $operatorPorts := concat ($operatorIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $operatorPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: "gpu-operator"
+      app: "gpu-operator"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $operatorFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $operatorPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $dcgmNP := .Values.dcgmExporter.networkPolicy | default dict -}}
+{{- if and (.Values.dcgmExporter.enabled | default false) (or $globalEnabled ($dcgmNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $dcgmIngress := $dcgmNP.ingress | default dict -}}
+{{- $dcgmFrom := concat $globalFrom ($dcgmIngress.from | default (list)) -}}
+{{- $dcgmPorts := concat ($dcgmIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $dcgmPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-dcgm-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "dcgm-exporter"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app: "nvidia-dcgm-exporter"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $dcgmFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $dcgmPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nodeStatusNP := .Values.nodeStatusExporter.networkPolicy | default dict -}}
+{{- if and (.Values.nodeStatusExporter.enabled | default false) (or $globalEnabled ($nodeStatusNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nodeStatusIngress := $nodeStatusNP.ingress | default dict -}}
+{{- $nodeStatusFrom := concat $globalFrom ($nodeStatusIngress.from | default (list)) -}}
+{{- $nodeStatusPorts := concat ($nodeStatusIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nodeStatusPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-node-status-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "node-status-exporter"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app: "nvidia-node-status-exporter"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nodeStatusFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nodeStatusPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nfdMaster := (get $nfd "master") | default dict -}}
+{{- $nfdMasterNP := $nfdMaster.networkPolicy | default dict -}}
+{{- if and (.Values.nfd.enabled | default false) ($nfdMaster.enable | default false) (or $globalEnabled ($nfdMasterNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nfdMasterIngress := $nfdMasterNP.ingress | default dict -}}
+{{- $nfdMasterFrom := concat $globalFrom ($nfdMasterIngress.from | default (list)) -}}
+{{- $nfdMasterPorts := concat ($nfdMasterIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nfdMasterPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-nfd-master
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "nfd-master"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $nfdName | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      role: "master"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nfdMasterFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nfdMasterPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nfdWorker := (get $nfd "worker") | default dict -}}
+{{- $nfdWorkerNP := $nfdWorker.networkPolicy | default dict -}}
+{{- if and (.Values.nfd.enabled | default false) ($nfdWorker.enable | default false) (or $globalEnabled ($nfdWorkerNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nfdWorkerIngress := $nfdWorkerNP.ingress | default dict -}}
+{{- $nfdWorkerFrom := concat $globalFrom ($nfdWorkerIngress.from | default (list)) -}}
+{{- $nfdWorkerPorts := concat ($nfdWorkerIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nfdWorkerPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-nfd-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "nfd-worker"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $nfdName | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      role: "worker"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nfdWorkerFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nfdWorkerPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nfdGC := (get $nfd "gc") | default dict -}}
+{{- $nfdGCNP := $nfdGC.networkPolicy | default dict -}}
+{{- if and (.Values.nfd.enabled | default false) ($nfdGC.enable | default false) (or $globalEnabled ($nfdGCNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nfdGCIngress := $nfdGCNP.ingress | default dict -}}
+{{- $nfdGCFrom := concat $globalFrom ($nfdGCIngress.from | default (list)) -}}
+{{- $nfdGCPorts := concat ($nfdGCIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nfdGCPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-nfd-gc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "nfd-gc"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $nfdName | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      role: "gc"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nfdGCFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nfdGCPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nfdTopology := (get $nfd "topologyUpdater") | default dict -}}
+{{- $nfdTopologyNP := $nfdTopology.networkPolicy | default dict -}}
+{{- if and (.Values.nfd.enabled | default false) ($nfdTopology.enable | default false) (or $globalEnabled ($nfdTopologyNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nfdTopologyIngress := $nfdTopologyNP.ingress | default dict -}}
+{{- $nfdTopologyFrom := concat $globalFrom ($nfdTopologyIngress.from | default (list)) -}}
+{{- $nfdTopologyPorts := concat ($nfdTopologyIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nfdTopologyPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-nfd-topology-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "nfd-topology-updater"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $nfdName | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      role: "topology-updater"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nfdTopologyFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nfdTopologyPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+{{- if (get $state "denyAll") }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-deny-all-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress: []
+{{- end }}
+
