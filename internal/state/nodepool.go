@@ -29,20 +29,22 @@ import (
 )
 
 const (
-	nfdKernelLabelKey        = "feature.node.kubernetes.io/kernel-version.full"
-	nfdOSTreeVersionLabelKey = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
+	nfdKernelLabelKey                    = "feature.node.kubernetes.io/kernel-version.full"
+	nfdKernelConfigMemoryHotplugLabelKey = "feature.node.kubernetes.io/kernel-config.MEMORY_HOTPLUG"
+	nfdOSTreeVersionLabelKey             = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 )
 
 // TODO: move this code to it's own module?
 // TODO: add unit tests
 type nodePool struct {
-	name         string
-	osRelease    string
-	osVersion    string
-	osTag        string
-	rhcosVersion string
-	kernel       string
-	nodeSelector map[string]string
+	name                    string
+	osRelease               string
+	osVersion               string
+	osTag                   string
+	rhcosVersion            string
+	kernel                  string
+	nodeSelector            map[string]string
+	memoryHotplugAutoOnline bool
 }
 
 // getNodePools partitions nodes into one or more node pools. The list of nodes to partition
@@ -80,6 +82,7 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 		nodePool := nodePool{}
 		nodePool.nodeSelector = make(map[string]string)
 		maps.Copy(nodePool.nodeSelector, nodeSelector)
+		nodePool.memoryHotplugAutoOnline = nodeLabels[nfdKernelConfigMemoryHotplugLabelKey] == "true"
 
 		osID, ok := nodeLabels[nfdOSReleaseIDLabelKey]
 		if !ok {
@@ -126,10 +129,14 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 			nodePool.name = rhcosVersion
 		}
 
-		if _, exists := nodePoolMap[nodePool.name]; !exists {
-			logger.Info("Detected new node pool", "NodePool", nodePool)
-			nodePoolMap[nodePool.name] = nodePool
+		if existing, exists := nodePoolMap[nodePool.name]; exists {
+			existing.memoryHotplugAutoOnline = existing.memoryHotplugAutoOnline && nodePool.memoryHotplugAutoOnline
+			nodePoolMap[nodePool.name] = existing
+			continue
 		}
+
+		logger.Info("Detected new node pool", "NodePool", nodePool)
+		nodePoolMap[nodePool.name] = nodePool
 	}
 
 	var nodePools []nodePool
