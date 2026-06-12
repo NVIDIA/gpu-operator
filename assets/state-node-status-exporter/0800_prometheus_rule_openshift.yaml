@@ -10,7 +10,10 @@ spec:
   - name: Alert on node deployment failure
     rules:
     - alert: GPUOperatorNodeDeploymentFailed
-      # There is no GPU exposed on the node,
+      # There is no GPU exposed on the node.
+      # When the device plugin is intentionally disabled in the ClusterPolicy
+      # (devicePlugin.enabled: false), the metric is set to -1, so this
+      # alert will not fire in that case.
       expr: |
         gpu_operator_node_device_plugin_devices_total == 0
       for: 30m
