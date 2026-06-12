@@ -1,0 +1,32 @@
+# kind cluster for the autoscaling simulation. Both workers register with
+# the GPU node label and the startup taint already in place, the way a
+# cloud node pool template provisions nodes: there is no window where the
+# node is schedulable before the taint exists.
+#
+# Two workers are required: kindscaler.sh clones <cluster>-worker2 as the
+# template when adding nodes.
+#
+# Adapted from the node-readiness-controller testing setup
+# (config/testing/kind/kind-3node-config.yaml in
+# kubernetes-sigs/node-readiness-controller).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: gpu-sim
+nodes:
+  - role: control-plane
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "nvidia.com/gpu.present=true"
+            register-with-taints: "readiness.k8s.io/nvidia-gpu-not-ready=pending:NoSchedule"
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "nvidia.com/gpu.present=true"
+            register-with-taints: "readiness.k8s.io/nvidia-gpu-not-ready=pending:NoSchedule"
