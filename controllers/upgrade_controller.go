@@ -47,6 +47,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
@@ -231,10 +232,38 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 	return nil
 }
 
+// driverPodRestartOnly is the upgrade controller's RestartOnlyPredicate: it allows an
+// out-of-sync driver pod to be restarted in place when the running pod and the desired
+// DaemonSet have the same DRIVER_CONFIG_DIGEST, i.e. the install-relevant config is
+// unchanged (e.g. only a helm.sh/chart label changed). If either digest is missing, it
+// returns false and the node takes the full upgrade flow.
+func (r *UpgradeReconciler) driverPodRestartOnly(_ context.Context, pod *corev1.Pod, ds *appsv1.DaemonSet) (bool, error) {
+	if pod == nil || ds == nil {
+		return false, nil
+	}
+	desired := driverconfig.DriverConfigDigestFromPodSpec(&ds.Spec.Template.Spec)
+	running := driverconfig.DriverConfigDigestFromPodSpec(&pod.Spec)
+	if desired == "" || running == "" {
+		r.Log.V(consts.LogLevelDebug).Info("driver config digest missing; taking full upgrade flow",
+			"pod", pod.Name, "daemonset", ds.Name, "desiredDigest", desired, "runningDigest", running)
+		return false, nil
+	}
+	restartOnly := desired == running
+	r.Log.V(consts.LogLevelDebug).Info("evaluated driver config digest for restart-only routing",
+		"pod", pod.Name, "daemonset", ds.Name,
+		"desiredDigest", desired, "runningDigest", running, "restartOnly", restartOnly)
+	return restartOnly, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 //
 //nolint:dupl
 func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	// Route digest-unchanged driver pod-template changes to a restart-only upgrade.
+	if r.StateManager != nil {
+		r.StateManager = r.StateManager.WithRestartOnlyPredicate(r.driverPodRestartOnly)
+	}
+
 	// Create a new controller
 	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1,
 		RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR)})

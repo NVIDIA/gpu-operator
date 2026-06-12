@@ -17,11 +17,17 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+
+	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 )
 
 func TestSetDrainSpecPodSelector(t *testing.T) {
@@ -66,6 +72,47 @@ func TestSetDrainSpecPodSelector(t *testing.T) {
 
 			assert.NotNil(t, upgradePolicy.DrainSpec)
 			assert.Equal(t, tt.expectedSelector, upgradePolicy.DrainSpec.PodSelector)
+		})
+	}
+}
+
+func TestDriverPodRestartOnly(t *testing.T) {
+	driverPod := func(digest string) *corev1.Pod {
+		return &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+			Name: "nvidia-driver-ctr",
+			Env:  []corev1.EnvVar{{Name: driverconfig.DriverConfigDigestEnvName, Value: digest}},
+		}}}}
+	}
+	driverDS := func(digest string) *appsv1.DaemonSet {
+		return &appsv1.DaemonSet{Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				Name: "nvidia-driver-ctr",
+				Env:  []corev1.EnvVar{{Name: driverconfig.DriverConfigDigestEnvName, Value: digest}},
+			}}},
+		}}}
+	}
+
+	r := &UpgradeReconciler{Log: logr.Discard()}
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		pod         *corev1.Pod
+		ds          *appsv1.DaemonSet
+		wantRestart bool
+	}{
+		{name: "equal digests -> restart-only", pod: driverPod("same"), ds: driverDS("same"), wantRestart: true},
+		{name: "differing digests -> full upgrade", pod: driverPod("old"), ds: driverDS("new"), wantRestart: false},
+		{name: "missing digest on pod -> full upgrade", pod: driverPod(""), ds: driverDS("new"), wantRestart: false},
+		{name: "missing digest on daemonset -> full upgrade", pod: driverPod("old"), ds: driverDS(""), wantRestart: false},
+		{name: "nil pod -> full upgrade", pod: nil, ds: driverDS("x"), wantRestart: false},
+		{name: "nil daemonset -> full upgrade", pod: driverPod("x"), ds: nil, wantRestart: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := r.driverPodRestartOnly(ctx, tt.pod, tt.ds)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantRestart, got)
 		})
 	}
 }
