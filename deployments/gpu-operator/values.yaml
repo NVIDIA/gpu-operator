@@ -12,6 +12,15 @@ nfd:
 psa:
   enabled: false
 
+networkPolicy:
+  enabled: false
+  labels: {}
+  annotations: {}
+  ingress:
+    from: []
+    # Ports to allow on all enabled component policies as native NetworkPolicyPort objects.
+    ports: []
+
 cdi:
   enabled: true
   nriPluginEnabled: false
@@ -115,6 +124,13 @@ operator:
     requests:
       cpu: 200m
       memory: 100Mi
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 8080
+          protocol: TCP
   # metrics:
   #   serviceMonitor:
   #     interval: 15s
@@ -304,6 +320,13 @@ dcgmExporter:
   resources: {}
   hostPID: false
   hostNetwork: false
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 9400
+          protocol: TCP
   # HPC job mapping configuration for correlating GPU metrics with HPC workload manager jobs
   # This is used by HPC workload managers like Slurm to label GPU metrics with job IDs
   # hpcJobMapping:
@@ -437,6 +460,13 @@ nodeStatusExporter:
   imagePullSecrets: []
   resources: {}
   hostNetwork: false
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 8000
+          protocol: TCP
 
 gds:
   enabled: false
@@ -565,11 +595,25 @@ node-feature-discovery:
   priorityClassName: system-node-critical
   gc:
     enable: true
+    networkPolicy:
+      enabled: false
+      ingress:
+        from: []
+        ports:
+          - port: 8080
+            protocol: TCP
     replicaCount: 1
     serviceAccount:
       name: node-feature-discovery
       create: false
   worker:
+    networkPolicy:
+      enabled: false
+      ingress:
+        from: []
+        ports:
+          - port: 8080
+            protocol: TCP
     serviceAccount:
       name: node-feature-discovery
       # disable creation to avoid duplicate serviceaccount creation by master spec below
@@ -594,6 +638,13 @@ node-feature-discovery:
           deviceLabelFields:
           - vendor
   master:
+    networkPolicy:
+      enabled: false
+      ingress:
+        from: []
+        ports:
+          - port: 8080
+            protocol: TCP
     serviceAccount:
       name: node-feature-discovery
       create: true
@@ -603,3 +654,11 @@ node-feature-discovery:
       # resourceLabels: ["nvidia.com/feature-1","nvidia.com/feature-2"]
       # enableTaints: false
       # labelWhiteList: "nvidia.com/gpu"
+  topologyUpdater:
+    networkPolicy:
+      enabled: false
+      ingress:
+        from: []
+        ports:
+          - port: 8080
+            protocol: TCP
