@@ -1,0 +1,253 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin
+  namespace: gpu-operator
+  labels:
+    helm.sh/chart: nvidia-dra-driver-26.4.0-dev
+    app.kubernetes.io/version: 26.4.0-dev
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nvidia-dra-driver
+    app.kubernetes.io/instance: nvidia-dra-driver
+    app: nvidia-dra-driver-kubelet-plugin
+spec:
+  selector:
+    matchLabels:
+      nvidia-dra-driver-component: kubelet-plugin
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nvidia-dra-driver
+        app.kubernetes.io/instance: nvidia-dra-driver
+        nvidia-dra-driver-component: kubelet-plugin
+        app: nvidia-dra-driver-kubelet-plugin
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dra-driver-kubeletplugin
+      securityContext: {}
+      initContainers:
+      - name: init-container
+        image: FILLED BY THE OPERATOR
+        securityContext:
+          privileged: true
+        command:
+        - bash
+        - "/usr/bin/kubelet-plugin-prestart.sh"
+        env:
+        - name: NVIDIA_DRIVER_ROOT
+          value: "/run/nvidia/driver"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins_registry"
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins"
+        volumeMounts:
+        - name: driver-root-parent
+          mountPath: "/driver-root-parent"
+          mountPropagation: HostToContainer
+      containers:
+      - name: compute-domains
+        securityContext:
+          privileged: true
+        image: FILLED BY THE OPERATOR
+        imagePullPolicy: IfNotPresent
+        command:
+        - bash
+        - "-c"
+        args:
+        - |-
+          # Conditionally mask the params file to prevent this container from
+          # recreating any missing GPU device nodes. This is necessary, for
+          # example, when running under nvkind to limit the set GPUs governed
+          # by the plugin even though it has cgroup access to all of them.
+          if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+            cp /proc/driver/nvidia/params /root/gpu-params
+            sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' /root/gpu-params
+            mount --bind /root/gpu-params /proc/driver/nvidia/params
+          fi
+          compute-domain-kubelet-plugin -v $(LOG_VERBOSITY)
+        resources: {}
+        startupProbe:
+          grpc:
+            port: 51515
+            service: liveness
+          failureThreshold: 600
+          periodSeconds: 1
+          timeoutSeconds: 10
+        livenessProbe:
+          grpc:
+            port: 51515
+            service: liveness
+          failureThreshold: 3
+          periodSeconds: 10
+          timeoutSeconds: 10
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8081"
+        - name: METRICS_PATH
+          value: "/metrics"
+        - name: LOG_VERBOSITY
+          value: '4'
+        - name: MASK_NVIDIA_DRIVER_PARAMS
+          value: ''
+        - name: NVIDIA_DRIVER_ROOT
+          value: "/run/nvidia/driver"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: CDI_ROOT
+          value: "/var/run/cdi"
+        - name: NVIDIA_MIG_CONFIG_DEVICES
+          value: all
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins_registry"
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins"
+        - name: HEALTHCHECK_PORT
+          value: '51515'
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: "/var/lib/kubelet/plugins_registry"
+        - name: plugins
+          mountPath: "/var/lib/kubelet/plugins"
+          mountPropagation: Bidirectional
+        - name: cdi
+          mountPath: "/var/run/cdi"
+        - name: driver-root
+          mountPath: "/driver-root"
+          readOnly: true
+          mountPropagation: HostToContainer
+      - name: gpus
+        securityContext:
+          privileged: true
+        image: FILLED BY THE OPERATOR
+        imagePullPolicy: IfNotPresent
+        command:
+        - bash
+        - "-c"
+        args:
+        - |-
+          # Conditionally mask the params file to prevent this container from
+          # recreating any missing GPU device nodes. This is necessary, for
+          # example, when running under nvkind to limit the set GPUs governed
+          # by the plugin even though it has cgroup access to all of them.
+          if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+            cp /proc/driver/nvidia/params /root/gpu-params
+            sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' /root/gpu-params
+            mount --bind /root/gpu-params /proc/driver/nvidia/params
+          fi
+          gpu-kubelet-plugin -v $(LOG_VERBOSITY)
+        resources: {}
+        startupProbe:
+          grpc:
+            port: 51516
+            service: liveness
+          failureThreshold: 600
+          periodSeconds: 1
+          timeoutSeconds: 10
+        livenessProbe:
+          grpc:
+            port: 51516
+            service: liveness
+          failureThreshold: 3
+          periodSeconds: 30
+          timeoutSeconds: 10
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8080"
+        - name: METRICS_PATH
+          value: "/metrics"
+        - name: LOG_VERBOSITY
+          value: '4'
+        - name: MASK_NVIDIA_DRIVER_PARAMS
+          value: ''
+        - name: NVIDIA_DRIVER_ROOT
+          value: "/run/nvidia/driver"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: CDI_ROOT
+          value: "/var/run/cdi"
+        - name: NVIDIA_MIG_CONFIG_DEVICES
+          value: all
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: IMAGE_NAME
+          value: FILLED BY THE OPERATOR
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins_registry"
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins"
+        - name: HEALTHCHECK_PORT
+          value: '51516'
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: "/var/lib/kubelet/plugins_registry"
+        - name: plugins
+          mountPath: "/var/lib/kubelet/plugins"
+          mountPropagation: Bidirectional
+        - name: cdi
+          mountPath: "/var/run/cdi"
+        - name: driver-root
+          mountPath: "/driver-root"
+          mountPropagation: HostToContainer
+      volumes:
+      - name: plugins-registry
+        hostPath:
+          path: "/var/lib/kubelet/plugins_registry"
+      - name: plugins
+        hostPath:
+          path: "/var/lib/kubelet/plugins"
+      - name: cdi
+        hostPath:
+          path: "/var/run/cdi"
+      - name: driver-root-parent
+        hostPath:
+          path: "/run/nvidia"
+          type: DirectoryOrCreate
+      - name: driver-root
+        hostPath:
+          path: "/run/nvidia/driver"
+          type: DirectoryOrCreate
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/pci-10de.present
+                operator: In
+                values:
+                - 'true'
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/cpu-model.vendor_id
+                operator: In
+                values:
+                - NVIDIA
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: In
+                values:
+                - 'true'
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      nodeSelector:
+        nvidia.com/gpu.deploy.dra-driver-kubelet-plugin: 'true'

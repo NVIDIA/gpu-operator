@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dra-driver-role-binding-controller
+  namespace: gpu-operator
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-controller
+  namespace: gpu-operator
+roleRef:
+  kind: Role
+  name: nvidia-dra-driver-role-controller
+  apiGroup: rbac.authorization.k8s.io

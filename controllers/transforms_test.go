@@ -200,6 +200,36 @@ func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
 	return d
 }
 
+// _Deployment is a Deployment wrapper used for testing
+type _Deployment struct {
+	*appsv1.Deployment
+}
+
+func NewDeployment() _Deployment {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-deployment",
+			Namespace: "test-ns",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{},
+			},
+		},
+	}
+	return _Deployment{deployment}
+}
+
+func (d _Deployment) WithContainer(container corev1.Container) _Deployment {
+	d.Spec.Template.Spec.Containers = append(d.Spec.Template.Spec.Containers, container)
+	return d
+}
+
+func (d _Deployment) WithTolerations(tolerations []corev1.Toleration) _Deployment {
+	d.Spec.Template.Spec.Tolerations = tolerations
+	return d
+}
+
 // Pod is a Pod wrapper used for testing
 type Pod struct {
 	*corev1.Pod
@@ -4846,4 +4876,409 @@ func TestHashDriverInstallConfigZeroFieldInvariant(t *testing.T) {
 	changedDigest := utils.GetObjectHashIgnoreEmptyKeys(extended)
 	assert.NotEqual(t, originalDigest, changedDigest,
 		"a non-zero new field should change the digest")
+}
+
+func TestTransformDRADriverKubeletPlugin(t *testing.T) {
+	testCases := []struct {
+		description   string
+		ds            Daemonset
+		cpSpec        *gpuv1.ClusterPolicySpec
+		expectedDs    Daemonset
+		errorExpected bool
+	}{
+		{
+			description: "empty dra driver spec",
+			ds:          NewDaemonset(),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DRADriver: gpuv1.DRADriverSpec{},
+			},
+			expectedDs:    NewDaemonset(),
+			errorExpected: true,
+		},
+		{
+			description: "full dra driver spec, gpus and compute domains enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithContainer(corev1.Container{Name: "compute-domains"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{InstallDir: "/usr/local/nvidia"},
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(true),
+						KubeletPlugin: gpuv1.DRADriverKubeletPlugin{
+							Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+							Resources: &gpuv1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("50m"),
+									corev1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(true),
+						KubeletPlugin: gpuv1.DRADriverKubeletPlugin{
+							Env: []gpuv1.EnvVar{
+								{Name: "foo", Value: "bar"},
+							},
+							Resources: &gpuv1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("50m"),
+									corev1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "gpus",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: NvidiaCTKPathEnvName, Value: "/usr/local/nvidia/toolkit/nvidia-ctk"},
+						{Name: "IMAGE_NAME", Value: "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0"},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "compute-domains",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: NvidiaCTKPathEnvName, Value: "/usr/local/nvidia/toolkit/nvidia-ctk"},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+				}),
+		},
+		{
+			description: "gpus enabled, compute domains disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithContainer(corev1.Container{Name: "compute-domains"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{InstallDir: "/usr/local/nvidia"},
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(true),
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(false),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "gpus",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: NvidiaCTKPathEnvName, Value: "/usr/local/nvidia/toolkit/nvidia-ctk"},
+						{Name: "IMAGE_NAME", Value: "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0"},
+					},
+				}),
+		},
+		{
+			description: "gpus disabled, compute domains enabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithContainer(corev1.Container{Name: "compute-domains"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Toolkit: gpuv1.ToolkitSpec{InstallDir: "/usr/local/nvidia"},
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(false),
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(true),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name:            "compute-domains",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: NvidiaCTKPathEnvName, Value: "/usr/local/nvidia/toolkit/nvidia-ctk"},
+					},
+				}),
+		},
+		{
+			description: "custom driver root updates init container and volumes",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "init-container"}).
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithHostPathVolume("driver-root", DefaultDriverInstallDir, ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("driver-root-parent", "/run/nvidia", ptr.To(corev1.HostPathDirectoryOrCreate)),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				HostPaths: gpuv1.HostPathsSpec{DriverInstallDir: "/opt/nvidia/driver"},
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(true),
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(false),
+					},
+				},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "init-container",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_DRIVER_ROOT", Value: "/opt/nvidia/driver"},
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "gpus",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "NVIDIA_DRIVER_ROOT", Value: "/opt/nvidia/driver"},
+						{Name: NvidiaCTKPathEnvName, Value: "toolkit/nvidia-ctk"},
+						{Name: "IMAGE_NAME", Value: "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0"},
+					},
+				}).
+				WithHostPathVolume("driver-root", "/opt/nvidia/driver", ptr.To(corev1.HostPathDirectoryOrCreate)).
+				WithHostPathVolume("driver-root-parent", "/opt/nvidia", ptr.To(corev1.HostPathDirectoryOrCreate)),
+		},
+		{
+			description: "gpus disabled, compute domains disabled",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "gpus"}).
+				WithContainer(corev1.Container{Name: "compute-domains"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					GPUs: gpuv1.DRADriverGPUs{
+						Enabled: newBoolPtr(false),
+					},
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(false),
+					},
+				},
+			},
+			expectedDs: NewDaemonset(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDRADriverKubeletPlugin(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestTransformDRADriverController(t *testing.T) {
+	testCases := []struct {
+		description        string
+		deployment         _Deployment
+		cpSpec             *gpuv1.ClusterPolicySpec
+		expectedDeployment _Deployment
+		errorExpected      bool
+	}{
+		{
+			description: "empty dra driver spec",
+			deployment:  NewDeployment(),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DRADriver: gpuv1.DRADriverSpec{},
+			},
+			expectedDeployment: NewDeployment(),
+			errorExpected:      true,
+		},
+		{
+			description: "full dra driver spec",
+			deployment: NewDeployment().
+				WithContainer(corev1.Container{Name: "compute-domain"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DRADriver: gpuv1.DRADriverSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-dra-driver-gpu",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					ComputeDomains: gpuv1.DRADriverComputeDomains{
+						Enabled: newBoolPtr(true),
+						Controller: gpuv1.DRADriverController{
+							Env: []gpuv1.EnvVar{
+								{Name: "foo", Value: "bar"},
+							},
+							Resources: &gpuv1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("50m"),
+									corev1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+							Tolerations: []corev1.Toleration{
+								{
+									Key:      "foo",
+									Operator: corev1.TolerationOpExists,
+									Effect:   corev1.TaintEffectNoSchedule,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedDeployment: NewDeployment().
+				WithTolerations([]corev1.Toleration{
+					{
+						Key:      "foo",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "compute-domain",
+					Image:           "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "IMAGE_NAME", Value: "nvcr.io/nvidia/k8s-dra-driver-gpu:v1.0.0"},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+					},
+				}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			err := TransformDRADriverController(tc.deployment.Deployment, tc.cpSpec)
+			if tc.errorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expectedDeployment, tc.deployment)
+		})
+	}
+}
+
+func TestApplyDRAFeatureGates(t *testing.T) {
+	testCases := []struct {
+		description string
+		gates       map[string]bool
+		initialEnv  []corev1.EnvVar
+		expectedEnv []corev1.EnvVar
+	}{
+		{
+			description: "empty map is a no-op",
+			gates:       map[string]bool{},
+			initialEnv:  []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+			expectedEnv: []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+		},
+		{
+			description: "nil map is a no-op",
+			gates:       nil,
+			initialEnv:  []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+			expectedEnv: []corev1.EnvVar{{Name: "KEEP_ME", Value: "yes"}},
+		},
+		{
+			description: "single gate renders Key=true with trailing comma",
+			gates:       map[string]bool{"NVMLDeviceHealthCheck": true},
+			expectedEnv: []corev1.EnvVar{{Name: "FEATURE_GATES", Value: "NVMLDeviceHealthCheck=true,"}},
+		},
+		{
+			description: "multiple gates render in alphabetical order",
+			gates:       map[string]bool{"DynamicMIG": false, "NVMLDeviceHealthCheck": true, "MPSSupport": true},
+			expectedEnv: []corev1.EnvVar{{Name: "FEATURE_GATES", Value: "DynamicMIG=false,MPSSupport=true,NVMLDeviceHealthCheck=true,"}},
+		},
+		{
+			description: "overwrites existing FEATURE_GATES entry without duplicating",
+			gates:       map[string]bool{"DynamicMIG": true},
+			initialEnv: []corev1.EnvVar{
+				{Name: "FEATURE_GATES", Value: "stale=true,"},
+				{Name: "OTHER", Value: "preserved"},
+			},
+			expectedEnv: []corev1.EnvVar{
+				{Name: "FEATURE_GATES", Value: "DynamicMIG=true,"},
+				{Name: "OTHER", Value: "preserved"},
+			},
+		},
+		{
+			description: "appends FEATURE_GATES when not present, preserves siblings",
+			gates:       map[string]bool{"DynamicMIG": true},
+			initialEnv:  []corev1.EnvVar{{Name: "OTHER", Value: "preserved"}},
+			expectedEnv: []corev1.EnvVar{
+				{Name: "OTHER", Value: "preserved"},
+				{Name: "FEATURE_GATES", Value: "DynamicMIG=true,"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &corev1.Container{Env: tc.initialEnv}
+			applyDRAFeatureGates(c, tc.gates)
+			assert.Equal(t, tc.expectedEnv, c.Env)
+		})
+	}
 }
