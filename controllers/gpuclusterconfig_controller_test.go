@@ -65,7 +65,7 @@ func newGPUClusterConfigReconciler(t *testing.T, objs ...client.Object) (*GPUClu
 // fakeStateManager returns canned SyncState results so the controller tests don't load
 // real manifests. It records the last info catalog passed to SyncState so tests can
 // assert on its entries. GetWatchSources is promoted from the embedded (nil) interface
-// and is never called here — only SetupWithManager calls it, which these tests skip.
+// and is never called here; only SetupWithManager calls it, which these tests skip.
 type fakeStateManager struct {
 	state.Manager
 	results     state.Results
@@ -119,14 +119,22 @@ func TestGPUClusterConfigReconcileNotFound(t *testing.T) {
 
 // A ClusterPolicy in the cluster disables the GPUClusterConfig: the two paths are
 // mutually exclusive, so the DRA stack is not deployed alongside ClusterPolicy.
+// The result requeues so the instance recovers once the ClusterPolicy is removed.
 func TestGPUClusterConfigDisabledByClusterPolicy(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
 	r, c := newGPUClusterConfigReconciler(t, cfg, cp)
 
-	gccReconcile(t, r, cfg.Name)
+	res, err := r.Reconcile(t.Context(), gccRequest(cfg.Name))
+	require.NoError(t, err)
+	require.Positive(t, res.RequeueAfter, "disabled instance must requeue to detect ClusterPolicy removal")
 
 	require.Equal(t, nvidiav1alpha1.Disabled, gccState(t, c, cfg.Name))
+
+	// Removing the ClusterPolicy lets the next reconcile recover the instance.
+	require.NoError(t, c.Delete(t.Context(), cp))
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
 }
 
 func testNode(name string, labels map[string]string) *corev1.Node {

@@ -98,7 +98,10 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, msg); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
-		return ctrl.Result{}, nil
+		// Requeue so the ClusterPolicy's deletion is noticed and the instance
+		// recovers; nothing watches ClusterPolicy here, mirroring the ready-path
+		// resync below.
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
 	// Singleton, first-wins (mirroring ClusterPolicy): the first instance to reconcile
@@ -158,7 +161,7 @@ func (r *GPUClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // nvidia.com/gpu.present label, and resets it to "false" when a node no longer has
 // GPUs. This is a slimmed version of the ClusterPolicy controller's labeler: the
 // operands match on the common label directly, so per-component state labels are
-// not managed — except the driver deploy label, which the driver DaemonSet
+// not managed, except the driver deploy label, which the driver DaemonSet
 // rendered for NVIDIADriver hardcodes in its nodeSelector and which only the
 // ClusterPolicy controller would otherwise apply.
 func (r *GPUClusterConfigReconciler) labelGPUNodes(ctx context.Context) error {
