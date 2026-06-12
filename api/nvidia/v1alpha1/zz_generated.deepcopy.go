@@ -139,6 +139,11 @@ func (in *GDRCopySpec) DeepCopyInto(out *GDRCopySpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.UsePrecompiled != nil {
+		in, out := &in.UsePrecompiled, &out.UsePrecompiled
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]string, len(*in))

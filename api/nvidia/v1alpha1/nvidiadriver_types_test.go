@@ -402,3 +402,127 @@ func TestGDRCopyGetImagePath(t *testing.T) {
 		})
 	}
 }
+
+func TestGDRCopyGetPrecompiledImagePath(t *testing.T) {
+	testCases := []struct {
+		description   string
+		spec          *GDRCopySpec
+		osVersion     string
+		kernelVersion string
+		errorExpected bool
+		expectedImage string
+	}{
+		{
+			description: "malformed repository",
+			spec: &GDRCopySpec{
+				Repository: "malformed?/repo",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "malformed image",
+			spec: &GDRCopySpec{
+				Image: "malformed?image",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "only image provided with no tag or digest",
+			spec: &GDRCopySpec{
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv",
+			},
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "only image provided with tag",
+			spec: &GDRCopySpec{
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5.2",
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			expectedImage: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5.2-5.4.0-150-generic-ubuntu22.04",
+		},
+		{
+			description: "only image provided with digest",
+			spec: &GDRCopySpec{
+				Image: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:" + testDigest,
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "repository, image, and version set but image contains a tag",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+				Version:    "v2.5.2",
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "repository, image, and version set but image contains a digest",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:" + testDigest,
+				Version:    "v2.5.2",
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "missing version",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "gdrdrv",
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+			expectedImage: "",
+		},
+		{
+			description: "repository, image, and version set; version is a tag",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "gdrdrv",
+				Version:    "v2.5.2",
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			expectedImage: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5.2-5.4.0-150-generic-ubuntu22.04",
+		},
+		{
+			description: "repository, image, and version set; version is a digest",
+			spec: &GDRCopySpec{
+				Repository: "nvcr.io/nvidia/cloud-native",
+				Image:      "gdrdrv",
+				Version:    "sha256:" + testDigest,
+			},
+			osVersion:     "ubuntu22.04",
+			kernelVersion: "5.4.0-150-generic",
+			errorExpected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			image, err := tc.spec.GetPrecompiledImagePath(tc.osVersion, tc.kernelVersion)
+			if tc.errorExpected {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, image, tc.expectedImage)
+		})
+	}
+}
