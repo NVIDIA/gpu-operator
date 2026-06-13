@@ -59,6 +59,12 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			expected:  "rocky9",
 		},
 		{
+			name:      "ol omits minor version",
+			osName:    "ol",
+			osVersion: "9.5",
+			expected:  "ol9",
+		},
+		{
 			name:      "ubuntu preserves full version",
 			osName:    "ubuntu",
 			osVersion: "24.04",

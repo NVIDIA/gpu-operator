@@ -53,6 +53,13 @@ func TestGetOSTag(t *testing.T) {
 			expectError: false,
 		},
 		{
+			description: "oracle linux",
+			osRelease:   "ol",
+			osVersion:   "9.4",
+			expected:    "ol9",
+			expectError: false,
+		},
+		{
 			description: "RHEL 10",
 			osRelease:   "rhel",
 			osVersion:   "10.1",
