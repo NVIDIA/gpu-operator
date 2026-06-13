@@ -57,6 +57,20 @@ func (in *CCManagerSpec) DeepCopyInto(out *CCManagerSpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
 		*out = new(bool)
@@ -399,6 +413,20 @@ func (in *DCGMExporterSpec) DeepCopyInto(out *DCGMExporterSpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.MetricsConfig != nil {
 		in, out := &in.MetricsConfig, &out.MetricsConfig
 		*out = new(DCGMExporterMetricsConfig)
@@ -483,6 +511,20 @@ func (in *DCGMSpec) DeepCopyInto(out *DCGMSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
@@ -589,6 +631,20 @@ func (in *DevicePluginSpec) DeepCopyInto(out *DevicePluginSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -760,6 +816,20 @@ func (in *DriverSpec) DeepCopyInto(out *DriverSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.RepoConfig != nil {
 		in, out := &in.RepoConfig, &out.RepoConfig
@@ -961,6 +1031,20 @@ func (in *GPUFeatureDiscoverySpec) DeepCopyInto(out *GPUFeatureDiscoverySpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
 		*out = new(bool)
@@ -1033,6 +1117,20 @@ func (in *KataDevicePluginSpec) DeepCopyInto(out *KataDevicePluginSpec) {
 	*out = *in
 	out.ImageSpec = in.ImageSpec
 	in.ComponentCommonSpec.DeepCopyInto(&out.ComponentCommonSpec)
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
 		*out = new(bool)
@@ -1082,6 +1180,20 @@ func (in *KataManagerSpec) DeepCopyInto(out *KataManagerSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
@@ -1157,6 +1269,20 @@ func (in *MIGManagerSpec) DeepCopyInto(out *MIGManagerSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -1257,6 +1383,20 @@ func (in *NodeStatusExporterSpec) DeepCopyInto(out *NodeStatusExporterSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
@@ -1463,6 +1603,20 @@ func (in *SandboxDevicePluginSpec) DeepCopyInto(out *SandboxDevicePluginSpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
 		*out = new(bool)
@@ -1571,6 +1725,20 @@ func (in *ToolkitSpec) DeepCopyInto(out *ToolkitSpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
 		*out = new(bool)
@@ -1635,6 +1803,20 @@ func (in *VFIOManagerSpec) DeepCopyInto(out *VFIOManagerSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	in.DriverManager.DeepCopyInto(&out.DriverManager)
 	if in.HostNetwork != nil {
@@ -1701,6 +1883,20 @@ func (in *VGPUDeviceManagerSpec) DeepCopyInto(out *VGPUDeviceManagerSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
@@ -1787,6 +1983,20 @@ func (in *VGPUManagerSpec) DeepCopyInto(out *VGPUManagerSpec) {
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.DriverManager.DeepCopyInto(&out.DriverManager)
 	if in.KernelModuleConfig != nil {
 		in, out := &in.KernelModuleConfig, &out.KernelModuleConfig
@@ -1859,6 +2069,20 @@ func (in *ValidatorSpec) DeepCopyInto(out *ValidatorSpec) {
 		in, out := &in.Env, &out.Env
 		*out = make([]EnvVar, len(*in))
 		copy(*out, *in)
+	}
+	if in.ExtraVolumes != nil {
+		in, out := &in.ExtraVolumes, &out.ExtraVolumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ExtraVolumeMounts != nil {
+		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.HostNetwork != nil {
 		in, out := &in.HostNetwork, &out.HostNetwork
