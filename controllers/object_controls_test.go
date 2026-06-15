@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -311,6 +314,118 @@ func TestIsDaemonSetReadyUsesSelectorLabelsForOnDeletePods(t *testing.T) {
 	}
 
 	require.Equal(t, gpuv1.NotReady, isDaemonSetReady(dsName, controller))
+}
+
+func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedStates(t *testing.T) {
+	const namespace = "test-namespace"
+	const driverName = "demo-gold"
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(testScheme))
+
+	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			NodeSelector: map[string]string{"gpu": "true"},
+		},
+	}
+	nodeWithoutUpgradeState := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-without-upgrade-state",
+			Labels: map[string]string{
+				"gpu":                         "true",
+				consts.NVIDIADriverOwnerLabel: driverName,
+			},
+		},
+	}
+	nodeWithDoneState := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-with-done-state",
+			Labels: map[string]string{
+				"gpu":                         "true",
+				consts.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:             upgrade.UpgradeStateDone,
+			},
+		},
+	}
+	nodeWithActiveState := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-with-active-state",
+			Labels: map[string]string{
+				"gpu":                         "true",
+				consts.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:             upgrade.UpgradeStatePodRestartRequired,
+			},
+		},
+	}
+	nodeWithFailedState := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-with-failed-state",
+			Labels: map[string]string{
+				"gpu":                         "true",
+				consts.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:             upgrade.UpgradeStateFailed,
+			},
+		},
+	}
+	unownedMatchingNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "unowned-matching-node",
+			Labels: map[string]string{"gpu": "true"},
+		},
+	}
+	pods := []client.Object{
+		orphanedDriverPod("pod-without-upgrade-state", namespace, nodeWithoutUpgradeState.Name),
+		orphanedDriverPod("pod-with-done-state", namespace, nodeWithDoneState.Name),
+		orphanedDriverPod("pod-with-active-state", namespace, nodeWithActiveState.Name),
+		orphanedDriverPod("pod-with-failed-state", namespace, nodeWithFailedState.Name),
+		orphanedDriverPod("pod-on-unowned-matching-node", namespace, unownedMatchingNode.Name),
+	}
+
+	objects := []client.Object{driver, nodeWithoutUpgradeState, nodeWithDoneState, nodeWithActiveState, nodeWithFailedState, unownedMatchingNode}
+	objects = append(objects, pods...)
+	k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()
+	reconciler := &NVIDIADriverReconciler{
+		Client:    k8sClient,
+		Namespace: namespace,
+	}
+
+	require.NoError(t, reconciler.labelNodesWithOrphanedDriverPods(context.Background()))
+
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: nodeWithoutUpgradeState.Name}, nodeWithoutUpgradeState))
+	require.Equal(t, upgrade.UpgradeStateUpgradeRequired, nodeWithoutUpgradeState.Labels[upgradeStateLabel])
+
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: nodeWithDoneState.Name}, nodeWithDoneState))
+	require.Equal(t, upgrade.UpgradeStateUpgradeRequired, nodeWithDoneState.Labels[upgradeStateLabel])
+
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: nodeWithActiveState.Name}, nodeWithActiveState))
+	require.Equal(t, upgrade.UpgradeStatePodRestartRequired, nodeWithActiveState.Labels[upgradeStateLabel])
+
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: nodeWithFailedState.Name}, nodeWithFailedState))
+	require.Equal(t, upgrade.UpgradeStateFailed, nodeWithFailedState.Labels[upgradeStateLabel])
+
+	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: unownedMatchingNode.Name}, unownedMatchingNode))
+	require.Empty(t, unownedMatchingNode.Labels[upgradeStateLabel])
+}
+
+func orphanedDriverPod(name, namespace, nodeName string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				AppComponentLabelKey: DriverAppComponentLabelValue,
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: nodeName,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
 }
 
 func getModuleRoot(dir string) (string, error) {

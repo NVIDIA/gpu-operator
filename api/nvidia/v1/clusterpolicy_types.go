@@ -2183,6 +2183,11 @@ func (d *DriverSpec) UseNvidiaDriverCRDType() bool {
 	return *d.UseNvidiaDriverCRD
 }
 
+// IsNVIDIADriverCRDEnabled returns true if driver management is enabled through NVIDIADriver CRs.
+func (d *DriverSpec) IsNVIDIADriverCRDEnabled() bool {
+	return d != nil && d.IsEnabled() && d.UseNvidiaDriverCRDType()
+}
+
 // UsePrecompiledDrivers returns true if driver install is enabled using pre-compiled modules
 func (d *DriverSpec) UsePrecompiledDrivers() bool {
 	if d.UsePrecompiled == nil {

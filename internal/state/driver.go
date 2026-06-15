@@ -56,8 +56,8 @@ const (
 
 	// AppComponentLabelKey indicates the label key of the component
 	AppComponentLabelKey = "app.kubernetes.io/component"
-	// AppComponentLabelValue indicates the label values of the nvidia-gpu-driver component
-	AppComponentLabelValue = "nvidia-driver"
+	// DriverAppComponentLabelValue indicates the label value of the NVIDIA driver component
+	DriverAppComponentLabelValue = "nvidia-driver"
 )
 
 type stateDriver struct {
@@ -169,7 +169,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, info
 func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {
 	wr := make(map[string]SyncingSource)
 	nvDriverPredicate := predicate.NewTypedPredicateFuncs(func(ds *appsv1.DaemonSet) bool {
-		ls := metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}}
+		ls := metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}}
 		selector, _ := metav1.LabelSelectorAsSelector(&ls)
 		return selector.Matches(labels.Set(ds.GetLabels()))
 	})
@@ -270,7 +270,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	}
 
 	isOpenshift := runtimeSpec.OpenshiftVersion != ""
-	nodePools, err := getNodePools(ctx, s.client, cr.Spec.NodeSelector, cr.Spec.UsePrecompiledDrivers(), isOpenshift)
+	nodePools, err := getNodePools(ctx, s.client, cr, isOpenshift)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node pools: %w", err)
 	}

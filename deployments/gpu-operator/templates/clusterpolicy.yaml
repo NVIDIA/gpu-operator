@@ -167,6 +167,7 @@ spec:
   driver:
     enabled: {{ .Values.driver.enabled }}
     useNvidiaDriverCRD: {{ .Values.driver.nvidiaDriverCRD.enabled }}
+    {{- if not .Values.driver.nvidiaDriverCRD.enabled }}
     kernelModuleType: {{ .Values.driver.kernelModuleType }}
     usePrecompiled: {{ .Values.driver.usePrecompiled }}
     {{- if .Values.driver.repository }}
@@ -238,6 +239,7 @@ spec:
     {{- end }}
     {{- if .Values.driver.args }}
     args: {{ toYaml .Values.driver.args | nindent 6 }}
+    {{- end }}
     {{- end }}
     {{- if .Values.driver.upgradePolicy }}
     upgradePolicy:

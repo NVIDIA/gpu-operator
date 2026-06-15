@@ -67,8 +67,8 @@ const (
 	UpgradeSkipDrainLabelSelector = "nvidia.com/gpu-driver-upgrade-drain.skip!=true"
 	// AppComponentLabelKey indicates the label key of the component
 	AppComponentLabelKey = "app.kubernetes.io/component"
-	// AppComponentLabelValue indicates the label values of the nvidia-gpu-driver component
-	AppComponentLabelValue = "nvidia-driver"
+	// DriverAppComponentLabelValue indicates the label value of the NVIDIA driver component
+	DriverAppComponentLabelValue = "nvidia-driver"
 )
 
 //nolint
@@ -132,10 +132,10 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	driverLabelKey := DriverLabelKey
 	driverLabelValue := DriverLabelValue
 
-	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
+	if clusterPolicy.Spec.Driver.IsNVIDIADriverCRDEnabled() {
 		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
 		driverLabelKey = AppComponentLabelKey
-		driverLabelValue = AppComponentLabelValue
+		driverLabelValue = DriverAppComponentLabelValue
 	} else if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
 		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
 		// based on rhcos version. Hence use DTK label instead
@@ -318,7 +318,7 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	})
 
 	componentLabelSelector := predicate.NewTypedPredicateFuncs(func(ds *appsv1.DaemonSet) bool {
-		ls := metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: AppComponentLabelValue}}
+		ls := metav1.LabelSelector{MatchLabels: map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}}
 		selector, _ := metav1.LabelSelectorAsSelector(&ls)
 		return selector.Matches(labels.Set(ds.GetLabels()))
 	})
