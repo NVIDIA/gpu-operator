@@ -28,6 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         name: Checkout code
+        with:
+          persist-credentials: false
       - name: Get Golang version
         id: vars
         run: |
@@ -63,6 +65,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Get Golang version
         id: vars
         run: |
@@ -89,4 +93,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         name: Checkout code
+        with:
+          persist-credentials: false
       - run: make docker-build

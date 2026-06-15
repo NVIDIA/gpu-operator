@@ -68,6 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         name: Check out code
+        with:
+          persist-credentials: false
       - name: Install regctl
         uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
         with:
@@ -91,6 +93,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         name: Check out code
+          with:
+          persist-credentials: false
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
