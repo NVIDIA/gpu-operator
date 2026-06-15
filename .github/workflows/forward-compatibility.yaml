@@ -72,6 +72,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: write
     uses: ./.github/workflows/e2e-tests.yaml
     with:
       operator_image: ghcr.io/nvidia/gpu-operator
