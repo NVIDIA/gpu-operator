@@ -35,9 +35,9 @@ jobs:
       - uses: actions/checkout@v6
       
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@c70ad64367908075211b10dcd2ab9fad4bfa1816
         with:
-          release: v0.11.3
+          release: v0.11.4
       
       - name: Get latest component images and generate values override file
         env:
