@@ -45,6 +45,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	nvidiadriverutil "github.com/NVIDIA/gpu-operator/internal/nvidiadriver"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -83,9 +84,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
+			// Re-run owner assignment so deleting the last NVIDIADriver clears stale node owner labels.
+			return r.cleanupNVIDIADriverOwnerLabels(ctx)
 		}
 		wrappedErr := fmt.Errorf("error getting NVIDIADriver object: %w", err)
 		logger.Error(err, "error getting NVIDIADriver object")
@@ -95,6 +95,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, wrappedErr
+	}
+	if instance.HasDeletionTimestamp() {
+		logger.Info("NVIDIADriver delete requested; cleaning up owner labels")
+		return r.cleanupNVIDIADriverOwnerLabels(ctx)
 	}
 
 	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
@@ -152,6 +156,19 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	changed, err := nvidiadriverutil.AssignOwners(ctx, r.Client)
+	if err != nil {
+		logger.Error(err, "failed to assign NVIDIADriver owners to nodes")
+		instance.Status.State = nvidiav1alpha1.NotReady
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
+		}
+		return reconcile.Result{}, err
+	}
+	if changed {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
 	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
 		err := errors.New("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers")
 		logger.Error(err, "unsupported driver combination detected")
@@ -187,6 +204,11 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
+
+	if err := r.labelNodesWithOrphanedDriverPods(ctx); err != nil {
+		logger.Error(err, "failed to label nodes with orphaned NVIDIA driver pods")
+		return reconcile.Result{}, err
+	}
 
 	// update CR status
 	if err := r.updateCrStatus(ctx, instance, managerStatus); err != nil {
@@ -276,6 +298,63 @@ func (r *NVIDIADriverReconciler) enqueueAllNVIDIADrivers(ctx context.Context) []
 	return reconcileRequests
 }
 
+// enqueueNVIDIADriverReconcilers enqueues the NVIDIADriver that triggered the
+// event and all current NVIDIADriver instances. The triggering object is
+// included even for delete events so the NotFound reconcile path can clear
+// stale node owner labels.
+func (r *NVIDIADriverReconciler) enqueueNVIDIADriverReconcilers(ctx context.Context, driver *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
+	requests := r.enqueueAllNVIDIADrivers(ctx)
+	if driver != nil {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      driver.GetName(),
+				Namespace: driver.GetNamespace(),
+			},
+		})
+	}
+	return dedupeReconcileRequests(requests)
+}
+
+func dedupeReconcileRequests(requests []reconcile.Request) []reconcile.Request {
+	seen := map[types.NamespacedName]struct{}{}
+	deduped := make([]reconcile.Request, 0, len(requests))
+	for _, request := range requests {
+		if _, ok := seen[request.NamespacedName]; ok {
+			continue
+		}
+		seen[request.NamespacedName] = struct{}{}
+		deduped = append(deduped, request)
+	}
+	return deduped
+}
+
+// cleanupNVIDIADriverOwnerLabels re-runs owner assignment after a delete event
+// when ClusterPolicy is still configured for NVIDIADriver mode. This lets
+// AssignOwners remove stale nvidia.com/gpu-operator.driver.owner labels when no remaining
+// NVIDIADriver matches a GPU node, including deletion of the last NVIDIADriver.
+func (r *NVIDIADriverReconciler) cleanupNVIDIADriverOwnerLabels(ctx context.Context) (reconcile.Result, error) {
+	clusterPolicyList := &gpuv1.ClusterPolicyList{}
+	if err := r.List(ctx, clusterPolicyList); err != nil {
+		wrappedErr := fmt.Errorf("error getting ClusterPolicy list: %w", err)
+		log.FromContext(ctx).Error(wrappedErr, "failed to cleanup NVIDIADriver owner labels")
+		return reconcile.Result{}, wrappedErr
+	}
+
+	if len(clusterPolicyList.Items) == 0 {
+		return reconcile.Result{}, nil
+	}
+
+	if !clusterPolicyList.Items[0].Spec.Driver.UseNvidiaDriverCRDType() {
+		return reconcile.Result{}, nil
+	}
+
+	if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
+		log.FromContext(ctx).Error(err, "failed to cleanup NVIDIADriver owner labels")
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{}, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create state manager
@@ -307,8 +386,8 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch for changes to NVIDIADriver CRs. Whenever an event is generated for a NVIDIADriver CR,
 	// enqueue a reconcile request for all NVIDIADriver instances.
-	nvidiaDriverMapFn := func(ctx context.Context, _ *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
-		return r.enqueueAllNVIDIADrivers(ctx)
+	nvidiaDriverMapFn := func(ctx context.Context, driver *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
+		return r.enqueueNVIDIADriverReconcilers(ctx, driver)
 	}
 
 	// Watch for changes to the primary resource NVIDIADriver

@@ -1051,7 +1051,7 @@ func (n *ClusterPolicyController) initOCPParams() error {
 func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	result := gpuv1.Ready
 
-	// Skip state-driver if NVIDIADriver CRD is enabled
+	// Skip driver daemonset states if NVIDIADriver CRD is enabled
 	// TODO:
 	//   - Properly clean up any k8s object associated with 'state-driver'
 	//     and owned by the Clusterpolicy controller.
@@ -1062,8 +1062,9 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		n.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
 		n.logger.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
 		n.idx++
-		// Cleanup all driver daemonsets owned by ClusterPolicy.
-		err := n.cleanupAllDriverDaemonSets(n.ctx)
+		// Cleanup all driver daemonsets owned by ClusterPolicy while keeping the
+		// running driver pods available until NVIDIADriver rolls replacements.
+		err := n.cleanupAllDriverDaemonSets(n.ctx, metav1.DeletePropagationOrphan)
 		if err != nil {
 			return gpuv1.NotReady, fmt.Errorf("failed to cleanup all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 		}

@@ -200,6 +200,46 @@ check_no_driver_pod_restarts() {
 	return 0
 }
 
+print_driver_upgrade_debug() {
+	echo "current state of driver upgrade"
+	kubectl get node -l nvidia.com/gpu.present \
+		-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers
+
+	echo ""
+	echo "driver pods"
+	kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide || true
+
+	echo ""
+	echo "gpu operator operands"
+	kubectl get pods -n ${TEST_NAMESPACE} -o wide || true
+
+	echo ""
+	echo "driver daemonsets"
+	kubectl get daemonsets -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide || true
+
+	echo ""
+	echo "NVIDIADriver status"
+	local nvidiadriver_status
+	if nvidiadriver_status=$(kubectl get nvidiadriver -o json 2>/dev/null); then
+		echo "${nvidiadriver_status}" | jq -r '
+			(["NAME", "DEFAULT", "STATE", "REASON", "MESSAGE"] | @tsv),
+			(
+				.items[]
+				| (.status.conditions // []) as $conditions
+				| ($conditions[-1] // {}) as $latest
+				| [
+					.metadata.name,
+					(if .spec.default == true then "true" else "-" end),
+					(.status.state // "-"),
+					($latest.reason // "-"),
+					($latest.message // "-")
+				]
+				| @tsv
+			)
+		'
+	fi
+}
+
 wait_for_driver_upgrade_done() {
 	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
 	local current_time=0
@@ -221,13 +261,16 @@ wait_for_driver_upgrade_done() {
 
 		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			print_driver_upgrade_debug
 			exit 1;
 		fi
 
-		echo "current state of driver upgrade"
-		kubectl get node -l nvidia.com/gpu.present \
-			-o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}{"\n"}{end}'
-
+		if [[ $((current_time % 30)) -eq 0 ]]; then
+			print_driver_upgrade_debug
+		else
+			kubectl get node -l nvidia.com/gpu.present \
+				-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers
+		fi
 		
 		echo "Sleeping 5 seconds"
 		current_time=$((${current_time} + 5))
