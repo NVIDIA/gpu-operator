@@ -20,11 +20,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	testDigest = "10d1df8034373061366d4fb17b364b3b28d766b54d5a0b700c1a5a75378cf125"
 )
+
+func TestNVIDIADriverHasDeletionTimestamp(t *testing.T) {
+	var nilDriver *NVIDIADriver
+	require.False(t, nilDriver.HasDeletionTimestamp())
+	require.False(t, (&NVIDIADriver{}).HasDeletionTimestamp())
+
+	deletionTimestamp := metav1.Now()
+	require.True(t, (&NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			DeletionTimestamp: &deletionTimestamp,
+		},
+	}).HasDeletionTimestamp())
+}
 
 func TestGetImagePath(t *testing.T) {
 	testCases := []struct {

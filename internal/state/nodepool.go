@@ -26,6 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -55,16 +58,15 @@ type nodePool struct {
 //
 // Each nodePool object contains information needed to identify the corresonding node pool.
 // Most importantly, it contains a nodeSelector used to identify the node pool.
-func getNodePools(ctx context.Context, k8sClient client.Client, selector map[string]string, precompiled bool, openshift bool) ([]nodePool, error) {
+func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alpha1.NVIDIADriver, openshift bool) ([]nodePool, error) {
 	nodePoolMap := make(map[string]nodePool)
 
 	logger := log.FromContext(ctx)
 
-	nodeSelector := map[string]string{
-		"nvidia.com/gpu.present": "true",
-	}
-
-	maps.Copy(nodeSelector, selector)
+	nodeSelector := map[string]string{}
+	maps.Copy(nodeSelector, cr.Spec.NodeSelector)
+	nodeSelector[consts.GPUPresentLabel] = "true"
+	nodeSelector[consts.NVIDIADriverOwnerLabel] = cr.Name
 
 	nodeList := &corev1.NodeList{}
 	err := k8sClient.List(ctx, nodeList, client.MatchingLabels(nodeSelector))
@@ -104,7 +106,7 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 		nodePool.osTag = osTag
 		nodePool.name = osTag
 
-		if precompiled {
+		if cr.Spec.UsePrecompiledDrivers() {
 			kernelVersion, ok := nodeLabels[nfdKernelLabelKey]
 			if !ok {
 				logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
@@ -115,7 +117,7 @@ func getNodePools(ctx context.Context, k8sClient client.Client, selector map[str
 			nodePool.name = fmt.Sprintf("%s-%s", nodePool.name, getSanitizedKernelVersion(kernelVersion))
 		}
 
-		if !precompiled && openshift {
+		if !cr.Spec.UsePrecompiledDrivers() && openshift {
 			rhcosVersion, ok := nodeLabels[nfdOSTreeVersionLabelKey]
 			if !ok {
 				logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)

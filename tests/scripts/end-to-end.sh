@@ -43,7 +43,18 @@ test_restart_operator ${TEST_NAMESPACE} ${CONTAINER_RUNTIME}
 "${SCRIPT_DIR}"/enable-operands.sh
 "${SCRIPT_DIR}"/verify-operator.sh
 
-# Uninstall the workload and operator
+echo ""
+echo ""
+echo "--------------ClusterPolicy to NVIDIADriver Migration Test--------------------------"
+echo "------------------------------------------------------------------------------------"
+"${SCRIPT_DIR}"/migrate-clusterpolicy-to-nvidiadriver.sh
+
+echo "Run GPU test workload after migration"
+"${SCRIPT_DIR}"/uninstall-workload.sh
+"${SCRIPT_DIR}"/install-workload.sh
+"${SCRIPT_DIR}"/verify-workload.sh
+
+# Remove the completed workload before the next workload check.
 "${SCRIPT_DIR}"/uninstall-workload.sh
 "${SCRIPT_DIR}"/uninstall-operator.sh
 

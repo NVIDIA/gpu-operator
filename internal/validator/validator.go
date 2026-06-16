@@ -19,6 +19,7 @@ package validator
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,25 +46,37 @@ func NewNodeSelectorValidator(c client.Client) Validator {
 // Check returns error when nodes matching with the selector labels of current instance of NVIDIADriver
 // are conflicting with other instances of NVIDIADriver
 func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+	if err := cr.ValidateNodeSelector(); err != nil {
+		return err
+	}
+
 	drivers := &nvidiav1alpha1.NVIDIADriverList{}
 	err := nsv.client.List(ctx, drivers)
 	if err != nil {
 		return err
 	}
 
-	names := map[string]struct{}{}
-	for di := range drivers.Items {
-		nodeList, err := nsv.getNVIDIADriverSelectedNodes(ctx, &drivers.Items[di])
+	selectedNodeOwners := map[string][]string{}
+	for _, driver := range drivers.Items {
+		if err := driver.ValidateNodeSelector(); err != nil {
+			return err
+		}
+		if driver.IsDefault() {
+			continue
+		}
+		driverName := driver.Name
+		nodeList, err := nsv.getNVIDIADriverSelectedNodes(ctx, driver)
 		if err != nil {
 			return err
 		}
 
 		for ni := range nodeList.Items {
-			if _, ok := names[nodeList.Items[ni].Name]; ok {
-				return fmt.Errorf("conflicting NVIDIADriver NodeSelectors found for resource: %s, nodeSelector: %q", cr.Name, cr.Spec.NodeSelector)
+			nodeName := nodeList.Items[ni].Name
+			selectedNodeOwners[nodeName] = append(selectedNodeOwners[nodeName], driverName)
+			if len(selectedNodeOwners[nodeName]) > 1 {
+				sort.Strings(selectedNodeOwners[nodeName])
+				return fmt.Errorf("multiple NVIDIADrivers match the same node %s: %v", nodeName, selectedNodeOwners[nodeName])
 			}
-
-			names[nodeList.Items[ni].Name] = struct{}{}
 		}
 
 	}
@@ -72,14 +85,10 @@ func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alph
 }
 
 // getNVIDIADriverSelectedNodes returns selected nodes based on the nodeselector labels set for a given NVIDIADriver instance
-func (nsv *nodeSelectorValidator) getNVIDIADriverSelectedNodes(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) (*corev1.NodeList, error) {
+func (nsv *nodeSelectorValidator) getNVIDIADriverSelectedNodes(ctx context.Context, cr nvidiav1alpha1.NVIDIADriver) (*corev1.NodeList, error) {
 	nodeList := &corev1.NodeList{}
 
-	if cr.Spec.NodeSelector == nil {
-		cr.Spec.NodeSelector = cr.GetNodeSelector()
-	}
-
-	selector := labels.Set(cr.Spec.NodeSelector).AsSelector()
+	selector := labels.Set(cr.GetNodeSelector()).AsSelector()
 
 	opts := []client.ListOption{
 		client.MatchingLabelsSelector{Selector: selector},

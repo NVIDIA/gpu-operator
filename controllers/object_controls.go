@@ -4264,7 +4264,7 @@ func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	return true, nil
 }
 
-func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context) error {
+func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context, propagationPolicy metav1.DeletionPropagation) error {
 	// Get all DaemonSets owned by ClusterPolicy
 	//
 	// (cdesiniotis) There is a limitation with the controller-runtime client where only a single field selector
@@ -4280,8 +4280,10 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context)
 		ds := ds
 		// filter out DaemonSets which are not the NVIDIA driver/vgpu-manager
 		if strings.HasPrefix(ds.Name, commonDriverDaemonsetName) || strings.HasPrefix(ds.Name, commonVGPUManagerDaemonsetName) {
-			n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name)
-			err = n.client.Delete(ctx, &ds)
+			n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name, "PropagationPolicy", propagationPolicy)
+			err = n.client.Delete(ctx, &ds, &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			})
 			if err != nil {
 				return fmt.Errorf("error deleting NVIDIA driver daemonset: %w", err)
 			}
