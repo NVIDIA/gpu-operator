@@ -24,7 +24,6 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/gpu-operator/internal/consts"
-	"github.com/NVIDIA/gpu-operator/internal/nodeinfo"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -294,54 +292,6 @@ func (s *stateSkel) addStateSpecificLabels(obj *unstructured.Unstructured) {
 	obj.SetLabels(labels)
 }
 
-// nolint
-func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, error) {
-	reqLogger := log.FromContext(ctx)
-	reqLogger.V(consts.LogLevelInfo).Info(
-		"State spec in CR is nil, deleting existing objects if needed", "State:", s.name)
-	found, err := s.deleteStateRelatedObjects(ctx)
-	if err != nil {
-		return SyncStateError, fmt.Errorf("failed to delete k8s objects: %w", err)
-	}
-	if found {
-		reqLogger.V(consts.LogLevelInfo).Info("State deleting objects in progress", "State:", s.name)
-		return SyncStateNotReady, nil
-	}
-	return SyncStateIgnore, nil
-}
-
-// nolint
-func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error) {
-	stateLabel := map[string]string{
-		consts.StateLabel: s.name,
-	}
-	found := false
-	for _, gvk := range getSupportedGVKs() {
-		l := &unstructured.UnstructuredList{}
-		l.SetGroupVersionKind(gvk)
-		err := s.client.List(ctx, l, client.MatchingLabels(stateLabel))
-		if meta.IsNoMatchError(err) {
-			continue
-		}
-		if err != nil {
-			return false, err
-		}
-		if len(l.Items) > 0 {
-			found = true
-		}
-		for _, obj := range l.Items {
-			obj := obj
-			if obj.GetDeletionTimestamp() == nil {
-				err := s.client.Delete(ctx, &obj)
-				if err != nil {
-					return true, err
-				}
-			}
-		}
-	}
-	return found, nil
-}
-
 func (s *stateSkel) mergeObjects(updated, current *unstructured.Unstructured) error {
 	// Set resource version
 	// ResourceVersion must be passed unmodified back to the server.
@@ -442,15 +392,4 @@ func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger l
 		return true, nil
 	}
 	return false, nil
-}
-
-// Check if provided attrTypes are present in NodeAttributes.Attributes
-// nolint
-func (s *stateSkel) checkAttributesExist(attrs nodeinfo.NodeAttributes, attrTypes ...nodeinfo.AttributeType) error {
-	for _, t := range attrTypes {
-		if _, ok := attrs.Attributes[t]; !ok {
-			return fmt.Errorf("mandatory node attribute does not exist for node %s", attrs.Name)
-		}
-	}
-	return nil
 }
