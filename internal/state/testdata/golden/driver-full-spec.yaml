@@ -314,6 +314,13 @@ spec:
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: Always
         name: k8s-driver-manager
+        resources:
+          limits:
+            cpu: 500m
+            memory: 200Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         securityContext:
           privileged: true
         volumeMounts:

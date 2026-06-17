@@ -180,6 +180,9 @@ spec:
         {{- end }}
           securityContext:
             privileged: true
+          {{- if .Driver.Spec.Resources }}
+          resources: {{ .Driver.Spec.Resources | yaml | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: run-nvidia
               mountPath: /run/nvidia

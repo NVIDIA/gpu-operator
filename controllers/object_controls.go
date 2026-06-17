@@ -1018,7 +1018,7 @@ func TransformDCGMExporterService(obj *corev1.Service, config *gpuv1.ClusterPoli
 // TransformDriver transforms Nvidia driver daemonset with required config as per ClusterPolicy
 func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA)
+	err := transformDriverManagerInitContainer(obj, &config.Driver.Manager, config.Driver.GPUDirectRDMA, config.Driver.Resources)
 	if err != nil {
 		return err
 	}
@@ -1096,7 +1096,7 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 // TransformVGPUManager transforms NVIDIA vGPU Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager, nil)
+	err := transformDriverManagerInitContainer(obj, &config.VGPUManager.DriverManager, nil, config.VGPUManager.Resources)
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for vGPU Manager: %v", err)
 	}
@@ -1655,6 +1655,7 @@ func TransformMPSControlDaemon(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	if initCtr := findContainerByName(obj.Spec.Template.Spec.InitContainers, "mps-control-daemon-mounts"); initCtr != nil {
 		initCtr.Image = image
 		initCtr.ImagePullPolicy = imagePullPolicy
+		applyResourceRequirements(initCtr, config.DevicePlugin.Resources)
 	}
 
 	// update image path and imagePullPolicy for main container
@@ -2103,7 +2104,7 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 // TransformVFIOManager transforms VFIO-PCI Manager daemonset with required config as per ClusterPolicy
 func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update k8s-driver-manager initContainer
-	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil)
+	err := transformDriverManagerInitContainer(obj, &config.VFIOManager.DriverManager, nil, config.VFIOManager.Resources)
 	if err != nil {
 		return fmt.Errorf("failed to transform k8s-driver-manager initContainer for VFIO Manager: %v", err)
 	}
@@ -2281,6 +2282,14 @@ func transformValidatorSecurityContext(ctr *corev1.Container) {
 	ctr.SecurityContext.RunAsUser = rootUID
 }
 
+func applyResourceRequirements(ctr *corev1.Container, resources *gpuv1.ResourceRequirements) {
+	if resources == nil {
+		return
+	}
+	ctr.Resources.Requests = resources.Requests
+	ctr.Resources.Limits = resources.Limits
+}
+
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	err := TransformValidatorShared(obj, config)
@@ -2372,8 +2381,7 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if config.Validator.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.Validator.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Validator.Resources.Limits
+			applyResourceRequirements(&obj.Spec.Template.Spec.Containers[i], config.Validator.Resources)
 		}
 	}
 	// set arguments if specified for validator container
@@ -2409,6 +2417,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		if config.Validator.ImagePullPolicy != "" {
 			podSpec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
+		applyResourceRequirements(&podSpec.InitContainers[i], config.Validator.Resources)
 		// update the security context for the validator container
 		transformValidatorSecurityContext(&podSpec.InitContainers[i])
 
@@ -2858,6 +2867,7 @@ func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 	if config.DevicePlugin.ImagePullPolicy != "" {
 		initContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.DevicePlugin.ImagePullPolicy)
 	}
+	applyResourceRequirements(initContainer, configManagerResourceRequirements(obj, config))
 	// setup env
 	setContainerEnv(initContainer, "DEFAULT_CONFIG", config.DevicePlugin.Config.Default)
 	setContainerEnv(initContainer, "FALLBACK_STRATEGIES", "empty")
@@ -2865,6 +2875,13 @@ func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 	// setup volume mounts
 	addSharedMountsForPluginConfig(initContainer, config.DevicePlugin.Config)
 	return nil
+}
+
+func configManagerResourceRequirements(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) *gpuv1.ResourceRequirements {
+	if findContainerByName(obj.Spec.Template.Spec.Containers, "gpu-feature-discovery") != nil {
+		return config.GPUFeatureDiscovery.Resources
+	}
+	return config.DevicePlugin.Resources
 }
 
 func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec) error {
@@ -2896,7 +2913,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	return nil
 }
 
-func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec) error {
+func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpec *gpuv1.DriverManagerSpec, rdmaSpec *gpuv1.GPUDirectRDMASpec, resources *gpuv1.ResourceRequirements) error {
 	container := findContainerByName(obj.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 
 	if container == nil {
@@ -2912,6 +2929,7 @@ func transformDriverManagerInitContainer(obj *appsv1.DaemonSet, driverManagerSpe
 	if driverManagerSpec.ImagePullPolicy != "" {
 		container.ImagePullPolicy = gpuv1.ImagePullPolicy(driverManagerSpec.ImagePullPolicy)
 	}
+	applyResourceRequirements(container, resources)
 
 	if rdmaSpec != nil && rdmaSpec.IsEnabled() {
 		setContainerEnv(container, GPUDirectRDMAEnabledEnvName, "true")
@@ -3901,6 +3919,7 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 		if config.Validator.ImagePullPolicy != "" {
 			obj.Spec.Template.Spec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
+		applyResourceRequirements(&obj.Spec.Template.Spec.InitContainers[i], config.Validator.Resources)
 		// update the security context for the validator container
 		transformValidatorSecurityContext(&obj.Spec.Template.Spec.InitContainers[i])
 	}

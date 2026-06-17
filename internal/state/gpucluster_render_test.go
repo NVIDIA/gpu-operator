@@ -34,12 +34,16 @@ import (
 
 // fullSpecGPUCluster returns a CR exercising the optional DRA driver knobs: the
 // computeDomains capability with controller/kubelet-plugin overrides and per-container
-// env/resources on the gpus kubelet plugin.
+// env/resources on both kubelet plugins.
 func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 	cr := sampleGPUCluster()
 	cr.Spec.DRADriver.GPUs.KubeletPlugin = nvidiav1alpha1.DRADriverKubeletPluginSpec{
 		Env: []nvidiav1.EnvVar{{Name: "GPUS_EXTRA", Value: "1"}},
 		Resources: &nvidiav1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("100m"),
 				corev1.ResourceMemory: resource.MustParse("128Mi"),
@@ -54,6 +58,16 @@ func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 		},
 		KubeletPlugin: nvidiav1alpha1.DRADriverKubeletPluginSpec{
 			Env: []nvidiav1.EnvVar{{Name: "CD_PLUGIN_EXTRA", Value: "1"}},
+			Resources: &nvidiav1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("300m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
 		},
 	}
 	return cr
