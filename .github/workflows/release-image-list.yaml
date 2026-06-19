@@ -30,7 +30,7 @@ jobs:
     outputs:
       artifact_name: ${{ steps.generate.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         name: Check out code
         with:
           ref: ${{ github.event.release.tag_name }}
@@ -64,7 +64,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         name: Check out code
       - name: Download image list artifact
         uses: actions/download-artifact@v8

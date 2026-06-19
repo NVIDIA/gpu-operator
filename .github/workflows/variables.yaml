@@ -61,7 +61,7 @@ jobs:
       operator_image: ${{ steps.vars.outputs.operator_image }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       
       - name: Calculate all variables
         id: vars
