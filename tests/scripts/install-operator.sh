@@ -26,8 +26,6 @@ if [[ "${USE_VALUES_FILE}" == "false" ]]; then
 	if [[ -n "${OPERATOR_VERSION}" ]]; then
 		OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.version=${OPERATOR_VERSION} --set validator.version=${OPERATOR_VERSION}"
 	fi
-	
-	OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.defaultRuntime=${CONTAINER_RUNTIME}"
 fi
 
 if [[ "${USE_VALUES_FILE}" == "true" ]]; then
