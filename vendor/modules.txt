@@ -281,7 +281,7 @@ github.com/opencontainers/cgroups/devices/config
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.4.2
+# github.com/opencontainers/runc v1.4.3
 ## explicit; go 1.24.0
 github.com/opencontainers/runc/libcontainer/devices
 # github.com/openshift/api v0.0.0-20260612153628-992ec954f8b3

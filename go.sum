@@ -168,8 +168,8 @@ github.com/opencontainers/cgroups v0.0.6 h1:tfZFWTIIGaUUFImTyuTg+Mr5x8XRiSdZESgE
 github.com/opencontainers/cgroups v0.0.6/go.mod h1:oWVzJsKK0gG9SCRBfTpnn16WcGEqDI8PAcpMGbqWxcs=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
-github.com/opencontainers/runc v1.4.2 h1:/AEjjXuVH9lTRl9ZyUFQj7oWBM7Xv00qFV6Vx9q5N3o=
-github.com/opencontainers/runc v1.4.2/go.mod h1:ufk5PTTsy5pnGBAvTh50e+eqGk01pYH2YcVxh557Qlk=
+github.com/opencontainers/runc v1.4.3 h1:/bq84roxG30xEICkFodXzMEVQFs7kzo4lCiZME1uKxI=
+github.com/opencontainers/runc v1.4.3/go.mod h1:ufk5PTTsy5pnGBAvTh50e+eqGk01pYH2YcVxh557Qlk=
 github.com/openshift/api v0.0.0-20260612153628-992ec954f8b3 h1:oPRAgR0qOvfiEKKiivzfepwdDYlhl4iGexXCSIYXkSI=
 github.com/openshift/api v0.0.0-20260612153628-992ec954f8b3/go.mod h1:pyVjK0nZ4sRs4fuQVQ4rubsJdahI1PB94LnQ8sGdvxo=
 github.com/openshift/client-go v0.0.0-20260603140539-6892dc3e1ffc h1:yCLc/pmoZ4YZbMWlAnvYZ2YWkLZoPCilO4Fk/oAu2/E=
