@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Install regctl
         uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
