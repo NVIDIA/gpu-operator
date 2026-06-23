@@ -128,8 +128,8 @@ spec:
           - name: run-mellanox-drivers
             mountPath: /run/mellanox/drivers
             mountPropagation: HostToContainer
-          - name: sysfs-memory-online
-            mountPath: /sys/devices/system/memory/auto_online_blocks
+          - name: host-sys-devices-system
+            mountPath: /sys/devices/system
           - name: firmware-search-path
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
@@ -320,9 +320,10 @@ spec:
         - name: firmware-search-path
           hostPath:
             path: /sys/module/firmware_class/parameters/path
-        - name: sysfs-memory-online
+        - name: host-sys-devices-system
           hostPath:
-            path: /sys/devices/system/memory/auto_online_blocks
+            path: /sys/devices/system
+            type: Directory
         - name: nv-firmware
           hostPath:
             path: /run/nvidia/driver/lib/firmware

@@ -142,6 +142,56 @@ func TestDriverRenderMinimal(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverHostSysDevicesSystemVolumeUsesStableParentDirectory(t *testing.T) {
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.Nil(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: getMinimalDriverRenderData(),
+		})
+	require.Nil(t, err)
+	require.NotEmpty(t, objs)
+
+	ds, err := getDaemonsetFromObjects(objs)
+	require.Nil(t, err)
+
+	var hostSysDevicesSystemVolume *corev1.Volume
+	for i := range ds.Spec.Template.Spec.Volumes {
+		if ds.Spec.Template.Spec.Volumes[i].Name == "host-sys-devices-system" {
+			hostSysDevicesSystemVolume = &ds.Spec.Template.Spec.Volumes[i]
+			break
+		}
+	}
+	require.NotNil(t, hostSysDevicesSystemVolume)
+	require.NotNil(t, hostSysDevicesSystemVolume.HostPath)
+	require.NotNil(t, hostSysDevicesSystemVolume.HostPath.Type)
+	assert.Equal(t, "/sys/devices/system", hostSysDevicesSystemVolume.HostPath.Path)
+	assert.Equal(t, corev1.HostPathDirectory, *hostSysDevicesSystemVolume.HostPath.Type)
+
+	var driverContainer *corev1.Container
+	for i := range ds.Spec.Template.Spec.Containers {
+		if ds.Spec.Template.Spec.Containers[i].Name == "nvidia-driver-ctr" {
+			driverContainer = &ds.Spec.Template.Spec.Containers[i]
+			break
+		}
+	}
+	require.NotNil(t, driverContainer)
+
+	var hostSysDevicesSystemMount *corev1.VolumeMount
+	for i := range driverContainer.VolumeMounts {
+		if driverContainer.VolumeMounts[i].Name == "host-sys-devices-system" {
+			hostSysDevicesSystemMount = &driverContainer.VolumeMounts[i]
+			break
+		}
+	}
+	require.NotNil(t, hostSysDevicesSystemMount)
+	assert.Equal(t, "/sys/devices/system", hostSysDevicesSystemMount.MountPath)
+	assert.Empty(t, hostSysDevicesSystemMount.SubPath)
+}
+
 func TestDriverHostNetwork(t *testing.T) {
 	const (
 		testName = "driver-hostnetwork"
