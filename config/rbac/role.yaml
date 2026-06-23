@@ -118,6 +118,18 @@ rules:
   - update
   - watch
 - apiGroups:
+  - azmonitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - node.k8s.io
   resources:
   - runtimeclasses

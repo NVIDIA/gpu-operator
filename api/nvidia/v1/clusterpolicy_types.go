@@ -176,6 +176,14 @@ type ServiceMonitorConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Relabelings allows to rewrite labels on metric sets"
 	Relabelings []*promv1.RelabelConfig `json:"relabelings,omitempty"`
+
+	// APIGroup is the API group used for ServiceMonitor CRDs.
+	// Defaults to monitoring.coreos.com. Set to azmonitoring.coreos.com on AKS
+	// clusters using Azure Managed Prometheus.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="API group for ServiceMonitor CRDs"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // The Alias for backward compatibility
@@ -2445,6 +2453,21 @@ func (sm *ServiceMonitorConfig) IsEnabled() bool {
 	}
 	return *sm.Enabled
 }
+
+// GetAPIGroup returns the API group for ServiceMonitor CRDs.
+func (sm *ServiceMonitorConfig) GetAPIGroup() string {
+	if sm != nil && sm.APIGroup != "" {
+		return sm.APIGroup
+	}
+	return DefaultMonitoringAPIGroup
+}
+
+const (
+	// DefaultMonitoringAPIGroup is the default Prometheus Operator API group.
+	DefaultMonitoringAPIGroup = "monitoring.coreos.com"
+	// AzureMonitoringAPIGroup is used by Azure Managed Prometheus on AKS.
+	AzureMonitoringAPIGroup = "azmonitoring.coreos.com"
+)
 
 // IsNLSEnabled returns true if NLS should be used for licensing the driver
 func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {

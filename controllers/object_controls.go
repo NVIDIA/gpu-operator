@@ -39,6 +39,8 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -5049,6 +5051,59 @@ func applyServiceMonitorCustomEdits(desiredState *gpuv1.ServiceMonitorConfig, cu
 	}
 }
 
+func serviceMonitorCRDName(apiGroup string) string {
+	if apiGroup == "" {
+		apiGroup = gpuv1.DefaultMonitoringAPIGroup
+	}
+	return fmt.Sprintf("servicemonitors.%s", apiGroup)
+}
+
+func serviceMonitorGVK(apiGroup string) schema.GroupVersionKind {
+	if apiGroup == "" {
+		apiGroup = gpuv1.DefaultMonitoringAPIGroup
+	}
+	return schema.GroupVersionKind{Group: apiGroup, Version: "v1", Kind: "ServiceMonitor"}
+}
+
+func serviceMonitorConfigForState(n ClusterPolicyController, state string) *gpuv1.ServiceMonitorConfig {
+	switch state {
+	case "state-dcgm-exporter":
+		if n.singleton.Spec.DCGMExporter.ServiceMonitor != nil {
+			return n.singleton.Spec.DCGMExporter.ServiceMonitor
+		}
+	case "state-operator-metrics":
+		if n.singleton.Spec.Operator.Metrics.ServiceMonitor != nil {
+			return n.singleton.Spec.Operator.Metrics.ServiceMonitor
+		}
+	}
+	return nil
+}
+
+func serviceMonitorAPIGroupForState(n ClusterPolicyController, state string) string {
+	if sm := serviceMonitorConfigForState(n, state); sm != nil {
+		return sm.GetAPIGroup()
+	}
+	return gpuv1.DefaultMonitoringAPIGroup
+}
+
+func toUnstructuredServiceMonitor(sm *promv1.ServiceMonitor, apiGroup string) (*unstructured.Unstructured, error) {
+	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sm)
+	if err != nil {
+		return nil, err
+	}
+	u := &unstructured.Unstructured{Object: objMap}
+	u.SetGroupVersionKind(serviceMonitorGVK(apiGroup))
+	return u, nil
+}
+
+func deleteServiceMonitor(ctx context.Context, c client.Client, sm *promv1.ServiceMonitor, apiGroup string) error {
+	u, err := toUnstructuredServiceMonitor(sm, apiGroup)
+	if err != nil {
+		return err
+	}
+	return c.Delete(ctx, u)
+}
+
 // ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
@@ -5058,8 +5113,11 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 
 	logger := n.logger.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
 
+	apiGroup := serviceMonitorAPIGroupForState(n, n.stateNames[state])
+	crdName := serviceMonitorCRDName(apiGroup)
+
 	// Check if ServiceMonitor is a valid kind
-	serviceMonitorCRDExists, err := crdExists(n, ServiceMonitorCRDName)
+	serviceMonitorCRDExists, err := crdExists(n, crdName)
 	if err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -5069,7 +5127,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		if !serviceMonitorCRDExists {
 			return gpuv1.Ready, nil
 		}
-		err := n.client.Delete(ctx, obj)
+		err := deleteServiceMonitor(ctx, n.client, obj, apiGroup)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
@@ -5084,7 +5142,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			if !serviceMonitorCRDExists {
 				return gpuv1.Ready, nil
 			}
-			err := n.client.Delete(ctx, obj)
+			err := deleteServiceMonitor(ctx, n.client, obj, apiGroup)
 			if err != nil && !apierrors.IsNotFound(err) {
 				logger.Info("Couldn't delete", "Error", err)
 				return gpuv1.NotReady, err
@@ -5138,11 +5196,17 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	found := &promv1.ServiceMonitor{}
+	desired, err := toUnstructuredServiceMonitor(obj, apiGroup)
+	if err != nil {
+		return gpuv1.NotReady, err
+	}
+
+	found := &unstructured.Unstructured{}
+	found.SetGroupVersionKind(serviceMonitorGVK(apiGroup))
 	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
+		err = n.client.Create(ctx, desired)
 		if err != nil {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
@@ -5153,9 +5217,9 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
+	desired.SetResourceVersion(found.GetResourceVersion())
 
-	err = n.client.Update(ctx, obj)
+	err = n.client.Update(ctx, desired)
 	if err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return gpuv1.NotReady, err

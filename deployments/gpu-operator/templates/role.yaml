@@ -73,6 +73,7 @@ rules:
   - delete
 - apiGroups:
   - monitoring.coreos.com
+  - azmonitoring.coreos.com
   resources:
   - servicemonitors
   - prometheusrules

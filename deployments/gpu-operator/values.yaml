@@ -322,6 +322,7 @@ dcgmExporter:
     internalTrafficPolicy: Cluster
   serviceMonitor:
     enabled: true
+    # apiGroup: azmonitoring.coreos.com  # required for Azure Managed Prometheus on AKS
     interval: 15s
     scrapeTimeout: 10s
     honorLabels: false
