@@ -459,162 +459,39 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 	return modified
 }
 
-func (n *ClusterPolicyController) applyDriverAutoUpgradeAnnotation() error {
-	// fetch all nodes
-	opts := []client.ListOption{}
-	list := &corev1.NodeList{}
-	err := n.client.List(n.ctx, list, opts...)
-	if err != nil {
-		return fmt.Errorf("unable to list nodes to check annotations, err %s", err.Error())
-	}
-	for _, node := range list.Items {
-		node := node
-		labels := node.GetLabels()
-		if !hasCommonGPULabel(labels) {
-			// not a gpu node
-			continue
-		}
-		// set node annotation for driver auto-upgrade
-		updateRequired := false
-		value := "true"
-		annotationValue, annotationExists := node.Annotations[driverAutoUpgradeAnnotationKey]
-		if (n.singleton.Spec.Driver.IsEnabled() || n.singleton.Spec.Driver.UseNvidiaDriverCRDType()) &&
-			n.singleton.Spec.Driver.UpgradePolicy != nil &&
-			n.singleton.Spec.Driver.UpgradePolicy.AutoUpgrade &&
-			!n.sandboxEnabled {
-			// check if we need to add the annotation
-			if !annotationExists {
-				updateRequired = true
-			} else if annotationValue != "true" {
-				updateRequired = true
-			}
-		} else {
-			// check if we need to remove the annotation
-			if annotationExists {
-				updateRequired = true
-			}
-			value = "null"
-		}
-		if !updateRequired {
-			continue
-		}
-		// update annotation
-		node.Annotations[driverAutoUpgradeAnnotationKey] = value
-		if value == "null" {
-			// remove annotation if value is null
-			delete(node.Annotations, driverAutoUpgradeAnnotationKey)
-		}
-		err := n.client.Update(n.ctx, &node)
-		if err != nil {
-			n.logger.Info("Failed to update node state annotation on a node",
-				"node", node.Name,
-				"annotationKey", driverAutoUpgradeAnnotationKey,
-				"annotationValue", value, "error", err)
-			return err
-		}
-	}
-	return nil
-}
-
-// labelGPUNodes labels nodes with GPU's with NVIDIA common label
-// it return clusterHasNFDLabels (bool), gpuNodesTotal (int), error
-func (n *ClusterPolicyController) labelGPUNodes() (bool, int, error) {
+// discoverGPUNodes reads all cluster nodes and returns whether any NFD labels are present
+// and how many GPU nodes (with nvidia.com/gpu.present=true) exist.
+// Node label writes are handled by NodeLabelingReconciler.
+func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 	ctx := n.ctx
-	// fetch all nodes
-	opts := []client.ListOption{}
 	list := &corev1.NodeList{}
-	err := n.client.List(ctx, list, opts...)
-	if err != nil {
-		return false, 0, fmt.Errorf("unable to list nodes to check labels: %w", err)
+	if err := n.client.List(ctx, list); err != nil {
+		return false, 0, fmt.Errorf("unable to list nodes: %w", err)
 	}
+
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
 	for _, node := range list.Items {
-		node := node
-		updateLabels := false
-		nodeOriginal := node.DeepCopy()
-		// get node labels
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
 			clusterHasNFDLabels = hasNFDLabels(labels)
 		}
-		config, err := getWorkloadConfig(labels, n.sandboxEnabled)
-		if err != nil {
-			n.logger.Info("WARNING: failed to get GPU workload config for node; using default",
-				"NodeName", node.Name, "SandboxEnabled", n.sandboxEnabled,
-				"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
+		if !hasCommonGPULabel(labels) {
+			continue
 		}
-		n.logger.Info("GPU workload configuration", "NodeName", node.Name, "GpuWorkloadConfig", config)
-		mode := n.singleton.Spec.SandboxWorkloads.Mode
-		gpuWorkloadConfig := &gpuWorkloadConfiguration{config: config, sandboxMode: mode, node: node.Name, log: n.logger}
-		if !hasCommonGPULabel(labels) && hasGPULabels(labels) {
-			n.logger.Info("Node has GPU(s)", "NodeName", node.Name)
-			// label the node with common Nvidia GPU label
-			n.logger.Info("Setting node label", "NodeName", node.Name, "Label", commonGPULabelKey, "Value", commonGPULabelValue)
-			labels[commonGPULabelKey] = commonGPULabelValue
-			// update node labels
-			node.SetLabels(labels)
-			updateLabels = true
-		} else if hasCommonGPULabel(labels) && !hasGPULabels(labels) {
-			// previously labelled node and no longer has GPUs
-			// label node to reset common Nvidia GPU label
-			n.logger.Info("Node no longer has GPUs", "NodeName", node.Name)
-			n.logger.Info("Setting node label", "Label", commonGPULabelKey, "Value", "false")
-			labels[commonGPULabelKey] = "false"
-			n.logger.Info("Disabling all operands for node", "NodeName", node.Name)
-			removeAllGPUStateLabels(labels)
-			// update node labels
-			node.SetLabels(labels)
-			updateLabels = true
-		}
-
-		if hasCommonGPULabel(labels) {
-			// If node has GPU, then add state labels as per the workload type
-			n.logger.Info("Checking GPU state labels on the node", "NodeName", node.Name)
-			if gpuWorkloadConfig.updateGPUStateLabels(labels) {
-				n.logger.Info("Applying correct GPU state labels to the node", "NodeName", node.Name)
-				node.SetLabels(labels)
-				updateLabels = true
-			}
-			// Disable MIG on the node explicitly where no MIG config is specified
-			if n.singleton.Spec.MIGManager.IsEnabled() && hasMIGCapableGPU(labels) && !hasMIGConfigLabel(labels) {
-				if n.singleton.Spec.MIGManager.Config != nil && n.singleton.Spec.MIGManager.Config.Default == migConfigDisabledValue {
-					n.logger.Info("Setting MIG config label", "NodeName", node.Name, "Label", migConfigLabelKey, "Value", migConfigDisabledValue)
-					labels[migConfigLabelKey] = migConfigDisabledValue
-					node.SetLabels(labels)
-					updateLabels = true
-				}
-			}
-			// increment GPU node count
-			gpuNodesTotal++
-
-			// add GPU node CoreOS version for OCP
-			if n.ocpDriverToolkit.requested {
-				rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
-				if ok {
-					n.ocpDriverToolkit.rhcosVersions[rhcosVersion] = true
-					n.logger.V(1).Info("GPU node running RHCOS",
-						"nodeName", node.Name,
-						"RHCOS version", rhcosVersion,
-					)
-				} else {
-					n.logger.Info("node doesn't have the proper NFD RHCOS version label.",
-						"nodeName", node.Name,
-						"nfdLabel", nfdOSTreeVersionLabelKey,
-					)
-				}
+		gpuNodesTotal++
+		if n.ocpDriverToolkit.requested {
+			rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
+			if ok {
+				n.ocpDriverToolkit.rhcosVersions[rhcosVersion] = true
+				n.logger.V(1).Info("GPU node running RHCOS",
+					"nodeName", node.Name, "RHCOS version", rhcosVersion)
+			} else {
+				n.logger.Info("node doesn't have the proper NFD RHCOS version label.",
+					"nodeName", node.Name, "nfdLabel", nfdOSTreeVersionLabelKey)
 			}
 		}
-
-		// update node with the latest labels
-		if updateLabels {
-			err = n.client.Patch(ctx, &node, client.MergeFrom(nodeOriginal))
-			if err != nil {
-				return false, 0, fmt.Errorf("unable to label node %s for the GPU Operator deployment, err %s",
-					node.Name, err.Error())
-			}
-		}
-	} // end node loop
+	}
 
 	n.logger.Info("Number of nodes with GPU label", "NodeCount", gpuNodesTotal)
 	n.operatorMetrics.gpuNodesTotal.Set(float64(gpuNodesTotal))
@@ -949,8 +826,8 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		n.logger.Info("Pod Security Admission labels added to GPU Operator namespace", "namespace", n.operatorNamespace)
 	}
 
-	// fetch all nodes and label gpu nodes
-	hasNFDLabels, gpuNodeCount, err := n.labelGPUNodes()
+	// discover GPU nodes (labels are written by NodeLabelingReconciler)
+	hasNFDLabels, gpuNodeCount, err := n.discoverGPUNodes()
 	if err != nil {
 		return err
 	}
@@ -967,11 +844,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		}
 		n.gpuNodeOSRelease = gpuNodeOSRelease
 		n.gpuNodeOSTag = gpuNodeOSTag
-	}
-	// fetch all nodes and annotate gpu nodes
-	err = n.applyDriverAutoUpgradeAnnotation()
-	if err != nil {
-		return err
 	}
 
 	// detect the container runtime on worker nodes

@@ -45,7 +45,6 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
-	nvidiadriverutil "github.com/NVIDIA/gpu-operator/internal/nvidiadriver"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -84,8 +83,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
-			// Re-run owner assignment so deleting the last NVIDIADriver clears stale node owner labels.
-			return r.cleanupNVIDIADriverOwnerLabels(ctx)
+			return reconcile.Result{}, nil
 		}
 		wrappedErr := fmt.Errorf("error getting NVIDIADriver object: %w", err)
 		logger.Error(err, "error getting NVIDIADriver object")
@@ -97,8 +95,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, wrappedErr
 	}
 	if instance.HasDeletionTimestamp() {
-		logger.Info("NVIDIADriver delete requested; cleaning up owner labels")
-		return r.cleanupNVIDIADriverOwnerLabels(ctx)
+		return reconcile.Result{}, nil
 	}
 
 	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
@@ -156,19 +153,6 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	changed, err := nvidiadriverutil.AssignOwners(ctx, r.Client)
-	if err != nil {
-		logger.Error(err, "failed to assign NVIDIADriver owners to nodes")
-		instance.Status.State = nvidiav1alpha1.NotReady
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
-			logger.Error(condErr, "failed to set condition")
-		}
-		return reconcile.Result{}, err
-	}
-	if changed {
-		return reconcile.Result{RequeueAfter: time.Second}, nil
-	}
-
 	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
 		err := errors.New("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers")
 		logger.Error(err, "unsupported driver combination detected")
@@ -204,11 +188,6 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Sync state and update status
 	managerStatus := r.stateManager.SyncState(ctx, instance, infoCatalog)
-
-	if err := r.labelNodesWithOrphanedDriverPods(ctx); err != nil {
-		logger.Error(err, "failed to label nodes with orphaned NVIDIA driver pods")
-		return reconcile.Result{}, err
-	}
 
 	// update CR status
 	if err := r.updateCrStatus(ctx, instance, managerStatus); err != nil {
@@ -326,33 +305,6 @@ func dedupeReconcileRequests(requests []reconcile.Request) []reconcile.Request {
 		deduped = append(deduped, request)
 	}
 	return deduped
-}
-
-// cleanupNVIDIADriverOwnerLabels re-runs owner assignment after a delete event
-// when ClusterPolicy is still configured for NVIDIADriver mode. This lets
-// AssignOwners remove stale nvidia.com/gpu-operator.driver.owner labels when no remaining
-// NVIDIADriver matches a GPU node, including deletion of the last NVIDIADriver.
-func (r *NVIDIADriverReconciler) cleanupNVIDIADriverOwnerLabels(ctx context.Context) (reconcile.Result, error) {
-	clusterPolicyList := &gpuv1.ClusterPolicyList{}
-	if err := r.List(ctx, clusterPolicyList); err != nil {
-		wrappedErr := fmt.Errorf("error getting ClusterPolicy list: %w", err)
-		log.FromContext(ctx).Error(wrappedErr, "failed to cleanup NVIDIADriver owner labels")
-		return reconcile.Result{}, wrappedErr
-	}
-
-	if len(clusterPolicyList.Items) == 0 {
-		return reconcile.Result{}, nil
-	}
-
-	if !clusterPolicyList.Items[0].Spec.Driver.UseNvidiaDriverCRDType() {
-		return reconcile.Result{}, nil
-	}
-
-	if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
-		log.FromContext(ctx).Error(err, "failed to cleanup NVIDIADriver owner labels")
-		return reconcile.Result{}, err
-	}
-	return reconcile.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
