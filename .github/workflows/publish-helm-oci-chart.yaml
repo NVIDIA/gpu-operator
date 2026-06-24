@@ -41,7 +41,7 @@ jobs:
         name: Check out code
 
       - name: Set up Helm
-        uses: azure/setup-helm@v5.0.0
+        uses: azure/setup-helm@v5.0.1
 
       - name: Set chart image repository
         env:
