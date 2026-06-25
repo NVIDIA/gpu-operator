@@ -953,6 +953,107 @@ spec:
                       type: string
                   type: object
                 type: array
+              upgradePolicy:
+                description: UpgradePolicy allows to control automatic upgrade of
+                  the driver on nodes
+                properties:
+                  autoUpgrade:
+                    default: true
+                    description: |-
+                      AutoUpgrade is a switch for automatic upgrade feature.
+                      If set to false all other options are ignored.
+                    type: boolean
+                  drain:
+                    description: DrainSpec describes configuration for node drain
+                      during automatic upgrade
+                    properties:
+                      deleteEmptyDir:
+                        default: false
+                        description: |-
+                          DeleteEmptyDir indicates if should continue even if there are pods using emptyDir
+                          (local data that will be deleted when the node is drained)
+                        type: boolean
+                      enable:
+                        default: false
+                        description: Enable indicates if node draining is allowed
+                          during upgrade
+                        type: boolean
+                      force:
+                        default: false
+                        description: Force indicates if force draining is allowed
+                        type: boolean
+                      podSelector:
+                        description: |-
+                          PodSelector specifies a label selector to filter pods on the node that need to be drained
+                          For more details on label selectors, see:
+                          https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+                        type: string
+                      timeoutSeconds:
+                        default: 300
+                        description: TimeoutSecond specifies the length of time in
+                          seconds to wait before giving up drain, zero means infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                  maxParallelUpgrades:
+                    default: 1
+                    description: |-
+                      MaxParallelUpgrades indicates how many nodes can be upgraded in parallel.
+                      0 means no limit, all nodes will be upgraded in parallel.
+                    minimum: 0
+                    type: integer
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    default: 25%
+                    description: |-
+                      MaxUnavailable is the maximum number of nodes with the driver installed, that can be unavailable during the upgrade.
+                      Value can be an absolute number (ex: 5) or a percentage of total nodes at the start of upgrade (ex: 10%).
+                      Absolute number is calculated from percentage by rounding up.
+                      By default, a fixed value of 25% is used.
+                    x-kubernetes-int-or-string: true
+                  podDeletion:
+                    description: PodDeletionSpec describes configuration for deletion
+                      of pods using special resources during automatic upgrade
+                    properties:
+                      deleteEmptyDir:
+                        default: false
+                        description: |-
+                          DeleteEmptyDir indicates if should continue even if there are pods using emptyDir
+                          (local data that will be deleted when the pod is deleted)
+                        type: boolean
+                      force:
+                        default: false
+                        description: Force indicates if force deletion is allowed
+                        type: boolean
+                      timeoutSeconds:
+                        default: 300
+                        description: |-
+                          TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+                          infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                  waitForCompletion:
+                    description: WaitForCompletionSpec describes the configuration
+                      for waiting on job completions
+                    properties:
+                      podSelector:
+                        description: |-
+                          PodSelector specifies a label selector for the pods to wait for completion
+                          For more details on label selectors, see:
+                          https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+                        type: string
+                      timeoutSeconds:
+                        default: 0
+                        description: |-
+                          TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means
+                          infinite
+                        minimum: 0
+                        type: integer
+                    type: object
+                type: object
               useOpenKernelModules:
                 description: |-
                   Deprecated: This field is no longer honored by the gpu-operator. Please use KernelModuleType instead.

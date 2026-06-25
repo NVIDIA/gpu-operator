@@ -167,6 +167,25 @@ metadata:
             "version": "sha256:3d7ae961d7bce5e193885aa99e91ba87421bccc3d187cd9997083faf021208be",
             "nodeSelector": {},
             "manager": {},
+            "upgradePolicy": {
+                "autoUpgrade": true,
+                "drain": {
+                  "deleteEmptyDir": false,
+                  "enable": false,
+                  "force": false,
+                  "timeoutSeconds": 300
+                },
+                "maxParallelUpgrades": 1,
+                "maxUnavailable": "25%",
+                "podDeletion": {
+                  "deleteEmptyDir": false,
+                  "force": false,
+                  "timeoutSeconds": 300
+                },
+                "waitForCompletion": {
+                  "timeoutSeconds": 0
+                }
+            },
             "repoConfig": {
               "name": ""
             },

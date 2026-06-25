@@ -24,6 +24,9 @@ import (
 	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/image"
@@ -172,6 +175,11 @@ type NVIDIADriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Name of the Kubernetes Secret with secret environment variables for the NVIDIA Driver"
 	SecretEnv string `json:"secretEnv,omitempty"`
+
+	// UpgradePolicy allows to control automatic upgrade of the driver on nodes
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Driver Upgrade Policy"
+	UpgradePolicy *DriverUpgradePolicySpec `json:"upgradePolicy,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// NodeSelector specifies a selector for installation of NVIDIA driver
@@ -779,4 +787,113 @@ func (l *DriverLicensingConfigSpec) IsNLSEnabled() bool {
 		return true
 	}
 	return *l.NLSEnabled
+}
+
+// DriverUpgradePolicySpec describes policy configuration for automatic upgrades of the driver.
+type DriverUpgradePolicySpec struct {
+	// AutoUpgrade is a switch for automatic upgrade feature.
+	// If set to false all other options are ignored.
+	// +optional
+	// +kubebuilder:default=true
+	AutoUpgrade bool `json:"autoUpgrade,omitempty"`
+	// MaxParallelUpgrades indicates how many nodes can be upgraded in parallel.
+	// 0 means no limit, all nodes will be upgraded in parallel.
+	// +optional
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	MaxParallelUpgrades int `json:"maxParallelUpgrades,omitempty"`
+	// MaxUnavailable is the maximum number of nodes with the driver installed, that can be unavailable during the upgrade.
+	// Value can be an absolute number (ex: 5) or a percentage of total nodes at the start of upgrade (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// By default, a fixed value of 25% is used.
+	// +optional
+	// +kubebuilder:default="25%"
+	MaxUnavailable    *intstr.IntOrString    `json:"maxUnavailable,omitempty"`
+	PodDeletion       *PodDeletionSpec       `json:"podDeletion,omitempty"`
+	WaitForCompletion *WaitForCompletionSpec `json:"waitForCompletion,omitempty"`
+	DrainSpec         *DrainSpec             `json:"drain,omitempty"`
+}
+
+type PodDeletionSpec = upgrade_v1alpha1.PodDeletionSpec
+type WaitForCompletionSpec = upgrade_v1alpha1.WaitForCompletionSpec
+type DrainSpec = upgrade_v1alpha1.DrainSpec
+
+// GetUpgradePolicyWithDefaults returns the upgrade policy for this driver
+// with default values applied for any unset fields.
+func (s *NVIDIADriverSpec) GetUpgradePolicyWithDefaults() *upgrade_v1alpha1.DriverUpgradePolicySpec {
+	if s.UpgradePolicy == nil {
+		return getDefaultUpgradePolicySpec()
+	}
+
+	result := &upgrade_v1alpha1.DriverUpgradePolicySpec{
+		AutoUpgrade:         s.UpgradePolicy.AutoUpgrade,
+		MaxParallelUpgrades: s.UpgradePolicy.MaxParallelUpgrades,
+	}
+
+	if s.UpgradePolicy.MaxUnavailable != nil {
+		result.MaxUnavailable = s.UpgradePolicy.MaxUnavailable
+	} else {
+		result.MaxUnavailable = getDefaultMaxUnavailable()
+	}
+
+	if s.UpgradePolicy.PodDeletion != nil {
+		result.PodDeletion = s.UpgradePolicy.PodDeletion
+	} else {
+		result.PodDeletion = getDefaultPodDeletionSpec()
+	}
+
+	if s.UpgradePolicy.WaitForCompletion != nil {
+		result.WaitForCompletion = s.UpgradePolicy.WaitForCompletion
+	} else {
+		result.WaitForCompletion = getDefaultWaitForCompletionSpec()
+	}
+
+	if s.UpgradePolicy.DrainSpec != nil {
+		result.DrainSpec = s.UpgradePolicy.DrainSpec
+	} else {
+		result.DrainSpec = getDefaultDrainSpec()
+	}
+
+	return result
+}
+
+func getDefaultUpgradePolicySpec() *upgrade_v1alpha1.DriverUpgradePolicySpec {
+	return &upgrade_v1alpha1.DriverUpgradePolicySpec{
+		AutoUpgrade:         true,
+		MaxParallelUpgrades: 1,
+		MaxUnavailable:      getDefaultMaxUnavailable(),
+		PodDeletion:         getDefaultPodDeletionSpec(),
+		WaitForCompletion:   getDefaultWaitForCompletionSpec(),
+		DrainSpec:           getDefaultDrainSpec(),
+	}
+}
+
+func getDefaultMaxUnavailable() *intstr.IntOrString {
+	defaultMaxUnavailable := intstr.FromString("25%")
+	return &defaultMaxUnavailable
+}
+
+func getDefaultPodDeletionSpec() *PodDeletionSpec {
+	return &PodDeletionSpec{
+		Force:          false,
+		TimeoutSecond:  300,
+		DeleteEmptyDir: false,
+	}
+}
+
+func getDefaultWaitForCompletionSpec() *WaitForCompletionSpec {
+	return &WaitForCompletionSpec{
+		PodSelector:   "",
+		TimeoutSecond: 0,
+	}
+}
+
+func getDefaultDrainSpec() *DrainSpec {
+	return &DrainSpec{
+		Enable:         false,
+		Force:          false,
+		PodSelector:    "",
+		TimeoutSecond:  300,
+		DeleteEmptyDir: false,
+	}
 }

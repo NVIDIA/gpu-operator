@@ -13,6 +13,28 @@ spec:
   imagePullSecrets: []
   nodeSelector: {}
   manager: {}
+  upgradePolicy:
+    # global switch for automatic upgrade feature
+    # if set to false all other options are ignored
+    autoUpgrade: true
+    # how many nodes can be upgraded in parallel
+    # 0 means no limit, all nodes will be upgraded in parallel
+    maxParallelUpgrades: 1
+    # maximum number of nodes with the driver installed, that can be unavailable during
+    # the upgrade. Value can be an absolute number (ex: 5) or
+    # a percentage of total nodes at the start of upgrade (ex:
+    # 10%). Absolute number is calculated from percentage by rounding
+    # up. By default, a fixed value of 25% is used.'
+    maxUnavailable: 25%
+    # options for waiting on pod(job) completions
+    waitForCompletion:
+      timeoutSeconds: 0
+      podSelector: ""
+    # options for gpu pod deletion
+    podDeletion:
+      force: false
+      timeoutSeconds: 300
+      deleteEmptyDir: false
   rdma:
     enabled: false
     useHostMofed: false
