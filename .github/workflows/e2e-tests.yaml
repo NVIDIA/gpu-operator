@@ -82,6 +82,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         name: Check out code
+        with:
+          persist-credentials: false
       - name: Download values override file
         if: ${{ inputs.use_values_override }}
         uses: actions/download-artifact@v8
@@ -148,6 +150,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         name: Check out code
+        with:
+          persist-credentials: false
       - name: Download values override file
         if: ${{ inputs.use_values_override }}
         uses: actions/download-artifact@v8

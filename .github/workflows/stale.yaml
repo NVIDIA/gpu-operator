@@ -5,12 +5,15 @@ on:
   schedule:
     - cron: "21 4 * * *"
 
+permissions: {}
+
 jobs:
   stale:
     permissions:
       actions: write
       issues: write
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/stale@v10

@@ -18,6 +18,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   helm-lint:
     runs-on: ubuntu-latest
@@ -25,6 +28,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install Helm
         uses: azure/setup-helm@v5.0.1
         id: install
@@ -36,6 +41,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Get Golang version
         id: vars
         run: |
@@ -53,6 +60,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Get Golang version
         id: vars
         run: |
@@ -63,4 +72,3 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - run: make validate-helm-values
-
