@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@4b4db1dcc7dad75ad67a788a380f75a20cc8a040
         with:
           release: v0.11.3
 
