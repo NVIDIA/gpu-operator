@@ -52,9 +52,10 @@ import (
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
 type UpgradeReconciler struct {
 	client.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
-	StateManager upgrade.ClusterUpgradeStateManager
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	StateManager    upgrade.ClusterUpgradeStateManager
+	OperatorMetrics *OperatorMetrics
 }
 
 const (
@@ -89,9 +90,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	err := r.Get(ctx, req.NamespacedName, clusterPolicy)
 	if err != nil {
 		reqLogger.Error(err, "Error getting ClusterPolicy object")
-		if clusterPolicyCtrl.operatorMetrics != nil {
-			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
-		}
+		r.OperatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -105,26 +104,17 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
 		reqLogger.V(consts.LogLevelInfo).Info("Advanced driver upgrade policy is not supported when 'sandboxWorkloads.enabled=true'" +
 			"in ClusterPolicy, cleaning up upgrade state and skipping reconciliation")
-		// disable driver upgrade metrics
-		if clusterPolicyCtrl.operatorMetrics != nil {
-			clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
-		}
+		r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
 		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
 	}
 
 	if clusterPolicy.Spec.Driver.UpgradePolicy == nil ||
 		!clusterPolicy.Spec.Driver.UpgradePolicy.AutoUpgrade {
 		reqLogger.V(consts.LogLevelInfo).Info("Advanced driver upgrade policy is disabled, cleaning up upgrade state and skipping reconciliation")
-		// disable driver upgrade metrics
-		if clusterPolicyCtrl.operatorMetrics != nil {
-			clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
-		}
+		r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
 		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
 	}
-	// enable driver upgrade metrics
-	if clusterPolicyCtrl.operatorMetrics != nil {
-		clusterPolicyCtrl.operatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
-	}
+	r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
 
 	var driverLabel map[string]string
 
@@ -181,13 +171,11 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// log metrics with the current state
-	if clusterPolicyCtrl.operatorMetrics != nil {
-		clusterPolicyCtrl.operatorMetrics.upgradesInProgress.Set(float64(r.StateManager.GetUpgradesInProgress(state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesDone.Set(float64(r.StateManager.GetUpgradesDone(state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesAvailable.Set(float64(r.StateManager.GetUpgradesAvailable(state, clusterPolicy.Spec.Driver.UpgradePolicy.MaxParallelUpgrades, maxUnavailable)))
-		clusterPolicyCtrl.operatorMetrics.upgradesFailed.Set(float64(r.StateManager.GetUpgradesFailed(state)))
-		clusterPolicyCtrl.operatorMetrics.upgradesPending.Set(float64(r.StateManager.GetUpgradesPending(state)))
-	}
+	r.OperatorMetrics.upgradesInProgress.Set(float64(r.StateManager.GetUpgradesInProgress(state)))
+	r.OperatorMetrics.upgradesDone.Set(float64(r.StateManager.GetUpgradesDone(state)))
+	r.OperatorMetrics.upgradesAvailable.Set(float64(r.StateManager.GetUpgradesAvailable(state, clusterPolicy.Spec.Driver.UpgradePolicy.MaxParallelUpgrades, maxUnavailable)))
+	r.OperatorMetrics.upgradesFailed.Set(float64(r.StateManager.GetUpgradesFailed(state)))
+	r.OperatorMetrics.upgradesPending.Set(float64(r.StateManager.GetUpgradesPending(state)))
 
 	err = r.StateManager.ApplyState(ctx, state, clusterPolicy.Spec.Driver.UpgradePolicy)
 	if err != nil {

@@ -66,7 +66,9 @@ const (
 	operatorMetricsNamespace = "gpu_operator"
 )
 
-func initOperatorMetrics() *OperatorMetrics {
+// InitOperatorMetrics registers all GPU operator Prometheus metrics with the
+// controller-runtime registry and returns the initialised OperatorMetrics.
+func InitOperatorMetrics() *OperatorMetrics {
 	m := &OperatorMetrics{
 		gpuNodesTotal: promcli.NewGauge(
 			promcli.GaugeOpts{

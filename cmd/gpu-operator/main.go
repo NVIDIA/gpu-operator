@@ -154,11 +154,16 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+
+	setupLog.Info("initializing operator metrics")
+	operatorMetrics := controllers.InitOperatorMetrics()
+
 	if err = (&controllers.ClusterPolicyReconciler{
-		Namespace: operatorNamespace,
-		Client:    mgr.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
-		Scheme:    mgr.GetScheme(),
+		Namespace:       operatorNamespace,
+		Client:          mgr.GetClient(),
+		Log:             ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
+		Scheme:          mgr.GetScheme(),
+		OperatorMetrics: operatorMetrics,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPolicy")
 		os.Exit(1)
@@ -182,10 +187,11 @@ func main() {
 	clusterUpgradeStateManager = clusterUpgradeStateManager.WithPodDeletionEnabled(gpuPodSpecFilter).WithValidationEnabled("app=nvidia-operator-validator")
 
 	if err = (&controllers.UpgradeReconciler{
-		Client:       mgr.GetClient(),
-		Log:          upgradeLogger,
-		Scheme:       mgr.GetScheme(),
-		StateManager: clusterUpgradeStateManager,
+		Client:          mgr.GetClient(),
+		Log:             upgradeLogger,
+		Scheme:          mgr.GetScheme(),
+		StateManager:    clusterUpgradeStateManager,
+		OperatorMetrics: operatorMetrics,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
 		os.Exit(1)
