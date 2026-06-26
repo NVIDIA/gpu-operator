@@ -883,9 +883,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 			return fmt.Errorf("error validating clusterpolicy: %w", err)
 		}
 
-		n.operatorMetrics = initOperatorMetrics()
-		n.logger.Info("Operator metrics initialized.")
-
 		addState(n, "/opt/gpu-operator/pre-requisites")
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
 		addState(n, "/opt/gpu-operator/state-driver")

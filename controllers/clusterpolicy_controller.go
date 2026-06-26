@@ -61,6 +61,7 @@ type ClusterPolicyReconciler struct {
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
 	Namespace        string
+	OperatorMetrics  *OperatorMetrics
 	conditionUpdater conditions.Updater
 }
 
@@ -126,9 +127,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			r.Log.Error(condErr, "failed to set condition")
 		}
-		if clusterPolicyCtrl.operatorMetrics != nil {
-			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
-		}
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		return ctrl.Result{}, err
 	}
 
@@ -349,6 +348,8 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	if err != nil {
 		return err
 	}
+
+	clusterPolicyCtrl.operatorMetrics = r.OperatorMetrics
 
 	// initialize condition updater
 	r.conditionUpdater = conditions.NewClusterPolicyUpdater(mgr.GetClient())
