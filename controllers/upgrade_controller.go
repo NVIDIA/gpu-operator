@@ -47,6 +47,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
@@ -108,6 +109,19 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
 	}
 
+	// TODO: When integrating the NVIDIA DRA Driver for GPUs, decouple
+	// the driver-upgrade controller from ClusterPolicy. If a ClusterPolicy
+	// CR does not exist, take the NVIDIADriver code path.
+	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
+		return r.reconcileNVIDIADriverUpgrades(ctx, reqLogger)
+	}
+
+	return r.reconcileClusterPolicyDriverUpgrades(ctx, reqLogger, clusterPolicy)
+}
+
+// reconcileClusterPolicyDriverUpgrades handles driver upgrade reconciliation when the
+// ClusterPolicy CR is used for driver management.
+func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Context, reqLogger logr.Logger, clusterPolicy *gpuv1.ClusterPolicy) (ctrl.Result, error) {
 	if clusterPolicy.Spec.Driver.UpgradePolicy == nil ||
 		!clusterPolicy.Spec.Driver.UpgradePolicy.AutoUpgrade {
 		reqLogger.V(consts.LogLevelInfo).Info("Advanced driver upgrade policy is disabled, cleaning up upgrade state and skipping reconciliation")
@@ -122,11 +136,7 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	driverLabelKey := DriverLabelKey
 	driverLabelValue := DriverLabelValue
 
-	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
-		// app component label is added for all new driver daemonsets deployed by NVIDIADriver controller
-		driverLabelKey = AppComponentLabelKey
-		driverLabelValue = DriverAppComponentLabelValue
-	} else if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
+	if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
 		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
 		// based on rhcos version. Hence use DTK label instead
 		driverLabelKey = ocpDriverToolkitIdentificationLabel
@@ -190,6 +200,130 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
 }
 
+// reconcileNVIDIADriverUpgrades handles driver upgrade reconciliation when the NVIDIADriver CRD
+// is used for driver management. Each NVIDIADriver instance may have its own upgrade policy.
+func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, reqLogger logr.Logger) (ctrl.Result, error) {
+	var (
+		upgradesInProgress, upgradesDone, upgradesAvailable, upgradesFailed, upgradesPending int
+	)
+
+	nvidiaDriverList := &nvidiav1alpha1.NVIDIADriverList{}
+	if err := r.List(ctx, nvidiaDriverList); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Check if all NVIDIADriver instances have disabled automatic upgrades
+	noAutoUpgradesEnabled := true
+	for _, nvd := range nvidiaDriverList.Items {
+		upgradePolicy := nvd.Spec.GetUpgradePolicyWithDefaults()
+		if upgradePolicy.AutoUpgrade {
+			noAutoUpgradesEnabled = false
+			break
+		}
+	}
+
+	if noAutoUpgradesEnabled {
+		reqLogger.V(consts.LogLevelInfo).Info("No NVIDIADriver instance has upgrade policy enabled, cleaning up upgrade state and skipping reconciliation")
+		r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeDisabled)
+		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
+	}
+
+	r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
+
+	// Build a cluster-wide upgrade state using only the component label so that ALL
+	// driver pods are captured, including orphaned pods (e.g. pods left over from a
+	// ClusterPolicy-managed DaemonSet).
+	// TODO: decouple the operatorNamespace field from the ClusterPolicyController object
+	clusterState, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue})
+	if err != nil {
+		r.Log.Error(err, "Failed to build cluster upgrade state")
+		return ctrl.Result{}, err
+	}
+
+	// Partition the cluster upgrade state into per-NVIDIADriver buckets by reading the
+	// nvidia.com/gpu-operator.driver.owner label from each node.
+	statesByNVD := make(map[string]*upgrade.ClusterUpgradeState)
+	for stateKey, nodeStates := range clusterState.NodeStates {
+		for _, nodeState := range nodeStates {
+			ownerName := nodeState.Node.Labels[gpuconsts.NVIDIADriverOwnerLabel]
+			if ownerName == "" {
+				reqLogger.V(consts.LogLevelInfo).Info("Node does not have nvidia.com/gpu-operator.driver.owner label, skipping ...", "NodeName", nodeState.Node.Name)
+				continue
+			}
+			if statesByNVD[ownerName] == nil {
+				s := upgrade.NewClusterUpgradeState()
+				statesByNVD[ownerName] = &s
+			}
+			statesByNVD[ownerName].NodeStates[stateKey] = append(statesByNVD[ownerName].NodeStates[stateKey], nodeState)
+		}
+	}
+
+	// Apply the upgrade policy for each NVIDIADriver instance using its partitioned cluster upgrade state
+	for _, nvd := range nvidiaDriverList.Items {
+		upgradePolicy := nvd.Spec.GetUpgradePolicyWithDefaults()
+		if !upgradePolicy.AutoUpgrade {
+			reqLogger.V(consts.LogLevelInfo).Info("Auto upgrade is disabled for NVIDIADriver, cleaning up upgrade state for nodes it manages",
+				"name", nvd.Name)
+			if err := r.removeNodeUpgradeStateLabelsForNVD(ctx, nvd.Name); err != nil {
+				r.Log.Error(err, "Failed to remove upgrade state labels for NVIDIADriver", "name", nvd.Name)
+				return ctrl.Result{}, err
+			}
+			continue
+		}
+
+		state, ok := statesByNVD[nvd.Name]
+		if !ok {
+			continue
+		}
+
+		reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state for NVIDIADriver",
+			"name", nvd.Name, "state", state)
+
+		totalNodes := r.StateManager.GetTotalManagedNodes(state)
+		maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(upgradePolicy.MaxUnavailable, totalNodes, true)
+		if err != nil {
+			r.Log.Error(err, "Failed to compute maxUnavailable for NVIDIADriver", "name", nvd.Name)
+			return ctrl.Result{}, err
+		}
+
+		upgradesInProgress += r.StateManager.GetUpgradesInProgress(state)
+		upgradesDone += r.StateManager.GetUpgradesDone(state)
+		upgradesAvailable += r.StateManager.GetUpgradesAvailable(state, upgradePolicy.MaxParallelUpgrades, maxUnavailable)
+		upgradesFailed += r.StateManager.GetUpgradesFailed(state)
+		upgradesPending += r.StateManager.GetUpgradesPending(state)
+
+		// We want to skip the operator itself during the drain because the upgrade process might hang
+		// if the operator is evicted and can't be rescheduled to any other node, e.g. in a single-node cluster.
+		// It's safe to do because the goal of the node draining during the upgrade is to
+		// evict pods that might use driver and operator doesn't use in its own pod.
+		if upgradePolicy.DrainSpec.PodSelector == "" {
+			upgradePolicy.DrainSpec.PodSelector = UpgradeSkipDrainLabelSelector
+		} else {
+			upgradePolicy.DrainSpec.PodSelector = fmt.Sprintf("%s,%s", upgradePolicy.DrainSpec.PodSelector, UpgradeSkipDrainLabelSelector)
+		}
+
+		reqLogger.Info("Applying upgrade policy for NVIDIADriver", "name", nvd.Name)
+		if err := r.StateManager.ApplyState(ctx, state, upgradePolicy); err != nil {
+			r.Log.Error(err, "Failed to apply cluster upgrade state for NVIDIADriver", "name", nvd.Name)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Capture aggregate metrics from all NVIDIADriver CRs processed. This should provide
+	// a cluster-wide view of driver daemonset upgrades.
+	r.OperatorMetrics.upgradesInProgress.Set(float64(upgradesInProgress))
+	r.OperatorMetrics.upgradesDone.Set(float64(upgradesDone))
+	r.OperatorMetrics.upgradesAvailable.Set(float64(upgradesAvailable))
+	r.OperatorMetrics.upgradesFailed.Set(float64(upgradesFailed))
+	r.OperatorMetrics.upgradesPending.Set(float64(upgradesPending))
+
+	// In some cases if node state changes fail to apply, upgrade process
+	// might become stuck until the new reconcile loop is scheduled.
+	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
+	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
+	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
+}
+
 // removeNodeUpgradeStateLabels loops over nodes in the cluster and removes "nvidia.com/gpu-driver-upgrade-state"
 // It is used for cleanup when autoUpgrade feature gets disabled
 func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) error {
@@ -204,16 +338,44 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 
 	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
 
-	for i := range nodeList.Items {
-		node := &nodeList.Items[i]
-		_, present := node.Labels[upgradeStateLabel]
-		if present {
-			delete(node.Labels, upgradeStateLabel)
-			err = r.Update(ctx, node)
-			if err != nil {
-				r.Log.Error(err, "Failed to reset upgrade state label from node", "node", node)
-				return err
-			}
+	for _, node := range nodeList.Items {
+		if _, present := node.Labels[upgradeStateLabel]; !present {
+			continue
+		}
+		patch := client.MergeFrom(node.DeepCopy())
+		delete(node.Labels, upgradeStateLabel)
+		err = r.Patch(ctx, &node, patch)
+		if err != nil {
+			r.Log.Error(err, "Failed to remove upgrade state label from node", "node", node)
+			return err
+		}
+
+	}
+	return nil
+}
+
+// removeNodeUpgradeStateLabelsForNVD removes the upgrade-state label from all nodes owned by
+// the given NVIDIADriver CR. It is used for cleanup when autoUpgrade is disabled for that CR.
+func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Context, nvdName string) error {
+	r.Log.Info("Resetting node upgrade labels for NVIDIADriver", "name", nvdName)
+
+	nodeList := &corev1.NodeList{}
+	if err := r.List(ctx, nodeList, client.MatchingLabels{gpuconsts.NVIDIADriverOwnerLabel: nvdName}); err != nil {
+		r.Log.Error(err, "Failed to list nodes for NVIDIADriver", "name", nvdName)
+		return err
+	}
+
+	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
+
+	for _, node := range nodeList.Items {
+		if _, present := node.Labels[upgradeStateLabel]; !present {
+			continue
+		}
+		patch := client.MergeFrom(node.DeepCopy())
+		delete(node.Labels, upgradeStateLabel)
+		if err := r.Patch(ctx, &node, patch); err != nil {
+			r.Log.Error(err, "Failed to remove upgrade state label from node", "node", node.Name)
+			return err
 		}
 	}
 	return nil
