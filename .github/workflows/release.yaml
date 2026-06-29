@@ -71,7 +71,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@9a2d4216180dbb3e2dccfa60d2dd4afd98e42ec5
         with:
           release: v0.11.3
       - name: Retag gpu-operator
