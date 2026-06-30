@@ -713,6 +713,14 @@ func TestGetDriverAppName(t *testing.T) {
 	actual = getDriverAppName(cr, pool)
 	assert.Equal(t, "nvidia-gpu-driver-rocky9-59b779bcc5", actual)
 
+	// Oracle Linux
+	pool.osRelease = "ol"
+	pool.osVersion = "9.7"
+	pool.osTag, err = getOSTag(pool.osRelease, pool.osVersion)
+	assert.NoError(t, err)
+	actual = getDriverAppName(cr, pool)
+	assert.Equal(t, "nvidia-gpu-driver-ol9-59b779bcc5", actual)
+
 	// RHEL10
 	pool.osRelease = "rhel"
 	pool.osVersion = "10.1"
