@@ -388,12 +388,12 @@ func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedState
 	objects := []client.Object{driver, nodeWithoutUpgradeState, nodeWithDoneState, nodeWithActiveState, nodeWithFailedState, unownedMatchingNode}
 	objects = append(objects, pods...)
 	k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()
-	reconciler := &NVIDIADriverReconciler{
-		Client:    k8sClient,
-		Namespace: namespace,
+	nlc := &nodeLabelingController{
+		client:    k8sClient,
+		namespace: namespace,
 	}
 
-	require.NoError(t, reconciler.labelNodesWithOrphanedDriverPods(context.Background()))
+	require.NoError(t, nlc.labelNodesWithOrphanedDriverPods(context.Background()))
 
 	require.NoError(t, k8sClient.Get(context.Background(), types.NamespacedName{Name: nodeWithoutUpgradeState.Name}, nodeWithoutUpgradeState))
 	require.Equal(t, upgrade.UpgradeStateUpgradeRequired, nodeWithoutUpgradeState.Labels[upgradeStateLabel])
@@ -432,17 +432,17 @@ func TestLabelNodesWithOrphanedDriverPodsReturnsPatchError(t *testing.T) {
 	}
 	pod := orphanedDriverPod("orphaned-driver-pod", namespace, node.Name)
 	k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(driver, node, pod).Build()
-	reconciler := &NVIDIADriverReconciler{
-		Client: &patchFailingClient{
+	nlc := &nodeLabelingController{
+		client: &patchFailingClient{
 			Client:   k8sClient,
 			patchErr: errors.New("patch failed"),
 		},
-		Namespace: namespace,
+		namespace: namespace,
 	}
 
-	err := reconciler.labelNodesWithOrphanedDriverPods(context.Background())
+	err := nlc.labelNodesWithOrphanedDriverPods(context.Background())
 
-	require.ErrorContains(t, err, "failed to label node \"node-with-orphaned-pod\" with orphaned NVIDIA driver pod \"orphaned-driver-pod\"")
+	require.ErrorContains(t, err, "failed to label node \"node-with-orphaned-pod\" for orphaned driver pod \"orphaned-driver-pod\"")
 	require.ErrorContains(t, err, "patch failed")
 }
 
@@ -546,9 +546,17 @@ func setup() error {
 
 	clusterPolicyController.operatorMetrics = InitOperatorMetrics()
 
-	hasNFDLabels, gpuNodeCount, err := clusterPolicyController.labelGPUNodes()
-	if err != nil {
+	// Label GPU nodes via nodeLabelingController (mirrors production behavior)
+	nlc := &nodeLabelingController{
+		client: client,
+	}
+	if err := nlc.labelGPUNodes(ctx); err != nil {
 		return fmt.Errorf("unable to label nodes in cluster: %v", err)
+	}
+
+	hasNFDLabels, gpuNodeCount, err := clusterPolicyController.discoverGPUNodes()
+	if err != nil {
+		return fmt.Errorf("unable to discover GPU nodes in cluster: %v", err)
 	}
 	if gpuNodeCount == 0 {
 		return fmt.Errorf("no gpu nodes in mock cluster")

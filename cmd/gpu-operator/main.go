@@ -216,6 +216,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NVIDIADriver")
 		os.Exit(1)
 	}
+
+	if err = (&controllers.NodeLabelingReconciler{
+		Namespace: operatorNamespace,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Log:       ctrl.Log.WithName("controllers").WithName("NodeLabeling"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NodeLabeling")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

@@ -2205,6 +2205,14 @@ func (d *DriverSpec) IsVGPULicensingEnabled() bool {
 	return d.LicensingConfig.ConfigMapName != "" || d.LicensingConfig.SecretName != ""
 }
 
+// IsAutoUpgradeEnabled returns true if auto upgrade is enabled
+func (d *DriverSpec) IsAutoUpgradeEnabled() bool {
+	if d.UpgradePolicy == nil {
+		return false
+	}
+	return d.UpgradePolicy.AutoUpgrade
+}
+
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator
 func (p *DevicePluginSpec) IsEnabled() bool {
 	if p.Enabled == nil {
