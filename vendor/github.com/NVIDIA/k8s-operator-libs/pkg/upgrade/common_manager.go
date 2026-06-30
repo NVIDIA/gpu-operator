@@ -79,6 +79,17 @@ func NewClusterUpgradeState() ClusterUpgradeState {
 	return ClusterUpgradeState{NodeStates: make(map[string][]*NodeUpgradeState)}
 }
 
+// RestartOnlyPredicate is used for a node whose driver pod is out-of-sync with its
+// DaemonSet. running is the live driver pod's spec; desired is the DaemonSet template's
+// pod spec. Returning true means the difference does not affect the installed driver, so
+// the node is cordoned and the driver pod restarted in place, skipping pod-deletion
+// (workload eviction) and drain; the consumer guarantees the running driver does not need
+// to change across the restart. Returning false (the default when unset) routes the node
+// through the full upgrade flow. Returning an error keeps the node in upgrade-required to
+// be retried on a later reconcile. It is never called for orphaned pods, upgrade-requested
+// nodes, or nodes waiting for safe driver load.
+type RestartOnlyPredicate func(running, desired *corev1.PodSpec) (bool, error)
+
 // CommonUpgradeManagerImpl is an implementation of the CommonUpgradeStateManager interface.
 // It facilitates common logic implementation for both upgrade modes: in-place and requestor (e.g. maintenance OP).
 type CommonUpgradeManagerImpl struct {
@@ -97,6 +108,8 @@ type CommonUpgradeManagerImpl struct {
 	// optional states
 	podDeletionStateEnabled bool
 	validationStateEnabled  bool
+	// optional: when set, route immaterial pod-template changes to a restart-only path
+	restartOnlyPredicate RestartOnlyPredicate
 }
 
 // NewCommonUpgradeStateManager creates a new instance of CommonUpgradeManagerImpl

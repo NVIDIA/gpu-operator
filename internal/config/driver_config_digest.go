@@ -22,6 +22,38 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// DriverConfigDigestEnvName is the env var the operator sets on the driver pod
+// template, carrying a hash of the install-relevant driver config (DriverInstallState).
+const DriverConfigDigestEnvName = "DRIVER_CONFIG_DIGEST"
+
+// DriverConfigDigestFromPodSpec returns the DRIVER_CONFIG_DIGEST value from a driver
+// pod spec, or "" if absent. The env is set identically on every driver container, so
+// the first non-empty value (init containers first) is returned.
+func DriverConfigDigestFromPodSpec(spec *corev1.PodSpec) string {
+	if spec == nil {
+		return ""
+	}
+	digestFromEnv := func(env []corev1.EnvVar) string {
+		for _, e := range env {
+			if e.Name == DriverConfigDigestEnvName {
+				return e.Value
+			}
+		}
+		return ""
+	}
+	for _, initCtr := range spec.InitContainers {
+		if v := digestFromEnv(initCtr.Env); v != "" {
+			return v
+		}
+	}
+	for _, ctr := range spec.Containers {
+		if v := digestFromEnv(ctr.Env); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // DriverInstallState lists all fields that affect driver installation.
 // Changes to these fields trigger a driver reinstall.
 //
