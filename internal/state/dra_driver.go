@@ -113,11 +113,17 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 
 	hostPaths := cr.Spec.HostPaths
 	daemonsets := cr.Spec.Daemonsets
+	openshiftVersion, err := clusterOpenshiftVersion(infoCatalog)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OpenShift version: %w", err)
+	}
+
 	renderData := &draDriverRenderData{
 		DRADriver:             draDriverSpec,
 		HostPaths:             &hostPaths,
 		Daemonsets:            &daemonsets,
 		Namespace:             s.namespace,
+		OpenshiftVersion:      openshiftVersion,
 		DeviceClassAPIVersion: apiVersion,
 		FeatureGates:          renderDRAFeatureGates(cr.Spec.DRADriver.FeatureGates),
 		GPUsHealthcheckPort: resolveHealthcheckPort(

@@ -1,0 +1,115 @@
+# nvidia-dra-validator is the DRA-native analog of nvidia-operator-validator: its
+# pod becomes Ready only once the GPU stack on the node is healthy after a driver
+# (re)install. Pods carry `app: nvidia-operator-validator` -- the label the upgrade
+# controller's validation gate selects on. The DaemonSet name stays distinct because
+# ClusterPolicy renders a nvidia-operator-validator DaemonSet in the same namespace.
+#
+# Validation chain (each step gates the next):
+#  1. Scheduling gate (implicit): the pod consumes the adminAccess GPU claim, so
+#     it cannot be scheduled/started until the DRA driver is up and can allocate a
+#     GPU on the node -- the device-plugin-validation analog, via a ResourceClaim.
+#  2. gpu-validation initContainer: the claimed GPU is CDI-injected (device nodes +
+#     driver libs, including nvidia-smi); `nvidia-smi -L` enumerating it proves the
+#     DRA driver allocated and injected a working GPU against the current driver.
+#  3. main container: holds the pod Ready as the success signal.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dra-validator
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: nvidia-dra-validator
+    app.kubernetes.io/component: nvidia-dra-validator
+    app: nvidia-dra-validator
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nvidia-dra-validator
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nvidia-dra-validator
+        app.kubernetes.io/component: nvidia-dra-validator
+        app: nvidia-operator-validator
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dra-validator
+      # Gate scheduling on the per-component deploy label so the k8s-driver-manager can
+      # pause it to drain (and force a re-validate of) the validator during a driver reload.
+      nodeSelector:
+        nvidia.com/gpu.deploy.dra-validator: "true"
+      {{- if .Validator.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Validator.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      # Run only on compute GPU nodes. Passthrough (vfio-pci) GPUs are exposed via
+      # the vfio-gpu device class, not gpu.nvidia.com, so the claim is unsatisfiable
+      # there and the pod would stay Pending (see README: open question 1).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: In
+                values:
+                - "true"
+      {{- if .Daemonsets.Tolerations }}
+      tolerations:
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      {{- end }}
+      resourceClaims:
+      - name: validation-gpu
+        resourceClaimTemplateName: nvidia-dra-validator-gpu
+      initContainers:
+      - name: gpu-validation
+        image: {{ .Validator.ImagePath }}
+        {{- if .Validator.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .Validator.Spec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - sh
+        - -c
+        # nvidia-smi is provided by the gpu.nvidia.com CDI injection, not the image.
+        - nvidia-smi -L
+        resources:
+          claims:
+          - name: validation-gpu
+      containers:
+      - name: nvidia-dra-validator
+        image: {{ .Validator.ImagePath }}
+        {{- if .Validator.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .Validator.Spec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - sh
+        - -c
+        - "echo all validations are successful; while true; do sleep 86400; done"

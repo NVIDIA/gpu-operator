@@ -17,12 +17,9 @@
 package state
 
 import (
-	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -32,37 +29,11 @@ import (
 
 // Helpers shared by the GPUCluster operand states (DRA driver, DCGM, ...).
 
-const (
-	// draAdminNamespaceLabelKey is the label the kube-scheduler requires on a namespace
-	// before it allows adminAccess: true in ResourceClaim/ResourceClaimTemplate objects.
-	draAdminNamespaceLabelKey = "resource.kubernetes.io/admin-access"
-)
-
 // dcgmEnabled reports whether the standalone DCGM hostengine operand is enabled.
 // The DRA stack defaults it to disabled, so it does not use the reused v1
 // DCGMSpec.IsEnabled() (which treats a nil Enabled as enabled).
 func dcgmEnabled(cr *nvidiav1alpha1.GPUCluster) bool {
 	return cr.Spec.DCGM != nil && cr.Spec.DCGM.Enabled != nil && *cr.Spec.DCGM.Enabled
-}
-
-// ensureAdminAccessLabel patches the operator namespace with the label required by the
-// kube-scheduler to allow adminAccess: true in ResourceClaim/ResourceClaimTemplate
-// objects. The label is deliberately never removed: it is namespace-level configuration
-// that other adminAccess consumers in the namespace may rely on.
-func ensureAdminAccessLabel(ctx context.Context, k8sClient client.Client, namespace string) error {
-	ns := &corev1.Namespace{}
-	if err := k8sClient.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
-		return fmt.Errorf("could not get namespace %s: %w", namespace, err)
-	}
-	if ns.Labels[draAdminNamespaceLabelKey] == "true" {
-		return nil
-	}
-	patch := client.MergeFrom(ns.DeepCopy())
-	if ns.Labels == nil {
-		ns.Labels = make(map[string]string)
-	}
-	ns.Labels[draAdminNamespaceLabelKey] = "true"
-	return k8sClient.Patch(ctx, ns, patch)
 }
 
 // gpuClusterDaemonSetSource watches DaemonSets and enqueues the owning
@@ -97,4 +68,14 @@ func draResourceAPIVersion(infoCatalog InfoCatalog) (string, error) {
 			"ensure Dynamic Resource Allocation is enabled on the API server and kubelet")
 	}
 	return gvr.Group + "/" + gvr.Version, nil
+}
+
+// clusterOpenshiftVersion returns the OpenShift version, empty on vanilla Kubernetes;
+// it gates OpenShift-only objects such as SecurityContextConstraints.
+func clusterOpenshiftVersion(infoCatalog InfoCatalog) (string, error) {
+	info := infoCatalog.Get(InfoTypeClusterInfo)
+	if info == nil {
+		return "", fmt.Errorf("failed to get cluster info from info catalog")
+	}
+	return info.(clusterinfo.Interface).GetOpenshiftVersion()
 }

@@ -72,6 +72,9 @@ type dcgmRenderData struct {
 	DCGM       *dcgmSpec
 	Daemonsets *nvidiav1.DaemonsetsSpec
 	Namespace  string
+	// OpenshiftVersion gates OpenShift-only objects (SecurityContextConstraints); empty
+	// on vanilla Kubernetes.
+	OpenshiftVersion string
 	// ResourceClaimAPIVersion is the apiVersion to render on ResourceClaimTemplate
 	// objects, determined from the resource.k8s.io version served by the cluster.
 	ResourceClaimAPIVersion string
@@ -90,6 +93,9 @@ type dcgmExporterRenderData struct {
 	DCGMExporter *dcgmExporterSpec
 	Daemonsets   *nvidiav1.DaemonsetsSpec
 	Namespace    string
+	// OpenshiftVersion gates OpenShift-only objects (SecurityContextConstraints); empty
+	// on vanilla Kubernetes.
+	OpenshiftVersion string
 	// ResourceClaimAPIVersion is the apiVersion to render on ResourceClaimTemplate objects.
 	ResourceClaimAPIVersion string
 	RemoteHostEngine        string
@@ -116,6 +122,9 @@ type validatorRenderData struct {
 	Validator  *draDriverSpec
 	Daemonsets *nvidiav1.DaemonsetsSpec
 	Namespace  string
+	// OpenshiftVersion gates OpenShift-only objects (SecurityContextConstraints); empty
+	// on vanilla Kubernetes.
+	OpenshiftVersion string
 	// ResourceClaimAPIVersion is the apiVersion to render on the ResourceClaimTemplate,
 	// determined from the resource.k8s.io version served by the cluster.
 	ResourceClaimAPIVersion string
@@ -127,6 +136,9 @@ type draDriverRenderData struct {
 	HostPaths  *nvidiav1.HostPathsSpec
 	Daemonsets *nvidiav1.DaemonsetsSpec
 	Namespace  string
+	// OpenshiftVersion gates OpenShift-only objects (SecurityContextConstraints); empty
+	// on vanilla Kubernetes.
+	OpenshiftVersion string
 	// DeviceClassAPIVersion is the apiVersion to render on DeviceClass objects,
 	// determined from the resource.k8s.io version served by the cluster.
 	DeviceClassAPIVersion string
