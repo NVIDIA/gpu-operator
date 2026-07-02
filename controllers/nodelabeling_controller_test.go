@@ -612,6 +612,36 @@ func TestSetDriverAutoUpgradeAnnotation(t *testing.T) {
 	}
 }
 
+// With no ClusterPolicy, the annotation is applied from NVIDIADriver upgrade policies.
+func TestApplyDriverAutoUpgradeAnnotationNoClusterPolicy(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	nvd := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "gpu-driver"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			UpgradePolicy: &nvidiav1alpha1.DriverUpgradePolicySpec{AutoUpgrade: true},
+		},
+	}
+	owned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:   "owned-node",
+		Labels: map[string]string{consts.NVIDIADriverOwnerLabel: "gpu-driver"},
+	}}
+	unowned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "unowned-node"}}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(nvd, owned, unowned).Build()
+	nlc := &nodeLabelingController{client: fakeClient, logger: logr.Discard()}
+
+	require.NoError(t, nlc.applyDriverAutoUpgradeAnnotation(context.Background()))
+
+	updated := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: "owned-node"}, updated))
+	assert.Equal(t, "true", updated.Annotations[driverAutoUpgradeAnnotationKey])
+	require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: "unowned-node"}, updated))
+	assert.Empty(t, updated.Annotations[driverAutoUpgradeAnnotationKey])
+}
+
 func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 	const namespace = "test-ns"
 	const driverName = "gpu-driver"
@@ -783,4 +813,138 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			}
 		})
 	}
+}
+
+const gpuPCILabelKey = "feature.node.kubernetes.io/pci-10de.present"
+
+func TestUpdateGPUClusterStateLabels(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialLabels  map[string]string
+		expectedLabels map[string]string
+		expectModified bool
+	}{
+		{
+			name:          "GPU node gets the DRA operand deploy labels",
+			initialLabels: map[string]string{commonGPULabelKey: commonGPULabelValue},
+			expectedLabels: map[string]string{
+				commonGPULabelKey:          commonGPULabelValue,
+				driverDeployLabelKey:       "true",
+				draDriverDeployLabelKey:    "true",
+				draValidatorDeployLabelKey: "true",
+				dcgmDeployLabelKey:         "true",
+				dcgmExporterDeployLabelKey: "true",
+			},
+			expectModified: true,
+		},
+		{
+			name:           "node without the common GPU label has nothing to remove",
+			initialLabels:  map[string]string{"kubernetes.io/hostname": "plain"},
+			expectedLabels: map[string]string{"kubernetes.io/hostname": "plain"},
+			expectModified: false,
+		},
+		{
+			name: "node that lost its GPUs has the deploy labels removed",
+			initialLabels: map[string]string{
+				commonGPULabelKey:          "false",
+				driverDeployLabelKey:       "true",
+				draDriverDeployLabelKey:    "true",
+				draValidatorDeployLabelKey: "true",
+				dcgmDeployLabelKey:         "true",
+				dcgmExporterDeployLabelKey: "true",
+			},
+			expectedLabels: map[string]string{commonGPULabelKey: "false"},
+			expectModified: true,
+		},
+		{
+			name: "GPU node missing some deploy labels is converged",
+			initialLabels: map[string]string{
+				commonGPULabelKey:    commonGPULabelValue,
+				driverDeployLabelKey: "true",
+			},
+			expectedLabels: map[string]string{
+				commonGPULabelKey:          commonGPULabelValue,
+				driverDeployLabelKey:       "true",
+				draDriverDeployLabelKey:    "true",
+				draValidatorDeployLabelKey: "true",
+				dcgmDeployLabelKey:         "true",
+				dcgmExporterDeployLabelKey: "true",
+			},
+			expectModified: true,
+		},
+		{
+			name: "paused deploy labels are honored, not overwritten",
+			initialLabels: map[string]string{
+				commonGPULabelKey:          commonGPULabelValue,
+				driverDeployLabelKey:       "false",
+				draDriverDeployLabelKey:    "false",
+				draValidatorDeployLabelKey: "false",
+				dcgmDeployLabelKey:         "false",
+				dcgmExporterDeployLabelKey: "false",
+			},
+			expectedLabels: map[string]string{
+				commonGPULabelKey:          commonGPULabelValue,
+				driverDeployLabelKey:       "false",
+				draDriverDeployLabelKey:    "false",
+				draValidatorDeployLabelKey: "false",
+				dcgmDeployLabelKey:         "false",
+				dcgmExporterDeployLabelKey: "false",
+			},
+			expectModified: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			labels := mergeLabels(tc.initialLabels)
+			modified := updateGPUClusterStateLabels(labels)
+			assert.Equal(t, tc.expectModified, modified)
+			assert.Equal(t, tc.expectedLabels, labels)
+		})
+	}
+}
+
+func TestReconcileGPUClusterNodeLabels(t *testing.T) {
+	newReconciler := func(objs ...client.Object) (*NodeLabelingReconciler, client.Client) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		require.NoError(t, gpuv1.AddToScheme(scheme))
+		require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+		return &NodeLabelingReconciler{Client: c, Scheme: scheme, Log: logr.Discard()}, c
+	}
+	gpuNode := func() *corev1.Node {
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:   "gpu-node",
+			Labels: map[string]string{gpuPCILabelKey: "true"},
+		}}
+	}
+
+	t.Run("GPUCluster present and no ClusterPolicy labels the GPU node", func(t *testing.T) {
+		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+		r, c := newReconciler(gc, gpuNode())
+
+		_, err := r.Reconcile(context.Background(), reconcile.Request{})
+		require.NoError(t, err)
+
+		node := &corev1.Node{}
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
+		assert.Equal(t, commonGPULabelValue, node.Labels[commonGPULabelKey])
+		assert.Equal(t, "true", node.Labels[driverDeployLabelKey])
+		assert.Equal(t, "true", node.Labels[draDriverDeployLabelKey])
+		assert.Equal(t, "true", node.Labels[dcgmDeployLabelKey])
+		assert.Equal(t, "true", node.Labels[dcgmExporterDeployLabelKey])
+	})
+
+	t.Run("no ClusterPolicy and no GPUCluster leaves the node untouched", func(t *testing.T) {
+		r, c := newReconciler(gpuNode())
+
+		_, err := r.Reconcile(context.Background(), reconcile.Request{})
+		require.NoError(t, err)
+
+		node := &corev1.Node{}
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
+		assert.NotContains(t, node.Labels, commonGPULabelKey)
+		assert.NotContains(t, node.Labels, draDriverDeployLabelKey)
+	})
 }

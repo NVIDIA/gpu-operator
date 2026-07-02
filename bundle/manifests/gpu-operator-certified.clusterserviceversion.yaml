@@ -156,6 +156,30 @@ metadata:
         },
         {
           "apiVersion": "nvidia.com/v1alpha1",
+          "kind": "GPUCluster",
+          "metadata": {
+            "name": "gpu-cluster"
+          },
+          "spec": {
+            "draDriver": {
+              "repository": "registry.k8s.io/dra-driver-nvidia",
+              "image": "dra-driver-nvidia-gpu",
+              "version": "v0.4.0",
+              "imagePullPolicy": "IfNotPresent",
+              "computeDomains": {
+                "enabled": true
+              }
+            },
+            "dcgm": {
+              "enabled": false
+            },
+            "dcgmExporter": {
+              "enabled": true
+            }
+          }
+        },
+        {
+          "apiVersion": "nvidia.com/v1alpha1",
           "kind": "NVIDIADriver",
           "metadata": {
             "name": "gpu-driver"
@@ -224,6 +248,8 @@ spec:
   relatedImages:
     - name: gpu-operator-image
       image: ghcr.io/nvidia/gpu-operator:main-latest
+    - name: nvidia-dra-driver-image
+      image: registry.k8s.io/dra-driver-nvidia/dra-driver-nvidia-gpu:v0.4.0@sha256:dd17d49170f62071d13ef5de9b8f0ff26c66793f9d802c34532c0cb4f8a1d1f3
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless@sha256:613ab03c11d442fd960ff515f547e9921537454a712d08160bc8f677f89f1c35
     - name: dcgm-image
@@ -337,6 +363,49 @@ spec:
           path: state
           x-descriptors:
             - 'urn:alm:descriptor:text'
+    - name: gpuclusters.nvidia.com
+      kind: GPUCluster
+      version: v1alpha1
+      group: nvidia.com
+      displayName: GPUCluster
+      description: GPUCluster allows you to configure the DRA-based GPU software stack
+      resources:
+        - kind: ServiceAccount
+          name: ''
+          version: v1
+        - kind: DaemonSet
+          name: ''
+          version: apps/v1
+        - kind: Deployment
+          name: ''
+          version: apps/v1
+        - kind: ConfigMap
+          name: ''
+          version: v1
+        - kind: Pod
+          name: ''
+          version: v1
+        - kind: status
+          name: ''
+          version: v1
+      statusDescriptors:
+        - description: The current state of the GPUCluster.
+          displayName: State
+          path: state
+          x-descriptors:
+            - 'urn:alm:descriptor:text'
+    - name: computedomains.resource.nvidia.com
+      kind: ComputeDomain
+      version: v1beta1
+      group: resource.nvidia.com
+      displayName: ComputeDomain
+      description: ComputeDomain prepares a set of nodes to run a multi-node workload in.
+    - name: computedomaincliques.resource.nvidia.com
+      kind: ComputeDomainClique
+      version: v1beta1
+      group: resource.nvidia.com
+      displayName: ComputeDomainClique
+      description: ComputeDomainClique describes a clique within a ComputeDomain.
     - name: clusterpolicies.nvidia.com
       kind: ClusterPolicy
       version: v1
@@ -652,6 +721,9 @@ spec:
           - clusterpolicies
           - clusterpolicies/finalizers
           - clusterpolicies/status
+          - gpuclusters
+          - gpuclusters/finalizers
+          - gpuclusters/status
           - nvidiadrivers
           - nvidiadrivers/finalizers
           - nvidiadrivers/status
@@ -755,6 +827,7 @@ spec:
           - get
           - list
           - watch
+          - patch
         - apiGroups:
           - ""
           resources:
@@ -792,6 +865,117 @@ spec:
           - update
           - patch
           - delete
+        - apiGroups:
+          - resource.nvidia.com
+          resources:
+          - computedomains
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.nvidia.com
+          resources:
+          - computedomains/status
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.nvidia.com
+          resources:
+          - computedomaincliques
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - create
+          - update
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaims
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaimtemplates
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - deviceclasses
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceslices
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - resource.k8s.io
+          resources:
+          - resourceclaims/status
+          verbs:
+          - update
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
       permissions:
       - serviceAccountName: gpu-operator
         rules:
@@ -820,6 +1004,18 @@ spec:
           - apps
           resources:
           - daemonsets
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
           verbs:
           - create
           - get
@@ -938,6 +1134,8 @@ spec:
                         fieldPath: metadata.namespace
                   - name: "VALIDATOR_IMAGE"
                     value: "ghcr.io/nvidia/gpu-operator:main-latest"
+                  - name: "DRA_DRIVER_IMAGE"
+                    value: "registry.k8s.io/dra-driver-nvidia/dra-driver-nvidia-gpu:v0.4.0@sha256:dd17d49170f62071d13ef5de9b8f0ff26c66793f9d802c34532c0cb4f8a1d1f3"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.19.3@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
