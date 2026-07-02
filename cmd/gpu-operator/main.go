@@ -230,6 +230,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeLabeling")
 		os.Exit(1)
 	}
+
+	if err = (&controllers.GPUClusterReconciler{
+		Namespace:   operatorNamespace,
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClusterInfo: clusterInfo,
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
