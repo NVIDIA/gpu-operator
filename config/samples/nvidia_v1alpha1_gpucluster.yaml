@@ -1,0 +1,85 @@
+apiVersion: nvidia.com/v1alpha1
+kind: GPUCluster
+metadata:
+  name: gpucluster-sample
+spec:
+  draDriver:
+    repository: registry.k8s.io/dra-driver-nvidia
+    image: dra-driver-nvidia-gpu
+    version: v0.4.0
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    # NOTE: a driver-validation init container config block (e.g. `validator:`) is
+    # intentionally omitted for now and will be added soon.
+    gpus:
+      kubeletPlugin:
+        env: []
+        resources: {}
+    computeDomains:
+      enabled: true
+      # The controller Deployment tolerates control-plane taints out of the box;
+      # only env and resources are configurable here.
+      controller:
+        env: []
+        resources: {}
+      kubeletPlugin:
+        env: []
+        resources: {}
+  # standalone dcgm hostengine
+  dcgm:
+    # disabled by default to use embedded nv-hostengine by exporter
+    enabled: false
+    repository: nvcr.io/nvidia/cloud-native
+    image: dcgm
+    version: 4.5.2-1-ubuntu22.04
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    args: []
+    env: []
+    resources: {}
+    hostNetwork: false
+  dcgmExporter:
+    enabled: true
+    repository: nvcr.io/nvidia/k8s
+    image: dcgm-exporter
+    version: 4.5.1-4.8.0-distroless
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+    args: []
+    annotations: {}
+    env: []
+    resources: {}
+    hostPID: false
+    hostNetwork: false
+    # Enable Kubernetes pod labels / pod UID as Prometheus label dimensions on exported metrics.
+    # NOTE: both require the controller to grant dcgm-exporter cluster-level read access to pods.
+    enablePodLabels: false
+    enablePodUID: false
+    # Regex allowlist filtering which pod labels are included as metric dimensions (empty = all).
+    podLabelAllowlistRegex: []
+    service:
+      internalTrafficPolicy: Cluster
+    serviceMonitor:
+      enabled: false
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: false
+      additionalLabels: {}
+      relabelings: []
+  # Host paths used in host-path volumes for various components
+  hostPaths:
+    rootFS: "/"
+    driverInstallDir: "/run/nvidia/driver"
+    kubeletRootDir: "/var/lib/kubelet"
+  # Common configuration for all daemonsets deployed by the GPUCluster controller
+  daemonsets:
+    labels: {}
+    annotations: {}
+    priorityClassName: system-node-critical
+    tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    updateStrategy: "RollingUpdate"
+    rollingUpdate:
+      maxUnavailable: "1"

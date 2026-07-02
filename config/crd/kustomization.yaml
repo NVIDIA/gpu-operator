@@ -4,6 +4,7 @@
 resources:
 - bases/nvidia.com_clusterpolicies.yaml
 - bases/nvidia.com_nvidiadrivers.yaml
+- bases/nvidia.com_gpuclusters.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
