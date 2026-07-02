@@ -98,3 +98,13 @@ func draResourceAPIVersion(infoCatalog InfoCatalog) (string, error) {
 	}
 	return gvr.Group + "/" + gvr.Version, nil
 }
+
+// clusterOpenshiftVersion returns the OpenShift version, empty on vanilla Kubernetes;
+// it gates OpenShift-only objects such as SecurityContextConstraints.
+func clusterOpenshiftVersion(infoCatalog InfoCatalog) (string, error) {
+	info := infoCatalog.Get(InfoTypeClusterInfo)
+	if info == nil {
+		return "", fmt.Errorf("failed to get cluster info from info catalog")
+	}
+	return info.(clusterinfo.Interface).GetOpenshiftVersion()
+}

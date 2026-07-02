@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dcgm
+  namespace: {{ .Namespace }}
+  labels:
+    app: nvidia-dcgm
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dcgm
+      # Gate scheduling on the per-component deploy label so the k8s-driver-manager
+      # can pause it to drain DCGM off a node during a driver reload.
+      nodeSelector:
+        nvidia.com/gpu.deploy.dcgm: "true"
+      {{- if .DCGM.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .DCGM.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if deref .DCGM.Spec.HostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- if .Daemonsets.Tolerations }}
+      tolerations:
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      {{- end }}
+      resourceClaims:
+      - name: admin-gpus
+        resourceClaimTemplateName: nvidia-dcgm-admin
+      containers:
+      - name: nvidia-dcgm-ctr
+        image: {{ .DCGM.ImagePath }}
+        {{- if .DCGM.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DCGM.Spec.ImagePullPolicy }}
+        {{- end }}
+        {{- if .DCGM.Spec.Args }}
+        args:
+        {{- range .DCGM.Spec.Args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .DCGM.Spec.Env }}
+        env:
+        {{- range .DCGM.Spec.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        {{- end }}
+        securityContext:
+          privileged: true
+        ports:
+        - name: "dcgm"
+          containerPort: 5555
+        livenessProbe:
+          tcpSocket:
+            port: 5555
+          initialDelaySeconds: 15
+        readinessProbe:
+          tcpSocket:
+            port: 5555
+          initialDelaySeconds: 15
+        resources:
+          {{- if .DCGM.Spec.Resources }}
+          {{- if .DCGM.Spec.Resources.Limits }}
+          limits: {{ .DCGM.Spec.Resources.Limits | toJson }}
+          {{- end }}
+          {{- if .DCGM.Spec.Resources.Requests }}
+          requests: {{ .DCGM.Spec.Resources.Requests | toJson }}
+          {{- end }}
+          {{- end }}
+          claims:
+          - name: admin-gpus

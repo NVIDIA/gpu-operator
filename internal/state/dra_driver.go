@@ -119,11 +119,17 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 	if daemonsets.PriorityClassName != "" {
 		priorityClassName = daemonsets.PriorityClassName
 	}
+	openshiftVersion, err := clusterOpenshiftVersion(infoCatalog)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OpenShift version: %w", err)
+	}
+
 	renderData := &draDriverRenderData{
 		DRADriver:                      draDriverSpec,
 		HostPaths:                      &hostPaths,
 		Daemonsets:                     &daemonsets,
 		Namespace:                      s.namespace,
+		OpenshiftVersion:               openshiftVersion,
 		DeviceClassAPIVersion:          apiVersion,
 		FeatureGates:                   renderDRAFeatureGates(cr.Spec.DRADriver.FeatureGates),
 		KubeletPluginPriorityClassName: priorityClassName,
