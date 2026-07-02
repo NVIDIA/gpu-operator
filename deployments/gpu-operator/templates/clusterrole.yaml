@@ -114,6 +114,9 @@ rules:
   - clusterpolicies
   - clusterpolicies/finalizers
   - clusterpolicies/status
+  - gpuclusters
+  - gpuclusters/finalizers
+  - gpuclusters/status
   - nvidiadrivers
   - nvidiadrivers/finalizers
   - nvidiadrivers/status
@@ -160,3 +163,87 @@ rules:
 {{- if .Values.operator.cleanupCRD }}
   - delete
 {{- end }}
+# The rules below are the exact union of the DRA operand RBAC the operator creates
+# (RBAC escalation prevention requires the granter to hold every verb it grants) and
+# the operator's own rendering of DRA manifests; keep in lockstep with
+# manifests/state-dra-driver, state-dcgm, state-dcgm-exporter.
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomains
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomains/status
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomaincliques
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - create
+  - update
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaimtemplates
+  - deviceclasses
+  - resourceslices
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingadmissionpolicies
+  - validatingadmissionpolicybindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete

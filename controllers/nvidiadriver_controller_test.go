@@ -111,13 +111,14 @@ func TestReconcile(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	tests := []struct {
-		name          string
-		useCRD        *bool
-		driverEnabled *bool
-		spec          nvidiav1alpha1.NVIDIADriverSpec
-		validator     validator.Validator
-		error         error
-		expectedLog   string
+		name             string
+		useCRD           *bool
+		driverEnabled    *bool
+		gpuClusterExists bool
+		spec             nvidiav1alpha1.NVIDIADriverSpec
+		validator        validator.Validator
+		error            error
+		expectedLog      string
 	}{
 		{
 			name:   "ClusterPolicy has driver CRD false → reconciliation skips driver",
@@ -127,6 +128,16 @@ func TestReconcile(t *testing.T) {
 			},
 			error:       nil,
 			expectedLog: "useNvidiaDriverCRD is not enabled in ClusterPolicy",
+		},
+		{
+			name:             "driver CRD false but GPUCluster exists → reconciliation proceeds",
+			useCRD:           ptr.To(false),
+			gpuClusterExists: true,
+			validator: &FakeNodeSelectorValidator{
+				CustomError: errors.New("fake list error"),
+			},
+			error:       nil,
+			expectedLog: "nodeSelector validation failed",
 		},
 		{
 			name:   "ClusterPolicy has driver CRD true but validator errors",
@@ -188,6 +199,10 @@ func TestReconcile(t *testing.T) {
 
 			// Initialize fake client with ClusterPolicy (driver optional)
 			clientBuilder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp, driver)
+			if tc.gpuClusterExists {
+				gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+				clientBuilder = clientBuilder.WithObjects(gc)
+			}
 			client := clientBuilder.Build()
 
 			updater := &FakeConditionUpdater{}

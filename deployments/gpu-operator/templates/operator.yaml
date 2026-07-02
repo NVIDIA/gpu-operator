@@ -59,6 +59,11 @@ spec:
               fieldPath: metadata.namespace
         - name: "DRIVER_MANAGER_IMAGE"
           value: "{{ include "driver-manager.fullimage" . }}"
+        - name: "VALIDATOR_IMAGE"
+          value: "{{ include "validator.fullimage" . }}"
+        {{- if .Values.operator.env }}
+        {{- toYaml .Values.operator.env | nindent 8 }}
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
