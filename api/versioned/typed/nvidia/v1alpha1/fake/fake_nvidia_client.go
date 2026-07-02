@@ -28,6 +28,10 @@ type FakeNvidiaV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeNvidiaV1alpha1) GPUClusters() v1alpha1.GPUClusterInterface {
+	return newFakeGPUClusters(c)
+}
+
 func (c *FakeNvidiaV1alpha1) NVIDIADrivers() v1alpha1.NVIDIADriverInterface {
 	return newFakeNVIDIADrivers(c)
 }
