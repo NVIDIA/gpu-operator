@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nvidia-dcgm-exporter-read-pods
+  name: nvidia-dcgm-exporter-dra-read-pods
   labels:
-    app: nvidia-dcgm-exporter
+    app: nvidia-dcgm-exporter-dra
 rules:
 - apiGroups:
   - ""

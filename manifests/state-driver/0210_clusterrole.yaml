@@ -34,6 +34,15 @@ rules:
   - pods/eviction
   verbs:
   - create
+# k8s-driver-manager resolves pod ResourceClaims to find GPU pods allocated through DRA
+# before evicting them across a driver reload.
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps
   resources:

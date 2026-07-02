@@ -89,6 +89,8 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 	ds := findDaemonSet(t, objs)
 	podSpec := ds.Spec.Template.Spec
 	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-exporter"])
+	// The mode gate keeps the DRA-stack exporter off device-plugin nodes.
+	assert.Equal(t, "dra", podSpec.NodeSelector["nvidia.com/gpu-operator.resource-allocation.mode"])
 	require.NotNil(t, podSpec.AutomountServiceAccountToken)
 	assert.False(t, *podSpec.AutomountServiceAccountToken)
 
@@ -124,7 +126,7 @@ func TestDCGMExporterRemoteEngineWhenDCGMEnabled(t *testing.T) {
 
 	ds := findDaemonSet(t, objs)
 	env := envMap(ds.Spec.Template.Spec.Containers[0].Env)
-	assert.Equal(t, "nvidia-dcgm:5555", env["DCGM_REMOTE_HOSTENGINE_INFO"])
+	assert.Equal(t, "nvidia-dcgm-dra:5555", env["DCGM_REMOTE_HOSTENGINE_INFO"])
 }
 
 func TestDCGMExporterPodMetadataEnrichment(t *testing.T) {
@@ -215,7 +217,7 @@ func TestDCGMExporterServiceMonitorRendered(t *testing.T) {
 
 	sm := findByKind(objs, "ServiceMonitor")
 	require.NotNil(t, sm, "ServiceMonitor must render when the CRD is served and it is enabled")
-	assert.Equal(t, "nvidia-dcgm-exporter", sm.GetName())
+	assert.Equal(t, "nvidia-dcgm-exporter-dra", sm.GetName())
 }
 
 func TestDCGMExporterServiceType(t *testing.T) {

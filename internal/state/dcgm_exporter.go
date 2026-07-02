@@ -35,9 +35,9 @@ const (
 	// CR does not specify repository/image/version.
 	dcgmExporterImageEnvName = "DCGM_EXPORTER_IMAGE"
 
-	// dcgmRemoteHostEngine points dcgm-exporter at the standalone nvidia-dcgm hostengine
-	// Service (manifests/state-dcgm/0600_service.yaml).
-	dcgmRemoteHostEngine = "nvidia-dcgm:5555"
+	// dcgmRemoteHostEngine points dcgm-exporter at the standalone nvidia-dcgm-dra
+	// hostengine Service (manifests/state-dcgm/0600_service.yaml).
+	dcgmRemoteHostEngine = "nvidia-dcgm-dra:5555"
 
 	dcgmExporterDefaultCollectors     = "/etc/dcgm-exporter/dcp-metrics-included.csv"
 	dcgmExporterCustomCollectors      = "/etc/dcgm-exporter/dcgm-metrics.csv"

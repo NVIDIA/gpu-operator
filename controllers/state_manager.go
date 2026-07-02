@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -80,6 +82,7 @@ const (
 	gfdDeployLabelKey              = "nvidia.com/gpu.deploy.gpu-feature-discovery"
 	dcgmDeployLabelKey             = "nvidia.com/gpu.deploy.dcgm"
 	dcgmExporterDeployLabelKey     = "nvidia.com/gpu.deploy.dcgm-exporter"
+	vgpuManagerDeployLabelKey      = "nvidia.com/gpu.deploy.vgpu-manager"
 	podSecurityLabelPrefix         = "pod-security.kubernetes.io/"
 	podSecurityLevelPrivileged     = "privileged"
 	driverAutoUpgradeAnnotationKey = "nvidia.com/gpu-driver-upgrade-enabled"
@@ -114,7 +117,7 @@ var gpuStateLabels = map[string]map[string]string{
 	},
 	gpuWorkloadConfigVMVgpu: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
-		"nvidia.com/gpu.deploy.vgpu-manager":          "true",
+		vgpuManagerDeployLabelKey:                     "true",
 		"nvidia.com/gpu.deploy.vgpu-device-manager":   "true",
 		"nvidia.com/gpu.deploy.sandbox-validator":     "true",
 		"nvidia.com/gpu.deploy.cc-manager":            "true",
@@ -131,6 +134,37 @@ var gpuClusterStateLabels = map[string]string{
 	draValidatorDeployLabelKey: "true",
 	dcgmDeployLabelKey:         "true",
 	dcgmExporterDeployLabelKey: "true",
+}
+
+// clusterPolicyStateLabelKeys returns every deploy-label key the ClusterPolicy
+// (device-plugin) stack may set on a node. The sandbox device-plugin keys are added
+// explicitly (and the result computed per call) because getEffectiveStateLabels
+// mutates the vm-passthrough map in place; mig-manager is added explicitly because
+// addGPUStateLabels sets it per MIG capability rather than via the workload-config maps.
+func clusterPolicyStateLabelKeys() map[string]bool {
+	keys := make(map[string]bool)
+	for _, labelsMap := range gpuStateLabels {
+		for key := range labelsMap {
+			keys[key] = true
+		}
+	}
+	keys[kubevirtDevicePluginDeployLabelKey] = true
+	keys[kataDevicePluginDeployLabelKey] = true
+	keys[migManagerLabelKey] = true
+	return keys
+}
+
+// devicePluginOnlyStateLabelKeys returns the deploy-label keys the mode sweep deletes
+// from a DRA node: the ClusterPolicy stack's keys minus those the GPUCluster stack
+// shares, and minus vgpu-manager, which (like gpu.deploy.driver) gates an
+// NVIDIADriver-rendered DaemonSet that may serve either stack.
+func devicePluginOnlyStateLabelKeys() map[string]bool {
+	keys := clusterPolicyStateLabelKeys()
+	for key := range gpuClusterStateLabels {
+		delete(keys, key)
+	}
+	delete(keys, vgpuManagerDeployLabelKey)
+	return keys
 }
 
 var gpuNodeLabels = map[string]string{
@@ -191,6 +225,11 @@ type ClusterPolicyController struct {
 	hasGPUNodes      bool
 	hasNFDLabels     bool
 	sandboxEnabled   bool
+
+	// gpuClusterExists and allGPUNodesModeLabeled gate rendering of the resource-allocation
+	// mode nodeSelector on operand DaemonSets; see applyModeSelector.
+	gpuClusterExists       bool
+	allGPUNodesModeLabeled bool
 }
 
 func addState(n *ClusterPolicyController, path string) {
@@ -401,6 +440,12 @@ func removeAllGPUStateLabels(labels map[string]string) bool {
 			}
 		}
 	}
+	for key := range gpuClusterStateLabels {
+		if _, ok := labels[key]; ok {
+			delete(labels, key)
+			modified = true
+		}
+	}
 	if _, ok := labels[kataDevicePluginDeployLabelKey]; ok {
 		delete(labels, kataDevicePluginDeployLabelKey)
 		modified = true
@@ -427,13 +472,17 @@ func (w *gpuWorkloadConfiguration) updateGPUStateLabels(labels map[string]string
 }
 
 // addGPUStateLabels adds GPU state labels needed for the GPU workload configuration.
-// If a required state label already exists on the node, honor the current value.
+// If a required state label already exists on the node with a non-empty value, honor it —
+// k8s-driver-manager pauses operands across a driver reload by rewriting their label values.
+// A present-but-empty value is treated as absent: no legitimate state is "", but
+// k8s-driver-manager stamps "" when pausing an operand that was never deployed on the node
+// (an absent label snapshots as ""), which must not block the operand here forever.
 // For vm-passthrough, uses kata-device-plugin when mode is "kata", otherwise sandbox-device-plugin.
 func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) bool {
 	modified := false
 	effective := getEffectiveStateLabels(w.config, w.sandboxMode)
 	for key, value := range effective {
-		if _, ok := labels[key]; !ok {
+		if v, ok := labels[key]; !ok || v == "" {
 			w.log.Info("Setting node label", "NodeName", w.node, "Label", key, "Value", value)
 			labels[key] = value
 			modified = true
@@ -452,16 +501,19 @@ func (w *gpuWorkloadConfiguration) addGPUStateLabels(labels map[string]string) b
 func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string) bool {
 	modified := false
 	effective := getEffectiveStateLabels(w.config, w.sandboxMode)
-	// Collect all keys that are ever used as state labels (from static map + mode-dependent key)
-	allStateKeys := make(map[string]bool)
-	for _, labelsMap := range gpuStateLabels {
-		for key := range labelsMap {
-			allStateKeys[key] = true
-		}
+	// All keys ever used as state labels, including the DRA stack's: keys not in the
+	// effective set are deleted, which also sweeps DRA leftovers off device-plugin nodes.
+	allStateKeys := clusterPolicyStateLabelKeys()
+	for key := range gpuClusterStateLabels {
+		allStateKeys[key] = true
 	}
-	allStateKeys[kataDevicePluginDeployLabelKey] = true
 	for key := range labels {
 		if !allStateKeys[key] {
+			continue
+		}
+		// mig-manager is never in the effective set: addGPUStateLabels manages it for
+		// the container config per MIG capability, so it must not be swept there.
+		if key == migManagerLabelKey && w.config == gpuWorkloadConfigContainer {
 			continue
 		}
 		if _, keep := effective[key]; !keep {
@@ -470,18 +522,12 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 			modified = true
 		}
 	}
-	if w.config != gpuWorkloadConfigContainer {
-		if _, ok := labels[migManagerLabelKey]; ok {
-			w.log.Info("Deleting node label", "NodeName", w.node, "Label", migManagerLabelKey)
-			delete(labels, migManagerLabelKey)
-			modified = true
-		}
-	}
 	return modified
 }
 
 // discoverGPUNodes reads all cluster nodes and returns whether any NFD labels are present
-// and how many GPU nodes (with nvidia.com/gpu.present=true) exist.
+// and how many GPU nodes (with nvidia.com/gpu.present=true) exist. It also records in
+// n.allGPUNodesModeLabeled whether every GPU node carries the resource-allocation mode label.
 // Node label writes are handled by NodeLabelingReconciler.
 func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 	ctx := n.ctx
@@ -492,6 +538,7 @@ func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
+	n.allGPUNodesModeLabeled = true
 	for _, node := range list.Items {
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
@@ -501,6 +548,9 @@ func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 			continue
 		}
 		gpuNodesTotal++
+		if labels[consts.GPUAllocationModeLabelKey] == "" {
+			n.allGPUNodesModeLabeled = false
+		}
 		if n.ocpDriverToolkit.requested {
 			rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
 			if ok {
@@ -828,6 +878,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
+
+	gpuClusters := &nvidiav1alpha1.GPUClusterList{}
+	if err := n.client.List(ctx, gpuClusters); err != nil {
+		return fmt.Errorf("unable to list GPUClusters: %w", err)
+	}
+	n.gpuClusterExists = len(gpuClusters.Items) > 0
 
 	if n.hasGPUNodes {
 		gpuNodeOSRelease, gpuNodeOSTag, err := n.getGPUNodeOSInfo()

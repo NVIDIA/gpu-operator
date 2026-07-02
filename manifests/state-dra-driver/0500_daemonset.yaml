@@ -50,8 +50,11 @@ spec:
       - name: {{ . }}
       {{- end }}
       {{- end }}
-      # Gate scheduling on the deploy label so k8s-driver-manager can pause the
-      # kubelet-plugin to drain it off a node across a driver reload.
+      # Gate scheduling on the deploy label only. The node-labeling controller sets it
+      # exclusively on mode=dra nodes and, on a mode flip away from dra, removes it only
+      # after every claim-holding pod on the node is gone, so the kubelet-plugin outlives
+      # the pods whose claims it must unprepare. k8s-driver-manager likewise pauses this
+      # label to drain the plugin (last) across a driver reload.
       nodeSelector:
         nvidia.com/gpu.deploy.dra-driver: "true"
       affinity:

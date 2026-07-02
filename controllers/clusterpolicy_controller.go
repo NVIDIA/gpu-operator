@@ -42,7 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -242,30 +244,36 @@ func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedNa
 	}
 }
 
+// enqueueAllClusterPolicies returns a reconcile request for every ClusterPolicy in the
+// cluster, for watches on secondary resources (Nodes, GPUClusters) that affect rendering.
+func (r *ClusterPolicyReconciler) enqueueAllClusterPolicies(ctx context.Context) []reconcile.Request {
+	opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
+	list := &gpuv1.ClusterPolicyList{}
+
+	err := r.List(ctx, list, opts...)
+	if err != nil {
+		r.Log.Error(err, "Unable to list ClusterPolicies")
+		return []reconcile.Request{}
+	}
+
+	cpToRec := []reconcile.Request{}
+
+	for _, cp := range list.Items {
+		cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
+			Name:      cp.GetName(),
+			Namespace: cp.GetNamespace(),
+		}})
+	}
+
+	return cpToRec
+}
+
 func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
 	mapFn := func(ctx context.Context, n *corev1.Node) []reconcile.Request {
-		// find all the ClusterPolicy to trigger their reconciliation
-		opts := []client.ListOption{} // Namespace = "" to list across all namespaces.
-		list := &gpuv1.ClusterPolicyList{}
-
-		err := r.List(ctx, list, opts...)
-		if err != nil {
-			r.Log.Error(err, "Unable to list ClusterPolicies")
-			return []reconcile.Request{}
-		}
-
-		cpToRec := []reconcile.Request{}
-
-		for _, cp := range list.Items {
-			cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
-				Name:      cp.GetName(),
-				Namespace: cp.GetNamespace(),
-			}})
-		}
+		cpToRec := r.enqueueAllClusterPolicies(ctx)
 		r.Log.Info("Reconciliate ClusterPolicies after node label update", "nb", len(cpToRec))
-
 		return cpToRec
 	}
 
@@ -292,10 +300,15 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]
 			osTreeLabelChanged := oldOSTreeLabel != newOSTreeLabel
 
+			// The resource-allocation mode label gates rendering of the mode nodeSelector
+			// on operand DaemonSets, so re-render when it lands or changes.
+			modeLabelChanged := oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey]
+
 			needsUpdate := gpuCommonLabelAdded ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
-				osTreeLabelChanged
+				osTreeLabelChanged ||
+				modeLabelChanged
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
@@ -304,6 +317,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
+					"modeLabelChanged", modeLabelChanged,
 				)
 			}
 			return needsUpdate
@@ -376,6 +390,20 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 				handler.OnlyControllerOwner()),
 		),
 	)
+	if err != nil {
+		return err
+	}
+
+	// Watch GPUCluster: its existence gates the resource-allocation mode nodeSelector on operands.
+	gpuClusterMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUCluster) []reconcile.Request {
+		return r.enqueueAllClusterPolicies(ctx)
+	}
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&nvidiav1alpha1.GPUCluster{},
+		handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
+		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+	))
 	if err != nil {
 		return err
 	}
