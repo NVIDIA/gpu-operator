@@ -20,11 +20,19 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/crdutil"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 )
 
@@ -94,6 +102,13 @@ func main() {
 				return runDelete(ctx, config)
 			},
 		},
+		{
+			Name:  "delete-gpuclusters",
+			Usage: "Delete all GPUCluster CRs and wait until they are gone",
+			Action: func(ctx context.Context, _ *cli.Command) error {
+				return runDeleteGPUClusters(ctx)
+			},
+		},
 	}
 
 	err := c.Run(context.Background(), os.Args)
@@ -125,4 +140,58 @@ func runDelete(ctx context.Context, cfg config) error {
 
 	logger.Info("Successfully deleted CRDs")
 	return nil
+}
+
+// runDeleteGPUClusters deletes every GPUCluster CR and blocks until all are gone. The
+// GPUCluster controller drains ResourceClaim-consuming operands under a finalizer
+// before the CR disappears, so waiting here (from the chart's pre-delete hook) keeps
+// the operator alive until that ordered teardown has completed.
+func runDeleteGPUClusters(ctx context.Context) error {
+	scheme := runtime.NewScheme()
+	if err := nvidiav1alpha1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("failed to add GPUCluster types to scheme: %w", err)
+	}
+	restConfig, err := ctrlconfig.GetConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+	k8sClient, err := ctrlclient.New(restConfig, ctrlclient.Options{Scheme: scheme})
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	for {
+		list := &nvidiav1alpha1.GPUClusterList{}
+		if err := k8sClient.List(ctx, list); err != nil {
+			// The GPUCluster CRD may not be installed (e.g. cleanup enabled without
+			// the DRA stack ever deployed); nothing to drain in that case.
+			if meta.IsNoMatchError(err) {
+				logger.Info("GPUCluster CRD not installed, nothing to delete")
+				return nil
+			}
+			return fmt.Errorf("failed to list GPUClusters: %w", err)
+		}
+		if len(list.Items) == 0 {
+			logger.Info("All GPUCluster CRs deleted")
+			return nil
+		}
+		for i := range list.Items {
+			cr := &list.Items[i]
+			if cr.DeletionTimestamp.IsZero() {
+				logger.Infof("Deleting GPUCluster %s", cr.Name)
+				if err := k8sClient.Delete(ctx, cr); err != nil && !apierrors.IsNotFound(err) {
+					return fmt.Errorf("failed to delete GPUCluster %s: %w", cr.Name, err)
+				}
+			}
+		}
+		logger.Infof("Waiting for %d GPUCluster CR(s) to be deleted", len(list.Items))
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for GPUCluster CRs to be deleted: %w", ctx.Err())
+		case <-time.After(5 * time.Second):
+		}
+	}
 }

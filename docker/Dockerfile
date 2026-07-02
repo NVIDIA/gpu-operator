@@ -120,6 +120,7 @@ COPY validator/manifests /opt/validator/manifests
 # Add CRD resource into the image for helm upgrades
 COPY deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml /opt/gpu-operator/nvidia.com_clusterpolicies.yaml
 COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
+COPY deployments/gpu-operator/crds/nvidia.com_gpuclusters.yaml /opt/gpu-operator/nvidia.com_gpuclusters.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
 USER 65532:65532

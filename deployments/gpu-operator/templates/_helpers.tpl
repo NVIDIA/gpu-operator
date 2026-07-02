@@ -78,3 +78,10 @@ Full image name with tag
 {{- define "driver-manager.fullimage" -}}
 {{- .Values.driver.manager.repository -}}/{{- .Values.driver.manager.image -}}:{{- .Values.driver.manager.version -}}
 {{- end }}
+
+{{/*
+Full image name with tag
+*/}}
+{{- define "validator.fullimage" -}}
+{{- .Values.validator.repository -}}/{{- .Values.validator.image -}}:{{- .Values.validator.version | default .Chart.AppVersion -}}
+{{- end }}
