@@ -606,6 +606,31 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 	}
 }
 
+func TestDriverConfigPathHelpers(t *testing.T) {
+	repoConfigPath, err := getRepoConfigPath("rhel")
+	require.NoError(t, err)
+	assert.Equal(t, "/etc/yum.repos.d", repoConfigPath)
+
+	certConfigPath, err := getCertConfigPath("rhcos")
+	require.NoError(t, err)
+	assert.Equal(t, "/etc/pki/ca-trust/extracted/pem", certConfigPath)
+
+	subscriptionPaths, err := getSubscriptionPathsToVolumeSources("rhel")
+	require.NoError(t, err)
+	assert.Contains(t, subscriptionPaths, "/run/secrets/etc-pki-entitlement")
+	assert.Contains(t, subscriptionPaths, "/run/secrets/redhat.repo")
+	assert.Contains(t, subscriptionPaths, "/run/secrets/rhsm")
+
+	_, err = getRepoConfigPath("unsupported")
+	require.ErrorContains(t, err, "distribution unsupported not supported")
+
+	_, err = getCertConfigPath("unsupported")
+	require.ErrorContains(t, err, "distribution unsupported not supported")
+
+	_, err = getSubscriptionPathsToVolumeSources("unsupported")
+	require.ErrorContains(t, err, "distribution unsupported not supported")
+}
+
 func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	const (
 		testName     = "driver-openshift-drivertoolkit"
