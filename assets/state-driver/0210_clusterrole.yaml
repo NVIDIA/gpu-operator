@@ -28,12 +28,24 @@ rules:
   - get
   - list
   - watch
+  # delete lets the drain helper remove GPU pods on clusters without the eviction API
+  # subresource enabled; eviction (below) is preferred when available.
+  - delete
 - apiGroups:
   - ""
   resources:
   - pods/eviction
   verbs:
   - create
+# k8s-driver-manager resolves pod ResourceClaims to find GPU pods allocated through DRA
+# before evicting them across a driver reload.
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps
   resources:

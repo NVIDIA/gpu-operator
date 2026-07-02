@@ -19,10 +19,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -53,15 +56,22 @@ type NodeLabelingReconciler struct {
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
-// re-receive that state as arguments. Exactly one of clusterPolicy or gpuCluster is
-// set, selecting the ClusterPolicy stack (the default) or the DRA-based GPUCluster
-// stack; the two CRs are mutually exclusive.
+// re-receive that state as arguments. clusterPolicy drives the device-plugin stack and
+// gpuCluster the DRA stack; the two may coexist, with each node served by exactly
+// one stack according to its nvidia.com/gpu-operator.resource-allocation.mode label. defaultMode is the mode
+// applied to GPU nodes that do not have the label yet.
 type nodeLabelingController struct {
 	client        client.Client
 	namespace     string
 	clusterPolicy *gpuv1.ClusterPolicy
 	gpuCluster    *nvidiav1alpha1.GPUCluster
+	defaultMode   consts.GPUAllocationMode
 	logger        logr.Logger
+
+	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
+	// at least one node because pods holding gpu.nvidia.com claims are still present; the
+	// reconciler requeues until the kubelet-plugin can drain last.
+	draPluginRemovalDeferred bool
 }
 
 // gpuNodeLabelsUpdateResult reports total node patches and the subset where GPU
@@ -79,6 +89,8 @@ type nodeLabelUpdateReasons struct {
 	gpuCommonLabelOutdated       bool
 	gpuCommonLabelChanged        bool
 	commonOperandsLabelChanged   bool
+	modeLabelMissing             bool
+	modeLabelChanged             bool
 	gpuWorkloadConfigChanged     bool
 	migCapableLabelChanged       bool
 	osTreeLabelChanged           bool
@@ -91,6 +103,8 @@ func (r nodeLabelUpdateReasons) needsUpdate() bool {
 		r.gpuCommonLabelOutdated ||
 		r.gpuCommonLabelChanged ||
 		r.commonOperandsLabelChanged ||
+		r.modeLabelMissing ||
+		r.modeLabelChanged ||
 		r.gpuWorkloadConfigChanged ||
 		r.migCapableLabelChanged ||
 		r.osTreeLabelChanged ||
@@ -107,6 +121,8 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 		gpuCommonLabelOutdated:       !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels),
 		gpuCommonLabelChanged:        oldLabels[commonGPULabelKey] != newLabels[commonGPULabelKey],
 		commonOperandsLabelChanged:   hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels),
+		modeLabelMissing:             hasCommonGPULabel(newLabels) && newLabels[consts.GPUAllocationModeLabelKey] == "",
+		modeLabelChanged:             oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey],
 		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
 		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
@@ -120,8 +136,8 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.Info("Reconciling node labels")
 
-	// Default to the ClusterPolicy stack; fall back to the GPUCluster (DRA) stack when
-	// no ClusterPolicy exists. Neither existing means there is nothing to label.
+	// The ClusterPolicy (device-plugin stack) and GPUCluster (DRA stack) CRs may
+	// coexist; neither existing means there is nothing to label.
 	clusterPolicy, gpuCluster, err := resolveActiveConfig(ctx, r.Client)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -131,11 +147,21 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
+	envDefaultMode, err := defaultModeFromEnv()
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if clusterPolicy != nil && gpuCluster != nil && envDefaultMode == "" {
+		r.Log.Info("WARNING: both ClusterPolicy and GPUCluster exist but DEFAULT_GPU_ALLOCATION_MODE is unset; " +
+			"defaulting new GPU nodes to the device-plugin stack")
+	}
+
 	nlc := &nodeLabelingController{
 		client:        r.Client,
 		namespace:     r.Namespace,
 		clusterPolicy: clusterPolicy,
 		gpuCluster:    gpuCluster,
+		defaultMode:   resolveDefaultMode(clusterPolicy != nil, gpuCluster != nil, envDefaultMode),
 		logger:        r.Log,
 	}
 
@@ -162,7 +188,9 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	usesNvidiaDriverCRD := nlc.gpuCluster != nil ||
 		(nlc.clusterPolicy != nil && nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())
 	if usesNvidiaDriverCRD {
-		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
+		classicClusterPolicyDriver := nlc.clusterPolicy != nil &&
+			!nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType()
+		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client, classicClusterPolicyDriver); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to assign NVIDIADriver owners to nodes: %w", err)
 		}
 		if err := nlc.labelNodesWithOrphanedDriverPods(ctx); err != nil {
@@ -170,12 +198,32 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	// The k8s-driver-manager init container consumes this annotation on either plane.
+	// The k8s-driver-manager init container consumes this annotation on either stack.
 	if err := nlc.applyDriverAutoUpgradeAnnotation(ctx); err != nil {
 		return reconcile.Result{}, err
 	}
 
+	if nlc.draPluginRemovalDeferred {
+		// Pod deletion events also retrigger reconciliation; the requeue is a backstop so
+		// the kubelet-plugin label falls off even if an event is missed.
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+	}
 	return reconcile.Result{}, nil
+}
+
+// defaultModeFromEnv reads and validates the DEFAULT_GPU_ALLOCATION_MODE operator
+// environment variable. Unset yields the empty mode (resolveDefaultMode then falls back
+// to device-plugin); a set-but-invalid value is an error.
+func defaultModeFromEnv() (consts.GPUAllocationMode, error) {
+	raw := os.Getenv(consts.DefaultGPUAllocationModeEnvName)
+	switch mode := consts.GPUAllocationMode(raw); mode {
+	case "", consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDRA:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("invalid %s environment variable: %q is not one of %q or %q",
+			consts.DefaultGPUAllocationModeEnvName, raw,
+			consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDRA)
+	}
 }
 
 // labelGPUNodes reconciles GPU-related labels and reports which node labels were patched.
@@ -190,6 +238,7 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 		original := node.DeepCopy()
 		labels := node.GetLabels()
 		gpuDiscoveryStateChanged := false
+		modeLabelModified := false
 		stateLabelsModified := false
 
 		if nlc.reconcileCommonGPULabel(labels, node.Name) {
@@ -197,12 +246,17 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 			gpuDiscoveryStateChanged = true
 		}
 
-		if nlc.updateGPUStateLabels(labels, node.Name) {
+		if nlc.reconcileModeLabel(labels, node.Name) {
+			node.SetLabels(labels)
+			modeLabelModified = true
+		}
+
+		if nlc.updateGPUStateLabels(ctx, labels, node.Name) {
 			node.SetLabels(labels)
 			stateLabelsModified = true
 		}
 
-		modified := gpuDiscoveryStateChanged || stateLabelsModified
+		modified := gpuDiscoveryStateChanged || modeLabelModified || stateLabelsModified
 		if modified {
 			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
 				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
@@ -232,16 +286,50 @@ func (nlc *nodeLabelingController) reconcileCommonGPULabel(labels map[string]str
 	return false
 }
 
-// updateGPUStateLabels syncs nvidia.com/gpu.deploy.* labels and sets the MIG config label when
-// appropriate. If the node does not have the common GPU label, all state labels are removed.
-// Returns true if labels were modified.
-func (nlc *nodeLabelingController) updateGPUStateLabels(labels map[string]string, nodeName string) bool {
-	if nlc.gpuCluster != nil {
-		return updateGPUClusterStateLabels(labels)
+// reconcileModeLabel writes nvidia.com/gpu-operator.resource-allocation.mode on GPU nodes that do not have it
+// yet. An existing value is never overwritten (or removed), whether set by a previous
+// reconcile or manually by a user: changing the cluster configuration or DEFAULT_GPU_ALLOCATION_MODE
+// must not migrate nodes that are already serving GPUs through one stack. Returns true if
+// labels were modified.
+func (nlc *nodeLabelingController) reconcileModeLabel(labels map[string]string, nodeName string) bool {
+	if !hasCommonGPULabel(labels) {
+		return false
 	}
+	if _, ok := labels[consts.GPUAllocationModeLabelKey]; ok {
+		return false
+	}
+	nlc.logger.Info("Setting GPU Operator mode label", "NodeName", nodeName,
+		"Label", consts.GPUAllocationModeLabelKey, "Value", nlc.defaultMode)
+	labels[consts.GPUAllocationModeLabelKey] = string(nlc.defaultMode)
+	return true
+}
 
+// updateGPUStateLabels syncs nvidia.com/gpu.deploy.* labels and sets the MIG config label when
+// appropriate. Which label set is applied follows the node's nvidia.com/gpu-operator.resource-allocation.mode
+// label; deploy labels exclusive to the other stack are swept away, while shared and
+// unrecognized deploy labels are left alone. If the node does not have the common GPU
+// label, all state labels are removed. Returns true if labels were modified.
+func (nlc *nodeLabelingController) updateGPUStateLabels(ctx context.Context, labels map[string]string, nodeName string) bool {
 	if !hasCommonGPULabel(labels) {
 		return removeAllGPUStateLabels(labels)
+	}
+
+	switch consts.GPUAllocationMode(labels[consts.GPUAllocationModeLabelKey]) {
+	case consts.GPUAllocationModeDRA:
+		if nlc.gpuCluster == nil {
+			return false
+		}
+		sweptPreviousStack := nlc.clearPreviousStackStateLabels(labels, devicePluginOnlyStateLabelKeys(), nodeName)
+		appliedStackLabels := updateGPUClusterStateLabels(labels)
+		return sweptPreviousStack || appliedStackLabels
+	case consts.GPUAllocationModeDevicePlugin:
+		if nlc.clusterPolicy == nil {
+			return false
+		}
+	default:
+		// Unlabeled (or unrecognized mode): apply no deploy labels, which keeps the node
+		// empty of operands until a mode is set.
+		return false
 	}
 
 	cp := nlc.clusterPolicy
@@ -263,7 +351,21 @@ func (nlc *nodeLabelingController) updateGPUStateLabels(labels map[string]string
 		node:        nodeName,
 		log:         nlc.logger,
 	}
+	// The kubelet-plugin must outlive every pod whose gpu.nvidia.com claims it has to
+	// unprepare: its DaemonSet gates only on gpu.deploy.dra-driver (not the mode label),
+	// so deferring this one key's removal keeps it running until the claim holders,
+	// drained by the mode flip, are gone. Without this the plugin unregisters first and
+	// the claim holders wedge in Terminating on unprepare.
+	draPluginLabel, draPluginWasSet := labels[draDriverDeployLabelKey]
 	modified := gpuWorkloadConfig.updateGPUStateLabels(labels)
+	if draPluginWasSet {
+		if _, stillSet := labels[draDriverDeployLabelKey]; !stillSet && nlc.nodeHasDRAClaimPods(ctx, nodeName) {
+			labels[draDriverDeployLabelKey] = draPluginLabel
+			nlc.draPluginRemovalDeferred = true
+			nlc.logger.Info("Deferring DRA kubelet-plugin removal until pods with GPU claims are gone",
+				"NodeName", nodeName, "Label", draDriverDeployLabelKey)
+		}
+	}
 
 	if cp != nil && cp.Spec.MIGManager.IsEnabled() && hasMIGCapableGPU(labels) && !hasMIGConfigLabel(labels) {
 		migConfigDefault := ""
@@ -282,25 +384,118 @@ func (nlc *nodeLabelingController) updateGPUStateLabels(labels map[string]string
 
 // updateGPUClusterStateLabels is the GPUCluster analogue of the ClusterPolicy
 // gpuWorkloadConfiguration state-label logic: it sets the DRA operand deploy labels on a GPU
-// node and removes them once the GPUs are gone. Like the ClusterPolicy path it honors an
-// existing value (set only when absent) so the k8s-driver-manager can pause an operand by
-// flipping its label to drain it off a node during a driver reload. Returns true if modified.
+// node (removal once the GPUs are gone is handled by removeAllGPUStateLabels). Like the
+// ClusterPolicy path it honors an existing non-empty value so the k8s-driver-manager can
+// pause an operand by flipping its label to drain it off a node during a driver reload.
+// A present-but-empty value is treated as absent: no legitimate state is "", but
+// k8s-driver-manager stamps "" when pausing an operand that was never deployed on the node.
+// Returns true if modified.
 func updateGPUClusterStateLabels(labels map[string]string) bool {
 	modified := false
-	if !hasCommonGPULabel(labels) {
-		for key := range gpuClusterStateLabels {
-			if _, ok := labels[key]; ok {
-				delete(labels, key)
-				modified = true
-			}
-		}
-		return modified
-	}
 	for key, value := range gpuClusterStateLabels {
-		if _, ok := labels[key]; !ok {
+		if v, ok := labels[key]; !ok || v == "" {
 			labels[key] = value
 			modified = true
 		}
+	}
+	return modified
+}
+
+// NVIDIAGPUDRADriverName is the DRA driver that allocates NVIDIA GPUs. Pods holding
+// ResourceClaims allocated by it consume GPUs exactly like pods requesting
+// device-plugin resources.
+const NVIDIAGPUDRADriverName = "gpu.nvidia.com"
+
+// PodHasNVIDIAGPUClaim reports whether any of the pod's ResourceClaims is allocated by
+// the NVIDIA GPU DRA driver. A claim that exists but cannot be read counts as a GPU
+// claim: callers use this to decide whether a pod still depends on the DRA
+// kubelet-plugin, and overcounting is recoverable while undercounting wedges teardown.
+//
+// includeAdminAccess selects between the two meanings of "holds a GPU claim":
+// admin-access allocations grant monitoring/validation pods (the GPUCluster operands)
+// a management view of the devices without consuming them, so they neither block a
+// driver reload nor warrant eviction (pass false); unpreparing them still requires
+// the DRA kubelet-plugin, so teardown ordering must count them (pass true).
+func PodHasNVIDIAGPUClaim(ctx context.Context, c client.Reader, pod *corev1.Pod, includeAdminAccess bool) bool {
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		claimName := podClaim.ResourceClaimName
+		if claimName == nil {
+			// Claim generated from a ResourceClaimTemplate; the actual name is in status.
+			for i := range pod.Status.ResourceClaimStatuses {
+				status := &pod.Status.ResourceClaimStatuses[i]
+				if status.Name == podClaim.Name && status.ResourceClaimName != nil {
+					claimName = status.ResourceClaimName
+					break
+				}
+			}
+		}
+		if claimName == nil {
+			// No claim object exists yet, so nothing is allocated for this entry.
+			continue
+		}
+
+		claim := &resourcev1.ResourceClaim{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: *claimName}, claim); err != nil {
+			ctrl.Log.Error(err, "failed to resolve pod ResourceClaim, treating pod as a GPU pod",
+				"pod", pod.Namespace+"/"+pod.Name, "claim", *claimName)
+			return true
+		}
+		if claim.Status.Allocation == nil {
+			continue
+		}
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			if !includeAdminAccess && result.AdminAccess != nil && *result.AdminAccess {
+				continue
+			}
+			if result.Driver == NVIDIAGPUDRADriverName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// nodeHasDRAClaimPods reports whether any pod on the node still holds a ResourceClaim
+// allocated by the NVIDIA GPU DRA driver. Terminating pods count: unpreparing their
+// claims is exactly what still requires the kubelet-plugin. Completed pods without a
+// deletion timestamp do not: their claims were unprepared when they reached a terminal
+// phase. Admin-access claims count too: the operands holding them wedge Terminating
+// if the plugin unregisters before their claims are unprepared.
+func (nlc *nodeLabelingController) nodeHasDRAClaimPods(ctx context.Context, nodeName string) bool {
+	podList := &corev1.PodList{}
+	if err := nlc.client.List(ctx, podList); err != nil {
+		nlc.logger.Error(err, "failed to list pods; assuming the node still has GPU claim pods", "NodeName", nodeName)
+		return true
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+		terminal := pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
+		if terminal && pod.DeletionTimestamp == nil {
+			continue
+		}
+		if PodHasNVIDIAGPUClaim(ctx, nlc.client, pod, true) {
+			return true
+		}
+	}
+	return false
+}
+
+// clearPreviousStackStateLabels deletes the given deploy-label keys exclusive to the
+// other (previously serving) stack, value-blind.
+// Keys outside deleteKeys are never touched, so k8s-driver-manager pause state on the
+// owning stack's keys survives. Returns true if labels were modified.
+func (nlc *nodeLabelingController) clearPreviousStackStateLabels(labels map[string]string, deleteKeys map[string]bool, nodeName string) bool {
+	modified := false
+	for key := range deleteKeys {
+		if _, ok := labels[key]; !ok {
+			continue
+		}
+		nlc.logger.Info("Deleting node label", "NodeName", nodeName, "Label", key)
+		delete(labels, key)
+		modified = true
 	}
 	return modified
 }
@@ -558,6 +753,8 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 					"gpuCommonLabelOutdated", reasons.gpuCommonLabelOutdated,
 					"gpuCommonLabelChanged", reasons.gpuCommonLabelChanged,
 					"commonOperandsLabelChanged", reasons.commonOperandsLabelChanged,
+					"modeLabelMissing", reasons.modeLabelMissing,
+					"modeLabelChanged", reasons.modeLabelChanged,
 					"gpuWorkloadConfigLabelChanged", reasons.gpuWorkloadConfigChanged,
 					"migCapableLabelChanged", reasons.migCapableLabelChanged,
 					"osTreeLabelChanged", reasons.osTreeLabelChanged,

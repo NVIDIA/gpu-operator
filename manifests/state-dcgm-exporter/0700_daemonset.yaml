@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter-dra
   namespace: {{ .Namespace }}
   labels:
-    app: nvidia-dcgm-exporter
+    app: nvidia-dcgm-exporter-dra
     {{- range $k, $v := .Daemonsets.Labels }}
     {{ $k }}: {{ $v | quote }}
     {{- end }}
@@ -17,13 +17,13 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: nvidia-dcgm-exporter
+      app: nvidia-dcgm-exporter-dra
   updateStrategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: nvidia-dcgm-exporter
+        app: nvidia-dcgm-exporter-dra
         {{- range $k, $v := .Daemonsets.Labels }}
         {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
         {{ $k }}: {{ $v | quote }}
@@ -40,12 +40,13 @@ spec:
       {{- end }}
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: nvidia-dcgm-exporter
+      serviceAccountName: nvidia-dcgm-exporter-dra
       automountServiceAccountToken: {{ .PodMetadataEnabled }}
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
       # can pause it to drain dcgm-exporter off a node during a driver reload.
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm-exporter: "true"
+        nvidia.com/gpu-operator.resource-allocation.mode: "dra"
       {{- if .DCGMExporter.Spec.ImagePullSecrets }}
       imagePullSecrets:
       {{- range .DCGMExporter.Spec.ImagePullSecrets }}
@@ -69,7 +70,7 @@ spec:
       - name: admin-gpus
         resourceClaimTemplateName: nvidia-dcgm-exporter-admin
       containers:
-      - name: nvidia-dcgm-exporter
+      - name: nvidia-dcgm-exporter-dra
         image: {{ .DCGMExporter.ImagePath }}
         {{- if .DCGMExporter.Spec.ImagePullPolicy }}
         imagePullPolicy: {{ .DCGMExporter.Spec.ImagePullPolicy }}

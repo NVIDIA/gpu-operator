@@ -95,23 +95,9 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	// GPUCluster (DRA path) is mutually exclusive with ClusterPolicy: if one
-	// exists, yield to it rather than deploying the DRA stack alongside it.
-	clusterPolicy, _, err := resolveActiveConfig(ctx, r.Client)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if clusterPolicy != nil {
-		logger.V(consts.LogLevelWarning).Info("ClusterPolicy present, skipping mutually exclusive GPUCluster")
-		if err := r.updateCRStatus(ctx, instance, nvidiav1alpha1.Disabled); err != nil {
-			return ctrl.Result{}, err
-		}
-		msg := "GPUCluster is mutually exclusive with ClusterPolicy; remove the ClusterPolicy or disable GPUCluster"
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, msg); condErr != nil {
-			logger.Error(condErr, "failed to set condition")
-		}
-		return ctrl.Result{}, nil
-	}
+	// GPUCluster (DRA stack) may coexist with a ClusterPolicy (device-plugin
+	// stack): every operand DaemonSet of both stacks gates on the per-node
+	// nvidia.com/gpu-operator.resource-allocation.mode label, so each node is served by exactly one stack.
 
 	// Singleton, first-wins (mirroring ClusterPolicy): the first instance to reconcile
 	// claims ownership; any other instance is marked Ignored and skipped. The owner is

@@ -378,6 +378,22 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return err
 	}
 
+	// Watch GPUCluster: its existence gates the resource-allocation mode nodeSelector on the driver.
+	gpuClusterMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUCluster) []reconcile.Request {
+		return r.enqueueAllNVIDIADrivers(ctx)
+	}
+	err = c.Watch(
+		source.Kind(
+			mgr.GetCache(),
+			&nvidiav1alpha1.GPUCluster{},
+			handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
+			predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+		),
+	)
+	if err != nil {
+		return err
+	}
+
 	nodePredicate := predicate.TypedFuncs[*corev1.Node]{
 		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()

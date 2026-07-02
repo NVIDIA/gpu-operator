@@ -62,6 +62,7 @@ spec:
       # pause it to drain (and force a re-validate of) the validator during a driver reload.
       nodeSelector:
         nvidia.com/gpu.deploy.dra-validator: "true"
+        nvidia.com/gpu-operator.resource-allocation.mode: "dra"
       {{- if .Validator.Spec.ImagePullSecrets }}
       imagePullSecrets:
       {{- range .Validator.Spec.ImagePullSecrets }}

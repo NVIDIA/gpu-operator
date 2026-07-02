@@ -414,6 +414,9 @@ func TestDRADriverKubeletPluginScheduling(t *testing.T) {
 	// priorityClassName and tolerations come from the shared daemonsets spec.
 	assert.Equal(t, "ds-priority", ds.Spec.Template.Spec.PriorityClassName)
 	assert.Subset(t, tolKeys(ds.Spec.Template.Spec.Tolerations), []string{"ds-tol"})
-	// The kubelet-plugin gates on the deploy label so k8s-driver-manager can evict it.
+	// The kubelet-plugin gates only on the deploy label: the node-labeling controller
+	// (and k8s-driver-manager) control it so the plugin drains last, after every
+	// claim-holding pod; the mode label must not unschedule it directly.
 	assert.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.dra-driver"])
+	assert.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
 }

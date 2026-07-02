@@ -77,6 +77,7 @@ const (
 // +kubebuilder:rbac:groups=mellanox.com,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=list
+// +kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaims,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments;daemonsets;replicasets;statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
 

@@ -714,6 +714,9 @@ func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
 	logger := n.logger.WithValues("Daemonset", obj.Name)
+
+	applyModeSelector(obj, n)
+
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":                     TransformDriver,
 		"nvidia-vgpu-manager-daemonset":               TransformVGPUManager,
@@ -764,6 +767,25 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets)
 
 	return nil
+}
+
+// applyModeSelector adds the nvidia.com/gpu-operator.resource-allocation.mode nodeSelector to a
+// ClusterPolicy operand DaemonSet, restricting it to device-plugin-stack nodes. The selector is
+// rendered only once a GPUCluster CR exists (before that there is no DRA stack to fence operands
+// off from, and ClusterPolicy operands schedule on their gpu.deploy.* labels alone) AND every GPU
+// node already carries the mode label. The second condition keeps the selector from de-scheduling
+// operand pods on nodes the NodeLabelingReconciler has not labeled yet (e.g. a GPUCluster created
+// in the same upgrade that introduced the label); it holds the selector back cluster-wide until
+// labeling converges, which is safe: unlabeled nodes carry no DRA deploy labels, so both stacks
+// stay correctly routed by the deploy labels alone in the interim.
+func applyModeSelector(obj *appsv1.DaemonSet, n ClusterPolicyController) {
+	if !n.gpuClusterExists || !n.allGPUNodesModeLabeled {
+		return
+	}
+	if obj.Spec.Template.Spec.NodeSelector == nil {
+		obj.Spec.Template.Spec.NodeSelector = map[string]string{}
+	}
+	obj.Spec.Template.Spec.NodeSelector[consts.GPUAllocationModeLabelKey] = string(consts.GPUAllocationModeDevicePlugin)
 }
 
 // applyCommonDaemonsetMetadata adds additional labels and annotations to the daemonset podSpec if there are any specified

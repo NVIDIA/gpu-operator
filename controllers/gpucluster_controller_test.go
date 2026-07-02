@@ -197,16 +197,16 @@ func TestGPUClusterTeardownDrainsClaimConsumersFirst(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: plugin.Name, Namespace: "test-namespace"}, ds))
 }
 
-// A ClusterPolicy in the cluster disables the GPUCluster: the two paths are
-// mutually exclusive, so the DRA stack is not deployed alongside ClusterPolicy.
-func TestGPUClusterDisabledByClusterPolicy(t *testing.T) {
+// A ClusterPolicy in the cluster does not disable the GPUCluster: the two stacks
+// coexist, with per-node ownership decided by the nvidia.com/gpu-operator.resource-allocation.mode label.
+func TestGPUClusterCoexistsWithClusterPolicy(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
 	r, c := newGPUClusterReconciler(t, cfg, cp)
 
 	gccReconcile(t, r, cfg.Name)
 
-	require.Equal(t, nvidiav1alpha1.Disabled, gccState(t, c, cfg.Name))
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
 }
 
 // First-reconciled wins (mirroring ClusterPolicy): whichever instance reconciles first

@@ -2,10 +2,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter-dra
   namespace: {{ .Namespace }}
   labels:
-    app: nvidia-dcgm-exporter
+    app: nvidia-dcgm-exporter-dra
     {{- range $k, $v := .DCGMExporter.Spec.ServiceMonitor.AdditionalLabels }}
     {{ $k }}: {{ $v | quote }}
     {{- end }}
@@ -16,7 +16,7 @@ spec:
     - {{ .Namespace }}
   selector:
     matchLabels:
-      app: nvidia-dcgm-exporter
+      app: nvidia-dcgm-exporter-dra
   endpoints:
   - port: gpu-metrics
     path: /metrics
