@@ -114,6 +114,8 @@ func newStates(crdKind string, namespace string, k8sClient client.Client, scheme
 	switch crdKind {
 	case nvidiav1alpha1.NVIDIADriverCRDName:
 		return newNVIDIADriverStates(k8sClient, namespace, scheme)
+	case nvidiav1alpha1.GPUClusterCRDName:
+		return newGPUClusterStates(k8sClient, namespace, scheme)
 	default:
 		break
 	}
@@ -127,4 +129,14 @@ func newNVIDIADriverStates(k8sClient client.Client, namespace string, scheme *ru
 	}
 
 	return []State{driverState}, nil
+}
+
+// newGPUClusterStates returns the states reconciled for a GPUCluster.
+func newGPUClusterStates(k8sClient client.Client, namespace string, scheme *runtime.Scheme) ([]State, error) {
+	draDriverState, err := NewStateDRADriver(k8sClient, namespace, scheme, "/opt/gpu-operator/manifests/state-dra-driver")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DRA driver state: %v", err)
+	}
+
+	return []State{draDriverState}, nil
 }

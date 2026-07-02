@@ -1,0 +1,84 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: computedomaincliques.resource.nvidia.com
+spec:
+  group: resource.nvidia.com
+  names:
+    kind: ComputeDomainClique
+    listKind: ComputeDomainCliqueList
+    plural: computedomaincliques
+    singular: computedomainclique
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ComputeDomainClique holds information about a specific clique within a ComputeDomain.
+          It is created in the driver namespace and named as "<computeDomainUID>.<cliqueID>".
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          daemons:
+            items:
+              description: ComputeDomainDaemonInfo provides information about each
+                daemon in a ComputeDomainClique.
+              properties:
+                cliqueID:
+                  type: string
+                index:
+                  description: |-
+                    The Index field is used to ensure a consistent IP-to-DNS name
+                    mapping across all machines within an IMEX domain. Each node's index
+                    directly determines its DNS name within a given NVLink partition
+                    (i.e. clique). In other words, the 2-tuple of (CliqueID, Index) will
+                    always be unique. This field is marked as optional (but not
+                    omitempty) in order to support downgrades and avoid an API bump.
+                  type: integer
+                ipAddress:
+                  type: string
+                nodeName:
+                  type: string
+                status:
+                  default: NotReady
+                  description: |-
+                    The Status field tracks the readiness of the IMEX daemon running on
+                    this node. It gets switched to Ready whenever the IMEX daemon is
+                    ready to broker GPU memory exchanges and switches to NotReady when
+                    it is not. It is marked as optional in order to support downgrades
+                    and avoid an API bump.
+                  enum:
+                  - Ready
+                  - NotReady
+                  type: string
+              required:
+              - cliqueID
+              - ipAddress
+              - nodeName
+              type: object
+            type: array
+            x-kubernetes-list-map-keys:
+            - nodeName
+            x-kubernetes-list-type: map
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+        type: object
+    served: true
+    storage: true

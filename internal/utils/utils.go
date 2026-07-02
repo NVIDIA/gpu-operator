@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -121,4 +122,44 @@ func GetStringHash(s string) string {
 		panic(err)
 	}
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
+}
+
+// PrependPathListEnvvar prepends a specified list of strings to a specified envvar and returns its value.
+func PrependPathListEnvvar(envvar string, prepend ...string) string {
+	if len(prepend) == 0 {
+		return os.Getenv(envvar)
+	}
+	current := filepath.SplitList(os.Getenv(envvar))
+	return strings.Join(append(prepend, current...), string(filepath.ListSeparator))
+}
+
+// SetEnvVar adds or updates an envvar in the list of specified envvars and returns it.
+func SetEnvVar(envvars []string, key, value string) []string {
+	envvars = slices.DeleteFunc(envvars, func(e string) bool {
+		return strings.HasPrefix(e, key+"=")
+	})
+	return append(envvars, key+"="+value)
+}
+
+// WriteFileAtomically writes content to the specified file via a temp file + rename,
+// so readers never observe a partially written file.
+func WriteFileAtomically(path, content string) error {
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	// Best-effort cleanup; on success the rename moves the temp file away first.
+	defer func() { _ = os.Remove(tmpFile.Name()) }() //nolint:gosec
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+	if err := os.Rename(tmpFile.Name(), path); err != nil {
+		return fmt.Errorf("error moving temporary file to %q: %w", path, err)
+	}
+	return nil
 }

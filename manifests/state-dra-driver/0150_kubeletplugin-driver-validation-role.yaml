@@ -1,0 +1,28 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-dra-driver-kubeletplugin-driver-validation
+  namespace: {{ .Namespace }}
+rules:
+# The driver-validation init container lists DaemonSets to determine whether
+# the driver is managed by the operator.
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dra-driver-kubeletplugin-driver-validation
+  namespace: {{ .Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-kubeletplugin
+  namespace: {{ .Namespace }}
+roleRef:
+  kind: Role
+  name: nvidia-dra-driver-kubeletplugin-driver-validation
+  apiGroup: rbac.authorization.k8s.io
