@@ -16,6 +16,10 @@
 
 package main
 
+import (
+	"github.com/NVIDIA/gpu-operator/internal/driverroot"
+)
+
 // driverInfo contains information about an NVIDIA driver installation.
 //
 // isHostDriver indicates whether the driver is installed directly on
@@ -53,7 +57,7 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 	// For drivers not installed directly on the host, devRoot can either be
 	// hostRoot or driverInstallDir
 	var devRoot, devRootCtrPath string
-	devRoot = root(driverInstallDirCtrPath).getDevRoot()
+	devRoot = driverroot.Root(driverInstallDirCtrPath).GetDevRoot()
 	if devRoot == "/" {
 		devRoot = hostRoot
 		devRootCtrPath = "/host"

@@ -1,0 +1,350 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dra-driver-kubelet-plugin
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: nvidia-dra-driver
+    app.kubernetes.io/component: nvidia-dra-driver-kubelet-plugin
+    app: nvidia-dra-driver-kubelet-plugin
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dra-driver-kubelet-plugin
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nvidia-dra-driver
+        app.kubernetes.io/component: nvidia-dra-driver-kubelet-plugin
+        app: nvidia-dra-driver-kubelet-plugin
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: {{ .KubeletPluginPriorityClassName }}
+      serviceAccountName: nvidia-dra-driver-kubeletplugin
+      {{- if .DRADriver.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .DRADriver.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      # Gate scheduling on the deploy label so k8s-driver-manager can pause the
+      # kubelet-plugin to drain it off a node across a driver reload.
+      nodeSelector:
+        nvidia.com/gpu.deploy.dra-driver: "true"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/pci-10de.present
+                operator: In
+                values:
+                - "true"
+            - matchExpressions:
+              - key: feature.node.kubernetes.io/cpu-model.vendor_id
+                operator: In
+                values:
+                - NVIDIA
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: In
+                values:
+                - "true"
+      {{- if .KubeletPluginTolerations }}
+      tolerations:
+      {{- range .KubeletPluginTolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      {{- end }}
+      initContainers:
+      - name: driver-validation
+        image: {{ .DRADriver.InitImagePath }}
+        {{- if .DRADriver.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DRADriver.Spec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - nvidia-validator
+        securityContext:
+          privileged: true
+          # The validator ships in the gpu-operator image (USER 65532); it must run
+          # as root to chroot into the host root for the host-driver probe.
+          runAsUser: 0
+        env:
+        - name: COMPONENT
+          value: driver
+        - name: WITH_WAIT
+          value: "true"
+        # Validate with 'nvidia-smi --version': GPUs may be bound to vfio-pci.
+        - name: DRIVER_VALIDATION_SKIP_GPU_INIT
+          value: "true"
+        # The kubelet plugin manages device nodes itself.
+        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
+          value: "true"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: HOST_ROOT
+          value: {{ .HostPaths.RootFS | default "/" | quote }}
+        - name: DRIVER_INSTALL_DIR
+          value: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+        - name: DRIVER_INSTALL_DIR_CTR_PATH
+          value: /driver-root
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: driver-install-dir
+          mountPath: /driver-root
+          mountPropagation: HostToContainer
+        - name: validations
+          mountPath: /run/nvidia/validations
+      containers:
+      - name: gpus
+        image: {{ .DRADriver.ImagePath }}
+        {{- if .DRADriver.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DRADriver.Spec.ImagePullPolicy }}
+        {{- end }}
+        securityContext:
+          privileged: true
+        command:
+        - bash
+        - -c
+        args:
+        - |-
+          # Export the driver-ready env contract (NVIDIA_DRIVER_ROOT,
+          # DRIVER_ROOT_CTR_PATH) written by the driver-validation init container.
+          set -a
+          source /run/nvidia/validations/driver-ready
+          set +a
+          # Conditionally mask the params file to prevent this container from
+          # recreating any missing GPU device nodes (e.g. under nvkind).
+          if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+            cp /proc/driver/nvidia/params /root/gpu-params
+            sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' /root/gpu-params
+            mount --bind /root/gpu-params /proc/driver/nvidia/params
+          fi
+          exec gpu-kubelet-plugin -v "${LOG_VERBOSITY}"
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8080"
+        - name: METRICS_PATH
+          value: /metrics
+        - name: LOG_VERBOSITY
+          value: "4"
+        - name: MASK_NVIDIA_DRIVER_PARAMS
+          value: ""
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: CDI_ROOT
+          value: /var/run/cdi
+        - name: NVIDIA_MIG_CONFIG_DEVICES
+          value: all
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: IMAGE_NAME
+          value: {{ .DRADriver.ImagePath | quote }}
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: HEALTHCHECK_PORT
+          value: {{ .GPUsHealthcheckPort | quote }}
+        {{- if .FeatureGates }}
+        - name: FEATURE_GATES
+          value: {{ .FeatureGates | quote }}
+        {{- end }}
+        {{- range .DRADriver.Spec.GPUs.KubeletPlugin.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        {{- if gt .GPUsHealthcheckPort 0 }}
+        startupProbe:
+          grpc:
+            port: {{ .GPUsHealthcheckPort }}
+            service: liveness
+          failureThreshold: 600
+          periodSeconds: 1
+          timeoutSeconds: 10
+        livenessProbe:
+          grpc:
+            port: {{ .GPUsHealthcheckPort }}
+            service: liveness
+          failureThreshold: 3
+          periodSeconds: 30
+          timeoutSeconds: 10
+        {{- end }}
+        {{- if .DRADriver.Spec.GPUs.KubeletPlugin.Resources }}
+        resources: {{ .DRADriver.Spec.GPUs.KubeletPlugin.Resources | toJson }}
+        {{- end }}
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: plugins
+          mountPath: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+          mountPropagation: Bidirectional
+        - name: cdi
+          mountPath: /var/run/cdi
+        - name: validations
+          mountPath: /run/nvidia/validations
+          readOnly: true
+        - name: host-root
+          mountPath: /host
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: driver-install-dir
+          mountPath: /driver-root
+          mountPropagation: HostToContainer
+      {{- if .DRADriver.Spec.IsComputeDomainsEnabled }}
+      - name: compute-domains
+        image: {{ .DRADriver.ImagePath }}
+        {{- if .DRADriver.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DRADriver.Spec.ImagePullPolicy }}
+        {{- end }}
+        securityContext:
+          privileged: true
+        command:
+        - bash
+        - -c
+        args:
+        - |-
+          # Export the driver-ready env contract (NVIDIA_DRIVER_ROOT,
+          # DRIVER_ROOT_CTR_PATH) written by the driver-validation init container.
+          set -a
+          source /run/nvidia/validations/driver-ready
+          set +a
+          # Conditionally mask the params file to prevent this container from
+          # recreating any missing GPU device nodes (e.g. under nvkind).
+          if [ "${MASK_NVIDIA_DRIVER_PARAMS}" = "true" ]; then
+            cp /proc/driver/nvidia/params /root/gpu-params
+            sed -i 's/^ModifyDeviceFiles: 1$/ModifyDeviceFiles: 0/' /root/gpu-params
+            mount --bind /root/gpu-params /proc/driver/nvidia/params
+          fi
+          exec compute-domain-kubelet-plugin -v "${LOG_VERBOSITY}"
+        env:
+        - name: HTTP_ENDPOINT
+          value: ":8081"
+        - name: METRICS_PATH
+          value: /metrics
+        - name: LOG_VERBOSITY
+          value: "4"
+        - name: MASK_NVIDIA_DRIVER_PARAMS
+          value: ""
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: void
+        - name: CDI_ROOT
+          value: /var/run/cdi
+        - name: NVIDIA_MIG_CONFIG_DEVICES
+          value: all
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: HEALTHCHECK_PORT
+          value: {{ .ComputeDomainsHealthcheckPort | quote }}
+        {{- if .FeatureGates }}
+        - name: FEATURE_GATES
+          value: {{ .FeatureGates | quote }}
+        {{- end }}
+        {{- range .DRADriver.Spec.ComputeDomains.KubeletPlugin.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        {{- if gt .ComputeDomainsHealthcheckPort 0 }}
+        startupProbe:
+          grpc:
+            port: {{ .ComputeDomainsHealthcheckPort }}
+            service: liveness
+          failureThreshold: 600
+          periodSeconds: 1
+          timeoutSeconds: 10
+        livenessProbe:
+          grpc:
+            port: {{ .ComputeDomainsHealthcheckPort }}
+            service: liveness
+          failureThreshold: 3
+          periodSeconds: 10
+          timeoutSeconds: 10
+        {{- end }}
+        {{- if .DRADriver.Spec.ComputeDomains.KubeletPlugin.Resources }}
+        resources: {{ .DRADriver.Spec.ComputeDomains.KubeletPlugin.Resources | toJson }}
+        {{- end }}
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+        - name: plugins
+          mountPath: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+          mountPropagation: Bidirectional
+        - name: cdi
+          mountPath: /var/run/cdi
+        - name: validations
+          mountPath: /run/nvidia/validations
+          readOnly: true
+        - name: host-root
+          mountPath: /host
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: driver-install-dir
+          mountPath: /driver-root
+          mountPropagation: HostToContainer
+      {{- end }}
+      volumes:
+      - name: plugins-registry
+        hostPath:
+          path: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+      - name: plugins
+        hostPath:
+          path: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
+      - name: cdi
+        hostPath:
+          path: /var/run/cdi
+      - name: host-root
+        hostPath:
+          path: {{ .HostPaths.RootFS | default "/" | quote }}
+      - name: driver-install-dir
+        hostPath:
+          path: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+          type: DirectoryOrCreate
+      # hostPath so the validator can see the driver container's .driver-ctr-ready.
+      - name: validations
+        hostPath:
+          path: /run/nvidia/validations
+          type: DirectoryOrCreate

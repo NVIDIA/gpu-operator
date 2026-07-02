@@ -31,7 +31,6 @@ import (
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	devchar "github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks"
-	"github.com/cyphar/filepath-securejoin/pathrs-lite"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert/yaml"
 	cli "github.com/urfave/cli/v3"
@@ -48,7 +47,9 @@ import (
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/driverroot"
 	"github.com/NVIDIA/gpu-operator/internal/info"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // Component of GPU operator
@@ -120,22 +121,23 @@ type CCManager struct {
 }
 
 var (
-	kubeconfigFlag                string
-	nodeNameFlag                  string
-	namespaceFlag                 string
-	withWaitFlag                  bool
-	withWorkloadFlag              bool
-	componentFlag                 string
-	cleanupAllFlag                bool
-	outputDirFlag                 string
-	sleepIntervalSecondsFlag      int
-	migStrategyFlag               string
-	metricsPort                   int
-	defaultGPUWorkloadConfigFlag  string
-	disableDevCharSymlinkCreation bool
-	hostRootFlag                  string
-	driverInstallDirFlag          string
-	driverInstallDirCtrPathFlag   string
+	kubeconfigFlag                  string
+	nodeNameFlag                    string
+	namespaceFlag                   string
+	withWaitFlag                    bool
+	withWorkloadFlag                bool
+	componentFlag                   string
+	cleanupAllFlag                  bool
+	outputDirFlag                   string
+	sleepIntervalSecondsFlag        int
+	migStrategyFlag                 string
+	metricsPort                     int
+	defaultGPUWorkloadConfigFlag    string
+	disableDevCharSymlinkCreation   bool
+	hostRootFlag                    string
+	driverInstallDirFlag            string
+	driverInstallDirCtrPathFlag     string
+	driverValidationSkipGPUInitFlag bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -375,6 +377,13 @@ func main() {
 			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
 			Destination: &driverInstallDirCtrPathFlag,
 			Sources:     cli.EnvVars("DRIVER_INSTALL_DIR_CTR_PATH"),
+		},
+		&cli.BoolFlag{
+			Name:        "driver-validation-skip-gpu-init",
+			Value:       false,
+			Usage:       "validate the driver with 'nvidia-smi --version' to avoid initializing GPUs, e.g. when GPUs are bound to vfio-pci",
+			Destination: &driverValidationSkipGPUInitFlag,
+			Sources:     cli.EnvVars("DRIVER_VALIDATION_SKIP_GPU_INIT"),
 		},
 	}
 
@@ -674,28 +683,6 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 	}
 }
 
-// prependPathListEnvvar prepends a specified list of strings to a specified envvar and returns its value.
-func prependPathListEnvvar(envvar string, prepend ...string) string {
-	if len(prepend) == 0 {
-		return os.Getenv(envvar)
-	}
-	current := filepath.SplitList(os.Getenv(envvar))
-	return strings.Join(append(prepend, current...), string(filepath.ListSeparator))
-}
-
-// setEnvVar adds or updates an envar to the list of specified envvars and returns it.
-func setEnvVar(envvars []string, key, value string) []string {
-	var updated []string
-	for _, envvar := range envvars {
-		pair := strings.SplitN(envvar, "=", 2)
-		if pair[0] == key {
-			continue
-		}
-		updated = append(updated, envvar)
-	}
-	return append(updated, fmt.Sprintf("%s=%s", key, value))
-}
-
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
 // container has completed and is in Ready state.
 func assertDriverContainerReady(silent bool) error {
@@ -743,22 +730,6 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// resolveHostNvidiaSMI opens and stats nvidia-smi within the mounted host root.
-func resolveHostNvidiaSMI(hostRootCtrPath string) (os.FileInfo, error) {
-	f, err := pathrs.OpenInRoot(hostRootCtrPath, "/usr/bin/nvidia-smi")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open 'nvidia-smi' on the host: %w", err)
-	}
-	defer f.Close()
-
-	fileInfo, err := f.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("failed to stat 'nvidia-smi' on the host: %w", err)
-	}
-
-	return fileInfo, nil
-}
-
 func validateHostDriver(silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
 	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
@@ -767,7 +738,7 @@ func validateHostDriver(silent bool) error {
 		return nil
 	}
 
-	fileInfo, err := resolveHostNvidiaSMI("/host")
+	fileInfo, err := driverroot.ResolveHostNvidiaSMI("/host")
 	if err != nil {
 		return err
 	}
@@ -775,9 +746,18 @@ func validateHostDriver(silent bool) error {
 		return fmt.Errorf("empty 'nvidia-smi' file found on the host")
 	}
 	command := "chroot"
-	args := []string{"/host", "nvidia-smi"}
+	args := append([]string{"/host", "nvidia-smi"}, nvidiaSMIArgs()...)
 
 	return runCommand(command, args, silent)
+}
+
+// With driver-validation-skip-gpu-init, validate with 'nvidia-smi --version',
+// which does not require the driver to own any GPU (e.g. GPUs bound to vfio-pci).
+func nvidiaSMIArgs() []string {
+	if driverValidationSkipGPUInitFlag {
+		return []string{"--version"}
+	}
+	return nil
 }
 
 func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
@@ -788,21 +768,21 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 		}
 	}
 
-	driverRoot := root(driverInstallDirCtrPathFlag)
+	driverRoot := driverroot.Root(driverInstallDirCtrPathFlag)
 
 	validateDriver := func(silent bool) error {
-		driverLibraryPath, err := driverRoot.getDriverLibraryPath()
+		driverLibraryPath, err := driverRoot.GetDriverLibraryPath()
 		if err != nil {
 			return fmt.Errorf("failed to locate driver libraries: %w", err)
 		}
 
-		nvidiaSMIPath, err := driverRoot.getNvidiaSMIPath()
+		nvidiaSMIPath, err := driverRoot.GetNvidiaSMIPath()
 		if err != nil {
 			return fmt.Errorf("failed to locate nvidia-smi: %w", err)
 		}
-		cmd := exec.Command(nvidiaSMIPath)
+		cmd := exec.Command(nvidiaSMIPath, nvidiaSMIArgs()...)
 		// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
-		cmd.Env = setEnvVar(os.Environ(), "LD_PRELOAD", prependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
+		cmd.Env = utils.SetEnvVar(os.Environ(), "LD_PRELOAD", utils.PrependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
 		if !silent {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -940,7 +920,7 @@ func (d *Driver) createStatusFile(driverInfo driverInfo) error {
 	}, "\n") + "\n"
 
 	// create driver status file
-	return createStatusFileWithContent(outputDirFlag+"/"+driverStatusFile, statusFileContent)
+	return utils.WriteFileAtomically(outputDirFlag+"/"+driverStatusFile, statusFileContent)
 }
 
 // isNvidiaModuleLoaded checks if NVIDIA kernel module is already loaded in kernel memory.
@@ -1013,29 +993,6 @@ func createStatusFile(statusFile string) error {
 	_, err := os.Create(statusFile)
 	if err != nil {
 		return fmt.Errorf("unable to create status file %s: %s", statusFile, err)
-	}
-	return nil
-}
-
-func createStatusFileWithContent(statusFile string, content string) error {
-	dir := filepath.Dir(statusFile)
-	tmpFile, err := os.CreateTemp(dir, filepath.Base(statusFile)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary status file: %w", err)
-	}
-	_, err = tmpFile.WriteString(content)
-	tmpFile.Close()
-	if err != nil {
-		return fmt.Errorf("failed to write temporary status file: %w", err)
-	}
-	defer func() {
-		//nolint:gosec
-		_ = os.Remove(tmpFile.Name())
-	}()
-
-	//nolint:gosec
-	if err := os.Rename(tmpFile.Name(), statusFile); err != nil {
-		return fmt.Errorf("error moving temporary file to '%s': %w", statusFile, err)
 	}
 	return nil
 }
@@ -1657,7 +1614,7 @@ func (v *VfioPCI) validate() error {
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
-	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	err = utils.WriteFileAtomically(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
 		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
@@ -1717,7 +1674,7 @@ func (v *VGPUManager) validate() error {
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
-	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	err = utils.WriteFileAtomically(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
 		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
@@ -1771,7 +1728,7 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := resolveHostNvidiaSMI("/host"); err == nil {
+	if _, err := driverroot.ResolveHostNvidiaSMI("/host"); err == nil {
 		args = []string{"/host", "nvidia-smi"}
 		hostDriver = true
 	}
@@ -1904,7 +1861,7 @@ func (v *VGPUDevices) validate() error {
 	}
 	log.Infof("GPU workload configuration: %s", gpuWorkloadConfig)
 
-	err = createStatusFileWithContent(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
+	err = utils.WriteFileAtomically(filepath.Join(outputDirFlag, workloadTypeStatusFile), gpuWorkloadConfig+"\n")
 	if err != nil {
 		return fmt.Errorf("error updating %s status file: %w", workloadTypeStatusFile, err)
 	}
