@@ -65,6 +65,7 @@ const (
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
 	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
 	migManagerAssetsPath          = "assets/state-mig-manager/"
+	vGPUDeviceManagerAssetsPath   = "assets/state-vgpu-device-manager/"
 	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
 	upgradedKernel                = "5.4.135-generic"
 )
@@ -1252,6 +1253,45 @@ func TestVGPUManagerAssets(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating resources: %v", err)
 	}
+}
+
+// TestVGPUDeviceManagerReadinessGate verifies that the vGPU Device Manager's
+// vgpu-manager-validation init container waits for the vGPU Manager readiness
+// status file written in BOTH deployment modes: vgpu-manager-ready (vGPU
+// Manager deployed as a container) and host-vgpu-manager-ready (vGPU Manager
+// driver pre-installed on the host). The validator writes only the host-
+// prefixed file when the driver is pre-installed, so a gate that waits for the
+// container-managed file alone hangs indefinitely when driver.enabled=false.
+func TestVGPUDeviceManagerReadinessGate(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, vGPUDeviceManagerAssetsPath, "0600_daemonset.yaml")
+	buffer, err := os.ReadFile(manifestPath)
+	require.NoError(t, err, "unable to read vGPU Device Manager daemonset asset")
+
+	ds := appsv1.DaemonSet{}
+	ser := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
+	_, _, err = ser.Decode(buffer, nil, &ds)
+	require.NoError(t, err, "unable to decode vGPU Device Manager daemonset asset")
+
+	var initCtr *corev1.Container
+	for i := range ds.Spec.Template.Spec.InitContainers {
+		if ds.Spec.Template.Spec.InitContainers[i].Name == "vgpu-manager-validation" {
+			initCtr = &ds.Spec.Template.Spec.InitContainers[i]
+			break
+		}
+	}
+	require.NotNil(t, initCtr, "vgpu-manager-validation init container not found")
+
+	args := strings.Join(initCtr.Args, " ")
+	require.Contains(t, args, "/run/nvidia/validations/vgpu-manager-ready",
+		"readiness gate must wait for the container-managed vGPU Manager status file")
+	require.Contains(t, args, "/run/nvidia/validations/host-vgpu-manager-ready",
+		"readiness gate must also wait for the host-installed vGPU Manager status file (driver.enabled=false)")
+	// The two files must be combined with OR: the gate must pass when EITHER
+	// status file exists, since the validator only ever writes one of them.
+	// Guard against an accidental AND, which would re-break both modes.
+	require.Contains(t, args, "|| [ -f /run/nvidia/validations/host-vgpu-manager-ready",
+		"the two status files must be combined with OR, not AND, so the gate passes when either is present")
 }
 
 // getSandboxDevicePluginTestInput return a ClusterPolicy instance for a particular
