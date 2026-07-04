@@ -242,6 +242,10 @@ const (
 	shell = "sh"
 	// defaultVGPUReadinessTimeout is the default timeout for waiting for the vGPU stack to be ready
 	defaultVGPUReadinessTimeout = 5 * time.Minute
+	// sriovManageBinaryPath is the path to NVIDIA's sriov-manage script inside the
+	// driver root. It ships with the vGPU Manager (host driver) and enables
+	// SR-IOV Virtual Functions on the NVIDIA GPUs.
+	sriovManageBinaryPath = "/usr/lib/nvidia/sriov-manage"
 	// constants for driver components
 	GDRCOPY       = "gdrcopy"
 	NVIDIAFS      = "nvidia-fs"
@@ -1741,6 +1745,14 @@ func (v *VGPUManager) validate() error {
 		return err
 	}
 
+	// SR-IOV VFs are runtime state and do not survive a node reboot, so
+	// re-establish them before waiting. This is best-effort: on failure we still
+	// fall through to waitForParentDevices, which preserves the prior behavior on
+	// setups where the VFs are created out-of-band.
+	if err := enableVFs(hostDriver); err != nil {
+		log.Warnf("Unable to enable SR-IOV VFs, will wait for them to appear: %v", err)
+	}
+
 	log.Info("Waiting for parent devices to be available...")
 	if err := waitForParentDevices(ctx, defaultVGPUReadinessTimeout); err != nil {
 		return fmt.Errorf("vGPU Manager parent devices not ready: %w", err)
@@ -1775,6 +1787,61 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	}
 
 	return hostDriver, runCommand(command, args, silent)
+}
+
+// countVFs sums the expected (TotalVFs) and enabled (NumVFs) VF counts across
+// all SR-IOV physical functions among the given NVIDIA GPUs, and returns the
+// number of physical functions found.
+func countVFs(gpus []*nvpci.NvidiaPCIDevice) (totalExpected, totalEnabled uint64, pfCount int) {
+	for _, gpu := range gpus {
+		sriovInfo := gpu.SriovInfo
+		if sriovInfo.IsPF() {
+			pfCount++
+			totalExpected += sriovInfo.PhysicalFunction.TotalVFs
+			totalEnabled += sriovInfo.PhysicalFunction.NumVFs
+		}
+	}
+	return totalExpected, totalEnabled, pfCount
+}
+
+// enableVFs re-creates SR-IOV Virtual Functions on the NVIDIA GPUs by invoking
+// NVIDIA's 'sriov-manage -e ALL' inside the driver root. On the vGPU (sandbox)
+// workload path, VFs are runtime state that does not survive a node reboot;
+// without re-enabling them, after a reboot the vGPU devices cannot be created
+// and validation blocks in waitForParentDevices waiting for VFs that never
+// appear.
+//
+// It is idempotent: enablement is skipped when every SR-IOV-capable GPU already
+// has its full VF count, which is the normal steady state, so the common case
+// is a no-op. The post-reboot trigger this targets has no VFs enabled and no
+// running VMs yet, so re-enabling is safe. It covers only VF re-enablement — no
+// GPU reset and no MIG reconfiguration are performed here.
+func enableVFs(hostDriver bool) error {
+	gpus, err := nvpci.New().GetGPUs()
+	if err != nil {
+		return fmt.Errorf("error getting GPUs: %w", err)
+	}
+
+	totalExpected, totalEnabled, _ := countVFs(gpus)
+	if totalExpected == 0 {
+		log.Info("No SR-IOV capable GPUs found, skipping VF enablement")
+		return nil
+	}
+	if totalEnabled >= totalExpected {
+		log.Info("SR-IOV VFs already enabled on all capable GPUs, skipping VF enablement")
+		return nil
+	}
+
+	// sriov-manage lives inside the driver root: the driver container root when
+	// the vGPU Manager is deployed as a container, or the host root when the
+	// vGPU Manager driver is pre-installed on the host.
+	driverRoot := defaultDriverInstallDir
+	if hostDriver {
+		driverRoot = "/host"
+	}
+
+	log.Infof("Enabling SR-IOV VFs on NVIDIA GPUs via 'sriov-manage -e ALL' (driver root: %q)", driverRoot)
+	return runCommand("chroot", []string{driverRoot, sriovManageBinaryPath, "-e", "ALL"}, false)
 }
 
 // waitForParentDevices polls until the vGPU stack is ready — either NVIDIA
@@ -1825,16 +1892,7 @@ func mdevParentDevicesExist(nvmdevLib nvmdev.Interface) bool {
 
 // AreAllVFsReady reports whether every SR-IOV PF has all of its VFs enabled.
 func AreAllVFsReady(gpus []*nvpci.NvidiaPCIDevice) bool {
-	var totalExpected, totalEnabled uint64
-	var pfCount int
-	for _, gpu := range gpus {
-		sriovInfo := gpu.SriovInfo
-		if sriovInfo.IsPF() {
-			pfCount++
-			totalExpected += sriovInfo.PhysicalFunction.TotalVFs
-			totalEnabled += sriovInfo.PhysicalFunction.NumVFs
-		}
-	}
+	totalExpected, totalEnabled, pfCount := countVFs(gpus)
 
 	if totalExpected == 0 {
 		log.Info("no SR-IOV capable GPUs found")
