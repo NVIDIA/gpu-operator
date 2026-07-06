@@ -240,8 +240,8 @@ spec:
           name: run-mellanox-drivers
         - mountPath: /sys/module/firmware_class/parameters/path
           name: firmware-search-path
-        - mountPath: /sys/devices/system/memory/auto_online_blocks
-          name: sysfs-memory-online
+        - mountPath: /sys/devices/system
+          name: host-sys-devices-system
         - mountPath: /lib/firmware
           name: nv-firmware
         - mountPath: /usr/local/bin/startup-probe.sh
@@ -355,8 +355,9 @@ spec:
           path: /sys/module/firmware_class/parameters/path
         name: firmware-search-path
       - hostPath:
-          path: /sys/devices/system/memory/auto_online_blocks
-        name: sysfs-memory-online
+          path: /sys/devices/system
+          type: Directory
+        name: host-sys-devices-system
       - hostPath:
           path: /run/nvidia/driver/lib/firmware
           type: DirectoryOrCreate
