@@ -24,3 +24,5 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 : ${CONTAINER_RUNTIME:="docker"}
 
 : ${PRIVATE_REGISTRY:="nvcr.io"}
+
+: ${GPU_MODE:="gpu"}
