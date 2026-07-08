@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -46,6 +49,206 @@ func mergeLabels(maps ...map[string]string) map[string]string {
 		}
 	}
 	return out
+}
+
+func TestNodeLabelingReconcileDefersDependentOperationsAfterGPULabelChanges(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	clusterPolicy := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{
+				UseNvidiaDriverCRD: ptr.To(true),
+			},
+		},
+	}
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: consts.DefaultNVIDIADriverName},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			Default: true,
+		},
+	}
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node",
+			Labels: map[string]string{
+				"feature.node.kubernetes.io/pci-10de.present": "true",
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(clusterPolicy, driver, node).
+		Build()
+
+	reconciler := &NodeLabelingReconciler{
+		Client:    fakeClient,
+		Namespace: "test-ns",
+		Log:       logr.Discard(),
+	}
+
+	result, err := reconciler.Reconcile(ctx, reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedNode := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
+	assert.Equal(t, commonGPULabelValue, updatedNode.Labels[commonGPULabelKey])
+	assert.NotContains(t, updatedNode.Labels, consts.NVIDIADriverOwnerLabel)
+
+	result, err = reconciler.Reconcile(ctx, reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
+	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[consts.NVIDIADriverOwnerLabel])
+}
+
+func TestNodeLabelingReconcileDoesNotDeferDependentOperationsForStateLabelChanges(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	clusterPolicy := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{
+				UseNvidiaDriverCRD: ptr.To(true),
+			},
+		},
+	}
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: consts.DefaultNVIDIADriverName},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			Default: true,
+		},
+	}
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node",
+			Labels: map[string]string{
+				"feature.node.kubernetes.io/pci-10de.present": "true",
+				commonGPULabelKey: commonGPULabelValue,
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(clusterPolicy, driver, node).
+		Build()
+
+	reconciler := &NodeLabelingReconciler{
+		Client:    fakeClient,
+		Namespace: "test-ns",
+		Log:       logr.Discard(),
+	}
+
+	result, err := reconciler.Reconcile(ctx, reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedNode := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
+	assert.Equal(t, "true", updatedNode.Labels["nvidia.com/gpu.deploy.driver"])
+	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[consts.NVIDIADriverOwnerLabel])
+}
+
+func TestNodeLabelUpdateReasonsDetectsLabelChanges(t *testing.T) {
+	tests := []struct {
+		name   string
+		old    map[string]string
+		new    map[string]string
+		assert func(*testing.T, nodeLabelUpdateReasons)
+	}{
+		{
+			name: "GPU common label changed",
+			old: map[string]string{
+				"feature.node.kubernetes.io/pci-10de.present": "true",
+			},
+			new: map[string]string{
+				"feature.node.kubernetes.io/pci-10de.present": "true",
+				commonGPULabelKey: commonGPULabelValue,
+			},
+			assert: func(t *testing.T, reasons nodeLabelUpdateReasons) {
+				assert.True(t, reasons.gpuCommonLabelChanged)
+			},
+		},
+		{
+			name: "MIG capable label changed",
+			old:  map[string]string{},
+			new: map[string]string{
+				migCapableLabelKey: migCapableLabelValue,
+			},
+			assert: func(t *testing.T, reasons nodeLabelUpdateReasons) {
+				assert.True(t, reasons.migCapableLabelChanged)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reasons := getNodeLabelUpdateReasons(tc.old, tc.new)
+
+			tc.assert(t, reasons)
+			assert.True(t, reasons.needsUpdate())
+		})
+	}
+}
+
+func TestLabelGPUNodesReturnsPartialUpdateCountOnPatchError(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	patchErr := errors.New("patch failed")
+	patchCalls := 0
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(
+			&corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpu-node-a",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+			},
+			&corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpu-node-b",
+					Labels: map[string]string{
+						"feature.node.kubernetes.io/pci-10de.present": "true",
+					},
+				},
+			},
+		).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				patchCalls++
+				if patchCalls == 2 {
+					return patchErr
+				}
+				return c.Patch(ctx, obj, patch, opts...)
+			},
+		}).
+		Build()
+
+	nlc := &nodeLabelingController{
+		client:        fakeClient,
+		clusterPolicy: &gpuv1.ClusterPolicy{},
+		logger:        logr.Discard(),
+	}
+
+	result, err := nlc.labelGPUNodes(ctx)
+	require.ErrorIs(t, err, patchErr)
+	assert.Equal(t, 1, result.totalPatchedNodeCount)
+	assert.Equal(t, 1, result.gpuDiscoveryStateChangedNodeCount)
 }
 
 func TestReconcileCommonGPULabel(t *testing.T) {

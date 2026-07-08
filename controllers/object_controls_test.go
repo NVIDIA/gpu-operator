@@ -550,7 +550,7 @@ func setup() error {
 	nlc := &nodeLabelingController{
 		client: client,
 	}
-	if err := nlc.labelGPUNodes(ctx); err != nil {
+	if _, err := nlc.labelGPUNodes(ctx); err != nil {
 		return fmt.Errorf("unable to label nodes in cluster: %v", err)
 	}
 

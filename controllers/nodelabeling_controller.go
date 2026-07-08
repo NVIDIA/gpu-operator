@@ -61,6 +61,56 @@ type nodeLabelingController struct {
 	logger        logr.Logger
 }
 
+// gpuNodeLabelsUpdateResult reports total node patches and the subset where GPU
+// discovery state changed. The discovery state is stored in nvidia.com/gpu.present,
+// which AssignOwners uses to find GPU nodes, so dependent operations are deferred
+// until the informer cache observes those node updates.
+type gpuNodeLabelsUpdateResult struct {
+	totalPatchedNodeCount             int
+	gpuDiscoveryStateChangedNodeCount int
+}
+
+// nodeLabelUpdateReasons captures why a node update event should trigger node-label reconciliation.
+type nodeLabelUpdateReasons struct {
+	gpuCommonLabelMissing        bool
+	gpuCommonLabelOutdated       bool
+	gpuCommonLabelChanged        bool
+	commonOperandsLabelChanged   bool
+	gpuWorkloadConfigChanged     bool
+	migCapableLabelChanged       bool
+	osTreeLabelChanged           bool
+	nvidiaDriverOwnerLabelChange bool
+}
+
+// needsUpdate reports whether any tracked node-label change requires reconciliation.
+func (r nodeLabelUpdateReasons) needsUpdate() bool {
+	return r.gpuCommonLabelMissing ||
+		r.gpuCommonLabelOutdated ||
+		r.gpuCommonLabelChanged ||
+		r.commonOperandsLabelChanged ||
+		r.gpuWorkloadConfigChanged ||
+		r.migCapableLabelChanged ||
+		r.osTreeLabelChanged ||
+		r.nvidiaDriverOwnerLabelChange
+}
+
+// getNodeLabelUpdateReasons compares old and new node labels for changes that affect GPU Operator labels.
+func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabelUpdateReasons {
+	oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
+	newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
+
+	return nodeLabelUpdateReasons{
+		gpuCommonLabelMissing:        hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels),
+		gpuCommonLabelOutdated:       !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels),
+		gpuCommonLabelChanged:        oldLabels[commonGPULabelKey] != newLabels[commonGPULabelKey],
+		commonOperandsLabelChanged:   hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels),
+		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
+		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
+		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
+		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+	}
+}
+
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
 
 // Reconcile applies GPU-Operator related labels and annotations to all cluster nodes.
@@ -90,8 +140,22 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		logger:        r.Log,
 	}
 
-	if err := nlc.labelGPUNodes(ctx); err != nil {
+	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
+	if err != nil {
+		if gpuLabelUpdateResult.totalPatchedNodeCount > 0 {
+			r.Log.Error(err, "GPU node label update failed after partially updating nodes",
+				"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
+				"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
+			)
+		}
 		return reconcile.Result{}, err
+	}
+	if gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount > 0 {
+		r.Log.V(consts.LogLevelDebug).Info("GPU discovery state used by owner assignment updated; dependent node label operations will run after the node update event",
+			"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
+			"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
+		)
+		return reconcile.Result{}, nil
 	}
 
 	if nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
@@ -110,34 +174,42 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return reconcile.Result{}, nil
 }
 
-func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) error {
+// labelGPUNodes reconciles GPU-related labels and reports which node labels were patched.
+func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLabelsUpdateResult, error) {
+	result := gpuNodeLabelsUpdateResult{}
 	nodeList := &corev1.NodeList{}
 	if err := nlc.client.List(ctx, nodeList); err != nil {
-		return fmt.Errorf("unable to list nodes: %w", err)
+		return result, fmt.Errorf("unable to list nodes: %w", err)
 	}
 
 	for _, node := range nodeList.Items {
 		original := node.DeepCopy()
 		labels := node.GetLabels()
-		modified := false
+		gpuDiscoveryStateChanged := false
+		stateLabelsModified := false
 
 		if nlc.reconcileCommonGPULabel(labels, node.Name) {
 			node.SetLabels(labels)
-			modified = true
+			gpuDiscoveryStateChanged = true
 		}
 
 		if nlc.updateGPUStateLabels(labels, node.Name) {
 			node.SetLabels(labels)
-			modified = true
+			stateLabelsModified = true
 		}
 
+		modified := gpuDiscoveryStateChanged || stateLabelsModified
 		if modified {
 			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
-				return fmt.Errorf("unable to label node %s: %w", node.Name, err)
+				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
+			}
+			result.totalPatchedNodeCount++
+			if gpuDiscoveryStateChanged {
+				result.gpuDiscoveryStateChangedNodeCount++
 			}
 		}
 	}
-	return nil
+	return result, nil
 }
 
 // reconcileCommonGPULabel keeps nvidia.com/gpu.present in sync with NFD GPU PCI labels.
@@ -406,28 +478,8 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
 
-			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
-			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
-			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
-			migCapableLabelChanged := hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels)
-
-			oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
-			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
-			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
-
-			oldOSTreeLabel := oldLabels[nfdOSTreeVersionLabelKey]
-			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]
-			osTreeLabelChanged := oldOSTreeLabel != newOSTreeLabel
-
-			nvidiaDriverOwnerLabelChanged := oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel]
-
-			needsUpdate := gpuCommonLabelMissing ||
-				gpuCommonLabelOutdated ||
-				commonOperandsLabelChanged ||
-				gpuWorkloadConfigLabelChanged ||
-				osTreeLabelChanged ||
-				nvidiaDriverOwnerLabelChanged ||
-				migCapableLabelChanged
+			reasons := getNodeLabelUpdateReasons(oldLabels, newLabels)
+			needsUpdate := reasons.needsUpdate()
 
 			// When an NVIDIADriver daemonset pod is running on the node, check if any
 			// label which is configured in the NVIDIADriver's node selector has changed.
@@ -452,13 +504,14 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
 					"name", nodeName,
-					"gpuCommonLabelMissing", gpuCommonLabelMissing,
-					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
-					"commonOperandsLabelChanged", commonOperandsLabelChanged,
-					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
-					"migCapableLabelChanged", migCapableLabelChanged,
-					"osTreeLabelChanged", osTreeLabelChanged,
-					"nvidiaDriverOwnerLabelChanged", nvidiaDriverOwnerLabelChanged,
+					"gpuCommonLabelMissing", reasons.gpuCommonLabelMissing,
+					"gpuCommonLabelOutdated", reasons.gpuCommonLabelOutdated,
+					"gpuCommonLabelChanged", reasons.gpuCommonLabelChanged,
+					"commonOperandsLabelChanged", reasons.commonOperandsLabelChanged,
+					"gpuWorkloadConfigLabelChanged", reasons.gpuWorkloadConfigChanged,
+					"migCapableLabelChanged", reasons.migCapableLabelChanged,
+					"osTreeLabelChanged", reasons.osTreeLabelChanged,
+					"nvidiaDriverOwnerLabelChanged", reasons.nvidiaDriverOwnerLabelChange,
 					"nvidiaDriverNodeSelectorLabelChanged", nvidiaDriverNodeSelectorLabelChanged,
 				)
 			}
