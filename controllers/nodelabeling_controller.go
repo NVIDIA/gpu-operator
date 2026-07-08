@@ -409,6 +409,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			gpuCommonLabelMissing := hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels)
 			gpuCommonLabelOutdated := !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels)
 			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
+			migCapableLabelChanged := hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels)
 
 			oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
 			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
@@ -425,7 +426,8 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
 				osTreeLabelChanged ||
-				nvidiaDriverOwnerLabelChanged
+				nvidiaDriverOwnerLabelChanged ||
+				migCapableLabelChanged
 
 			// When an NVIDIADriver daemonset pod is running on the node, check if any
 			// label which is configured in the NVIDIADriver's node selector has changed.
@@ -454,6 +456,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 					"gpuCommonLabelOutdated", gpuCommonLabelOutdated,
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
+					"migCapableLabelChanged", migCapableLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
 					"nvidiaDriverOwnerLabelChanged", nvidiaDriverOwnerLabelChanged,
 					"nvidiaDriverNodeSelectorLabelChanged", nvidiaDriverNodeSelectorLabelChanged,
