@@ -1,0 +1,350 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Manual usage:
+# 1. In GitHub Actions, choose this workflow and select the branch that should
+#    produce the RC artifacts. The workflow runs on the selected branch head.
+# 2. Set release_tag to the artifact version, for example v26.7.0-rc.1.
+#    No Git tag is required or created.
+# 3. Optionally set helm_values_override_b64 to base64-encoded Helm values YAML
+#    for image overrides. Include operator, validator, and nodeStatusExporter
+#    when overriding the gpu-operator image location or tag.
+#    Example values-overrides.yaml:
+#      operator:
+#        repository: ghcr.io/nvidia
+#        image: gpu-operator
+#        version: 4d29f656
+#      validator:
+#        repository: ghcr.io/nvidia
+#        image: gpu-operator
+#        version: 4d29f656
+#      nodeStatusExporter:
+#        repository: ghcr.io/nvidia
+#        image: gpu-operator
+#        version: 4d29f656
+#    Encode it with:
+#      base64 -w0 values-overrides.yaml
+#    On macOS/BSD base64, use:
+#      base64 < values-overrides.yaml | tr -d '\n'
+# 4. Optional input:
+#    - olm_bundle_os_suffix defaults to rhel9.6.
+# 5. Start the manual workflow. The Helm OCI chart and OLM bundle image are
+#    pushed to GHCR with release_tag, and dist/ is uploaded as a workflow
+#    artifact.
+#
+name: Release RC Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "RC release tag, for example v26.7.0-rc.1"
+        required: true
+        type: string
+      helm_values_override_b64:
+        description: "Base64-encoded Helm values override YAML"
+        required: false
+        type: string
+      olm_bundle_os_suffix:
+        description: "OS suffix used for OLM bundle driver and GDRCopy images"
+        required: false
+        default: "rhel9.6"
+        type: string
+
+permissions: {}
+
+jobs:
+  package-rc-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      release_tag: ${{ steps.validate.outputs.release_tag }}
+      helm_values_override_asset: ${{ steps.package.outputs.helm_values_override_asset }}
+      image_list_asset: ${{ steps.package.outputs.image_list_asset }}
+    steps:
+      - uses: actions/checkout@v7
+        name: Check out code
+        with:
+          persist-credentials: false
+
+      - name: Validate inputs
+        id: validate
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RELEASE_TAG}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "::error::release_tag must look like v26.3.2-rc.1"
+            exit 1
+          fi
+
+          echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Release tag: ${RELEASE_TAG}"
+          echo "::notice::Source commit: ${GITHUB_SHA}"
+
+      - name: Validate package inputs
+        id: package-inputs
+        env:
+          HELM_VALUES_OVERRIDE_B64: ${{ inputs.helm_values_override_b64 }}
+        run: |
+          set -euo pipefail
+
+          OVERRIDE_FILE=""
+          if [[ -n "${HELM_VALUES_OVERRIDE_B64}" ]]; then
+            OVERRIDE_FILE="${RUNNER_TEMP}/helm-values-overrides.yaml"
+            printf '%s' "${HELM_VALUES_OVERRIDE_B64}" | base64 --decode > "${OVERRIDE_FILE}"
+          fi
+
+          if [[ ! -d bundle ]]; then
+            echo "::error::OLM bundle path does not exist or is not a directory: bundle"
+            exit 1
+          fi
+
+          echo "helm_values_override=${OVERRIDE_FILE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Get Golang version
+        run: |
+          GOLANG_VERSION=$(grep "GOLANG_VERSION ?=" versions.mk)
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
+
+      - name: Get regctl version
+        run: |
+          REGCTL_VERSION=$(grep "REGCTL_VERSION ?=" versions.mk)
+          echo "REGCTL_VERSION=${REGCTL_VERSION##REGCTL_VERSION ?= }" >> "${GITHUB_ENV}"
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        with:
+          release: ${{ env.REGCTL_VERSION }}
+
+      - name: Install Operator SDK
+        run: |
+          set -euo pipefail
+
+          OPERATOR_SDK_VERSION="$(awk -F': ' '/operators.operatorframework.io.metrics.builder:/ { print $2 }' bundle/metadata/annotations.yaml | sed 's/^operator-sdk-//')"
+          if [[ -z "${OPERATOR_SDK_VERSION}" ]]; then
+            echo "::error::OPERATOR_SDK_VERSION not found in bundle metadata"
+            exit 1
+          fi
+
+          curl -sSLo operator-sdk \
+            "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
+          chmod +x operator-sdk
+          sudo mv operator-sdk /usr/local/bin/operator-sdk
+          operator-sdk version
+
+      - name: Login to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "${GH_TOKEN}" | regctl registry login ghcr.io -u "${GITHUB_ACTOR}" --pass-stdin
+
+      - name: Login to GitHub Container Registry for Helm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${GH_TOKEN}" | helm registry login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Login to GitHub Container Registry for Docker
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Apply Helm values override
+        if: ${{ steps.package-inputs.outputs.helm_values_override != '' }}
+        env:
+          HELM_VALUES_OVERRIDE: ${{ steps.package-inputs.outputs.helm_values_override }}
+        run: |
+          python3 .github/scripts/merge-yaml.py \
+            --base deployments/gpu-operator/values.yaml \
+            --override "${HELM_VALUES_OVERRIDE}" \
+            --output deployments/gpu-operator/values.yaml
+
+      - name: Lint Helm chart
+        run: helm lint deployments/gpu-operator
+
+      - name: Update OLM bundle images and release metadata
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          OLM_BUNDLE_OS_SUFFIX: ${{ inputs.olm_bundle_os_suffix }}
+        run: |
+          python3 .github/scripts/update-csv-images.py \
+            --release-tag "${RELEASE_TAG}" \
+            --olm-bundle-os-suffix "${OLM_BUNDLE_OS_SUFFIX}" \
+            --values deployments/gpu-operator/values.yaml \
+            --chart deployments/gpu-operator/Chart.yaml \
+            --csv bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+
+      - name: Validate updated OLM bundle
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          CSV: bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+        run: |
+          set -euo pipefail
+
+          python3 .github/scripts/validate-olm-release-metadata.py \
+            --release-tag "${RELEASE_TAG}" \
+            --csv "${CSV}"
+
+          operator-sdk bundle validate ./bundle
+          make validate-csv
+
+      - name: Build and push OLM bundle image
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          GH_REPOSITORY: ${{ github.repository }}
+          VERSION: ""
+          DEFAULT_CHANNEL: "stable"
+          CHANNELS: "stable"
+          BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS: "--platform=linux/amd64,linux/arm64 --push"
+        run: |
+          REPOSITORY="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          BUNDLE_IMAGE_BASE="ghcr.io/${REPOSITORY}/gpu-operator-bundle"
+          make build-bundle-image DOCKER="docker buildx" BUNDLE_IMAGE="${BUNDLE_IMAGE_BASE}:${RELEASE_TAG}"
+
+      - name: Package RC assets
+        id: package
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          HELM_VALUES_OVERRIDE: ${{ steps.package-inputs.outputs.helm_values_override }}
+        run: |
+          set -euo pipefail
+
+          ARTIFACT_NAME="gpu-operator-rc-assets-${RELEASE_TAG}"
+          DIST_DIR="dist"
+          mkdir -p "${DIST_DIR}"
+
+          IMAGE_LIST_ASSET="gpu-operator-images.txt"
+          VALUES_ASSET="values-${RELEASE_TAG}.yaml"
+          CSV_ASSET="gpu-operator-certified-${RELEASE_TAG}.clusterserviceversion.yaml"
+          VALUES_OVERRIDE_ASSET=""
+          if [[ -n "${HELM_VALUES_OVERRIDE}" ]]; then
+            VALUES_OVERRIDE_ASSET="helm-values-overrides-${RELEASE_TAG}.yaml"
+            cp "${HELM_VALUES_OVERRIDE}" "${DIST_DIR}/${VALUES_OVERRIDE_ASSET}"
+          fi
+
+          cp deployments/gpu-operator/values.yaml "${DIST_DIR}/${VALUES_ASSET}"
+          cp bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml "${DIST_DIR}/${CSV_ASSET}"
+
+          python3 .github/scripts/generate-image-list.py \
+            --gpu-operator-version "${RELEASE_TAG}" \
+            --values deployments/gpu-operator/values.yaml \
+            --chart deployments/gpu-operator/Chart.yaml \
+            --nfd-values deployments/gpu-operator/charts/node-feature-discovery/values.yaml \
+            --nfd-chart deployments/gpu-operator/charts/node-feature-discovery/Chart.yaml \
+            --output "${DIST_DIR}/${IMAGE_LIST_ASSET}"
+
+          helm package \
+            --version "${RELEASE_TAG}" \
+            --app-version "${RELEASE_TAG}" \
+            --destination "${DIST_DIR}" \
+            deployments/gpu-operator
+
+          (
+            cd "${DIST_DIR}"
+            sha256sum * > SHA256SUMS
+          )
+
+          echo "artifact_name=${ARTIFACT_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "helm_values_override_asset=${VALUES_OVERRIDE_ASSET}" >> "${GITHUB_OUTPUT}"
+          echo "image_list_asset=${IMAGE_LIST_ASSET}" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Packaged assets:"
+          ls -lah "${DIST_DIR}"
+
+      - name: Publish Helm OCI chart
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          REPOSITORY="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          CHART_PACKAGE="dist/gpu-operator-${RELEASE_TAG}.tgz"
+          CHART_REPOSITORY="oci://ghcr.io/${REPOSITORY}/charts"
+
+          if [[ ! -f "${CHART_PACKAGE}" ]]; then
+            echo "::error::Helm chart package does not exist: ${CHART_PACKAGE}"
+            exit 1
+          fi
+
+          helm push "${CHART_PACKAGE}" "${CHART_REPOSITORY}"
+          echo "::notice::Published Helm chart to ${CHART_REPOSITORY}/gpu-operator:${RELEASE_TAG}"
+
+      - name: Verify expected images are available
+        env:
+          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
+          GH_REPOSITORY: ${{ github.repository }}
+          IMAGE_LIST_ASSET: ${{ steps.package.outputs.image_list_asset }}
+        run: |
+          set -euo pipefail
+
+          IMAGE_LIST="dist/${IMAGE_LIST_ASSET}"
+          if [[ ! -s "${IMAGE_LIST}" ]]; then
+            echo "::error::Image list asset does not exist or is empty: ${IMAGE_LIST}"
+            exit 1
+          fi
+
+          REPOSITORY="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          BUNDLE_IMAGE="ghcr.io/${REPOSITORY}/gpu-operator-bundle:${RELEASE_TAG}"
+
+          missing_images=()
+          while IFS= read -r image || [[ -n "${image}" ]]; do
+            [[ -z "${image}" ]] && continue
+            if ! regctl manifest head "${image}" >/dev/null; then
+              missing_images+=("${image}")
+            fi
+          done < "${IMAGE_LIST}"
+
+          if ! regctl manifest head "${BUNDLE_IMAGE}" >/dev/null; then
+            missing_images+=("${BUNDLE_IMAGE}")
+          fi
+
+          if (( ${#missing_images[@]} > 0 )); then
+            echo "::error::The following expected images are not available:"
+            printf '  %s\n' "${missing_images[@]}"
+            exit 1
+          fi
+
+          echo "::notice::Verified all expected images are available, including ${BUNDLE_IMAGE}."
+
+      - name: Upload packaged assets artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: dist/*
+          if-no-files-found: error

@@ -36,10 +36,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Get regctl version
+        run: |
+          REGCTL_VERSION=$(grep "REGCTL_VERSION ?=" versions.mk)
+          echo "REGCTL_VERSION=${REGCTL_VERSION##REGCTL_VERSION ?= }" >> "${GITHUB_ENV}"
+
       - name: Install regctl
         uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
         with:
-          release: v0.11.3
+          release: ${{ env.REGCTL_VERSION }}
 
       - name: Get latest component images and generate values override file
         env:

@@ -23,4 +23,6 @@ GOLANG_VERSION ?= 1.26.4
 
 GOLANGCI_LINT_VERSION ?= v2.12.2
 
+REGCTL_VERSION ?= v0.11.5
+
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")

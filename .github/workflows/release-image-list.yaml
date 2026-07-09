@@ -23,6 +23,7 @@ permissions:
 
 jobs:
   generate-image-list:
+    if: ${{ !github.event.release.prerelease && !contains(github.event.release.tag_name, '-rc.') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
