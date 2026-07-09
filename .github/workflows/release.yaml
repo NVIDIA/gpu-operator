@@ -75,7 +75,7 @@ jobs:
           REGCTL_VERSION=$(grep "REGCTL_VERSION ?=" versions.mk)
           echo "REGCTL_VERSION=${REGCTL_VERSION##REGCTL_VERSION ?= }" >> "${GITHUB_ENV}"
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1
         with:
           release: ${{ env.REGCTL_VERSION }}
       - name: Retag gpu-operator
