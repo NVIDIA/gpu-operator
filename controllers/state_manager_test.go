@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -45,6 +46,18 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			osName:    "talos",
 			osVersion: "v1.12.6",
 			expected:  "talosv1.12.6",
+		},
+		{
+			name:      "rhel 9 omits minor version",
+			osName:    "rhel",
+			osVersion: "9.4",
+			expected:  "rhel9",
+		},
+		{
+			name:      "rhel 8 omits minor version",
+			osName:    "rhel",
+			osVersion: "8.10",
+			expected:  "rhel8",
 		},
 		{
 			name:      "rhel 10 omits minor version",
@@ -88,13 +101,6 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			osVersion: "rolling",
 			expected:  "archlinuxrolling",
 		},
-		{
-			name:              "rhel invalid major version errors",
-			osName:            "rhel",
-			osVersion:         "A.10",
-			expectError:       true,
-			errorContainsText: "error processing OS major version",
-		},
 	}
 
 	for _, tc := range testCases {
@@ -126,6 +132,91 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.osName, osName)
 			require.Equal(t, tc.expected, osTag)
+		})
+	}
+}
+
+type errorListClient struct {
+	ctrlclient.Client
+	err error
+}
+
+func (c errorListClient) List(ctx context.Context, list ctrlclient.ObjectList, opts ...ctrlclient.ListOption) error {
+	return c.err
+}
+
+func TestGetGPUNodeOSInfoListError(t *testing.T) {
+	expectedErr := errors.New("list failed")
+	controller := ClusterPolicyController{
+		ctx:    context.Background(),
+		client: errorListClient{err: expectedErr},
+	}
+
+	osName, osTag, err := controller.getGPUNodeOSInfo()
+	require.ErrorIs(t, err, expectedErr)
+	require.Empty(t, osName)
+	require.Empty(t, osTag)
+	require.Contains(t, err.Error(), "unable to list nodes with GPU present")
+}
+
+func TestGetGPUNodeOSInfoNoGPUNodes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	client := fake.NewClientBuilder().WithScheme(scheme).Build()
+	controller := ClusterPolicyController{ctx: context.Background(), client: client}
+
+	osName, osTag, err := controller.getGPUNodeOSInfo()
+	require.Error(t, err)
+	require.Empty(t, osName)
+	require.Empty(t, osTag)
+	require.Contains(t, err.Error(), "no nodes found with GPU present")
+}
+
+func TestGetGPUNodeOSInfoMissingLabels(t *testing.T) {
+	testCases := []struct {
+		name              string
+		labels            map[string]string
+		errorContainsText string
+	}{
+		{
+			name: "missing OS release label",
+			labels: map[string]string{
+				commonGPULabelKey:      commonGPULabelValue,
+				nfdOSVersionIDLabelKey: "9.4",
+			},
+			errorContainsText: "unable to retrieve OS name",
+		},
+		{
+			name: "missing OS version label",
+			labels: map[string]string{
+				commonGPULabelKey:      commonGPULabelValue,
+				nfdOSReleaseIDLabelKey: "rhel",
+			},
+			errorContainsText: "unable to retrieve OS version",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "gpu-node-1",
+					Labels: tc.labels,
+				},
+			}
+
+			client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).Build()
+			controller := ClusterPolicyController{ctx: context.Background(), client: client}
+
+			osName, osTag, err := controller.getGPUNodeOSInfo()
+			require.Error(t, err)
+			require.Empty(t, osName)
+			require.Empty(t, osTag)
+			require.Contains(t, err.Error(), tc.errorContainsText)
 		})
 	}
 }

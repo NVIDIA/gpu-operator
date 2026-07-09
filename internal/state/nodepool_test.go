@@ -17,9 +17,18 @@
 package state
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestGetOSTag(t *testing.T) {
@@ -35,7 +44,14 @@ func TestGetOSTag(t *testing.T) {
 			description: "valid os release & version",
 			osRelease:   "rhel",
 			osVersion:   "9.4",
-			expected:    "rhel9.4",
+			expected:    "rhel9",
+			expectError: false,
+		},
+		{
+			description: "valid os release & version - rhel8",
+			osRelease:   "rhel",
+			osVersion:   "8.10",
+			expected:    "rhel8",
 			expectError: false,
 		},
 		{
@@ -73,13 +89,6 @@ func TestGetOSTag(t *testing.T) {
 			expected:    "archlinuxrolling",
 			expectError: false,
 		},
-		{
-			description:  "invalid os version",
-			osRelease:    "rhel",
-			osVersion:    "A.10",
-			expectError:  true,
-			errorMessage: "failed to parse os version: strconv.Atoi: parsing \"A\": invalid syntax",
-		},
 	}
 
 	for _, test := range tests {
@@ -94,4 +103,191 @@ func TestGetOSTag(t *testing.T) {
 			require.Equal(t, test.expected, actual)
 		})
 	}
+}
+
+func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "rhel-node",
+				Labels: map[string]string{
+					"pool":                        "gold",
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "rhel",
+					nfdOSVersionIDLabelKey:        "9.4",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "ubuntu-node",
+				Labels: map[string]string{
+					"pool":                        "gold",
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "ubuntu",
+					nfdOSVersionIDLabelKey:        "22.04",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "other-pool-node",
+				Labels: map[string]string{
+					"pool":                        "silver",
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "ubuntu",
+					nfdOSVersionIDLabelKey:        "20.04",
+				},
+			}},
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			NodeSelector: map[string]string{"pool": "gold"},
+		},
+	}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, false)
+
+	require.NoError(t, err)
+	require.Len(t, nodePools, 2)
+
+	poolsByName := nodePoolsByName(nodePools)
+	require.Contains(t, poolsByName, "rhel9")
+	require.Equal(t, "rhel", poolsByName["rhel9"].osRelease)
+	require.Equal(t, "9.4", poolsByName["rhel9"].osVersion)
+	require.Equal(t, "gold", poolsByName["rhel9"].nodeSelector["pool"])
+	require.Equal(t, "driver-a", poolsByName["rhel9"].nodeSelector[consts.NVIDIADriverOwnerLabel])
+
+	require.Contains(t, poolsByName, "ubuntu22.04")
+	require.Equal(t, "ubuntu", poolsByName["ubuntu22.04"].osRelease)
+	require.Equal(t, "22.04", poolsByName["ubuntu22.04"].osVersion)
+}
+
+func TestGetNodePoolsSkipsNodesMissingNFDOSLabels(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "missing-os-release",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSVersionIDLabelKey:        "9.4",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "missing-os-version",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "rhel",
+				},
+			}},
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+	}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, false)
+
+	require.NoError(t, err)
+	require.Empty(t, nodePools)
+}
+
+func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "kernel-node",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "ubuntu",
+					nfdOSVersionIDLabelKey:        "22.04",
+					nfdKernelLabelKey:             "5.15.0-70-generic_x86_64",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "missing-kernel-node",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "ubuntu",
+					nfdOSVersionIDLabelKey:        "22.04",
+				},
+			}},
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			UsePrecompiled: ptr.To(true),
+		},
+	}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, false)
+
+	require.NoError(t, err)
+	require.Len(t, nodePools, 1)
+	require.Equal(t, "ubuntu22.04-5.15.0-70-generic", nodePools[0].name)
+	require.Equal(t, "5.15.0-70-generic_x86_64", nodePools[0].kernel)
+	require.Equal(t, "5.15.0-70-generic_x86_64", nodePools[0].nodeSelector[nfdKernelLabelKey])
+}
+
+func TestGetNodePoolsPartitionsOpenShiftNodesByRHCOSVersion(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "rhcos-node",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "rhcos",
+					nfdOSVersionIDLabelKey:        "4.14",
+					nfdOSTreeVersionLabelKey:      "414.92.202309282257",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "missing-rhcos-node",
+				Labels: map[string]string{
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "rhcos",
+					nfdOSVersionIDLabelKey:        "4.14",
+				},
+			}},
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+	}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, true)
+
+	require.NoError(t, err)
+	require.Len(t, nodePools, 1)
+	require.Equal(t, "414.92.202309282257", nodePools[0].name)
+	require.Equal(t, "414.92.202309282257", nodePools[0].rhcosVersion)
+	require.Equal(t, "414.92.202309282257", nodePools[0].nodeSelector[nfdOSTreeVersionLabelKey])
+}
+
+func nodePoolsByName(nodePools []nodePool) map[string]nodePool {
+	poolsByName := make(map[string]nodePool, len(nodePools))
+	for _, pool := range nodePools {
+		poolsByName[pool.name] = pool
+	}
+	return poolsByName
 }

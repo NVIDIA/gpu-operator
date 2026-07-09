@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -539,40 +538,14 @@ func (n *ClusterPolicyController) getGPUNodeOSInfo() (string, string, error) {
 	if !ok {
 		return "", "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
 	}
-	osMajorVersion := strings.Split(osVersion, ".")[0]
-
-	// If the OS is RockyLinux or RHEL 10 & above, we will omit the minor version when constructing the os image tag
+	// If the OS is RockyLinux or RHEL, we will omit the minor version when constructing the os image tag
 	switch osName {
-	case "rocky":
-		osVersion = osMajorVersion
-	case "rhel":
-		osMajorNumber, err := parseOSMajorVersion(osVersion)
-		if err != nil {
-			return "", "", err
-		}
-		if osMajorNumber >= 10 {
-			osVersion = osMajorVersion
-		}
+	case "rocky", "rhel":
+		osVersion = strings.Split(osVersion, ".")[0]
 	}
 	osTag := fmt.Sprintf("%s%s", osName, osVersion)
 
 	return osName, osTag, nil
-}
-
-func parseOSMajorVersion(osVersion string) (int, error) {
-	osMajorVersion := strings.Split(osVersion, ".")[0]
-	osMajorVersion = strings.TrimSpace(osMajorVersion)
-	osMajorVersion = strings.TrimPrefix(strings.TrimPrefix(osMajorVersion, "v"), "V")
-	if osMajorVersion == "" {
-		return 0, fmt.Errorf("empty OS major version")
-	}
-
-	osMajorNumber, err := strconv.Atoi(osMajorVersion)
-	if err != nil {
-		return 0, fmt.Errorf("error processing OS major version %s: %w", osMajorVersion, err)
-	}
-
-	return osMajorNumber, nil
 }
 
 func (n *ClusterPolicyController) setPodSecurityLabelsForNamespace() error {
