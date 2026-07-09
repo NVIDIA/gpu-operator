@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG CUDA_SAMPLES_VERSION=12.9
+ARG CUDA_SAMPLES_VERSION=13.2
 
 FROM golang:1.26.4 AS builder
 
@@ -64,7 +64,7 @@ WORKDIR /build
 ARG SAMPLE_NAME=vectorAdd
 
 RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${CUDA_SAMPLES_VERSION} | \
-    tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* && \
+    tar -xzvf - --strip-components=1 --wildcards */${SAMPLE_NAME}/* --wildcards */Common/* --wildcards */cmake/* && \
     cd $(find /build/Samples -iname "${SAMPLE_NAME}") && \
     cmake . && \
     make && \
