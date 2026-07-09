@@ -69,10 +69,21 @@
         "nvcr.io/nvidia/cloud-native/nvidia-sandbox-device-plugin",
         "nvcr.io/nvidia/kubevirt-gpu-device-plugin",
         "nvcr.io/nvidia/k8s-device-plugin",
-        "nvcr.io/nvidia/k8s/container-toolkit",
         "nvcr.io/nvidia/cloud-native/k8s-mig-manager"
       ],
       "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPaths": [
+        "deployments/gpu-operator/values.yaml",
+        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
+      ],
+      "matchPackageNames": [
+        "nvcr.io/nvidia/k8s/container-toolkit"
+      ],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-(?<prerelease>rc\\.\\d+))?$",
+      "ignoreUnstable": false,
       "separateMajorMinor": false
     },
     {
