@@ -1,0 +1,57 @@
+# E-MOBI Fork License Attribution
+
+This repository is a community fork and customization of the original NVIDIA GPU Operator project.
+
+## Original Project
+- **Project**: NVIDIA GPU Operator
+- **Repository**: https://github.com/NVIDIA/gpu-operator
+- **License**: Apache License 2.0
+- **Copyright**: Copyright 2020, NVIDIA CORPORATION
+
+## E-MOBI Customization
+- **Organization**: E-MOBI / EKONOMIK MOBIL, S.R.L.
+- **Division**: E-MOBI Robotics Développement
+- **Repository**: https://github.com/ekonomikmobil/E-MOBI-Robotics-Developpement-gpu-operator
+- **License**: Apache License 2.0
+- **Copyright**: Copyright 2024-2025, E-MOBI / EKONOMIK MOBIL, S.R.L.
+
+## License Compliance
+
+All modifications and enhancements by E-MOBI are provided under the same Apache License 2.0 as the original project.
+
+This means:
+- ✅ The original NVIDIA GPU Operator license is fully respected
+- ✅ All NVIDIA contributions remain under Apache 2.0
+- ✅ All E-MOBI enhancements are also under Apache 2.0
+- ✅ Users have full freedom to use, modify, and distribute under Apache 2.0 terms
+
+## Derivative Work Notice
+
+This is a derivative work of the NVIDIA GPU Operator. Users should:
+1. Acknowledge NVIDIA's original contribution
+2. Understand that both the original and E-MOBI components are licensed under Apache 2.0
+3. Review both the original LICENSE (NVIDIA) and this file for attribution
+
+## Acknowledgments
+
+E-MOBI gratefully acknowledges:
+- **NVIDIA** for the excellent GPU Operator framework
+- The **Kubernetes community** for the operator framework
+- All **contributors** who have improved this project
+
+---
+
+## Original Apache 2.0 License
+
+Both the original NVIDIA GPU Operator and all E-MOBI customizations are licensed under:
+
+Apache License  
+Version 2.0, January 2004  
+http://www.apache.org/licenses/
+
+Full license text is available in the LICENSE file.
+
+---
+
+**E-MOBI / EKONOMIK MOBIL, S.R.L**  
+*Building the Future of AI-Powered Solutions*

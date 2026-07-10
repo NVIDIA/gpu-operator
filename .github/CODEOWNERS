@@ -1,0 +1,14 @@
+# E-MOBI GPU Operator Code Owners
+
+# Default owners
+* @ekonomikmobil @nouveauempiredhaiti-arch
+
+# E-MOBI specific enhancements
+/docs/ @ekonomikmobil
+/examples/emobi/ @ekonomikmobil
+/deploy/emobi/ @ekonomikmobil
+
+# Respect original NVIDIA components
+/pkg/driver/ @ekonomikmobil
+/pkg/controller/ @ekonomikmobil
+/api/ @ekonomikmobil
