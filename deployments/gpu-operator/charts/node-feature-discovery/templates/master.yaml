@@ -22,9 +22,16 @@ spec:
     metadata:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
+        {{- with .Values.master.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         role: master
       annotations:
+        {{- if .Values.checksumValuesOnly }}
+        checksum/config: {{ .Values.master.config | toYaml | sha256sum }}
+        {{- else }}
         checksum/config: {{ include (print $.Template.BasePath "/nfd-master-conf.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.master.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -39,6 +46,13 @@ spec:
       securityContext:
         {{- toYaml .Values.master.podSecurityContext | nindent 8 }}
       hostNetwork: {{ .Values.master.hostNetwork }}
+      {{- if kindIs "bool" .Values.master.hostUsers }}
+      hostUsers: {{ .Values.master.hostUsers }}
+      {{- end }}
+      {{- with .Values.master.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: master
           securityContext:
@@ -115,7 +129,9 @@ spec:
             {{- if .Values.master.instance | empty | not }}
             - "-instance={{ .Values.master.instance }}"
             {{- end }}
+            {{- if gt (int .Values.master.replicaCount) 1 }}
             - "-enable-leader-election"
+            {{- end }}
             {{- if .Values.master.extraLabelNs | empty | not }}
             - "-extra-label-ns={{- join "," .Values.master.extraLabelNs }}"
             {{- end }}

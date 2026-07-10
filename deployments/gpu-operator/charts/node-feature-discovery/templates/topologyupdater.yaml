@@ -21,9 +21,16 @@ spec:
     metadata:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
+        {{- with .Values.topologyUpdater.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         role: topology-updater
       annotations:
+        {{- if .Values.checksumValuesOnly }}
+        checksum/config: {{ .Values.topologyUpdater.config | toYaml | sha256sum }}
+        {{- else }}
         checksum/config: {{ include (print $.Template.BasePath "/nfd-topologyupdater-conf.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.topologyUpdater.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -37,6 +44,13 @@ spec:
       securityContext:
         {{- toYaml .Values.topologyUpdater.podSecurityContext | nindent 8 }}
       hostNetwork: {{ .Values.topologyUpdater.hostNetwork }}
+      {{- if kindIs "bool" .Values.topologyUpdater.hostUsers }}
+      hostUsers: {{ .Values.topologyUpdater.hostUsers }}
+      {{- end }}
+      {{- with .Values.topologyUpdater.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: topology-updater
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

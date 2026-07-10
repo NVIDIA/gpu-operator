@@ -25,9 +25,16 @@ spec:
     metadata:
       labels:
         {{- include "node-feature-discovery.selectorLabels" . | nindent 8 }}
+        {{- with .Values.worker.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         role: worker
       annotations:
+        {{- if .Values.checksumValuesOnly }}
+        checksum/config: {{ .Values.worker.config | toYaml | sha256sum }}
+        {{- else }}
         checksum/config: {{ include (print $.Template.BasePath "/nfd-worker-conf.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.worker.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -41,6 +48,13 @@ spec:
       securityContext:
         {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
       hostNetwork: {{ .Values.worker.hostNetwork }}
+      {{- if kindIs "bool" .Values.worker.hostUsers }}
+      hostUsers: {{ .Values.worker.hostUsers }}
+      {{- end }}
+      {{- with .Values.worker.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: worker
         securityContext:
@@ -107,6 +121,7 @@ spec:
         {{- range $key, $value := .Values.featureGates }}
         - "-feature-gates={{ $key }}={{ $value }}"
         {{- end }}
+        - "-owner-refs={{ join "," .Values.worker.ownerRefs }}"
         - "-port={{ .Values.worker.port | default "8080"}}"
         {{- with .Values.worker.extraArgs }}
         {{- toYaml . | nindent 8 }}

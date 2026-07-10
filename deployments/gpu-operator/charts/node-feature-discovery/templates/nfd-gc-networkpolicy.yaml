@@ -1,0 +1,26 @@
+{{- if .Values.gc.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "node-feature-discovery.fullname" . }}-gc-network-policy
+  namespace: {{ include "node-feature-discovery.namespace" . }}
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+    role: gc
+spec:
+  egress:
+    {{- with .Values.gc.networkPolicy.egress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  ingress:
+    {{- with .Values.gc.networkPolicy.ingress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  podSelector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: gc
+  policyTypes:
+  - Egress
+  - Ingress
+{{- end }}

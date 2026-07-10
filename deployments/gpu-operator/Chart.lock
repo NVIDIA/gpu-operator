@@ -1,6 +1,6 @@
 dependencies:
 - name: node-feature-discovery
   repository: oci://registry.k8s.io/nfd/charts
-  version: 0.18.3
-digest: sha256:1bce3b80da1e6d47a0befbaa6a2f758aeac6d20382e900f0c301f45020afbebc
-generated: "2026-01-23T15:08:56.617442-08:00"
+  version: 0.19.0
+digest: sha256:74a6bc356f75fdeef2541cb01b8fd49b40daff296b26b44e077ff70d4f2f9fad
+generated: "2026-07-13T08:59:51.650411-07:00"

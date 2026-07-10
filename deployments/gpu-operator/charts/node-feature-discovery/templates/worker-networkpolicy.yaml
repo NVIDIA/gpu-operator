@@ -1,0 +1,26 @@
+{{- if .Values.worker.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "node-feature-discovery.fullname" . }}-worker-network-policy
+  namespace: {{ include "node-feature-discovery.namespace" . }}
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+    role: worker
+spec:
+  egress:
+    {{- with .Values.worker.networkPolicy.egress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  ingress:
+    {{- with .Values.worker.networkPolicy.ingress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  podSelector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: worker
+  policyTypes:
+  - Egress
+  - Ingress
+{{- end }}
