@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
-	"github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes"
 )
 
 // MockNvmdev mock mdev device.
@@ -99,38 +98,7 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 		return err
 	}
 
-	vendor, err := os.Create(filepath.Join(deviceDir, "vendor"))
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(vendor, "0x%x", nvpci.PCINvidiaVendorID)
-	if err != nil {
-		return err
-	}
-
-	class, err := os.Create(filepath.Join(deviceDir, "class"))
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(class, "0x%x", nvpci.PCI3dControllerClass)
-	if err != nil {
-		return err
-	}
-
-	device, err := os.Create(filepath.Join(deviceDir, "device"))
-	if err != nil {
-		return err
-	}
-	_, err = device.WriteString("0x20bf")
-	if err != nil {
-		return err
-	}
-
-	_, err = os.Create(filepath.Join(deviceDir, "nvidia"))
-	if err != nil {
-		return err
-	}
-	err = os.Symlink(filepath.Join(deviceDir, "nvidia"), filepath.Join(deviceDir, "driver"))
+	err = nvpci.CreateMockA100SysfsFiles(deviceDir)
 	if err != nil {
 		return err
 	}
@@ -149,43 +117,6 @@ func (m *MockNvmdev) AddMockA100Parent(address string, numaNode int) error {
 		return err
 	}
 	_, err = fmt.Fprintf(numa, "%v", numaNode)
-	if err != nil {
-		return err
-	}
-
-	config, err := os.Create(filepath.Join(deviceDir, "config"))
-	if err != nil {
-		return err
-	}
-	_data := make([]byte, nvpci.PCICfgSpaceStandardSize)
-	data := bytes.New(&_data)
-	data.Write16(0, nvpci.PCINvidiaVendorID)
-	data.Write16(2, uint16(0x20bf))
-	data.Write8(nvpci.PCIStatusBytePosition, nvpci.PCIStatusCapabilityList)
-	_, err = config.Write(*data.Raw())
-	if err != nil {
-		return err
-	}
-
-	bar0 := []uint64{0x00000000c2000000, 0x00000000c2ffffff, 0x0000000000040200}
-	resource, err := os.Create(filepath.Join(deviceDir, "resource"))
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(resource, "0x%x 0x%x 0x%x", bar0[0], bar0[1], bar0[2])
-	if err != nil {
-		return err
-	}
-
-	pmcID := uint32(0x170000a1)
-	resource0, err := os.Create(filepath.Join(deviceDir, "resource0"))
-	if err != nil {
-		return err
-	}
-	_data = make([]byte, bar0[1]-bar0[0]+1)
-	data = bytes.New(&_data).LittleEndian()
-	data.Write32(0, pmcID)
-	_, err = resource0.Write(*data.Raw())
 	if err != nil {
 		return err
 	}

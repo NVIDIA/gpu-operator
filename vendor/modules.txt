@@ -26,7 +26,7 @@ github.com/Masterminds/sprig/v3
 # github.com/Mellanox/maintenance-operator/api v0.3.0
 ## explicit; go 1.24.11
 github.com/Mellanox/maintenance-operator/api/v1alpha1
-# github.com/NVIDIA/go-nvlib v0.11.0
+# github.com/NVIDIA/go-nvlib v0.12.0
 ## explicit; go 1.25.0
 github.com/NVIDIA/go-nvlib/pkg/nvmdev
 github.com/NVIDIA/go-nvlib/pkg/nvpci
