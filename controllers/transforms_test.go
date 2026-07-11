@@ -1739,6 +1739,57 @@ func TestTransformDCGMExporter(t *testing.T) {
 				WithRuntimeClassName("nvidia").
 				WithAutomountServiceAccountToken(true),
 		},
+		{
+			description: "transform dcgm exporter with extra volumes and volume mounts",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "dcgm-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					ExtraVolumes: []corev1.Volume{
+						{
+							Name: "nvidia-install-dir-host",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/home/kubernetes/bin/nvidia",
+								},
+							},
+						},
+					},
+					ExtraVolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "nvidia-install-dir-host",
+							MountPath: "/usr/local/nvidia",
+						},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "nvidia-install-dir-host", MountPath: "/usr/local/nvidia"},
+				},
+			}).WithContainer(corev1.Container{
+				Name: "dummy",
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "nvidia-install-dir-host", MountPath: "/usr/local/nvidia"},
+				},
+			}).
+				WithRuntimeClassName("nvidia").
+				WithHostPathVolume("nvidia-install-dir-host", "/home/kubernetes/bin/nvidia", nil),
+		},
 	}
 
 	for _, tc := range testCases {

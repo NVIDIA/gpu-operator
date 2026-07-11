@@ -419,6 +419,16 @@ type ValidatorSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// HostNetwork indicates whether the Validator pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -654,6 +664,16 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// Optional: Custom repo configuration for NVIDIA Driver container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For NVIDIA Driver Container"
@@ -744,6 +764,16 @@ type VGPUManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// DriverManager represents configuration for NVIDIA Driver Manager initContainer
 	DriverManager DriverManagerSpec `json:"driverManager,omitempty"`
 
@@ -812,6 +842,16 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// Toolkit install directory on the host
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=/usr/local/nvidia
@@ -879,6 +919,16 @@ type DevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// Optional: Configuration for the NVIDIA Device Plugin via the ConfigMap
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -977,6 +1027,16 @@ type SandboxDevicePluginSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// HostNetwork indicates whether the Sandbox Device Plugin pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1041,6 +1101,16 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// Optional: Custom metrics configuration for NVIDIA DCGM Exporter
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1198,6 +1268,16 @@ type DCGMSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// Deprecated: HostPort represents host port that needs to be bound for DCGM engine (Default: 5555)
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Host port to bind for DCGM engine"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:number"
@@ -1262,6 +1342,16 @@ type NodeStatusExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// HostNetwork indicates whether the Node Status Exporter pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
@@ -1392,6 +1482,16 @@ type GPUFeatureDiscoverySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// HostNetwork indicates whether the GPU Feature Discovery pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1451,6 +1551,16 @@ type MIGManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// Optional: Custom mig-parted configuration for NVIDIA MIG Manager container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1668,6 +1778,16 @@ type KataDevicePluginSpec struct {
 	ImageSpec           `json:",inline"`
 	ComponentCommonSpec `json:",inline"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// HostNetwork indicates whether the Kata Sandbox Device Plugin pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1732,6 +1852,16 @@ type KataManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// HostNetwork indicates whether the Kata Manager pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
@@ -1800,6 +1930,16 @@ type CCManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
 
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+
 	// HostNetwork indicates whether the CC Manager pod uses the host's network namespace.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1859,6 +1999,16 @@ type VFIOManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// DriverManager represents configuration for NVIDIA Driver Manager
 	DriverManager DriverManagerSpec `json:"driverManager,omitempty"`
@@ -1922,6 +2072,16 @@ type VGPUDeviceManagerSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
 	Env []EnvVar `json:"env,omitempty"`
+
+	// Optional: List of extra volumes to add to the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+
+	// Optional: List of extra volume mounts to add to every container in the daemonset pod spec
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Extra Volume Mounts"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 
 	// NVIDIA vGPU devices configuration for NVIDIA vGPU Device Manager container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
