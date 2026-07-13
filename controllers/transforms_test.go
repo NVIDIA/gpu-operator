@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -509,31 +508,6 @@ func TestTransformForRuntime(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "crio-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "crio-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-					},
-				}),
-		},
-		// Cover the kata-manager naming case
-		{
-			description: "containerd skips drop-in for kata manager",
-			runtime:     gpuv1.Containerd,
-			input: NewDaemonset().
-				WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
-			expectedOutput: NewDaemonset().
-				WithHostPathVolume("containerd-config", filepath.Dir(DefaultContainerdConfigFile), ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-socket", filepath.Dir(DefaultContainerdSocketFile), nil).
-				WithContainer(corev1.Container{
-					Name: "nvidia-kata-manager",
-					Env: []corev1.EnvVar{
-						{Name: "RUNTIME", Value: gpuv1.Containerd.String()},
-						{Name: "CONTAINERD_RUNTIME_CLASS", Value: DefaultRuntimeClass},
-						{Name: "RUNTIME_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
-						{Name: "CONTAINERD_CONFIG", Value: filepath.Join(DefaultRuntimeConfigTargetDir, filepath.Base(DefaultContainerdConfigFile))},
-						{Name: "RUNTIME_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
-						{Name: "CONTAINERD_SOCKET", Value: filepath.Join(DefaultRuntimeSocketTargetDir, filepath.Base(DefaultContainerdSocketFile))},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
-						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
 					},
 				}),
 		},
@@ -2027,124 +2001,6 @@ func TestTransformMigManager(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			err := TransformMIGManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
-				runtime: gpuv1.Containerd,
-				logger:  ctrl.Log.WithName("test"),
-			})
-			require.NoError(t, err)
-			require.EqualValues(t, tc.expectedDs, tc.ds)
-		})
-	}
-}
-
-func TestTransformKataManager(t *testing.T) {
-	testCases := []struct {
-		description string
-		ds          Daemonset
-		cpSpec      *gpuv1.ClusterPolicySpec
-		expectedDs  Daemonset
-	}{
-		{
-			description: "transform kata manager",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				KataManager: gpuv1.KataManagerSpec{
-					Repository:       "nvcr.io/nvidia/cloud-native",
-					Image:            "kata-manager",
-					Version:          "v1.0.0",
-					ImagePullPolicy:  "IfNotPresent",
-					ImagePullSecrets: []string{"pull-secret"},
-					Args:             []string{"--test-flag"},
-					Config: &kata_v1alpha1.Config{
-						ArtifactsDir: "/var/lib/kata",
-					},
-					Env: []gpuv1.EnvVar{
-						{Name: "foo", Value: "bar"},
-					},
-				},
-			},
-			expectedDs: NewDaemonset().WithContainer(corev1.Container{
-				Name:            "nvidia-kata-manager",
-				Image:           "nvcr.io/nvidia/cloud-native/kata-manager:v1.0.0",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Args:            []string{"--test-flag"},
-				Env: []corev1.EnvVar{
-					{Name: "KATA_ARTIFACTS_DIR", Value: "/var/lib/kata"},
-					{Name: "foo", Value: "bar"},
-					{Name: "RUNTIME", Value: "containerd"},
-					{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
-					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
-					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
-					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
-					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
-					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
-					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
-				},
-			}).WithPullSecret("pull-secret").WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).WithHostPathVolume("containerd-socket", "/run/containerd", nil),
-		},
-		{
-			description: "transform kata manager with custom container runtime socket",
-			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-kata-manager"}),
-			cpSpec: &gpuv1.ClusterPolicySpec{
-				KataManager: gpuv1.KataManagerSpec{
-					Repository:       "nvcr.io/nvidia/cloud-native",
-					Image:            "kata-manager",
-					Version:          "v1.0.0",
-					ImagePullPolicy:  "IfNotPresent",
-					ImagePullSecrets: []string{"pull-secret"},
-					Args:             []string{"--test-flag"},
-					Config: &kata_v1alpha1.Config{
-						ArtifactsDir: "/var/lib/kata",
-					},
-					Env: []gpuv1.EnvVar{
-						{
-							Name: "CONTAINERD_CONFIG", Value: "/var/lib/rancher/k3s/agent/etc/containerd/config.toml",
-						},
-						{
-							Name: "CONTAINERD_SOCKET", Value: "/run/k3s/containerd/containerd.sock",
-						},
-						{
-							Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia",
-						},
-						{
-							Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true",
-						},
-					},
-				},
-			},
-			expectedDs: NewDaemonset().WithContainer(corev1.Container{
-				Name:            "nvidia-kata-manager",
-				Image:           "nvcr.io/nvidia/cloud-native/kata-manager:v1.0.0",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Args:            []string{"--test-flag"},
-				Env: []corev1.EnvVar{
-					{Name: "KATA_ARTIFACTS_DIR", Value: "/var/lib/kata"},
-					{Name: "CONTAINERD_CONFIG", Value: "/runtime/config-dir/config.toml"},
-					{Name: "CONTAINERD_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
-					{Name: "CONTAINERD_RUNTIME_CLASS", Value: "nvidia"},
-					{Name: "CONTAINERD_SET_AS_DEFAULT", Value: "true"},
-					{Name: "RUNTIME", Value: "containerd"},
-					{Name: "RUNTIME_CONFIG", Value: "/runtime/config-dir/config.toml"},
-					{Name: "RUNTIME_SOCKET", Value: "/runtime/sock-dir/containerd.sock"},
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{Name: "kata-artifacts", MountPath: "/var/lib/kata"},
-					{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
-					{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
-				},
-			}).WithPullSecret("pull-secret").
-				WithPodAnnotations(map[string]string{"nvidia.com/kata-manager.last-applied-hash": "1929911998"}).
-				WithHostPathVolume("kata-artifacts", "/var/lib/kata", ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
-				WithHostPathVolume("containerd-socket", "/run/k3s/containerd", nil),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			err := TransformKataManager(tc.ds.DaemonSet, tc.cpSpec, ClusterPolicyController{
 				runtime: gpuv1.Containerd,
 				logger:  ctrl.Log.WithName("test"),
 			})

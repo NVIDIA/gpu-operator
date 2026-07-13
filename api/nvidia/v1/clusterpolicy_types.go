@@ -88,6 +88,7 @@ type ClusterPolicySpec struct {
 	VGPUDeviceManager VGPUDeviceManagerSpec `json:"vgpuDeviceManager,omitempty"`
 	// CDI configures how the Container Device Interface is used in the cluster
 	CDI CDIConfigSpec `json:"cdi,omitempty"`
+	// Deprecated: This field is no longer honored by the GPU Operator. All values under this field are ignored.
 	// KataManager component spec
 	KataManager KataManagerSpec `json:"kataManager,omitempty"`
 	// CCManager component spec

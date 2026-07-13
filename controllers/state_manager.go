@@ -972,7 +972,9 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 	case "state-kata-device-plugin":
 		return n.sandboxEnabled && clusterPolicySpec.KataSandboxDevicePlugin.IsEnabled() && clusterPolicySpec.SandboxWorkloads.Mode == string(gpuv1.Kata)
 	case "state-kata-manager":
-		return n.sandboxEnabled && clusterPolicySpec.KataManager.IsEnabled()
+		// always return false for kata manager as it stands deprecated
+		// this means that any changes to the cluster policy CRD wrt kata manager will not be honored
+		return false
 	case "state-vfio-manager":
 		return n.sandboxEnabled && clusterPolicySpec.VFIOManager.IsEnabled()
 	case "state-vgpu-device-manager":
