@@ -1542,7 +1542,9 @@ spec:
                     type: string
                 type: object
               kataManager:
-                description: KataManager component spec
+                description: |-
+                  Deprecated: This field is no longer honored by the GPU Operator. All values under this field are ignored.
+                  KataManager component spec
                 properties:
                   args:
                     description: 'Optional: List of arguments'
