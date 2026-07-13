@@ -52,6 +52,31 @@
       "depNameTemplate": "{{repo}}/{{image}}",
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "go.mod",
+        "tools/go.mod"
+      ],
+      "matchStrings": [
+        "go (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "versions.mk"
+      ],
+      "matchStrings": [
+        "GOLANG_VERSION \\?= (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version",
+      "versioningTemplate": "semver"
     }
   ],
   "labels": [
@@ -60,7 +85,7 @@
   ],
   "packageRules": [
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
+      "matchFileNames": ["deployments/gpu-operator/values.yaml"],
       "matchPackageNames": [
         "nvcr.io/nvidia/cloud-native/k8s-driver-manager",
         "nvcr.io/nvidia/cloud-native/k8s-kata-manager",
@@ -75,7 +100,7 @@
       "separateMajorMinor": false
     },
     {
-      "matchPaths": [
+      "matchFileNames": [
         "deployments/gpu-operator/values.yaml",
         "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
       ],
@@ -87,7 +112,7 @@
       "separateMajorMinor": false
     },
     {
-      "matchPaths": [
+      "matchFileNames": [
         "deployments/gpu-operator/values.yaml",
         "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
       ],
@@ -98,7 +123,7 @@
       "separateMajorMinor": false
     },
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
+      "matchFileNames": ["deployments/gpu-operator/values.yaml"],
       "matchPackageNames": [
        "nvcr.io/nvidia/cuda"
       ],
@@ -112,6 +137,16 @@
     {
       "matchDatasources": ["*"],
       "groupName": "{{depName}}"
+    },
+    {
+      "description": "Group all Go toolchain version bumps",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["go"],
+      "matchDatasources": ["golang-version"],
+      "groupName": "Go toolchain",
+      "groupSlug": "go-toolchain",
+      "separateMajorMinor": false,
+      "separateMinorPatch": false
     }
   ]
 }
