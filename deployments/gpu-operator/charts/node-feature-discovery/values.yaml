@@ -1,28 +1,86 @@
 image:
+  # -- NFD image repository
+  # @section -- General
   repository: registry.k8s.io/nfd/node-feature-discovery
-  # This should be set to 'IfNotPresent' for released version
+  # @schema enum: [Always, IfNotPresent, Never]
+  # -- Image pull policy
+  # @section -- General
   pullPolicy: IfNotPresent
-  # tag, if defined will use the given image tag, else Chart.AppVersion will be used
-  # tag
+  # @schema type: [string, null]
+  # -- NFD image tag. If not specified Chart.AppVersion will be used.
+  # @section -- General
+  tag:
+# @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/imagePullSecrets
+# -- Image pull secrets. [More info](https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod).
+# @section -- General
 imagePullSecrets: []
 
+# -- Override the name of the chart
+# @section -- General
 nameOverride: ""
+# -- Override a default fully qualified app name
+# @section -- General
 fullnameOverride: ""
+# -- Override the namespace to install the chart into. By default, the namespace is determined by Helm.
+# @section -- General
 namespaceOverride: ""
 
-featureGates:
-  NodeFeatureGroupAPI: false
+# @schema patternProperties: {"^[a-zA-Z]$": {type: string}}
+# -- [Feature gates](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/feature-gates) to enable/disable specific features.
+# @section -- General
+featureGates: {}
 
+# -- Only checksum config values (not the full rendered ConfigMap template) for the rollout annotation.
+# When enabled, pods will only restart when config values actually change, not on unrelated template changes.
+# @section -- General
+checksumValuesOnly: false
+
+# -- The name of the PriorityClass to be used for the NFD pods.
+# @section -- General
 priorityClassName: ""
 
+# -- Enable/disable the Helm post-delete hook.
+# @section -- General
 postDeleteCleanup: true
 
+#
+# Global configuration for NFD used as a sub-chart
+#
+global:
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/imagePullSecrets
+  # -- If `imagePullSecrets` is specified, it takes precedence over `global.imagePullSecrets`. [More info](https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod).
+  # @section -- Global
+  imagePullSecrets: []
+
+#
+# NFD-Master configuration
+#
 master:
+  # -- Specifies whether nfd-master should be deployed
+  # @section -- NFD-Master
   enable: true
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-commandline-reference) to pass to nfd-master.
+  # @section -- NFD-Master
   extraArgs: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
+  # -- Additional environment variables to set in the nfd-master container.
+  # @section -- NFD-Master
   extraEnvs: []
+  # -- Run the container in the host's network namespace.
+  # @section -- NFD-Master
   hostNetwork: false
+  # @schema type: [boolean, null]
+  # -- (bool) Run the container with host user ids. NOTE: if hostNetwork is true, hostUsers should be true.
+  # @section -- NFD-Master
+  hostUsers: ~  # @schema type: [boolean, null]
+  # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
+  # -- NFD master pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).
+  # @section -- NFD-Master
   dnsPolicy: ClusterFirstWithHostNet
+  # @schema type: [object, null]
+  # -- NFD master [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-configuration-reference).
+  # @section -- NFD-Master
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
     # noPublish: false
     # extraLabelNs: ["added.ns.io","added.kubernets.io"]
@@ -69,45 +127,92 @@ master:
     #   retryPeriod: 2s
     # nfdApiParallelism: 10
   ### <NFD-MASTER-CONF-END-DO-NOT-REMOVE>
+
+  # @schema type: integer; minimum: 1; maximum: 65535
+  # -- Port on which to serve http for metrics and healthz endpoints.
+  # @section -- NFD-Master
   port: 8080
+  # @schema type: [string, null]
+  # -- Instance name. Used to separate annotation namespaces for multiple parallel deployments.
+  # @section -- NFD-Master
   instance:
+  # @schema type: [string, null]
+  # -- (int) NFD API controller resync period. Time duration string (e.g. "5m", "1h", "2h45m").
+  # @section -- NFD-Master
   resyncPeriod:
+  # @schema item: string
+  # -- Label namespaces to deny. Labels with these prefixes will not be published to the nodes.
+  # @section -- NFD-Master
   denyLabelNs: []
+  # @schema item: string
+  # -- Additional label namespaces to publish. Labels with these prefixes are allowed even if otherwise denied by `master.denyLabelNs`.
+  # @section -- NFD-Master
   extraLabelNs: []
+  # -- Enable node tainting.
+  # @section -- NFD-Master
   enableTaints: false
-  nfdApiParallelism: null
+  # @schema type: [integer, null]; minimum: 1; maximum: 100
+  # -- (int) The maximum number of concurrent node updates.
+  # @section -- NFD-Master
+  nfdApiParallelism:
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-master Deployment.
+  # @section -- NFD-Master
   deploymentAnnotations: {}
+  # -- Number of the desired replicas for the nfd-master Deployment.
+  # @section -- NFD-Master
   replicaCount: 1
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSecurityContext
+  # -- [Pod SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod) of the nfd-master pods.
+  # @section -- NFD-Master
   podSecurityContext: {}
-    # fsGroup: 2000
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/initContainers
+  # -- [Init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) to add to the nfd-master pods.
+  # @section -- NFD-Master
+  initContainers: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.SecurityContext
+  # -- [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container) of the nfd-master container.
+  # @section -- NFD-Master
   securityContext:
+    # @schema hidden
     allowPrivilegeEscalation: false
+    # @schema hidden
     capabilities:
       drop: [ "ALL" ]
+    # @schema hidden
     readOnlyRootFilesystem: true
+    # @schema hidden
     runAsNonRoot: true
-    # runAsUser: 1000
-
   serviceAccount:
-    # Specifies whether a service account should be created
+    # -- Specifies whether a service account should be created.
+    # @section -- NFD-Master
     create: true
-    # Annotations to add to the service account
+    # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+    # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the service account
+    # @section -- NFD-Master
     annotations: {}
-    # The name of the service account to use.
-    # If not set and create is true, a name is generated using the fullname template
+    # @schema type: [string, null]
+    # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
+    # @section -- NFD-Master
     name:
-
-  # specify how many old ReplicaSets for the Deployment to retain.
+  # @schema type: [integer, null]
+  # -- (int) Specifies the number of old ReplicaSets for the Deployment to retain. [revisionHistoryLimit](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#revision-history-limit)
+  # @section -- NFD-Master
   revisionHistoryLimit:
-
   rbac:
+    # -- Create [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) configuration for nfd-master.
+    # @section -- NFD-Master
     create: true
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.ResourceRequirements
   resources:
+    # @schema hidden
+    # -- Resource [limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-master container.
+    # @section -- NFD-Master
     limits:
       memory: 4Gi
+    # @schema hidden
+    # -- Resource [requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-master container.
+    # @section -- NFD-Master
     requests:
       cpu: 100m
       # You may want to use the same value for `requests.memory` and `limits.memory`. The “requests” value affects scheduling to accommodate pods on nodes.
@@ -116,23 +221,77 @@ master:
       # cannot be compressed and once allocated to a pod, it can only be reclaimed by killing the pod.
       # Natan Yellin 22/09/2022 https://home.robusta.dev/blog/kubernetes-memory-limit
       memory: 128Mi
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/nodeSelector
+  # -- [Node selector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) for the nfd-master pods.
+  # @section -- NFD-Master
   nodeSelector: {}
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/tolerations
+  # -- [Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) for the nfd-master pods.
+  # @section -- NFD-Master
   tolerations:
-  - key: "node-role.kubernetes.io/control-plane"
+  - # @schema hidden
+    key: "node-role.kubernetes.io/control-plane"
+    # @schema hidden
     operator: "Equal"
+    # @schema hidden
     value: ""
+    # @schema hidden
     effect: "NoSchedule"
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.policy.v1.PodDisruptionBudgetSpec
   podDisruptionBudget:
+    # -- Configure PodDisruptionBudget for the nfd-master Deployment.
+    # @section -- NFD-Master
     enable: false
+    # @schema hidden
+    # -- Minimum number (or percentage) of pods that must be available after the eviction.
+    # @section -- NFD-Master
     minAvailable: 1
+    # @schema hidden
+    # -- Policy to evict unhealthy pods when a PodDisruptionBudget is defined.
+    # @section -- NFD-Master
     unhealthyPodEvictionPolicy: AlwaysAllow
+  # @section -- NFD-Master
+  networkPolicy:
+    # -- Should a networkPolicy be deployed for the nfd-master pods
+    # @section -- NFD-Master
+    enabled: false
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyEgressRule
+    # -- [Egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-master pods.
+    # The minimum egress ports required to function are: DNS (53/udp, 53/tcp, API server (80/tcp, 443/tcp, 6443/tcp). NOTE: OKD and Openshift use 6443/tcp
+    # @section -- NFD-Master
+    egress:
+    - ports: # @schema hidden
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+      - port: 53
+        protocol: TCP
+      - port: 53
+        protocol: UDP
+      - port: 6443
+        protocol: TCP
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyIngressRule
+    # -- [Ingress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-master pods.
+    # @section -- NFD-Master
+    ingress:
+    - ports: # @schema hidden
+      - protocol: TCP
+        port: http
 
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-master pods.
+  # @section -- NFD-Master
   annotations: {}
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/labels
+  # -- [Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to add to the nfd-master pods.
+  # @section -- NFD-Master
+  labels: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Affinity
+  # -- [Affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) for the nfd-master pods.
+  # @section -- NFD-Master
   affinity:
+    # @schema hidden
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
         - weight: 1
@@ -141,36 +300,120 @@ master:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
-                
+  # -- Startup probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-startup-probes).
+  # @section -- NFD-Master
+  # @default -- -
   startupProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Master
+    initialDelaySeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Master
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Master
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
+    # @section -- NFD-Master
     failureThreshold: 30
-    # periodSeconds: 10
-  livenessProbe: {}
-    # failureThreshold: 3
-    # initialDelaySeconds: 0
-    # periodSeconds: 10
-    # timeoutSeconds: 1
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # @section -- NFD-Master
+  # @default -- -
+  livenessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Master
+    initialDelaySeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Master
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Master
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Master
+    failureThreshold:
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # @section -- NFD-Master
+  # @default -- -
   readinessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Master
+    initialDelaySeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Master
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Master
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Master
+    successThreshold:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
+    # @section -- NFD-Master
     failureThreshold: 10
-    # initialDelaySeconds: 0
-    # periodSeconds: 10
-    # timeoutSeconds: 1
-    # successThreshold: 1
 
+#
+# NFD-Worker configuration
+#
 worker:
+  # -- Specifies whether nfd-worker should be deployed
+  # @section -- NFD-Worker
   enable: true
+  # @schema uniqueItems:true;item:string;itemEnum:["node","pod","ds"]
+  # -- Objects used as owner references for NodeFeature objects. Valid values are `node`, `pod`, and `ds`. This value is passed through `-owner-refs` and takes precedence over `worker.config.core.ownerRefs`.
+  # @section -- NFD-Worker
+  ownerRefs:
+    - pod
+    - ds
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-commandline-reference) to pass to nfd-worker.
+  # @section -- NFD-Worker
   extraArgs: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
+  # -- Additional environment variables to set in the nfd-worker container.
+  # @section -- NFD-Worker
   extraEnvs: []
+  # -- Run the container in the host's network namespace.
+  # @section -- NFD-Worker
   hostNetwork: false
+  # @schema type: [boolean, null]
+  # -- (bool) Run the container with host user ids. NOTE: if hostNetwork is true, hostUsers should be true.
+  # @section -- NFD-Worker
+  hostUsers: ~  # @schema type: [boolean, null]
+  # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
+  # -- NFD worker pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # @section -- NFD-Worker
   dnsPolicy: ClusterFirstWithHostNet
+  # @schema type: [object, null]
+  # -- NFD worker [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-configuration-reference).
+  # @section -- NFD-Worker
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
     #  labelWhiteList:
     #  noPublish: false
     #  noOwnerRefs: false
+    #  # Select from node, pod and ds. Use [] to disable owner references.
+    #  ownerRefs: [pod, ds]
     #  sleepInterval: 60s
     #  featureSources: [all]
     #  labelSources: [all]
+    #  # Discover these features but omit them from the published NodeFeature object
+    #  # to reduce its size. Exact key or '*' prefix (e.g. pci.device, pci.*).
+    #  # Only for features no NodeFeatureRule/NodeFeatureGroup consumes.
+    #  noPublishFeatures: []
     #  klog:
     #    addDirHeader: false
     #    alsologtostderr: false
@@ -280,6 +523,9 @@ worker:
     #          matchExpressions:
     #            e1000e: {op: Exists}
     #        - feature: kernel.selinux
+    #          matchExpressions:
+    #            enabled: {op: IsFalse}
+    #        - feature: kernel.kvm
     #          matchExpressions:
     #            enabled: {op: IsFalse}
     #        - feature: kernel.version
@@ -406,75 +652,196 @@ worker:
     #          matchName: {op: In, value: ["SWAP", "X86", "ARM"]}
 ### <NFD-WORKER-CONF-END-DO-NOT-REMOVE>
 
+  # @schema type: integer; minimum: 1; maximum: 65535
+  # -- Port on which to serve http for metrics and healthz endpoints.
+  # @section -- NFD-Worker
   port: 8080
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-worker DaemonSet.
+  # @section -- NFD-Worker
   daemonsetAnnotations: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSecurityContext
+  # -- [Pod SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod) of the nfd-worker pods.
+  # @section -- NFD-Worker
   podSecurityContext: {}
-    # fsGroup: 2000
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/initContainers
+  # -- [Init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) to add to the nfd-worker pods.
+  # @section -- NFD-Worker
+  initContainers: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.SecurityContext
+  # -- [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container) of the nfd-worker container.
+  # @section -- NFD-Worker
   securityContext:
+    # @schema hidden
     allowPrivilegeEscalation: false
+    # @schema hidden
     capabilities:
       drop: [ "ALL" ]
+    # @schema hidden
     readOnlyRootFilesystem: true
+    # @schema hidden
     runAsNonRoot: true
-    # runAsUser: 1000
 
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # @section -- NFD-Worker
+  # @default -- -
   livenessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Worker
     initialDelaySeconds: 10
-    # failureThreshold: 3
-    # periodSeconds: 10
-    # timeoutSeconds: 1
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Worker
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Worker
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Worker
+    failureThreshold:
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # @section -- NFD-Worker
+  # @default -- -
   readinessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Worker
     initialDelaySeconds: 5
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Worker
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Worker
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Worker
+    successThreshold:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
+    # @section -- NFD-Worker
     failureThreshold: 10
-    # periodSeconds: 10
-    # timeoutSeconds: 1
-    # successThreshold: 1
 
   serviceAccount:
-    # Specifies whether a service account should be created.
-    # We create this by default to make it easier for downstream users to apply PodSecurityPolicies.
+    # -- Specifies whether a service account should be created.
+    # @section -- NFD-Worker
     create: true
-    # Annotations to add to the service account
+    # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+    # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the service account
+    # @section -- NFD-Worker
     annotations: {}
-    # The name of the service account to use.
-    # If not set and create is true, a name is generated using the fullname template
+    # @schema type: [string, null]
+    # -- Name of the service account to use. If not set and create is true, a name is generated using the fullname template
+    # @section -- NFD-Worker
     name:
-
-  # specify how many old ControllerRevisions for the DaemonSet to retain.
+  # @schema type: [integer, null]
+  # -- (int) Specifies the number of old history for the DaemonSet to retain to allow rollback.
+  # @section -- NFD-Worker
   revisionHistoryLimit:
-
   rbac:
+    # -- Create [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) configuration for nfd-worker.
+    # @section -- NFD-Worker
     create: true
 
   # Allow users to mount the hostPath /usr/src, useful for RHCOS on s390x
   # Does not work on systems without /usr/src AND a read-only /usr, such as Talos
+  # -- Mount host path /user/src inside the container. Does not work on systems without /usr/src AND a read-only /usr.
+  # @section -- NFD-Worker
   mountUsrSrc: false
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.ResourceRequirements
   resources:
+    # @schema hidden
+    # -- Resource [limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-worker container.
+    # @section -- NFD-Worker
     limits:
       memory: 512Mi
+    # @schema hidden
+    # -- Resource [requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-worker container.
+    # @section -- NFD-Worker
     requests:
       cpu: 5m
       memory: 64Mi
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/nodeSelector
+  # -- [Node selector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) for the nfd-worker pods.
+  # @section -- NFD-Worker
   nodeSelector: {}
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/tolerations
+  # -- [Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) for the nfd-worker pods.
+  # @section -- NFD-Worker
   tolerations: []
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-worker pods.
+  # @section -- NFD-Worker
   annotations: {}
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/labels
+  # -- [Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to add to the nfd-worker pods.
+  # @section -- NFD-Worker
+  labels: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Affinity
+  # -- [Affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) for the nfd-worker pods.
+  # @section -- NFD-Worker
   affinity: {}
+  # @schema type: [string, null]
+  # -- The name of the PriorityClass to be used for the nfd-worker pods.
+  # @section -- NFD-Worker
+  priorityClassName:
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy
+  # -- Update strategy for the nfd-worker DaemonSet. Defaults to a rolling
+  # update with `maxUnavailable: "10%"` so upgrades complete in a bounded
+  # number of waves on clusters of any size (the Kubernetes default of
+  # `maxUnavailable: 1` rolls one node at a time and makes Helm wait and
+  # Flux HelmRelease timeouts likely on large clusters). nfd-worker is
+  # stateless and node labels persist while a worker pod restarts, so a
+  # faster roll is safe. Set `maxUnavailable: 1` to restore the Kubernetes
+  # default. To use `type: OnDelete`, also set `rollingUpdate: null`
+  # (Helm deep-merges maps).
+  # [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)
+  # @section -- NFD-Worker
+  updateStrategy:
+    rollingUpdate:
+      # @schema type: [string, integer]
+      maxUnavailable: "10%"
+  # @section -- NFD-Worker
+  networkPolicy:
+    # -- Should a networkPolicy be deployed for the nfd-worker pods
+    # @section -- NFD-Worker
+    enabled: false
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyEgressRule
+    # -- [Egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-worker pods.
+    # The minimum egress ports required to function are: DNS (53/udp, 53/tcp, API server (80/tcp, 443/tcp, 6443/tcp). NOTE: OKD and Openshift use 6443/tcp
+    # @section -- NFD-Worker
+    egress:
+    - ports: # @schema hidden
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+      - port: 53
+        protocol: TCP
+      - port: 53
+        protocol: UDP
+      - port: 6443
+        protocol: TCP
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyIngressRule
+    # -- [Ingress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-worker pods.
+    # @section -- NFD-Worker
+    ingress:
+    - ports: # @schema hidden
+      - protocol: TCP
+        port: http
 
-  priorityClassName: ""
-
-  updateStrategy: {}
-    # type: RollingUpdate
-    # rollingUpdate:
-    #   maxSurge: 0
-    #   maxUnavailable: "10%"
-
+#
+# NFD-Topology-Updater configuration
+#
 topologyUpdater:
+  # @schema type: [object, null]
+  # -- Configuration for the topology updater. See the [configuration reference](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-configuration-reference) for details.
+  # @section -- NFD-Topology-Updater
   config: ### <NFD-TOPOLOGY-UPDATER-CONF-START-DO-NOT-REMOVE>
     ## key = node name, value = list of resources to be excluded.
     ## use * to exclude from all nodes.
@@ -485,120 +852,410 @@ topologyUpdater:
     #  *: [hugepages-2Mi]
 ### <NFD-TOPOLOGY-UPDATER-CONF-END-DO-NOT-REMOVE>
 
+  # -- Specifies whether nfd-topology-updater should be deployed.
+  # @section -- NFD-Topology-Updater
   enable: false
+  # -- Create the NodeResourceTopology CRD. This MUST be set to true when
+  # 'enable' is true, unless the CRD is installed separately (e.g., by another
+  # Helm release or external tool). If the CRD is missing, the topology-updater
+  # pods will fail with "NodeResourceTopology CRD is not installed" error.
+  # @section -- NFD-Topology-Updater
   createCRDs: false
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-commandline-reference) to pass to nfd-topology-updater.
+  # @section -- NFD-Topology-Updater
   extraArgs: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
+  # -- Additional environment variables to set in the nfd-topology-updater container.
+  # @section -- NFD-Topology-Updater
   extraEnvs: []
+  # -- Run the container in the host's network namespace.
+  # @section -- NFD-Topology-Updater
   hostNetwork: false
+  # @schema type: [boolean, null]
+  # -- (bool) Run the container with host user ids. NOTE: if hostNetwork is true, hostUsers should be true.
+  # @section -- NFD-Topology-Updater
+  hostUsers: ~  # @schema type: [boolean, null]
+  # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
+  # -- NFD topology updater pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # @section -- NFD-Topology-Updater
   dnsPolicy: ClusterFirstWithHostNet
-
   serviceAccount:
+    # -- Specifies whether a service account should be created.
+    # @section -- NFD-Topology-Updater
     create: true
+    # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+    # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the service account.
+    # @section -- NFD-Topology-Updater
     annotations: {}
+    # @schema type: [string, null]
+    # -- Name or the service account to use. If not set and create is true, a name is generated using the fullname template.
+    # @section -- NFD-Topology-Updater
     name:
 
-  # specify how many old ControllerRevisions for the DaemonSet to retain.
+  # @schema type: [integer, null]
+  # -- (int) Specifies the number of old history for the DaemonSet to retain to allow rollback.
+  # @section -- NFD-Topology-Updater
   revisionHistoryLimit:
-
   rbac:
+    # -- Create [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) configuration for nfd-topology-updater.
+    # @section -- NFD-Topology-Updater
     create: true
-
+  # @schema type: integer; minimum: 1; maximum: 65535
+  # -- Port on which to serve http for metrics and healthz endpoints.
+  # @section -- NFD-Topology-Updater
   port: 8080
+  # @schema type: [string, null]
+  # -- Host path for the kubelet config file.
+  # @section -- NFD-Topology-Updater
   kubeletConfigPath:
+  # @schema type: [string, null]
+  # -- Host path for the kubelet socket for podresources endpoint.
+  # @section -- NFD-Topology-Updater
   kubeletPodResourcesSockPath:
+  # -- Time to sleep between CR updates. Non-positive value implies no CR update.
+  # @section -- NFD-Topology-Updater
   updateInterval: 60s
+  # -- Namespace to watch pods, `*` for all namespaces.
+  # @section -- NFD-Topology-Updater
   watchNamespace: "*"
+  # -- The kubelet state directory path for watching state and checkpoint files. Empty value disables kubelet state tracking.
+  # @section -- NFD-Topology-Updater
   kubeletStateDir: /var/lib/kubelet
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSecurityContext
+  # -- [Pod SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod) of the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
   podSecurityContext: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/initContainers
+  # -- [Init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) to add to the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
+  initContainers: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.SecurityContext
+  # -- [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container) of the nfd-topology-updater container.
+  # @section -- NFD-Topology-Updater
   securityContext:
+    # @schema hidden
     allowPrivilegeEscalation: false
+    # @schema hidden
     capabilities:
       drop: [ "ALL" ]
+    # @schema hidden
     readOnlyRootFilesystem: true
+    # @schema hidden
     runAsUser: 0
 
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # @section -- NFD-Topology-Updater
+  # @default -- -
   livenessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Topology-Updater
     initialDelaySeconds: 10
-    # failureThreshold: 3
-    # periodSeconds: 10
-    # timeoutSeconds: 1
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Topology-Updater
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Topology-Updater
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Topology-Updater
+    failureThreshold:
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # @section -- NFD-Topology-Updater
+  # @default -- -
   readinessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-Topology-Updater
     initialDelaySeconds: 5
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-Topology-Updater
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-Topology-Updater
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-Topology-Updater
+    successThreshold:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
+    # @section -- NFD-Topology-Updater
     failureThreshold: 10
-    # periodSeconds: 10
-    # timeoutSeconds: 1
-    # successThreshold: 1
 
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.ResourceRequirements
   resources:
+    # @schema hidden
+    # -- Resource [limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-topology-updater container.
+    # @section -- NFD-Topology-Updater
     limits:
       memory: 60Mi
+    # @schema hidden
+    # -- Resource [requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-topology-updater container.
+    # @section -- NFD-Topology-Updater
     requests:
       cpu: 50m
       memory: 40Mi
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/nodeSelector
+  # -- [Node selector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) for the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
   nodeSelector: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/tolerations
+  # -- [Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) for the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
   tolerations: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
   annotations: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/labels
+  # -- [Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to add to the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
+  labels: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-topology-updater DaemonSet.
+  # @section -- NFD-Topology-Updater
   daemonsetAnnotations: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Affinity
+  # -- [Affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) for the nfd-topology-updater pods.
+  # @section -- NFD-Topology-Updater
   affinity: {}
+  # -- Enables compute and report of pod fingerprint in NRT objects.
+  # @section -- NFD-Topology-Updater
   podSetFingerprint: true
+  # @section -- NFD-Topology-Updater
+  networkPolicy:
+    # -- Should a networkPolicy be deployed for the nfd-topology pods
+    # @section -- NFD-Topology-Updater
+    enabled: false
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyEgressRule
+    # -- [Egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-topology pods.
+    # The minimum egress ports required to function are: DNS (53/udp, 53/tcp, API server (80/tcp, 443/tcp, 6443/tcp). NOTE: OKD and Openshift use 6443/tcp
+    # @section -- NFD-Topology-Updater
+    egress:
+    - ports: # @schema hidden
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+      - port: 53
+        protocol: TCP
+      - port: 53
+        protocol: UDP
+      - port: 6443
+        protocol: TCP
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyIngressRule
+    # -- [Ingress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-topology pods.
+    # @section -- NFD-Topology-Updater
+    ingress:
+    - ports: # @schema hidden
+      - protocol: TCP
+        port: http
 
+#
+# NFD-GC configuration
+#
 gc:
+  # -- Specifies whether nfd-gc should be deployed.
+  # @section -- NFD-GC
   enable: true
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/gc-commandline-reference) to pass to nfd-gc.
+  # @section -- NFD-GC
   extraArgs: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
+  # -- Additional environment variables to set in the nfd-gc container.
+  # @section -- NFD-GC
   extraEnvs: []
+  # -- Run the container in the host's network namespace.
+  # @section -- NFD-GC
   hostNetwork: false
+  # @schema type: [boolean, null]
+  # -- (bool) Run the container with host user ids. NOTE: if hostNetwork is true, hostUsers should be true.
+  # @section -- NFD-GC
+  hostUsers: ~  # @schema type: [boolean, null]
+  # -- The number of desired replicas for the nfd-gc Deployment.
+  # @section -- NFD-GC
   replicaCount: 1
+  # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
+  # -- NFD gc pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # @section -- NFD-GC
   dnsPolicy: ClusterFirstWithHostNet
-
   serviceAccount:
+    # -- Specifies whether a service account should be created.
+    # @section -- NFD-GC
     create: true
+    # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+    # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the service account.
+    # @section -- NFD-GC
     annotations: {}
+    # @schema type: [string, null]
+    # -- Name of the service account to use. If not set and create is true, a name is generated using the fullname template.
+    # @section -- NFD-GC
     name:
   rbac:
+    # -- Create [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) configuration for nfd-gc.
+    # @section -- NFD-GC
     create: true
-
+  # -- Time between periodic garbage collector runs.
+  # @section -- NFD-GC
   interval: 1h
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSecurityContext
+  # -- [Pod SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod) of the nfd-gc pods.
+  # @section -- NFD-GC
   podSecurityContext: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/initContainers
+  # -- [Init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) to add to the nfd-gc pods.
+  # @section -- NFD-GC
+  initContainers: []
 
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # @section -- NFD-GC
+  # @default -- -
   livenessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-GC
     initialDelaySeconds: 10
-    # failureThreshold: 3
-    # periodSeconds: 10
-    # timeoutSeconds: 1
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-GC
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-GC
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-GC
+    failureThreshold:
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # @section -- NFD-GC
+  # @default -- -
   readinessProbe:
+    # @schema type: [integer, null]
+    # -- (int) The number of seconds after the container has started before probe is initiated.
+    # @section -- NFD-GC
     initialDelaySeconds: 5
-    # failureThreshold: 3
-    # periodSeconds: 10
-    # timeoutSeconds: 1
-    # successThreshold: 1
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of seconds after which the probe times out.
+    # @section -- NFD-GC
+    timeoutSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) How often (in seconds) to perform the probe.
+    # @section -- NFD-GC
+    periodSeconds:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # @section -- NFD-GC
+    successThreshold:
+    # @schema type: [integer, null]; minimum: 1
+    # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
+    # @section -- NFD-GC
+    failureThreshold:
 
   resources:
+    # @schema hidden
+    # -- Resource [limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-gc container.
+    # @section -- NFD-GC
     limits:
       memory: 1Gi
+    # @schema hidden
+    # -- Resource [requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) for the nfd-gc container.
+    # @section -- NFD-GC
     requests:
       cpu: 10m
       memory: 128Mi
-
+  # @schema type: integer; minimum: 1; maximum: 65535
+  # -- Port on which to serve http for metrics and healthz endpoints.
+  # @section -- NFD-GC
   port: 8080
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/nodeSelector
+  # -- [Node selector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) for the nfd-gc pods.
+  # @section -- NFD-GC
   nodeSelector: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.PodSpec/properties/tolerations
+  # -- [Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) for the nfd-gc pods.
+  # @section -- NFD-GC
   tolerations: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-gc pods.
+  # @section -- NFD-GC
   annotations: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/labels
+  # -- [Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to add to the nfd-gc pods.
+  # @section -- NFD-GC
+  labels: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta/properties/annotations
+  # -- [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to add to the nfd-gc  Deployment.
+  # @section -- NFD-GC
   deploymentAnnotations: {}
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Affinity
+  # -- [Affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) for the nfd-gc pods.
+  # @section -- NFD-GC
   affinity: {}
-
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.policy.v1.PodDisruptionBudgetSpec
   podDisruptionBudget:
+    # -- Configure PodDisruptionBudget for the nfd-master Deployment.
+    # @section -- NFD-GC
     enable: false
+    # @schema hidden
+    # -- Minimum number (or percentage) of pods that must be available after the eviction.
+    # @section -- NFD-GC
     minAvailable: 1
+    # @schema hidden
+    # -- Policy to evict unhealthy pods when a PodDisruptionBudget is defined.
+    # @section -- NFD-GC
     unhealthyPodEvictionPolicy: AlwaysAllow
-
-  # specify how many old ReplicaSets for the Deployment to retain.
+  # @schema type: [integer, null]
+  # -- (int) Specifies the number of old history for the Deployment to retain to allow rollback.
+  # @section -- NFD-GC
   revisionHistoryLimit:
+  # @section -- NFD-GC
+  networkPolicy:
+    # -- Should a networkPolicy be deployed for the nfd-gc pods
+    # @section -- NFD-GC
+    enabled: false
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyEgressRule
+    # -- [Egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-gc pods.
+    # The minimum egress ports required to function are: DNS (53/udp, 53/tcp, API server (80/tcp, 443/tcp, 6443/tcp). NOTE: OKD and Openshift use 6443/tcp
+    # @section -- NFD-GC
+    egress:
+    - ports: # @schema hidden
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+      - port: 53
+        protocol: TCP
+      - port: 53
+        protocol: UDP
+      - port: 6443
+        protocol: TCP
+    # @schema itemRef: $k8s/_definitions.json#/definitions/io.k8s.api.networking.v1.NetworkPolicyIngressRule
+    # -- [Ingress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#network-traffic-filtering) for the nfd-gc pods.
+    # @section -- NFD-GC
+    ingress:
+    - ports: # @schema hidden
+      - protocol: TCP
+        port: http
 
+#
+# Prometheus configuration
+#
 prometheus:
+  # -- Create PodMonitor object for enabling metrics collection by Prometheus Operator.
+  # @section -- Prometheus
   enable: false
+  # -- Interval at which metrics are scraped.
+  # @section -- Prometheus
   scrapeInterval: 10s
+  # -- Labels to add to the PodMonitor object.
+  # @section -- Prometheus
   labels: {}

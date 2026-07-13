@@ -1,9 +1,11 @@
 apiVersion: v2
-appVersion: v0.18.3
-description: 'Detects hardware features available on each node in a Kubernetes cluster,
-  and advertises those features using node labels. '
+appVersion: v0.19.0
+description: 'Node Feature Discovery (NFD) is a Kubernetes add-on for detecting hardware
+  features and system configuration. Detected features are advertised as node labels.
+  NFD provides flexible configuration and extension points for a wide range of vendor
+  and application specific node labeling needs. '
 home: https://github.com/kubernetes-sigs/node-feature-discovery
-icon: https://kubernetes-sigs.github.io/node-feature-discovery/v0.18/assets/images/nfd/favicon.svg
+icon: https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/assets/images/nfd/favicon.svg
 keywords:
 - feature-discovery
 - feature-detection
@@ -12,4 +14,4 @@ name: node-feature-discovery
 sources:
 - https://github.com/kubernetes-sigs/node-feature-discovery
 type: application
-version: 0.18.3
+version: 0.19.0

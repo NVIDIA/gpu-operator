@@ -1,0 +1,10 @@
+# Configuration file for https://github.com/losisin/helm-values-schema-json
+values:
+  - values.yaml
+output: values.schema.json
+k8sSchemaVersion: "v1.34.1"
+useHelmDocs: true
+# Bundle external $ref schemas into $defs to support air-gapped environments
+# See: https://github.com/kubernetes-sigs/node-feature-discovery/issues/2398
+bundle: true
+bundleWithoutID: true

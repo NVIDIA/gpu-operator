@@ -57,6 +57,25 @@ rules:
   - update
 {{- end }}
 
+{{- if and .Values.worker.enable .Values.worker.rbac.create }}
+{{- if has "node" .Values.worker.ownerRefs }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "node-feature-discovery.fullname" . }}-worker
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+{{- end }}
+{{- end }}
+
 {{- if and .Values.topologyUpdater.enable .Values.topologyUpdater.rbac.create }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -82,7 +101,7 @@ rules:
 - apiGroups:
     - ""
   resources:
-    - nodes/proxy
+    - nodes/configz
   verbs:
     - get
 - apiGroups:
@@ -91,6 +110,8 @@ rules:
   - pods
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - topology.node.k8s.io
   resources:
@@ -99,6 +120,14 @@ rules:
   - create
   - get
   - update
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch
 {{- end }}
 
 {{- if and .Values.gc.enable .Values.gc.rbac.create }}
@@ -117,12 +146,6 @@ rules:
   verbs:
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes/proxy
-  verbs:
-  - get
 - apiGroups:
   - topology.node.k8s.io
   resources:

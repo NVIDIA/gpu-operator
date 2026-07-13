@@ -1,0 +1,26 @@
+{{- if .Values.topologyUpdater.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "node-feature-discovery.fullname" . }}-topology-updater-network-policy
+  namespace: {{ include "node-feature-discovery.namespace" . }}
+  labels:
+    {{- include "node-feature-discovery.labels" . | nindent 4 }}
+    role: topology-updater
+spec:
+  egress:
+    {{- with .Values.topologyUpdater.networkPolicy.egress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  ingress:
+    {{- with .Values.topologyUpdater.networkPolicy.ingress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  podSelector:
+    matchLabels:
+      {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}
+      role: topology-updater
+  policyTypes:
+  - Egress
+  - Ingress
+{{- end }}
