@@ -452,7 +452,7 @@ gdrcopy:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: gdrdrv
-  version: "v2.5.2"
+  version: "v2.6"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
