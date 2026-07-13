@@ -34,11 +34,24 @@
         "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
       ],
       "matchStrings": [
-        "[-\\s]*value:\\s*\"?(?<depName>[^:\"]+)(?::(?<currentValue>[^@\"]+))?@(?<currentDigest>sha256:[a-f0-9]{64})\"?",
-        "[-\\s]*image: (?<depName>.*?)(?::(?<currentValue>.*?))?@(?<currentDigest>sha256:[a-f0-9]{64})",
-        "- name: (?<suffix>[\\w-]+)[-\\s]*image: (?<depName>.*?)(?::(?<currentValue>.*?))?@(?<currentDigest>sha256:[a-f0-9]{64})"
+        "[-\\s]*value:\\s*\"?(?<depName>[^:\"]+):(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})\"?",
+        "[-\\s]*image: (?<depName>.*?):(?<currentValue>.*?)@(?<currentDigest>sha256:[a-f0-9]{64})",
+        "- name: (?<suffix>[\\w-]+)[-\\s]*image: (?<depName>.*?):(?<currentValue>.*?)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "versioningTemplate": "{{depName}}{{#if newValue}}:{{newValue}}{{/if}}{{#if newDigest}}@{{newDigest}}{{/if}}",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
+      ],
+      "matchStrings": [
+        "(?<prefix>\\s*image:\\s*)(?<depName>nvcr\\.io/nvidia/cloud-native/gdrdrv)(?::(?<currentValue>v?\\d+\\.\\d+(?:\\.\\d+)?-rhel9(?:\\.\\d+)?))?@(?<currentDigest>sha256:[a-f0-9]{64})",
+        "(?<prefix>\\s*value:\\s*\")(?<depName>nvcr\\.io/nvidia/cloud-native/gdrdrv)(?::(?<currentValue>v?\\d+\\.\\d+(?:\\.\\d+)?-rhel9(?:\\.\\d+)?))?@(?<currentDigest>sha256:[a-f0-9]{64})(?<suffix>\")"
+      ],
+      "currentValueTemplate": "{{#if currentValue}}{{{currentValue}}}{{else}}v2.5.2-rhel9.6{{/if}}",
+      "autoReplaceStringTemplate": "{{{prefix}}}{{{depName}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}{{{suffix}}}",
       "datasourceTemplate": "docker"
     },
     {
@@ -60,7 +73,10 @@
   ],
   "packageRules": [
     {
-      "matchPaths": ["deployments/gpu-operator/values.yaml"],
+      "matchPaths": [
+        "deployments/gpu-operator/values.yaml",
+        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
+      ],
       "matchPackageNames": [
         "nvcr.io/nvidia/cloud-native/k8s-driver-manager",
         "nvcr.io/nvidia/cloud-native/k8s-kata-manager",
@@ -103,6 +119,25 @@
        "nvcr.io/nvidia/cuda"
       ],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-base-ubi9$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPaths": ["deployments/gpu-operator/values.yaml"],
+      "matchPackageNames": [
+        "nvcr.io/nvidia/cloud-native/nvidia-fs",
+        "nvcr.io/nvidia/cloud-native/gdrdrv"
+      ],
+      "extractVersion": "^(?<version>v?\\d+\\.\\d+(?:\\.\\d+)?)(?:-[A-Za-z0-9_.-]+)?$",
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)(?:\\.(?<patch>\\d+))?$",
+      "separateMajorMinor": false
+    },
+    {
+      "matchPaths": ["bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"],
+      "matchPackageNames": [
+        "nvcr.io/nvidia/cloud-native/gdrdrv"
+      ],
+      "versionCompatibility": "^(?<version>v?\\d+\\.\\d+(?:\\.\\d+)?)(?<compatibility>-rhel9(?:\\.\\d+)?)$",
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)(?:\\.(?<patch>\\d+))?$",
       "separateMajorMinor": false
     },
     {
