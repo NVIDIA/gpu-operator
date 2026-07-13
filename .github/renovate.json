@@ -122,6 +122,14 @@
       "separateMajorMinor": false
     },
     {
+      "matchFileNames": ["bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"],
+      "matchPackageNames": [
+        "nvcr.io/nvidia/cloud-native/dcgm"
+      ],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<build>\\d+)-ubi\\d+$",
+      "separateMajorMinor": false
+    },
+    {
       "matchFileNames": ["deployments/gpu-operator/values.yaml"],
       "matchPackageNames": [
        "nvcr.io/nvidia/cuda"
