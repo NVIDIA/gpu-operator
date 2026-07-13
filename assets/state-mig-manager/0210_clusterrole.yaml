@@ -13,3 +13,9 @@ rules:
   - watch
   - update
   - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
