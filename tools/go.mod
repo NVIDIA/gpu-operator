@@ -1,6 +1,6 @@
 module github.com/NVIDIA/gpu-operator/tools
 
-go 1.26.0
+go 1.26.5
 
 require (
 	github.com/jandelgado/gcov2lcov v1.1.1
