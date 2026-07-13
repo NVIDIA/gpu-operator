@@ -56,11 +56,10 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "go.mod",
-        "tools/go.mod"
+        "versions.mk"
       ],
       "matchStrings": [
-        "go (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "GOLANG_VERSION \\?= (?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version",
@@ -69,10 +68,10 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "versions.mk"
+        "docker/Dockerfile"
       ],
       "matchStrings": [
-        "GOLANG_VERSION \\?= (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "FROM golang:(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version",
