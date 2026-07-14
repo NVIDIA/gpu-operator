@@ -91,7 +91,7 @@ jobs:
           name: values-overrides
           path: ${{ github.workspace }}
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.6
+        uses: NVIDIA/holodeck@v0.3.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -159,7 +159,7 @@ jobs:
           name: values-overrides
           path: ${{ github.workspace }}
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.6
+        uses: NVIDIA/holodeck@v0.3.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
