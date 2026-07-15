@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+rules:
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nvidia-dcgm-exporter-dra
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: nvidia-dcgm-exporter-admin
+  namespace: test-operator
+spec:
+  spec:
+    devices:
+      requests:
+      - exactly:
+          adminAccess: true
+          allocationMode: All
+          deviceClassName: gpu.nvidia.com
+        name: admin-gpus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app: nvidia-dcgm-exporter-dra
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+spec:
+  ports:
+  - name: gpu-metrics
+    port: 9400
+    protocol: TCP
+    targetPort: 9400
+  selector:
+    app: nvidia-dcgm-exporter-dra
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-dcgm-exporter-dra
+  name: nvidia-dcgm-exporter-dra
+  namespace: test-operator
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter-dra
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm-exporter-dra
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: DCGM_EXPORTER_LISTEN
+          value: :9400
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        - name: DCGM_EXPORTER_COLLECTORS
+          value: /etc/dcgm-exporter/dcp-metrics-included.csv
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: nvcr.io/nvidia/k8s/dcgm-exporter:test
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9400
+          initialDelaySeconds: 45
+          periodSeconds: 5
+        name: nvidia-dcgm-exporter-dra
+        ports:
+        - containerPort: 9400
+          name: metrics
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9400
+          initialDelaySeconds: 45
+        resources:
+          claims:
+          - name: admin-gpus
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/lib/kubelet/pod-resources
+          name: pod-gpu-resources
+          readOnly: true
+      nodeSelector:
+        nvidia.com/gpu-operator.resource-allocation.mode: dra
+        nvidia.com/gpu.deploy.dcgm-exporter: "true"
+      priorityClassName: system-node-critical
+      resourceClaims:
+      - name: admin-gpus
+        resourceClaimTemplateName: nvidia-dcgm-exporter-admin
+      serviceAccountName: nvidia-dcgm-exporter-dra
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/pod-resources
+        name: pod-gpu-resources
+  updateStrategy:
+    type: RollingUpdate
+---
