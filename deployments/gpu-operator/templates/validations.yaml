@@ -5,3 +5,11 @@
 {{- if and (eq .Values.cdi.nriPluginEnabled true) (eq .Values.toolkit.enabled false)  }}
 {{ fail "the NRI Plugin cannot be enabled when the Container Toolkit is disabled" }}
 {{- end }}
+
+{{- if and (.Values.devicePlugin.config.create) (empty .Values.devicePlugin.config.data) }}
+{{ fail "devicePlugin.config.data cannot be empty when devicePlugin.config.create is set to true" }}
+{{- end }}
+
+{{- if and (.Values.devicePlugin.config.create) (empty .Values.devicePlugin.config.name) }}
+{{ fail "devicePlugin.config.name cannot be empty when devicePlugin.config.create is set to true" }}
+{{- end }}
