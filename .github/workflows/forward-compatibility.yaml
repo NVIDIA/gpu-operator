@@ -103,7 +103,7 @@ jobs:
     steps:
       - name: Send Slack alert notification
         if: ${{ env.SLACK_BOT_TOKEN != '' }}
-        uses: slackapi/slack-github-action@v3.0.5
+        uses: slackapi/slack-github-action@v4.0.0
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
