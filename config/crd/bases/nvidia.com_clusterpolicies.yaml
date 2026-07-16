@@ -160,6 +160,10 @@ spec:
               daemonsets:
                 description: Daemonset defines common configuration for all Daemonsets
                 properties:
+                  affinity:
+                    description: 'Optional: Set affinity for all Daemonsets'
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   annotations:
                     additionalProperties:
                       type: string
@@ -175,6 +179,12 @@ spec:
                       Optional: Map of string keys and values that can be used to organize and categorize
                       (scope and select) objects. May match selectors of replication controllers
                       and services.
+                    type: object
+                  nodeSelector:
+                    additionalProperties:
+                      type: string
+                    description: 'Optional: Set nodeSelector merged with operand nodeSelector
+                      labels'
                     type: object
                   podSecurityContext:
                     description: 'Optional: Set pod-level security context for all

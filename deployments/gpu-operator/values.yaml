@@ -41,6 +41,8 @@ hostPaths:
 daemonsets:
   labels: {}
   annotations: {}
+  nodeSelector: {}
+  affinity: {}
   priorityClassName: system-node-critical
   tolerations:
   - key: nvidia.com/gpu
