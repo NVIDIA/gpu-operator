@@ -32,6 +32,8 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 	testCases := []struct {
 		description  string
 		contents     map[string]string
+		perms        map[string]os.FileMode
+		expectedPath string
 		expectsError bool
 	}{
 		{
@@ -39,6 +41,7 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 			contents: map[string]string{
 				"/usr/bin/nvidia-smi": "fake nvidia-smi",
 			},
+			expectedPath: "/usr/bin/nvidia-smi",
 		},
 		{
 			description: "nvidia-smi exists through absolute /usr/bin symlink",
@@ -46,6 +49,7 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 				"/run/current-system/sw/bin/nvidia-smi": "fake nvidia-smi",
 				"/usr/bin":                              "symlink=/run/current-system/sw/bin",
 			},
+			expectedPath: "/usr/bin/nvidia-smi",
 		},
 		{
 			description: "nvidia-smi exists through relative /usr/bin symlink",
@@ -53,6 +57,84 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 				"/run/current-system/sw/bin/nvidia-smi": "fake nvidia-smi",
 				"/usr/bin":                              "symlink=../run/current-system/sw/bin",
 			},
+			expectedPath: "/usr/bin/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists in /opt/bin",
+			contents: map[string]string{
+				"/opt/bin/nvidia-smi": "fake nvidia-smi",
+			},
+			expectedPath: "/opt/bin/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists in /bin",
+			contents: map[string]string{
+				"/bin/nvidia-smi": "fake nvidia-smi",
+			},
+			expectedPath: "/bin/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists in /usr/sbin",
+			contents: map[string]string{
+				"/usr/sbin/nvidia-smi": "fake nvidia-smi",
+			},
+			expectedPath: "/usr/sbin/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists through absolute /usr/sbin symlink",
+			contents: map[string]string{
+				"/run/current-system/sw/bin/nvidia-smi": "fake nvidia-smi",
+				"/usr/sbin":                             "symlink=/run/current-system/sw/bin",
+			},
+			expectedPath: "/usr/sbin/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists in WSL path",
+			contents: map[string]string{
+				"/usr/lib/wsl/lib/nvidia-smi": "fake nvidia-smi",
+			},
+			expectedPath: "/usr/lib/wsl/lib/nvidia-smi",
+		},
+		{
+			description: "nvidia-smi exists through absolute WSL path symlink",
+			contents: map[string]string{
+				"/run/wsl/lib/nvidia-smi": "fake nvidia-smi",
+				"/usr/lib/wsl/lib":        "symlink=/run/wsl/lib",
+			},
+			expectedPath: "/usr/lib/wsl/lib/nvidia-smi",
+		},
+		{
+			description: "earlier search path is preferred when multiple exist",
+			contents: map[string]string{
+				"/usr/bin/nvidia-smi":  "fake nvidia-smi in usr/bin",
+				"/usr/sbin/nvidia-smi": "fake nvidia-smi in usr/sbin",
+			},
+			expectedPath: "/usr/bin/nvidia-smi",
+		},
+		{
+			description: "/opt/bin is searched last",
+			contents: map[string]string{
+				"/opt/bin/nvidia-smi":  "fake nvidia-smi in opt/bin",
+				"/usr/sbin/nvidia-smi": "fake nvidia-smi in usr/sbin",
+			},
+			expectedPath: "/usr/sbin/nvidia-smi",
+		},
+		{
+			description: "non-executable nvidia-smi is skipped",
+			contents: map[string]string{
+				"/usr/bin/nvidia-smi": "fake nvidia-smi",
+			},
+			perms: map[string]os.FileMode{
+				"/usr/bin/nvidia-smi": 0600,
+			},
+			expectsError: true,
+		},
+		{
+			description: "empty nvidia-smi is skipped",
+			contents: map[string]string{
+				"/usr/bin/nvidia-smi": "",
+			},
+			expectsError: true,
 		},
 		{
 			description: "parent dir is symlink to path not within root",
@@ -81,17 +163,21 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 					continue
 				}
 
-				require.NoError(t, os.WriteFile(target, []byte(contents), 0600))
+				mode := os.FileMode(0755)
+				if m, ok := tc.perms[name]; ok {
+					mode = m
+				}
+				require.NoError(t, os.WriteFile(target, []byte(contents), mode))
 			}
 
-			fileInfo, err := resolveHostNvidiaSMI(hostRoot)
+			nvidiaSMIPath, err := resolveHostNvidiaSMI(hostRoot)
 			if tc.expectsError {
 				require.Error(t, err)
 				return
 			}
 
 			require.NoError(t, err)
-			require.NotZero(t, fileInfo.Size())
+			require.Equal(t, tc.expectedPath, nvidiaSMIPath)
 		})
 	}
 }
