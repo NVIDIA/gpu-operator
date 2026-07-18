@@ -551,7 +551,7 @@ ccManager:
   defaultMode: "on"
   repository: nvcr.io/nvidia/cloud-native
   image: k8s-cc-manager
-  version: v0.4.0
+  version: v0.4.2
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   resources: {}
