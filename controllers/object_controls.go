@@ -130,6 +130,8 @@ const (
 	NvidiaDisableRequireEnvName = "NVIDIA_DISABLE_REQUIRE"
 	// GDSEnabledEnvName is the env name to enable GDS support with device-plugin
 	GDSEnabledEnvName = "GDS_ENABLED"
+	// DevicePluginEnabledEnvName indicates whether the device plugin is enabled in the ClusterPolicy
+	DevicePluginEnabledEnvName = "DEVICE_PLUGIN_ENABLED"
 	// MOFEDEnabledEnvName is the env name to enable MOFED devices injection with device-plugin
 	MOFEDEnabledEnvName = "MOFED_ENABLED"
 	// GDRCopyEnabledEnvName is the envvar that enables injection of the GDRCopy device node with the device-plugin
@@ -2513,6 +2515,12 @@ func TransformNodeStatusExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPol
 	if len(config.NodeStatusExporter.Args) > 0 {
 		obj.Spec.Template.Spec.Containers[0].Args = config.NodeStatusExporter.Args
 	}
+
+	devicePluginEnabled := "true"
+	if !config.DevicePlugin.IsEnabled() {
+		devicePluginEnabled = "false"
+	}
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DevicePluginEnabledEnvName, devicePluginEnabled)
 
 	// set/append environment variables for exporter container
 	if len(config.NodeStatusExporter.Env) > 0 {
