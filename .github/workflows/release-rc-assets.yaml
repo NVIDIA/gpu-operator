@@ -145,7 +145,7 @@ jobs:
         run: pip install --quiet pyyaml
 
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+        uses: regclient/actions/regctl-installer@c48159175b58fb90cccd0f98410927a81e04a166
         with:
           release: ${{ env.REGCTL_VERSION }}
 
