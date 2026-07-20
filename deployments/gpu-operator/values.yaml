@@ -115,6 +115,9 @@ operator:
     requests:
       cpu: 200m
       memory: 100Mi
+  dnsPolicy: ""
+  dnsConfig: {}
+  securityContext: {}
   # metrics:
   #   serviceMonitor:
   #     interval: 15s
