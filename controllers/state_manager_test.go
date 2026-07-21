@@ -21,6 +21,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,6 +297,50 @@ func TestHasOperandsDisabled(t *testing.T) {
 			t.Errorf("hasOperandsDisabled(%v) = %v, want %v", tc.labels, got, tc.want)
 		}
 	}
+}
+
+func TestUpdateGPUStateLabels_OperandsDisabled(t *testing.T) {
+	log := logr.Discard()
+	w := &gpuWorkloadConfiguration{config: gpuWorkloadConfigContainer, node: "test-node", log: log}
+
+	t.Run("preserves driver label when operands disabled", func(t *testing.T) {
+		labels := map[string]string{
+			commonOperandsLabelKey:                        "false",
+			driverDeployLabelKey:                          "true",
+			"nvidia.com/gpu.deploy.container-toolkit":     "true",
+			"nvidia.com/gpu.deploy.device-plugin":         "true",
+			"nvidia.com/gpu.deploy.gpu-feature-discovery": "true",
+		}
+		modified := w.updateGPUStateLabels(labels)
+		require.True(t, modified)
+		require.Equal(t, "true", labels[driverDeployLabelKey], "driver label must be preserved when operands disabled")
+		require.NotContains(t, labels, "nvidia.com/gpu.deploy.container-toolkit")
+		require.NotContains(t, labels, "nvidia.com/gpu.deploy.device-plugin")
+		require.NotContains(t, labels, "nvidia.com/gpu.deploy.gpu-feature-discovery")
+	})
+
+	t.Run("driver label not added if absent when operands disabled", func(t *testing.T) {
+		labels := map[string]string{
+			commonOperandsLabelKey:                    "false",
+			"nvidia.com/gpu.deploy.container-toolkit": "true",
+		}
+		modified := w.updateGPUStateLabels(labels)
+		require.True(t, modified)
+		require.NotContains(t, labels, driverDeployLabelKey, "driver label must not be added if it was not present")
+		require.NotContains(t, labels, "nvidia.com/gpu.deploy.container-toolkit")
+	})
+
+	t.Run("preserves driver label set to false when operands disabled", func(t *testing.T) {
+		labels := map[string]string{
+			commonOperandsLabelKey:                    "false",
+			driverDeployLabelKey:                      "false",
+			"nvidia.com/gpu.deploy.container-toolkit": "true",
+		}
+		modified := w.updateGPUStateLabels(labels)
+		require.True(t, modified)
+		require.Equal(t, "false", labels[driverDeployLabelKey], "explicitly-disabled driver label must be preserved")
+		require.NotContains(t, labels, "nvidia.com/gpu.deploy.container-toolkit")
+	})
 }
 
 func TestHasNFDLabels(t *testing.T) {

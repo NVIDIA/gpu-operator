@@ -70,6 +70,7 @@ const (
 	gpuWorkloadConfigContainer         = "container"
 	gpuWorkloadConfigVMPassthrough     = "vm-passthrough"
 	gpuWorkloadConfigVMVgpu            = "vm-vgpu"
+	driverDeployLabelKey               = "nvidia.com/gpu.deploy.driver"
 	kubevirtDevicePluginDeployLabelKey = "nvidia.com/gpu.deploy.sandbox-device-plugin"
 	kataDevicePluginDeployLabelKey     = "nvidia.com/gpu.deploy.kata-sandbox-device-plugin"
 	podSecurityLabelPrefix             = "pod-security.kubernetes.io/"
@@ -397,10 +398,15 @@ func removeAllGPUStateLabels(labels map[string]string) bool {
 // updateGPUStateLabels returns true if the input labels map is modified.
 func (w *gpuWorkloadConfiguration) updateGPUStateLabels(labels map[string]string) bool {
 	if hasOperandsDisabled(labels) {
-		// Operands are disabled, delete all GPU state labels
+		// Operands are disabled: remove all GPU state labels except the driver label.
 		w.log.Info("Operands are disabled for node", "NodeName", w.node, "Label", commonOperandsLabelKey, "Value", "false")
-		w.log.Info("Disabling all operands for node", "NodeName", w.node)
-		return removeAllGPUStateLabels(labels)
+		w.log.Info("Disabling all operands for node (except the GPU driver)", "NodeName", w.node)
+		driverLabelValue, hasDriverLabel := labels[driverDeployLabelKey]
+		modified := removeAllGPUStateLabels(labels)
+		if hasDriverLabel {
+			labels[driverDeployLabelKey] = driverLabelValue
+		}
+		return modified
 	}
 	removed := w.removeGPUStateLabels(labels)
 	added := w.addGPUStateLabels(labels)
