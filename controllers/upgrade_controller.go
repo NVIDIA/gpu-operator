@@ -22,7 +22,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -53,13 +51,18 @@ import (
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
 type UpgradeReconciler struct {
 	client.Client
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	StateManager    upgrade.ClusterUpgradeStateManager
-	OperatorMetrics *OperatorMetrics
+	Log               logr.Logger
+	Scheme            *runtime.Scheme
+	StateManager      upgrade.ClusterUpgradeStateManager
+	OperatorMetrics   *OperatorMetrics
+	OperatorNamespace string
 }
 
 const (
+	// upgradeControllerSingletonName is the request name every watch enqueues; the
+	// reconciler resolves the active configuration source itself.
+	upgradeControllerSingletonName = "driver-upgrade"
+
 	plannedRequeueInterval = time.Minute * 2
 	// DriverLabelKey indicates pod label key of the driver
 	DriverLabelKey = "app"
@@ -87,20 +90,20 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqLogger := r.Log.WithValues("upgrade", req.NamespacedName)
 	reqLogger.V(consts.LogLevelInfo).Info("Reconciling Upgrade")
 
-	// Fetch the ClusterPolicy instance
-	clusterPolicy := &gpuv1.ClusterPolicy{}
-	err := r.Get(ctx, req.NamespacedName, clusterPolicy)
+	// Requests carry the singleton name rather than a CR reference, so re-resolve the
+	// active configuration source on every reconcile.
+	clusterPolicy, _, err := resolveActiveConfig(ctx, r.Client)
 	if err != nil {
-		reqLogger.Error(err, "Error getting ClusterPolicy object")
+		reqLogger.Error(err, "Error resolving the active configuration source")
 		r.OperatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
-		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	if clusterPolicy == nil {
+		// Without a ClusterPolicy, any operator-managed driver belongs to NVIDIADriver
+		// CRs; with none of those either, this cleans up stale upgrade-state labels
+		// and no-ops.
+		return r.reconcileNVIDIADriverUpgrades(ctx, reqLogger)
 	}
 
 	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
@@ -110,9 +113,6 @@ func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.removeNodeUpgradeStateLabels(ctx)
 	}
 
-	// TODO: When integrating the NVIDIA DRA Driver for GPUs, decouple
-	// the driver-upgrade controller from ClusterPolicy. If a ClusterPolicy
-	// CR does not exist, take the NVIDIADriver code path.
 	if clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
 		return r.reconcileNVIDIADriverUpgrades(ctx, reqLogger)
 	}
@@ -147,7 +147,7 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	driverLabel = map[string]string{driverLabelKey: driverLabelValue}
 	reqLogger.Info("Using label selector", "key", driverLabelKey, "value", driverLabelValue)
 
-	state, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace,
+	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace,
 		driverLabel)
 	if err != nil {
 		r.Log.Error(err, "Failed to build cluster upgrade state")
@@ -234,8 +234,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 	// Build a cluster-wide upgrade state using only the component label so that ALL
 	// driver pods are captured, including orphaned pods (e.g. pods left over from a
 	// ClusterPolicy-managed DaemonSet).
-	// TODO: decouple the operatorNamespace field from the ClusterPolicyController object
-	clusterState, err := r.StateManager.BuildState(ctx, clusterPolicyCtrl.operatorNamespace, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue})
+	clusterState, err := r.StateManager.BuildState(ctx, r.OperatorNamespace, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue})
 	if err != nil {
 		r.Log.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
@@ -393,21 +392,40 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	// Watch for changes to primary resource ClusterPolicy
+	mapToSingleton := func(_ context.Context, _ client.Object) []reconcile.Request {
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: upgradeControllerSingletonName}}}
+	}
+
+	// Watch ClusterPolicy; its deletion switches reconciliation to the NVIDIADriver path.
+	cpMapFn := func(ctx context.Context, cp *gpuv1.ClusterPolicy) []reconcile.Request {
+		return mapToSingleton(ctx, cp)
+	}
 	err = c.Watch(source.Kind(
 		mgr.GetCache(),
 		&gpuv1.ClusterPolicy{},
-		&handler.TypedEnqueueRequestForObject[*gpuv1.ClusterPolicy]{},
+		handler.TypedEnqueueRequestsFromMapFunc(cpMapFn),
 		predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{}),
 	)
 	if err != nil {
 		return err
 	}
 
-	// Define a mapping from the Node object in the event to one or more
-	// ClusterPolicy objects to Reconcile
-	nodeMapFn := func(ctx context.Context, o *corev1.Node) []reconcile.Request {
-		return getClusterPoliciesToReconcile(ctx, mgr.GetClient())
+	// Watch NVIDIADriver so upgradePolicy changes are reconciled even with no ClusterPolicy.
+	nvdMapFn := func(ctx context.Context, nd *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
+		return mapToSingleton(ctx, nd)
+	}
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&nvidiav1alpha1.NVIDIADriver{},
+		handler.TypedEnqueueRequestsFromMapFunc(nvdMapFn),
+		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.NVIDIADriver]{}),
+	)
+	if err != nil {
+		return err
+	}
+
+	nodeMapFn := func(ctx context.Context, n *corev1.Node) []reconcile.Request {
+		return mapToSingleton(ctx, n)
 	}
 
 	// Only watch for changes to the upgrade state label
@@ -430,9 +448,6 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	// Define a mapping between the DaemonSet object in the event
-	// to one or more ClusterPolicy instances to reconcile.
-	//
 	// For events generated by DaemonSets, ensure the object is
 	// owned by either ClusterPolicy or NVIDIADriver.
 	dsMapFn := func(ctx context.Context, a *appsv1.DaemonSet) []reconcile.Request {
@@ -451,10 +466,10 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			return nil
 		}
 
-		return getClusterPoliciesToReconcile(ctx, mgr.GetClient())
+		return mapToSingleton(ctx, a)
 	}
 
-	// Watch for changes to NVIDIA driver daemonsets and enqueue ClusterPolicy
+	// Watch for changes to NVIDIA driver daemonsets
 	// TODO: use one common label to identify all NVIDIA driver DaemonSets
 	appLabelSelector := predicate.NewTypedPredicateFuncs(func(ds *appsv1.DaemonSet) bool {
 		ls := metav1.LabelSelector{MatchLabels: map[string]string{DriverLabelKey: DriverLabelValue}}
@@ -489,27 +504,4 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	}
 
 	return nil
-}
-
-func getClusterPoliciesToReconcile(ctx context.Context, k8sClient client.Client) []reconcile.Request {
-	logger := log.FromContext(ctx)
-	opts := []client.ListOption{}
-	list := &gpuv1.ClusterPolicyList{}
-
-	err := k8sClient.List(ctx, list, opts...)
-	if err != nil {
-		logger.Error(err, "Unable to list ClusterPolicies")
-		return []reconcile.Request{}
-	}
-
-	cpToRec := []reconcile.Request{}
-
-	for _, cp := range list.Items {
-		cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      cp.GetName(),
-			Namespace: cp.GetNamespace(),
-		}})
-	}
-
-	return cpToRec
 }
