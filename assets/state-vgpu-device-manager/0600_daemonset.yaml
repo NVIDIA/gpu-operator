@@ -23,9 +23,11 @@ spec:
         - name: vgpu-manager-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
-          # TODO: Account for pre-installed vGPU Manager. Currently validator
-          # creates a different status file when driver is pre-installed.
-          args: ["until [ -f /run/nvidia/validations/vgpu-manager-ready ]; do echo waiting for NVIDIA vGPU Manager to be setup; sleep 5; done"]
+          # The validator writes vgpu-manager-ready when the vGPU Manager is
+          # deployed as a container, and host-vgpu-manager-ready when the vGPU
+          # Manager driver is pre-installed on the host. Wait for either so this
+          # operand starts in both cases.
+          args: ["until [ -f /run/nvidia/validations/vgpu-manager-ready ] || [ -f /run/nvidia/validations/host-vgpu-manager-ready ]; do echo waiting for NVIDIA vGPU Manager to be setup; sleep 5; done"]
           securityContext:
             privileged: true
           volumeMounts:
