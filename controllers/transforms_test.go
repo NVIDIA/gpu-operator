@@ -4089,6 +4089,81 @@ func TestTransformVGPUManager(t *testing.T) {
 	}
 }
 
+// TestTransformVGPUManagerFabricMode verifies that the vGPU Manager container is
+// defaulted to NVIDIA Fabric Manager vGPU multitenancy mode (FABRIC_MODE=2),
+// which SR-IOV vGPU on NVSwitch (HGX) systems requires, and that a
+// user-provided FABRIC_MODE in VGPUManager.Env is preserved.
+func TestTransformVGPUManagerFabricMode(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				nfdOSReleaseIDLabelKey: "ubuntu",
+				nfdOSVersionIDLabelKey: "24.04",
+				nfdKernelLabelKey:      "6.8.0-60-generic",
+				commonGPULabelKey:      "true",
+			},
+		},
+	}
+	mockClient := fake.NewFakeClient(node)
+
+	baseSpec := func() *gpuv1.ClusterPolicySpec {
+		return &gpuv1.ClusterPolicySpec{
+			VGPUManager: gpuv1.VGPUManagerSpec{
+				Repository:      "nvcr.io/nvidia",
+				Image:           "vgpu-manager",
+				Version:         "550.90.07",
+				ImagePullPolicy: "IfNotPresent",
+				DriverManager: gpuv1.DriverManagerSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "k8s-driver-manager",
+					ImagePullPolicy: "IfNotPresent",
+					Version:         "v0.8.0",
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		description        string
+		env                []gpuv1.EnvVar
+		expectedFabricMode string
+	}{
+		{
+			description:        "defaults to vGPU multitenancy mode",
+			env:                nil,
+			expectedFabricMode: "2",
+		},
+		{
+			description:        "user-provided FABRIC_MODE is preserved",
+			env:                []gpuv1.EnvVar{{Name: "FABRIC_MODE", Value: "0"}},
+			expectedFabricMode: "0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			ds := NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-manager-ctr"})
+			cpSpec := baseSpec()
+			cpSpec.VGPUManager.Env = tc.env
+
+			clusterPolicyCtrl := ClusterPolicyController{
+				logger:            ctrl.Log.WithName("test"),
+				client:            mockClient,
+				operatorNamespace: "test-ns",
+			}
+			err := TransformVGPUManager(ds.DaemonSet, cpSpec, clusterPolicyCtrl)
+			require.NoError(t, err)
+
+			container := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
+			require.NotNil(t, container)
+			require.Equal(t, tc.expectedFabricMode, getContainerEnv(container, "FABRIC_MODE"))
+		})
+	}
+}
+
 func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
