@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	"github.com/stretchr/testify/require"
 )
 
@@ -287,6 +288,102 @@ UNKNOWN_FEATURE: true`,
 					t.Errorf("validateAdditionalDriverComponents() unexpected error: %v", err)
 				}
 			}
+		})
+	}
+}
+
+// pfDevice returns an SR-IOV physical function GPU with the given VF counts.
+func pfDevice(address string, totalVFs, numVFs uint64) *nvpci.NvidiaPCIDevice {
+	return &nvpci.NvidiaPCIDevice{
+		Address: address,
+		SriovInfo: nvpci.SriovInfo{
+			PhysicalFunction: &nvpci.SriovPhysicalFunction{
+				TotalVFs: totalVFs,
+				NumVFs:   numVFs,
+			},
+		},
+	}
+}
+
+// TestCountVFs verifies the shared VF-accounting helper that drives both the
+// idempotency guard in enableVFs and the readiness check in waitForVFs. Getting
+// this wrong would either skip a needed 'sriov-manage -e' (VFs never come back
+// after a reboot) or disturb VFs already assigned to running VMs, so the guard
+// (totalEnabled >= totalExpected) is exercised across the boundary cases.
+func TestCountVFs(t *testing.T) {
+	testCases := []struct {
+		description       string
+		gpus              []*nvpci.NvidiaPCIDevice
+		wantExpected      uint64
+		wantEnabled       uint64
+		wantPFCount       int
+		wantNeedsEnabling bool
+	}{
+		{
+			description:       "no SR-IOV capable GPUs",
+			gpus:              []*nvpci.NvidiaPCIDevice{{Address: "0000:41:00.0"}},
+			wantExpected:      0,
+			wantEnabled:       0,
+			wantPFCount:       0,
+			wantNeedsEnabling: false,
+		},
+		{
+			description:       "VFs missing after reboot",
+			gpus:              []*nvpci.NvidiaPCIDevice{pfDevice("0000:41:00.0", 16, 0)},
+			wantExpected:      16,
+			wantEnabled:       0,
+			wantPFCount:       1,
+			wantNeedsEnabling: true,
+		},
+		{
+			description:       "VFs fully enabled",
+			gpus:              []*nvpci.NvidiaPCIDevice{pfDevice("0000:41:00.0", 16, 16)},
+			wantExpected:      16,
+			wantEnabled:       16,
+			wantPFCount:       1,
+			wantNeedsEnabling: false,
+		},
+		{
+			description: "partially enabled across multiple PFs",
+			gpus: []*nvpci.NvidiaPCIDevice{
+				pfDevice("0000:41:00.0", 16, 16),
+				pfDevice("0000:c1:00.0", 16, 0),
+			},
+			wantExpected:      32,
+			wantEnabled:       16,
+			wantPFCount:       2,
+			wantNeedsEnabling: true,
+		},
+		{
+			description: "virtual functions are not counted as PFs",
+			gpus: []*nvpci.NvidiaPCIDevice{
+				pfDevice("0000:41:00.0", 16, 16),
+				{
+					Address: "0000:41:00.4",
+					SriovInfo: nvpci.SriovInfo{
+						VirtualFunction: &nvpci.SriovVirtualFunction{},
+					},
+				},
+			},
+			wantExpected:      16,
+			wantEnabled:       16,
+			wantPFCount:       1,
+			wantNeedsEnabling: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			totalExpected, totalEnabled, pfCount := countVFs(tc.gpus)
+			require.Equal(t, tc.wantExpected, totalExpected, "totalExpected")
+			require.Equal(t, tc.wantEnabled, totalEnabled, "totalEnabled")
+			require.Equal(t, tc.wantPFCount, pfCount, "pfCount")
+
+			// This mirrors the guard enableVFs uses to decide whether to invoke
+			// sriov-manage: enable only when there is at least one SR-IOV GPU and
+			// not every VF is already present.
+			needsEnabling := totalExpected > 0 && totalEnabled < totalExpected
+			require.Equal(t, tc.wantNeedsEnabling, needsEnabling, "needsEnabling")
 		})
 	}
 }
