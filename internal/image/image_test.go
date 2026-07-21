@@ -23,6 +23,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestImagePath exercises the value-producing paths of ImagePath.
+//
+// ImagePath has two structural branches:
+//   - Branch A (repository=="" && version==""): returns `image` verbatim when
+//     set (the kbld/carvel case), otherwise falls back to the env var, then errors.
+//   - Branch B (repository OR version non-empty): ALWAYS builds a non-empty
+//     "repo/image:tag" or "repo/image@digest" string and returns it, so it never
+//     consults the env. Digest is selected only when version has the exact,
+//     case-sensitive "sha256:" prefix.
 func TestImagePath(t *testing.T) {
 	const envName = "TEST_IMAGE_PATH_ENV"
 
@@ -31,10 +40,11 @@ func TestImagePath(t *testing.T) {
 		repository  string
 		image       string
 		version     string
-		envValue    string // when non-empty, envName is set to this value
+		setEnv      bool // when true, envName is set to envValue (possibly "")
+		envValue    string
 		expected    string
-		expectError bool
 	}{
+		// ---- Branch B: tag paths (positive) ----
 		{
 			description: "repository, image and tag version resolve to repo/image:tag",
 			repository:  "nvcr.io/nvidia",
@@ -43,67 +53,188 @@ func TestImagePath(t *testing.T) {
 			expected:    "nvcr.io/nvidia/gpu-operator:v1.0.0",
 		},
 		{
+			description: "multi-segment repository is preserved",
+			repository:  "nvcr.io/nvidia/cloud-native",
+			image:       "k8s-driver-manager",
+			version:     "v0.7.0",
+			expected:    "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.7.0",
+		},
+		// ---- Branch B: digest paths (positive) ----
+		{
 			description: "sha256 version is joined with @ instead of :",
 			repository:  "nvcr.io/nvidia",
 			image:       "gpu-operator",
-			version:     "sha256:abc123",
-			expected:    "nvcr.io/nvidia/gpu-operator@sha256:abc123",
+			version:     "sha256:abcdef0123456789",
+			expected:    "nvcr.io/nvidia/gpu-operator@sha256:abcdef0123456789",
 		},
 		{
-			description: "empty repository and version with image set returns image as-is (kbld case)",
-			repository:  "",
-			image:       "nvcr.io/nvidia/gpu-operator@sha256:abc123",
-			version:     "",
-			expected:    "nvcr.io/nvidia/gpu-operator@sha256:abc123",
-		},
-		{
-			description: "CR image path takes priority over env",
+			description: "sha256 prefix with empty digest still uses @",
 			repository:  "nvcr.io/nvidia",
+			image:       "gpu-operator",
+			version:     "sha256:",
+			expected:    "nvcr.io/nvidia/gpu-operator@sha256:",
+		},
+		{
+			description: "version 'sha256' without a colon is treated as a tag, not a digest",
+			repository:  "nvcr.io/nvidia",
+			image:       "gpu-operator",
+			version:     "sha256",
+			expected:    "nvcr.io/nvidia/gpu-operator:sha256",
+		},
+		{
+			description: "uppercase SHA256 prefix is case-sensitive and treated as a tag",
+			repository:  "nvcr.io/nvidia",
+			image:       "gpu-operator",
+			version:     "SHA256:abc",
+			expected:    "nvcr.io/nvidia/gpu-operator:SHA256:abc",
+		},
+		// ---- Branch A: kbld image passthrough (positive) ----
+		{
+			description: "empty repository and version with digest image returns image as-is (kbld case)",
+			repository:  "",
+			image:       "nvcr.io/nvidia/gpu-operator@sha256:deadbeef",
+			version:     "",
+			expected:    "nvcr.io/nvidia/gpu-operator@sha256:deadbeef",
+		},
+		{
+			description: "empty repository and version with tag image returns image as-is (kbld case)",
+			repository:  "",
+			image:       "busybox:1.36",
+			version:     "",
+			expected:    "busybox:1.36",
+		},
+		// ---- Priority: CR (branch B) always beats env (positive) ----
+		{
+			description: "CR tag path takes priority over env",
+			repository:  "nvcr.io/nvidia",
+			image:       "gpu-operator",
+			version:     "v2.0.0",
+			setEnv:      true,
+			envValue:    "from-env/gpu-operator:v9.9.9",
+			expected:    "nvcr.io/nvidia/gpu-operator:v2.0.0",
+		},
+		{
+			description: "partial CR (repository only, empty version) still beats a valid env",
+			repository:  "nvcr.io/nvidia",
+			image:       "gpu-operator",
+			version:     "",
+			setEnv:      true,
+			envValue:    "from-env/gpu-operator:v9.9.9",
+			expected:    "nvcr.io/nvidia/gpu-operator:", // trailing colon, NOT the env value
+		},
+		{
+			description: "partial CR (version only, empty repository) still beats a valid env",
+			repository:  "",
 			image:       "gpu-operator",
 			version:     "v1.0.0",
+			setEnv:      true,
 			envValue:    "from-env/gpu-operator:v9.9.9",
-			expected:    "nvcr.io/nvidia/gpu-operator:v1.0.0",
+			expected:    "/gpu-operator:v1.0.0", // leading slash, NOT the env value
 		},
+		// ---- Env fallback (positive): only when repo, version AND image are empty ----
 		{
-			description: "falls back to env when CR values are empty",
+			description: "falls back to env when CR is fully empty",
 			repository:  "",
 			image:       "",
 			version:     "",
-			envValue:    "from-env/gpu-operator:v2.0.0",
-			expected:    "from-env/gpu-operator:v2.0.0",
+			setEnv:      true,
+			envValue:    "registry.example.com/op:v3",
+			expected:    "registry.example.com/op:v3",
 		},
+		// ---- Edge cases: function performs no input validation (positive) ----
 		{
-			description: "errors when neither CR nor env provide an image path",
+			description: "empty repository with tag version yields a leading slash",
 			repository:  "",
-			image:       "",
-			version:     "",
-			expectError: true,
-		},
-		{
-			description: "repository and image with empty version still builds a CR path with trailing colon",
-			repository:  "nvcr.io/nvidia",
 			image:       "gpu-operator",
-			version:     "",
-			expected:    "nvcr.io/nvidia/gpu-operator:",
+			version:     "v1.0.0",
+			expected:    "/gpu-operator:v1.0.0",
+		},
+		{
+			description: "empty repository with digest version yields a leading slash",
+			repository:  "",
+			image:       "gpu-operator",
+			version:     "sha256:cafe",
+			expected:    "/gpu-operator@sha256:cafe",
+		},
+		{
+			description: "empty image in branch B keeps an empty image segment",
+			repository:  "nvcr.io/nvidia",
+			image:       "",
+			version:     "v1.0.0",
+			expected:    "nvcr.io/nvidia/:v1.0.0",
+		},
+		{
+			description: "empty repository and image with tag version yields /:tag",
+			repository:  "",
+			image:       "",
+			version:     "v1.0.0",
+			expected:    "/:v1.0.0",
+		},
+		{
+			description: "empty repository and image with digest version yields /@digest",
+			repository:  "",
+			image:       "",
+			version:     "sha256:abc",
+			expected:    "/@sha256:abc",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			if tc.envValue != "" {
+			if tc.setEnv {
 				t.Setenv(envName, tc.envValue)
 			}
 
 			path, err := ImagePath(tc.repository, tc.image, tc.version, envName)
 
-			if tc.expectError {
-				require.Error(t, err)
-				assert.Empty(t, path)
-				return
-			}
-
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, path)
 		})
 	}
+}
+
+// TestImagePath_Errors covers the only error path: repository, version and image
+// are all empty AND the env var provides nothing.
+func TestImagePath_Errors(t *testing.T) {
+	const envName = "TEST_IMAGE_PATH_ENV_ERR"
+
+	testCases := []struct {
+		description string
+		setEnv      bool
+		envValue    string
+	}{
+		{
+			description: "errors when CR is empty and env is unset",
+			setEnv:      false,
+		},
+		{
+			description: "errors when CR is empty and env is explicitly the empty string",
+			setEnv:      true,
+			envValue:    "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			if tc.setEnv {
+				t.Setenv(envName, tc.envValue)
+			}
+
+			path, err := ImagePath("", "", "", envName)
+
+			require.Error(t, err)
+			assert.Empty(t, path)
+			// The error should name both sources and the specific env var checked.
+			assert.ErrorContains(t, err, "empty image path provided through both CR and ENV")
+			assert.ErrorContains(t, err, envName)
+		})
+	}
+}
+
+// TestImagePath_ErrorNamesProvidedEnvVar verifies the error message reflects the
+// exact env var name passed in, not a hardcoded one.
+func TestImagePath_ErrorNamesProvidedEnvVar(t *testing.T) {
+	_, err := ImagePath("", "", "", "SOME_CUSTOM_IMAGE_ENV")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "SOME_CUSTOM_IMAGE_ENV")
 }
