@@ -28,10 +28,11 @@ import (
 // ImagePath has two structural branches:
 //   - Branch A (repository=="" && version==""): returns `image` verbatim when
 //     set (the kbld/carvel case), otherwise falls back to the env var, then errors.
-//   - Branch B (repository OR version non-empty): ALWAYS builds a non-empty
-//     "repo/image:tag" or "repo/image@digest" string and returns it, so it never
-//     consults the env. Digest is selected only when version has the exact,
-//     case-sensitive "sha256:" prefix.
+//   - Branch B (repository OR version non-empty): builds a "repo/image:tag" or
+//     "repo/image@digest" string when repository and image are both set (never
+//     consulting the env); an incomplete spec (empty repository or image) is
+//     rejected with an error (see TestImagePath_InvalidSpec). Digest is selected
+//     only when version has the exact, case-sensitive "sha256:" prefix.
 func TestImagePath(t *testing.T) {
 	const envName = "TEST_IMAGE_PATH_ENV"
 
@@ -122,15 +123,6 @@ func TestImagePath(t *testing.T) {
 			envValue:    "from-env/gpu-operator:v9.9.9",
 			expected:    "nvcr.io/nvidia/gpu-operator:", // trailing colon, NOT the env value
 		},
-		{
-			description: "partial CR (version only, empty repository) still beats a valid env",
-			repository:  "",
-			image:       "gpu-operator",
-			version:     "v1.0.0",
-			setEnv:      true,
-			envValue:    "from-env/gpu-operator:v9.9.9",
-			expected:    "/gpu-operator:v1.0.0", // leading slash, NOT the env value
-		},
 		// ---- Env fallback (positive): only when repo, version AND image are empty ----
 		{
 			description: "falls back to env when CR is fully empty",
@@ -140,42 +132,6 @@ func TestImagePath(t *testing.T) {
 			setEnv:      true,
 			envValue:    "registry.example.com/op:v3",
 			expected:    "registry.example.com/op:v3",
-		},
-		// ---- Edge cases: function performs no input validation (positive) ----
-		{
-			description: "empty repository with tag version yields a leading slash",
-			repository:  "",
-			image:       "gpu-operator",
-			version:     "v1.0.0",
-			expected:    "/gpu-operator:v1.0.0",
-		},
-		{
-			description: "empty repository with digest version yields a leading slash",
-			repository:  "",
-			image:       "gpu-operator",
-			version:     "sha256:cafe",
-			expected:    "/gpu-operator@sha256:cafe",
-		},
-		{
-			description: "empty image in branch B keeps an empty image segment",
-			repository:  "nvcr.io/nvidia",
-			image:       "",
-			version:     "v1.0.0",
-			expected:    "nvcr.io/nvidia/:v1.0.0",
-		},
-		{
-			description: "empty repository and image with tag version yields /:tag",
-			repository:  "",
-			image:       "",
-			version:     "v1.0.0",
-			expected:    "/:v1.0.0",
-		},
-		{
-			description: "empty repository and image with digest version yields /@digest",
-			repository:  "",
-			image:       "",
-			version:     "sha256:abc",
-			expected:    "/@sha256:abc",
 		},
 	}
 
@@ -227,6 +183,66 @@ func TestImagePath_Errors(t *testing.T) {
 			// The error should name both sources and the specific env var checked.
 			assert.ErrorContains(t, err, "empty image path provided through both CR and ENV")
 			assert.ErrorContains(t, err, envName)
+		})
+	}
+}
+
+// TestImagePath_InvalidSpec covers the validation of an incomplete CR spec: when
+// repository or version is set (branch B) but repository or image is empty, the
+// only reference that could be built is malformed (leading slash or empty path
+// segment), so ImagePath returns an error instead of an invalid image path.
+func TestImagePath_InvalidSpec(t *testing.T) {
+	const envName = "TEST_IMAGE_PATH_ENV_INVALID"
+
+	testCases := []struct {
+		description string
+		repository  string
+		image       string
+		version     string
+	}{
+		{
+			description: "empty repository with tag version",
+			repository:  "",
+			image:       "gpu-operator",
+			version:     "v1.0.0",
+		},
+		{
+			description: "empty repository with digest version",
+			repository:  "",
+			image:       "gpu-operator",
+			version:     "sha256:cafe",
+		},
+		{
+			description: "empty image with repository and version set",
+			repository:  "nvcr.io/nvidia",
+			image:       "",
+			version:     "v1.0.0",
+		},
+		{
+			description: "empty repository and image with tag version",
+			repository:  "",
+			image:       "",
+			version:     "v1.0.0",
+		},
+		{
+			description: "empty repository and image with digest version",
+			repository:  "",
+			image:       "",
+			version:     "sha256:abc",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			// An env value must NOT rescue an incomplete CR spec: the partial
+			// spec is a misconfiguration and should fail fast regardless.
+			t.Setenv(envName, "from-env/op:v9")
+
+			path, err := ImagePath(tc.repository, tc.image, tc.version, envName)
+
+			require.Error(t, err)
+			assert.Empty(t, path)
+			assert.ErrorContains(t, err, "invalid image specification")
 		})
 	}
 }
