@@ -117,8 +117,7 @@ func hashNonZeroFields(h hash.Hash32, v reflect.Value) {
 
 func GetStringHash(s string) string {
 	hasher := fnv.New32a()
-	if _, err := hasher.Write([]byte(s)); err != nil {
-		panic(err)
-	}
+	// hash.Hash's Write never returns an error, per its documented contract.
+	_, _ = hasher.Write([]byte(s))
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
