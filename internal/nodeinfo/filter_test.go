@@ -134,4 +134,28 @@ var _ = Describe("NodeAttributes tests", func() {
 			Expect(filteredNodes).To(BeEmpty())
 		})
 	})
+
+	Context("Reset on NodeLabelFilterBuilder", func() {
+		It("clears previously added labels so the filter matches every node", func() {
+			builder := NewNodeLabelFilterBuilder().WithLabel(NodeLabelCPUArch, "arm64")
+			// Before reset, the arm64 criteria matches no node.
+			Expect(builder.Build().Apply(nodes)).To(BeEmpty())
+
+			// After reset, the builder has no criteria, so every node passes.
+			filter := builder.Reset().Build()
+			Expect(filter.Apply(nodes)).To(HaveLen(len(nodes)))
+		})
+	})
+
+	Context("Reset on NodeLabelNoValFilterBuilder", func() {
+		It("clears previously added labels so the filter matches every node", func() {
+			builder := NewNodeLabelNoValFilterBuilderr().WithLabel("unknown_label")
+			// Before reset, the unknown label matches no node.
+			Expect(builder.Build().Apply(nodes)).To(BeEmpty())
+
+			// After reset, the builder has no criteria, so every node passes.
+			filter := builder.Reset().Build()
+			Expect(filter.Apply(nodes)).To(HaveLen(len(nodes)))
+		})
+	})
 })
