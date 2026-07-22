@@ -123,8 +123,9 @@ func TestGetFilesWithSuffix_BaseDirIsFile(t *testing.T) {
 	assert.Equal(t, []string{f}, got)
 }
 
-// TestGetFilesWithSuffix_MatchesMultipleSuffixes documents that a file matching
-// more than one of the provided suffixes is appended once per matching suffix.
+// TestGetFilesWithSuffix_MatchesMultipleSuffixes verifies that a file matching
+// more than one of the provided suffixes is returned exactly once (not once per
+// matching suffix).
 func TestGetFilesWithSuffix_MatchesMultipleSuffixes(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "archive.tar.gz")
@@ -132,5 +133,5 @@ func TestGetFilesWithSuffix_MatchesMultipleSuffixes(t *testing.T) {
 
 	got, err := GetFilesWithSuffix(dir, ".gz", ".tar.gz")
 	require.NoError(t, err)
-	assert.Equal(t, []string{f, f}, got)
+	assert.Equal(t, []string{f}, got)
 }
