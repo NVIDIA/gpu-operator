@@ -2257,6 +2257,14 @@ func transformValidatorSecurityContext(ctr *corev1.Container) {
 	ctr.SecurityContext.RunAsUser = rootUID
 }
 
+func applyResourceRequirements(ctr *corev1.Container, resources *gpuv1.ResourceRequirements) {
+	if resources == nil {
+		return
+	}
+	ctr.Resources.Requests = resources.Requests
+	ctr.Resources.Limits = resources.Limits
+}
+
 // TransformValidator transforms nvidia-operator-validator daemonset with required config as per ClusterPolicy
 func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	err := TransformValidatorShared(obj, config)
@@ -2348,8 +2356,7 @@ func TransformValidatorShared(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	if config.Validator.Resources != nil {
 		// apply resource limits to all containers
 		for i := range obj.Spec.Template.Spec.Containers {
-			obj.Spec.Template.Spec.Containers[i].Resources.Requests = config.Validator.Resources.Requests
-			obj.Spec.Template.Spec.Containers[i].Resources.Limits = config.Validator.Resources.Limits
+			applyResourceRequirements(&obj.Spec.Template.Spec.Containers[i], config.Validator.Resources)
 		}
 	}
 	// set arguments if specified for validator container
@@ -2385,6 +2392,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		if config.Validator.ImagePullPolicy != "" {
 			podSpec.InitContainers[i].ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
 		}
+		applyResourceRequirements(&podSpec.InitContainers[i], config.Validator.Resources)
 		// update the security context for the validator container
 		transformValidatorSecurityContext(&podSpec.InitContainers[i])
 

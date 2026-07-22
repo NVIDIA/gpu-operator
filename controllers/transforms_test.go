@@ -2709,6 +2709,52 @@ func TestTransformValidatorComponent(t *testing.T) {
 	}
 }
 
+func TestTransformValidatorComponentWithResources(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+	}
+
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Validator: gpuv1.ValidatorSpec{
+			Repository:      "nvcr.io/nvidia/cloud-native",
+			Image:           "gpu-operator-validator",
+			Version:         "v1.0.0",
+			ImagePullPolicy: "IfNotPresent",
+			Resources: &gpuv1.ResourceRequirements{
+				Limits:   resources.Limits,
+				Requests: resources.Requests,
+			},
+		},
+	}
+
+	testCases := []struct {
+		component     string
+		containerName string
+	}{
+		{component: "driver", containerName: "driver-validation"},
+		{component: "toolkit", containerName: "toolkit-validation"},
+		{component: "cuda", containerName: "cuda-validation"},
+		{component: "plugin", containerName: "plugin-validation"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.containerName, func(t *testing.T) {
+			pod := NewPod().WithInitContainer(corev1.Container{Name: tc.containerName})
+			err := TransformValidatorComponent(cpSpec, &pod.Spec, tc.component)
+			require.NoError(t, err)
+			require.Len(t, pod.Spec.InitContainers, 1)
+			require.EqualValues(t, resources, pod.Spec.InitContainers[0].Resources)
+		})
+	}
+}
+
 func TestTransformValidator(t *testing.T) {
 	testCases := []struct {
 		description   string
