@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
@@ -252,11 +251,14 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, infoCatalog InfoCatalog) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 
-	info := infoCatalog.Get(InfoTypeClusterPolicyCR)
+	info := infoCatalog.Get(InfoTypeHostRoot)
 	if info == nil {
-		return nil, fmt.Errorf("failed to get ClusterPolicy CR from info catalog")
+		return nil, fmt.Errorf("failed to get host root from info catalog")
 	}
-	clusterPolicy := info.(gpuv1.ClusterPolicy)
+	hostRoot, ok := info.(string)
+	if !ok {
+		return nil, fmt.Errorf("host root in info catalog has unexpected type %T", info)
+	}
 
 	info = infoCatalog.Get(InfoTypeClusterInfo)
 	if info == nil {
@@ -280,7 +282,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	renderData := &driverRenderData{
 		GPUDirectRDMA: gpuDirectRDMASpec,
 		Runtime:       runtimeSpec,
-		HostRoot:      clusterPolicy.Spec.HostPaths.RootFS,
+		HostRoot:      hostRoot,
 	}
 
 	if len(nodePools) == 0 {

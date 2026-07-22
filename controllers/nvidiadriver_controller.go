@@ -64,6 +64,7 @@ type NVIDIADriverReconciler struct {
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusters,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -98,45 +99,26 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	// Get the singleton NVIDIA ClusterPolicy object in the cluster.
-	clusterPolicyList := &gpuv1.ClusterPolicyList{}
-	if err := r.List(ctx, clusterPolicyList); err != nil {
-		wrappedErr := fmt.Errorf("error getting ClusterPolicy list: %w", err)
-		logger.Error(err, "error getting ClusterPolicy list")
-		instance.Status.State = nvidiav1alpha1.NotReady
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
-			logger.Error(condErr, "failed to set condition")
-		}
-		return reconcile.Result{}, wrappedErr
-	}
-
-	if len(clusterPolicyList.Items) == 0 {
-		err := fmt.Errorf("no ClusterPolicy object found in the cluster")
-		logger.Error(err, "failed to get ClusterPolicy object")
+	// Source the cluster-wide host root from the active configuration: a ClusterPolicy takes
+	// precedence, otherwise the controller runs standalone against the GPUCluster.
+	clusterPolicy, gpuCluster, err := resolveActiveConfig(ctx, r.Client)
+	if err != nil {
+		logger.Error(err, "error resolving active cluster configuration")
 		instance.Status.State = nvidiav1alpha1.NotReady
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, err
 	}
-	clusterPolicyInstance := clusterPolicyList.Items[0]
 
 	// Ensure the NVIDIADriver CR has a consumer: either the ClusterPolicy delegates its
 	// driver to the NVIDIADriver CRD, or a GPUCluster exists. GPUCluster does
 	// not manage the driver itself — it is either preinstalled on the host (no NVIDIADriver
 	// CR) or installed via NVIDIADriver CRs, so any CR that exists alongside one is in use.
-	if !clusterPolicyInstance.Spec.Driver.UseNvidiaDriverCRDType() {
-		gpuClusters := &nvidiav1alpha1.GPUClusterList{}
-		if err := r.List(ctx, gpuClusters); err != nil {
-			wrappedErr := fmt.Errorf("error getting GPUCluster list: %w", err)
-			logger.Error(err, "error getting GPUCluster list")
-			instance.Status.State = nvidiav1alpha1.NotReady
-			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
-				logger.Error(condErr, "failed to set condition")
-			}
-			return reconcile.Result{}, wrappedErr
-		}
-		if len(gpuClusters.Items) == 0 {
+	var hostRoot string
+	switch {
+	case clusterPolicy != nil:
+		if !clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() && gpuCluster == nil {
 			msg := "useNvidiaDriverCRD is not enabled in ClusterPolicy and no GPUCluster exists"
 			logger.V(consts.LogLevelWarning).Info("NVIDIADriver reconciliation skipped", "reason", msg)
 			instance.Status.State = nvidiav1alpha1.Disabled
@@ -145,6 +127,17 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 			return reconcile.Result{}, nil
 		}
+		hostRoot = clusterPolicy.Spec.HostPaths.RootFS
+	case gpuCluster != nil:
+		hostRoot = gpuCluster.Spec.HostPaths.RootFS
+	default:
+		err := fmt.Errorf("no ClusterPolicy or GPUCluster object found in the cluster")
+		logger.Error(err, "failed to get a cluster-wide configuration object")
+		instance.Status.State = nvidiav1alpha1.NotReady
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
+		}
+		return reconcile.Result{}, err
 	}
 
 	// Create a new InfoCatalog which is a generic interface for passing information to state managers
@@ -153,8 +146,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Add an entry for ClusterInfo, which was collected before the NVIDIADriver controller was started
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
 
-	// Add an entry for Clusterpolicy, which is needed to deploy the driver daemonset
-	infoCatalog.Add(state.InfoTypeClusterPolicyCR, clusterPolicyInstance)
+	// Add the host root, which is needed to deploy the driver daemonset
+	infoCatalog.Add(state.InfoTypeHostRoot, hostRoot)
 
 	// Verify the nodeSelector configured for this NVIDIADriver instance does
 	// not conflict with any other instances. This ensures only one driver
@@ -397,6 +390,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	gpuClusterMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUCluster) []reconcile.Request {
 		return r.enqueueAllNVIDIADrivers(ctx)
 	}
+
 	err = c.Watch(
 		source.Kind(
 			mgr.GetCache(),
