@@ -153,6 +153,10 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 		return ctrl.Result{}, err
 	}
 
+	if err := r.clearStaleUpgradeLabels(ctx, state, driverLabel, clusterPolicyCtrl.operatorNamespace); err != nil {
+		r.Log.Error(err, "Failed to clear stale upgrade labels")
+	}
+
 	reqLogger.Info("Propagate state to state manager")
 	reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state", "state", state)
 
@@ -240,6 +244,10 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 		return ctrl.Result{}, err
 	}
 
+	if err := r.clearStaleUpgradeLabels(ctx, clusterState, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}, clusterPolicyCtrl.operatorNamespace); err != nil {
+		r.Log.Error(err, "Failed to clear stale upgrade labels")
+	}
+
 	// Partition the cluster upgrade state into per-NVIDIADriver buckets by reading the
 	// nvidia.com/gpu-operator.driver.owner label from each node.
 	statesByNVD := make(map[string]*upgrade.ClusterUpgradeState)
@@ -322,6 +330,54 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
 	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
+}
+
+// clearStaleUpgradeLabels removes upgrade-state labels from nodes no longer selected by a driver DaemonSet.
+func (r *UpgradeReconciler) clearStaleUpgradeLabels(ctx context.Context, state *upgrade.ClusterUpgradeState, driverLabel map[string]string, namespace string) error {
+	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
+	managedNodes := make(map[string]bool)
+	for _, nodeStates := range state.NodeStates {
+		for _, nodeState := range nodeStates {
+			if nodeState.Node != nil {
+				managedNodes[nodeState.Node.Name] = true
+			}
+		}
+	}
+
+	nodeList := &corev1.NodeList{}
+	if err := r.List(ctx, nodeList, client.HasLabels{upgradeStateLabel}); err != nil {
+		return fmt.Errorf("list nodes with upgrade labels: %w", err)
+	}
+
+	driverDaemonSets := &appsv1.DaemonSetList{}
+	if err := r.List(ctx, driverDaemonSets, client.InNamespace(namespace), client.MatchingLabels(driverLabel)); err != nil {
+		return fmt.Errorf("list driver DaemonSets: %w", err)
+	}
+
+	for index := range nodeList.Items {
+		node := &nodeList.Items[index]
+		if managedNodes[node.Name] || selectedByDriverDaemonSet(node, driverDaemonSets.Items) {
+			continue
+		}
+
+		patch := client.MergeFrom(node.DeepCopy())
+		delete(node.Labels, upgradeStateLabel)
+		if err := r.Patch(ctx, node, patch); err != nil {
+			r.Log.Error(err, "Failed to clear stale upgrade label from node", "node", node.Name)
+		}
+	}
+
+	return nil
+}
+
+func selectedByDriverDaemonSet(node *corev1.Node, driverDaemonSets []appsv1.DaemonSet) bool {
+	for _, daemonSet := range driverDaemonSets {
+		selector := labels.SelectorFromSet(daemonSet.Spec.Template.Spec.NodeSelector)
+		if selector.Matches(labels.Set(node.Labels)) {
+			return true
+		}
+	}
+	return false
 }
 
 // removeNodeUpgradeStateLabels loops over nodes in the cluster and removes "nvidia.com/gpu-driver-upgrade-state"
