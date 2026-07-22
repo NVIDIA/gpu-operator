@@ -245,6 +245,15 @@ const (
 	NVIDIAPEERMEM = "nvidia-peermem"
 )
 
+var hostNvidiaSMISearchPaths = []string{
+	"/usr/bin/nvidia-smi",
+	"/usr/sbin/nvidia-smi",
+	"/bin/nvidia-smi",
+	"/sbin/nvidia-smi",
+	wslNvidiaSMIPath,
+	"/opt/bin/nvidia-smi",
+}
+
 func main() {
 	c := cli.Command{}
 
@@ -743,20 +752,34 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// resolveHostNvidiaSMI opens and stats nvidia-smi within the mounted host root.
-func resolveHostNvidiaSMI(hostRootCtrPath string) (os.FileInfo, error) {
-	f, err := pathrs.OpenInRoot(hostRootCtrPath, "/usr/bin/nvidia-smi")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open 'nvidia-smi' on the host: %w", err)
-	}
-	defer f.Close()
+// resolveHostNvidiaSMI searches common nvidia-smi locations within the mounted
+// host root and returns the resolved path relative to the host root. A candidate
+// is only accepted if it resolves to a regular, non-empty, executable file, so
+// the privileged validator never execs a bogus binary from a non-standard path.
+func resolveHostNvidiaSMI(hostRootCtrPath string) (string, error) {
+	for _, nvidiaSMIPath := range hostNvidiaSMISearchPaths {
+		f, err := pathrs.OpenInRoot(hostRootCtrPath, nvidiaSMIPath)
+		if err != nil {
+			log.Debugf("failed to open '%s' on the host: %v", nvidiaSMIPath, err)
+			continue
+		}
 
-	fileInfo, err := f.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("failed to stat 'nvidia-smi' on the host: %w", err)
+		fileInfo, err := f.Stat()
+		_ = f.Close()
+		if err != nil {
+			log.Debugf("failed to stat '%s' on the host: %v", nvidiaSMIPath, err)
+			continue
+		}
+
+		if !fileInfo.Mode().IsRegular() || fileInfo.Size() == 0 || fileInfo.Mode().Perm()&0o111 == 0 {
+			log.Debugf("skipping '%s' on the host: not a non-empty executable regular file", nvidiaSMIPath)
+			continue
+		}
+
+		return nvidiaSMIPath, nil
 	}
 
-	return fileInfo, nil
+	return "", fmt.Errorf("failed to find an executable 'nvidia-smi' on the host")
 }
 
 func validateHostDriver(silent bool) error {
@@ -767,15 +790,12 @@ func validateHostDriver(silent bool) error {
 		return nil
 	}
 
-	fileInfo, err := resolveHostNvidiaSMI("/host")
+	nvidiaSMIPath, err := resolveHostNvidiaSMI("/host")
 	if err != nil {
 		return err
 	}
-	if fileInfo.Size() == 0 {
-		return fmt.Errorf("empty 'nvidia-smi' file found on the host")
-	}
 	command := "chroot"
-	args := []string{"/host", "nvidia-smi"}
+	args := []string{"/host", nvidiaSMIPath}
 
 	return runCommand(command, args, silent)
 }
@@ -1771,8 +1791,8 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	args := []string{"/run/nvidia/driver", "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
-	if _, err := resolveHostNvidiaSMI("/host"); err == nil {
-		args = []string{"/host", "nvidia-smi"}
+	if nvidiaSMIPath, err := resolveHostNvidiaSMI("/host"); err == nil {
+		args = []string{"/host", nvidiaSMIPath}
 		hostDriver = true
 	}
 
