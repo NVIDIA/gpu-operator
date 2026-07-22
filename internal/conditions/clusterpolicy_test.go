@@ -21,13 +21,15 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -35,18 +37,20 @@ import (
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
-// clusterPolicyScheme returns a scheme that knows about ClusterPolicy.
-func clusterPolicyScheme(t *testing.T) {
+// clusterPolicyScheme returns a fresh scheme that knows about ClusterPolicy,
+// avoiding mutation of the global scheme.Scheme.
+func clusterPolicyScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
-	require.NoError(t, nvidiav1.AddToScheme(scheme.Scheme))
+	s := runtime.NewScheme()
+	require.NoError(t, nvidiav1.AddToScheme(s))
+	return s
 }
 
 // newClusterPolicyClient builds a fake client seeded with the given objects and
 // their status subresource enabled.
 func newClusterPolicyClient(t *testing.T, objs ...client.Object) client.Client {
 	t.Helper()
-	clusterPolicyScheme(t)
-	b := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+	b := fake.NewClientBuilder().WithScheme(clusterPolicyScheme(t))
 	if len(objs) > 0 {
 		b = b.WithObjects(objs...).WithStatusSubresource(objs...)
 	}
@@ -73,19 +77,16 @@ func TestClusterPolicyUpdater_SetConditionsReady(t *testing.T) {
 
 	got := &nvidiav1.ClusterPolicy{}
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: clusterPolicy.Name}, got))
-	require.Len(t, got.Status.Conditions, 2)
 
-	// Ready => True with the caller's reason/message.
-	assert.Equal(t, Ready, got.Status.Conditions[0].Type)
-	assert.Equal(t, metav1.ConditionTrue, got.Status.Conditions[0].Status)
-	assert.Equal(t, Reconciled, got.Status.Conditions[0].Reason)
-	assert.Equal(t, "all resources reconciled", got.Status.Conditions[0].Message)
-
-	// Error => False with reason "Ready" and no message.
-	assert.Equal(t, Error, got.Status.Conditions[1].Type)
-	assert.Equal(t, metav1.ConditionFalse, got.Status.Conditions[1].Status)
-	assert.Equal(t, Ready, got.Status.Conditions[1].Reason)
-	assert.Empty(t, got.Status.Conditions[1].Message)
+	want := []metav1.Condition{
+		// Ready => True with the caller's reason/message.
+		{Type: Ready, Status: metav1.ConditionTrue, Reason: Reconciled, Message: "all resources reconciled"},
+		// Error => False with reason "Ready" and no message.
+		{Type: Error, Status: metav1.ConditionFalse, Reason: Ready},
+	}
+	diff := cmp.Diff(want, got.Status.Conditions,
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"))
+	assert.Empty(t, diff, "unexpected conditions (-want +got):\n%s", diff)
 }
 
 func TestClusterPolicyUpdater_SetConditionsError(t *testing.T) {
@@ -98,19 +99,16 @@ func TestClusterPolicyUpdater_SetConditionsError(t *testing.T) {
 
 	got := &nvidiav1.ClusterPolicy{}
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: clusterPolicy.Name}, got))
-	require.Len(t, got.Status.Conditions, 2)
 
-	// Ready => False with reason "Error" and no message.
-	assert.Equal(t, Ready, got.Status.Conditions[0].Type)
-	assert.Equal(t, metav1.ConditionFalse, got.Status.Conditions[0].Status)
-	assert.Equal(t, Error, got.Status.Conditions[0].Reason)
-	assert.Empty(t, got.Status.Conditions[0].Message)
-
-	// Error => True with the caller's reason/message.
-	assert.Equal(t, Error, got.Status.Conditions[1].Type)
-	assert.Equal(t, metav1.ConditionTrue, got.Status.Conditions[1].Status)
-	assert.Equal(t, ReconcileFailed, got.Status.Conditions[1].Reason)
-	assert.Equal(t, "reconciliation failed", got.Status.Conditions[1].Message)
+	want := []metav1.Condition{
+		// Ready => False with reason "Error" and no message.
+		{Type: Ready, Status: metav1.ConditionFalse, Reason: Error},
+		// Error => True with the caller's reason/message.
+		{Type: Error, Status: metav1.ConditionTrue, Reason: ReconcileFailed, Message: "reconciliation failed"},
+	}
+	diff := cmp.Diff(want, got.Status.Conditions,
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"))
+	assert.Empty(t, diff, "unexpected conditions (-want +got):\n%s", diff)
 }
 
 // TestClusterPolicyUpdater_ReadyThenError verifies transitioning from Ready to
@@ -126,12 +124,16 @@ func TestClusterPolicyUpdater_ReadyThenError(t *testing.T) {
 
 	got := &nvidiav1.ClusterPolicy{}
 	require.NoError(t, c.Get(ctx, types.NamespacedName{Name: clusterPolicy.Name}, got))
-	require.Len(t, got.Status.Conditions, 2)
 
-	assert.Equal(t, metav1.ConditionFalse, got.Status.Conditions[0].Status) // Ready
-	assert.Equal(t, metav1.ConditionTrue, got.Status.Conditions[1].Status)  // Error
-	assert.Equal(t, DriverNotReady, got.Status.Conditions[1].Reason)
-	assert.Equal(t, "driver down", got.Status.Conditions[1].Message)
+	// The error transition flips Ready to False (reason Error) and Error to True
+	// with the caller's reason/message, in place.
+	want := []metav1.Condition{
+		{Type: Ready, Status: metav1.ConditionFalse, Reason: Error},
+		{Type: Error, Status: metav1.ConditionTrue, Reason: DriverNotReady, Message: "driver down"},
+	}
+	diff := cmp.Diff(want, got.Status.Conditions,
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"))
+	assert.Empty(t, diff, "unexpected conditions (-want +got):\n%s", diff)
 }
 
 // TestClusterPolicyUpdater_WrongObjectType covers the type-assertion guard in
@@ -198,11 +200,10 @@ func TestClusterPolicyUpdater_UnknownStatusType(t *testing.T) {
 // status update is retried and ultimately succeeds.
 func TestClusterPolicyUpdater_RetryOnConflict(t *testing.T) {
 	clusterPolicy := newClusterPolicy("cluster-policy")
-	clusterPolicyScheme(t)
 
 	var updateCalls int
 	c := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(clusterPolicyScheme(t)).
 		WithObjects(clusterPolicy).
 		WithStatusSubresource(clusterPolicy).
 		WithInterceptorFuncs(interceptor.Funcs{
@@ -234,10 +235,9 @@ func TestClusterPolicyUpdater_RetryOnConflict(t *testing.T) {
 // the status update is propagated to the caller.
 func TestClusterPolicyUpdater_UpdateError(t *testing.T) {
 	clusterPolicy := newClusterPolicy("cluster-policy")
-	clusterPolicyScheme(t)
 
 	c := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(clusterPolicyScheme(t)).
 		WithObjects(clusterPolicy).
 		WithStatusSubresource(clusterPolicy).
 		WithInterceptorFuncs(interceptor.Funcs{

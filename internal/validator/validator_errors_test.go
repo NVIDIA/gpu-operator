@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -31,11 +31,21 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
+// newValidatorScheme returns a fresh scheme registered with exactly the types
+// the validator's fake clients need (NVIDIADriver CRs and core Nodes), avoiding
+// mutation of the global scheme.Scheme.
+func newValidatorScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+	s := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+	return s
+}
+
 // TestValidateReturnsErrorWhenDriverListFails covers the failure to list the
 // NVIDIADriver CRs.
 func TestValidateReturnsErrorWhenDriverListFails(t *testing.T) {
-	s := scheme.Scheme
-	require.NoError(t, nvidiav1alpha1.AddToScheme(s))
+	s := newValidatorScheme(t)
 
 	requested := makeTestDriver("requested", nil, false) // valid: nil nodeSelector
 	c := fake.NewClientBuilder().
@@ -60,8 +70,7 @@ func TestValidateReturnsErrorWhenDriverListFails(t *testing.T) {
 // where another persisted driver has an invalid nodeSelector (a default driver
 // with a nodeSelector), which is rejected while iterating the driver list.
 func TestValidateReturnsErrorWhenListedDriverHasInvalidSelector(t *testing.T) {
-	s := scheme.Scheme
-	require.NoError(t, nvidiav1alpha1.AddToScheme(s))
+	s := newValidatorScheme(t)
 
 	requested := makeTestDriver("requested", nil, false) // valid
 	invalid := makeTestDriver("invalid-default", map[string]string{"nodepool": "b"}, true)
@@ -81,8 +90,7 @@ func TestValidateReturnsErrorWhenListedDriverHasInvalidSelector(t *testing.T) {
 // TestValidateReturnsErrorWhenNodeListFails covers the failure to list the nodes
 // selected by a non-default driver.
 func TestValidateReturnsErrorWhenNodeListFails(t *testing.T) {
-	s := scheme.Scheme
-	require.NoError(t, nvidiav1alpha1.AddToScheme(s))
+	s := newValidatorScheme(t)
 
 	requested := makeTestDriver("requested", map[string]string{"nodepool": "a"}, false)
 	c := fake.NewClientBuilder().

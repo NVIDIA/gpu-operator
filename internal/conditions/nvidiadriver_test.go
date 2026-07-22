@@ -21,13 +21,15 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -35,18 +37,20 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
-// nvDriverScheme ensures the scheme knows about NVIDIADriver.
-func nvDriverScheme(t *testing.T) {
+// nvDriverScheme returns a fresh scheme that knows about NVIDIADriver, avoiding
+// mutation of the global scheme.Scheme.
+func nvDriverScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
-	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme.Scheme))
+	s := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(s))
+	return s
 }
 
 // newNvDriverClient builds a fake client seeded with the given objects and their
 // status subresource enabled.
 func newNvDriverClient(t *testing.T, objs ...client.Object) client.Client {
 	t.Helper()
-	nvDriverScheme(t)
-	b := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+	b := fake.NewClientBuilder().WithScheme(nvDriverScheme(t))
 	if len(objs) > 0 {
 		b = b.WithObjects(objs...).WithStatusSubresource(objs...)
 	}
@@ -135,13 +139,14 @@ func TestNvDriverUpdater_SetConditionsErrorDefaultsState(t *testing.T) {
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: drv.Name}, got))
 
 	assert.Equal(t, nvidiav1alpha1.NotReady, got.Status.State)
-	require.Len(t, got.Status.Conditions, 2)
-	assert.Equal(t, Ready, got.Status.Conditions[0].Type)
-	assert.Equal(t, metav1.ConditionFalse, got.Status.Conditions[0].Status)
-	assert.Equal(t, Error, got.Status.Conditions[1].Type)
-	assert.Equal(t, metav1.ConditionTrue, got.Status.Conditions[1].Status)
-	assert.Equal(t, ConflictingNodeSelector, got.Status.Conditions[1].Reason)
-	assert.Equal(t, "conflicting nodes", got.Status.Conditions[1].Message)
+
+	want := []metav1.Condition{
+		{Type: Ready, Status: metav1.ConditionFalse, Reason: Error},
+		{Type: Error, Status: metav1.ConditionTrue, Reason: ConflictingNodeSelector, Message: "conflicting nodes"},
+	}
+	diff := cmp.Diff(want, got.Status.Conditions,
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"))
+	assert.Empty(t, diff, "unexpected conditions (-want +got):\n%s", diff)
 }
 
 // TestNvDriverUpdater_SetConditionsErrorPreservesState verifies that a non-empty
@@ -164,11 +169,10 @@ func TestNvDriverUpdater_SetConditionsErrorPreservesState(t *testing.T) {
 // status update is retried and ultimately succeeds.
 func TestNvDriverUpdater_RetryOnConflict(t *testing.T) {
 	drv := newNvDriver("gpu-driver")
-	nvDriverScheme(t)
 
 	var updateCalls int
 	c := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(nvDriverScheme(t)).
 		WithObjects(drv).
 		WithStatusSubresource(drv).
 		WithInterceptorFuncs(interceptor.Funcs{
@@ -200,10 +204,9 @@ func TestNvDriverUpdater_RetryOnConflict(t *testing.T) {
 // status update is propagated to the caller.
 func TestNvDriverUpdater_UpdateError(t *testing.T) {
 	drv := newNvDriver("gpu-driver")
-	nvDriverScheme(t)
 
 	c := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(nvDriverScheme(t)).
 		WithObjects(drv).
 		WithStatusSubresource(drv).
 		WithInterceptorFuncs(interceptor.Funcs{
