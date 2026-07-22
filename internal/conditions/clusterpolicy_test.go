@@ -64,15 +64,15 @@ func TestNewClusterPolicyUpdater(t *testing.T) {
 }
 
 func TestClusterPolicyUpdater_SetConditionsReady(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
-	c := newClusterPolicyClient(t, cp)
+	clusterPolicy := newClusterPolicy("cluster-policy")
+	c := newClusterPolicyClient(t, clusterPolicy)
 	u := NewClusterPolicyUpdater(c)
 
-	err := u.SetConditionsReady(context.Background(), cp, Reconciled, "all resources reconciled")
+	err := u.SetConditionsReady(context.Background(), clusterPolicy, Reconciled, "all resources reconciled")
 	require.NoError(t, err)
 
 	got := &nvidiav1.ClusterPolicy{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: cp.Name}, got))
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: clusterPolicy.Name}, got))
 	require.Len(t, got.Status.Conditions, 2)
 
 	// Ready => True with the caller's reason/message.
@@ -89,15 +89,15 @@ func TestClusterPolicyUpdater_SetConditionsReady(t *testing.T) {
 }
 
 func TestClusterPolicyUpdater_SetConditionsError(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
-	c := newClusterPolicyClient(t, cp)
+	clusterPolicy := newClusterPolicy("cluster-policy")
+	c := newClusterPolicyClient(t, clusterPolicy)
 	u := NewClusterPolicyUpdater(c)
 
-	err := u.SetConditionsError(context.Background(), cp, ReconcileFailed, "reconciliation failed")
+	err := u.SetConditionsError(context.Background(), clusterPolicy, ReconcileFailed, "reconciliation failed")
 	require.NoError(t, err)
 
 	got := &nvidiav1.ClusterPolicy{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: cp.Name}, got))
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: clusterPolicy.Name}, got))
 	require.Len(t, got.Status.Conditions, 2)
 
 	// Ready => False with reason "Error" and no message.
@@ -116,16 +116,16 @@ func TestClusterPolicyUpdater_SetConditionsError(t *testing.T) {
 // TestClusterPolicyUpdater_ReadyThenError verifies transitioning from Ready to
 // Error flips both conditions in place rather than accumulating duplicates.
 func TestClusterPolicyUpdater_ReadyThenError(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
-	c := newClusterPolicyClient(t, cp)
+	clusterPolicy := newClusterPolicy("cluster-policy")
+	c := newClusterPolicyClient(t, clusterPolicy)
 	u := NewClusterPolicyUpdater(c)
 	ctx := context.Background()
 
-	require.NoError(t, u.SetConditionsReady(ctx, cp, Reconciled, "ok"))
-	require.NoError(t, u.SetConditionsError(ctx, cp, DriverNotReady, "driver down"))
+	require.NoError(t, u.SetConditionsReady(ctx, clusterPolicy, Reconciled, "ok"))
+	require.NoError(t, u.SetConditionsError(ctx, clusterPolicy, DriverNotReady, "driver down"))
 
 	got := &nvidiav1.ClusterPolicy{}
-	require.NoError(t, c.Get(ctx, types.NamespacedName{Name: cp.Name}, got))
+	require.NoError(t, c.Get(ctx, types.NamespacedName{Name: clusterPolicy.Name}, got))
 	require.Len(t, got.Status.Conditions, 2)
 
 	assert.Equal(t, metav1.ConditionFalse, got.Status.Conditions[0].Status) // Ready
@@ -176,8 +176,8 @@ func TestClusterPolicyUpdater_GetError(t *testing.T) {
 	c := newClusterPolicyClient(t) // no objects seeded
 	u := NewClusterPolicyUpdater(c)
 
-	cp := newClusterPolicy("missing")
-	err := u.SetConditionsReady(context.Background(), cp, Reconciled, "m")
+	clusterPolicy := newClusterPolicy("missing")
+	err := u.SetConditionsReady(context.Background(), clusterPolicy, Reconciled, "m")
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "failed to get ClusterPolicy instance for status update")
 }
@@ -185,11 +185,11 @@ func TestClusterPolicyUpdater_GetError(t *testing.T) {
 // TestClusterPolicyUpdater_UnknownStatusType covers the default branch of the
 // status-type switch, reachable only through the unexported setConditions.
 func TestClusterPolicyUpdater_UnknownStatusType(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
-	c := newClusterPolicyClient(t, cp)
+	clusterPolicy := newClusterPolicy("cluster-policy")
+	c := newClusterPolicyClient(t, clusterPolicy)
 	u := &clusterPolicyUpdater{client: c}
 
-	err := u.setConditions(context.Background(), cp, "BogusStatus", "reason", "message")
+	err := u.setConditions(context.Background(), clusterPolicy, "BogusStatus", "reason", "message")
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "unknown status type provided: BogusStatus")
 }
@@ -197,14 +197,14 @@ func TestClusterPolicyUpdater_UnknownStatusType(t *testing.T) {
 // TestClusterPolicyUpdater_RetryOnConflict verifies that a Conflict error on the
 // status update is retried and ultimately succeeds.
 func TestClusterPolicyUpdater_RetryOnConflict(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
+	clusterPolicy := newClusterPolicy("cluster-policy")
 	clusterPolicyScheme(t)
 
 	var updateCalls int
 	c := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(cp).
-		WithStatusSubresource(cp).
+		WithObjects(clusterPolicy).
+		WithStatusSubresource(clusterPolicy).
 		WithInterceptorFuncs(interceptor.Funcs{
 			SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 				updateCalls++
@@ -221,25 +221,25 @@ func TestClusterPolicyUpdater_RetryOnConflict(t *testing.T) {
 		Build()
 	u := NewClusterPolicyUpdater(c)
 
-	err := u.SetConditionsReady(context.Background(), cp, Reconciled, "m")
+	err := u.SetConditionsReady(context.Background(), clusterPolicy, Reconciled, "m")
 	require.NoError(t, err)
 	assert.Equal(t, 2, updateCalls, "expected exactly one retry after the conflict")
 
 	got := &nvidiav1.ClusterPolicy{}
-	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: cp.Name}, got))
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: clusterPolicy.Name}, got))
 	assert.Len(t, got.Status.Conditions, 2)
 }
 
 // TestClusterPolicyUpdater_UpdateError verifies that a non-conflict error from
 // the status update is propagated to the caller.
 func TestClusterPolicyUpdater_UpdateError(t *testing.T) {
-	cp := newClusterPolicy("cluster-policy")
+	clusterPolicy := newClusterPolicy("cluster-policy")
 	clusterPolicyScheme(t)
 
 	c := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(cp).
-		WithStatusSubresource(cp).
+		WithObjects(clusterPolicy).
+		WithStatusSubresource(clusterPolicy).
 		WithInterceptorFuncs(interceptor.Funcs{
 			SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 				return errors.New("status update boom")
@@ -248,7 +248,7 @@ func TestClusterPolicyUpdater_UpdateError(t *testing.T) {
 		Build()
 	u := NewClusterPolicyUpdater(c)
 
-	err := u.SetConditionsError(context.Background(), cp, ReconcileFailed, "m")
+	err := u.SetConditionsError(context.Background(), clusterPolicy, ReconcileFailed, "m")
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "status update boom")
 }
