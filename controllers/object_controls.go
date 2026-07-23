@@ -812,6 +812,19 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
+	if len(config.Daemonsets.NodeSelector) > 0 {
+		if obj.Spec.Template.Spec.NodeSelector == nil {
+			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
+		for key, value := range config.Daemonsets.NodeSelector {
+			obj.Spec.Template.Spec.NodeSelector[key] = value
+		}
+	}
+
+	if config.Daemonsets.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = config.Daemonsets.Affinity
+	}
+
 	// set pod-level security context if specified (applies as defaults to all containers in the pod)
 	if config.Daemonsets.PodSecurityContext != nil {
 		obj.Spec.Template.Spec.SecurityContext = config.Daemonsets.PodSecurityContext

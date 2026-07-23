@@ -43,6 +43,12 @@ spec:
     {{- if .Values.daemonsets.tolerations }}
     tolerations: {{ toYaml .Values.daemonsets.tolerations | nindent 6 }}
     {{- end }}
+    {{- if .Values.daemonsets.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.daemonsets.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.daemonsets.affinity }}
+    affinity: {{ toYaml .Values.daemonsets.affinity | nindent 6 }}
+    {{- end }}
     {{- if .Values.daemonsets.priorityClassName }}
     priorityClassName: {{ .Values.daemonsets.priorityClassName }}
     {{- end }}
