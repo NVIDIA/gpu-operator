@@ -1,5 +1,5 @@
 /*
-# Copyright 2024 NVIDIA CORPORATION
+# Copyright (c) NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 */
 
-package main
+package driver
 
 import (
 	"fmt"
@@ -22,48 +22,30 @@ import (
 	"path/filepath"
 )
 
-type root string
+// Root represents a directory containing an NVIDIA driver installation.
+type Root string
 
-// getDriverLibraryPath returns path to `libnvidia-ml.so.1` in the driver root.
+// GetDriverLibraryPath returns path to `libnvidia-ml.so.1` in the driver root.
 // The folder for this file is also expected to be the location of other driver files.
-func (r root) getDriverLibraryPath() (string, error) {
-	librarySearchPaths := []string{
+func (r Root) GetDriverLibraryPath() (string, error) {
+	return r.findFile("libnvidia-ml.so.1",
 		"/usr/lib64",
 		"/usr/lib/x86_64-linux-gnu",
 		"/usr/lib/aarch64-linux-gnu",
 		"/lib64",
 		"/lib/x86_64-linux-gnu",
 		"/lib/aarch64-linux-gnu",
-	}
-
-	libraryPath, err := r.findFile("libnvidia-ml.so.1", librarySearchPaths...)
-	if err != nil {
-		return "", err
-	}
-
-	return libraryPath, nil
+	)
 }
 
-// getNvidiaSMIPath returns path to the `nvidia-smi` executable in the driver root.
-func (r root) getNvidiaSMIPath() (string, error) {
-	binarySearchPaths := []string{
-		"/usr/bin",
-		"/usr/sbin",
-		"/bin",
-		"/sbin",
-	}
-
-	binaryPath, err := r.findFile("nvidia-smi", binarySearchPaths...)
-	if err != nil {
-		return "", err
-	}
-
-	return binaryPath, nil
+// GetNvidiaSMIPath returns path to the `nvidia-smi` executable in the driver root.
+func (r Root) GetNvidiaSMIPath() (string, error) {
+	return r.findFile("nvidia-smi", "/usr/bin", "/usr/sbin", "/bin", "/sbin")
 }
 
 // isDevRoot checks whether the specified root is a dev root.
 // A dev root is defined as a root containing a /dev folder.
-func (r root) isDevRoot() bool {
+func (r Root) isDevRoot() bool {
 	stat, err := os.Stat(filepath.Join(string(r), "dev"))
 	if err != nil {
 		return false
@@ -71,9 +53,9 @@ func (r root) isDevRoot() bool {
 	return stat.IsDir()
 }
 
-// getDevRoot returns the dev root associated with the root.
+// GetDevRoot returns the dev root associated with the root.
 // If the root is not a dev root, this defaults to "/".
-func (r root) getDevRoot() string {
+func (r Root) GetDevRoot() string {
 	if r.isDevRoot() {
 		return string(r)
 	}
@@ -83,8 +65,7 @@ func (r root) getDevRoot() string {
 // findFile searches the root for a specified file.
 // A number of folders can be specified to search in addition to the root itself.
 // If the file represents a symlink, this is resolved and the final path is returned.
-func (r root) findFile(name string, searchIn ...string) (string, error) {
-
+func (r Root) findFile(name string, searchIn ...string) (string, error) {
 	for _, d := range append([]string{"/"}, searchIn...) {
 		l := filepath.Join(string(r), d, name)
 		candidate, err := resolveLink(l)

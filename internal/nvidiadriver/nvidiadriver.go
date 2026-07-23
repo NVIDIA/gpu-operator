@@ -35,8 +35,11 @@ func nodeMatchesSelector(nodeLabels map[string]string, selector map[string]strin
 
 // AssignOwners labels GPU nodes with the NVIDIADriver that should manage their driver pods.
 // Non-default NVIDIADrivers take precedence over the default fallback, and conflicts fail closed before
-// node owner labels are changed. On success, it returns true when any node owner label was changed.
-func AssignOwners(ctx context.Context, c client.Client) (bool, error) {
+// node owner labels are changed. When classicClusterPolicyDriver is true (a ClusterPolicy manages
+// its own driver rather than delegating to NVIDIADriver CRs), device-plugin nodes get no owner:
+// their driver comes from the ClusterPolicy DaemonSet, and assigning an owner would land a second
+// driver DaemonSet on them. On success, it returns true when any node owner label was changed.
+func AssignOwners(ctx context.Context, c client.Client, classicClusterPolicyDriver bool) (bool, error) {
 	drivers := &nvidiav1alpha1.NVIDIADriverList{}
 	if err := c.List(ctx, drivers); err != nil {
 		return false, fmt.Errorf("failed to list NVIDIADriver CRs: %w", err)
@@ -61,6 +64,11 @@ func AssignOwners(ctx context.Context, c client.Client) (bool, error) {
 
 	desiredOwnersByNode := map[string]string{}
 	for _, node := range nodes.Items {
+		if classicClusterPolicyDriver &&
+			node.Labels[consts.GPUAllocationModeLabelKey] == string(consts.GPUAllocationModeDevicePlugin) {
+			desiredOwnersByNode[node.Name] = ""
+			continue
+		}
 		desiredOwner, err := desiredOwnerForNode(&node, nonDefaultDrivers, defaultOwner)
 		if err != nil {
 			return false, err

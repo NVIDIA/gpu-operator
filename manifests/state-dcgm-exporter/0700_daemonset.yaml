@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-dcgm-exporter-dra
+  namespace: {{ .Namespace }}
+  labels:
+    app: nvidia-dcgm-exporter-dra
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter-dra
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm-exporter-dra
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
+      {{- if or .Daemonsets.Annotations .DCGMExporter.Spec.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- range $k, $v := .DCGMExporter.Spec.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-dcgm-exporter-dra
+      automountServiceAccountToken: {{ .PodMetadataEnabled }}
+      # Gate scheduling on the per-component deploy label so the k8s-driver-manager
+      # can pause it to drain dcgm-exporter off a node during a driver reload.
+      nodeSelector:
+        nvidia.com/gpu.deploy.dcgm-exporter: "true"
+        nvidia.com/gpu-operator.resource-allocation.mode: "dra"
+      {{- if .DCGMExporter.Spec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .DCGMExporter.Spec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .HostPID }}
+      hostPID: true
+      {{- end }}
+      {{- if .HostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- if .Daemonsets.Tolerations }}
+      tolerations:
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      {{- end }}
+      resourceClaims:
+      - name: admin-gpus
+        resourceClaimTemplateName: nvidia-dcgm-exporter-admin
+      containers:
+      - name: nvidia-dcgm-exporter-dra
+        image: {{ .DCGMExporter.ImagePath }}
+        {{- if .DCGMExporter.Spec.ImagePullPolicy }}
+        imagePullPolicy: {{ .DCGMExporter.Spec.ImagePullPolicy }}
+        {{- end }}
+        {{- if .DCGMExporter.Spec.Args }}
+        args:
+        {{- range .DCGMExporter.Spec.Args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        env:
+        - name: DCGM_EXPORTER_LISTEN
+          value: ":9400"
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        - name: DCGM_EXPORTER_COLLECTORS
+          value: {{ .Collectors | quote }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        {{- if .RemoteHostEngine }}
+        - name: DCGM_REMOTE_HOSTENGINE_INFO
+          value: {{ .RemoteHostEngine | quote }}
+        {{- end }}
+        {{- if .HPCJobMappingDir }}
+        - name: DCGM_HPC_JOB_MAPPING_DIR
+          value: {{ .HPCJobMappingDir | quote }}
+        {{- end }}
+        {{- if .EnablePodLabels }}
+        - name: DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS
+          value: "true"
+        {{- end }}
+        {{- if .EnablePodUID }}
+        - name: DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID
+          value: "true"
+        {{- end }}
+        {{- if .PodLabelAllowlistRegex }}
+        - name: DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX
+          value: {{ .PodLabelAllowlistRegex | quote }}
+        {{- end }}
+        {{- range .DCGMExporter.Spec.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        securityContext:
+          privileged: true
+        ports:
+        - name: "metrics"
+          containerPort: 9400
+        livenessProbe:
+          httpGet:
+            port: 9400
+            path: /health
+          initialDelaySeconds: 45
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            port: 9400
+            path: /health
+          initialDelaySeconds: 45
+        resources:
+          {{- if .DCGMExporter.Spec.Resources }}
+          {{- if .DCGMExporter.Spec.Resources.Limits }}
+          limits: {{ .DCGMExporter.Spec.Resources.Limits | toJson }}
+          {{- end }}
+          {{- if .DCGMExporter.Spec.Resources.Requests }}
+          requests: {{ .DCGMExporter.Spec.Resources.Requests | toJson }}
+          {{- end }}
+          {{- end }}
+          claims:
+          - name: admin-gpus
+        volumeMounts:
+        - name: pod-gpu-resources
+          readOnly: true
+          mountPath: /var/lib/kubelet/pod-resources
+        {{- if .MetricsConfigName }}
+        - name: metrics-config
+          readOnly: true
+          mountPath: /etc/dcgm-exporter/dcgm-metrics.csv
+          subPath: dcgm-metrics.csv
+        {{- end }}
+        {{- if .HPCJobMappingDir }}
+        - name: hpc-job-mapping
+          readOnly: true
+          mountPath: {{ .HPCJobMappingDir }}
+        {{- end }}
+      volumes:
+      - name: pod-gpu-resources
+        hostPath:
+          path: {{ .PodResourcesDir }}
+      {{- if .MetricsConfigName }}
+      - name: metrics-config
+        configMap:
+          name: {{ .MetricsConfigName }}
+          items:
+          - key: dcgm-metrics.csv
+            path: dcgm-metrics.csv
+      {{- end }}
+      {{- if .HPCJobMappingDir }}
+      - name: hpc-job-mapping
+        hostPath:
+          path: {{ .HPCJobMappingDir }}
+          type: DirectoryOrCreate
+      {{- end }}

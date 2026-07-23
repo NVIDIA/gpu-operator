@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -40,6 +41,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -186,7 +188,7 @@ func main() {
 		os.Exit(1)
 	}
 	clusterUpgradeStateManager = clusterUpgradeStateManager.
-		WithPodDeletionEnabled(gpuPodSpecFilter).
+		WithPodDeletionEnabled(gpuPodSpecFilter(ctx, mgr.GetAPIReader())).
 		WithValidationEnabled("app=nvidia-operator-validator").
 		WithRestartOnlyPredicate(predicates.DriverPodRestartOnly(upgradeLogger))
 
@@ -230,6 +232,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeLabeling")
 		os.Exit(1)
 	}
+
+	if err = (&controllers.GPUClusterReconciler{
+		Namespace:   operatorNamespace,
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClusterInfo: clusterInfo,
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -247,26 +259,28 @@ func main() {
 	}
 }
 
-func gpuPodSpecFilter(pod corev1.Pod) bool {
-	gpuInResourceList := func(rl corev1.ResourceList) bool {
-		for resourceName := range rl {
-			str := string(resourceName)
-			if strings.HasPrefix(str, "nvidia.com/gpu") || strings.HasPrefix(str, "nvidia.com/mig-") {
+func gpuPodSpecFilter(ctx context.Context, c client.Reader) func(pod corev1.Pod) bool {
+	return func(pod corev1.Pod) bool {
+		gpuInResourceList := func(rl corev1.ResourceList) bool {
+			for resourceName := range rl {
+				str := string(resourceName)
+				if strings.HasPrefix(str, "nvidia.com/gpu") || strings.HasPrefix(str, "nvidia.com/mig-") {
+					return true
+				}
+			}
+			return false
+		}
+
+		//  ignore pods other than in running and pending state
+		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+			return false
+		}
+
+		for _, ctr := range pod.Spec.Containers {
+			if gpuInResourceList(ctr.Resources.Limits) || gpuInResourceList(ctr.Resources.Requests) {
 				return true
 			}
 		}
-		return false
+		return controllers.PodHasNVIDIAGPUClaim(ctx, c, &pod, false)
 	}
-
-	//  ignore pods other than in running and pending state
-	if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
-		return false
-	}
-
-	for _, c := range pod.Spec.Containers {
-		if gpuInResourceList(c.Resources.Limits) || gpuInResourceList(c.Resources.Requests) {
-			return true
-		}
-	}
-	return false
 }

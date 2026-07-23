@@ -24,11 +24,14 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/gpu-operator/internal/consts"
@@ -56,6 +59,64 @@ func (s *stateSkel) Name() string {
 // Description provides the State description
 func (s *stateSkel) Description() string {
 	return s.description
+}
+
+// newStateSkel builds the common state skeleton, loading the manifests from
+// manifestDir into the renderer.
+func newStateSkel(
+	k8sClient client.Client,
+	namespace string,
+	scheme *runtime.Scheme,
+	manifestDir string,
+	name string,
+	description string) (stateSkel, error) {
+
+	files, err := utils.GetFilesWithSuffix(manifestDir, render.ManifestFileSuffix...)
+	if err != nil {
+		return stateSkel{}, fmt.Errorf("failed to get files from manifest directory: %v", err)
+	}
+
+	return stateSkel{
+		name:        name,
+		description: description,
+		client:      k8sClient,
+		namespace:   namespace,
+		scheme:      scheme,
+		renderer:    render.NewRenderer(files),
+	}, nil
+}
+
+// renderObjects renders the state's manifests with the given templating data.
+func (s *stateSkel) renderObjects(ctx context.Context, data interface{}) ([]*unstructured.Unstructured, error) {
+	logger := log.FromContext(ctx)
+	logger.V(consts.LogLevelDebug).Info("Rendering objects", "State:", s.name, "data", data)
+
+	objs, err := s.renderer.RenderObjects(&render.TemplatingData{Data: data})
+	if err != nil {
+		return nil, fmt.Errorf("failed to render kubernetes manifests: %w", err)
+	}
+	return objs, nil
+}
+
+// syncObjects creates or updates the rendered objects and returns the aggregated sync
+// state. Owner references make every object (including cluster-scoped ones) garbage
+// collected when the owning CR is deleted.
+func (s *stateSkel) syncObjects(ctx context.Context, owner metav1.Object, objs []*unstructured.Unstructured) (SyncState, error) {
+	err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
+		if err := controllerutil.SetControllerReference(owner, obj, s.scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference for object: %w", err)
+		}
+		return nil
+	}, objs)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to create/update objects: %w", err)
+	}
+
+	syncState, err := s.getSyncState(ctx, objs)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to get sync state: %w", err)
+	}
+	return syncState, nil
 }
 
 func getSupportedGVKs() []schema.GroupVersionKind {
@@ -159,6 +220,24 @@ func getSupportedGVKs() []schema.GroupVersionKind {
 			Group:   "monitoring.coreos.com",
 			Kind:    "PrometheusRule",
 			Version: "v1",
+		},
+		// ResourceClaimTemplate is listed under every resource.k8s.io version because
+		// which one a cluster serves depends on its Kubernetes version; unserved
+		// versions are skipped via IsNoMatchError during deletion.
+		{
+			Group:   "resource.k8s.io",
+			Kind:    "ResourceClaimTemplate",
+			Version: "v1",
+		},
+		{
+			Group:   "resource.k8s.io",
+			Kind:    "ResourceClaimTemplate",
+			Version: "v1beta2",
+		},
+		{
+			Group:   "resource.k8s.io",
+			Kind:    "ResourceClaimTemplate",
+			Version: "v1beta1",
 		},
 	}
 }
@@ -266,7 +345,7 @@ func (s *stateSkel) createOrUpdateObjs(
 				if desiredObjectHash == currentObjHash {
 					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
-					return nil
+					continue
 				}
 			}
 		}
@@ -290,6 +369,66 @@ func (s *stateSkel) addStateSpecificLabels(obj *unstructured.Unstructured) {
 	}
 	labels[consts.StateLabel] = s.name
 	obj.SetLabels(labels)
+}
+
+func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, error) {
+	reqLogger := log.FromContext(ctx)
+	reqLogger.V(consts.LogLevelInfo).Info(
+		"State spec in CR is nil, deleting existing objects if needed", "State:", s.name)
+	found, err := s.deleteStateRelatedObjects(ctx)
+	if err != nil {
+		return SyncStateError, fmt.Errorf("failed to delete k8s objects: %w", err)
+	}
+	if found {
+		reqLogger.V(consts.LogLevelInfo).Info("State deleting objects in progress", "State:", s.name)
+		return SyncStateNotReady, nil
+	}
+	return SyncStateIgnore, nil
+}
+
+func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error) {
+	stateLabel := map[string]string{
+		consts.StateLabel: s.name,
+	}
+	found := false
+	for _, gvk := range getSupportedGVKs() {
+		// Scope the query for namespaced kinds to the operator namespace (where all
+		// operand objects live) so only namespaced list permission is needed; list
+		// cluster-scoped kinds cluster-wide. RESTMapping also reports unserved kinds.
+		mapping, err := s.client.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
+		if meta.IsNoMatchError(err) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		l := &unstructured.UnstructuredList{}
+		l.SetGroupVersionKind(gvk)
+		listOpts := []client.ListOption{client.MatchingLabels(stateLabel)}
+		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+			listOpts = append(listOpts, client.InNamespace(s.namespace))
+		}
+		if err := s.client.List(ctx, l, listOpts...); err != nil {
+			// The operator cannot have created objects of a kind it is not allowed to
+			// list, so a forbidden error means there is nothing of this kind to clean up.
+			if apierrors.IsForbidden(err) {
+				continue
+			}
+			return false, err
+		}
+		if len(l.Items) > 0 {
+			found = true
+		}
+		for _, obj := range l.Items {
+			if obj.GetDeletionTimestamp() == nil {
+				err := s.client.Delete(ctx, &obj)
+				if err != nil && !apierrors.IsNotFound(err) {
+					return true, err
+				}
+			}
+		}
+	}
+	return found, nil
 }
 
 func (s *stateSkel) mergeObjects(updated, current *unstructured.Unstructured) error {
@@ -357,6 +496,12 @@ func (s *stateSkel) getSyncState(ctx context.Context, objs []*unstructured.Unstr
 				return SyncStateNotReady, err
 			}
 		}
+		if found.GetKind() == "Deployment" {
+			if ready, err := s.isDeploymentReady(found, reqLogger); err != nil || !ready {
+				reqLogger.V(consts.LogLevelInfo).Info("Object is not ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
+				return SyncStateNotReady, err
+			}
+		}
 		reqLogger.V(consts.LogLevelInfo).Info("Object is ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
 	}
 	return SyncStateReady, nil
@@ -383,12 +528,50 @@ func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger l
 		"UpdatedPodsScheduled", ds.Status.UpdatedNumberScheduled,
 		"PodsReady:", ds.Status.NumberReady,
 		"Conditions:", ds.Status.Conditions)
-	// Note(adrianc): We check for DesiredNumberScheduled!=0 as we expect to have at least one node that would need
-	// to have DaemonSet Pods deployed onto it. DesiredNumberScheduled == 0 then indicates that this field was not yet
-	// updated by the DaemonSet controller
-	// TODO: Check if we can use another field maybe to indicate it was processed by the DaemonSet controller.
+	// A DaemonSet targeting zero nodes is ready: every operand DaemonSet gates on the
+	// nvidia.com/gpu-operator.resource-allocation.mode node label, so zero desired pods is a legitimate
+	// steady state (e.g. all GPU nodes serving the other stack). ObservedGeneration
+	// distinguishes this from a DaemonSet the controller has not processed yet, where the
+	// zero counts are merely uninitialized status.
+	if ds.Status.ObservedGeneration >= ds.Generation &&
+		ds.Status.DesiredNumberScheduled == 0 && ds.Status.NumberMisscheduled == 0 &&
+		ds.Status.CurrentNumberScheduled == 0 {
+		return true, nil
+	}
 	if ds.Status.DesiredNumberScheduled != 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberAvailable &&
 		ds.Status.UpdatedNumberScheduled == ds.Status.NumberAvailable {
+		return true, nil
+	}
+	return false, nil
+}
+
+// isDeploymentReady checks if a deployment is ready
+func (s *stateSkel) isDeploymentReady(ud *unstructured.Unstructured, reqLogger logr.Logger) (bool, error) {
+	buf, err := ud.MarshalJSON()
+	if err != nil {
+		return false, fmt.Errorf("failed to marshall unstructured deployment object: %w", err)
+	}
+
+	dep := &appsv1.Deployment{}
+	if err = json.Unmarshal(buf, dep); err != nil {
+		return false, fmt.Errorf("failed to unmarshall to deployment object: %w", err)
+	}
+
+	desired := int32(1)
+	if dep.Spec.Replicas != nil {
+		desired = *dep.Spec.Replicas
+	}
+
+	reqLogger.V(consts.LogLevelDebug).Info(
+		"Check deployment state",
+		"DesiredReplicas:", desired,
+		"UpdatedReplicas:", dep.Status.UpdatedReplicas,
+		"AvailableReplicas:", dep.Status.AvailableReplicas,
+		"ObservedGeneration:", dep.Status.ObservedGeneration)
+
+	if dep.Status.ObservedGeneration >= dep.Generation &&
+		dep.Status.UpdatedReplicas == desired &&
+		dep.Status.AvailableReplicas == desired {
 		return true, nil
 	}
 	return false, nil

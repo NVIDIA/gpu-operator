@@ -1,0 +1,122 @@
+{{- if .DRADriver.Spec.IsComputeDomainsEnabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: nvidia-dra-driver
+    app.kubernetes.io/component: nvidia-dra-driver-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-dra-driver-controller
+rules:
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomains
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomains/status
+  verbs:
+  - update
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaimtemplates
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - create
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomaincliques
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-dra-driver-controller
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: nvidia-dra-driver-controller
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-controller
+  namespace: {{ .Namespace }}
+roleRef:
+  kind: Role
+  name: nvidia-dra-driver-controller
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

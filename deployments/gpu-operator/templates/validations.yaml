@@ -13,3 +13,10 @@
 {{- if and (.Values.devicePlugin.config.create) (empty .Values.devicePlugin.config.name) }}
 {{ fail "devicePlugin.config.name cannot be empty when devicePlugin.config.create is set to true" }}
 {{- end }}
+
+{{- if .Values.gpuCluster.deployCR }}
+{{- $clusterSupportsDRA := or (.Capabilities.APIVersions.Has "resource.k8s.io/v1/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta2/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta1/DeviceClass") }}
+{{- if not $clusterSupportsDRA }}
+{{ fail "gpuCluster.deployCR=true requires a Kubernetes cluster that supports Dynamic Resource Allocation (no resource.k8s.io DeviceClass API is served). When rendering offline with 'helm template', pass --api-versions resource.k8s.io/v1/DeviceClass" }}
+{{- end }}
+{{- end }}

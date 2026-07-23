@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,13 +44,15 @@ import (
 )
 
 const (
-	manifestDir       = "../../manifests"
+	manifestDir       = "../../manifests/state-driver"
 	manifestResultDir = "./testdata/golden"
 )
 
 type testClusterInfo struct {
 	runtime          string
 	openshiftVersion string
+	draResourceGVR   schema.GroupVersionResource
+	draSupported     bool
 }
 
 func (i testClusterInfo) GetContainerRuntime() (string, error) {
@@ -66,6 +69,10 @@ func (i testClusterInfo) GetOpenshiftDriverToolkitImages() map[string]string {
 
 func (i testClusterInfo) GetOpenshiftProxySpec() (*configv1.ProxySpec, error) {
 	return nil, nil
+}
+
+func (i testClusterInfo) GetDRAResourceGVR() (schema.GroupVersionResource, bool, error) {
+	return i.draResourceGVR, i.draSupported, nil
 }
 
 func getYAMLString(objs []*unstructured.Unstructured) (string, error) {

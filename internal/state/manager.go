@@ -114,6 +114,8 @@ func newStates(crdKind string, namespace string, k8sClient client.Client, scheme
 	switch crdKind {
 	case nvidiav1alpha1.NVIDIADriverCRDName:
 		return newNVIDIADriverStates(k8sClient, namespace, scheme)
+	case nvidiav1alpha1.GPUClusterCRDName:
+		return newGPUClusterStates(k8sClient, namespace, scheme)
 	default:
 		break
 	}
@@ -127,4 +129,28 @@ func newNVIDIADriverStates(k8sClient client.Client, namespace string, scheme *ru
 	}
 
 	return []State{driverState}, nil
+}
+
+// newGPUClusterStates returns the states reconciled for a GPUCluster.
+func newGPUClusterStates(k8sClient client.Client, namespace string, scheme *runtime.Scheme) ([]State, error) {
+	operands := []struct {
+		name        string
+		manifestDir string
+		newState    func(client.Client, string, *runtime.Scheme, string) (State, error)
+	}{
+		{"DRA driver", "/opt/gpu-operator/manifests/state-dra-driver", NewStateDRADriver},
+		{"DCGM", "/opt/gpu-operator/manifests/state-dcgm", NewStateDCGM},
+		{"DCGM Exporter", "/opt/gpu-operator/manifests/state-dcgm-exporter", NewStateDCGMExporter},
+		{"DRA validator", "/opt/gpu-operator/manifests/state-dra-validation", NewStateDRAValidation},
+	}
+
+	states := make([]State, 0, len(operands))
+	for _, operand := range operands {
+		state, err := operand.newState(k8sClient, namespace, scheme, operand.manifestDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create %s state: %v", operand.name, err)
+		}
+		states = append(states, state)
+	}
+	return states, nil
 }

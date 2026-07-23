@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-operator-cleanup-gpucluster
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # Delete the chart-managed GPUCluster CR and wait for it to be gone before helm
+    # removes the operator (and, with operator.cleanupCRD, before the CRD cleanup
+    # hook runs). The operator drains ResourceClaim-consuming operands under a
+    # finalizer on CR deletion, so it must stay alive until the CR has disappeared.
+    # Unconditional because the CR outlives a gpuCluster.deployCR flip (resource
+    # policy keep); a no-op when the CRD or the CR does not exist.
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  template:
+    metadata:
+      name: gpu-operator-cleanup-gpucluster
+      labels:
+        {{- include "gpu-operator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: "gpu-operator"
+    spec:
+      serviceAccountName: gpu-operator
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.operator.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: cleanup-gpucluster
+          image: {{ include "gpu-operator.fullimage" . }}
+          imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          command:
+            - /usr/bin/cleanup-gpuclusters
+            - --gpucluster-name
+            - {{ include "gpu-operator.gpucluster-name" . }}
+      restartPolicy: OnFailure

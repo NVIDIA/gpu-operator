@@ -1,0 +1,36 @@
+{{- if .ServiceMonitorEnabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-dcgm-exporter-dra
+  namespace: {{ .Namespace }}
+  labels:
+    app: nvidia-dcgm-exporter-dra
+    {{- range $k, $v := .DCGMExporter.Spec.ServiceMonitor.AdditionalLabels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+spec:
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - {{ .Namespace }}
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter-dra
+  endpoints:
+  - port: gpu-metrics
+    path: /metrics
+    honorLabels: {{ deref .DCGMExporter.Spec.ServiceMonitor.HonorLabels }}
+    {{- if .DCGMExporter.Spec.ServiceMonitor.Interval }}
+    interval: {{ .DCGMExporter.Spec.ServiceMonitor.Interval | quote }}
+    {{- end }}
+    {{- if .DCGMExporter.Spec.ServiceMonitor.ScrapeTimeout }}
+    scrapeTimeout: {{ .DCGMExporter.Spec.ServiceMonitor.ScrapeTimeout | quote }}
+    {{- end }}
+    {{- if .DCGMExporter.Spec.ServiceMonitor.Relabelings }}
+    relabelings:
+    {{- range .DCGMExporter.Spec.ServiceMonitor.Relabelings }}
+    - {{ . | toJson }}
+    {{- end }}
+    {{- end }}
+{{- end }}

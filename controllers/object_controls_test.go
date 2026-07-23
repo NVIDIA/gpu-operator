@@ -1076,6 +1076,11 @@ func TestDevicePlugin(t *testing.T) {
 				return
 			}
 
+			// Without a GPUCluster in the cluster, scheduling gates on the deploy label
+			// alone; the mode nodeSelector is rendered only once the DRA stack coexists.
+			require.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.device-plugin"])
+			require.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
+
 			configManagerInitPresent := false
 			configManagerSidecarPresent := false
 			devicePluginImage := ""
@@ -1613,6 +1618,11 @@ func TestDCGMExporter(t *testing.T) {
 				return
 			}
 
+			// dcgm-exporter is shared with the DRA stack, but the mode gate resolving
+			// per-node ownership is rendered only once a GPUCluster exists.
+			require.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.dcgm-exporter"])
+			require.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
+
 			dcgmExporterImage := ""
 			for _, container := range ds.Spec.Template.Spec.Containers {
 				if container.Name == "nvidia-dcgm-exporter" {
@@ -1650,6 +1660,84 @@ func TestDCGMExporter(t *testing.T) {
 				t.Fatalf("error removing state %v:", err)
 			}
 			clusterPolicyController.idx--
+		})
+	}
+}
+
+// TestApplyModeSelector verifies the render gate for the resource-allocation mode
+// nodeSelector: injected only when a GPUCluster exists AND every GPU node already carries
+// the mode label. It drives preProcessDaemonSet with a DaemonSet that has no per-operand
+// transformation (nvidia-kata-manager) to prove the injection covers that path too.
+func TestApplyModeSelector(t *testing.T) {
+	testCases := []struct {
+		description            string
+		gpuClusterExists       bool
+		allGPUNodesModeLabeled bool
+		expectSelector         bool
+	}{
+		{"no GPUCluster", false, true, false},
+		{"GPUCluster but unlabeled node", true, false, false},
+		{"GPUCluster and all nodes labeled", true, true, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			n := clusterPolicyController
+			n.gpuClusterExists = tc.gpuClusterExists
+			n.allGPUNodesModeLabeled = tc.allGPUNodesModeLabeled
+
+			ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "nvidia-kata-manager"}}
+			require.NoError(t, preProcessDaemonSet(ds, n))
+
+			if tc.expectSelector {
+				require.Equal(t, "device-plugin",
+					ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu-operator.resource-allocation.mode"])
+			} else {
+				require.NotContains(t, ds.Spec.Template.Spec.NodeSelector,
+					"nvidia.com/gpu-operator.resource-allocation.mode")
+			}
+		})
+	}
+}
+
+// TestDiscoverGPUNodesModeLabelGate verifies discoverGPUNodes reports whether every GPU node
+// carries the resource-allocation mode label; non-GPU nodes are ignored.
+func TestDiscoverGPUNodesModeLabelGate(t *testing.T) {
+	newNode := func(name string, labels map[string]string) *corev1.Node {
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+	}
+	gpuLabeled := map[string]string{
+		commonGPULabelKey: "true",
+		"nvidia.com/gpu-operator.resource-allocation.mode": "device-plugin",
+	}
+	gpuUnlabeled := map[string]string{commonGPULabelKey: "true"}
+	nonGPUUnlabeled := map[string]string{"kubernetes.io/os": "linux"}
+
+	testCases := []struct {
+		description string
+		nodes       []*corev1.Node
+		expected    bool
+	}{
+		{"all GPU nodes labeled", []*corev1.Node{newNode("a", gpuLabeled), newNode("b", gpuLabeled)}, true},
+		{"one GPU node unlabeled", []*corev1.Node{newNode("a", gpuLabeled), newNode("b", gpuUnlabeled)}, false},
+		{"non-GPU node without label ignored", []*corev1.Node{newNode("a", gpuLabeled), newNode("b", nonGPUUnlabeled)}, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cl := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			for _, node := range tc.nodes {
+				require.NoError(t, cl.Create(context.Background(), node))
+			}
+			n := ClusterPolicyController{
+				ctx:             context.Background(),
+				client:          cl,
+				logger:          clusterPolicyController.logger,
+				operatorMetrics: clusterPolicyController.operatorMetrics,
+			}
+			_, _, err := n.discoverGPUNodes()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, n.allGPUNodesModeLabeled)
 		})
 	}
 }

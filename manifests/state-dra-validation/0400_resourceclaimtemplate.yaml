@@ -1,0 +1,31 @@
+# The validator's GPU claim. adminAccess gives non-exclusive access to a GPU:
+# the claim never reserves the device, never reduces allocatable, and never
+# blocks on GPUs already in use by running workloads -- so the validator pod is
+# schedulable iff the DRA driver is up and publishing GPUs, regardless of node
+# load. ExactCount:1 (not All) keeps the blast radius to a single GPU; we only
+# need to prove the DRA driver can allocate+inject one working GPU.
+#
+# adminAccess requires the namespace to carry resource.kubernetes.io/admin-access:
+# "true" (gated by the DRAAdminAccess feature gate, beta/default-on in k8s 1.34).
+apiVersion: {{ .ResourceClaimAPIVersion }}
+kind: ResourceClaimTemplate
+metadata:
+  name: nvidia-dra-validator-gpu
+  namespace: {{ .Namespace }}
+spec:
+  spec:
+    devices:
+      requests:
+      - name: validation-gpu
+        {{- if ne .ResourceClaimAPIVersion "resource.k8s.io/v1beta1" }}
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          allocationMode: ExactCount
+          count: 1
+          adminAccess: true
+        {{- else }}
+        deviceClassName: gpu.nvidia.com
+        allocationMode: ExactCount
+        count: 1
+        adminAccess: true
+        {{- end }}

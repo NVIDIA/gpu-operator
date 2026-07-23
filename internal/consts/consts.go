@@ -70,6 +70,31 @@ const (
 	// NVIDIADriverOwnerLabel is an operator-managed node label used to route each GPU node to one NVIDIADriver.
 	NVIDIADriverOwnerLabel = "nvidia.com/gpu-operator.driver.owner"
 
+	// GPUAllocationModeLabelKey is a node label selecting which stack serves the node's GPUs:
+	// the device plugin (ClusterPolicy) or the DRA driver (GPUCluster). Once both stacks can
+	// coexist (a GPUCluster exists) and every GPU node carries the label, operand DaemonSets
+	// except the DRA kubelet-plugin carry it as a nodeSelector entry alongside their
+	// gpu.deploy.<operand> selector, so a node only ever runs operands of the stack it is
+	// labeled for; rendering the selector is deferred until then so that introducing it never
+	// de-schedules operands from nodes not yet labeled. The kubelet-plugin gates only on
+	// gpu.deploy.dra-driver, which the node-labeling controller removes last — after every
+	// claim-holding pod is gone — so claims can still be unprepared during a mode flip. The
+	// node-labeling controller writes the mode label once per GPU node and never overwrites
+	// an existing value.
+	GPUAllocationModeLabelKey = "nvidia.com/gpu-operator.resource-allocation.mode"
+	// GPUAllocationModeDevicePlugin selects the device-plugin (ClusterPolicy) stack for a node.
+	GPUAllocationModeDevicePlugin GPUAllocationMode = "device-plugin"
+	// GPUAllocationModeDRA selects the DRA (GPUCluster) stack for a node.
+	GPUAllocationModeDRA GPUAllocationMode = "dra"
+	// DefaultGPUAllocationModeEnvName is the operator environment variable holding the mode
+	// applied to GPU nodes that do not have the mode label yet, consulted when both a
+	// ClusterPolicy and a GPUCluster exist. It never overrides an existing label.
+	DefaultGPUAllocationModeEnvName = "DEFAULT_GPU_ALLOCATION_MODE"
+
 	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
 	MinimumGDSVersionForOpenRM = "v2.17.5"
 )
+
+// GPUAllocationMode is the value set of the GPUAllocationModeLabelKey node label and the
+// DEFAULT_GPU_ALLOCATION_MODE environment variable, selecting which stack serves a node's GPUs.
+type GPUAllocationMode string

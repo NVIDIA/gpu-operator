@@ -56,6 +56,13 @@ rules:
   verbs:
   - create
 - apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+  - list
+- apiGroups:
   - apps
   resources:
   - daemonsets
