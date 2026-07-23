@@ -376,3 +376,202 @@ UNKNOWN_FEATURE: true`,
 		})
 	}
 }
+
+// TestNormalizePCIAddress verifies that PCI addresses coming from nvidia-smi
+// (8-hex-digit domain, upper case) and go-nvlib (4-hex-digit domain, lower
+// case) normalize to the same key, since commitMIGMode joins the two sources on
+// this key to decide which GPU to reset.
+func TestNormalizePCIAddress(t *testing.T) {
+	testCases := []struct {
+		description string
+		address     string
+		want        string
+	}{
+		{
+			description: "nvidia-smi form with 8-digit domain",
+			address:     "00000000:41:00.0",
+			want:        "0000:41:00.0",
+		},
+		{
+			description: "go-nvlib form is unchanged",
+			address:     "0000:41:00.0",
+			want:        "0000:41:00.0",
+		},
+		{
+			description: "uppercase is lowercased",
+			address:     "0000:C1:00.0",
+			want:        "0000:c1:00.0",
+		},
+		{
+			description: "surrounding whitespace is trimmed",
+			address:     " 00000000:41:00.0 ",
+			want:        "0000:41:00.0",
+		},
+		{
+			description: "non-zero domain is preserved",
+			address:     "00010000:41:00.0",
+			want:        "10000:41:00.0",
+		},
+		{
+			description: "malformed input is passed through lowercased",
+			address:     "not-an-address",
+			want:        "not-an-address",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			require.Equal(t, tc.want, normalizePCIAddress(tc.address))
+		})
+	}
+}
+
+// TestParseMIGModes verifies parsing of the nvidia-smi MIG-mode CSV, including
+// address normalization, that malformed rows are skipped, and that only a
+// pending-but-uncommitted enable is flagged via needsCommit — the guard
+// commitMIGMode uses to decide whether a GPU reset is warranted.
+func TestParseMIGModes(t *testing.T) {
+	output := strings.Join([]string{
+		"00000000:41:00.0, Disabled, Enabled",
+		"00000000:C1:00.0, Enabled, Enabled",
+		"0000:81:00.0, Disabled, Disabled",
+		"0000:a1:00.0, [N/A], [N/A]",
+		"",
+		"malformed line without enough fields",
+	}, "\n")
+
+	modes := parseMIGModes(output)
+
+	require.Len(t, modes, 4)
+	require.Equal(t, migMode{current: "Disabled", pending: "Enabled"}, modes["0000:41:00.0"])
+	require.Equal(t, migMode{current: "Enabled", pending: "Enabled"}, modes["0000:c1:00.0"])
+	require.Equal(t, migMode{current: "Disabled", pending: "Disabled"}, modes["0000:81:00.0"])
+	require.Equal(t, migMode{current: "[N/A]", pending: "[N/A]"}, modes["0000:a1:00.0"])
+
+	// Only the GPU with a requested-but-not-applied enable needs a reset to
+	// commit; already-committed, disabled, and unsupported GPUs do not.
+	require.True(t, modes["0000:41:00.0"].needsCommit(), "pending enable, not yet current")
+	require.False(t, modes["0000:c1:00.0"].needsCommit(), "already enabled")
+	require.False(t, modes["0000:81:00.0"].needsCommit(), "disabled")
+	require.False(t, modes["0000:a1:00.0"].needsCommit(), "MIG not supported")
+}
+
+// TestMIGModeNeedsCommit exercises needsCommit directly across the value
+// combinations nvidia-smi can report, including case-insensitivity.
+func TestMIGModeNeedsCommit(t *testing.T) {
+	testCases := []struct {
+		description string
+		mode        migMode
+		want        bool
+	}{
+		{
+			description: "pending enable not yet committed",
+			mode:        migMode{current: "Disabled", pending: "Enabled"},
+			want:        true,
+		},
+		{
+			description: "already enabled",
+			mode:        migMode{current: "Enabled", pending: "Enabled"},
+			want:        false,
+		},
+		{
+			description: "no pending change while disabled",
+			mode:        migMode{current: "Disabled", pending: "Disabled"},
+			want:        false,
+		},
+		{
+			description: "pending disable is out of scope",
+			mode:        migMode{current: "Enabled", pending: "Disabled"},
+			want:        false,
+		},
+		{
+			description: "MIG unsupported",
+			mode:        migMode{current: "[N/A]", pending: "[N/A]"},
+			want:        false,
+		},
+		{
+			description: "case-insensitive match",
+			mode:        migMode{current: "disabled", pending: "enabled"},
+			want:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.mode.needsCommit())
+		})
+	}
+}
+
+// TestShouldResetForMIGCommit exercises the single decision point behind the
+// destructive GPU reset across the guard matrix, since a wrong combination
+// would either reset a GPU carrying a live workload or fail to recover MIG mode
+// after a reboot. A reset is warranted only for an uncommitted MIG-mode enable
+// on a GPU with no VFs and no running workload.
+func TestShouldResetForMIGCommit(t *testing.T) {
+	pendingEnable := migMode{current: "Disabled", pending: "Enabled"}
+
+	testCases := []struct {
+		description string
+		mode        migMode
+		numVFs      uint64
+		busy        bool
+		want        bool
+	}{
+		{
+			description: "uncommitted enable, no VFs, idle",
+			mode:        pendingEnable,
+			numVFs:      0,
+			busy:        false,
+			want:        true,
+		},
+		{
+			description: "VFs still enabled (vGPU VM attached)",
+			mode:        pendingEnable,
+			numVFs:      16,
+			busy:        false,
+			want:        false,
+		},
+		{
+			description: "running compute process",
+			mode:        pendingEnable,
+			numVFs:      0,
+			busy:        true,
+			want:        false,
+		},
+		{
+			description: "VFs enabled and busy",
+			mode:        pendingEnable,
+			numVFs:      16,
+			busy:        true,
+			want:        false,
+		},
+		{
+			description: "MIG already committed",
+			mode:        migMode{current: "Enabled", pending: "Enabled"},
+			numVFs:      0,
+			busy:        false,
+			want:        false,
+		},
+		{
+			description: "no pending MIG-mode change",
+			mode:        migMode{current: "Disabled", pending: "Disabled"},
+			numVFs:      0,
+			busy:        false,
+			want:        false,
+		},
+		{
+			description: "MIG unsupported",
+			mode:        migMode{current: "[N/A]", pending: "[N/A]"},
+			numVFs:      0,
+			busy:        false,
+			want:        false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			require.Equal(t, tc.want, shouldResetForMIGCommit(tc.mode, tc.numVFs, tc.busy))
+		})
+	}
+}

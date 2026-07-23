@@ -18,12 +18,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -136,6 +138,7 @@ var (
 	hostRootFlag                  string
 	driverInstallDirFlag          string
 	driverInstallDirCtrPathFlag   string
+	commitMIGModeWithResetFlag    bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -239,6 +242,10 @@ const (
 	shell = "sh"
 	// defaultVFWaitTimeout is the default timeout for waiting for VFs to be created
 	defaultVFWaitTimeout = 5 * time.Minute
+	// migModeEnabled is the value nvidia-smi reports for mig.mode.current and
+	// mig.mode.pending when MIG mode is enabled (the other values being
+	// "Disabled" and "[N/A]" for GPUs that do not support MIG).
+	migModeEnabled = "Enabled"
 	// constants for driver components
 	GDRCOPY       = "gdrcopy"
 	NVIDIAFS      = "nvidia-fs"
@@ -384,6 +391,17 @@ func main() {
 			Usage:       "the path where the NVIDIA driver install dir is mounted in the container",
 			Destination: &driverInstallDirCtrPathFlag,
 			Sources:     cli.EnvVars("DRIVER_INSTALL_DIR_CTR_PATH"),
+		},
+		&cli.BoolFlag{
+			Name:  "commit-mig-mode-with-gpu-reset",
+			Value: false,
+			Usage: "on the vGPU (sandbox) workload path, commit a pending-but-uncommitted MIG-mode enable " +
+				"by performing a targeted GPU reset (nvidia-smi --gpu-reset) during vGPU Manager validation. " +
+				"This is destructive: it resets the GPU. It only acts on GPUs that have an uncommitted MIG-mode " +
+				"enable, no SR-IOV VFs enabled, and no running compute processes, so it is a no-op except right " +
+				"after a reboot before any VM is running. Disabled by default.",
+			Destination: &commitMIGModeWithResetFlag,
+			Sources:     cli.EnvVars("COMMIT_MIG_MODE_WITH_GPU_RESET"),
 		},
 	}
 
@@ -1767,6 +1785,18 @@ func (v *VGPUManager) validate() error {
 		return err
 	}
 
+	// A MIG-mode change requested on the vGPU path (e.g. by the MIG manager)
+	// is not applied until the GPU is reset, and neither the MIG mode nor the
+	// SR-IOV VFs survive a node reboot. Commit the pending MIG-mode change here
+	// via a targeted GPU reset so MIG-backed vGPU devices can be created again,
+	// before the VFs are (re-)established and waited for. This is opt-in and
+	// best-effort: it is disabled by default, and on failure we fall through,
+	// preserving the prior behavior for setups that commit MIG mode and create
+	// VFs out-of-band (e.g. host systemd units).
+	if err := commitMIGMode(hostDriver); err != nil {
+		log.Warnf("Unable to commit MIG mode via GPU reset, continuing: %v", err)
+	}
+
 	log.Info("Waiting for VFs to be available...")
 	if err := waitForVFs(ctx, defaultVFWaitTimeout); err != nil {
 		return fmt.Errorf("vGPU Manager VFs not ready: %w", err)
@@ -1801,6 +1831,201 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	}
 
 	return hostDriver, runCommand(command, args, silent)
+}
+
+// migMode holds the current and pending MIG-mode state of a single GPU as
+// reported by nvidia-smi (each being "Enabled", "Disabled", or "[N/A]").
+type migMode struct {
+	current string
+	pending string
+}
+
+// needsCommit reports whether the GPU has a MIG-mode enable that has been
+// requested (pending) but not yet applied (current). This is the state a GPU
+// reset resolves: the MIG manager can set MIG mode to Enabled, but the change
+// only takes effect after the GPU is reset. It deliberately covers only the
+// enable direction, which is what MIG-backed vGPU requires after a reboot.
+func (m migMode) needsCommit() bool {
+	return strings.EqualFold(m.pending, migModeEnabled) && !strings.EqualFold(m.current, migModeEnabled)
+}
+
+// shouldResetForMIGCommit reports whether a GPU should be reset to commit a
+// pending MIG-mode change, given its observed state. It is the single decision
+// point behind the destructive reset in commitMIGMode. A reset is warranted
+// only when all of the following hold:
+//
+//   - the MIG-mode enable is requested but not yet applied (needsCommit);
+//   - no SR-IOV VFs are enabled — VFs do not survive a reboot, so a GPU with
+//     VFs still has a vGPU VM attached, and SR-IOV must be disabled for the
+//     reset to succeed;
+//   - no workload is running on the GPU.
+func shouldResetForMIGCommit(mode migMode, numVFs uint64, busy bool) bool {
+	return mode.needsCommit() && numVFs == 0 && !busy
+}
+
+// normalizePCIAddress lowercases a PCI address and normalizes its domain to
+// four hex digits so addresses from nvidia-smi (e.g. "00000000:41:00.0") and
+// go-nvlib (e.g. "0000:41:00.0") compare equal.
+func normalizePCIAddress(address string) string {
+	address = strings.ToLower(strings.TrimSpace(address))
+	domain, rest, found := strings.Cut(address, ":")
+	if !found {
+		return address
+	}
+	value, err := strconv.ParseUint(domain, 16, 32)
+	if err != nil {
+		return address
+	}
+	return fmt.Sprintf("%04x:%s", value, rest)
+}
+
+// parseMIGModes parses the CSV output of
+// 'nvidia-smi --query-gpu=pci.bus_id,mig.mode.current,mig.mode.pending
+// --format=csv,noheader' into a map keyed by normalized PCI address. Lines that
+// do not have exactly three fields (e.g. blank lines) are skipped.
+func parseMIGModes(output string) map[string]migMode {
+	modes := make(map[string]migMode)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ",")
+		if len(fields) != 3 {
+			continue
+		}
+		address := normalizePCIAddress(fields[0])
+		modes[address] = migMode{
+			current: strings.TrimSpace(fields[1]),
+			pending: strings.TrimSpace(fields[2]),
+		}
+	}
+	return modes
+}
+
+// vgpuDriverRoot returns the root to chroot into to run the vGPU Manager driver
+// tooling (nvidia-smi): the host root when the driver is pre-installed on the
+// host, or the containerized driver install dir otherwise. It mirrors the
+// driver-root resolution used elsewhere in vGPU Manager validation.
+func vgpuDriverRoot(hostDriver bool) string {
+	if hostDriver {
+		return "/host"
+	}
+	return defaultDriverInstallDir
+}
+
+// queryMIGModes returns the MIG-mode state of every GPU, keyed by normalized
+// PCI address, by invoking nvidia-smi inside the driver root.
+func queryMIGModes(driverRoot string) (map[string]migMode, error) {
+	args := []string{
+		driverRoot, "nvidia-smi",
+		"--query-gpu=pci.bus_id,mig.mode.current,mig.mode.pending",
+		"--format=csv,noheader",
+	}
+	out, err := exec.Command("chroot", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("error querying MIG mode: %w", err)
+	}
+	return parseMIGModes(string(out)), nil
+}
+
+// gpuHasRunningProcesses reports whether the GPU at the given PCI address has
+// any running compute processes, so a GPU carrying an active workload is never
+// reset. It is a fast-path guard covering compute clients; 'nvidia-smi
+// --gpu-reset' independently refuses to reset a GPU that is in use, so it is
+// the authoritative safety net for clients this query does not enumerate. On
+// query error it returns the error, and the caller treats the GPU as busy
+// (fail-closed) so an uncertain GPU is left untouched.
+func gpuHasRunningProcesses(driverRoot, address string) (bool, error) {
+	args := []string{
+		driverRoot, "nvidia-smi",
+		"-i", address,
+		"--query-compute-apps=pid",
+		"--format=csv,noheader",
+	}
+	out, err := exec.Command("chroot", args...).Output()
+	if err != nil {
+		return false, fmt.Errorf("error querying running processes: %w", err)
+	}
+	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// commitMIGMode commits a pending-but-uncommitted MIG-mode enable on the vGPU
+// (sandbox) workload path by performing a targeted GPU reset, so MIG-backed
+// vGPU devices can be created after a node reboot without a host-side unit
+// doing the reset.
+//
+// The reset (nvidia-smi --gpu-reset) is destructive: it resets the GPU and
+// tears down anything running on it. It is therefore tightly gated. It runs
+// only when explicitly enabled (commit-mig-mode-with-gpu-reset, off by
+// default), and only resets a GPU that all of the following hold for:
+//
+//   - the caller is on the vGPU path — commitMIGMode is reached only from
+//     VGPUManager.validate(), which early-returns for other workloads;
+//   - the GPU has a MIG-mode enable that is requested but not yet applied
+//     (mig.mode.pending == Enabled, mig.mode.current != Enabled);
+//   - the GPU has no SR-IOV VFs enabled — VFs do not survive a reboot, so a GPU
+//     with VFs still has a vGPU VM attached; a GPU reset also requires SR-IOV to
+//     be disabled first;
+//   - the GPU has no running compute processes.
+//
+// In the steady state (MIG already committed, or VFs/VMs present) it is a
+// no-op. It is best-effort: reset failures are aggregated and returned, and the
+// caller logs and continues so out-of-band setups keep working.
+func commitMIGMode(hostDriver bool) error {
+	if !commitMIGModeWithResetFlag {
+		return nil
+	}
+
+	gpus, err := nvpci.New().GetGPUs()
+	if err != nil {
+		return fmt.Errorf("error getting GPUs: %w", err)
+	}
+
+	driverRoot := vgpuDriverRoot(hostDriver)
+	migModes, err := queryMIGModes(driverRoot)
+	if err != nil {
+		return err
+	}
+
+	var resetErrs []error
+	for _, gpu := range gpus {
+		address := normalizePCIAddress(gpu.Address)
+
+		mode, ok := migModes[address]
+		if !ok || !mode.needsCommit() {
+			continue
+		}
+
+		// A GPU with VFs still enabled has a vGPU VM attached (VFs do not
+		// survive a reboot), and a GPU reset requires SR-IOV to be disabled.
+		var numVFs uint64
+		if gpu.SriovInfo.IsPF() {
+			numVFs = gpu.SriovInfo.PhysicalFunction.NumVFs
+		}
+		if numVFs > 0 {
+			log.Warnf("Skipping GPU reset on %s: %d SR-IOV VF(s) still enabled", gpu.Address, numVFs)
+			continue
+		}
+
+		busy, err := gpuHasRunningProcesses(driverRoot, gpu.Address)
+		if err != nil {
+			log.Warnf("Skipping GPU reset on %s: unable to confirm it is idle: %v", gpu.Address, err)
+			continue
+		}
+
+		if !shouldResetForMIGCommit(mode, numVFs, busy) {
+			log.Warnf("Skipping GPU reset on %s: running compute processes present", gpu.Address)
+			continue
+		}
+
+		log.Infof("Committing pending MIG-mode change on GPU %s via targeted GPU reset", gpu.Address)
+		if err := runCommand("chroot", []string{driverRoot, "nvidia-smi", "-i", gpu.Address, "--gpu-reset"}, false); err != nil {
+			resetErrs = append(resetErrs, fmt.Errorf("gpu %s: %w", gpu.Address, err))
+		}
+	}
+
+	return errors.Join(resetErrs...)
 }
 
 // waitForVFs waits for Virtual Functions to be created on all NVIDIA GPUs.
