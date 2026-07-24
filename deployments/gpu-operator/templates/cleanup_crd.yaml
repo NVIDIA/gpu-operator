@@ -30,6 +30,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.operator.nodeSelector | nindent 8 }}
+      {{- else }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      {{- end }}
       containers:
         - name: cleanup-crd
           image: {{ include "gpu-operator.fullimage" . }}
