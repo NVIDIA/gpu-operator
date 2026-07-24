@@ -17,6 +17,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"hash"
 	"hash/fnv"
@@ -29,6 +30,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -162,4 +165,16 @@ func WriteFileAtomically(path, content string) error {
 		return fmt.Errorf("error moving temporary file to %q: %w", path, err)
 	}
 	return nil
+}
+
+// EnsureFinalizer adds a finalizer to an object that has not been marked for deletion.
+// It is idempotent and returns an error only if an attempt to add the finalizer has failed.
+func EnsureFinalizer(ctx context.Context, c client.Client, o client.Object, finalizer string) error {
+	if !o.GetDeletionTimestamp().IsZero() || controllerutil.ContainsFinalizer(o, finalizer) {
+		return nil
+	}
+
+	original := o.DeepCopyObject().(client.Object)
+	controllerutil.AddFinalizer(o, finalizer)
+	return c.Patch(ctx, o, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{}))
 }

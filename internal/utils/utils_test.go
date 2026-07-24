@@ -17,10 +17,16 @@
 package utils
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func TestGetObjectHash(t *testing.T) {
@@ -189,4 +195,52 @@ func TestGetStringHash(t *testing.T) {
 		actual := GetStringHash(tc.input)
 		assert.Equal(t, tc.expected, actual)
 	}
+}
+
+func TestEnsureFinalizer(t *testing.T) {
+	const testFinalizer = "test.io/finalizer"
+
+	s := scheme.Scheme
+
+	newObj := func(name string, finalizers ...string) *corev1.ConfigMap {
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       "default",
+				ResourceVersion: "1",
+				Finalizers:      finalizers,
+			},
+		}
+	}
+
+	t.Run("adds finalizer when not present", func(t *testing.T) {
+		obj := newObj("obj")
+		c := fake.NewClientBuilder().WithScheme(s).WithObjects(obj).Build()
+
+		err := EnsureFinalizer(context.Background(), c, obj, testFinalizer)
+		assert.NoError(t, err)
+		assert.True(t, controllerutil.ContainsFinalizer(obj, testFinalizer))
+	})
+
+	t.Run("no-op when finalizer already present", func(t *testing.T) {
+		obj := newObj("obj", testFinalizer)
+		// object not registered in client — Patch would fail if reached
+		c := fake.NewClientBuilder().WithScheme(s).Build()
+
+		err := EnsureFinalizer(context.Background(), c, obj, testFinalizer)
+		assert.NoError(t, err)
+		assert.True(t, controllerutil.ContainsFinalizer(obj, testFinalizer))
+	})
+
+	t.Run("no-op when object is being deleted", func(t *testing.T) {
+		now := metav1.Now()
+		obj := newObj("obj")
+		obj.DeletionTimestamp = &now
+		// object not registered in client — Patch would fail if reached
+		c := fake.NewClientBuilder().WithScheme(s).Build()
+
+		err := EnsureFinalizer(context.Background(), c, obj, testFinalizer)
+		assert.NoError(t, err)
+		assert.False(t, controllerutil.ContainsFinalizer(obj, testFinalizer))
+	})
 }
