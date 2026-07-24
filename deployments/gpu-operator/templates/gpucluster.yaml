@@ -10,6 +10,8 @@ metadata:
   # keep helm from also deleting it.
   annotations:
     "helm.sh/resource-policy": keep
+  finalizers:
+  - gpucluster.nvidia.com/dra-resourceclaim
 spec:
   draDriver:
     {{- if .Values.draDriver.repository }}

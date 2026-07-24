@@ -158,7 +158,10 @@ metadata:
           "apiVersion": "nvidia.com/v1alpha1",
           "kind": "GPUCluster",
           "metadata": {
-            "name": "gpu-cluster"
+            "name": "gpu-cluster",
+            "finalizers": [
+              "gpucluster.nvidia.com/dra-resourceclaim"
+            ]
           },
           "spec": {
             "draDriver": {
