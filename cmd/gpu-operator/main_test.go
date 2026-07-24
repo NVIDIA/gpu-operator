@@ -135,3 +135,77 @@ func TestGPUPodSpecFilterResourceClaims(t *testing.T) {
 		})
 	}
 }
+
+func resourcePod(phase corev1.PodPhase, containers ...corev1.Container) corev1.Pod {
+	return corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"},
+		Spec:       corev1.PodSpec{Containers: containers},
+		Status:     corev1.PodStatus{Phase: phase},
+	}
+}
+
+func gpuContainer(limits, requests corev1.ResourceList) corev1.Container {
+	return corev1.Container{Resources: corev1.ResourceRequirements{Limits: limits, Requests: requests}}
+}
+
+// TestGPUPodSpecFilterResourceList covers the container resource-list branch of
+// gpuPodSpecFilter (nvidia.com/gpu and nvidia.com/mig- in a container's
+// limits/requests, plus the Running/Pending phase gate). The sibling
+// TestGPUPodSpecFilterResourceClaims only exercises the DRA/ResourceClaims
+// branch, leaving this branch uncovered.
+//
+// gpuPodSpecFilter returns true when a pod should be treated as a GPU pod, so
+// each case's wantGPUPod field states the expected classification.
+func TestGPUPodSpecFilterResourceList(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(scheme))
+
+	testCases := []struct {
+		name       string
+		pod        corev1.Pod
+		wantGPUPod bool
+	}{
+		{
+			name:       "running pod requesting nvidia.com/gpu in limits -> GPU pod",
+			pod:        resourcePod(corev1.PodRunning, gpuContainer(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: true,
+		},
+		{
+			name:       "pending pod requesting nvidia.com/gpu in requests -> GPU pod",
+			pod:        resourcePod(corev1.PodPending, gpuContainer(nil, corev1.ResourceList{"nvidia.com/gpu": {}})),
+			wantGPUPod: true,
+		},
+		{
+			name:       "running pod requesting an nvidia.com/mig- resource -> GPU pod",
+			pod:        resourcePod(corev1.PodRunning, gpuContainer(corev1.ResourceList{"nvidia.com/mig-1g.5gb": {}}, nil)),
+			wantGPUPod: true,
+		},
+		{
+			name: "running pod where only a later container requests a gpu -> GPU pod",
+			pod: resourcePod(corev1.PodRunning,
+				gpuContainer(corev1.ResourceList{"cpu": {}}, nil),
+				gpuContainer(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: true,
+		},
+		{
+			name:       "running pod requesting only cpu/memory -> not a GPU pod",
+			pod:        resourcePod(corev1.PodRunning, gpuContainer(corev1.ResourceList{"cpu": {}, "memory": {}}, nil)),
+			wantGPUPod: false,
+		},
+		{
+			name:       "succeeded pod requesting a gpu -> not a GPU pod (phase gate rejects it)",
+			pod:        resourcePod(corev1.PodSucceeded, gpuContainer(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+			gotGPUPod := gpuPodSpecFilter(t.Context(), c)(tc.pod)
+
+			require.Equal(t, tc.wantGPUPod, gotGPUPod)
+		})
+	}
+}
