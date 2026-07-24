@@ -584,7 +584,7 @@ gpuCluster:
 draDriver:
   repository: registry.k8s.io/dra-driver-nvidia
   image: dra-driver-nvidia-gpu
-  version: v0.4.0
+  version: v0.4.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   # featureGates toggles DRA driver feature gates; rendered as FEATURE_GATES.
