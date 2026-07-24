@@ -2628,15 +2628,26 @@ func getContainerEnv(c *corev1.Container, key string) string {
 }
 
 func setContainerEnv(c *corev1.Container, key, value string) {
-	for i, val := range c.Env {
-		if val.Name != key {
+	for index := 0; index < len(c.Env); index++ {
+		if c.Env[index].Name != key {
 			continue
 		}
 
-		c.Env[i].Value = value
+		c.Env[index].Value = value
+		c.Env = append(c.Env[:index+1], removeDuplicateEnvVars(c.Env[index+1:], key)...)
 		return
 	}
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
+}
+
+func removeDuplicateEnvVars(env []corev1.EnvVar, key string) []corev1.EnvVar {
+	result := env[:0]
+	for _, variable := range env {
+		if variable.Name != key {
+			result = append(result, variable)
+		}
+	}
+	return result
 }
 
 // findContainerByName returns a pointer to the container with the given name, or nil if not found.

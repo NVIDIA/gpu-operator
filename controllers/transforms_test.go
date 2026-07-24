@@ -1353,6 +1353,37 @@ func TestTransformDCGMExporter(t *testing.T) {
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostPID(true),
 		},
 		{
+			description: "transform dcgm exporter overrides kubernetes environment variable",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{
+					Name: "dcgm-exporter",
+					Env: []corev1.EnvVar{
+						{Name: "DCGM_EXPORTER_KUBERNETES", Value: "true"},
+						{Name: "DCGM_EXPORTER_KUBERNETES", Value: "false"},
+					},
+				}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "dcgm-exporter",
+					Version:    "v1.0.0",
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_EXPORTER_KUBERNETES", Value: "false"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_EXPORTER_KUBERNETES", Value: "false"},
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithRuntimeClassName("nvidia"),
+		},
+		{
 			description: "transform dcgm exporter with hostPID disabled",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
