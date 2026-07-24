@@ -171,14 +171,6 @@ rules:
   - resource.nvidia.com
   resources:
   - computedomains
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - resource.nvidia.com
-  resources:
   - computedomains/status
   verbs:
   - get
