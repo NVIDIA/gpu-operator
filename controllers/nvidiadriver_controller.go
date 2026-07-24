@@ -240,6 +240,14 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *NVIDIADriverReconciler) updateCrStatus(
 	ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, status state.Results) error {
 	reqLogger := log.FromContext(ctx)
+	desiredState := nvidiav1alpha1.State(status.Status)
+
+	// Keep the reconcile object in sync with the status about to be persisted.
+	// The condition updater is invoked immediately after this function and uses
+	// cr.Status.State when writing an error condition. Without this assignment,
+	// it can overwrite the new state with the value that was present when this
+	// reconcile started.
+	cr.Status.State = desiredState
 
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &nvidiav1alpha1.NVIDIADriver{}
@@ -250,10 +258,10 @@ func (r *NVIDIADriverReconciler) updateCrStatus(
 	}
 
 	// Update global State
-	if instance.Status.State == nvidiav1alpha1.State(status.Status) {
+	if instance.Status.State == desiredState {
 		return nil
 	}
-	instance.Status.State = nvidiav1alpha1.State(status.Status)
+	instance.Status.State = desiredState
 
 	// send status update request to k8s API
 	reqLogger.V(consts.LogLevelInfo).Info("Updating CR Status", "Status", instance.Status)
