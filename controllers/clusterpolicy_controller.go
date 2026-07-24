@@ -19,7 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -146,6 +148,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	clusterPolicyCtrl.operatorMetrics.reconciliationTotal.Inc()
 	overallStatus := gpuv1.Ready
 	statesNotReady := []string{}
+	notReadyReasons := []string{}
 	for {
 		status, statusError := clusterPolicyCtrl.step()
 		if statusError != nil {
@@ -171,12 +174,31 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	if clusterPolicyCtrl.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
+		upgradeInProgress, err := r.nvidiaDriverUpgradeIncomplete(ctx)
+		if err != nil {
+			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
+			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Failed to determine NVIDIADriver upgrade state: %s", err)); condErr != nil {
+				r.Log.Error(condErr, "failed to set condition")
+			}
+			return ctrl.Result{}, err
+		}
+		if upgradeInProgress {
+			overallStatus = gpuv1.NotReady
+			notReadyReasons = append(notReadyReasons,
+				"NVIDIADriver upgrade has not completed",
+				"one or more NVIDIADriver-owned Nodes are marked pending, in-progress, or failed",
+			)
+		}
+	}
+
 	// if any state is not ready, requeue for reconcile after 5 seconds
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 
-		err := fmt.Errorf("ClusterPolicy is not ready, states not ready: %v", statesNotReady)
+		err := fmt.Errorf("%s", clusterPolicyNotReadyMessage(statesNotReady, notReadyReasons))
 		r.Log.Error(err, "ClusterPolicy not yet ready")
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, err.Error()); condErr != nil {
@@ -225,6 +247,52 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+// clusterPolicyNotReadyMessage formats a condition message with operand states and additional not-ready reasons.
+func clusterPolicyNotReadyMessage(statesNotReady, notReadyReasons []string) string {
+	messageParts := []string{"ClusterPolicy is not ready"}
+	if len(statesNotReady) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("states not ready: %v", statesNotReady))
+	}
+	messageParts = append(messageParts, notReadyReasons...)
+	return strings.Join(messageParts, "; ")
+}
+
+// nvidiaDriverUpgradeIncomplete reports whether any NVIDIADriver-owned Node has a pending, active, or failed upgrade.
+func (r *ClusterPolicyReconciler) nvidiaDriverUpgradeIncomplete(ctx context.Context) (bool, error) {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.HasLabels{consts.NVIDIADriverOwnerLabel}); err != nil {
+		return false, fmt.Errorf("failed to list nodes for NVIDIADriver upgrade state: %w", err)
+	}
+
+	for _, node := range nodes.Items {
+		if isIncompleteDriverUpgradeState(node.Labels[upgrade.GetUpgradeStateLabelKey()]) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// isIncompleteDriverUpgradeState reports whether a Node upgrade state keeps the aggregate driver rollout incomplete.
+func isIncompleteDriverUpgradeState(state string) bool {
+	switch state {
+	case upgrade.UpgradeStateUpgradeRequired,
+		upgrade.UpgradeStateCordonRequired,
+		upgrade.UpgradeStateWaitForJobsRequired,
+		upgrade.UpgradeStatePodDeletionRequired,
+		upgrade.UpgradeStateDrainRequired,
+		upgrade.UpgradeStateNodeMaintenanceRequired,
+		upgrade.UpgradeStatePostMaintenanceRequired,
+		upgrade.UpgradeStatePodRestartRequired,
+		upgrade.UpgradeStateValidationRequired,
+		upgrade.UpgradeStateUncordonRequired,
+		upgrade.UpgradeStateFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
