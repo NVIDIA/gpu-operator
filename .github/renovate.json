@@ -145,6 +145,13 @@
       "versioning": "loose"
     },
     {
+      "description": "Keep only the base GDS version as the OS suffix is added at runtime",
+      "matchFileNames": ["deployments/gpu-operator/values.yaml"],
+      "matchPackageNames": ["nvcr.io/nvidia/cloud-native/nvidia-fs"],
+      "extractVersion": "^(?<version>v?\\d+\\.\\d+(?:\\.\\d+)?)(?:-.*)?$",
+      "versioning": "loose"
+    },
+    {
       "matchFileNames": ["bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"],
       "matchPackageNames": ["nvcr.io/nvidia/cloud-native/gdrdrv"],
       "enabled": false
