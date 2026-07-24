@@ -2671,6 +2671,182 @@ data:
             - devices: all
               vgpu-devices:
                 V100-16Q: 1
+        6000D-1-42CGFX:
+            - devices: all
+              vgpu-devices:
+                6000D-1-42CGFX: 2
+        6000D-1-42QGFX:
+            - devices: all
+              vgpu-devices:
+                6000D-1-42QGFX: 2
+        6000D-2-84CGFX:
+            - devices: all
+              vgpu-devices:
+                6000D-2-84CGFX: 1
+        6000D-2-84QGFX:
+            - devices: all
+              vgpu-devices:
+                6000D-2-84QGFX: 1
+        B300X-1-34C:
+            - devices: all
+              vgpu-devices:
+                B300X-1-34C: 7
+        B300X-1-34CME:
+            - devices: all
+              vgpu-devices:
+                B300X-1-34CME: 1
+        B300X-1-67C:
+            - devices: all
+              vgpu-devices:
+                B300X-1-67C: 4
+        B300X-2-67C:
+            - devices: all
+              vgpu-devices:
+                B300X-2-67C: 3
+        B300X-3-135C:
+            - devices: all
+              vgpu-devices:
+                B300X-3-135C: 2
+        B300X-4-135C:
+            - devices: all
+              vgpu-devices:
+                B300X-4-135C: 1
+        B300X-7-269C:
+            - devices: all
+              vgpu-devices:
+                B300X-7-269C: 1
+        B300X-269C:
+            - devices: all
+              vgpu-devices:
+                B300X-269C: 1
+        DC-1-2QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-2QGFX: 48
+        DC-1-3QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-3QGFX: 32
+        DC-1-4QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-4QGFX: 24
+        DC-1-6QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-6QGFX: 16
+        DC-1-8CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-8CGFX: 12
+        DC-1-8QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-8QGFX: 12
+        DC-1-12CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-12CGFX: 8
+        DC-1-12QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-12QGFX: 8
+        DC-1-16C:
+            - devices: all
+              vgpu-devices:
+                DC-1-16C: 2
+        DC-1-16Q:
+            - devices: all
+              vgpu-devices:
+                DC-1-16Q: 2
+        DC-1-24CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-24CGFX: 4
+        DC-1-24QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-1-24QGFX: 4
+        DC-2-8C:
+            - devices: all
+              vgpu-devices:
+                DC-2-8C: 4
+        DC-2-8Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-8Q: 4
+        DC-2-12CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-12CGFX: 8
+        DC-2-12QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-12QGFX: 8
+        DC-2-16CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-16CGFX: 6
+        DC-2-16QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-16QGFX: 6
+        DC-2-24CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-24CGFX: 4
+        DC-2-24QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-24QGFX: 4
+        DC-2-32C:
+            - devices: all
+              vgpu-devices:
+                DC-2-32C: 1
+        DC-2-32Q:
+            - devices: all
+              vgpu-devices:
+                DC-2-32Q: 1
+        DC-2-48CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-48CGFX: 2
+        DC-2-48QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-2-48QGFX: 2
+        DC-4-24CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-24CGFX: 4
+        DC-4-24QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-24QGFX: 4
+        DC-4-32CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-32CGFX: 3
+        DC-4-32QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-32QGFX: 3
+        DC-4-48CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-48CGFX: 2
+        DC-4-48QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-48QGFX: 2
+        DC-4-96CGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-96CGFX: 1
+        DC-4-96QGFX:
+            - devices: all
+              vgpu-devices:
+                DC-4-96QGFX: 1
         default:
             - device-filter: "0x1DB110DE"
               devices: all
@@ -2888,3 +3064,11 @@ data:
               devices: all
               vgpu-devices:
                 6000D-84Q: 1
+            - device-filter: "0x2C3A10DE"
+              devices: all
+              vgpu-devices:
+                DC-16Q: 2
+            - device-filter: "0x318210DE"
+              devices: all
+              vgpu-devices:
+                B300X-269C: 1
