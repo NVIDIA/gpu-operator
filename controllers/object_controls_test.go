@@ -2579,3 +2579,62 @@ func TestDriverPrecompiledLibModulesSuse(t *testing.T) {
 		})
 	}
 }
+
+// TestGDRCopyResolveDriverTag tests that resolveDriverTag returns the correct
+// image path for GDRCopy in both non-precompiled and precompiled modes.
+func TestGDRCopyResolveDriverTag(t *testing.T) {
+	const (
+		repo    = "nvcr.io/nvidia/cloud-native"
+		image   = "gdrdrv"
+		version = "v2.5.2"
+		kernel  = "5.4.0-150-generic"
+		osTag   = "ubuntu22.04"
+	)
+
+	n := ClusterPolicyController{
+		currentKernelVersion: kernel,
+		gpuNodeOSTag:         osTag,
+		singleton:            &gpuv1.ClusterPolicy{},
+	}
+
+	t.Run("non-precompiled", func(t *testing.T) {
+		spec := &gpuv1.GDRCopySpec{Repository: repo, Image: image, Version: version}
+		got, err := resolveDriverTag(n, spec)
+		require.NoError(t, err)
+		require.Equal(t, repo+"/"+image+":"+version+"-"+osTag, got)
+	})
+
+	t.Run("precompiled", func(t *testing.T) {
+		spec := &gpuv1.GDRCopySpec{Repository: repo, Image: image, Version: version, UsePrecompiled: ptr.To(true)}
+		got, err := resolveDriverTag(n, spec)
+		require.NoError(t, err)
+		require.Equal(t, repo+"/"+image+":"+version+"-"+kernel+"-"+osTag, got)
+	})
+}
+
+// TestGDRCopyPrecompiledDriverIncompatibility tests that enabling precompiled
+// drivers without enabling precompiled GDRCopy returns an error.
+func TestGDRCopyPrecompiledDriverIncompatibility(t *testing.T) {
+	cp := getDriverTestInput("precompiled")
+	enabled := true
+	cp.Spec.GDRCopy = &gpuv1.GDRCopySpec{
+		Enabled:        &enabled,
+		Repository:     "nvcr.io/nvidia/cloud-native",
+		Image:          "gdrdrv",
+		Version:        "v2.5.2",
+		UsePrecompiled: ptr.To(false),
+	}
+
+	err := updateClusterPolicy(&clusterPolicyController, cp)
+	require.NoError(t, err)
+
+	addState(&clusterPolicyController, filepath.Join(cfg.root, driverAssetsPath))
+	// step() returns an error without incrementing idx, so the state is still at idx
+	defer func() {
+		_ = removeState(&clusterPolicyController, clusterPolicyController.idx)
+	}()
+
+	_, err = clusterPolicyController.step()
+	require.Error(t, err, "expected error when driver is precompiled but GDRCopy is not")
+	require.Contains(t, err.Error(), "GDRCopy is not supported")
+}

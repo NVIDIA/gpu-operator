@@ -623,13 +623,23 @@ func getGDSSpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdsDrive
 	}, nil
 }
 
+func getGDRCopyImagePath(spec *nvidiav1alpha1.GDRCopySpec, pool nodePool) (string, error) {
+	os := pool.osTag
+
+	if spec.UsePrecompiledDrivers() {
+		return spec.GetPrecompiledImagePath(os, pool.kernel)
+	}
+
+	return spec.GetImagePath(os)
+}
+
 func getGDRCopySpec(spec *nvidiav1alpha1.NVIDIADriverSpec, pool nodePool) (*gdrcopyDriverSpec, error) {
 	if spec == nil || !spec.IsGDRCopyEnabled() {
 		// note: GDRCopy is optional in the NvidiaDriver CRD
 		return nil, nil
 	}
 	gdrcopySpec := spec.GDRCopy
-	imagePath, err := gdrcopySpec.GetImagePath(pool.osTag)
+	imagePath, err := getGDRCopyImagePath(gdrcopySpec, pool)
 	if err != nil {
 		return nil, err
 	}

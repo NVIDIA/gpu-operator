@@ -3086,8 +3086,8 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			obj.Spec.Template.Spec.Containers = append(obj.Spec.Template.Spec.Containers[:i], obj.Spec.Template.Spec.Containers[i+1:]...)
 			return nil
 		}
-		if config.Driver.UsePrecompiledDrivers() {
-			return fmt.Errorf("GDRCopy is not supported along with pre-compiled NVIDIA drivers")
+		if config.Driver.UsePrecompiledDrivers() && !config.GDRCopy.UsePrecompiledDrivers() {
+			return fmt.Errorf("GDRCopy is not supported along with pre-compiled NVIDIA drivers unless gdrcopy.usePrecompiled is also enabled")
 		}
 
 		gdrcopyContainer := &obj.Spec.Template.Spec.Containers[i]
@@ -3371,9 +3371,14 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 		}
 	case *gpuv1.GDRCopySpec:
 		spec := driverSpec.(*gpuv1.GDRCopySpec)
-		image, err = gpuv1.ImagePath(spec)
-		if err != nil {
-			return "", err
+		if spec.UsePrecompiledDrivers() {
+			// use per kernel version tag
+			image = spec.Repository + "/" + spec.Image + ":" + spec.Version + "-" + n.currentKernelVersion
+		} else {
+			image, err = gpuv1.ImagePath(spec)
+			if err != nil {
+				return "", err
+			}
 		}
 	default:
 		return "", fmt.Errorf("invalid type to construct image path: %v", v)
