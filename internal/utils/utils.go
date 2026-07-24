@@ -50,6 +50,9 @@ func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 		for _, s := range suffixes {
 			if strings.HasSuffix(base, s) {
 				files = append(files, path)
+				// Stop at the first matching suffix so a file that matches
+				// more than one of the provided suffixes is returned only once.
+				break
 			}
 		}
 		return nil
@@ -78,6 +81,10 @@ func GetObjectHash(obj interface{}) string {
 // GetObjectHashIgnoreEmptyKeys returns an FNV-32a hash of only the non-zero
 // fields of a struct. Adding a new zero-valued field will not change
 // the digest. Embedded structs are flattened.
+//
+// obj must be a struct or a pointer to a struct. Passing any other kind
+// (map, slice, scalar) or a nil pointer will panic, since only struct fields
+// can be enumerated.
 func GetObjectHashIgnoreEmptyKeys(obj interface{}) string {
 	hasher := fnv.New32a()
 	hashNonZeroFields(hasher, reflect.Indirect(reflect.ValueOf(obj)))
@@ -118,9 +125,8 @@ func hashNonZeroFields(h hash.Hash32, v reflect.Value) {
 
 func GetStringHash(s string) string {
 	hasher := fnv.New32a()
-	if _, err := hasher.Write([]byte(s)); err != nil {
-		panic(err)
-	}
+	// hash.Hash's Write never returns an error, per its documented contract.
+	_, _ = hasher.Write([]byte(s))
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
 

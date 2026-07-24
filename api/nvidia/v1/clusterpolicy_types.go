@@ -2061,6 +2061,12 @@ func imagePath(repository string, image string, version string, imagePathEnvName
 			crdImagePath = image
 		}
 	} else {
+		// A partial CR spec (repository or image missing) can only produce a
+		// malformed reference such as "/image:tag" or "repo/:tag", so fail fast
+		// with a clear error instead of emitting an invalid image path.
+		if repository == "" || image == "" {
+			return "", fmt.Errorf("invalid image specification: both repository and image must be set (repository=%q, image=%q, version=%q)", repository, image, version)
+		}
 		// use @ if image digest is specified instead of tag
 		if strings.HasPrefix(version, "sha256:") {
 			crdImagePath = repository + "/" + image + "@" + version
