@@ -606,6 +606,103 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 	}
 }
 
+func TestDriverAdditionalConfigsVGPULicensing(t *testing.T) {
+	nlsDisabled := false
+
+	testCases := []struct {
+		description       string
+		licensingConfig   *nvidiav1alpha1.DriverLicensingConfigSpec
+		expectTokenSubcfg bool
+		expectedItemKeys  []string
+	}{
+		{
+			description: "secret with NLS enabled mounts gridd.conf and the client token",
+			licensingConfig: &nvidiav1alpha1.DriverLicensingConfigSpec{
+				SecretName: "licensing-config-secret",
+			},
+			expectTokenSubcfg: true,
+			expectedItemKeys:  []string{consts.VGPULicensingFileName, consts.NLSClientTokenFileName},
+		},
+		{
+			description: "configmap with NLS disabled mounts only gridd.conf",
+			licensingConfig: &nvidiav1alpha1.DriverLicensingConfigSpec{
+				Name:       "licensing-config-configmap",
+				NLSEnabled: &nlsDisabled,
+			},
+			expectTokenSubcfg: false,
+			expectedItemKeys:  []string{consts.VGPULicensingFileName},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			stateDriver := &stateDriver{
+				stateSkel: stateSkel{
+					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(),
+					namespace: "test-ns",
+				},
+			}
+			driver := &nvidiav1alpha1.NVIDIADriver{}
+			driver.Spec.LicensingConfig = tc.licensingConfig
+
+			configs, err := stateDriver.getDriverAdditionalConfigs(
+				context.Background(),
+				driver,
+				testClusterInfo{runtime: consts.Containerd},
+				nodePool{osRelease: "ubuntu", osVersion: "22.04"},
+			)
+			require.NoError(t, err)
+
+			mountsByPath := map[string]corev1.VolumeMount{}
+			for _, m := range configs.VolumeMounts {
+				if m.Name == "licensing-config" {
+					mountsByPath[m.MountPath] = m
+				}
+			}
+
+			// The directory mount is what makes rotated licensing files visible to a running
+			// pod: kubelet only refreshes mounts that do not use a subPath.
+			dirMount, ok := mountsByPath[consts.VGPULicensingConfigDirMountPath]
+			require.True(t, ok, "expected a directory mount at %s", consts.VGPULicensingConfigDirMountPath)
+			assert.Empty(t, dirMount.SubPath, "directory mount must not set a subPath")
+			assert.True(t, dirMount.ReadOnly)
+
+			// The pre-existing subPath mounts are retained so that driver images which copy from
+			// the legacy paths keep working.
+			griddMount, ok := mountsByPath[consts.VGPULicensingConfigMountPath]
+			require.True(t, ok, "expected the legacy gridd.conf subPath mount to be retained")
+			assert.Equal(t, consts.VGPULicensingFileName, griddMount.SubPath)
+
+			tokenMount, ok := mountsByPath[consts.NLSClientTokenMountPath]
+			assert.Equal(t, tc.expectTokenSubcfg, ok, "NLS client token mount presence")
+			if tc.expectTokenSubcfg {
+				assert.Equal(t, consts.NLSClientTokenFileName, tokenMount.SubPath)
+			}
+
+			var items []corev1.KeyToPath
+			for _, v := range configs.Volumes {
+				if v.Name != "licensing-config" {
+					continue
+				}
+				switch {
+				case v.Secret != nil:
+					items = v.Secret.Items
+				case v.ConfigMap != nil:
+					items = v.ConfigMap.Items
+				}
+			}
+			// Keys are projected explicitly so that extra keys carried by a user's Secret
+			// (for example one synced from Vault) never land in the mounted directory.
+			require.Len(t, items, len(tc.expectedItemKeys))
+			var gotKeys []string
+			for _, item := range items {
+				gotKeys = append(gotKeys, item.Key)
+			}
+			assert.ElementsMatch(t, tc.expectedItemKeys, gotKeys)
+		})
+	}
+}
+
 func TestDriverConfigPathHelpers(t *testing.T) {
 	repoConfigPath, err := getRepoConfigPath("rhel")
 	require.NoError(t, err)
@@ -1014,6 +1111,10 @@ func TestDriverVGPULicensing(t *testing.T) {
 				MountPath: "/drivers/ClientConfigToken/client_configuration_token.tok",
 				SubPath:   "client_configuration_token.tok",
 			},
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/licensing-config",
+			},
 		},
 		Volumes: []corev1.Volume{
 			{
@@ -1083,6 +1184,10 @@ func TestDriverVGPULicensingSecret(t *testing.T) {
 				Name:      "licensing-config",
 				MountPath: "/drivers/ClientConfigToken/client_configuration_token.tok",
 				SubPath:   "client_configuration_token.tok",
+			},
+			{
+				Name:      "licensing-config",
+				MountPath: "/drivers/licensing-config",
 			},
 		},
 		Volumes: []corev1.Volume{

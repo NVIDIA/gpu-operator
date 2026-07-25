@@ -279,6 +279,14 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, nlsTokenVolMount)
 		}
 
+		// Additionally mount the whole licensing volume as a directory. The subPath mounts above are
+		// resolved once at container start, so an in-place update of the Secret/ConfigMap is never
+		// visible to a running driver pod. A directory mount is kept in sync by kubelet, allowing the
+		// driver container to pick up a rotated license without a daemonset rollout.
+		licensingConfigDirVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true,
+			MountPath: consts.VGPULicensingConfigDirMountPath}
+		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, licensingConfigDirVolMount)
+
 		var licensingConfigVolumeSource corev1.VolumeSource
 		if cr.Spec.LicensingConfig.SecretName != "" {
 			licensingConfigVolumeSource = corev1.VolumeSource{

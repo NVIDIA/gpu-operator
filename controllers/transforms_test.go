@@ -3443,11 +3443,16 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 						MountPath: consts.VGPULicensingConfigMountPath,
 						SubPath:   consts.VGPULicensingFileName,
 					},
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: consts.VGPULicensingConfigDirMountPath,
+					},
 				},
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "1164839178",
+						Value: "838227286",
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -3457,7 +3462,7 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "1164839178",
+						Value: "838227286",
 					},
 				},
 			}).WithVolume(corev1.Volume{
@@ -3509,11 +3514,16 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 						MountPath: consts.VGPULicensingConfigMountPath,
 						SubPath:   consts.VGPULicensingFileName,
 					},
+					{
+						Name:      "licensing-config",
+						ReadOnly:  true,
+						MountPath: consts.VGPULicensingConfigDirMountPath,
+					},
 				},
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "3123249180",
+						Value: "14574464",
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -3523,7 +3533,7 @@ func TestTransformDriverWithLicensingConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "3123249180",
+						Value: "14574464",
 					},
 				},
 			}).WithVolume(corev1.Volume{

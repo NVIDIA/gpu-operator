@@ -185,7 +185,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: DRIVER_CONFIG_DIGEST
-          value: "1619279977"
+          value: "748513754"
         image: nvcr.io/nvidia/driver:525.85.03-ubuntu22.04
         imagePullPolicy: IfNotPresent
         lifecycle:
@@ -253,6 +253,8 @@ spec:
         - mountPath: /drivers/ClientConfigToken/client_configuration_token.tok
           name: licensing-config
           subPath: client_configuration_token.tok
+        - mountPath: /drivers/licensing-config
+          name: licensing-config
       hostPID: true
       initContainers:
       - args:
@@ -283,7 +285,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DRIVER_CONFIG_DIGEST
-          value: "1619279977"
+          value: "748513754"
         image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:devel
         imagePullPolicy: IfNotPresent
         name: k8s-driver-manager
