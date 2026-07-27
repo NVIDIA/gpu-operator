@@ -47,8 +47,10 @@ import (
 // FakeConditionUpdater implements conditions.Updater
 // It always returns CustomError if set
 type FakeConditionUpdater struct {
-	CustomError    error
-	LastErrorState nvidiav1alpha1.State
+	CustomError      error
+	LastErrorState   nvidiav1alpha1.State
+	LastErrorReason  string
+	LastErrorMessage string
 }
 
 // SetConditionsError always returns CustomError if set
@@ -56,6 +58,8 @@ func (f *FakeConditionUpdater) SetConditionsError(ctx context.Context, obj any, 
 	if driver, ok := obj.(*nvidiav1alpha1.NVIDIADriver); ok {
 		f.LastErrorState = driver.Status.State
 	}
+	f.LastErrorReason = condType
+	f.LastErrorMessage = msg
 	return f.CustomError
 }
 
@@ -286,6 +290,46 @@ func TestReconcileConflictSetsNotReadyState(t *testing.T) {
 	_, err := reconciler.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+}
+
+func TestReconcileMultipleDefaultDriversSetsNotReadyState(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+
+	defaultDriver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "default-a"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{Default: true},
+	}
+	secondDefaultDriver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "default-b"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{Default: true},
+	}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
+		},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp, defaultDriver, secondDefaultDriver).Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		conditionUpdater:      updater,
+		nodeSelectorValidator: validator.NewNodeSelectorValidator(client),
+	}
+
+	for _, name := range []string{defaultDriver.Name, secondDefaultDriver.Name} {
+		_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: name},
+		})
+		require.NoError(t, err)
+		require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+		require.Equal(t, conditions.ReconcileFailed, updater.LastErrorReason)
+		require.Contains(t, updater.LastErrorMessage, "multiple default NVIDIADrivers found")
+	}
 }
 
 func TestUpdateCrStatusPreservesNotReadyStateWhenSettingErrorCondition(t *testing.T) {

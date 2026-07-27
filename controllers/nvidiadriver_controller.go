@@ -162,7 +162,11 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.nodeSelectorValidator.Validate(ctx, instance); err != nil {
 		logger.Error(err, "nodeSelector validation failed")
 		instance.Status.State = nvidiav1alpha1.NotReady
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ConflictingNodeSelector, err.Error()); condErr != nil {
+		conditionReason := conditions.ConflictingNodeSelector
+		if errors.Is(err, validator.ErrMultipleDefaultNVIDIADrivers) {
+			conditionReason = conditions.ReconcileFailed
+		}
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditionReason, err.Error()); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
