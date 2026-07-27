@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
+	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,6 +67,40 @@ func TestSetDrainSpecPodSelector(t *testing.T) {
 
 			assert.NotNil(t, upgradePolicy.DrainSpec)
 			assert.Equal(t, tt.expectedSelector, upgradePolicy.DrainSpec.PodSelector)
+		})
+	}
+}
+
+func TestUpgradeNodeLabelsChanged(t *testing.T) {
+	tests := []struct {
+		name      string
+		oldLabels map[string]string
+		newLabels map[string]string
+		expected  bool
+	}{
+		{
+			name:      "upgrade state changes",
+			oldLabels: map[string]string{upgrade.GetUpgradeStateLabelKey(): upgrade.UpgradeStateUpgradeRequired},
+			newLabels: map[string]string{upgrade.GetUpgradeStateLabelKey(): upgrade.UpgradeStateDone},
+			expected:  true,
+		},
+		{
+			name:      "skip label changes",
+			oldLabels: map[string]string{upgrade.GetUpgradeSkipNodeLabelKey(): "false"},
+			newLabels: map[string]string{upgrade.GetUpgradeSkipNodeLabelKey(): "true"},
+			expected:  true,
+		},
+		{
+			name:      "unrelated label changes",
+			oldLabels: map[string]string{"example.com/label": "old"},
+			newLabels: map[string]string{"example.com/label": "new"},
+			expected:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, upgradeNodeLabelsChanged(tc.oldLabels, tc.newLabels))
 		})
 	}
 }

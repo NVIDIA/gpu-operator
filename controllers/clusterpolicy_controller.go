@@ -19,7 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -146,6 +148,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	clusterPolicyCtrl.operatorMetrics.reconciliationTotal.Inc()
 	overallStatus := gpuv1.Ready
 	statesNotReady := []string{}
+	notReadyReasons := []string{}
 	for {
 		status, statusError := clusterPolicyCtrl.step()
 		if statusError != nil {
@@ -171,18 +174,42 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// if any state is not ready, requeue for reconcile after 5 seconds
+	if clusterPolicyCtrl.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
+		upgradeIncomplete, err := r.nvidiaDriverUpgradeIncomplete(ctx)
+		if err != nil {
+			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
+			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
+			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, fmt.Sprintf("Failed to determine NVIDIADriver upgrade state: %s", err)); condErr != nil {
+				r.Log.Error(condErr, "failed to set condition")
+			}
+			return ctrl.Result{}, err
+		}
+		if upgradeIncomplete {
+			overallStatus = gpuv1.NotReady
+			notReadyReasons = append(notReadyReasons,
+				"NVIDIADriver upgrade has not completed",
+				"one or more NVIDIADriver-owned Nodes are marked pending, in-progress, or failed",
+			)
+		}
+	}
+
+	// Keep the ClusterPolicy NotReady while an NVIDIADriver upgrade is active or
+	// failed. Unlike operand states, upgrade-only conditions are reconciled by
+	// Node label watch events rather than periodic polling.
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
 
-		err := fmt.Errorf("ClusterPolicy is not ready, states not ready: %v", statesNotReady)
+		err := fmt.Errorf("%s", clusterPolicyNotReadyMessage(statesNotReady, notReadyReasons))
 		r.Log.Error(err, "ClusterPolicy not yet ready")
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, err.Error()); condErr != nil {
 			r.Log.Error(condErr, "failed to set condition")
 		}
-		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		if len(statesNotReady) > 0 {
+			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+		return ctrl.Result{}, nil
 	}
 
 	if !clusterPolicyCtrl.hasNFDLabels {
@@ -225,6 +252,40 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+// clusterPolicyNotReadyMessage formats a condition message with operand states and additional not-ready reasons.
+func clusterPolicyNotReadyMessage(statesNotReady, notReadyReasons []string) string {
+	messageParts := []string{"ClusterPolicy is not ready"}
+	if len(statesNotReady) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("states not ready: %v", statesNotReady))
+	}
+	messageParts = append(messageParts, notReadyReasons...)
+	return strings.Join(messageParts, "; ")
+}
+
+// nvidiaDriverUpgradeIncomplete reports whether any NVIDIADriver-owned Node has a pending, active, or failed upgrade.
+func (r *ClusterPolicyReconciler) nvidiaDriverUpgradeIncomplete(ctx context.Context) (bool, error) {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.HasLabels{consts.NVIDIADriverOwnerLabel}); err != nil {
+		return false, fmt.Errorf("failed to list nodes for NVIDIADriver upgrade state: %w", err)
+	}
+
+	for _, node := range nodes.Items {
+		if node.Labels[upgrade.GetUpgradeSkipNodeLabelKey()] == "true" {
+			continue
+		}
+		if isIncompleteDriverUpgradeState(node.Labels[upgrade.GetUpgradeStateLabelKey()]) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// isIncompleteDriverUpgradeState reports whether a Node upgrade state keeps the aggregate driver rollout incomplete.
+func isIncompleteDriverUpgradeState(state string) bool {
+	return state != upgrade.UpgradeStateDone && state != upgrade.UpgradeStateUnknown
 }
 
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
@@ -303,12 +364,16 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// The resource-allocation mode label gates rendering of the mode nodeSelector
 			// on operand DaemonSets, so re-render when it lands or changes.
 			modeLabelChanged := oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey]
+			driverOwnerLabelChanged, driverUpgradeStateLabelChanged, driverUpgradeSkipLabelChanged := driverUpgradeLabelsChanged(oldLabels, newLabels)
 
 			needsUpdate := gpuCommonLabelAdded ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
 				osTreeLabelChanged ||
-				modeLabelChanged
+				modeLabelChanged ||
+				driverOwnerLabelChanged ||
+				driverUpgradeStateLabelChanged ||
+				driverUpgradeSkipLabelChanged
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
@@ -318,6 +383,9 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
 					"modeLabelChanged", modeLabelChanged,
+					"driverOwnerLabelChanged", driverOwnerLabelChanged,
+					"driverUpgradeStateLabelChanged", driverUpgradeStateLabelChanged,
+					"driverUpgradeSkipLabelChanged", driverUpgradeSkipLabelChanged,
 				)
 			}
 			return needsUpdate
@@ -329,12 +397,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// DaemonSet.
 			// NB: we cannot know here if the DriverToolkit is
 			// enabled.
-
-			labels := e.Object.GetLabels()
-
-			_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
-
-			return hasGPULabels(labels) && hasOSTreeLabel
+			return shouldReconcileClusterPolicyOnNodeDeletion(e.Object.GetLabels())
 		},
 	}
 
@@ -347,6 +410,21 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 	)
 
 	return err
+}
+
+// driverUpgradeLabelsChanged reports Node label changes that affect aggregate
+// NVIDIADriver rollout status.
+func driverUpgradeLabelsChanged(oldLabels, newLabels map[string]string) (bool, bool, bool) {
+	return oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+		oldLabels[upgrade.GetUpgradeStateLabelKey()] != newLabels[upgrade.GetUpgradeStateLabelKey()],
+		oldLabels[upgrade.GetUpgradeSkipNodeLabelKey()] != newLabels[upgrade.GetUpgradeSkipNodeLabelKey()]
+}
+
+// shouldReconcileClusterPolicyOnNodeDeletion reports whether deleting a Node
+// can affect ClusterPolicy rendering or aggregate NVIDIADriver upgrade status.
+func shouldReconcileClusterPolicyOnNodeDeletion(labels map[string]string) bool {
+	_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
+	return (hasGPULabels(labels) && hasOSTreeLabel) || labels[consts.NVIDIADriverOwnerLabel] != ""
 }
 
 // SetupWithManager sets up the controller with the Manager.
