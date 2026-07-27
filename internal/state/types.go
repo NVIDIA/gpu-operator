@@ -133,7 +133,7 @@ type validatorRenderData struct {
 // draDriverRenderData is the templating data for the DRA driver manifests.
 type draDriverRenderData struct {
 	DRADriver  *draDriverSpec
-	HostPaths  *nvidiav1.HostPathsSpec
+	HostPaths  *nvidiav1alpha1.HostPathsSpec
 	Daemonsets *nvidiav1.DaemonsetsSpec
 	Namespace  string
 	// OpenshiftVersion gates OpenShift-only objects (SecurityContextConstraints); empty

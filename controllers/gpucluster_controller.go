@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
@@ -120,6 +121,21 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	r.singleton = instance
 
+	// DRA requires all driver management through NVIDIADriver CRs: surface an unmet
+	// prerequisite on this CR's status and hold off deploying operands until it is met.
+	if msg, err := r.validatePrerequisites(ctx); err != nil {
+		return ctrl.Result{}, err
+	} else if msg != "" {
+		logger.V(consts.LogLevelWarning).Info("GPUCluster prerequisite not met", "reason", msg)
+		if err := r.updateCRStatus(ctx, instance, nvidiav1alpha1.NotReady); err != nil {
+			return ctrl.Result{}, err
+		}
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.PrerequisiteNotMet, msg); condErr != nil {
+			logger.Error(condErr, "failed to set condition")
+		}
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+
 	// The operand states render ResourceClaimTemplates with adminAccess: true, which the
 	// kube-scheduler only admits from a labeled namespace; label it before syncing states.
 	if err := r.ensureAdminAccessLabel(ctx); err != nil {
@@ -160,6 +176,23 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// newly-created ClusterPolicy) are detected and reconciled even while ready;
 	// only DaemonSets are watched, and the ready path is otherwise event-driven.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// validatePrerequisites checks the cross-CR rules that gate DRA enablement, returning
+// a message describing the first unmet prerequisite or an empty string when all are met.
+func (r *GPUClusterReconciler) validatePrerequisites(ctx context.Context) (string, error) {
+	clusterPolicies := &gpuv1.ClusterPolicyList{}
+	if err := r.List(ctx, clusterPolicies); err != nil {
+		return "", fmt.Errorf("error listing ClusterPolicy objects: %w", err)
+	}
+	// TODO: check only the active singleton ClusterPolicy once the singleton
+	// selection is resolvable across controllers (see resolveActiveConfig).
+	for _, clusterPolicy := range clusterPolicies.Items {
+		if !clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
+			return fmt.Sprintf("ClusterPolicy %s does not have driver.useNvidiaDriverCRD enabled; migrate driver management to NVIDIADriver CRs before enabling DRA", clusterPolicy.Name), nil
+		}
+	}
+	return "", nil
 }
 
 // ensureAdminAccessLabel patches the operator namespace with the label required by the

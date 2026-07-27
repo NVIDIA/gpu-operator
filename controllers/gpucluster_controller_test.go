@@ -20,6 +20,7 @@ import (
 	"context"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -71,14 +72,17 @@ func newGPUClusterReconciler(t *testing.T, objs ...client.Object) (*GPUClusterRe
 }
 
 // fakeStateManager returns canned SyncState results so the controller tests don't load
-// real manifests. GetWatchSources is promoted from the embedded (nil) interface and is
-// never called here — only SetupWithManager calls it, which these tests skip.
+// real manifests. It records the last info catalog passed to SyncState so tests can
+// assert on its entries. GetWatchSources is promoted from the embedded (nil) interface
+// and is never called here — only SetupWithManager calls it, which these tests skip.
 type fakeStateManager struct {
 	state.Manager
-	results state.Results
+	results     state.Results
+	lastCatalog state.InfoCatalog
 }
 
-func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, _ state.InfoCatalog) state.Results {
+func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, catalog state.InfoCatalog) state.Results {
+	f.lastCatalog = catalog
 	return f.results
 }
 
@@ -213,15 +217,53 @@ func TestGPUClusterTeardownDrainsClaimConsumersFirst(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: plugin.Name, Namespace: "test-namespace"}, ds))
 }
 
-// A ClusterPolicy in the cluster does not disable the GPUCluster: the two stacks
-// coexist, with per-node ownership decided by the nvidia.com/gpu-operator.resource-allocation.mode label.
+// A ClusterPolicy in the cluster does not disable the GPUCluster, provided it
+// delegates driver management to NVIDIADriver CRs: the two stacks coexist, with
+// per-node ownership decided by the nvidia.com/gpu-operator.resource-allocation.mode label.
 func TestGPUClusterCoexistsWithClusterPolicy(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
-	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
+		},
+	}
 	r, c := newGPUClusterReconciler(t, cfg, cp)
 
 	gccReconcile(t, r, cfg.Name)
 
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+}
+
+// A ClusterPolicy that manages its own driver (useNvidiaDriverCRD=false) is an invalid
+// companion for DRA: the GPUCluster reports the unmet prerequisite and deploys nothing.
+func TestGPUClusterClusterPolicyDriverPrerequisite(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	r, c := newGPUClusterReconciler(t, cfg, cp)
+	r.conditionUpdater = conditions.NewGPUClusterUpdater(c)
+
+	res, err := r.Reconcile(t.Context(), gccRequest(cfg.Name))
+	require.NoError(t, err)
+	require.Equal(t, time.Minute, res.RequeueAfter)
+
+	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
+	require.Nil(t, r.stateManager.(*fakeStateManager).lastCatalog, "operands must not be synced")
+
+	instance := &nvidiav1alpha1.GPUCluster{}
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cfg.Name}, instance))
+	cond := meta.FindStatusCondition(instance.Status.Conditions, conditions.Error)
+	require.NotNil(t, cond)
+	require.Equal(t, conditions.PrerequisiteNotMet, cond.Reason)
+	require.Contains(t, cond.Message, "useNvidiaDriverCRD")
+
+	// Toggling the flag to true clears the prerequisite on the next reconcile.
+	updated := &gpuv1.ClusterPolicy{}
+	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cp.Name}, updated))
+	updated.Spec.Driver.UseNvidiaDriverCRD = ptr.To(true)
+	require.NoError(t, c.Update(t.Context(), updated))
+
+	gccReconcile(t, r, cfg.Name)
 	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
 }
 
