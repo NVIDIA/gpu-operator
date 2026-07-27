@@ -410,11 +410,10 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return getClusterPoliciesToReconcile(ctx, mgr.GetClient())
 	}
 
-	// Only watch for changes to the upgrade state label
-	upgradeStateLabelPredicate := predicate.TypedFuncs[*corev1.Node]{
+	// Watch changes that alter whether a node participates in a driver upgrade.
+	upgradeNodeLabelPredicate := predicate.TypedFuncs[*corev1.Node]{
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
-			label := upgrade.GetUpgradeStateLabelKey()
-			return e.ObjectOld.Labels[label] != e.ObjectNew.Labels[label]
+			return upgradeNodeLabelsChanged(e.ObjectOld.Labels, e.ObjectNew.Labels)
 		},
 	}
 
@@ -423,7 +422,7 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			mgr.GetCache(),
 			&corev1.Node{},
 			handler.TypedEnqueueRequestsFromMapFunc[*corev1.Node](nodeMapFn),
-			upgradeStateLabelPredicate,
+			upgradeNodeLabelPredicate,
 		),
 	)
 	if err != nil {
@@ -489,6 +488,13 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	}
 
 	return nil
+}
+
+// upgradeNodeLabelsChanged reports Node label changes that require the upgrade
+// controller to re-evaluate upgrade participation or progress.
+func upgradeNodeLabelsChanged(oldLabels, newLabels map[string]string) bool {
+	return oldLabels[upgrade.GetUpgradeStateLabelKey()] != newLabels[upgrade.GetUpgradeStateLabelKey()] ||
+		oldLabels[upgrade.GetUpgradeSkipNodeLabelKey()] != newLabels[upgrade.GetUpgradeSkipNodeLabelKey()]
 }
 
 func getClusterPoliciesToReconcile(ctx context.Context, k8sClient client.Client) []reconcile.Request {

@@ -175,7 +175,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if clusterPolicyCtrl.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
-		upgradeInProgress, err := r.nvidiaDriverUpgradeIncomplete(ctx)
+		upgradeIncomplete, err := r.nvidiaDriverUpgradeIncomplete(ctx)
 		if err != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
@@ -184,7 +184,7 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 			return ctrl.Result{}, err
 		}
-		if upgradeInProgress {
+		if upgradeIncomplete {
 			overallStatus = gpuv1.NotReady
 			notReadyReasons = append(notReadyReasons,
 				"NVIDIADriver upgrade has not completed",
@@ -193,7 +193,9 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// if any state is not ready, requeue for reconcile after 5 seconds
+	// Keep the ClusterPolicy NotReady while an NVIDIADriver upgrade is active or
+	// failed. Unlike operand states, upgrade-only conditions are reconciled by
+	// Node label watch events rather than periodic polling.
 	if overallStatus != gpuv1.Ready {
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 		clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
@@ -204,7 +206,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, err.Error()); condErr != nil {
 			r.Log.Error(condErr, "failed to set condition")
 		}
-		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		if len(statesNotReady) > 0 {
+			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+		return ctrl.Result{}, nil
 	}
 
 	if !clusterPolicyCtrl.hasNFDLabels {
@@ -267,6 +272,9 @@ func (r *ClusterPolicyReconciler) nvidiaDriverUpgradeIncomplete(ctx context.Cont
 	}
 
 	for _, node := range nodes.Items {
+		if node.Labels[upgrade.GetUpgradeSkipNodeLabelKey()] == "true" {
+			continue
+		}
 		if isIncompleteDriverUpgradeState(node.Labels[upgrade.GetUpgradeStateLabelKey()]) {
 			return true, nil
 		}
@@ -277,22 +285,7 @@ func (r *ClusterPolicyReconciler) nvidiaDriverUpgradeIncomplete(ctx context.Cont
 
 // isIncompleteDriverUpgradeState reports whether a Node upgrade state keeps the aggregate driver rollout incomplete.
 func isIncompleteDriverUpgradeState(state string) bool {
-	switch state {
-	case upgrade.UpgradeStateUpgradeRequired,
-		upgrade.UpgradeStateCordonRequired,
-		upgrade.UpgradeStateWaitForJobsRequired,
-		upgrade.UpgradeStatePodDeletionRequired,
-		upgrade.UpgradeStateDrainRequired,
-		upgrade.UpgradeStateNodeMaintenanceRequired,
-		upgrade.UpgradeStatePostMaintenanceRequired,
-		upgrade.UpgradeStatePodRestartRequired,
-		upgrade.UpgradeStateValidationRequired,
-		upgrade.UpgradeStateUncordonRequired,
-		upgrade.UpgradeStateFailed:
-		return true
-	default:
-		return false
-	}
+	return state != upgrade.UpgradeStateDone && state != upgrade.UpgradeStateUnknown
 }
 
 func updateCRState(ctx context.Context, r *ClusterPolicyReconciler, namespacedName types.NamespacedName, state gpuv1.State) {
@@ -371,12 +364,16 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// The resource-allocation mode label gates rendering of the mode nodeSelector
 			// on operand DaemonSets, so re-render when it lands or changes.
 			modeLabelChanged := oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey]
+			driverOwnerLabelChanged, driverUpgradeStateLabelChanged, driverUpgradeSkipLabelChanged := driverUpgradeLabelsChanged(oldLabels, newLabels)
 
 			needsUpdate := gpuCommonLabelAdded ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
 				osTreeLabelChanged ||
-				modeLabelChanged
+				modeLabelChanged ||
+				driverOwnerLabelChanged ||
+				driverUpgradeStateLabelChanged ||
+				driverUpgradeSkipLabelChanged
 
 			if needsUpdate {
 				r.Log.Info("Node needs an update",
@@ -386,6 +383,9 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
 					"modeLabelChanged", modeLabelChanged,
+					"driverOwnerLabelChanged", driverOwnerLabelChanged,
+					"driverUpgradeStateLabelChanged", driverUpgradeStateLabelChanged,
+					"driverUpgradeSkipLabelChanged", driverUpgradeSkipLabelChanged,
 				)
 			}
 			return needsUpdate
@@ -397,12 +397,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			// DaemonSet.
 			// NB: we cannot know here if the DriverToolkit is
 			// enabled.
-
-			labels := e.Object.GetLabels()
-
-			_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
-
-			return hasGPULabels(labels) && hasOSTreeLabel
+			return shouldReconcileClusterPolicyOnNodeDeletion(e.Object.GetLabels())
 		},
 	}
 
@@ -415,6 +410,21 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 	)
 
 	return err
+}
+
+// driverUpgradeLabelsChanged reports Node label changes that affect aggregate
+// NVIDIADriver rollout status.
+func driverUpgradeLabelsChanged(oldLabels, newLabels map[string]string) (bool, bool, bool) {
+	return oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+		oldLabels[upgrade.GetUpgradeStateLabelKey()] != newLabels[upgrade.GetUpgradeStateLabelKey()],
+		oldLabels[upgrade.GetUpgradeSkipNodeLabelKey()] != newLabels[upgrade.GetUpgradeSkipNodeLabelKey()]
+}
+
+// shouldReconcileClusterPolicyOnNodeDeletion reports whether deleting a Node
+// can affect ClusterPolicy rendering or aggregate NVIDIADriver upgrade status.
+func shouldReconcileClusterPolicyOnNodeDeletion(labels map[string]string) bool {
+	_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
+	return (hasGPULabels(labels) && hasOSTreeLabel) || labels[consts.NVIDIADriverOwnerLabel] != ""
 }
 
 // SetupWithManager sets up the controller with the Manager.
