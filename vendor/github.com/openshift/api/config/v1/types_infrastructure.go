@@ -19,6 +19,7 @@ import (
 // +kubebuilder:resource:path=infrastructures,scope=Cluster
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=MutableTopology,rule="!has(self.spec.controlPlaneTopology) || (has(oldSelf.spec.controlPlaneTopology) && self.spec.controlPlaneTopology == oldSelf.spec.controlPlaneTopology) || (has(self.status.controlPlaneTopology) && self.spec.controlPlaneTopology == self.status.controlPlaneTopology) || (has(self.status.controlPlaneTopology) && self.status.controlPlaneTopology == 'SingleReplica' && self.spec.controlPlaneTopology == 'HighlyAvailable')",message="spec.controlPlaneTopology must match status.controlPlaneTopology or be set to HighlyAvailable when status.controlPlaneTopology is SingleReplica"
 type Infrastructure struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -55,6 +56,21 @@ type InfrastructureSpec struct {
 	// platformSpec holds desired information specific to the underlying
 	// infrastructure provider.
 	PlatformSpec PlatformSpec `json:"platformSpec,omitempty"`
+
+	// controlPlaneTopology expresses the desired topology configuration for control nodes.
+	//
+	// When status.controlPlaneTopology is 'SingleReplica' and spec.controlPlaneTopology is set to 'HighlyAvailable',
+	// a transition will be triggered to reconfigure the cluster from SingleReplica to HighlyAvailable.
+	//
+	// When left blank or status.controlPlaneTopology and spec.controlPlaneTopology are the same value,
+	// no changes are required and no transitions will be triggered.
+	//
+	// This value may be set to match status.controlPlaneTopology regardless of the current value.
+	//
+	// +openshift:enable:FeatureGate=MutableTopology
+	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
+	// +optional
+	ControlPlaneTopology TopologyMode `json:"controlPlaneTopology,omitempty"`
 }
 
 // InfrastructureStatus describes the infrastructure the cluster is leveraging.
@@ -192,6 +208,21 @@ type DNSRecordsType string
 const (
 	DNSRecordsTypeExternal DNSRecordsType = "External"
 	DNSRecordsTypeInternal DNSRecordsType = "Internal"
+)
+
+// VIPManagementType defines which mechanism manages the API and Ingress
+// VIPs on an on-premise cluster.
+// +kubebuilder:validation:Enum=Keepalived;BGP
+// +enum
+type VIPManagementType string
+
+const (
+	// VIPManagementTypeKeepalived means the VIPs are managed by the default
+	// keepalived/VRRP mechanism.
+	VIPManagementTypeKeepalived VIPManagementType = "Keepalived"
+	// VIPManagementTypeBGP means the VIPs are advertised via BGP by kube-vip
+	// (Routing Table Mode) and frr-k8s running as static pods.
+	VIPManagementTypeBGP VIPManagementType = "BGP"
 )
 
 // PlatformType is a specific supported infrastructure provider.
@@ -644,7 +675,6 @@ type AzurePlatformStatus struct {
 	//
 	// +default={"dnsType": "PlatformDefault"}
 	// +kubebuilder:default={"dnsType": "PlatformDefault"}
-	// +openshift:enable:FeatureGate=AzureClusterHostedDNSInstall
 	// +optional
 	CloudLoadBalancerConfig *CloudLoadBalancerConfig `json:"cloudLoadBalancerConfig,omitempty"`
 
@@ -1059,6 +1089,21 @@ type BareMetalPlatformStatus struct {
 	// +optional
 	LoadBalancer *BareMetalPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 
+	// vipManagement indicates which VIP management mechanism is active
+	// on this cluster.
+	// Allowed values are `Keepalived`, `BGP`, and omitted.
+	// Once set to a non-empty value, this field is immutable.
+	// When set to `BGP`, kube-vip (Routing Table Mode) and frr-k8s are
+	// deployed as static pods to advertise VIPs via BGP, replacing the
+	// default keepalived/VRRP mechanism.
+	// When set to `Keepalived`, the default keepalived-based VIP
+	// management is used.
+	// When omitted, the default keepalived-based VIP management is used.
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="vipManagement is immutable once set"
+	// +openshift:enable:FeatureGate=BGPBasedVIPManagement
+	// +optional
+	VIPManagement VIPManagementType `json:"vipManagement,omitempty"`
+
 	// dnsRecordsType determines whether records for api, api-int, and ingress
 	// are provided by the internal DNS service or externally.
 	// Allowed values are `Internal`, `External`, and omitted.
@@ -1408,6 +1453,9 @@ type VSpherePlatformFailureDomainSpec struct {
 	ZoneAffinity *VSphereFailureDomainZoneAffinity `json:"zoneAffinity,omitempty"`
 
 	// server is the fully-qualified domain name or the IP address of the vCenter server.
+	// This must match the server field of an entry in the vcenters list.
+	// The match is case-sensitive; the value must be specified exactly as it appears in the vcenters entry.
+	// The value must be between 1 and 255 characters long.
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
@@ -1642,6 +1690,7 @@ type VSpherePlatformNodeNetworking struct {
 // use these fields for configuration.
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.apiServerInternalIPs) || has(self.apiServerInternalIPs)",message="apiServerInternalIPs list is required once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.ingressIPs) || has(self.ingressIPs)",message="ingressIPs list is required once set"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=VSphereMultiVCenterDay2,rule="!has(self.failureDomains) || size(self.failureDomains) == 0 || (has(self.vcenters) && self.failureDomains.all(fd, self.vcenters.exists(vc, vc.server == fd.server)))",message="all failure domains must have a corresponding vCenter entry"
 type VSpherePlatformSpec struct {
 	// vcenters holds the connection details for services to communicate with vCenter.
 	// Up to 3 vCenters are supported.
@@ -1666,6 +1715,7 @@ type VSpherePlatformSpec struct {
 
 	// failureDomains contains the definition of region, zone and the vCenter topology.
 	// If this is omitted failure domains (regions and zones) will not be used.
+	// Each failure domain's server must match the server field of an entry in the vcenters list.
 	// +listType=map
 	// +listMapKey=name
 	// +optional

@@ -14,8 +14,8 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
-	github.com/openshift/api v0.0.0-20260612153628-992ec954f8b3
-	github.com/openshift/client-go v0.0.0-20260603140539-6892dc3e1ffc
+	github.com/openshift/api v0.0.0-20260727141720-967cc4c36c9b
+	github.com/openshift/client-go v0.0.0-20260723174158-ae2315de9d73
 	github.com/operator-framework/api v0.45.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.92.1
 	github.com/prometheus/client_golang v1.24.1
