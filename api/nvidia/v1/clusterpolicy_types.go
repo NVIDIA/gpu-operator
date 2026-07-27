@@ -2061,6 +2061,9 @@ func imagePath(repository string, image string, version string, imagePathEnvName
 			crdImagePath = image
 		}
 	} else {
+		if repository == "" || image == "" || version == "" {
+			return "", fmt.Errorf("invalid image specification: repository, image and version must all be set (repository=%s, image=%s, version=%s)", repository, image, version)
+		}
 		// use @ if image digest is specified instead of tag
 		if strings.HasPrefix(version, "sha256:") {
 			crdImagePath = repository + "/" + image + "@" + version
