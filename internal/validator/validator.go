@@ -18,6 +18,7 @@ package validator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -32,6 +33,9 @@ import (
 type Validator interface {
 	Validate(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error
 }
+
+// ErrMultipleDefaultNVIDIADrivers is returned when more than one NVIDIADriver is configured as the fallback driver.
+var ErrMultipleDefaultNVIDIADrivers = errors.New("multiple default NVIDIADrivers found")
 
 // nodeSelectorValidator validates against the nodeSelector
 type nodeSelectorValidator struct {
@@ -56,11 +60,25 @@ func (nsv *nodeSelectorValidator) Validate(ctx context.Context, cr *nvidiav1alph
 		return err
 	}
 
-	selectedNodeOwners := map[string][]string{}
+	defaultDriverNames := []string{}
 	for _, driver := range drivers.Items {
 		if err := driver.ValidateNodeSelector(); err != nil {
 			return err
 		}
+		if driver.IsDefault() {
+			if !driver.HasDeletionTimestamp() {
+				defaultDriverNames = append(defaultDriverNames, driver.Name)
+			}
+		}
+	}
+
+	if len(defaultDriverNames) > 1 {
+		sort.Strings(defaultDriverNames)
+		return fmt.Errorf("%w: %v", ErrMultipleDefaultNVIDIADrivers, defaultDriverNames)
+	}
+
+	selectedNodeOwners := map[string][]string{}
+	for _, driver := range drivers.Items {
 		if driver.IsDefault() {
 			continue
 		}

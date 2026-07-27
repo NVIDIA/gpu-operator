@@ -13,6 +13,7 @@ source ${SCRIPT_DIR}/checks.sh
 
 NVIDIA_DRIVER_NAME="${NVIDIA_DRIVER_NAME:-e2e-driver}"
 DEFAULT_NVIDIA_DRIVER_NAME="${DEFAULT_NVIDIA_DRIVER_NAME:-e2e-default-driver}"
+DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME="${DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME:-e2e-duplicate-default-driver}"
 
 get_default_nvidiadriver_name() {
     kubectl get nvidiadriver -o json |
@@ -297,6 +298,31 @@ wait_for_nvidiadriver_condition_message() {
     done
 }
 
+wait_for_nvidiadriver_ready() {
+    local driver_name=$1
+    local current_time=0
+
+    echo "Waiting for NVIDIADriver/${driver_name} to report Ready"
+    while :; do
+        if kubectl get nvidiadriver/"${driver_name}" -o json | jq -e '
+            (.status.state // "") == "ready" and
+            ([.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length > 0) and
+            ([.status.conditions[]? | select(.type == "Error" and .status == "True")] | length == 0)
+        ' >/dev/null; then
+            break
+        fi
+
+        if [[ "${current_time}" -gt 120 ]]; then
+            echo "timeout reached waiting for NVIDIADriver/${driver_name} to report Ready"
+            kubectl get nvidiadriver/"${driver_name}" -o yaml
+            exit 1
+        fi
+
+        sleep 5
+        current_time=$((${current_time} + 5))
+    done
+}
+
 test_removed_default_field_conflict_preserves_owners() {
     echo "Testing that clearing the default field makes the CR a normal conflicting NVIDIADriver"
     unset_default_driver "${DEFAULT_NVIDIA_DRIVER_NAME}"
@@ -308,6 +334,19 @@ test_removed_default_field_conflict_preserves_owners() {
     wait_for_nvidiadriver_owner "${NVIDIA_DRIVER_NAME}"
 }
 
+test_multiple_default_drivers_are_not_ready() {
+    echo "Testing that multiple default NVIDIADrivers report a reconciliation failure"
+    create_nvidiadriver_from "${DEFAULT_NVIDIA_DRIVER_NAME}" "${DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME}" true
+    wait_for_nvidiadriver_condition_message "${DEFAULT_NVIDIA_DRIVER_NAME}" "multiple default NVIDIADrivers found"
+    wait_for_nvidiadriver_condition_message "${DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME}" "multiple default NVIDIADrivers found"
+    assert_nvidiadriver_owner_count "${NVIDIA_DRIVER_NAME}"
+
+    kubectl delete nvidiadriver/"${DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME}"
+    wait_for_default_nvidiadriver "${DEFAULT_NVIDIA_DRIVER_NAME}"
+    wait_for_nvidiadriver_ready "${DEFAULT_NVIDIA_DRIVER_NAME}"
+    wait_for_nvidiadriver_owner "${NVIDIA_DRIVER_NAME}"
+}
+
 test_arbitrary_name_default_nvidiadriver
 create_nvidiadriver
 wait_for_nvidiadriver_owner "${NVIDIA_DRIVER_NAME}"
@@ -316,3 +355,4 @@ check_nvidia_driver_pods_ready
 test_driver_image_updates
 test_custom_labels_override
 test_removed_default_field_conflict_preserves_owners
+test_multiple_default_drivers_are_not_ready

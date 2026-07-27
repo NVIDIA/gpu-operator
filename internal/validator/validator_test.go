@@ -18,6 +18,7 @@ package validator
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -126,6 +128,38 @@ func TestCheckNodeSelectorIgnoresDefaultDriver(t *testing.T) {
 
 	err = nsv.Validate(context.Background(), requestedDriver)
 	assert.NoError(t, err)
+}
+
+func TestCheckNodeSelectorRejectsMultipleDefaultDrivers(t *testing.T) {
+	defaultDriver := makeTestDriver("default-a", nil, true)
+	secondDefaultDriver := makeTestDriver("default-b", nil, true)
+
+	s := scheme.Scheme
+	err := nvidiav1alpha1.AddToScheme(s)
+	require.NoError(t, err)
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(defaultDriver, secondDefaultDriver).Build()
+	nsv := NewNodeSelectorValidator(c)
+
+	err = nsv.Validate(context.Background(), defaultDriver)
+	require.ErrorIs(t, err, ErrMultipleDefaultNVIDIADrivers)
+	require.EqualError(t, err, "multiple default NVIDIADrivers found: [default-a default-b]")
+}
+
+func TestCheckNodeSelectorIgnoresDeletingDefaultDriver(t *testing.T) {
+	defaultDriver := makeTestDriver("default-a", nil, true)
+	deletingDefaultDriver := makeTestDriver("default-b", nil, true)
+	deletingDefaultDriver.DeletionTimestamp = ptr.To(metav1.Now())
+	deletingDefaultDriver.Finalizers = []string{"test-finalizer"}
+
+	s := scheme.Scheme
+	err := nvidiav1alpha1.AddToScheme(s)
+	require.NoError(t, err)
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(defaultDriver, deletingDefaultDriver).Build()
+	nsv := NewNodeSelectorValidator(c)
+
+	err = nsv.Validate(context.Background(), defaultDriver)
+	require.NoError(t, err)
+	require.False(t, errors.Is(err, ErrMultipleDefaultNVIDIADrivers))
 }
 
 func TestCheckNodeSelectorRejectsReservedOwnerLabel(t *testing.T) {
