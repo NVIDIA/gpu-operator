@@ -45,6 +45,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // gpuClusterFinalizer holds the GPUCluster until reconcileDelete has ordered teardown.
@@ -97,11 +98,9 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !instance.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, instance)
 	}
-	if !controllerutil.ContainsFinalizer(instance, gpuClusterFinalizer) {
-		controllerutil.AddFinalizer(instance, gpuClusterFinalizer)
-		if err := r.Update(ctx, instance); err != nil {
-			return ctrl.Result{}, fmt.Errorf("error adding finalizer: %w", err)
-		}
+
+	if err := utils.EnsureFinalizer(ctx, r.Client, instance, gpuClusterFinalizer); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error adding finalizer to GPUCluster %s: %w", req.NamespacedName, err)
 	}
 
 	// GPUCluster (DRA stack) may coexist with a ClusterPolicy (device-plugin
