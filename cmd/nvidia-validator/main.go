@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -233,6 +234,8 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
 	CCCapableLabelKey = "nvidia.com/cc.capable"
+	// devicePluginDeployLabelKey controls per-node device plugin deployment.
+	devicePluginDeployLabelKey = "nvidia.com/gpu.deploy.device-plugin"
 	// appComponentLabelKey indicates the label key of the component
 	appComponentLabelKey = "app.kubernetes.io/component"
 	// wslNvidiaSMIPath indicates the path to the nvidia-smi binary on WSL
@@ -1153,6 +1156,10 @@ func (p *Plugin) validate() error {
 	p.setKubeClient(kubeClient)
 
 	err = p.validateGPUResource()
+	if errors.Is(err, errDevicePluginDisabledOnNode) {
+		log.Info("Device plugin is disabled on this node, skipping GPU resource validation")
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1404,7 +1411,27 @@ func (p *Plugin) countGPUResources() (int64, error) {
 	return count, nil
 }
 
+// errDevicePluginDisabledOnNode indicates that per-node device plugin deployment is disabled.
+var errDevicePluginDisabledOnNode = errors.New("device plugin is disabled on this node")
+
+// isDevicePluginDisabledByNodeLabel checks for explicit per-node disablement.
+func isDevicePluginDisabledByNodeLabel(node *corev1.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.GetLabels()[devicePluginDeployLabelKey] == "false"
+}
+
 func (p *Plugin) validateGPUResource() error {
+	// Cluster-wide disablement removes this init container; handle per-node disablement here.
+	node, err := getNode(p.ctx, p.kubeClient)
+	if err != nil {
+		return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
+	}
+	if isDevicePluginDisabledByNodeLabel(node) {
+		return errDevicePluginDisabledOnNode
+	}
+
 	for retry := 1; retry <= gpuResourceDiscoveryWaitRetries; retry++ {
 		// get node info to check discovered GPU resources
 		node, err := getNode(p.ctx, p.kubeClient)
