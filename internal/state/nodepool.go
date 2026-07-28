@@ -143,9 +143,9 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 
 func getOSTag(osRelease, osVersion string) (string, error) {
 	var osTagSuffix string
-	// If the OS is RockyLinux or RHEL, we will omit the minor version when constructing the os image tag
+	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag
 	switch osRelease {
-	case "rocky", "rhel":
+	case "ol", "rocky", "rhel":
 		osTagSuffix = strings.Split(osVersion, ".")[0]
 	default:
 		osTagSuffix = osVersion

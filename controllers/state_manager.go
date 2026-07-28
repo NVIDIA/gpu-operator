@@ -610,9 +610,9 @@ func (n *ClusterPolicyController) getGPUNodeOSInfo() (string, string, error) {
 	if !ok {
 		return "", "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
 	}
-	// If the OS is RockyLinux or RHEL, we will omit the minor version when constructing the os image tag
+	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag
 	switch osName {
-	case "rocky", "rhel":
+	case "ol", "rocky", "rhel":
 		osVersion = strings.Split(osVersion, ".")[0]
 	}
 	osTag := fmt.Sprintf("%s%s", osName, osVersion)
