@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -59,6 +58,7 @@ type NVIDIADriverReconciler struct {
 	stateManager          state.Manager
 	nodeSelectorValidator validator.Validator
 	conditionUpdater      conditions.Updater
+	nodeSelectorCache     nvidiaDriverNodeSelectorCache
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=nvidiadrivers,verbs=get;list;watch;create;update;patch;delete
@@ -82,6 +82,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	instance := &nvidiav1alpha1.NVIDIADriver{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
+			r.nodeSelectorCache.removeByKey(req.NamespacedName)
 			// Request object not found, could have been deleted after reconcile request.
 			return reconcile.Result{}, nil
 		}
@@ -94,6 +95,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, wrappedErr
 	}
+	r.nodeSelectorCache.replace(instance)
 	if instance.HasDeletionTimestamp() {
 		return reconcile.Result{}, nil
 	}
@@ -334,6 +336,47 @@ func dedupeReconcileRequests(requests []reconcile.Request) []reconcile.Request {
 	return deduped
 }
 
+func nodeDriverRenderingLabelsChanged(oldLabels, newLabels map[string]string) bool {
+	relevantLabels := []string{
+		consts.NVIDIADriverOwnerLabel,
+		consts.GPUPresentLabel,
+		driverDeployLabelKey,
+		vgpuManagerDeployLabelKey,
+		nfdOSReleaseIDLabelKey,
+		nfdOSVersionIDLabelKey,
+		nfdKernelLabelKey,
+		nfdOSTreeVersionLabelKey,
+	}
+
+	for _, label := range relevantLabels {
+		if oldLabels[label] != newLabels[label] {
+			return true
+		}
+	}
+	return hasGPULabels(oldLabels) != hasGPULabels(newLabels)
+}
+
+func (r *NVIDIADriverReconciler) enqueueNodeDriverReconcileRequests(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], oldLabels, newLabels map[string]string) {
+	if !r.nodeLabelsAffectNVIDIADrivers(ctx, oldLabels, newLabels) {
+		return
+	}
+	for _, request := range r.enqueueAllNVIDIADrivers(ctx) {
+		queue.Add(request)
+	}
+}
+
+func (r *NVIDIADriverReconciler) nodeLabelsAffectNVIDIADrivers(ctx context.Context, oldLabels, newLabels map[string]string) bool {
+	if nodeDriverRenderingLabelsChanged(oldLabels, newLabels) {
+		return true
+	}
+	changed, err := r.nodeSelectorCache.selectorLabelsChanged(ctx, r.Client, oldLabels, newLabels)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "failed to initialize NVIDIADriver node-selector cache")
+		return true
+	}
+	return changed
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create state manager
@@ -363,18 +406,27 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return err
 	}
 
-	// Watch for changes to NVIDIADriver CRs. Whenever an event is generated for a NVIDIADriver CR,
-	// enqueue a reconcile request for all NVIDIADriver instances.
 	nvidiaDriverMapFn := func(ctx context.Context, driver *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
 		return r.enqueueNVIDIADriverReconcilers(ctx, driver)
 	}
+	nvidiaDriverPredicate := predicate.TypedFuncs[*nvidiav1alpha1.NVIDIADriver]{
+		CreateFunc: func(e event.TypedCreateEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return true
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
+				(e.ObjectOld.GetDeletionTimestamp() == nil) != (e.ObjectNew.GetDeletionTimestamp() == nil)
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return true
+		},
+	}
 
-	// Watch for changes to the primary resource NVIDIADriver
 	err = c.Watch(source.Kind(
 		mgr.GetCache(),
 		&nvidiav1alpha1.NVIDIADriver{},
 		handler.TypedEnqueueRequestsFromMapFunc(nvidiaDriverMapFn),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.NVIDIADriver]{},
+		nvidiaDriverPredicate,
 	),
 	)
 	if err != nil {
@@ -384,12 +436,6 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	// Watch for changes to ClusterPolicy. Whenever an event is generated for ClusterPolicy, enqueue
 	// a reconcile request for all NVIDIADriver instances.
 	mapFn := func(ctx context.Context, _ *gpuv1.ClusterPolicy) []reconcile.Request {
-		return r.enqueueAllNVIDIADrivers(ctx)
-	}
-
-	// Watch for changes to the Nodes. Whenever an event is generated for a Node, enqueue
-	// a reconcile request for all NVIDIADriver instances.
-	nodeMapFn := func(ctx context.Context, _ *corev1.Node) []reconcile.Request {
 		return r.enqueueAllNVIDIADrivers(ctx)
 	}
 
@@ -421,38 +467,30 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return err
 	}
 
-	nodePredicate := predicate.TypedFuncs[*corev1.Node]{
-		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
-			labels := e.Object.GetLabels()
-			return hasGPULabels(labels)
-		},
-		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
-			logger := log.FromContext(ctx)
-			newLabels := e.ObjectNew.GetLabels()
-			oldLabels := e.ObjectOld.GetLabels()
-			nodeName := e.ObjectNew.GetName()
-
-			needsUpdate := hasGPULabels(newLabels) && !maps.Equal(newLabels, oldLabels)
-
-			if needsUpdate {
-				logger.Info("Node labels have been changed",
-					"name", nodeName,
-				)
+	nodeHandler := handler.TypedFuncs[*corev1.Node, reconcile.Request]{
+		CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			if hasGPULabels(e.Object.GetLabels()) {
+				r.enqueueNodeDriverReconcileRequests(ctx, queue, nil, e.Object.GetLabels())
 			}
-			return needsUpdate
 		},
-		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
-			labels := e.Object.GetLabels()
-			return hasGPULabels(labels)
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			oldLabels := e.ObjectOld.GetLabels()
+			newLabels := e.ObjectNew.GetLabels()
+			if hasGPULabels(oldLabels) || hasGPULabels(newLabels) {
+				r.enqueueNodeDriverReconcileRequests(ctx, queue, oldLabels, newLabels)
+			}
+		},
+		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*corev1.Node], queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			if hasGPULabels(e.Object.GetLabels()) {
+				r.enqueueNodeDriverReconcileRequests(ctx, queue, e.Object.GetLabels(), nil)
+			}
 		},
 	}
 
-	// Watch for changes to node labels
 	err = c.Watch(
 		source.Kind(mgr.GetCache(),
 			&corev1.Node{},
-			handler.TypedEnqueueRequestsFromMapFunc(nodeMapFn),
-			nodePredicate,
+			nodeHandler,
 		),
 	)
 	if err != nil {

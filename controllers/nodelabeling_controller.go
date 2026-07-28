@@ -57,6 +57,8 @@ type NodeLabelingReconciler struct {
 	Scheme    *runtime.Scheme
 	Namespace string
 	Log       logr.Logger
+
+	nvidiaDriverNodeSelectorCache nvidiaDriverNodeSelectorCache
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
@@ -139,6 +141,9 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 // Reconcile applies GPU-Operator related labels and annotations to all cluster nodes.
 func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.Info("Reconciling node labels")
+	if err := r.nvidiaDriverNodeSelectorCache.refresh(ctx, r.Client); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to refresh NVIDIADriver node-selector cache: %w", err)
+	}
 
 	// The ClusterPolicy (device-plugin stack) and GPUCluster (DRA stack) CRs may
 	// coexist; neither existing means there is nothing to label.
@@ -639,7 +644,7 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 	return nil
 }
 
-// nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a live NVIDIADriver.
+// nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a NVIDIADriver that is not being deleted.
 func nodeOwnedByNVIDIADriver(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.NVIDIADriver) bool {
 	if node.Labels == nil || node.Labels[consts.NVIDIADriverOwnerLabel] == "" {
 		return false
@@ -713,15 +718,26 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return fmt.Errorf("error watching GPUCluster: %w", err)
 	}
 
-	// Watch NVIDIADriver including delete events so owner labels are cleaned up promptly.
-	nvidiaDriverMapFn := func(ctx context.Context, nd *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
-		return mapToSingleton(ctx, nd)
+	nvidiaDriverMapFn := func(ctx context.Context, driver *nvidiav1alpha1.NVIDIADriver) []reconcile.Request {
+		return mapToSingleton(ctx, driver)
+	}
+	nvidiaDriverPredicate := predicate.TypedFuncs[*nvidiav1alpha1.NVIDIADriver]{
+		CreateFunc: func(e event.TypedCreateEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return true
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
+				(e.ObjectOld.GetDeletionTimestamp() == nil) != (e.ObjectNew.GetDeletionTimestamp() == nil)
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[*nvidiav1alpha1.NVIDIADriver]) bool {
+			return true
+		},
 	}
 	if err := c.Watch(source.Kind(
 		mgr.GetCache(),
 		&nvidiav1alpha1.NVIDIADriver{},
 		handler.TypedEnqueueRequestsFromMapFunc(nvidiaDriverMapFn),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.NVIDIADriver]{},
+		nvidiaDriverPredicate,
 	)); err != nil {
 		return fmt.Errorf("error watching NVIDIADriver: %w", err)
 	}
@@ -739,24 +755,15 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			reasons := getNodeLabelUpdateReasons(oldLabels, newLabels)
 			needsUpdate := reasons.needsUpdate()
 
-			// When an NVIDIADriver daemonset pod is running on the node, check if any
-			// label which is configured in the NVIDIADriver's node selector has changed.
 			nvidiaDriverNodeSelectorLabelChanged := false
-			if !needsUpdate && newLabels[consts.NVIDIADriverOwnerLabel] != "" {
-				name := newLabels[consts.NVIDIADriverOwnerLabel]
-				nvidiaDriver := &nvidiav1alpha1.NVIDIADriver{}
-				err := r.Get(ctx, types.NamespacedName{Name: name}, nvidiaDriver)
+			if !needsUpdate && (hasGPULabels(oldLabels) || hasGPULabels(newLabels)) {
+				changed, err := r.nvidiaDriverNodeSelectorCache.selectorLabelsChanged(ctx, r.Client, oldLabels, newLabels)
 				if err != nil {
-					r.Log.Error(err, "failed to get NVIDIADriver object that owns this node", "name", name, "node", nodeName)
-					return false
+					r.Log.Error(err, "failed to initialize NVIDIADriver selector-key cache")
+					return true
 				}
-				for key := range nvidiaDriver.Spec.NodeSelector {
-					if oldLabels[key] != newLabels[key] {
-						nvidiaDriverNodeSelectorLabelChanged = true
-						needsUpdate = true
-						break
-					}
-				}
+				nvidiaDriverNodeSelectorLabelChanged = changed
+				needsUpdate = nvidiaDriverNodeSelectorLabelChanged
 			}
 
 			if needsUpdate {
