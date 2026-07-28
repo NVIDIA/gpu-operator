@@ -82,6 +82,8 @@ operator:
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia
+  nodeSelector:
+    kubernetes.io/os: linux
   use_ocp_driver_toolkit: false
   # cleanup CRD on chart un-install
   cleanupCRD: false
