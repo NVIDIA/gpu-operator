@@ -79,6 +79,8 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.operator.nodeSelector | nindent 8 }}
       containers:
         - name: upgrade-crd
           image: {{ include "gpu-operator.fullimage" . }}
