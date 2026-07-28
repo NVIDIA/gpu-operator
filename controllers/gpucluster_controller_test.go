@@ -267,37 +267,6 @@ func TestGPUClusterClusterPolicyDriverPrerequisite(t *testing.T) {
 	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
 }
 
-// First-reconciled wins (mirroring ClusterPolicy): whichever instance reconciles first
-// claims ownership, regardless of name or creationTimestamp.
-func TestGPUClusterSingleton(t *testing.T) {
-	first := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "first"}}
-	second := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "second"}}
-	r, c := newGPUClusterReconciler(t, first, second)
-
-	gccReconcile(t, r, first.Name)
-	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, first.Name))
-
-	gccReconcile(t, r, second.Name)
-	require.Equal(t, nvidiav1alpha1.Ignored, gccState(t, c, second.Name))
-}
-
-// Matching ClusterPolicy, an ignored duplicate carries no status condition.
-func TestGPUClusterDuplicateNoCondition(t *testing.T) {
-	owner := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "owner"}}
-	duplicate := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "duplicate"}}
-	r, c := newGPUClusterReconciler(t, owner, duplicate)
-	r.conditionUpdater = conditions.NewGPUClusterUpdater(c)
-
-	gccReconcile(t, r, owner.Name)     // owner reconciles first, claiming ownership
-	gccReconcile(t, r, duplicate.Name) // duplicate is ignored
-
-	instance := &nvidiav1alpha1.GPUCluster{}
-	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: duplicate.Name}, instance))
-	require.Equal(t, nvidiav1alpha1.Ignored, instance.Status.State)
-	require.Nil(t, meta.FindStatusCondition(instance.Status.Conditions, conditions.Error))
-	require.Nil(t, meta.FindStatusCondition(instance.Status.Conditions, conditions.Ready))
-}
-
 func TestEnqueueAllGPUClusters(t *testing.T) {
 	r, _ := newGPUClusterReconciler(t,
 		&nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config-a"}},

@@ -1028,7 +1028,6 @@ spec:
               state:
                 description: State indicates the status of the GPUCluster instance
                 enum:
-                - ignored
                 - ready
                 - notReady
                 - disabled
@@ -1037,6 +1036,9 @@ spec:
             - state
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: GPUCluster is a singleton, metadata.name must be 'gpu-cluster'
+          rule: self.metadata.name == 'gpu-cluster'
     served: true
     storage: true
     subresources:

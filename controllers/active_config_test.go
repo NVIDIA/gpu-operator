@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,6 +75,21 @@ func TestResolveActiveConfig(t *testing.T) {
 		assert.Nil(t, cp)
 		require.NotNil(t, gc)
 		assert.Equal(t, "cluster-config", gc.Name)
+	})
+
+	t.Run("oldest ClusterPolicy is the singleton, name breaks ties", func(t *testing.T) {
+		oldTime := metav1.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		zOlder := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "z-older", CreationTimestamp: oldTime}}
+		bOlder := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "b-older", CreationTimestamp: oldTime}}
+		aNewer := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{
+			Name: "a-newer", CreationTimestamp: metav1.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}}
+		c := fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(zOlder, bOlder, aNewer).Build()
+
+		cp, _, err := resolveActiveConfig(context.Background(), c)
+		require.NoError(t, err)
+		require.NotNil(t, cp)
+		assert.Equal(t, "b-older", cp.Name)
 	})
 
 	t.Run("neither CR present returns all nil", func(t *testing.T) {

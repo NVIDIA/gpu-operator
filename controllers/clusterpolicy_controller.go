@@ -117,9 +117,14 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return reconcile.Result{}, err
 	}
 
-	// TODO: Handle deletion of the main ClusterPolicy and cycle to the next one.
-	// We already have a main Clusterpolicy
-	if clusterPolicyCtrl.singleton != nil && clusterPolicyCtrl.singleton.Name != instance.Name {
+	// The ClusterPolicy with the oldest creationTimestamp (name as tie-breaker) is
+	// treated as the singleton, so the choice is stable across operator restarts and
+	// derivable by other controllers (see getSingletonClusterPolicy).
+	clusterPolicies := &gpuv1.ClusterPolicyList{}
+	if err := r.List(ctx, clusterPolicies); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error listing ClusterPolicy objects: %w", err)
+	}
+	if active := getSingletonClusterPolicy(clusterPolicies.Items); active != nil && active.Name != instance.Name {
 		instance.SetStatus(gpuv1.Ignored, clusterPolicyCtrl.operatorNamespace)
 		// do not change `clusterPolicyCtrl.operatorMetrics.reconciliationStatus` here,
 		// spurious reconciliation
