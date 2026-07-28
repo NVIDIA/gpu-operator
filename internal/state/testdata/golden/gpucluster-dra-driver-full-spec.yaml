@@ -491,6 +491,9 @@ spec:
           timeoutSeconds: 10
         name: gpus
         resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
           requests:
             cpu: 100m
             memory: 128Mi
@@ -582,6 +585,13 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 10
         name: compute-domains
+        resources:
+          limits:
+            cpu: 300m
+            memory: 512Mi
+          requests:
+            cpu: 200m
+            memory: 64Mi
         securityContext:
           privileged: true
         startupProbe:
@@ -634,6 +644,13 @@ spec:
         image: nvcr.io/nvidia/gpu-operator-validator:test
         imagePullPolicy: IfNotPresent
         name: driver-validation
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 200m
+            memory: 128Mi
         securityContext:
           privileged: true
           runAsUser: 0

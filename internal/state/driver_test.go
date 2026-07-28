@@ -149,6 +149,36 @@ func TestDriverRenderMinimal(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverManagerResources(t *testing.T) {
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.NoError(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	renderData := getMinimalDriverRenderData()
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.NoError(t, err)
+
+	ds, err := getDaemonsetFromObjects(objs)
+	require.NoError(t, err)
+
+	var driverManager *corev1.Container
+	for i := range ds.Spec.Template.Spec.InitContainers {
+		if ds.Spec.Template.Spec.InitContainers[i].Name == "k8s-driver-manager" {
+			driverManager = &ds.Spec.Template.Spec.InitContainers[i]
+			break
+		}
+	}
+	require.NotNil(t, driverManager)
+	require.EqualValues(t, corev1.ResourceRequirements{
+		Requests: renderData.Driver.Spec.Resources.Requests,
+		Limits:   renderData.Driver.Spec.Resources.Limits,
+	}, driverManager.Resources)
+}
+
 func TestDriverHostSysDevicesSystemVolumeUsesStableParentDirectory(t *testing.T) {
 	state, err := NewStateDriver(nil, "", nil, manifestDir)
 	require.Nil(t, err)

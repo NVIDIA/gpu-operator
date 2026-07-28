@@ -1220,6 +1220,17 @@ func TestTransformDevicePlugin(t *testing.T) {
 }
 
 func TestTransformMPSControlDaemon(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+
 	testCases := []struct {
 		description       string
 		daemonset         Daemonset
@@ -1241,6 +1252,10 @@ func TestTransformMPSControlDaemon(t *testing.T) {
 					ImagePullPolicy:  string(corev1.PullAlways),
 					ImagePullSecrets: []string{"secret"},
 					MPS:              &gpuv1.MPSConfig{Root: "/var/mps"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits:   resources.Limits,
+						Requests: resources.Requests,
+					},
 				},
 			},
 			expectedDaemonset: NewDaemonset().
@@ -1248,11 +1263,13 @@ func TestTransformMPSControlDaemon(t *testing.T) {
 					Name:            "mps-control-daemon-mounts",
 					Image:           "nvcr.io/mps:latest",
 					ImagePullPolicy: corev1.PullAlways,
+					Resources:       resources,
 				}).
 				WithContainer(corev1.Container{
 					Name:            "mps-control-daemon-ctr",
 					Image:           "nvcr.io/mps:latest",
 					ImagePullPolicy: corev1.PullAlways,
+					Resources:       resources,
 					Env: []corev1.EnvVar{
 						{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
 					},
@@ -2074,6 +2091,7 @@ func TestTransformVFIOManager(t *testing.T) {
 					Image:           "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Env:             mockEnvCore,
+					Resources:       resources,
 				}).
 				WithPullSecret(secret),
 		},
@@ -2227,6 +2245,17 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 }
 
 func TestTransformValidationInitContainer(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+
 	testCases := []struct {
 		description string
 		ds          Daemonset
@@ -2246,6 +2275,10 @@ func TestTransformValidationInitContainer(t *testing.T) {
 					Version:          "v1.0.0",
 					ImagePullPolicy:  "IfNotPresent",
 					ImagePullSecrets: []string{"pull-secret"},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits:   resources.Limits,
+						Requests: resources.Requests,
+					},
 					Driver: gpuv1.DriverValidatorSpec{
 						Env: []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
 					},
@@ -2259,6 +2292,7 @@ func TestTransformValidationInitContainer(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				Resources:       resources,
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser: rootUID,
 				},
@@ -2267,6 +2301,7 @@ func TestTransformValidationInitContainer(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             []corev1.EnvVar{{Name: "foo", Value: "bar"}},
+				Resources:       resources,
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser: rootUID,
 				},
@@ -2289,7 +2324,140 @@ func newBoolPtr(b bool) *bool {
 	return boolPtr
 }
 
+func TestTransformConfigManagerInitContainerWithResources(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	ds := NewDaemonset().
+		WithInitContainer(corev1.Container{Name: "config-manager-init"}).
+		WithInitContainer(corev1.Container{Name: "dummy"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		DevicePlugin: gpuv1.DevicePluginSpec{
+			Repository:      "nvcr.io/nvidia",
+			Image:           "k8s-device-plugin",
+			Version:         "v1.0.0",
+			ImagePullPolicy: "IfNotPresent",
+			Resources: &gpuv1.ResourceRequirements{
+				Limits:   resources.Limits,
+				Requests: resources.Requests,
+			},
+			Config: &gpuv1.DevicePluginConfig{
+				Name:    "plugin-config",
+				Default: "default",
+			},
+		},
+	}
+	expectedDs := NewDaemonset().
+		WithInitContainer(corev1.Container{
+			Name:            "config-manager-init",
+			Image:           "nvcr.io/nvidia/k8s-device-plugin:v1.0.0",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Resources:       resources,
+			Env: []corev1.EnvVar{
+				{Name: "DEFAULT_CONFIG", Value: "default"},
+				{Name: "FALLBACK_STRATEGIES", Value: "empty"},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: "config", MountPath: "/config"},
+				{Name: "plugin-config", MountPath: "/available-configs"},
+			},
+		}).
+		WithInitContainer(corev1.Container{Name: "dummy"})
+
+	err := transformConfigManagerInitContainer(ds.DaemonSet, cpSpec)
+	require.NoError(t, err)
+	require.EqualValues(t, expectedDs, ds)
+}
+
+func TestHandleDevicePluginConfigWithGPUFeatureDiscoveryResources(t *testing.T) {
+	gfdResources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	devicePluginResources := &gpuv1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("2"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+
+	testCases := []struct {
+		name                  string
+		devicePluginResources *gpuv1.ResourceRequirements
+	}{
+		{
+			name: "only GPU Feature Discovery resources configured",
+		},
+		{
+			name:                  "both component resources configured",
+			devicePluginResources: devicePluginResources,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ds := NewDaemonset().
+				WithContainer(corev1.Container{Name: "gpu-feature-discovery"}).
+				WithInitContainer(corev1.Container{Name: "config-manager-init"})
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				GPUFeatureDiscovery: gpuv1.GPUFeatureDiscoverySpec{
+					Resources: &gpuv1.ResourceRequirements{
+						Limits:   gfdResources.Limits,
+						Requests: gfdResources.Requests,
+					},
+				},
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "k8s-device-plugin",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Resources:       tc.devicePluginResources,
+					Config: &gpuv1.DevicePluginConfig{
+						Name:    "plugin-config",
+						Default: "default",
+					},
+				},
+			}
+
+			err := handleDevicePluginConfig(ds.DaemonSet, cpSpec)
+			require.NoError(t, err)
+
+			initContainer := findContainerByName(ds.Spec.Template.Spec.InitContainers, "config-manager-init")
+			require.NotNil(t, initContainer)
+			require.EqualValues(t, gfdResources, initContainer.Resources)
+		})
+	}
+}
+
 func TestTransformDriverManagerInitContainer(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+
 	testCases := []struct {
 		description string
 		ds          Daemonset
@@ -2315,6 +2483,10 @@ func TestTransformDriverManagerInitContainer(t *testing.T) {
 						Enabled:      newBoolPtr(true),
 						UseHostMOFED: newBoolPtr(true),
 					},
+					Resources: &gpuv1.ResourceRequirements{
+						Limits:   resources.Limits,
+						Requests: resources.Requests,
+					},
 				},
 			},
 			expectedDs: NewDaemonset().WithInitContainer(corev1.Container{
@@ -2326,13 +2498,14 @@ func TestTransformDriverManagerInitContainer(t *testing.T) {
 					{Name: UseHostMOFEDEnvName, Value: "true"},
 					{Name: "foo", Value: "bar"},
 				},
+				Resources: resources,
 			}).WithInitContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA)
+			err := transformDriverManagerInitContainer(tc.ds.DaemonSet, &tc.cpSpec.Driver.Manager, tc.cpSpec.Driver.GPUDirectRDMA, tc.cpSpec.Driver.Resources)
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
@@ -2705,6 +2878,52 @@ func TestTransformValidatorComponent(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedPod, tc.pod)
+		})
+	}
+}
+
+func TestTransformValidatorComponentWithResources(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+	}
+
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Validator: gpuv1.ValidatorSpec{
+			Repository:      "nvcr.io/nvidia/cloud-native",
+			Image:           "gpu-operator-validator",
+			Version:         "v1.0.0",
+			ImagePullPolicy: "IfNotPresent",
+			Resources: &gpuv1.ResourceRequirements{
+				Limits:   resources.Limits,
+				Requests: resources.Requests,
+			},
+		},
+	}
+
+	testCases := []struct {
+		component     string
+		containerName string
+	}{
+		{component: "driver", containerName: "driver-validation"},
+		{component: "toolkit", containerName: "toolkit-validation"},
+		{component: "cuda", containerName: "cuda-validation"},
+		{component: "plugin", containerName: "plugin-validation"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.containerName, func(t *testing.T) {
+			pod := NewPod().WithInitContainer(corev1.Container{Name: tc.containerName})
+			err := TransformValidatorComponent(cpSpec, &pod.Spec, tc.component)
+			require.NoError(t, err)
+			require.Len(t, pod.Spec.InitContainers, 1)
+			require.EqualValues(t, resources, pod.Spec.InitContainers[0].Resources)
 		})
 	}
 }
@@ -3667,6 +3886,10 @@ func TestTransformDriverWithResources(t *testing.T) {
 			}).WithInitContainer(corev1.Container{
 				Name:  "k8s-driver-manager",
 				Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0",
+				Resources: corev1.ResourceRequirements{
+					Requests: resources.Requests,
+					Limits:   resources.Limits,
+				},
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
@@ -4009,6 +4232,16 @@ func TestTransformVGPUManager(t *testing.T) {
 	}
 
 	mockClient := fake.NewFakeClient(node, kernelModuleConfigMap)
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
 
 	testCases := []struct {
 		description   string
@@ -4028,6 +4261,10 @@ func TestTransformVGPUManager(t *testing.T) {
 					Image:           "vgpu-manager",
 					Version:         "550.90.07",
 					ImagePullPolicy: "IfNotPresent",
+					Resources: &gpuv1.ResourceRequirements{
+						Limits:   resources.Limits,
+						Requests: resources.Requests,
+					},
 					DriverManager: gpuv1.DriverManagerSpec{
 						Repository:      "nvcr.io/nvidia/cloud-native",
 						Image:           "k8s-driver-manager",
@@ -4061,6 +4298,7 @@ func TestTransformVGPUManager(t *testing.T) {
 			container := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
 			require.NotNil(t, container)
 			require.Len(t, container.VolumeMounts, 1)
+			require.EqualValues(t, resources, container.Resources)
 			require.Equal(t, corev1.VolumeMount{
 				Name:      "vgpu-kernel-module-config",
 				ReadOnly:  true,
@@ -4085,6 +4323,10 @@ func TestTransformVGPUManager(t *testing.T) {
 					},
 				},
 			}, tc.daemonset.Spec.Template.Spec.Volumes[0])
+
+			driverManager := findContainerByName(tc.daemonset.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+			require.NotNil(t, driverManager)
+			require.EqualValues(t, resources, driverManager.Resources)
 		})
 	}
 }

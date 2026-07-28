@@ -22,10 +22,12 @@ import (
 	"sort"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/image"
 )
@@ -149,11 +151,65 @@ func getDRADriverSpec(spec *nvidiav1alpha1.DRADriverSpec) (*draDriverSpec, error
 		return nil, fmt.Errorf("failed to construct DRA driver validator image path: %w", err)
 	}
 
+	resourceRequirements := []*nvidiav1.ResourceRequirements{
+		spec.GPUs.KubeletPlugin.Resources,
+	}
+	if spec.IsComputeDomainsEnabled() {
+		resourceRequirements = append(resourceRequirements, spec.ComputeDomains.KubeletPlugin.Resources)
+	}
+
 	return &draDriverSpec{
-		Spec:          spec,
-		ImagePath:     imagePath,
-		InitImagePath: initImagePath,
+		Spec:                   spec,
+		ImagePath:              imagePath,
+		InitImagePath:          initImagePath,
+		InitContainerResources: maxResourceRequirements(resourceRequirements...),
 	}, nil
+}
+
+func maxResourceRequirements(requirements ...*nvidiav1.ResourceRequirements) *nvidiav1.ResourceRequirements {
+	result := &nvidiav1.ResourceRequirements{}
+
+	for _, requirement := range requirements {
+		if requirement == nil {
+			continue
+		}
+		result.Requests = maxResourceList(result.Requests, requirement.Requests)
+		result.Limits = maxResourceList(result.Limits, requirement.Limits)
+	}
+
+	// A request-only container can have a larger request than another container's
+	// explicit limit. Keep the merged requirement valid without adding limits for
+	// resources that were unbounded in every source container.
+	for name, request := range result.Requests {
+		limit, ok := result.Limits[name]
+		if ok && request.Cmp(limit) > 0 {
+			result.Limits[name] = request.DeepCopy()
+		}
+	}
+
+	if len(result.Requests) == 0 && len(result.Limits) == 0 {
+		return nil
+	}
+	return result
+}
+
+func maxResourceList(resourceLists ...corev1.ResourceList) corev1.ResourceList {
+	var result corev1.ResourceList
+
+	for _, resourceList := range resourceLists {
+		for name, quantity := range resourceList {
+			current, ok := result[name]
+			if ok && quantity.Cmp(current) <= 0 {
+				continue
+			}
+			if result == nil {
+				result = corev1.ResourceList{}
+			}
+			result[name] = quantity.DeepCopy()
+		}
+	}
+
+	return result
 }
 
 // renderDRAFeatureGates renders the feature-gate map as the FEATURE_GATES env value

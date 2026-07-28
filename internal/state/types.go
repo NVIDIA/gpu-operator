@@ -52,13 +52,13 @@ type gdrcopyDriverSpec struct {
 	ImagePath string
 }
 
-// draDriverSpec is a wrapper of DRADriverSpec with the fully-qualified image paths
-// populated: ImagePath for the DRA driver containers and InitImagePath for the
-// driver-validation init container (shipped in the gpu-operator image).
+// draDriverSpec is a wrapper of DRADriverSpec with derived values used to render
+// the DRA driver containers and the driver-validation init container.
 type draDriverSpec struct {
-	Spec          *nvidiav1alpha1.DRADriverSpec
-	ImagePath     string
-	InitImagePath string
+	Spec                   *nvidiav1alpha1.DRADriverSpec
+	ImagePath              string
+	InitImagePath          string
+	InitContainerResources *nvidiav1.ResourceRequirements
 }
 
 // dcgmSpec is a wrapper of DCGMSpec with the resolved image path.

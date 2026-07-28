@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -176,6 +177,104 @@ func TestDRADriverHealthcheckPortOverride(t *testing.T) {
 	assert.Equal(t, int32(52000), gpus.StartupProbe.GRPC.Port)
 	require.NotNil(t, gpus.LivenessProbe)
 	assert.Equal(t, int32(52000), gpus.LivenessProbe.GRPC.Port)
+}
+
+func TestDRADriverValidationResources(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := fullSpecGPUCluster()
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	initCtr := findDaemonSet(t, objs).Spec.Template.Spec.InitContainers[0]
+	assert.Equal(t, "driver-validation", initCtr.Name)
+	assert.Equal(t, corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+	}, initCtr.Resources)
+}
+
+func TestDRADriverValidationResourcesIgnoreDisabledComputeDomains(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUCluster()
+	cr.Spec.DRADriver.GPUs.KubeletPlugin.Resources = &nvidiav1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("500m"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("100m"),
+		},
+	}
+	cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Resources = &nvidiav1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("2"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("1"),
+		},
+	}
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	initCtr := findDaemonSet(t, objs).Spec.Template.Spec.InitContainers[0]
+	assert.Equal(t, corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("500m"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("100m"),
+		},
+	}, initCtr.Resources)
+}
+
+func TestMaxResourceRequirements(t *testing.T) {
+	t.Run("raises an explicit limit to the maximum request", func(t *testing.T) {
+		actual := maxResourceRequirements(
+			&nvidiav1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			&nvidiav1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("500m"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+		)
+
+		assert.Equal(t, &nvidiav1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			},
+		}, actual)
+	})
+
+	t.Run("keeps a request-only resource unbounded", func(t *testing.T) {
+		actual := maxResourceRequirements(&nvidiav1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		})
+
+		assert.Equal(t, &nvidiav1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		}, actual)
+	})
 }
 
 func TestDRADriverHealthcheckDisabled(t *testing.T) {

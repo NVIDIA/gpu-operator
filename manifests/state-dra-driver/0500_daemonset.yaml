@@ -90,6 +90,9 @@ spec:
         {{- end }}
         command:
         - nvidia-validator
+        {{- if .DRADriver.InitContainerResources }}
+        resources: {{ .DRADriver.InitContainerResources | toJson }}
+        {{- end }}
         securityContext:
           privileged: true
           # The validator ships in the gpu-operator image (USER 65532); it must run
