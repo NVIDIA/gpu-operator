@@ -26,6 +26,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestResolveHostNvidiaSMI(t *testing.T) {
@@ -373,6 +375,87 @@ UNKNOWN_FEATURE: true`,
 					t.Errorf("validateAdditionalDriverComponents() unexpected error: %v", err)
 				}
 			}
+		})
+	}
+}
+
+func TestIsDevicePluginDisabledOnNode(t *testing.T) {
+	tests := []struct {
+		name   string
+		node   *corev1.Node
+		wantOK bool
+	}{
+		{
+			name:   "nil node is treated as plugin-enabled",
+			node:   nil,
+			wantOK: false,
+		},
+		{
+			name:   "node with no labels is plugin-enabled",
+			node:   &corev1.Node{},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin label absent, other labels present",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"foo": "bar",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin explicitly true keeps validation active",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin explicitly false triggers skip",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "false",
+			}}},
+			wantOK: true,
+		},
+		{
+			name: "device-plugin empty value is not treated as disabled",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin paused value is not treated as disabled",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "paused-for-driver-upgrade",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "resource-allocation mode dra triggers skip",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu-operator.resource-allocation.mode": "dra",
+			}}},
+			wantOK: true,
+		},
+		{
+			name: "resource-allocation mode device-plugin does not skip",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu-operator.resource-allocation.mode": "device-plugin",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "both signals set to skip still skips",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin":              "false",
+				"nvidia.com/gpu-operator.resource-allocation.mode": "dra",
+			}}},
+			wantOK: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.wantOK, isDevicePluginDisabledOnNode(tt.node))
 		})
 	}
 }
