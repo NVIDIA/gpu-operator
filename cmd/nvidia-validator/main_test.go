@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
+	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	"github.com/stretchr/testify/require"
 )
 
@@ -375,4 +377,111 @@ UNKNOWN_FEATURE: true`,
 			}
 		})
 	}
+}
+
+func newTestPF(totalVFs, numVFs uint64) *nvpci.NvidiaPCIDevice {
+	return &nvpci.NvidiaPCIDevice{
+		SriovInfo: nvpci.SriovInfo{
+			PhysicalFunction: &nvpci.SriovPhysicalFunction{
+				TotalVFs: totalVFs,
+				NumVFs:   numVFs,
+			},
+		},
+	}
+}
+
+func TestIsDriverUsingSRIOV(t *testing.T) {
+	nonSriovGPU := &nvpci.NvidiaPCIDevice{}
+
+	testCases := []struct {
+		description string
+		gpus        []*nvpci.NvidiaPCIDevice
+		expected    bool
+	}{
+		{
+			description: "no GPUs",
+			gpus:        nil,
+			expected:    false,
+		},
+		{
+			description: "non-SRIOV GPU",
+			gpus:        []*nvpci.NvidiaPCIDevice{nonSriovGPU},
+			expected:    false,
+		},
+		{
+			description: "SRIOV-capable PF with no VFs enabled",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 0)},
+			expected:    false,
+		},
+		{
+			description: "PF with VFs enabled",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 16)},
+			expected:    true,
+		},
+		{
+			description: "mixed non-SRIOV GPU and PF with VFs enabled",
+			gpus:        []*nvpci.NvidiaPCIDevice{nonSriovGPU, newTestPF(16, 4)},
+			expected:    true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			require.Equal(t, tc.expected, isDriverUsingSRIOV(tc.gpus))
+		})
+	}
+}
+
+func TestAreAllVFsReady(t *testing.T) {
+	testCases := []struct {
+		description string
+		gpus        []*nvpci.NvidiaPCIDevice
+		expected    bool
+	}{
+		{
+			description: "no GPUs",
+			gpus:        nil,
+			expected:    false,
+		},
+		{
+			description: "non-SRIOV GPU only",
+			gpus:        []*nvpci.NvidiaPCIDevice{{}},
+			expected:    false,
+		},
+		{
+			description: "PF with only some VFs enabled",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 4)},
+			expected:    false,
+		},
+		{
+			description: "PF with all VFs enabled",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 16)},
+			expected:    true,
+		},
+		{
+			description: "one PF complete, one PF incomplete",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 16), newTestPF(16, 0)},
+			expected:    false,
+		},
+		{
+			description: "all PFs complete",
+			gpus:        []*nvpci.NvidiaPCIDevice{newTestPF(16, 16), newTestPF(8, 8)},
+			expected:    true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			require.Equal(t, tc.expected, AreAllVFsReady(tc.gpus))
+		})
+	}
+}
+
+func TestMdevParentDevicesExist(t *testing.T) {
+	mock, err := nvmdev.NewMock()
+	require.NoError(t, err)
+	defer mock.Cleanup()
+
+	require.False(t, mdevParentDevicesExist(mock))
+
+	require.NoError(t, mock.AddMockA100Parent("0000:3b:00.0", 0))
+	require.True(t, mdevParentDevicesExist(mock))
 }
