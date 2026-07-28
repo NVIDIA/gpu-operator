@@ -419,6 +419,31 @@ func clusterPolicyForUpgradeTest(useNvidiaDriverCRD bool) *gpuv1.ClusterPolicy {
 	}
 }
 
+// The ClusterPolicy with the oldest creationTimestamp is the singleton regardless of
+// reconcile order; any other instance is skipped without running any states.
+func TestClusterPolicyReconcileSkipsNonSingleton(t *testing.T) {
+	older := clusterPolicyForUpgradeTest(true)
+	older.Name = "older"
+	older.CreationTimestamp = metav1.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, older)
+
+	newer := clusterPolicyForUpgradeTest(true)
+	newer.Name = "newer"
+	newer.CreationTimestamp = metav1.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, c.Create(t.Context(), newer))
+
+	// The newer instance reconciles first but is not the singleton: no error, no
+	// requeue, and no state is persisted since its states never run.
+	result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(newer)})
+	require.NoError(t, err)
+	require.Zero(t, result)
+	require.Empty(t, clusterPolicyState(t, c, newer.Name))
+
+	_, err = r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(older)})
+	require.NoError(t, err)
+	require.Equal(t, gpuv1.Ready, clusterPolicyState(t, c, older.Name))
+}
+
 func newClusterPolicyUpgradeTestReconciler(t *testing.T, cp *gpuv1.ClusterPolicy, nodes ...*corev1.Node) (*ClusterPolicyReconciler, client.Client, *OperatorMetrics) {
 	t.Helper()
 	scheme := runtime.NewScheme()

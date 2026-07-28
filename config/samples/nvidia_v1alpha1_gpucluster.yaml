@@ -1,7 +1,7 @@
 apiVersion: nvidia.com/v1alpha1
 kind: GPUCluster
 metadata:
-  name: gpucluster-sample
+  name: gpu-cluster
 spec:
   draDriver:
     repository: registry.k8s.io/dra-driver-nvidia

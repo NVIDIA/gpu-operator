@@ -66,10 +66,6 @@ type GPUClusterReconciler struct {
 	stateManager     state.Manager
 	conditionUpdater conditions.Updater
 	recorder         events.EventRecorder
-
-	// singleton is the GPUCluster that owns reconciliation; the first instance to
-	// reconcile claims it (first-wins), mirroring ClusterPolicy.
-	singleton *nvidiav1alpha1.GPUCluster
 }
 
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusters,verbs=get;list;watch;create;update;patch;delete
@@ -108,18 +104,8 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// stack): every operand DaemonSet of both stacks gates on the per-node
 	// nvidia.com/gpu-operator.resource-allocation.mode label, so each node is served by exactly one stack.
 
-	// Singleton, first-wins (mirroring ClusterPolicy): the first instance to reconcile
-	// claims ownership; any other instance is marked Ignored and skipped. The owner is
-	// held in memory, so the choice resets on operator restart.
-	if r.singleton != nil && r.singleton.Name != instance.Name {
-		logger.V(consts.LogLevelWarning).Info("Multiple GPUCluster instances found, ignoring this one",
-			"name", instance.Name, "owner", r.singleton.Name)
-		if err := r.updateCRStatus(ctx, instance, nvidiav1alpha1.Ignored); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-	r.singleton = instance
+	// No singleton claim is needed: the CRD's CEL rule pins metadata.name, so at most
+	// one GPUCluster can exist.
 
 	// DRA requires all driver management through NVIDIADriver CRs: surface an unmet
 	// prerequisite on this CR's status and hold off deploying operands until it is met.
@@ -185,12 +171,10 @@ func (r *GPUClusterReconciler) validatePrerequisites(ctx context.Context) (strin
 	if err := r.List(ctx, clusterPolicies); err != nil {
 		return "", fmt.Errorf("error listing ClusterPolicy objects: %w", err)
 	}
-	// TODO: check only the active singleton ClusterPolicy once the singleton
-	// selection is resolvable across controllers (see resolveActiveConfig).
-	for _, clusterPolicy := range clusterPolicies.Items {
-		if !clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType() {
-			return fmt.Sprintf("ClusterPolicy %s does not have driver.useNvidiaDriverCRD enabled; migrate driver management to NVIDIADriver CRs before enabling DRA", clusterPolicy.Name), nil
-		}
+	// Only the active singleton ClusterPolicy matters here: an Ignored instance
+	// deploys nothing, so it cannot own driver daemonsets.
+	if active := getSingletonClusterPolicy(clusterPolicies.Items); active != nil && !active.Spec.Driver.UseNvidiaDriverCRDType() {
+		return fmt.Sprintf("ClusterPolicy %s does not have driver.useNvidiaDriverCRD enabled; migrate driver management to NVIDIADriver CRs before enabling DRA", active.Name), nil
 	}
 	return "", nil
 }

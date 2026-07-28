@@ -26,11 +26,6 @@ const (
 	GPUClusterCRDName = "GPUCluster"
 )
 
-const (
-	// Ignored marks a duplicate GPUCluster that the singleton controller does not reconcile.
-	Ignored State = "ignored"
-)
-
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // GPUClusterSpec defines the desired state of GPUCluster, the DRA-based
@@ -170,7 +165,7 @@ type HostPathsSpec struct {
 
 // GPUClusterStatus defines the observed state of GPUCluster
 type GPUClusterStatus struct {
-	// +kubebuilder:validation:Enum=ignored;ready;notReady;disabled
+	// +kubebuilder:validation:Enum=ready;notReady;disabled
 	// State indicates the status of the GPUCluster instance
 	State State `json:"state"`
 	// Namespace indicates the namespace in which the operator and operands are installed
@@ -186,6 +181,7 @@ type GPUClusterStatus struct {
 //+kubebuilder:resource:scope=Cluster,shortName={"gc"}
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 //+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,priority=0
+//+kubebuilder:validation:XValidation:rule="self.metadata.name == 'gpu-cluster'",message="GPUCluster is a singleton, metadata.name must be 'gpu-cluster'"
 
 // GPUCluster is the Schema for the gpuclusters API
 type GPUCluster struct {

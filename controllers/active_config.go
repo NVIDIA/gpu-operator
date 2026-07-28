@@ -27,16 +27,38 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
-// TODO: with multiple CRs of a kind, the tie-breaker is list order, which is not
-// guaranteed. Resolve the singleton the reconcilers actually selected instead.
-func resolveActiveConfig(ctx context.Context, c client.Client) (*gpuv1.ClusterPolicy, *nvidiav1alpha1.GPUCluster, error) {
-	var clusterPolicy *gpuv1.ClusterPolicy
+// getSingletonClusterPolicy returns the ClusterPolicy treated as the cluster-wide
+// singleton: oldest creationTimestamp first, lowest name as the tie-breaker. This
+// selection is a heuristic: ideally the operator would hold a reference to the
+// singleton ClusterPolicy globally throughout its lifetime, and until it does,
+// picking the oldest is the next-best approach. Unlike a first-reconciled-wins claim
+// held in controller memory, the result is stable across operator restarts and
+// derivable by every controller. Returns nil for an empty list.
+// GPUCluster needs no selection: its CRD pins metadata.name, enforcing the singleton
+// at admission.
+func getSingletonClusterPolicy(items []gpuv1.ClusterPolicy) *gpuv1.ClusterPolicy {
+	var active *gpuv1.ClusterPolicy
+	for i := range items {
+		candidate := &items[i]
+		if active == nil {
+			active = candidate
+			continue
+		}
+		candidateCreated, activeCreated := candidate.CreationTimestamp, active.CreationTimestamp
+		if candidateCreated.Before(&activeCreated) ||
+			(candidateCreated.Equal(&activeCreated) && candidate.Name < active.Name) {
+			active = candidate
+		}
+	}
+	return active
+}
+
+// resolveActiveConfig returns the active ClusterPolicy, selected with the same
+// getSingletonClusterPolicy rule the ClusterPolicy controller uses, and the GPUCluster.
+func resolveActiveConfig(ctx context.Context, c client.Reader) (*gpuv1.ClusterPolicy, *nvidiav1alpha1.GPUCluster, error) {
 	clusterPolicies := &gpuv1.ClusterPolicyList{}
 	if err := c.List(ctx, clusterPolicies); err != nil {
 		return nil, nil, fmt.Errorf("failed to list ClusterPolicy: %w", err)
-	}
-	if len(clusterPolicies.Items) > 0 {
-		clusterPolicy = &clusterPolicies.Items[0]
 	}
 
 	var gpuCluster *nvidiav1alpha1.GPUCluster
@@ -48,7 +70,7 @@ func resolveActiveConfig(ctx context.Context, c client.Client) (*gpuv1.ClusterPo
 		gpuCluster = &gpuClusters.Items[0]
 	}
 
-	return clusterPolicy, gpuCluster, nil
+	return getSingletonClusterPolicy(clusterPolicies.Items), gpuCluster, nil
 }
 
 // resolveDefaultMode returns the nvidia.com/gpu-operator.resource-allocation.mode value for a GPU node that
