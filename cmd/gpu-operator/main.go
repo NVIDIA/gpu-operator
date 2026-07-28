@@ -193,11 +193,12 @@ func main() {
 		WithRestartOnlyPredicate(predicates.DriverPodRestartOnly(upgradeLogger))
 
 	if err = (&controllers.UpgradeReconciler{
-		Client:          mgr.GetClient(),
-		Log:             upgradeLogger,
-		Scheme:          mgr.GetScheme(),
-		StateManager:    clusterUpgradeStateManager,
-		OperatorMetrics: operatorMetrics,
+		Client:            mgr.GetClient(),
+		Log:               upgradeLogger,
+		Scheme:            mgr.GetScheme(),
+		StateManager:      clusterUpgradeStateManager,
+		OperatorMetrics:   operatorMetrics,
+		OperatorNamespace: operatorNamespace,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
 		os.Exit(1)

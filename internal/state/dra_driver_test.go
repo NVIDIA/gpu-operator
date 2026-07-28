@@ -65,8 +65,7 @@ func sampleGPUCluster() *nvidiav1alpha1.GPUCluster {
 				}},
 				PriorityClassName: "system-node-critical",
 			},
-			HostPaths: nvidiav1.HostPathsSpec{
-				RootFS:           "/",
+			HostPaths: nvidiav1alpha1.HostPathsSpec{
 				DriverInstallDir: "/run/nvidia/driver",
 				KubeletRootDir:   "/var/lib/kubelet",
 			},

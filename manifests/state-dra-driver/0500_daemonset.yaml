@@ -111,7 +111,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: HOST_ROOT
-          value: {{ .HostPaths.RootFS | default "/" | quote }}
+          value: "/"
         - name: DRIVER_INSTALL_DIR
           value: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
         - name: DRIVER_INSTALL_DIR_CTR_PATH
@@ -341,7 +341,7 @@ spec:
           path: /var/run/cdi
       - name: host-root
         hostPath:
-          path: {{ .HostPaths.RootFS | default "/" | quote }}
+          path: "/"
       - name: driver-install-dir
         hostPath:
           path: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}

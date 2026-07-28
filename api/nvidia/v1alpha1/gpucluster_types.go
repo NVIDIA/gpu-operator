@@ -52,7 +52,7 @@ type GPUClusterSpec struct {
 	DCGMExporter *nvidiav1.DCGMExporterSpec `json:"dcgmExporter,omitempty"`
 
 	// HostPaths defines the host paths used in host-path volumes for various components.
-	HostPaths nvidiav1.HostPathsSpec `json:"hostPaths,omitempty"`
+	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
 
 	// Daemonsets defines the common configuration applied to all DaemonSets deployed
 	// by the GPUCluster controller.
@@ -152,6 +152,20 @@ type DRADriverControllerSpec struct {
 
 	// Optional: Define resources requests and limits for the controller container
 	Resources *nvidiav1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// HostPathsSpec defines various paths on the host needed by GPU Operator components.
+// Unlike the v1 ClusterPolicy struct it mirrors, it has no RootFS: the host root is
+// hard-coded to "/" for the DRA stack.
+type HostPathsSpec struct {
+	// DriverInstallDir represents the root at which driver files including libraries,
+	// config files, and executables can be found.
+	DriverInstallDir string `json:"driverInstallDir,omitempty"`
+
+	// KubeletRootDir represents the location of the kubelet root directory.
+	// If empty, it will default to "/var/lib/kubelet".
+	// +kubebuilder:default="/var/lib/kubelet"
+	KubeletRootDir string `json:"kubeletRootDir,omitempty"`
 }
 
 // GPUClusterStatus defines the observed state of GPUCluster

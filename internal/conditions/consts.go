@@ -32,4 +32,6 @@ const (
 	OperandNotReady = "OperandNotReady"
 	// DriverNotReady indicates that the driver daemonset pods are not ready
 	DriverNotReady = "DriverNotReady"
+	// PrerequisiteNotMet indicates that a configuration prerequisite for reconciliation has not been met
+	PrerequisiteNotMet = "PrerequisiteNotMet"
 )

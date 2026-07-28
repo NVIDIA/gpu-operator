@@ -129,7 +129,6 @@ spec:
       name: {{ .Values.dcgmExporter.config.name }}
     {{- end }}
   hostPaths:
-    rootFS: {{ .Values.hostPaths.rootFS }}
     driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
     {{- if .Values.hostPaths.kubeletRootDir }}
     kubeletRootDir: {{ .Values.hostPaths.kubeletRootDir }}
