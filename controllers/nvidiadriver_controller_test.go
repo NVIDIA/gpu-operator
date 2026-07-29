@@ -137,7 +137,22 @@ func TestReconcile(t *testing.T) {
 				CustomError: nil,
 			},
 			error:       nil,
-			expectedLog: "GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers",
+			expectedLog: "GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver (unless also using pre-compiled images) is not supported along with pre-compiled NVIDIA drivers",
+		},
+		{
+			name:   "driver CRD true, no validator errors, use precompiled drivers and GDRCopy enabled without precompiled",
+			useCRD: ptr.To(true),
+			spec: nvidiav1alpha1.NVIDIADriverSpec{
+				UsePrecompiled: ptr.To(true),
+				GDRCopy: &nvidiav1alpha1.GDRCopySpec{
+					Enabled: ptr.To(true),
+				},
+			},
+			validator: &FakeNodeSelectorValidator{
+				CustomError: nil,
+			},
+			error:       nil,
+			expectedLog: "GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver (unless also using pre-compiled images) is not supported along with pre-compiled NVIDIA drivers",
 		},
 	}
 

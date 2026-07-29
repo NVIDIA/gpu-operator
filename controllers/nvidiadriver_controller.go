@@ -152,8 +152,9 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
-		err := errors.New("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver is not supported along with pre-compiled NVIDIA drivers")
+	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() ||
+		(instance.Spec.IsGDRCopyEnabled() && !instance.Spec.GDRCopy.UsePrecompiledDrivers())) {
+		err := errors.New("GPUDirect Storage driver (nvidia-fs) and/or GDRCopy driver (unless also using pre-compiled images) is not supported along with pre-compiled NVIDIA drivers")
 		logger.Error(err, "unsupported driver combination detected")
 		instance.Status.State = nvidiav1alpha1.NotReady
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
