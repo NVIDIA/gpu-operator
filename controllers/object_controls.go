@@ -3426,8 +3426,17 @@ func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string
 	case *gpuv1.GDRCopySpec:
 		spec := driverSpec.(*gpuv1.GDRCopySpec)
 		if spec.UsePrecompiledDrivers() {
-			// use per kernel version tag
-			image = spec.Repository + "/" + spec.Image + ":" + spec.Version + "-" + n.currentKernelVersion
+			if spec.Repository == "" && spec.Version == "" {
+				if spec.Image != "" {
+					// this is useful for tools like kbld(carvel) which will just specify gdrcopy.image param as path:version
+					image = spec.Image + "-" + n.currentKernelVersion
+				} else {
+					return "", fmt.Errorf("unable to resolve gdrcopy image path for pre-compiled drivers, gdrcopy.repository, gdrcopy.image and gdrcopy.version have to be specified in the ClusterPolicy")
+				}
+			} else {
+				// use per kernel version tag
+				image = spec.Repository + "/" + spec.Image + ":" + spec.Version + "-" + n.currentKernelVersion
+			}
 		} else {
 			image, err = gpuv1.ImagePath(spec)
 			if err != nil {
