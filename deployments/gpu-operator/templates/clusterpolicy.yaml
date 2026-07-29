@@ -722,6 +722,7 @@ spec:
   {{- if .Values.gdrcopy }}
   gdrcopy:
     enabled: {{ .Values.gdrcopy.enabled | default false }}
+    usePrecompiled: {{ .Values.gdrcopy.usePrecompiled | default false }}
     {{- if .Values.gdrcopy.repository }}
     repository: {{ .Values.gdrcopy.repository }}
     {{- end }}
