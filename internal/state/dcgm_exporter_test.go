@@ -88,9 +88,7 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 
 	ds := findDaemonSet(t, objs)
 	podSpec := ds.Spec.Template.Spec
-	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-exporter"])
-	// The mode gate keeps the DRA-stack exporter off device-plugin nodes.
-	assert.Equal(t, "dra", podSpec.NodeSelector["nvidia.com/gpu-operator.resource-allocation.mode"])
+	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-exporter-dra"])
 	require.NotNil(t, podSpec.AutomountServiceAccountToken)
 	assert.False(t, *podSpec.AutomountServiceAccountToken)
 

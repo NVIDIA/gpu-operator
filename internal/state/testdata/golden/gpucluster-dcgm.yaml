@@ -84,8 +84,7 @@ spec:
         securityContext:
           privileged: true
       nodeSelector:
-        nvidia.com/gpu-operator.resource-allocation.mode: dra
-        nvidia.com/gpu.deploy.dcgm: "true"
+        nvidia.com/gpu.deploy.dcgm-dra: "true"
       priorityClassName: system-node-critical
       resourceClaims:
       - name: admin-gpus

@@ -32,7 +32,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestResolveActiveConfig(t *testing.T) {
@@ -136,27 +135,4 @@ func TestResolveActiveConfig(t *testing.T) {
 		assert.Nil(t, cp)
 		assert.Nil(t, gc)
 	})
-}
-
-func TestResolveDefaultMode(t *testing.T) {
-	testCases := []struct {
-		description         string
-		clusterPolicyExists bool
-		gpuClusterExists    bool
-		envDefaultMode      consts.GPUAllocationMode
-		expected            consts.GPUAllocationMode
-	}{
-		{"both CRs, DEFAULT_GPU_ALLOCATION_MODE=dra", true, true, consts.GPUAllocationModeDRA, consts.GPUAllocationModeDRA},
-		{"both CRs, DEFAULT_GPU_ALLOCATION_MODE=device-plugin", true, true, consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDevicePlugin},
-		{"both CRs, DEFAULT_GPU_ALLOCATION_MODE unset defaults to device-plugin", true, true, "", consts.GPUAllocationModeDevicePlugin},
-		{"only ClusterPolicy ignores DEFAULT_GPU_ALLOCATION_MODE", true, false, consts.GPUAllocationModeDRA, consts.GPUAllocationModeDevicePlugin},
-		{"only GPUCluster ignores DEFAULT_GPU_ALLOCATION_MODE", false, true, consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDRA},
-		{"neither CR resolves to no mode", false, false, consts.GPUAllocationModeDRA, ""},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			mode := resolveDefaultMode(tc.clusterPolicyExists, tc.gpuClusterExists, tc.envDefaultMode)
-			assert.Equal(t, tc.expected, mode)
-		})
-	}
 }

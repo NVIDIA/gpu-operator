@@ -72,7 +72,6 @@ spec:
           claims:
           - name: validation-gpu
       nodeSelector:
-        nvidia.com/gpu-operator.resource-allocation.mode: dra
         nvidia.com/gpu.deploy.dra-validator: "true"
       priorityClassName: system-node-critical
       resourceClaims:

@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -60,16 +59,14 @@ type NodeLabelingReconciler struct {
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
-// re-receive that state as arguments. clusterPolicy drives the device-plugin stack and
-// gpuCluster the DRA stack; the two may coexist, with each node served by exactly
-// one stack according to its nvidia.com/gpu-operator.resource-allocation.mode label. defaultMode is the mode
-// applied to GPU nodes that do not have the label yet.
+// re-receive that state as arguments. Exactly one of clusterPolicy (device-plugin stack)
+// or gpuCluster (DRA stack) is non-nil per reconcile; Reconcile returns an error if both
+// exist simultaneously.
 type nodeLabelingController struct {
 	client        client.Client
 	namespace     string
 	clusterPolicy *gpuv1.ClusterPolicy
 	gpuCluster    *nvidiav1alpha1.GPUCluster
-	defaultMode   consts.GPUAllocationMode
 	logger        logr.Logger
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
@@ -93,8 +90,6 @@ type nodeLabelUpdateReasons struct {
 	gpuCommonLabelOutdated       bool
 	gpuCommonLabelChanged        bool
 	commonOperandsLabelChanged   bool
-	modeLabelMissing             bool
-	modeLabelChanged             bool
 	gpuWorkloadConfigChanged     bool
 	migCapableLabelChanged       bool
 	osTreeLabelChanged           bool
@@ -107,8 +102,6 @@ func (r nodeLabelUpdateReasons) needsUpdate() bool {
 		r.gpuCommonLabelOutdated ||
 		r.gpuCommonLabelChanged ||
 		r.commonOperandsLabelChanged ||
-		r.modeLabelMissing ||
-		r.modeLabelChanged ||
 		r.gpuWorkloadConfigChanged ||
 		r.migCapableLabelChanged ||
 		r.osTreeLabelChanged ||
@@ -125,8 +118,6 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 		gpuCommonLabelOutdated:       !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels),
 		gpuCommonLabelChanged:        oldLabels[commonGPULabelKey] != newLabels[commonGPULabelKey],
 		commonOperandsLabelChanged:   hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels),
-		modeLabelMissing:             hasCommonGPULabel(newLabels) && newLabels[consts.GPUAllocationModeLabelKey] == "",
-		modeLabelChanged:             oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey],
 		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
 		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
@@ -140,8 +131,6 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.Info("Reconciling node labels")
 
-	// The ClusterPolicy (device-plugin stack) and GPUCluster (DRA stack) CRs may
-	// coexist; neither existing means there is nothing to label.
 	clusterPolicy, gpuCluster, err := resolveActiveConfig(ctx, r.Client)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -150,14 +139,9 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.Log.Info("No ClusterPolicy or GPUCluster CR exists, skipping node labeling")
 		return reconcile.Result{}, nil
 	}
-
-	envDefaultMode, err := defaultModeFromEnv()
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	if clusterPolicy != nil && gpuCluster != nil && envDefaultMode == "" {
-		r.Log.Info("WARNING: both ClusterPolicy and GPUCluster exist but DEFAULT_GPU_ALLOCATION_MODE is unset; " +
-			"defaulting new GPU nodes to the device-plugin stack")
+	// TODO: allow both CRs to co-exist
+	if clusterPolicy != nil && gpuCluster != nil {
+		return reconcile.Result{}, fmt.Errorf("both ClusterPolicy and GPUCluster CRs exist; only one may be present at a time")
 	}
 
 	nlc := &nodeLabelingController{
@@ -165,7 +149,6 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		namespace:     r.Namespace,
 		clusterPolicy: clusterPolicy,
 		gpuCluster:    gpuCluster,
-		defaultMode:   resolveDefaultMode(clusterPolicy != nil, gpuCluster != nil, envDefaultMode),
 		logger:        r.Log,
 	}
 
@@ -192,9 +175,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	usesNvidiaDriverCRD := nlc.gpuCluster != nil ||
 		(nlc.clusterPolicy != nil && nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())
 	if usesNvidiaDriverCRD {
-		classicClusterPolicyDriver := nlc.clusterPolicy != nil &&
-			!nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType()
-		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client, classicClusterPolicyDriver); err != nil {
+		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to assign NVIDIADriver owners to nodes: %w", err)
 		}
 		if err := nlc.labelNodesWithOrphanedDriverPods(ctx); err != nil {
@@ -215,21 +196,6 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return reconcile.Result{}, nil
 }
 
-// defaultModeFromEnv reads and validates the DEFAULT_GPU_ALLOCATION_MODE operator
-// environment variable. Unset yields the empty mode (resolveDefaultMode then falls back
-// to device-plugin); a set-but-invalid value is an error.
-func defaultModeFromEnv() (consts.GPUAllocationMode, error) {
-	raw := os.Getenv(consts.DefaultGPUAllocationModeEnvName)
-	switch mode := consts.GPUAllocationMode(raw); mode {
-	case "", consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDRA:
-		return mode, nil
-	default:
-		return "", fmt.Errorf("invalid %s environment variable: %q is not one of %q or %q",
-			consts.DefaultGPUAllocationModeEnvName, raw,
-			consts.GPUAllocationModeDevicePlugin, consts.GPUAllocationModeDRA)
-	}
-}
-
 // labelGPUNodes reconciles GPU-related labels and reports which node labels were patched.
 func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLabelsUpdateResult, error) {
 	result := gpuNodeLabelsUpdateResult{}
@@ -242,7 +208,6 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 		original := node.DeepCopy()
 		labels := node.GetLabels()
 		gpuDiscoveryStateChanged := false
-		modeLabelModified := false
 		stateLabelsModified := false
 
 		if nlc.reconcileCommonGPULabel(labels, node.Name) {
@@ -250,17 +215,12 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 			gpuDiscoveryStateChanged = true
 		}
 
-		if nlc.reconcileModeLabel(labels, node.Name) {
-			node.SetLabels(labels)
-			modeLabelModified = true
-		}
-
 		if nlc.updateGPUStateLabels(ctx, labels, node.Name) {
 			node.SetLabels(labels)
 			stateLabelsModified = true
 		}
 
-		modified := gpuDiscoveryStateChanged || modeLabelModified || stateLabelsModified
+		modified := gpuDiscoveryStateChanged || stateLabelsModified
 		if modified {
 			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
 				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
@@ -290,52 +250,22 @@ func (nlc *nodeLabelingController) reconcileCommonGPULabel(labels map[string]str
 	return false
 }
 
-// reconcileModeLabel writes nvidia.com/gpu-operator.resource-allocation.mode on GPU nodes that do not have it
-// yet. An existing value is never overwritten (or removed), whether set by a previous
-// reconcile or manually by a user: changing the cluster configuration or DEFAULT_GPU_ALLOCATION_MODE
-// must not migrate nodes that are already serving GPUs through one stack. Returns true if
-// labels were modified.
-func (nlc *nodeLabelingController) reconcileModeLabel(labels map[string]string, nodeName string) bool {
-	if !hasCommonGPULabel(labels) {
-		return false
-	}
-	if _, ok := labels[consts.GPUAllocationModeLabelKey]; ok {
-		return false
-	}
-	nlc.logger.Info("Setting GPU Operator mode label", "NodeName", nodeName,
-		"Label", consts.GPUAllocationModeLabelKey, "Value", nlc.defaultMode)
-	labels[consts.GPUAllocationModeLabelKey] = string(nlc.defaultMode)
-	return true
-}
-
 // updateGPUStateLabels syncs nvidia.com/gpu.deploy.* labels and sets the MIG config label when
-// appropriate. Which label set is applied follows the node's nvidia.com/gpu-operator.resource-allocation.mode
-// label; deploy labels exclusive to the other stack are swept away, while shared and
-// unrecognized deploy labels are left alone. If the node does not have the common GPU
-// label, all state labels are removed. Returns true if labels were modified.
+// appropriate. Which label set is applied follows which CR is active (gpuCluster → DRA stack,
+// clusterPolicy → device-plugin stack); deploy labels exclusive to the other stack are swept
+// away, while shared and unrecognized deploy labels are left alone. If the node does not have
+// the common GPU label, all state labels are removed. Returns true if labels were modified.
 func (nlc *nodeLabelingController) updateGPUStateLabels(ctx context.Context, labels map[string]string, nodeName string) bool {
 	if !hasCommonGPULabel(labels) {
 		return removeAllGPUStateLabels(labels)
 	}
 
-	switch consts.GPUAllocationMode(labels[consts.GPUAllocationModeLabelKey]) {
-	case consts.GPUAllocationModeDRA:
-		if nlc.gpuCluster == nil {
-			return false
-		}
+	if nlc.gpuCluster != nil {
 		// Sweep only the device-plugin stack's exclusive keys so k8s-driver-manager
 		// pause state on the DRA stack's own keys survives.
 		sweptPreviousStack := nlc.removeLabelsFromNode(labels, devicePluginOnlyStateLabelKeys(), nodeName)
 		appliedStackLabels := updateGPUClusterStateLabels(labels)
 		return sweptPreviousStack || appliedStackLabels
-	case consts.GPUAllocationModeDevicePlugin:
-		if nlc.clusterPolicy == nil {
-			return false
-		}
-	default:
-		// Unlabeled (or unrecognized mode): apply no deploy labels, which keeps the node
-		// empty of operands until a mode is set.
-		return false
 	}
 
 	cp := nlc.clusterPolicy
@@ -766,8 +696,6 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 					"gpuCommonLabelOutdated", reasons.gpuCommonLabelOutdated,
 					"gpuCommonLabelChanged", reasons.gpuCommonLabelChanged,
 					"commonOperandsLabelChanged", reasons.commonOperandsLabelChanged,
-					"modeLabelMissing", reasons.modeLabelMissing,
-					"modeLabelChanged", reasons.modeLabelChanged,
 					"gpuWorkloadConfigLabelChanged", reasons.gpuWorkloadConfigChanged,
 					"migCapableLabelChanged", reasons.migCapableLabelChanged,
 					"osTreeLabelChanged", reasons.osTreeLabelChanged,

@@ -131,8 +131,25 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
+	// TODO: remove the below code block once both ClusterPolicy and GPUCluster can co-exist
+	gpuClusters := &nvidiav1alpha1.GPUClusterList{}
+	if err := r.List(ctx, gpuClusters); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list GPUCluster objects: %w", err)
+	}
+	if len(gpuClusters.Items) > 0 {
+		err := fmt.Errorf("conflicting GPUCluster resource %q detected; ClusterPolicy and GPUCluster cannot co-exist", gpuClusters.Items[0].Name)
+		r.Log.Error(err, "only one CR may be present at a time")
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
+			r.Log.Error(condErr, "failed to set condition")
+		}
+		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
+		return ctrl.Result{}, err
+	}
+
 	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {
 		r.Log.Error(err, "unable to initialize ClusterPolicy controller")
+		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			r.Log.Error(condErr, "failed to set condition")
 		}
@@ -366,16 +383,12 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]
 			osTreeLabelChanged := oldOSTreeLabel != newOSTreeLabel
 
-			// The resource-allocation mode label gates rendering of the mode nodeSelector
-			// on operand DaemonSets, so re-render when it lands or changes.
-			modeLabelChanged := oldLabels[consts.GPUAllocationModeLabelKey] != newLabels[consts.GPUAllocationModeLabelKey]
 			driverOwnerLabelChanged, driverUpgradeStateLabelChanged, driverUpgradeSkipLabelChanged := driverUpgradeLabelsChanged(oldLabels, newLabels)
 
 			needsUpdate := gpuCommonLabelAdded ||
 				commonOperandsLabelChanged ||
 				gpuWorkloadConfigLabelChanged ||
 				osTreeLabelChanged ||
-				modeLabelChanged ||
 				driverOwnerLabelChanged ||
 				driverUpgradeStateLabelChanged ||
 				driverUpgradeSkipLabelChanged
@@ -387,7 +400,6 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 					"commonOperandsLabelChanged", commonOperandsLabelChanged,
 					"gpuWorkloadConfigLabelChanged", gpuWorkloadConfigLabelChanged,
 					"osTreeLabelChanged", osTreeLabelChanged,
-					"modeLabelChanged", modeLabelChanged,
 					"driverOwnerLabelChanged", driverOwnerLabelChanged,
 					"driverUpgradeStateLabelChanged", driverUpgradeStateLabelChanged,
 					"driverUpgradeSkipLabelChanged", driverUpgradeSkipLabelChanged,

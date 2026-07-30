@@ -76,9 +76,6 @@ operator:
   #version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  # Additional environment variables for the operator container, e.g. DEFAULT_GPU_ALLOCATION_MODE
-  # ("device-plugin" or "dra"): the stack assigned to new GPU nodes when both a
-  # ClusterPolicy and a GPUCluster exist.
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia
@@ -563,26 +560,24 @@ ccManager:
   resources: {}
   hostNetwork: false
 
-# clusterPolicy controls whether the chart deploys the ClusterPolicy CR, which
-# manages the classic device-plugin GPU enablement stack. Disable it to run a
-# GPUCluster-only (DRA) installation.
+# The ClusterPolicy CR stores the desired state of the GPU
+# enablement stack based on the Kubernetes Device Plugin framework.
 clusterPolicy:
   deployCR: true
 
-# gpuCluster deploys the DRA-based GPU enablement stack (the NVIDIA DRA
-# driver for GPUs) via a GPUCluster CR. This is an alpha feature
-# (nvidia.com/v1alpha1) and is disabled by default.
+# The GPUCluster CR stores the desired state of the GPU
+# enablement stack based on Dynamic Resource Allocation (DRA).
+# This is an experimental feature and is disabled by default.
 #
-# The GPUCluster and ClusterPolicy CRs may coexist: each GPU node is served by
-# exactly one stack according to its nvidia.com/gpu-operator.resource-allocation.mode
-# label. Requires an NVIDIA driver (>= 580) with CDI, host-installed or via
-# driver.enabled / an NVIDIADriver CR; GPUCluster waits for driver readiness
-# before deploying.
+# To enable the GPUCluster (DRA) enablement stack, set
+# gpuCluster.deployCR=true and clusterPolicy.deployCR=false
+# It is an invalid configuration for both CRs to exist.
 gpuCluster:
   deployCR: false
 
-# draDriver configures the NVIDIA DRA driver operand managed by the GPUCluster
-# CR (rendered only when gpuCluster.deployCR is true).
+# draDriver configures the NVIDIA DRA driver for GPUs which
+# is managed by the GPUCluster CR (rendered only when
+# gpuCluster.deployCR=true).
 draDriver:
   repository: registry.k8s.io/dra-driver-nvidia
   image: dra-driver-nvidia-gpu

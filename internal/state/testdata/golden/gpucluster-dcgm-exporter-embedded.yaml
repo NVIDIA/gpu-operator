@@ -122,8 +122,7 @@ spec:
           name: pod-gpu-resources
           readOnly: true
       nodeSelector:
-        nvidia.com/gpu-operator.resource-allocation.mode: dra
-        nvidia.com/gpu.deploy.dcgm-exporter: "true"
+        nvidia.com/gpu.deploy.dcgm-exporter-dra: "true"
       priorityClassName: system-node-critical
       resourceClaims:
       - name: admin-gpus

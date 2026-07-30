@@ -35,8 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -79,6 +77,8 @@ const (
 	driverDeployLabelKey           = "nvidia.com/gpu.deploy.driver"
 	draDriverDeployLabelKey        = "nvidia.com/gpu.deploy.dra-driver"
 	draValidatorDeployLabelKey     = "nvidia.com/gpu.deploy.dra-validator"
+	draDCGMDeployLabelKey          = "nvidia.com/gpu.deploy.dcgm-dra"
+	draDCGMExporterDeployLabelKey  = "nvidia.com/gpu.deploy.dcgm-exporter-dra"
 	gfdDeployLabelKey              = "nvidia.com/gpu.deploy.gpu-feature-discovery"
 	dcgmDeployLabelKey             = "nvidia.com/gpu.deploy.dcgm"
 	dcgmExporterDeployLabelKey     = "nvidia.com/gpu.deploy.dcgm-exporter"
@@ -129,11 +129,11 @@ var gpuStateLabels = map[string]map[string]string{
 // GPUCluster operands gate their nodeSelectors on, analogous to gpuStateLabels for
 // the ClusterPolicy stack.
 var gpuClusterStateLabels = map[string]string{
-	driverDeployLabelKey:       "true",
-	draDriverDeployLabelKey:    "true",
-	draValidatorDeployLabelKey: "true",
-	dcgmDeployLabelKey:         "true",
-	dcgmExporterDeployLabelKey: "true",
+	driverDeployLabelKey:          "true",
+	draDriverDeployLabelKey:       "true",
+	draValidatorDeployLabelKey:    "true",
+	draDCGMDeployLabelKey:         "true",
+	draDCGMExporterDeployLabelKey: "true",
 }
 
 // clusterPolicyStateLabelKeys returns every deploy-label key the ClusterPolicy
@@ -225,11 +225,6 @@ type ClusterPolicyController struct {
 	hasGPUNodes      bool
 	hasNFDLabels     bool
 	sandboxEnabled   bool
-
-	// gpuClusterExists and allGPUNodesModeLabeled gate rendering of the resource-allocation
-	// mode nodeSelector on operand DaemonSets; see applyModeSelector.
-	gpuClusterExists       bool
-	allGPUNodesModeLabeled bool
 }
 
 func addState(n *ClusterPolicyController, path string) {
@@ -526,8 +521,7 @@ func (w *gpuWorkloadConfiguration) removeGPUStateLabels(labels map[string]string
 }
 
 // discoverGPUNodes reads all cluster nodes and returns whether any NFD labels are present
-// and how many GPU nodes (with nvidia.com/gpu.present=true) exist. It also records in
-// n.allGPUNodesModeLabeled whether every GPU node carries the resource-allocation mode label.
+// and how many GPU nodes (with nvidia.com/gpu.present=true) exist.
 // Node label writes are handled by NodeLabelingReconciler.
 func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 	ctx := n.ctx
@@ -538,7 +532,6 @@ func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 
 	clusterHasNFDLabels := false
 	gpuNodesTotal := 0
-	n.allGPUNodesModeLabeled = true
 	for _, node := range list.Items {
 		labels := node.GetLabels()
 		if !clusterHasNFDLabels {
@@ -548,9 +541,6 @@ func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 			continue
 		}
 		gpuNodesTotal++
-		if labels[consts.GPUAllocationModeLabelKey] == "" {
-			n.allGPUNodesModeLabeled = false
-		}
 		if n.ocpDriverToolkit.requested {
 			rhcosVersion, ok := labels[nfdOSTreeVersionLabelKey]
 			if ok {
@@ -878,12 +868,6 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	}
 	n.hasGPUNodes = gpuNodeCount != 0
 	n.hasNFDLabels = hasNFDLabels
-
-	gpuClusters := &nvidiav1alpha1.GPUClusterList{}
-	if err := n.client.List(ctx, gpuClusters); err != nil {
-		return fmt.Errorf("unable to list GPUClusters: %w", err)
-	}
-	n.gpuClusterExists = len(gpuClusters.Items) > 0
 
 	if n.hasGPUNodes {
 		gpuNodeOSRelease, gpuNodeOSTag, err := n.getGPUNodeOSInfo()

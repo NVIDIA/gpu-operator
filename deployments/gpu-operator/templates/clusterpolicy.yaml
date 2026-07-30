@@ -1,5 +1,3 @@
-{{- /* ClusterPolicy (device-plugin stack) and GPUCluster (DRA stack) may coexist; per-node
-       ownership is decided by the nvidia.com/gpu-operator.resource-allocation.mode label. */ -}}
 {{- if .Values.clusterPolicy.deployCR }}
 apiVersion: nvidia.com/v1
 kind: ClusterPolicy

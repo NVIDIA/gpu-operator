@@ -20,13 +20,11 @@ import (
 	"context"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +36,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 )
 
@@ -217,52 +214,17 @@ func TestGPUClusterTeardownDrainsClaimConsumersFirst(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: plugin.Name, Namespace: "test-namespace"}, ds))
 }
 
-// A ClusterPolicy in the cluster does not disable the GPUCluster, provided it
-// delegates driver management to NVIDIADriver CRs: the two stacks coexist, with
-// per-node ownership decided by the nvidia.com/gpu-operator.resource-allocation.mode label.
+// A ClusterPolicy and GPUCluster CR cannot co-exist
 func TestGPUClusterCoexistsWithClusterPolicy(t *testing.T) {
-	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
-	cp := &gpuv1.ClusterPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
-		Spec: gpuv1.ClusterPolicySpec{
-			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
-		},
-	}
-	r, c := newGPUClusterReconciler(t, cfg, cp)
-
-	gccReconcile(t, r, cfg.Name)
-
-	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
-}
-
-// A ClusterPolicy that manages its own driver (useNvidiaDriverCRD=false) is an invalid
-// companion for DRA: the GPUCluster reports the unmet prerequisite and deploys nothing.
-func TestGPUClusterClusterPolicyDriverPrerequisite(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
 	r, c := newGPUClusterReconciler(t, cfg, cp)
-	r.conditionUpdater = conditions.NewGPUClusterUpdater(c)
 
-	res, err := r.Reconcile(t.Context(), gccRequest(cfg.Name))
-	require.NoError(t, err)
-	require.Equal(t, time.Minute, res.RequeueAfter)
-
+	gccReconcile(t, r, cfg.Name)
 	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
-	require.Nil(t, r.stateManager.(*fakeStateManager).lastCatalog, "operands must not be synced")
 
-	instance := &nvidiav1alpha1.GPUCluster{}
-	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cfg.Name}, instance))
-	cond := meta.FindStatusCondition(instance.Status.Conditions, conditions.Error)
-	require.NotNil(t, cond)
-	require.Equal(t, conditions.PrerequisiteNotMet, cond.Reason)
-	require.Contains(t, cond.Message, "useNvidiaDriverCRD")
-
-	// Toggling the flag to true clears the prerequisite on the next reconcile.
-	updated := &gpuv1.ClusterPolicy{}
-	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cp.Name}, updated))
-	updated.Spec.Driver.UseNvidiaDriverCRD = ptr.To(true)
-	require.NoError(t, c.Update(t.Context(), updated))
-
+	// Deleting the ClusterPolicy instance satisfies the prerequisites on the next reconcile
+	require.NoError(t, c.Delete(t.Context(), cp))
 	gccReconcile(t, r, cfg.Name)
 	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
 }

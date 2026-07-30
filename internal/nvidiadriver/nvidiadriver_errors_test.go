@@ -62,7 +62,7 @@ func TestAssignOwnersReturnsErrorWhenDriverListFails(t *testing.T) {
 		}).
 		Build()
 
-	changed, err := AssignOwners(context.Background(), c, false)
+	changed, err := AssignOwners(context.Background(), c)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "failed to list NVIDIADriver CRs")
@@ -88,7 +88,7 @@ func TestAssignOwnersReturnsErrorWhenNodeListFails(t *testing.T) {
 		}).
 		Build()
 
-	changed, err := AssignOwners(context.Background(), c, false)
+	changed, err := AssignOwners(context.Background(), c)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "failed to list GPU nodes")
@@ -112,7 +112,7 @@ func TestAssignOwnersReturnsErrorWhenOwnerLabelUpdateFails(t *testing.T) {
 		}).
 		Build()
 
-	changed, err := AssignOwners(context.Background(), c, false)
+	changed, err := AssignOwners(context.Background(), c)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "failed to update NVIDIADriver owner label for node \"gpu-node\"")
@@ -134,7 +134,7 @@ func TestAssignOwnersReturnsErrorWhenOwnerLabelRemovalFails(t *testing.T) {
 		}).
 		Build()
 
-	changed, err := AssignOwners(context.Background(), c, false)
+	changed, err := AssignOwners(context.Background(), c)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "failed to remove NVIDIADriver owner label for node \"gpu-node\"")

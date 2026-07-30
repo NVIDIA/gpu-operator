@@ -123,43 +123,6 @@ func TestNodeMatchesSelector(t *testing.T) {
 	}
 }
 
-func TestAssignOwnersSkipsDevicePluginNodesUnderClassicClusterPolicyDriver(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
-	require.NoError(t, corev1.AddToScheme(scheme))
-
-	defaultDriver := &nvidiav1alpha1.NVIDIADriver{
-		ObjectMeta: metav1.ObjectMeta{Name: consts.DefaultNVIDIADriverName},
-		Spec:       nvidiav1alpha1.NVIDIADriverSpec{Default: true},
-	}
-	draNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
-		Name: "dra-node",
-		Labels: map[string]string{
-			consts.GPUPresentLabel:           "true",
-			consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDRA),
-		},
-	}}
-	devicePluginNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
-		Name: "device-plugin-node",
-		Labels: map[string]string{
-			consts.GPUPresentLabel:           "true",
-			consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-			consts.NVIDIADriverOwnerLabel:    consts.DefaultNVIDIADriverName,
-		},
-	}}
-
-	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, draNode, devicePluginNode).Build()
-
-	changed, err := AssignOwners(context.Background(), k8sClient, true)
-	require.NoError(t, err)
-	require.True(t, changed)
-
-	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "dra-node"}, draNode))
-	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "device-plugin-node"}, devicePluginNode))
-	require.Equal(t, consts.DefaultNVIDIADriverName, draNode.Labels[consts.NVIDIADriverOwnerLabel])
-	require.NotContains(t, devicePluginNode.Labels, consts.NVIDIADriverOwnerLabel)
-}
-
 func TestAssignNVIDIADriverOwnersGivesSpecificDriversPrecedence(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
@@ -186,7 +149,7 @@ func TestAssignNVIDIADriverOwnersGivesSpecificDriversPrecedence(t *testing.T) {
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, specificDriver, defaultNode, specificNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -218,7 +181,7 @@ func TestAssignNVIDIADriverOwnersAllowsMissingDefaultDriver(t *testing.T) {
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(specificDriver, unmatchedNode, specificNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -255,7 +218,7 @@ func TestAssignNVIDIADriverOwnersIgnoresDeletingDrivers(t *testing.T) {
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(deletingDriver, node).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -279,7 +242,7 @@ func TestAssignNVIDIADriverOwnersUsesDefaultDriverWithArbitraryName(t *testing.T
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, node).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -320,7 +283,7 @@ func TestAssignNVIDIADriverOwnersReturnsFalseWhenOwnersAreCurrent(t *testing.T) 
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, specificDriver, defaultNode, specificNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.NoError(t, err)
 	require.False(t, changed)
 }
@@ -345,7 +308,7 @@ func TestAssignNVIDIADriverOwnersErrorsOnMultipleDefaultDrivers(t *testing.T) {
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriverA, defaultDriverB, node).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "multiple default NVIDIADrivers found")
@@ -375,7 +338,7 @@ func TestAssignNVIDIADriverOwnersRejectsReservedOwnerLabelSelector(t *testing.T)
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(driver, node).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "reserved label")
@@ -418,7 +381,7 @@ func TestAssignNVIDIADriverOwnersRejectsDefaultDriverNodeSelector(t *testing.T) 
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, specificDriver, defaultNode, unmatchedNode, specificNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "default NVIDIADriver")
@@ -464,7 +427,7 @@ func TestAssignNVIDIADriverOwnersDoesNotFallbackToDefaultOnUserDriverConflict(t 
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, driverA, driverB, conflictedNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "multiple NVIDIADrivers match the same node")
@@ -510,7 +473,7 @@ func TestAssignNVIDIADriverOwnersDoesNotChangeOwnersWhenAnyUserDriverConflicts(t
 
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultDriver, goldDriver, silverDriver, goldNode, defaultNode).Build()
 
-	changed, err := AssignOwners(context.Background(), k8sClient, false)
+	changed, err := AssignOwners(context.Background(), k8sClient)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "multiple NVIDIADrivers match the same node")
