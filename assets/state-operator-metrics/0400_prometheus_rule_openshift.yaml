@@ -10,10 +10,8 @@ spec:
   - name: Alert on GPU Operator operator reconciliation failure
     rules:
     - alert: GPUOperatorReconciliationFailed
-      expr: |
-        gpu_operator_reconciliation_status != 1
-        AND
-        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 3600)
+      expr: gpu_operator_reconciliation_status != 1
+      for: 1h
       labels:
         severity: warning
       annotations:
@@ -30,9 +28,8 @@ spec:
       expr: |
         gpu_operator_reconciliation_status != 1
         AND
-        (time() - gpu_operator_reconciliation_last_success_ts_seconds > 1800)
-        AND
         gpu_operator_reconciliation_has_nfd_labels == 0
+      for: 30m
       labels:
         severity: warning
       annotations:
