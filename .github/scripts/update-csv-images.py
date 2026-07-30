@@ -24,8 +24,20 @@ import sys
 import yaml
 
 
+class LiteralBlock(str):
+    """A string serialized as a YAML literal block scalar."""
+
+
+def represent_literal_block(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+
+yaml.SafeDumper.add_representer(LiteralBlock, represent_literal_block)
+
+
 RELATED_IMAGE_COMPONENTS = {
     "gpu-operator-image": "operator",
+    "nvidia-dra-driver-image": "draDriver",
     "gpu-operator-validator-image": "validator",
     "dcgm-exporter-image": "dcgmExporter",
     "dcgm-image": "dcgm",
@@ -44,6 +56,7 @@ RELATED_IMAGE_COMPONENTS = {
 
 ENV_IMAGE_COMPONENTS = {
     "VALIDATOR_IMAGE": "validator",
+    "DRA_DRIVER_IMAGE": "draDriver",
     "GFD_IMAGE": "gfd",
     "CONTAINER_TOOLKIT_IMAGE": "toolkit",
     "DCGM_IMAGE": "dcgm",
@@ -218,25 +231,39 @@ def split_repository_image_version(image_ref):
     return repository, image, version
 
 
+def split_repository_image_digest_version(image_ref):
+    repository, image, version = split_repository_image_version(image_ref)
+    if "@sha256:" in image_ref:
+        version = image_ref.rsplit("@", 1)[1]
+    return repository, image, version
+
+
+def update_image_reference_fields(spec, image_ref):
+    repository, image, version = split_repository_image_digest_version(image_ref)
+    spec["repository"] = repository
+    spec["image"] = image
+    spec["version"] = version
+
+
 def update_alm_examples(csv, image_refs):
     annotations = csv.get("metadata", {}).get("annotations", {})
     alm_examples = annotations.get("alm-examples")
     driver_ref = image_refs.get("driver")
-    if not alm_examples or not driver_ref:
+    dra_driver_ref = image_refs.get("draDriver")
+    if not alm_examples or not (driver_ref or dra_driver_ref):
         return
 
     examples = json.loads(alm_examples)
-    driver_repository, driver_image, driver_version = split_repository_image_version(driver_ref)
 
     for example in examples:
-        if example.get("kind") != "NVIDIADriver":
-            continue
         spec = example.setdefault("spec", {})
-        spec["repository"] = driver_repository
-        spec["image"] = driver_image
-        spec["version"] = driver_version
+        if example.get("kind") == "NVIDIADriver" and driver_ref:
+            update_image_reference_fields(spec, driver_ref)
+        elif example.get("kind") == "GPUCluster" and dra_driver_ref:
+            dra_driver = spec.setdefault("draDriver", {})
+            update_image_reference_fields(dra_driver, dra_driver_ref)
 
-    annotations["alm-examples"] = json.dumps(examples, indent=2)
+    annotations["alm-examples"] = LiteralBlock(json.dumps(examples, indent=2))
 
 
 def update_operator_deployment(csv, operator_ref, env_refs):
