@@ -100,6 +100,10 @@ spec:
         - name: DCGM_HPC_JOB_MAPPING_DIR
           value: {{ .HPCJobMappingDir | quote }}
         {{- end }}
+        {{- if .PodMetadataEnabled }}
+        - name: KUBERNETES_ENABLE_DRA
+          value: "true"
+        {{- end }}
         {{- if .EnablePodLabels }}
         - name: DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS
           value: "true"
