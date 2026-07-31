@@ -444,6 +444,24 @@ func TestClusterPolicyReconcileSkipsNonSingleton(t *testing.T) {
 	require.Equal(t, gpuv1.Ready, clusterPolicyState(t, c, older.Name))
 }
 
+func TestClusterPolicyBlockedByGPUCluster(t *testing.T) {
+	cp := clusterPolicyForUpgradeTest(true)
+	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp)
+
+	gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	require.NoError(t, c.Create(t.Context(), gc))
+
+	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	require.Equal(t, gpuv1.NotReady, clusterPolicyState(t, c, cp.Name))
+	require.ErrorContains(t, err, "ClusterPolicy and GPUCluster cannot co-exist")
+
+	// Deleting the GPUCluster instance unblocks the next reconcile
+	require.NoError(t, c.Delete(t.Context(), gc))
+	_, err = r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	require.NoError(t, err)
+	require.Equal(t, gpuv1.Ready, clusterPolicyState(t, c, cp.Name))
+}
+
 func newClusterPolicyUpgradeTestReconciler(t *testing.T, cp *gpuv1.ClusterPolicy, nodes ...*corev1.Node) (*ClusterPolicyReconciler, client.Client, *OperatorMetrics) {
 	t.Helper()
 	scheme := runtime.NewScheme()

@@ -124,7 +124,7 @@ func TestDCGMEnabled(t *testing.T) {
 
 	ds := findDaemonSet(t, objs)
 	podSpec := ds.Spec.Template.Spec
-	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm"])
+	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-dra"])
 	require.Len(t, podSpec.Containers, 1)
 	ctr := podSpec.Containers[0]
 	assert.Equal(t, "nvidia-dcgm-ctr", ctr.Name)

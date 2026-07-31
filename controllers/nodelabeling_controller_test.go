@@ -561,69 +561,15 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 				clusterPolicy: tc.clusterPolicy,
 				logger:        logr.Discard(),
 			}
-			// The ClusterPolicy workload-config logic only applies to nodes owned by the
-			// device-plugin stack, so GPU nodes carry the corresponding mode label.
 			labels := mergeLabels(tc.initialLabels)
 			expectedLabels := mergeLabels(tc.expectedLabels)
-			if hasCommonGPULabel(labels) {
-				labels[consts.GPUAllocationModeLabelKey] = string(consts.GPUAllocationModeDevicePlugin)
-				expectedLabels[consts.GPUAllocationModeLabelKey] = string(consts.GPUAllocationModeDevicePlugin)
-			}
 			nlc.updateGPUStateLabels(context.Background(), labels, "test-node")
 			assert.Equal(t, expectedLabels, labels)
 		})
 	}
 }
 
-func TestReconcileModeLabel(t *testing.T) {
-	tests := []struct {
-		name           string
-		defaultMode    consts.GPUAllocationMode
-		initialLabels  map[string]string
-		expectedMode   string
-		expectModified bool
-	}{
-		{
-			name:           "unlabeled GPU node gets the default mode",
-			defaultMode:    consts.GPUAllocationModeDRA,
-			initialLabels:  map[string]string{commonGPULabelKey: commonGPULabelValue},
-			expectedMode:   string(consts.GPUAllocationModeDRA),
-			expectModified: true,
-		},
-		{
-			name:        "pre-labeled node is never overwritten",
-			defaultMode: consts.GPUAllocationModeDRA,
-			initialLabels: map[string]string{
-				commonGPULabelKey:                commonGPULabelValue,
-				consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-			},
-			expectedMode:   string(consts.GPUAllocationModeDevicePlugin),
-			expectModified: false,
-		},
-		{
-			name:           "non-GPU node is not labeled",
-			defaultMode:    consts.GPUAllocationModeDevicePlugin,
-			initialLabels:  map[string]string{"kubernetes.io/hostname": "plain"},
-			expectedMode:   "",
-			expectModified: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			nlc := &nodeLabelingController{
-				defaultMode: tc.defaultMode,
-				logger:      logr.Discard(),
-			}
-			labels := mergeLabels(tc.initialLabels)
-			modified := nlc.reconcileModeLabel(labels, "test-node")
-			assert.Equal(t, tc.expectModified, modified)
-			assert.Equal(t, tc.expectedMode, labels[consts.GPUAllocationModeLabelKey])
-		})
-	}
-}
-
-func TestUpdateGPUStateLabelsPerMode(t *testing.T) {
+func TestUpdateGPUStateLabelsDispatch(t *testing.T) {
 	clusterPolicy := &gpuv1.ClusterPolicy{}
 	gpuCluster := &nvidiav1alpha1.GPUCluster{}
 
@@ -631,47 +577,24 @@ func TestUpdateGPUStateLabelsPerMode(t *testing.T) {
 		name           string
 		clusterPolicy  *gpuv1.ClusterPolicy
 		gpuCluster     *nvidiav1alpha1.GPUCluster
-		mode           string
+		initialLabels  map[string]string
 		expectedLabels map[string]string
 	}{
 		{
-			name:           "dra node gets the DRA deploy labels only",
-			clusterPolicy:  clusterPolicy,
+			name:           "GPUCluster gets the DRA deploy labels",
 			gpuCluster:     gpuCluster,
-			mode:           string(consts.GPUAllocationModeDRA),
+			initialLabels:  map[string]string{commonGPULabelKey: commonGPULabelValue},
 			expectedLabels: mergeLabels(gpuClusterStateLabels),
 		},
 		{
-			name:           "device-plugin node gets the ClusterPolicy deploy labels only",
+			name:           "ClusterPolicy gets the device-plugin deploy labels",
 			clusterPolicy:  clusterPolicy,
-			gpuCluster:     gpuCluster,
-			mode:           string(consts.GPUAllocationModeDevicePlugin),
+			initialLabels:  map[string]string{commonGPULabelKey: commonGPULabelValue},
 			expectedLabels: mergeLabels(gpuStateLabels[gpuWorkloadConfigContainer]),
 		},
 		{
-			name:           "unlabeled node gets no deploy labels",
-			clusterPolicy:  clusterPolicy,
-			gpuCluster:     gpuCluster,
-			mode:           "",
-			expectedLabels: map[string]string{},
-		},
-		{
-			name:           "unrecognized mode gets no deploy labels",
-			clusterPolicy:  clusterPolicy,
-			gpuCluster:     gpuCluster,
-			mode:           "bogus",
-			expectedLabels: map[string]string{},
-		},
-		{
-			name:           "dra node without a GPUCluster gets no deploy labels",
-			clusterPolicy:  clusterPolicy,
-			mode:           string(consts.GPUAllocationModeDRA),
-			expectedLabels: map[string]string{},
-		},
-		{
-			name:           "device-plugin node without a ClusterPolicy gets no deploy labels",
-			gpuCluster:     gpuCluster,
-			mode:           string(consts.GPUAllocationModeDevicePlugin),
+			name:           "no labels added without common GPU label present",
+			initialLabels:  map[string]string{},
 			expectedLabels: map[string]string{},
 		},
 	}
@@ -684,10 +607,7 @@ func TestUpdateGPUStateLabelsPerMode(t *testing.T) {
 				gpuCluster:    tc.gpuCluster,
 				logger:        logr.Discard(),
 			}
-			labels := map[string]string{commonGPULabelKey: commonGPULabelValue}
-			if tc.mode != "" {
-				labels[consts.GPUAllocationModeLabelKey] = tc.mode
-			}
+			labels := tc.initialLabels
 			expected := mergeLabels(labels, tc.expectedLabels)
 			nlc.updateGPUStateLabels(context.Background(), labels, "test-node")
 			assert.Equal(t, expected, labels)
@@ -698,14 +618,7 @@ func TestUpdateGPUStateLabelsPerMode(t *testing.T) {
 func TestUpdateGPUStateLabelsModeSweep(t *testing.T) {
 	clusterPolicy := &gpuv1.ClusterPolicy{}
 	gpuCluster := &nvidiav1alpha1.GPUCluster{}
-	draBase := map[string]string{
-		commonGPULabelKey:                commonGPULabelValue,
-		consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDRA),
-	}
-	devicePluginBase := map[string]string{
-		commonGPULabelKey:                commonGPULabelValue,
-		consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-	}
+	gpuBase := map[string]string{commonGPULabelKey: commonGPULabelValue}
 
 	tests := []struct {
 		name           string
@@ -715,70 +628,52 @@ func TestUpdateGPUStateLabelsModeSweep(t *testing.T) {
 		expectedLabels map[string]string
 	}{
 		{
-			name:           "dra node sweeps container-config leftovers, keeps shared keys",
-			clusterPolicy:  clusterPolicy,
+			name:           "GPUCluster sweeps container-config leftovers, keeps shared keys",
 			gpuCluster:     gpuCluster,
-			initialLabels:  mergeLabels(draBase, gpuStateLabels[gpuWorkloadConfigContainer]),
-			expectedLabels: mergeLabels(draBase, gpuClusterStateLabels),
+			initialLabels:  mergeLabels(gpuBase, gpuStateLabels[gpuWorkloadConfigContainer]),
+			expectedLabels: mergeLabels(gpuBase, gpuClusterStateLabels),
 		},
 		{
-			name:           "dra node sweeps vm-passthrough leftovers",
-			clusterPolicy:  clusterPolicy,
+			name:           "GPUCluster sweeps vm-passthrough leftovers",
 			gpuCluster:     gpuCluster,
-			initialLabels:  mergeLabels(draBase, gpuStateLabels[gpuWorkloadConfigVMPassthrough]),
-			expectedLabels: mergeLabels(draBase, gpuClusterStateLabels),
+			initialLabels:  mergeLabels(gpuBase, gpuStateLabels[gpuWorkloadConfigVMPassthrough]),
+			expectedLabels: mergeLabels(gpuBase, gpuClusterStateLabels),
 		},
 		{
-			name:          "dra node sweeps vm-vgpu leftovers but keeps the vgpu-manager driver gate",
-			clusterPolicy: clusterPolicy,
+			name:          "GPUCluster sweeps vm-vgpu leftovers but keeps the vgpu-manager driver gate",
 			gpuCluster:    gpuCluster,
-			initialLabels: mergeLabels(draBase, gpuStateLabels[gpuWorkloadConfigVMVgpu]),
-			expectedLabels: mergeLabels(draBase, gpuClusterStateLabels,
+			initialLabels: mergeLabels(gpuBase, gpuStateLabels[gpuWorkloadConfigVMVgpu]),
+			expectedLabels: mergeLabels(gpuBase, gpuClusterStateLabels,
 				map[string]string{vgpuManagerDeployLabelKey: "true"}),
 		},
 		{
-			name:           "device-plugin node sweeps DRA leftovers",
+			name:           "ClusterPolicy sweeps DRA leftovers",
 			clusterPolicy:  clusterPolicy,
-			gpuCluster:     gpuCluster,
-			initialLabels:  mergeLabels(devicePluginBase, gpuClusterStateLabels),
-			expectedLabels: mergeLabels(devicePluginBase, gpuStateLabels[gpuWorkloadConfigContainer]),
+			initialLabels:  mergeLabels(gpuBase, gpuClusterStateLabels),
+			expectedLabels: mergeLabels(gpuBase, gpuStateLabels[gpuWorkloadConfigContainer]),
 		},
 		{
-			name:          "sweep never touches values of the node's own stack keys",
-			clusterPolicy: clusterPolicy,
-			gpuCluster:    gpuCluster,
-			initialLabels: mergeLabels(draBase,
+			name:       "sweep never touches values of the node's own stack keys",
+			gpuCluster: gpuCluster,
+			initialLabels: mergeLabels(gpuBase,
 				map[string]string{draDriverDeployLabelKey: "paused-for-driver-upgrade"}),
-			expectedLabels: mergeLabels(draBase, gpuClusterStateLabels,
+			expectedLabels: mergeLabels(gpuBase, gpuClusterStateLabels,
 				map[string]string{draDriverDeployLabelKey: "paused-for-driver-upgrade"}),
 		},
 		{
-			name:          "sweep removes only other-stack keys, sparing unrecognized keys and the operands kill switch",
-			clusterPolicy: clusterPolicy,
-			gpuCluster:    gpuCluster,
-			initialLabels: mergeLabels(draBase, map[string]string{
+			name:       "sweep removes only other-stack keys, sparing unrecognized keys and the operands kill switch",
+			gpuCluster: gpuCluster,
+			initialLabels: mergeLabels(gpuBase, map[string]string{
 				"nvidia.com/gpu.deploy.nvsm": "true",
 				migManagerLabelKey:           "true",
 				commonOperandsLabelKey:       "false",
 				migConfigLabelKey:            migConfigDisabledValue,
 			}),
-			expectedLabels: mergeLabels(draBase, gpuClusterStateLabels, map[string]string{
+			expectedLabels: mergeLabels(gpuBase, gpuClusterStateLabels, map[string]string{
 				"nvidia.com/gpu.deploy.nvsm": "true",
 				commonOperandsLabelKey:       "false",
 				migConfigLabelKey:            migConfigDisabledValue,
 			}),
-		},
-		{
-			name:           "dra node without a GPUCluster sweeps nothing",
-			clusterPolicy:  clusterPolicy,
-			initialLabels:  mergeLabels(draBase, gpuStateLabels[gpuWorkloadConfigContainer]),
-			expectedLabels: mergeLabels(draBase, gpuStateLabels[gpuWorkloadConfigContainer]),
-		},
-		{
-			name:           "device-plugin node without a ClusterPolicy sweeps nothing",
-			gpuCluster:     gpuCluster,
-			initialLabels:  mergeLabels(devicePluginBase, gpuClusterStateLabels),
-			expectedLabels: mergeLabels(devicePluginBase, gpuClusterStateLabels),
 		},
 	}
 
@@ -828,18 +723,17 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		Status: corev1.PodStatus{Phase: corev1.PodRunning},
 	}
 
+	// flippedNodeLabels simulates a node that was on the DRA stack and is being switched
+	// to the device-plugin stack (GPUCluster deleted, ClusterPolicy now active). The node
+	// still carries DRA state labels from the previous stack.
 	flippedNodeLabels := func() map[string]string {
-		return mergeLabels(map[string]string{
-			commonGPULabelKey:                commonGPULabelValue,
-			consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-		}, gpuClusterStateLabels)
+		return mergeLabels(map[string]string{commonGPULabelKey: commonGPULabelValue}, gpuClusterStateLabels)
 	}
 
 	t.Run("claim pod on node defers plugin label removal", func(t *testing.T) {
 		nlc := &nodeLabelingController{
 			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), claimPod.DeepCopy()).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
-			gpuCluster:    &nvidiav1alpha1.GPUCluster{},
 			logger:        logr.Discard(),
 		}
 		labels := flippedNodeLabels()
@@ -861,7 +755,6 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		nlc := &nodeLabelingController{
 			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(adminClaim, adminPod).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
-			gpuCluster:    &nvidiav1alpha1.GPUCluster{},
 			logger:        logr.Discard(),
 		}
 		labels := flippedNodeLabels()
@@ -874,7 +767,6 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		nlc := &nodeLabelingController{
 			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
-			gpuCluster:    &nvidiav1alpha1.GPUCluster{},
 			logger:        logr.Discard(),
 		}
 		labels := flippedNodeLabels()
@@ -891,7 +783,6 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		nlc := &nodeLabelingController{
 			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), terminating).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
-			gpuCluster:    &nvidiav1alpha1.GPUCluster{},
 			logger:        logr.Discard(),
 		}
 		labels := flippedNodeLabels()
@@ -913,6 +804,8 @@ func TestModeSweepDeleteSets(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		migManagerLabelKey,
 		gfdDeployLabelKey,
+		dcgmDeployLabelKey,
+		dcgmExporterDeployLabelKey,
 		kataDevicePluginDeployLabelKey,
 		kubevirtDevicePluginDeployLabelKey,
 		"nvidia.com/gpu.deploy.client",
@@ -1211,12 +1104,12 @@ func TestUpdateGPUClusterStateLabels(t *testing.T) {
 			name:          "GPU node gets the DRA operand deploy labels",
 			initialLabels: map[string]string{commonGPULabelKey: commonGPULabelValue},
 			expectedLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "true",
-				draDriverDeployLabelKey:    "true",
-				draValidatorDeployLabelKey: "true",
-				dcgmDeployLabelKey:         "true",
-				dcgmExporterDeployLabelKey: "true",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "true",
+				draDriverDeployLabelKey:       "true",
+				draValidatorDeployLabelKey:    "true",
+				draDCGMDeployLabelKey:         "true",
+				draDCGMExporterDeployLabelKey: "true",
 			},
 			expectModified: true,
 		},
@@ -1227,50 +1120,50 @@ func TestUpdateGPUClusterStateLabels(t *testing.T) {
 				driverDeployLabelKey: "true",
 			},
 			expectedLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "true",
-				draDriverDeployLabelKey:    "true",
-				draValidatorDeployLabelKey: "true",
-				dcgmDeployLabelKey:         "true",
-				dcgmExporterDeployLabelKey: "true",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "true",
+				draDriverDeployLabelKey:       "true",
+				draValidatorDeployLabelKey:    "true",
+				draDCGMDeployLabelKey:         "true",
+				draDCGMExporterDeployLabelKey: "true",
 			},
 			expectModified: true,
 		},
 		{
 			name: "paused deploy labels are honored, not overwritten",
 			initialLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "false",
-				draDriverDeployLabelKey:    "false",
-				draValidatorDeployLabelKey: "false",
-				dcgmDeployLabelKey:         "false",
-				dcgmExporterDeployLabelKey: "false",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "false",
+				draDriverDeployLabelKey:       "false",
+				draValidatorDeployLabelKey:    "false",
+				draDCGMDeployLabelKey:         "false",
+				draDCGMExporterDeployLabelKey: "false",
 			},
 			expectedLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "false",
-				draDriverDeployLabelKey:    "false",
-				draValidatorDeployLabelKey: "false",
-				dcgmDeployLabelKey:         "false",
-				dcgmExporterDeployLabelKey: "false",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "false",
+				draDriverDeployLabelKey:       "false",
+				draValidatorDeployLabelKey:    "false",
+				draDCGMDeployLabelKey:         "false",
+				draDCGMExporterDeployLabelKey: "false",
 			},
 			expectModified: false,
 		},
 		{
 			name: "empty deploy labels are treated as absent and set",
 			initialLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "",
-				dcgmDeployLabelKey:         "",
-				dcgmExporterDeployLabelKey: "paused-for-driver-upgrade",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "",
+				draDCGMDeployLabelKey:         "",
+				draDCGMExporterDeployLabelKey: "paused-for-driver-upgrade",
 			},
 			expectedLabels: map[string]string{
-				commonGPULabelKey:          commonGPULabelValue,
-				driverDeployLabelKey:       "true",
-				draDriverDeployLabelKey:    "true",
-				draValidatorDeployLabelKey: "true",
-				dcgmDeployLabelKey:         "true",
-				dcgmExporterDeployLabelKey: "paused-for-driver-upgrade",
+				commonGPULabelKey:             commonGPULabelValue,
+				driverDeployLabelKey:          "true",
+				draDriverDeployLabelKey:       "true",
+				draValidatorDeployLabelKey:    "true",
+				draDCGMDeployLabelKey:         "true",
+				draDCGMExporterDeployLabelKey: "paused-for-driver-upgrade",
 			},
 			expectModified: true,
 		},
@@ -1302,7 +1195,7 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 		}}
 	}
 
-	t.Run("GPUCluster present and no ClusterPolicy labels the GPU node", func(t *testing.T) {
+	t.Run("GPUCluster present and no ClusterPolicy labels the GPU node with DRA stack", func(t *testing.T) {
 		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 		r, c := newReconciler(gc, gpuNode())
 
@@ -1312,11 +1205,24 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 		node := &corev1.Node{}
 		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
 		assert.Equal(t, commonGPULabelValue, node.Labels[commonGPULabelKey])
-		assert.Equal(t, string(consts.GPUAllocationModeDRA), node.Labels[consts.GPUAllocationModeLabelKey])
 		assert.Equal(t, "true", node.Labels[driverDeployLabelKey])
 		assert.Equal(t, "true", node.Labels[draDriverDeployLabelKey])
-		assert.Equal(t, "true", node.Labels[dcgmDeployLabelKey])
-		assert.Equal(t, "true", node.Labels[dcgmExporterDeployLabelKey])
+		assert.Equal(t, "true", node.Labels[draDCGMDeployLabelKey])
+		assert.Equal(t, "true", node.Labels[draDCGMExporterDeployLabelKey])
+	})
+
+	t.Run("ClusterPolicy present and no GPUCluster labels the GPU node with device-plugin stack", func(t *testing.T) {
+		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+		r, c := newReconciler(cp, gpuNode())
+
+		_, err := r.Reconcile(context.Background(), reconcile.Request{})
+		require.NoError(t, err)
+
+		node := &corev1.Node{}
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
+		assert.Equal(t, commonGPULabelValue, node.Labels[commonGPULabelKey])
+		assert.Equal(t, "true", node.Labels["nvidia.com/gpu.deploy.container-toolkit"])
+		assert.NotContains(t, node.Labels, draDriverDeployLabelKey)
 	})
 
 	t.Run("no ClusterPolicy and no GPUCluster leaves the node untouched", func(t *testing.T) {
@@ -1328,82 +1234,15 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 		node := &corev1.Node{}
 		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
 		assert.NotContains(t, node.Labels, commonGPULabelKey)
-		assert.NotContains(t, node.Labels, consts.GPUAllocationModeLabelKey)
 		assert.NotContains(t, node.Labels, draDriverDeployLabelKey)
 	})
 
-	getNode := func(t *testing.T, c client.Client) *corev1.Node {
-		t.Helper()
-		node := &corev1.Node{}
-		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "gpu-node"}, node))
-		return node
-	}
-	clusterPolicy := func() *gpuv1.ClusterPolicy {
-		return &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
-	}
-	gpuCluster := func() *nvidiav1alpha1.GPUCluster {
-		return &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
-	}
-
-	t.Run("both CRs label a new GPU node with DEFAULT_GPU_ALLOCATION_MODE", func(t *testing.T) {
-		t.Setenv(consts.DefaultGPUAllocationModeEnvName, string(consts.GPUAllocationModeDRA))
-		r, c := newReconciler(clusterPolicy(), gpuCluster(), gpuNode())
+	t.Run("both CRs present returns an error", func(t *testing.T) {
+		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+		r, _ := newReconciler(cp, gc, gpuNode())
 
 		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.NoError(t, err)
-
-		node := getNode(t, c)
-		assert.Equal(t, string(consts.GPUAllocationModeDRA), node.Labels[consts.GPUAllocationModeLabelKey])
-		assert.Equal(t, "true", node.Labels[draDriverDeployLabelKey])
-		assert.NotContains(t, node.Labels, "nvidia.com/gpu.deploy.container-toolkit")
-	})
-
-	t.Run("both CRs and unset DEFAULT_GPU_ALLOCATION_MODE default a new GPU node to device-plugin", func(t *testing.T) {
-		r, c := newReconciler(clusterPolicy(), gpuCluster(), gpuNode())
-
-		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.NoError(t, err)
-
-		node := getNode(t, c)
-		assert.Equal(t, string(consts.GPUAllocationModeDevicePlugin), node.Labels[consts.GPUAllocationModeLabelKey])
-		assert.Equal(t, "true", node.Labels["nvidia.com/gpu.deploy.container-toolkit"])
-		assert.NotContains(t, node.Labels, draDriverDeployLabelKey)
-	})
-
-	t.Run("an invalid DEFAULT_GPU_ALLOCATION_MODE fails reconciliation and labels nothing", func(t *testing.T) {
-		t.Setenv(consts.DefaultGPUAllocationModeEnvName, "bogus")
-		r, c := newReconciler(clusterPolicy(), gpuCluster(), gpuNode())
-
-		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.ErrorContains(t, err, `invalid DEFAULT_GPU_ALLOCATION_MODE environment variable: "bogus"`)
-
-		node := getNode(t, c)
-		assert.NotContains(t, node.Labels, consts.GPUAllocationModeLabelKey)
-	})
-
-	t.Run("a single CR wins over a contrary DEFAULT_GPU_ALLOCATION_MODE", func(t *testing.T) {
-		t.Setenv(consts.DefaultGPUAllocationModeEnvName, string(consts.GPUAllocationModeDevicePlugin))
-		r, c := newReconciler(gpuCluster(), gpuNode())
-
-		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.NoError(t, err)
-
-		node := getNode(t, c)
-		assert.Equal(t, string(consts.GPUAllocationModeDRA), node.Labels[consts.GPUAllocationModeLabelKey])
-	})
-
-	t.Run("a pre-labeled node keeps its mode and its stack's deploy labels", func(t *testing.T) {
-		t.Setenv(consts.DefaultGPUAllocationModeEnvName, string(consts.GPUAllocationModeDRA))
-		node := gpuNode()
-		node.Labels[consts.GPUAllocationModeLabelKey] = string(consts.GPUAllocationModeDevicePlugin)
-		r, c := newReconciler(clusterPolicy(), gpuCluster(), node)
-
-		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.NoError(t, err)
-
-		got := getNode(t, c)
-		assert.Equal(t, string(consts.GPUAllocationModeDevicePlugin), got.Labels[consts.GPUAllocationModeLabelKey])
-		assert.Equal(t, "true", got.Labels["nvidia.com/gpu.deploy.device-plugin"])
-		assert.NotContains(t, got.Labels, draDriverDeployLabelKey)
+		require.ErrorContains(t, err, "both ClusterPolicy and GPUCluster CRs exist")
 	})
 }

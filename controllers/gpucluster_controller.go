@@ -100,15 +100,6 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("error adding finalizer to GPUCluster %s: %w", req.NamespacedName, err)
 	}
 
-	// GPUCluster (DRA stack) may coexist with a ClusterPolicy (device-plugin
-	// stack): every operand DaemonSet of both stacks gates on the per-node
-	// nvidia.com/gpu-operator.resource-allocation.mode label, so each node is served by exactly one stack.
-
-	// No singleton claim is needed: the CRD's CEL rule pins metadata.name, so at most
-	// one GPUCluster can exist.
-
-	// DRA requires all driver management through NVIDIADriver CRs: surface an unmet
-	// prerequisite on this CR's status and hold off deploying operands until it is met.
 	if msg, err := r.validatePrerequisites(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if msg != "" {
@@ -171,10 +162,9 @@ func (r *GPUClusterReconciler) validatePrerequisites(ctx context.Context) (strin
 	if err := r.List(ctx, clusterPolicies); err != nil {
 		return "", fmt.Errorf("error listing ClusterPolicy objects: %w", err)
 	}
-	// Only the active singleton ClusterPolicy matters here: an Ignored instance
-	// deploys nothing, so it cannot own driver daemonsets.
-	if active := getSingletonClusterPolicy(clusterPolicies.Items); active != nil && !active.Spec.Driver.UseNvidiaDriverCRDType() {
-		return fmt.Sprintf("ClusterPolicy %s does not have driver.useNvidiaDriverCRD enabled; migrate driver management to NVIDIADriver CRs before enabling DRA", active.Name), nil
+	// TODO: relax this prerequisite once ClusterPolicy and GPUCluster can co-exist
+	if clusterPolicy := getSingletonClusterPolicy(clusterPolicies.Items); clusterPolicy != nil {
+		return fmt.Sprintf("A ClusterPolicy CR %q exists; a ClusterPolicy CR and GPUCluster CR may not exist at the same time", clusterPolicy.Name), nil
 	}
 	return "", nil
 }

@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestGetGPUNodeOSInfo(t *testing.T) {
@@ -520,19 +519,6 @@ func TestRemoveAllGPUStateLabels(t *testing.T) {
 		modified := removeAllGPUStateLabels(labels)
 		require.False(t, modified)
 		require.Equal(t, map[string]string{"kubernetes.io/hostname": "plain"}, labels)
-	})
-	// The mode label is sticky: operand rendering gates on all GPU nodes carrying it, so
-	// state-label cleanup must never strip it.
-	t.Run("preserves the resource-allocation mode label", func(t *testing.T) {
-		labels := map[string]string{
-			consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-			driverDeployLabelKey:             "true",
-		}
-		modified := removeAllGPUStateLabels(labels)
-		require.True(t, modified)
-		require.Equal(t, map[string]string{
-			consts.GPUAllocationModeLabelKey: string(consts.GPUAllocationModeDevicePlugin),
-		}, labels)
 	})
 }
 

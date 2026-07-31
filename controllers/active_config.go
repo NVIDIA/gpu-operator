@@ -24,7 +24,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // getSingletonClusterPolicy returns the ClusterPolicy treated as the cluster-wide
@@ -71,26 +70,4 @@ func resolveActiveConfig(ctx context.Context, c client.Reader) (*gpuv1.ClusterPo
 	}
 
 	return getSingletonClusterPolicy(clusterPolicies.Items), gpuCluster, nil
-}
-
-// resolveDefaultMode returns the nvidia.com/gpu-operator.resource-allocation.mode value for a GPU node that
-// does not have one yet. When exactly one configuration CR exists its stack wins;
-// envDefaultMode (the validated DEFAULT_GPU_ALLOCATION_MODE operator environment variable)
-// is consulted only when both CRs exist, defaulting to device-plugin when unset. Nodes
-// already labeled are never touched, so changing DEFAULT_GPU_ALLOCATION_MODE only affects
-// nodes labeled afterward.
-func resolveDefaultMode(clusterPolicyExists, gpuClusterExists bool, envDefaultMode consts.GPUAllocationMode) consts.GPUAllocationMode {
-	switch {
-	case clusterPolicyExists && gpuClusterExists:
-		if envDefaultMode == consts.GPUAllocationModeDRA {
-			return consts.GPUAllocationModeDRA
-		}
-		return consts.GPUAllocationModeDevicePlugin
-	case gpuClusterExists:
-		return consts.GPUAllocationModeDRA
-	case clusterPolicyExists:
-		return consts.GPUAllocationModeDevicePlugin
-	default:
-		return ""
-	}
 }

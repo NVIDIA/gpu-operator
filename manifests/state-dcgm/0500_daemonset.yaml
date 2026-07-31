@@ -41,8 +41,7 @@ spec:
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
       # can pause it to drain DCGM off a node during a driver reload.
       nodeSelector:
-        nvidia.com/gpu.deploy.dcgm: "true"
-        nvidia.com/gpu-operator.resource-allocation.mode: "dra"
+        nvidia.com/gpu.deploy.dcgm-dra: "true"
       {{- if .DCGM.Spec.ImagePullSecrets }}
       imagePullSecrets:
       {{- range .DCGM.Spec.ImagePullSecrets }}

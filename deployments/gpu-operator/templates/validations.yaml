@@ -1,3 +1,11 @@
+{{- if and .Values.clusterPolicy.deployCR .Values.gpuCluster.deployCR }}
+{{ fail "clusterPolicy.deployCR and gpuCluster.deployCR cannot both be true; only one CR can exist" }}
+{{- end }}
+
+{{- if and .Values.gpuCluster.deployCR (and .Values.driver.enabled (not .Values.driver.nvidiaDriverCRD.enabled)) }}
+{{ fail "the NVIDIADriver CRD must be enabled when deploying a GPUCluster CR, set driver.nvidiaDriverCRD.enabled=true" }}
+{{- end }}
+
 {{- if and (eq .Values.cdi.enabled false) (eq .Values.cdi.nriPluginEnabled true) }}
 {{ fail "the NRI Plugin cannot be enabled when CDI is disabled" }}
 {{- end }}
