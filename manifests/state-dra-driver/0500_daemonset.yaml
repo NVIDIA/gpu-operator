@@ -286,6 +286,8 @@ spec:
           value: {{ printf "%s/plugins" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
         - name: HEALTHCHECK_PORT
           value: {{ .ComputeDomainsHealthcheckPort | quote }}
+        - name: GPU_CLIQUE_LABEL_ENABLED
+          value: "true"
         {{- if .FeatureGates }}
         - name: FEATURE_GATES
           value: {{ .FeatureGates | quote }}
