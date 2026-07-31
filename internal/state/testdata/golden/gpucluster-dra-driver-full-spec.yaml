@@ -458,6 +458,8 @@ spec:
           value: void
         - name: CDI_ROOT
           value: /var/run/cdi
+        - name: HOST_ROOT
+          value: /host
         - name: NVIDIA_MIG_CONFIG_DEVICES
           value: all
         - name: NODE_NAME

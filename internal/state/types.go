@@ -142,8 +142,7 @@ type draDriverRenderData struct {
 	// DeviceClassAPIVersion is the apiVersion to render on DeviceClass objects,
 	// determined from the resource.k8s.io version served by the cluster.
 	DeviceClassAPIVersion string
-	// FeatureGates is the pre-rendered FEATURE_GATES env value (empty when none).
-	FeatureGates string
+	FeatureGates          map[string]bool
 	// GPUsHealthcheckPort and ComputeDomainsHealthcheckPort are the resolved gRPC health
 	// service ports of the two kubelet-plugin containers (the spec value, or the
 	// per-container default); a negative value omits the startup and liveness probes.

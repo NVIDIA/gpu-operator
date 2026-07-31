@@ -19,8 +19,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -127,7 +125,7 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		Namespace:             s.namespace,
 		OpenshiftVersion:      openshiftVersion,
 		DeviceClassAPIVersion: apiVersion,
-		FeatureGates:          renderDRAFeatureGates(cr.Spec.DRADriver.FeatureGates),
+		FeatureGates:          cr.Spec.DRADriver.FeatureGates,
 		GPUsHealthcheckPort: resolveHealthcheckPort(
 			cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort),
 		ComputeDomainsHealthcheckPort: resolveHealthcheckPort(
@@ -210,21 +208,4 @@ func maxResourceList(resourceLists ...corev1.ResourceList) corev1.ResourceList {
 	}
 
 	return result
-}
-
-// renderDRAFeatureGates renders the feature-gate map as the FEATURE_GATES env value
-// (comma-separated Key=Value). Keys are sorted so the rendered value is a pure
-// function of the input and reconciles do not churn the pod spec. Empty when none.
-func renderDRAFeatureGates(gates map[string]bool) string {
-	names := make([]string, 0, len(gates))
-	for name := range gates {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	pairs := make([]string, 0, len(names))
-	for _, name := range names {
-		pairs = append(pairs, fmt.Sprintf("%s=%t", name, gates[name]))
-	}
-	return strings.Join(pairs, ",")
 }

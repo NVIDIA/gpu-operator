@@ -124,7 +124,7 @@ spec:
           value: 2s
         {{- if .FeatureGates }}
         - name: FEATURE_GATES
-          value: {{ .FeatureGates | quote }}
+          value: {{ convertStringMapToCommaSeparatedString .FeatureGates | quote }}
         {{- end }}
         {{- range $controller.Env }}
         - name: {{ .Name }}

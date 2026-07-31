@@ -168,6 +168,8 @@ spec:
           value: void
         - name: CDI_ROOT
           value: /var/run/cdi
+        - name: HOST_ROOT
+          value: "/host"
         - name: NVIDIA_MIG_CONFIG_DEVICES
           value: all
         - name: NODE_NAME
@@ -188,7 +190,7 @@ spec:
           value: {{ .GPUsHealthcheckPort | quote }}
         {{- if .FeatureGates }}
         - name: FEATURE_GATES
-          value: {{ .FeatureGates | quote }}
+          value: {{ convertStringMapToCommaSeparatedString .FeatureGates | quote }}
         {{- end }}
         {{- range .DRADriver.Spec.GPUs.KubeletPlugin.Env }}
         - name: {{ .Name }}
@@ -231,6 +233,18 @@ spec:
         - name: driver-install-dir
           mountPath: /driver-root
           mountPropagation: HostToContainer
+        {{- if and .FeatureGates (and (index .FeatureGates "PassthroughSupport") .FeatureGates.PassthroughSupport) }}
+        - name: lib-modules
+          mountPath: /lib/modules/
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: sysfs
+          mountPath: /sys/
+          mountPropagation: Bidirectional
+        - name: procfs
+          mountPath: /proc/
+          mountPropagation: Bidirectional
+        {{- end }}
       {{- if .DRADriver.Spec.IsComputeDomainsEnabled }}
       - name: compute-domains
         image: {{ .DRADriver.ImagePath }}
@@ -290,7 +304,7 @@ spec:
           value: "true"
         {{- if .FeatureGates }}
         - name: FEATURE_GATES
-          value: {{ .FeatureGates | quote }}
+          value: {{ convertStringMapToCommaSeparatedString .FeatureGates | quote }}
         {{- end }}
         {{- range .DRADriver.Spec.ComputeDomains.KubeletPlugin.Env }}
         - name: {{ .Name }}
@@ -356,3 +370,19 @@ spec:
         hostPath:
           path: /run/nvidia/validations
           type: DirectoryOrCreate
+      {{- if and .FeatureGates (and (index .FeatureGates "PassthroughSupport") .FeatureGates.PassthroughSupport) }}
+      # This is needed by `https://github.com/NVIDIA/go-nvlib/pkg/nvpassthrough` pkg
+      # to detect the vfio-pci driver variant to use with a GPU.
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules/
+          type: Directory
+      - name: sysfs
+        hostPath:
+          path: /sys/
+          type: Directory
+      - name: procfs
+        hostPath:
+          path: /proc/
+          type: Directory
+      {{- end }}
