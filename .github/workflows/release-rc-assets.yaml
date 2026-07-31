@@ -176,7 +176,7 @@ jobs:
         run: echo "${GH_TOKEN}" | helm registry login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Login to GitHub Container Registry for Docker
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.5.2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
