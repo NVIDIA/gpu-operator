@@ -97,13 +97,11 @@ type dcgmExporterRenderData struct {
 	// on vanilla Kubernetes.
 	OpenshiftVersion string
 	// ResourceClaimAPIVersion is the apiVersion to render on ResourceClaimTemplate objects.
-	ResourceClaimAPIVersion string
-	RemoteHostEngine        string
-	Collectors              string
-	HPCJobMappingDir        string
-	PodLabelAllowlistRegex  string
-	// PodMetadataEnabled mounts the ServiceAccount token and binds the pods-read ClusterRole.
-	PodMetadataEnabled           bool
+	ResourceClaimAPIVersion      string
+	RemoteHostEngine             string
+	Collectors                   string
+	HPCJobMappingDir             string
+	PodLabelAllowlistRegex       string
 	EnablePodLabels              bool
 	EnablePodUID                 bool
 	HostPID                      bool

@@ -131,8 +131,8 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			},
 		},
 		{
-			// enablePodLabels: pod metadata mounts the ServiceAccount token and adds
-			// the DRA/pod-labels env and the read-pods ClusterRole/Binding.
+			// enablePodLabels adds the pod-labels env on top of the pod attribution
+			// that every DRA exporter gets.
 			name: "gpucluster-dcgm-exporter-pod-metadata",
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDCGMExporterState(t, false)

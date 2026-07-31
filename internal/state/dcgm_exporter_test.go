@@ -80,8 +80,10 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 	assert.Equal(t, 1, kinds["ResourceClaimTemplate"])
 	assert.Equal(t, 1, kinds["DaemonSet"])
 	assert.Equal(t, 1, kinds["Service"])
-	// No pod-read ClusterRole and no ServiceMonitor by default.
-	assert.Equal(t, 0, kinds["ClusterRole"])
+	// DRA attribution needs the ResourceSlice informer, so the read ClusterRole is
+	// always bound. No ServiceMonitor by default.
+	assert.Equal(t, 1, kinds["ClusterRole"])
+	assert.Equal(t, 1, kinds["ClusterRoleBinding"])
 	assert.Equal(t, 0, kinds["ServiceMonitor"])
 
 	claimHasAdminAccess(t, findByKind(objs, "ResourceClaimTemplate"))
@@ -90,12 +92,16 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 	podSpec := ds.Spec.Template.Spec
 	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-exporter-dra"])
 	require.NotNil(t, podSpec.AutomountServiceAccountToken)
-	assert.False(t, *podSpec.AutomountServiceAccountToken)
+	assert.True(t, *podSpec.AutomountServiceAccountToken)
 
 	ctr := podSpec.Containers[0]
 	assert.Equal(t, "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3", ctr.Image)
 	env := envMap(ctr.Env)
 	assert.Equal(t, ":9400", env["DCGM_EXPORTER_LISTEN"])
+	// Pod attribution on DRA nodes is on by default; pod labels and UID are not.
+	assert.Equal(t, "true", env["KUBERNETES_ENABLE_DRA"])
+	assert.NotContains(t, env, "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS")
+	assert.NotContains(t, env, "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID")
 	assert.Equal(t, "/etc/dcgm-exporter/dcp-metrics-included.csv", env["DCGM_EXPORTER_COLLECTORS"])
 	// Embedded engine: no remote host-engine env.
 	_, hasRemote := env["DCGM_REMOTE_HOSTENGINE_INFO"]
@@ -138,16 +144,8 @@ func TestDCGMExporterPodMetadataEnrichment(t *testing.T) {
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
 
-	// The pod-read ClusterRole + binding render only when enrichment is on.
-	kinds := kindCounts(objs)
-	assert.Equal(t, 1, kinds["ClusterRole"])
-	assert.Equal(t, 1, kinds["ClusterRoleBinding"])
-
 	ds := findDaemonSet(t, objs)
 	podSpec := ds.Spec.Template.Spec
-	// Enrichment needs a mounted SA token.
-	require.NotNil(t, podSpec.AutomountServiceAccountToken)
-	assert.True(t, *podSpec.AutomountServiceAccountToken)
 	env := envMap(podSpec.Containers[0].Env)
 	assert.Equal(t, "true", env["DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS"])
 	assert.Equal(t, "true", env["DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID"])
