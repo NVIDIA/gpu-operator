@@ -571,6 +571,8 @@ spec:
           value: /var/lib/kubelet/plugins
         - name: HEALTHCHECK_PORT
           value: "51515"
+        - name: GPU_CLIQUE_LABEL_ENABLED
+          value: "true"
         - name: FEATURE_GATES
           value: AdminAccess=false,MPSSupport=true
         - name: CD_PLUGIN_EXTRA
