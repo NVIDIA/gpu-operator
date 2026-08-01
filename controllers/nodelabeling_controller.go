@@ -591,6 +591,27 @@ func isDriverUpgradeRequestAllowed(upgradeState string) bool {
 	return upgradeState == upgrade.UpgradeStateUnknown || upgradeState == upgrade.UpgradeStateDone
 }
 
+// singletonCRPredicate returns a predicate that triggers reconciliation on create, delete,
+// and spec-changing update events for singleton CRs (ClusterPolicy, GPUCluster).
+// Create events are passed explicitly so that a CR created after the operator starts
+// immediately causes GPU nodes to be labeled without waiting for a subsequent update.
+func singletonCRPredicate[T interface {
+	client.Object
+	GetGeneration() int64
+}]() predicate.TypedFuncs[T] {
+	return predicate.TypedFuncs[T]{
+		CreateFunc: func(e event.TypedCreateEvent[T]) bool {
+			return true
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[T]) bool {
+			return e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration()
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[T]) bool {
+			return true
+		},
+	}
+}
+
 // SetupWithManager registers the NodeLabelingReconciler with the controller-runtime manager.
 func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	mapToSingleton := func(_ context.Context, _ client.Object) []reconcile.Request {
@@ -624,7 +645,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&gpuv1.ClusterPolicy{},
 		handler.TypedEnqueueRequestsFromMapFunc(clusterPolicyMapFn),
-		predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{},
+		singletonCRPredicate[*gpuv1.ClusterPolicy](),
 	)); err != nil {
 		return fmt.Errorf("error watching ClusterPolicy: %w", err)
 	}
@@ -638,7 +659,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&nvidiav1alpha1.GPUCluster{},
 		handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+		singletonCRPredicate[*nvidiav1alpha1.GPUCluster](),
 	)); err != nil {
 		return fmt.Errorf("error watching GPUCluster: %w", err)
 	}
