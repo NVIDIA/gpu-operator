@@ -84,18 +84,17 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 
 		osID, ok := nodeLabels[nfdOSReleaseIDLabelKey]
 		if !ok {
-			logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
+			logger.Info("WARNING: Could not find NFD label for node. Is NFD installed?", "Node", node.Name, "Label", nfdOSReleaseIDLabelKey)
 			continue
 		}
 		nodePool.nodeSelector[nfdOSReleaseIDLabelKey] = osID
+		nodePool.osRelease = osID
 
 		osVersion, ok := nodeLabels[nfdOSVersionIDLabelKey]
 		if !ok {
-			logger.Info("WARNING: Could not find NFD labels for node. Is NFD installed?", "Node", node.Name)
+			logger.Info("WARNING: Could not find NFD label for node. Is NFD installed?", "Node", node.Name, "Label", nfdOSVersionIDLabelKey)
 			continue
 		}
-		nodePool.nodeSelector[nfdOSVersionIDLabelKey] = osVersion
-		nodePool.osRelease = osID
 		nodePool.osVersion = osVersion
 
 		osTag, err := getOSTag(osID, osVersion)
@@ -104,6 +103,20 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 		}
 		nodePool.osTag = osTag
 		nodePool.name = osTag
+
+		// For certain distros, we omit the minor version from the os tag.
+		// In such cases, we ensure the nodeSelector for the node pool targets
+		// all nodes with the same major version.
+		if !strings.HasSuffix(osTag, osVersion) {
+			osMajor, ok := nodeLabels[nfdOSVersionIDMajorLabelKey]
+			if !ok {
+				logger.Info("WARNING: Could not find NFD label for node. Is NFD installed?", "Node", node.Name, "Label", nfdOSVersionIDMajorLabelKey)
+				continue
+			}
+			nodePool.nodeSelector[nfdOSVersionIDMajorLabelKey] = osMajor
+		} else {
+			nodePool.nodeSelector[nfdOSVersionIDLabelKey] = osVersion
+		}
 
 		if cr.Spec.UsePrecompiledDrivers() {
 			kernelVersion, ok := nodeLabels[nfdKernelLabelKey]
