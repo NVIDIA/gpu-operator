@@ -252,7 +252,7 @@ spec:
         - name: HEALTHCHECK_PORT
           value: "51516"
         - name: FEATURE_GATES
-          value: AdminAccess=false,MPSSupport=true
+          value: AdminAccess=false,MPSSupport=true,PassthroughSupport=true
         image: nvcr.io/nvidia/k8s-dra-driver-gpu:v0.1.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -290,6 +290,16 @@ spec:
         - mountPath: /driver-root
           mountPropagation: HostToContainer
           name: driver-install-dir
+        - mountPath: /lib/modules/
+          mountPropagation: HostToContainer
+          name: lib-modules
+          readOnly: true
+        - mountPath: /sys/
+          mountPropagation: Bidirectional
+          name: sysfs
+        - mountPath: /proc/
+          mountPropagation: Bidirectional
+          name: procfs
       initContainers:
       - command:
         - nvidia-validator
@@ -357,6 +367,18 @@ spec:
           path: /run/nvidia/validations
           type: DirectoryOrCreate
         name: validations
+      - hostPath:
+          path: /lib/modules/
+          type: Directory
+        name: lib-modules
+      - hostPath:
+          path: /sys/
+          type: Directory
+        name: sysfs
+      - hostPath:
+          path: /proc/
+          type: Directory
+        name: procfs
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 100%

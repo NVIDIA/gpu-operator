@@ -92,6 +92,17 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			},
 		},
 		{
+			name: "gpucluster-dra-driver-passthrough-support",
+			render: func(t *testing.T) []*unstructured.Unstructured {
+				s := newTestDRAState(t)
+				gpuCluster := sampleGPUCluster()
+				gpuCluster.Spec.DRADriver.FeatureGates["PassthroughSupport"] = true
+				objs, err := s.getManifestObjects(context.Background(), gpuCluster, draSupportedCatalog())
+				require.NoError(t, err)
+				return objs
+			},
+		},
+		{
 			name: "gpucluster-dra-driver-full-spec",
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDRAState(t)

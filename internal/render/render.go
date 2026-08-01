@@ -30,6 +30,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -111,7 +112,8 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 			}
 			return *b
 		},
-		"getObjectHash": utils.GetObjectHash,
+		"getObjectHash":                          utils.GetObjectHash,
+		"convertStringMapToCommaSeparatedString": convertStringMapToCommaSeparatedString,
 	})
 
 	if data.Funcs != nil {
@@ -151,4 +153,20 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 	}
 
 	return out, nil
+}
+
+// convertStringMapToCommaSeparatedString converts a map[string]bool to a comma-separated
+// "key=value" string with keys in sorted order. Returns "" for a nil or empty map.
+func convertStringMapToCommaSeparatedString(m map[string]bool) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	pairs := make([]string, 0, len(keys))
+	for _, k := range keys {
+		pairs = append(pairs, fmt.Sprintf("%s=%t", k, m[k]))
+	}
+	return strings.Join(pairs, ",")
 }
