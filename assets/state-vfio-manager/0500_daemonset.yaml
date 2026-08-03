@@ -87,7 +87,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["vfio-manage unbind --all"]
+                command: ["/bin/sh", "-c", "vfio-manage unbind --all"]
       terminationGracePeriodSeconds: 30
       volumes:
         - name: host-sys
