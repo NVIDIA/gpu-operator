@@ -40,6 +40,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -501,4 +502,94 @@ func TestEnqueueNVIDIADriverReconcilersDedupesEventDriver(t *testing.T) {
 
 	require.Len(t, requests, 1)
 	require.Equal(t, "default/driver-a", requests[0].String())
+}
+
+func TestNodeDriverRenderingLabelsChanged(t *testing.T) {
+	gpuLabels := map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true"}
+
+	tests := []struct {
+		name      string
+		oldLabels map[string]string
+		newLabels map[string]string
+		want      bool
+	}{
+		{
+			name:      "unrelated label change is ignored",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", "example.com/label": "old"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", "example.com/label": "new"},
+		},
+		{
+			name:      "NFD kernel change is relevant",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", nfdKernelLabelKey: "old"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", nfdKernelLabelKey: "new"},
+			want:      true,
+		},
+		{
+			name:      "driver deployment label change is relevant",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", driverDeployLabelKey: "true"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", driverDeployLabelKey: "false"},
+			want:      true,
+		},
+		{
+			name:      "vGPU manager deployment label change is relevant",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", vgpuManagerDeployLabelKey: "true"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", vgpuManagerDeployLabelKey: "false"},
+			want:      true,
+		},
+		{
+			name:      "GPU present label change is relevant",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", consts.GPUPresentLabel: "true"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", consts.GPUPresentLabel: "false"},
+			want:      true,
+		},
+		{
+			name:      "ownership reassignment affects all drivers",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a"},
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-b"},
+			want:      true,
+		},
+		{
+			name:      "GPU label removal is relevant",
+			oldLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a"},
+			newLabels: map[string]string{consts.NVIDIADriverOwnerLabel: "driver-a"},
+			want:      true,
+		},
+		{
+			name:      "NFD kernel label addition is relevant without an owner",
+			oldLabels: gpuLabels,
+			newLabels: map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", nfdKernelLabelKey: "new"},
+			want:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, nodeDriverRenderingLabelsChanged(tc.oldLabels, tc.newLabels))
+		})
+	}
+}
+
+func TestNodeLabelsAffectNVIDIADrivers(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	driverA := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+	}
+	driverB := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-b"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{NodeSelector: map[string]string{"region": "us-east"}},
+	}
+	reconciler := &NVIDIADriverReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(driverA, driverB).Build(),
+	}
+
+	require.True(t, reconciler.nodeLabelsAffectNVIDIADrivers(context.Background(),
+		map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a"},
+		map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", "region": "us-east"},
+	))
+	require.False(t, reconciler.nodeLabelsAffectNVIDIADrivers(context.Background(),
+		map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", "example.com/label": "old"},
+		map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true", consts.NVIDIADriverOwnerLabel: "driver-a", "example.com/label": "new"},
+	))
 }

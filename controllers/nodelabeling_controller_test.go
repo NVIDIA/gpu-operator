@@ -924,8 +924,8 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 
 	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
 
-	// liveDriver returns a NVIDIADriver with no deletion timestamp.
-	liveDriver := func() *nvidiav1alpha1.NVIDIADriver {
+	// nonDeletingDriver returns a NVIDIADriver with no deletion timestamp.
+	nonDeletingDriver := func() *nvidiav1alpha1.NVIDIADriver {
 		return &nvidiav1alpha1.NVIDIADriver{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		}
@@ -973,35 +973,35 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 		},
 		{
 			name:                 "orphaned pod on owned node, no upgrade state → labeled upgrade-required",
-			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:                []*corev1.Node{ownedNode("node-1", "")},
 			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
 			expectedUpgradeState: map[string]string{"node-1": upgrade.UpgradeStateUpgradeRequired},
 		},
 		{
 			name:                 "orphaned pod on owned node, upgrade-done state → labeled upgrade-required",
-			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:                []*corev1.Node{ownedNode("node-1", upgrade.UpgradeStateDone)},
 			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
 			expectedUpgradeState: map[string]string{"node-1": upgrade.UpgradeStateUpgradeRequired},
 		},
 		{
 			name:                 "orphaned pod on owned node, active upgrade state → not relabeled",
-			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:                []*corev1.Node{ownedNode("node-1", upgrade.UpgradeStatePodRestartRequired)},
 			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
 			expectedUpgradeState: map[string]string{"node-1": upgrade.UpgradeStatePodRestartRequired},
 		},
 		{
 			name:                 "orphaned pod on owned node, failed upgrade state → not relabeled",
-			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers:        []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:                []*corev1.Node{ownedNode("node-1", upgrade.UpgradeStateFailed)},
 			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
 			expectedUpgradeState: map[string]string{"node-1": upgrade.UpgradeStateFailed},
 		},
 		{
 			name:          "pod has owner references → skipped",
-			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:         []*corev1.Node{ownedNode("node-1", "")},
 			pods: []*corev1.Pod{func() *corev1.Pod {
 				p := orphanedPod("pod-1", "node-1")
@@ -1012,7 +1012,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 		},
 		{
 			name:          "pod not in Running phase → skipped",
-			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:         []*corev1.Node{ownedNode("node-1", "")},
 			pods: []*corev1.Pod{func() *corev1.Pod {
 				p := orphanedPod("pod-1", "node-1")
@@ -1023,7 +1023,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 		},
 		{
 			name:          "pod has no NodeName → skipped",
-			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes:         []*corev1.Node{ownedNode("node-1", "")},
 			pods: []*corev1.Pod{func() *corev1.Pod {
 				p := orphanedPod("pod-1", "node-1")
@@ -1034,7 +1034,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 		},
 		{
 			name:          "node not owned by any NVIDIADriver → not labeled",
-			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{liveDriver()},
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{nonDeletingDriver()},
 			nodes: []*corev1.Node{{
 				ObjectMeta: metav1.ObjectMeta{Name: "node-1"}, // no NVIDIADriverOwnerLabel
 			}},
