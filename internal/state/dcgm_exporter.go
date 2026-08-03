@@ -131,7 +131,6 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 		Collectors:                   collectors,
 		HPCJobMappingDir:             hpcJobMappingDir,
 		PodLabelAllowlistRegex:       strings.Join(spec.PodLabelAllowlistRegex, ","),
-		PodMetadataEnabled:           spec.IsKubernetesPodMetadataEnabled(),
 		EnablePodLabels:              spec.IsPodLabelsEnabled(),
 		EnablePodUID:                 spec.IsPodUIDEnabled(),
 		HostPID:                      spec.IsHostPIDEnabled(),

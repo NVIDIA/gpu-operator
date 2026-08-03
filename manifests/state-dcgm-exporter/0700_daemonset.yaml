@@ -41,7 +41,7 @@ spec:
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: nvidia-dcgm-exporter-dra
-      automountServiceAccountToken: {{ .PodMetadataEnabled }}
+      automountServiceAccountToken: true
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
       # can pause it to drain dcgm-exporter off a node during a driver reload.
       nodeSelector:
@@ -99,10 +99,11 @@ spec:
         - name: DCGM_HPC_JOB_MAPPING_DIR
           value: {{ .HPCJobMappingDir | quote }}
         {{- end }}
-        {{- if .PodMetadataEnabled }}
+        # The kubelet reports DRA-allocated devices as (pool, device) names rather
+        # than GPU UUIDs, so the exporter needs the ResourceSlice informer to resolve
+        # them. Without this the metrics carry no pod, namespace or container label.
         - name: KUBERNETES_ENABLE_DRA
           value: "true"
-        {{- end }}
         {{- if .EnablePodLabels }}
         - name: DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS
           value: "true"
