@@ -119,13 +119,25 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 		WithScheme(scheme.Scheme).
 		WithObjects(
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
-				Name: "rhel-node",
+				Name: "rhel9.4-node",
 				Labels: map[string]string{
 					"pool":                        "gold",
 					consts.GPUPresentLabel:        "true",
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "rhel",
 					nfdOSVersionIDLabelKey:        "9.4",
+					nfdOSVersionIDMajorLabelKey:   "9",
+				},
+			}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "rhel9.5-node",
+				Labels: map[string]string{
+					"pool":                        "gold",
+					consts.GPUPresentLabel:        "true",
+					consts.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:        "rhel",
+					nfdOSVersionIDLabelKey:        "9.5",
+					nfdOSVersionIDMajorLabelKey:   "9",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
@@ -136,6 +148,7 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "ubuntu",
 					nfdOSVersionIDLabelKey:        "22.04",
+					nfdOSVersionIDMajorLabelKey:   "22",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
@@ -146,6 +159,7 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "ubuntu",
 					nfdOSVersionIDLabelKey:        "20.04",
+					nfdOSVersionIDMajorLabelKey:   "20",
 				},
 			}},
 		).
@@ -165,13 +179,16 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 	poolsByName := nodePoolsByName(nodePools)
 	require.Contains(t, poolsByName, "rhel9")
 	require.Equal(t, "rhel", poolsByName["rhel9"].osRelease)
-	require.Equal(t, "9.4", poolsByName["rhel9"].osVersion)
 	require.Equal(t, "gold", poolsByName["rhel9"].nodeSelector["pool"])
 	require.Equal(t, "driver-a", poolsByName["rhel9"].nodeSelector[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "", poolsByName["rhel9"].nodeSelector[nfdOSVersionIDLabelKey])
+	require.Equal(t, "9", poolsByName["rhel9"].nodeSelector[nfdOSVersionIDMajorLabelKey])
 
 	require.Contains(t, poolsByName, "ubuntu22.04")
 	require.Equal(t, "ubuntu", poolsByName["ubuntu22.04"].osRelease)
 	require.Equal(t, "22.04", poolsByName["ubuntu22.04"].osVersion)
+	require.Equal(t, "22.04", poolsByName["ubuntu22.04"].nodeSelector[nfdOSVersionIDLabelKey])
+	require.Equal(t, "", poolsByName["ubuntu22.04"].nodeSelector[nfdOSVersionIDMajorLabelKey])
 }
 
 func TestGetNodePoolsSkipsNodesMissingNFDOSLabels(t *testing.T) {
@@ -221,6 +238,7 @@ func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "ubuntu",
 					nfdOSVersionIDLabelKey:        "22.04",
+					nfdOSVersionIDMajorLabelKey:   "22",
 					nfdKernelLabelKey:             "5.15.0-70-generic_x86_64",
 				},
 			}},
@@ -231,6 +249,7 @@ func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "ubuntu",
 					nfdOSVersionIDLabelKey:        "22.04",
+					nfdOSVersionIDMajorLabelKey:   "22",
 				},
 			}},
 		).
@@ -264,6 +283,7 @@ func TestGetNodePoolsPartitionsOpenShiftNodesByRHCOSVersion(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "rhcos",
 					nfdOSVersionIDLabelKey:        "4.14",
+					nfdOSVersionIDMajorLabelKey:   "4",
 					nfdOSTreeVersionLabelKey:      "414.92.202309282257",
 				},
 			}},
@@ -274,6 +294,7 @@ func TestGetNodePoolsPartitionsOpenShiftNodesByRHCOSVersion(t *testing.T) {
 					consts.NVIDIADriverOwnerLabel: "driver-a",
 					nfdOSReleaseIDLabelKey:        "rhcos",
 					nfdOSVersionIDLabelKey:        "4.14",
+					nfdOSVersionIDMajorLabelKey:   "4",
 				},
 			}},
 		).

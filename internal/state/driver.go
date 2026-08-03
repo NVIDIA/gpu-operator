@@ -50,8 +50,9 @@ import (
 )
 
 const (
-	nfdOSReleaseIDLabelKey = "feature.node.kubernetes.io/system-os_release.ID"
-	nfdOSVersionIDLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	nfdOSReleaseIDLabelKey      = "feature.node.kubernetes.io/system-os_release.ID"
+	nfdOSVersionIDLabelKey      = "feature.node.kubernetes.io/system-os_release.VERSION_ID"
+	nfdOSVersionIDMajorLabelKey = "feature.node.kubernetes.io/system-os_release.VERSION_ID.major"
 
 	// AppComponentLabelKey indicates the label key of the component
 	AppComponentLabelKey = "app.kubernetes.io/component"
