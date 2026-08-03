@@ -541,7 +541,7 @@ kataSandboxDevicePlugin:
   enabled: true
   repository: nvcr.io/nvidia/cloud-native
   image: nvidia-sandbox-device-plugin
-  version: "v0.0.3"
+  version: "v0.0.4"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   args: []
