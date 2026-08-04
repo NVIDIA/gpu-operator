@@ -59,7 +59,7 @@ on:
       olm_bundle_os_suffix:
         description: "OS suffix used for OLM bundle driver and GDRCopy images"
         required: false
-        default: "rhel9.6"
+        default: "rhel9"
         type: string
 
 permissions: {}
