@@ -565,52 +565,6 @@ ccManager:
 clusterPolicy:
   deployCR: true
 
-# The GPUCluster CR stores the desired state of the GPU
-# enablement stack based on Dynamic Resource Allocation (DRA).
-# This is an experimental feature and is disabled by default.
-#
-# To enable the GPUCluster (DRA) enablement stack, set
-# gpuCluster.deployCR=true and clusterPolicy.deployCR=false
-# It is an invalid configuration for both CRs to exist.
-gpuCluster:
-  deployCR: false
-
-# draDriver configures the NVIDIA DRA driver for GPUs which
-# is managed by the GPUCluster CR (rendered only when
-# gpuCluster.deployCR=true).
-draDriver:
-  repository: registry.k8s.io/dra-driver-nvidia
-  image: dra-driver-nvidia-gpu
-  version: v0.4.1
-  imagePullPolicy: IfNotPresent
-  imagePullSecrets: []
-  # featureGates toggles DRA driver feature gates; rendered as FEATURE_GATES.
-  # e.g. featureGates: {MPSSupport: true, NVMLDeviceHealthCheck: true}
-  featureGates: {}
-  # gpus configures the gpu.nvidia.com / mig.nvidia.com / vfio.gpu.nvidia.com
-  # capability (the gpus container of the kubelet-plugin DaemonSet). It is
-  # always deployed.
-  gpus:
-    # kubeletPlugin overrides env/resources for the gpus container.
-    # Scheduling is opinionated and not configurable here. All fields are optional:
-    kubeletPlugin: {}
-    #   env: []                          # list of {name, value}
-    #   resources: {}                    # requests/limits
-    #   healthcheck: {}                  # {enabled, port}; port defaults to 51516/51515
-  # computeDomains configures the Multi-Node NVLink (MNNVL) compute-domain
-  # capability: a controller Deployment plus the compute-domains kubelet-plugin
-  # container.
-  computeDomains:
-    enabled: true
-    # controller overrides env/resources for the compute-domain controller Deployment.
-    # Scheduling is opinionated and not configurable here. All fields are optional:
-    controller: {}
-    #   env: []
-    #   resources: {}
-    # kubeletPlugin overrides the compute-domains container (same fields as
-    # gpus.kubeletPlugin above).
-    kubeletPlugin: {}
-
 # Array of extra K8s manifests to deploy
 # Supports use of custom Helm templates
 extraObjects: []

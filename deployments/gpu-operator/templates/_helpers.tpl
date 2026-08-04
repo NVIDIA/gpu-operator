@@ -85,11 +85,3 @@ Full image name with tag
 {{- define "validator.fullimage" -}}
 {{- .Values.validator.repository -}}/{{- .Values.validator.image -}}:{{- .Values.validator.version | default .Chart.AppVersion -}}
 {{- end }}
-
-{{/*
-Name of the chart-managed GPUCluster CR; the pre-delete cleanup hook deletes it by
-this name.
-*/}}
-{{- define "gpu-operator.gpucluster-name" -}}
-gpu-cluster
-{{- end }}

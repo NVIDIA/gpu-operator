@@ -1,15 +1,15 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gpu-operator-cleanup-gpucluster
+  name: gpu-operator-delete-gpuclusters-before-uninstall
   namespace: {{ .Release.Namespace }}
   annotations:
-    # Delete the chart-managed GPUCluster CR and wait for it to be gone before helm
-    # removes the operator (and, with operator.cleanupCRD, before the CRD cleanup
-    # hook runs). The operator drains ResourceClaim-consuming operands under a
-    # finalizer on CR deletion, so it must stay alive until the CR has disappeared.
-    # Unconditional because the CR outlives a gpuCluster.deployCR flip (resource
-    # policy keep); a no-op when the CRD or the CR does not exist.
+    # Fail the pre-delete phase while GPUCluster CRs exist, so helm does
+    # not remove the operator before it has processed their finalizers.
+    # A GPUCluster deleted after the operator is gone stays stuck terminating,
+    # with the DRA operands running. The guard never deletes CRs; it waits
+    # for CRs that are already terminating and is a no-op when the CRD or no
+    # CRs exist.
     "helm.sh/hook": pre-delete
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
@@ -17,9 +17,12 @@ metadata:
     {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
 spec:
+  # Fail the uninstall on the first pod failure instead of retrying into
+  # helm's timeout.
+  backoffLimit: 0
   template:
     metadata:
-      name: gpu-operator-cleanup-gpucluster
+      name: gpu-operator-delete-gpuclusters-before-uninstall
       labels:
         {{- include "gpu-operator.labels" . | nindent 8 }}
         app.kubernetes.io/component: "gpu-operator"
@@ -38,11 +41,9 @@ spec:
       nodeSelector:
         {{- toYaml .Values.operator.nodeSelector | nindent 8 }}
       containers:
-        - name: cleanup-gpucluster
+        - name: check-gpuclusters
           image: {{ include "gpu-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
           command:
-            - /usr/bin/cleanup-gpuclusters
-            - --gpucluster-name
-            - {{ include "gpu-operator.gpucluster-name" . }}
-      restartPolicy: OnFailure
+            - /usr/bin/check-gpuclusters
+      restartPolicy: Never

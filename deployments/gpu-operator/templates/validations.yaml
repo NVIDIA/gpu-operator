@@ -1,11 +1,3 @@
-{{- if and .Values.clusterPolicy.deployCR .Values.gpuCluster.deployCR }}
-{{ fail "clusterPolicy.deployCR and gpuCluster.deployCR cannot both be true; only one CR can exist" }}
-{{- end }}
-
-{{- if and .Values.gpuCluster.deployCR (and .Values.driver.enabled (not .Values.driver.nvidiaDriverCRD.enabled)) }}
-{{ fail "the NVIDIADriver CRD must be enabled when deploying a GPUCluster CR, set driver.nvidiaDriverCRD.enabled=true" }}
-{{- end }}
-
 {{- if and (eq .Values.cdi.enabled false) (eq .Values.cdi.nriPluginEnabled true) }}
 {{ fail "the NRI Plugin cannot be enabled when CDI is disabled" }}
 {{- end }}
@@ -20,11 +12,4 @@
 
 {{- if and (.Values.devicePlugin.config.create) (empty .Values.devicePlugin.config.name) }}
 {{ fail "devicePlugin.config.name cannot be empty when devicePlugin.config.create is set to true" }}
-{{- end }}
-
-{{- if .Values.gpuCluster.deployCR }}
-{{- $clusterSupportsDRA := or (.Capabilities.APIVersions.Has "resource.k8s.io/v1/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta2/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta1/DeviceClass") }}
-{{- if not $clusterSupportsDRA }}
-{{ fail "gpuCluster.deployCR=true requires a Kubernetes cluster that supports Dynamic Resource Allocation (no resource.k8s.io DeviceClass API is served). When rendering offline with 'helm template', pass --api-versions resource.k8s.io/v1/DeviceClass" }}
-{{- end }}
 {{- end }}

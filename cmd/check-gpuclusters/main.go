@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,11 +39,11 @@ var logger = log.New()
 
 func main() {
 	var debug bool
-	var crName string
+	var timeout time.Duration
 
 	c := cli.Command{}
-	c.Name = "cleanup-gpuclusters"
-	c.Usage = "Delete the chart-managed GPUCluster CR and wait until it is gone"
+	c.Name = "check-gpuclusters"
+	c.Usage = "Fail while GPUCluster CRs exist so that helm uninstall aborts before the operator is removed"
 	c.Version = info.GetVersionString()
 	c.Flags = []cli.Flag{
 		&cli.BoolFlag{
@@ -53,12 +53,12 @@ func main() {
 			Destination: &debug,
 			Sources:     cli.EnvVars("DEBUG"),
 		},
-		&cli.StringFlag{
-			Name:        "gpucluster-name",
-			Usage:       "Name of the chart-managed GPUCluster CR to delete",
-			Required:    true,
-			Destination: &crName,
-			Sources:     cli.EnvVars("GPUCLUSTER_NAME"),
+		&cli.DurationFlag{
+			Name:        "timeout",
+			Usage:       "How long to wait for already-terminating GPUCluster CRs to be deleted",
+			Value:       5 * time.Minute,
+			Destination: &timeout,
+			Sources:     cli.EnvVars("TIMEOUT"),
 		},
 	}
 	c.Before = func(ctx context.Context, cli *cli.Command) (context.Context, error) {
@@ -70,7 +70,7 @@ func main() {
 		return ctx, nil
 	}
 	c.Action = func(ctx context.Context, _ *cli.Command) error {
-		return runDeleteGPUCluster(ctx, crName)
+		return checkGPUClusters(ctx, timeout)
 	}
 
 	err := c.Run(context.Background(), os.Args)
@@ -80,12 +80,13 @@ func main() {
 	}
 }
 
-// runDeleteGPUCluster deletes the named GPUCluster CR and blocks until it is gone. The
-// GPUCluster controller drains ResourceClaim-consuming operands under a finalizer
-// before the CR disappears, so waiting here (from the chart's pre-delete hook) keeps
-// the operator alive until that ordered teardown has completed. Scoped to the chart's
-// own CR by name so CRs created outside the chart are never touched.
-func runDeleteGPUCluster(ctx context.Context, name string) error {
+// checkGPUClusters fails while any GPUCluster CR exists, so that the chart's pre-delete hook
+// aborts helm uninstall before the operator is removed. A GPUCluster deleted after the
+// operator is gone has no controller to process its finalizer: the CR stays stuck
+// terminating and the DRA operands keep running. CRs that are already terminating are
+// waited on instead of failed on, so an uninstall that follows a delete succeeds
+// once the finalizer drain completes. The guard only lists CRs; it never deletes them.
+func checkGPUClusters(ctx context.Context, timeout time.Duration) error {
 	scheme := runtime.NewScheme()
 	if err := nvidiav1alpha1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to add GPUCluster types to scheme: %w", err)
@@ -99,34 +100,42 @@ func runDeleteGPUCluster(ctx context.Context, name string) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	for {
-		cr := &nvidiav1alpha1.GPUCluster{}
-		if err := k8sClient.Get(ctx, ctrlclient.ObjectKey{Name: name}, cr); err != nil {
-			// The GPUCluster CRD may not be installed (e.g. cleanup enabled without
-			// the DRA stack ever deployed); nothing to drain in that case.
+		list := &nvidiav1alpha1.GPUClusterList{}
+		if err := k8sClient.List(ctx, list); err != nil {
+			// The GPUCluster CRD may not be installed (e.g. the DRA stack was never
+			// deployed); nothing to check in that case.
 			if meta.IsNoMatchError(err) {
-				logger.Info("GPUCluster CRD not installed, nothing to delete")
+				logger.Info("GPUCluster CRD not installed, nothing to check")
 				return nil
 			}
-			if apierrors.IsNotFound(err) {
-				logger.Infof("GPUCluster %s deleted", name)
-				return nil
-			}
-			return fmt.Errorf("failed to get GPUCluster %s: %w", name, err)
+			return fmt.Errorf("failed to list GPUCluster objects: %w", err)
 		}
-		if cr.DeletionTimestamp.IsZero() {
-			logger.Infof("Deleting GPUCluster %s", name)
-			if err := k8sClient.Delete(ctx, cr); err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("failed to delete GPUCluster %s: %w", name, err)
+
+		var live []string
+		terminating := 0
+		for _, cr := range list.Items {
+			if cr.DeletionTimestamp.IsZero() {
+				live = append(live, cr.Name)
+			} else {
+				terminating++
 			}
 		}
-		logger.Infof("Waiting for GPUCluster %s to be deleted", name)
+		if len(live) > 0 {
+			return fmt.Errorf("GPUCluster CR(s) %s exist; delete them (kubectl delete gpuclusters %s) and wait for the deletion to complete, then retry the uninstall",
+				strings.Join(live, ", "), strings.Join(live, " "))
+		}
+		if terminating == 0 {
+			logger.Info("No GPUCluster CRs found")
+			return nil
+		}
+		logger.Infof("Waiting for %d terminating GPUCluster CR(s) to be deleted", terminating)
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for GPUCluster %s to be deleted: %w", name, ctx.Err())
+			return fmt.Errorf("timed out waiting for terminating GPUCluster CRs to be deleted: %w", ctx.Err())
 		case <-time.After(5 * time.Second):
 		}
 	}
