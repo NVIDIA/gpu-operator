@@ -57,6 +57,10 @@ const (
 	NLSClientTokenMountPath = "/drivers/ClientConfigToken/client_configuration_token.tok"
 	// NLSClientTokenFileName is the NLS client config token filename
 	NLSClientTokenFileName = "client_configuration_token.tok"
+	// VGPULicensingConfigDirMountPath indicates the target mount path for the directory holding the
+	// vGPU licensing configuration files. This mount does not use a subPath, so kubelet keeps its
+	// contents in sync with the backing Secret/ConfigMap while the driver pod is running.
+	VGPULicensingConfigDirMountPath = "/drivers/licensing-config"
 	// VGPUTopologyConfigMountPath indicates target mount path for vGPU topology daemon configuration file
 	VGPUTopologyConfigMountPath = "/etc/nvidia/nvidia-topologyd.conf"
 	// VGPUTopologyConfigFileName is the vGPU topology daemon configuration filename

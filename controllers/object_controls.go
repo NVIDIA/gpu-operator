@@ -3492,6 +3492,13 @@ func applyLicensingConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, nlsTokenVolMount)
 	}
 
+	// Additionally mount the whole licensing volume as a directory. The subPath mounts above are
+	// resolved once at container start, so an in-place update of the Secret/ConfigMap is never
+	// visible to a running driver pod. A directory mount is kept in sync by kubelet, allowing the
+	// driver container to pick up a rotated license without a daemonset rollout.
+	licensingConfigDirVolMount := corev1.VolumeMount{Name: "licensing-config", ReadOnly: true, MountPath: consts.VGPULicensingConfigDirMountPath}
+	driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, licensingConfigDirVolMount)
+
 	var licensingConfigVolumeSource corev1.VolumeSource
 	if config.Driver.LicensingConfig.SecretName != "" {
 		licensingConfigVolumeSource = corev1.VolumeSource{
