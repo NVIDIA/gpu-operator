@@ -1,5 +1,34 @@
 {{- if .DRADriver.Spec.IsComputeDomainsEnabled }}
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-dra-driver-kubeletplugin-computedomain
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-dra-driver-kubeletplugin-computedomain
+subjects:
+- kind: ServiceAccount
+  name: nvidia-dra-driver-kubeletplugin
+  namespace: {{ .Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: nvidia-dra-driver-kubeletplugin-computedomain
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: nvidia-dra-driver-kubeletplugin
