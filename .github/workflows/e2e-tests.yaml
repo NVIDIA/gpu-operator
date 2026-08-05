@@ -64,6 +64,8 @@ env:
   # Kept in sync with spec.kubernetes.version in tests/holodeck.yaml.
   KUBECTL_VERSION: v1.35.4
   JQ_VERSION: "1.7.1"
+  # From https://github.com/jqlang/jq/releases/download/jq-1.7.1/sha256sum.txt
+  JQ_SHA256: "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
 
 jobs:
   variables:
@@ -119,6 +121,7 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/bin"
           curl -fsSL -o "${RUNNER_TEMP}/bin/jq" \
             "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+          echo "${JQ_SHA256}  ${RUNNER_TEMP}/bin/jq" | sha256sum -c -
           chmod +x "${RUNNER_TEMP}/bin/jq"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
           helm version
@@ -142,6 +145,7 @@ jobs:
           PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
           set -euo pipefail
+          test -n "${PUBLIC_DNS_NAME}"
           SSH_DIR="${RUNNER_TEMP}/holodeck-ssh"
           mkdir -p "${SSH_DIR}"
           chmod 700 "${SSH_DIR}"
@@ -161,10 +165,15 @@ jobs:
         if: ${{ inputs.use_values_override }}
         run: |
           set -euo pipefail
-          echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> "$GITHUB_ENV"
+          echo "VALUES_FILE=${GITHUB_WORKSPACE}/values-overrides.yaml" >> "$GITHUB_ENV"
       - name: Load kernel modules on the node
         run: |
           set -euo pipefail
+          # node-exec.sh falls back to running the operation locally when
+          # NODE_SSH_HOST is empty, which is the developer path. In CI that
+          # would run modprobe against the shared runner, so fail loudly
+          # instead.
+          test -n "${NODE_SSH_HOST}"
           ./tests/scripts/node-exec.sh load-modules
       - name: Run e2e tests
         env:
@@ -174,12 +183,16 @@ jobs:
           CONTAINER_RUNTIME: "containerd"
         run: |
           set -euo pipefail
+          # The restart-operator test shells out to node-exec.sh, which runs
+          # locally when NODE_SSH_HOST is empty. Refuse to start rather than
+          # let crictl run against the shared runner.
+          test -n "${NODE_SSH_HOST}"
           mkdir -p "${GITHUB_WORKSPACE}/logs"
           ./tests/cases/defaults.sh
       - name: Collect cluster diagnostics
         if: always()
         run: |
-          mkdir -p "${LOG_DIR}"
+          mkdir -p "${LOG_DIR}" || true
           kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
           kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
@@ -191,9 +204,11 @@ jobs:
           name: containerd-e2e-test-logs
           path: ./logs/
           retention-days: 15
-      - name: Remove node SSH credentials
+      - name: Remove credentials from the runner
         if: always()
-        run: rm -rf "${RUNNER_TEMP}/holodeck-ssh"
+        run: |
+          rm -rf "${RUNNER_TEMP}/holodeck-ssh" || true
+          rm -f "${KUBECONFIG}" || true
 
   e2e-tests-nvidiadriver:
     needs: [variables, publish-helm-oci-chart]
@@ -232,6 +247,7 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/bin"
           curl -fsSL -o "${RUNNER_TEMP}/bin/jq" \
             "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+          echo "${JQ_SHA256}  ${RUNNER_TEMP}/bin/jq" | sha256sum -c -
           chmod +x "${RUNNER_TEMP}/bin/jq"
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
           helm version
@@ -255,6 +271,7 @@ jobs:
           PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
           set -euo pipefail
+          test -n "${PUBLIC_DNS_NAME}"
           SSH_DIR="${RUNNER_TEMP}/holodeck-ssh"
           mkdir -p "${SSH_DIR}"
           chmod 700 "${SSH_DIR}"
@@ -274,10 +291,15 @@ jobs:
         if: ${{ inputs.use_values_override }}
         run: |
           set -euo pipefail
-          echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> "$GITHUB_ENV"
+          echo "VALUES_FILE=${GITHUB_WORKSPACE}/values-overrides.yaml" >> "$GITHUB_ENV"
       - name: Load kernel modules on the node
         run: |
           set -euo pipefail
+          # node-exec.sh falls back to running the operation locally when
+          # NODE_SSH_HOST is empty, which is the developer path. In CI that
+          # would run modprobe against the shared runner, so fail loudly
+          # instead.
+          test -n "${NODE_SSH_HOST}"
           ./tests/scripts/node-exec.sh load-modules
       - name: Run e2e tests
         env:
@@ -287,12 +309,16 @@ jobs:
           CONTAINER_RUNTIME: "containerd"
         run: |
           set -euo pipefail
+          # The restart-operator test shells out to node-exec.sh, which runs
+          # locally when NODE_SSH_HOST is empty. Refuse to start rather than
+          # let crictl run against the shared runner.
+          test -n "${NODE_SSH_HOST}"
           mkdir -p "${GITHUB_WORKSPACE}/logs"
           ./tests/cases/nvidia-driver.sh
       - name: Collect cluster diagnostics
         if: always()
         run: |
-          mkdir -p "${LOG_DIR}"
+          mkdir -p "${LOG_DIR}" || true
           kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
           kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
@@ -304,6 +330,8 @@ jobs:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
           retention-days: 15
-      - name: Remove node SSH credentials
+      - name: Remove credentials from the runner
         if: always()
-        run: rm -rf "${RUNNER_TEMP}/holodeck-ssh"
+        run: |
+          rm -rf "${RUNNER_TEMP}/holodeck-ssh" || true
+          rm -f "${KUBECONFIG}" || true
