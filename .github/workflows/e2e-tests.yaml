@@ -55,6 +55,16 @@ on:
         type: boolean
         default: false
 
+env:
+  # Pinned versions of the tooling the test scripts drive from the runner.
+  # helm used to be installed on the test node by tests/scripts/prerequisites.sh
+  # straight from the helm get-helm-3 master script, i.e. whatever release was
+  # current at the time the job ran. Pinning it here is a deliberate change.
+  HELM_VERSION: v3.19.0
+  # Kept in sync with spec.kubernetes.version in tests/holodeck.yaml.
+  KUBECTL_VERSION: v1.35.4
+  JQ_VERSION: "1.7.1"
+
 jobs:
   variables:
     uses: ./.github/workflows/variables.yaml
@@ -79,6 +89,11 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      # Holodeck is configured with kubernetes.remoteAccess, so it drops a
+      # kubeconfig pointing at the node's public API server endpoint here.
+      KUBECONFIG: ${{ github.workspace }}/kubeconfig
+      LOG_DIR: ${{ github.workspace }}/logs
     steps:
       - uses: actions/checkout@v7
         name: Check out code
@@ -90,6 +105,25 @@ jobs:
         with:
           name: values-overrides
           path: ${{ github.workspace }}
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - name: Install jq and verify runner tooling
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL -o "${RUNNER_TEMP}/bin/jq" \
+            "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+          chmod +x "${RUNNER_TEMP}/bin/jq"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          helm version
+          kubectl version --client
+          "${RUNNER_TEMP}/bin/jq" --version
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.3.7
         with:
@@ -102,36 +136,54 @@ jobs:
         uses: mikefarah/yq@v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
-      - name: Set test environment
-        env:
-          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
-        run: |
-          echo "instance_hostname=ubuntu@${PUBLIC_DNS_NAME}" >> $GITHUB_ENV
-          echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
-      - name: Write SSH key
+      - name: Configure node SSH access
         env:
           AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
+          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
-          echo "${AWS_SSH_KEY}" > ${private_key} && chmod 400 ${private_key}
-      - name: Copy values override file to remote
+          set -euo pipefail
+          SSH_DIR="${RUNNER_TEMP}/holodeck-ssh"
+          mkdir -p "${SSH_DIR}"
+          chmod 700 "${SSH_DIR}"
+          install -m 600 /dev/null "${SSH_DIR}/id_rsa"
+          printf '%s\n' "${AWS_SSH_KEY}" > "${SSH_DIR}/id_rsa"
+          install -m 600 /dev/null "${SSH_DIR}/known_hosts"
+          echo "NODE_SSH_HOST=ubuntu@${PUBLIC_DNS_NAME}" >> "$GITHUB_ENV"
+          echo "NODE_SSH_KEY=${SSH_DIR}/id_rsa" >> "$GITHUB_ENV"
+          echo "NODE_SSH_KNOWN_HOSTS=${SSH_DIR}/known_hosts" >> "$GITHUB_ENV"
+      - name: Verify cluster access
+        run: |
+          set -euo pipefail
+          test -r "${KUBECONFIG}"
+          kubectl cluster-info
+          kubectl get nodes -o wide
+      - name: Select values override file
         if: ${{ inputs.use_values_override }}
         run: |
-          scp -i ${private_key} -o StrictHostKeyChecking=no \
-            ${{ github.workspace }}/values-overrides.yaml \
-            ${instance_hostname}:/tmp/values-overrides.yaml
-          echo "VALUES_FILE=/tmp/values-overrides.yaml" >> $GITHUB_ENV
+          set -euo pipefail
+          echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> "$GITHUB_ENV"
+      - name: Load kernel modules on the node
+        run: |
+          set -euo pipefail
+          ./tests/scripts/node-exec.sh load-modules
       - name: Run e2e tests
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
-          SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
-          TEST_CASE: "./tests/cases/defaults.sh"
         run: |
-          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
-          ./tests/scripts/pull.sh /tmp/logs logs
-          exit $rc
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/logs"
+          ./tests/cases/defaults.sh
+      - name: Collect cluster diagnostics
+        if: always()
+        run: |
+          mkdir -p "${LOG_DIR}"
+          kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
+          kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
+          kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
+          helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
       - name: Archive test logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -139,6 +191,9 @@ jobs:
           name: containerd-e2e-test-logs
           path: ./logs/
           retention-days: 15
+      - name: Remove node SSH credentials
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/holodeck-ssh"
 
   e2e-tests-nvidiadriver:
     needs: [variables, publish-helm-oci-chart]
@@ -147,6 +202,11 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      # Holodeck is configured with kubernetes.remoteAccess, so it drops a
+      # kubeconfig pointing at the node's public API server endpoint here.
+      KUBECONFIG: ${{ github.workspace }}/kubeconfig
+      LOG_DIR: ${{ github.workspace }}/logs
     steps:
       - uses: actions/checkout@v7
         name: Check out code
@@ -158,6 +218,25 @@ jobs:
         with:
           name: values-overrides
           path: ${{ github.workspace }}
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - name: Install jq and verify runner tooling
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL -o "${RUNNER_TEMP}/bin/jq" \
+            "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+          chmod +x "${RUNNER_TEMP}/bin/jq"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          helm version
+          kubectl version --client
+          "${RUNNER_TEMP}/bin/jq" --version
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@v0.3.7
         with:
@@ -170,36 +249,54 @@ jobs:
         uses: mikefarah/yq@v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
-      - name: Set test environment
-        env:
-          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
-        run: |
-          echo "instance_hostname=ubuntu@${PUBLIC_DNS_NAME}" >> $GITHUB_ENV
-          echo "private_key=${{ github.workspace }}/key.pem" >> $GITHUB_ENV
-      - name: Write SSH key
+      - name: Configure node SSH access
         env:
           AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
+          PUBLIC_DNS_NAME: ${{ steps.get_public_dns_name.outputs.result }}
         run: |
-          echo "${AWS_SSH_KEY}" > ${private_key} && chmod 400 ${private_key}
-      - name: Copy values override file to remote
+          set -euo pipefail
+          SSH_DIR="${RUNNER_TEMP}/holodeck-ssh"
+          mkdir -p "${SSH_DIR}"
+          chmod 700 "${SSH_DIR}"
+          install -m 600 /dev/null "${SSH_DIR}/id_rsa"
+          printf '%s\n' "${AWS_SSH_KEY}" > "${SSH_DIR}/id_rsa"
+          install -m 600 /dev/null "${SSH_DIR}/known_hosts"
+          echo "NODE_SSH_HOST=ubuntu@${PUBLIC_DNS_NAME}" >> "$GITHUB_ENV"
+          echo "NODE_SSH_KEY=${SSH_DIR}/id_rsa" >> "$GITHUB_ENV"
+          echo "NODE_SSH_KNOWN_HOSTS=${SSH_DIR}/known_hosts" >> "$GITHUB_ENV"
+      - name: Verify cluster access
+        run: |
+          set -euo pipefail
+          test -r "${KUBECONFIG}"
+          kubectl cluster-info
+          kubectl get nodes -o wide
+      - name: Select values override file
         if: ${{ inputs.use_values_override }}
         run: |
-          scp -i ${private_key} -o StrictHostKeyChecking=no \
-            ${{ github.workspace }}/values-overrides.yaml \
-            ${instance_hostname}:/tmp/values-overrides.yaml
-          echo "VALUES_FILE=/tmp/values-overrides.yaml" >> $GITHUB_ENV
+          set -euo pipefail
+          echo "VALUES_FILE=${{ github.workspace }}/values-overrides.yaml" >> "$GITHUB_ENV"
+      - name: Load kernel modules on the node
+        run: |
+          set -euo pipefail
+          ./tests/scripts/node-exec.sh load-modules
       - name: Run e2e tests
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
           GPU_PRODUCT_NAME: "Tesla-T4"
-          SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
-          TEST_CASE: "./tests/cases/nvidia-driver.sh"
         run: |
-          ./tests/ci-run-e2e.sh ${OPERATOR_IMAGE} ${OPERATOR_VERSION} ${GPU_PRODUCT_NAME} ${TEST_CASE} || rc=$?
-          ./tests/scripts/pull.sh /tmp/logs logs
-          exit $rc
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/logs"
+          ./tests/cases/nvidia-driver.sh
+      - name: Collect cluster diagnostics
+        if: always()
+        run: |
+          mkdir -p "${LOG_DIR}"
+          kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
+          kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
+          kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
+          helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
       - name: Archive test logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -207,3 +304,6 @@ jobs:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/
           retention-days: 15
+      - name: Remove node SSH credentials
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/holodeck-ssh"
