@@ -2,7 +2,8 @@
 
 check_pod_ready() {
 	local pod_label=$1
-	local current_time=0
+	# SECONDS counts from shell start, so record a baseline and measure against it.
+	local start_time=${SECONDS}
 	while :; do
 		echo "Checking $pod_label pod"
 		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
@@ -21,7 +22,7 @@ check_pod_ready() {
 			fi
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		if [[ $((SECONDS - start_time)) -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
 			exit 1;
 		fi
@@ -30,14 +31,14 @@ check_pod_ready() {
 		kubectl get pods -n ${TEST_NAMESPACE}
 
 		echo "Sleeping 5 seconds"
-		current_time=$((${current_time} + 5))
 		sleep 5
 	done
 }
 
 check_pod_deleted() {
 	local pod_label=$1
-	local current_time=0
+	# SECONDS counts from shell start, so record a baseline and measure against it.
+	local start_time=${SECONDS}
 	while :; do
 		echo "Checking $pod_label pod"
 		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
@@ -53,7 +54,7 @@ check_pod_deleted() {
 			echo "Pod $pod_label has not been deleted"
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		if [[ $((SECONDS - start_time)) -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
 			exit 1;
 		fi
@@ -62,7 +63,6 @@ check_pod_deleted() {
 		kubectl get pods -n ${TEST_NAMESPACE}
 
 		echo "Sleeping 5 seconds"
-		current_time=$((${current_time} + 5))
 		sleep 5
 	done
 }
@@ -111,7 +111,8 @@ test_restart_operator() {
 
 check_gpu_pod_ready() {
 	local log_dir=$1
-	local current_time=0
+	# SECONDS counts from shell start, so record a baseline and measure against it.
+	local start_time=${SECONDS}
 
 	# Ensure the log directory exists
 	mkdir -p ${log_dir}
@@ -125,7 +126,7 @@ check_gpu_pod_ready() {
 			break;
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		if [[ $((SECONDS - start_time)) -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
 			exit 1
 		fi
@@ -138,7 +139,8 @@ check_gpu_pod_ready() {
 			echo "Generating logs for pod: ${pod} ns: ${ns}"
 			echo "------------------------------------------------" >> "${log_dir}/${pod}.describe"
 			kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe"
-			kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${log_dir}/${pod}.logs" || true
+			# This runs on every poll iteration, so bound the volume we re-fetch each time.
+			kubectl -n "${ns}" logs "${pod}" --all-containers=true --tail=200 > "${log_dir}/${pod}.logs" || true
 		done
 
 		echo "Generating cluster logs"
@@ -146,14 +148,14 @@ check_gpu_pod_ready() {
 		kubectl get --all-namespaces pods >> "${log_dir}/cluster.logs"
 
 		echo "Sleeping 5 seconds"
-		current_time=$((${current_time} + 5))
 		sleep 5;
 	done
 }
 
 # TODO: deduplicate the logic found in this file by moving the duplicate to a common method and parameterizing the labels to select on
 check_nvidia_driver_pods_ready() {
-	local current_time=0
+	# SECONDS counts from shell start, so record a baseline and measure against it.
+	local start_time=${SECONDS}
 	while :; do
 		echo "Checking nvidia driver pod"
 		kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE}
@@ -172,7 +174,7 @@ check_nvidia_driver_pods_ready() {
 			fi
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		if [[ $((SECONDS - start_time)) -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
 			exit 1;
 		fi
@@ -181,7 +183,6 @@ check_nvidia_driver_pods_ready() {
 		kubectl get pods -n ${TEST_NAMESPACE}
 
 		echo "Sleeping 5 seconds"
-		current_time=$((${current_time} + 5))
 		sleep 5
 	done
 }
@@ -239,7 +240,13 @@ print_driver_upgrade_debug() {
 
 wait_for_driver_upgrade_done() {
 	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
-	local current_time=0
+	# SECONDS counts from shell start, so record a baseline and measure against it.
+	local start_time=${SECONDS}
+	local elapsed=0
+	# Next elapsed time at which the full debug dump is due. Iterations can take
+	# much longer than the nominal sleep, so track a due time instead of testing
+	# the elapsed time for divisibility, which would skip dumps entirely.
+	local next_debug=0
 	echo "waiting for the gpu driver upgrade to complete"
 	while :; do
 		local upgraded_count=0
@@ -256,21 +263,22 @@ wait_for_driver_upgrade_done() {
 			echo "gpu driver still in progress. $upgraded_count/$gpu_node_count node(s) upgraded"
 		fi
 
-		if [[ "${current_time}" -gt $((60 * 45)) ]]; then
+		elapsed=$((SECONDS - start_time))
+		if [[ "${elapsed}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
 			print_driver_upgrade_debug
 			exit 1;
 		fi
 
-		if [[ $((current_time % 30)) -eq 0 ]]; then
+		if [[ "${elapsed}" -ge "${next_debug}" ]]; then
 			print_driver_upgrade_debug
+			next_debug=$((elapsed + 30))
 		else
 			kubectl get node -l nvidia.com/gpu.present \
 				-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers
 		fi
 		
 		echo "Sleeping 5 seconds"
-		current_time=$((${current_time} + 5))
 		sleep 5
 	done
 }
