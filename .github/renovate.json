@@ -34,7 +34,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "deployments/gpu-operator/values.yaml"
+        "deployments/gpu-operator/values.yaml",
+        "config/samples/nvidia_v1alpha1_gpucluster.yaml"
       ],
       "matchStrings": [
         "[-\\s]*repository:\\s*(?<repo>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*image:\\s*(?<image>\\S+)\\s*\\n(?:\\s*#.*\\n|\\s*\\n)*[-\\s]*version:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -113,12 +114,25 @@
     {
       "matchFileNames": [
         "deployments/gpu-operator/values.yaml",
+        "config/samples/nvidia_v1alpha1_gpucluster.yaml",
         "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
       ],
       "matchPackageNames": [
         "nvcr.io/nvidia/k8s/dcgm-exporter"
       ],
       "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-\\d+\\.\\d+\\.\\d+-distroless$",
+      "separateMajorMinor": false
+    },
+    {
+      "description": "Keep DRA driver version current in both the sample GPUCluster CR and the OLM bundle",
+      "matchFileNames": [
+        "config/samples/nvidia_v1alpha1_gpucluster.yaml",
+        "bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml"
+      ],
+      "matchPackageNames": [
+        "registry.k8s.io/dra-driver-nvidia/dra-driver-nvidia-gpu"
+      ],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "separateMajorMinor": false
     },
     {
