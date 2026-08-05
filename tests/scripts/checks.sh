@@ -109,10 +109,33 @@ test_restart_operator() {
 	exit 1
 }
 
+# Regenerate the describe and log files for every pod passed in. The log files
+# are rewritten in full rather than tailed, so that the artifact left behind
+# holds the complete output of every container.
+collect_pod_logs() {
+	local log_dir=$1
+	local pods=$2
+
+	for pod in $(echo "$pods" | jq -r .[].name); do
+		ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
+		echo "Generating logs for pod: ${pod} ns: ${ns}"
+		echo "------------------------------------------------" >> "${log_dir}/${pod}.describe"
+		kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe"
+		kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${log_dir}/${pod}.logs" || true
+	done
+}
+
 check_gpu_pod_ready() {
 	local log_dir=$1
 	# SECONDS counts from shell start, so record a baseline and measure against it.
 	local start_time=${SECONDS}
+	local elapsed=0
+	# Regenerating every pod's describe and log files is the expensive part of
+	# this loop, so it runs on its own slower cadence while the readiness check
+	# below keeps polling every 5 seconds. Track the time at which the next
+	# regeneration is due rather than testing the elapsed time for divisibility,
+	# which would skip regenerations when an iteration runs long.
+	local next_collection=0
 
 	# Ensure the log directory exists
 	mkdir -p ${log_dir}
@@ -123,25 +146,26 @@ check_gpu_pod_ready() {
 		if [ "${status}" = "Succeeded" ]; then
 			echo "GPU pod terminated successfully"
 			rc=0
+			collect_pod_logs "${log_dir}" "${pods}"
 			break;
 		fi
 
-		if [[ $((SECONDS - start_time)) -gt $((60 * 45)) ]]; then
+		elapsed=$((SECONDS - start_time))
+		if [[ "${elapsed}" -gt $((60 * 45)) ]]; then
 			echo "timeout reached"
+			# Collect once more so that the artifact reflects the state at the
+			# timeout rather than the state at the last scheduled collection.
+			collect_pod_logs "${log_dir}" "${pods}"
 			exit 1
 		fi
 
 		# Echo useful information on stdout
 		kubectl get pods --all-namespaces
 
-		for pod in $(echo "$pods" | jq -r .[].name); do
-			ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
-			echo "Generating logs for pod: ${pod} ns: ${ns}"
-			echo "------------------------------------------------" >> "${log_dir}/${pod}.describe"
-			kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe"
-			# This runs on every poll iteration, so bound the volume we re-fetch each time.
-			kubectl -n "${ns}" logs "${pod}" --all-containers=true --tail=200 > "${log_dir}/${pod}.logs" || true
-		done
+		if [[ "${elapsed}" -ge "${next_collection}" ]]; then
+			collect_pod_logs "${log_dir}" "${pods}"
+			next_collection=$((elapsed + 30))
+		fi
 
 		echo "Generating cluster logs"
 		echo "------------------------------------------------" >> "${log_dir}/cluster.logs"
