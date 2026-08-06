@@ -198,7 +198,10 @@ jobs:
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
           helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
       - name: Archive test logs
-        if: ${{ failure() }}
+        # always() rather than failure(): a job stopped by timeout-minutes is
+        # cancelled, not failed, so failure() would skip the upload on exactly
+        # the runs whose logs we most need.
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: containerd-e2e-test-logs
@@ -324,7 +327,10 @@ jobs:
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
           helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
       - name: Archive test logs
-        if: ${{ failure() }}
+        # always() rather than failure(): a job stopped by timeout-minutes is
+        # cancelled, not failed, so failure() would skip the upload on exactly
+        # the runs whose logs we most need.
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: nvidiadriver-e2e-test-logs
