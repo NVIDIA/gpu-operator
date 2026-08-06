@@ -187,12 +187,12 @@ jobs:
           # locally when NODE_SSH_HOST is empty. Refuse to start rather than
           # let crictl run against the shared runner.
           test -n "${NODE_SSH_HOST}"
-          mkdir -p "${GITHUB_WORKSPACE}/logs"
+          mkdir -p "${LOG_DIR}"
           ./tests/cases/defaults.sh
       - name: Collect cluster diagnostics
         if: always()
         run: |
-          mkdir -p "${LOG_DIR}" || true
+          mkdir -p "${LOG_DIR}"
           kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
           kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
@@ -210,8 +210,8 @@ jobs:
       - name: Remove credentials from the runner
         if: always()
         run: |
-          rm -rf "${RUNNER_TEMP}/holodeck-ssh" || true
-          rm -f "${KUBECONFIG}" || true
+          rm -rf "${RUNNER_TEMP}/holodeck-ssh"
+          rm -f "${KUBECONFIG}"
 
   e2e-tests-nvidiadriver:
     needs: [variables, publish-helm-oci-chart]
@@ -316,12 +316,12 @@ jobs:
           # locally when NODE_SSH_HOST is empty. Refuse to start rather than
           # let crictl run against the shared runner.
           test -n "${NODE_SSH_HOST}"
-          mkdir -p "${GITHUB_WORKSPACE}/logs"
+          mkdir -p "${LOG_DIR}"
           ./tests/cases/nvidia-driver.sh
       - name: Collect cluster diagnostics
         if: always()
         run: |
-          mkdir -p "${LOG_DIR}" || true
+          mkdir -p "${LOG_DIR}"
           kubectl get nodes -o wide > "${LOG_DIR}/nodes.txt" 2>&1 || true
           kubectl get pods -A -o wide > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp > "${LOG_DIR}/events.txt" 2>&1 || true
@@ -339,5 +339,5 @@ jobs:
       - name: Remove credentials from the runner
         if: always()
         run: |
-          rm -rf "${RUNNER_TEMP}/holodeck-ssh" || true
-          rm -f "${KUBECONFIG}" || true
+          rm -rf "${RUNNER_TEMP}/holodeck-ssh"
+          rm -f "${KUBECONFIG}"

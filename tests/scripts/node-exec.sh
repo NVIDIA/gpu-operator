@@ -16,31 +16,22 @@
 
 set -euo pipefail
 
-# This script dispatches a host-mutating operation to the node hosting the
-# cluster. When NODE_SSH_HOST is set the operation is streamed to the node over
-# SSH; otherwise it is executed locally, which is the developer path where the
-# tests already run on the node itself.
+# Usage: node-exec.sh <operation> [args...]
+#
+# Runs one of the node-operations.sh operations on the node hosting the cluster.
+# When NODE_SSH_HOST is set the operation is streamed to the node over SSH;
+# otherwise it is executed locally, which is the developer path where the tests
+# already run on the node itself. The operation names and their arguments are
+# documented by node-operations.sh, which also reports them on bad input.
+#
+# Environment:
+#   NODE_SSH_HOST         user@host of the node, e.g. ubuntu@ec2-1-2-3-4.compute.amazonaws.com.
+#                         If unset or empty the operation is executed locally.
+#   NODE_SSH_KEY          Path to the private key. Required when NODE_SSH_HOST is set.
+#   NODE_SSH_KNOWN_HOSTS  Path to the known_hosts file. Required when NODE_SSH_HOST is set.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 NODE_OPERATIONS="${SCRIPT_DIR}/node-operations.sh"
-
-usage() {
-	cat <<'EOF'
-Usage: node-exec.sh <operation> [args...]
-
-Runs one of the node-operations.sh operations on the node hosting the cluster.
-
-Environment:
-  NODE_SSH_HOST         user@host of the node, e.g. ubuntu@ec2-1-2-3-4.compute.amazonaws.com.
-                        If unset or empty the operation is executed locally.
-  NODE_SSH_KEY          Path to the private key. Required when NODE_SSH_HOST is set.
-  NODE_SSH_KNOWN_HOSTS  Path to the known_hosts file. Required when NODE_SSH_HOST is set.
-
-Operations:
-  load-modules
-  restart-operator-container <runtime>
-EOF
-}
 
 require_readable_file() {
 	local name="${1}"
@@ -56,30 +47,19 @@ require_readable_file() {
 	fi
 }
 
-if [[ $# -lt 1 ]]; then
-	usage >&2
-	exit 2
-fi
-
-if [[ ! -r "${NODE_OPERATIONS}" ]]; then
-	echo "Error: ${NODE_OPERATIONS} does not exist or is not readable" >&2
-	exit 1
-fi
-
 if [[ -z "${NODE_SSH_HOST:-}" ]]; then
 	echo "Running '$*' locally"
-	bash "${NODE_OPERATIONS}" "$@"
-	exit $?
+	exec bash "${NODE_OPERATIONS}" "$@"
 fi
 
 require_readable_file "NODE_SSH_KEY" "${NODE_SSH_KEY:-}"
 require_readable_file "NODE_SSH_KNOWN_HOSTS" "${NODE_SSH_KNOWN_HOSTS:-}"
 
-# Quote each argument so that it survives the remote shell.
-REMOTE_COMMAND="bash -s --"
-for arg in "$@"; do
-	REMOTE_COMMAND+=" $(printf '%q' "${arg}")"
-done
+# Quote the arguments so that they survive the remote shell.
+REMOTE_ARGS=""
+if (( $# )); then
+	printf -v REMOTE_ARGS ' %q' "$@"
+fi
 
 echo "Running '$*' on ${NODE_SSH_HOST}"
 ssh -i "${NODE_SSH_KEY}" \
@@ -88,4 +68,4 @@ ssh -i "${NODE_SSH_KEY}" \
 	-o StrictHostKeyChecking=accept-new \
 	-o UserKnownHostsFile="${NODE_SSH_KNOWN_HOSTS}" \
 	"${NODE_SSH_HOST}" \
-	"${REMOTE_COMMAND}" < "${NODE_OPERATIONS}"
+	"bash -s --${REMOTE_ARGS}" < "${NODE_OPERATIONS}"

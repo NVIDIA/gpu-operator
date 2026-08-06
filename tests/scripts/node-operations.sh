@@ -41,15 +41,15 @@ load_modules() {
 	sudo modprobe -a i2c_core ipmi_msghandler
 }
 
-# The x-prefixed comparisons and the container selection pipelines below are
-# kept as they were in tests/scripts/checks.sh so that the behaviour of the
-# restart test does not change.
-# shellcheck disable=SC2268
+# The container selection pipelines below are kept as they were in
+# tests/scripts/checks.sh so that the behaviour of the restart test does not
+# change.
 restart_operator_container() {
 	local runtime="${1:-}"
 	local container_id=""
 
-	if [[ x"${runtime}" == x"containerd" ]]; then
+	case "${runtime}" in
+	containerd)
 		# The operator is the only container that has the string '"gpu-operator"'
 		# TODO: This requires permissions on containerd.sock
 		container_id="$(sudo crictl ps --name gpu-operator | awk '{if(NR>1)print $1}')" || true
@@ -58,7 +58,8 @@ restart_operator_container() {
 			return 1
 		fi
 		sudo crictl rm --force "${container_id}"
-	elif [[ x"${runtime}" == x"docker" ]]; then
+		;;
+	docker)
 		# The operator is the only container that has the string '"gpu-operator"'
 		container_id="$(docker ps --format '{{.ID}} {{.Command}}' | grep "gpu-operator" | cut -f 1 -d ' ')" || true
 		if [[ -z "${container_id}" ]]; then
@@ -66,10 +67,12 @@ restart_operator_container() {
 			return 1
 		fi
 		docker kill "${container_id}"
-	else
+		;;
+	*)
 		echo "Error: unknown runtime '${runtime}'. Supported runtimes: containerd, docker" >&2
 		return 1
-	fi
+		;;
+	esac
 }
 
 main() {

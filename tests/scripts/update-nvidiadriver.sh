@@ -56,8 +56,7 @@ set_default_driver() {
 
 wait_for_default_nvidiadriver() {
     local expected_name=$1
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + 120))
 
     echo "Waiting for NVIDIADriver/${expected_name} to be the only default"
     while :; do
@@ -68,7 +67,7 @@ wait_for_default_nvidiadriver() {
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt 120 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver/${expected_name} to be the only default"
             kubectl get nvidiadriver || true
             exit 1
@@ -120,8 +119,7 @@ create_nvidiadriver() {
 
 wait_for_nvidiadriver_owner() {
     local driver_name=$1
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + $((60 * 15))))
     local gpu_node_count
 
     gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present=true --no-headers | wc -l)
@@ -134,10 +132,10 @@ wait_for_nvidiadriver_owner() {
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt $((60 * 15)) ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver/${driver_name} ownership"
             kubectl get nodes -l nvidia.com/gpu.present=true -o json |
-                jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv'
+                jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv' || true
             exit 1
         fi
 
@@ -154,8 +152,7 @@ get_nvidiadriver_daemonsets() {
 
 wait_for_nvidiadriver_daemonsets() {
     local driver_name=$1
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + $((60 * 15))))
 
     echo "Waiting for daemonsets owned by NVIDIADriver/${driver_name}"
     while :; do
@@ -165,7 +162,7 @@ wait_for_nvidiadriver_daemonsets() {
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt $((60 * 15)) ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for daemonsets owned by NVIDIADriver/${driver_name}"
             kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "$TEST_NAMESPACE" -o yaml || true
             exit 1
@@ -184,16 +181,15 @@ test_driver_image_updates() {
     fi
 
     # Verify update is applied to Driver Daemonset
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + 120))
     while :; do
         if get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}" | jq -e --arg version "${TARGET_DRIVER_VERSION}" 'length > 0 and all(.[]; .spec.template.spec.containers[0].image | contains($version))' >/dev/null; then
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt 120 ]]; then
+        if (( SECONDS > deadline )); then
             echo "Image update failed for driver daemonset to version $TARGET_DRIVER_VERSION"
-            get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}"
+            get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}" || true
             exit 1
         fi
 
@@ -223,16 +219,15 @@ test_custom_labels_override() {
 
   # Wait for the operator to update the pod template with new labels
   echo "Waiting for DaemonSet pod template to be updated with new labels..."
-  # SECONDS counts from shell start, so record a baseline and measure against it.
-  local start_time=${SECONDS}
+  local deadline=$((SECONDS + 120))
   while :; do
     if get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}" | jq -e 'length > 0 and all(.[]; .spec.template.metadata.labels.cloudprovider == "aws" and .spec.template.metadata.labels.platform == "kubernetes")' >/dev/null; then
       break
     fi
 
-    if [[ $((SECONDS - start_time)) -gt 120 ]]; then
+    if (( SECONDS > deadline )); then
       echo "timeout reached waiting for DaemonSet pod template labels"
-      get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}"
+      get_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}" || true
       exit 1
     fi
 
@@ -268,7 +263,7 @@ assert_nvidiadriver_owner_count() {
     if [[ "${owned_count}" -ne "${gpu_node_count}" ]]; then
         echo "Expected ${gpu_node_count} GPU node(s) to remain owned by NVIDIADriver/${driver_name}, found ${owned_count}"
         kubectl get nodes -l nvidia.com/gpu.present=true -o json |
-            jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv'
+            jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv' || true
         exit 1
     fi
 }
@@ -276,8 +271,7 @@ assert_nvidiadriver_owner_count() {
 wait_for_nvidiadriver_condition_message() {
     local driver_name=$1
     local message=$2
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + 120))
 
     echo "Waiting for NVIDIADriver/${driver_name} status message to contain: ${message}"
     while :; do
@@ -288,7 +282,7 @@ wait_for_nvidiadriver_condition_message() {
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt 120 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver/${driver_name} status message"
             kubectl get nvidiadriver/"${driver_name}" -o yaml || true
             exit 1
@@ -300,8 +294,7 @@ wait_for_nvidiadriver_condition_message() {
 
 wait_for_nvidiadriver_ready() {
     local driver_name=$1
-    # SECONDS counts from shell start, so record a baseline and measure against it.
-    local start_time=${SECONDS}
+    local deadline=$((SECONDS + 120))
 
     echo "Waiting for NVIDIADriver/${driver_name} to report Ready"
     while :; do
@@ -313,7 +306,7 @@ wait_for_nvidiadriver_ready() {
             break
         fi
 
-        if [[ $((SECONDS - start_time)) -gt 120 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver/${driver_name} to report Ready"
             kubectl get nvidiadriver/"${driver_name}" -o yaml || true
             exit 1
