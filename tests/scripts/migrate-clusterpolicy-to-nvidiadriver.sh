@@ -34,7 +34,7 @@ wait_for_legacy_driver_daemonset_deleted() {
 
         if [[ "${elapsed_time}" -gt 300 ]]; then
             echo "timeout reached waiting for legacy driver DaemonSet deletion"
-            kubectl get daemonset -n "${TEST_NAMESPACE}" -o wide
+            kubectl get daemonset -n "${TEST_NAMESPACE}" -o wide || true
             exit 1
         fi
 
@@ -57,7 +57,7 @@ wait_for_orphaned_legacy_driver_pod() {
 
         if [[ "${elapsed_time}" -gt 300 ]]; then
             echo "timeout reached waiting for legacy driver pod to become orphaned"
-            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml
+            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml || true
             exit 1
         fi
 
@@ -127,7 +127,7 @@ wait_for_nvidiadriver_daemonset() {
 
         if [[ "${elapsed_time}" -gt 300 ]]; then
             echo "timeout reached waiting for NVIDIADriver-owned driver DaemonSet"
-            kubectl get daemonset -n "${TEST_NAMESPACE}" -o yaml
+            kubectl get daemonset -n "${TEST_NAMESPACE}" -o yaml || true
             exit 1
         fi
 
@@ -162,14 +162,14 @@ wait_for_legacy_driver_pod_deleted() {
 legacy_driver_pod=$(kubectl get pod -l app=nvidia-driver-daemonset -n "${TEST_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}')
 if [[ -z "${legacy_driver_pod}" ]]; then
     echo "legacy ClusterPolicy driver pod not found"
-    kubectl get pods -n "${TEST_NAMESPACE}" -o wide
+    kubectl get pods -n "${TEST_NAMESPACE}" -o wide || true
     exit 1
 fi
 
 operator_name=$(get_helm_release_name)
 if [[ -z "${operator_name}" ]]; then
     echo "GPU Operator Helm release not found in namespace ${TEST_NAMESPACE}"
-    ${HELM} list -n "${TEST_NAMESPACE}"
+    ${HELM} list -n "${TEST_NAMESPACE}" || true
     exit 1
 fi
 

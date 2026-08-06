@@ -70,7 +70,7 @@ wait_for_default_nvidiadriver() {
 
         if [[ $((SECONDS - start_time)) -gt 120 ]]; then
             echo "timeout reached waiting for NVIDIADriver/${expected_name} to be the only default"
-            kubectl get nvidiadriver
+            kubectl get nvidiadriver || true
             exit 1
         fi
 
@@ -83,7 +83,7 @@ test_arbitrary_name_default_nvidiadriver() {
     current_default=$(get_default_nvidiadriver_name)
     if [[ -z "${current_default}" ]]; then
         echo "default NVIDIADriver not found"
-        kubectl get nvidiadriver
+        kubectl get nvidiadriver || true
         exit 1
     fi
 
@@ -110,7 +110,7 @@ create_nvidiadriver() {
     default_name=$(get_default_nvidiadriver_name)
     if [[ -z "${default_name}" ]]; then
         echo "default NVIDIADriver not found"
-        kubectl get nvidiadriver
+        kubectl get nvidiadriver || true
         exit 1
     fi
 
@@ -167,7 +167,7 @@ wait_for_nvidiadriver_daemonsets() {
 
         if [[ $((SECONDS - start_time)) -gt $((60 * 15)) ]]; then
             echo "timeout reached waiting for daemonsets owned by NVIDIADriver/${driver_name}"
-            kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "$TEST_NAMESPACE" -o yaml
+            kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "$TEST_NAMESPACE" -o yaml || true
             exit 1
         fi
 
@@ -253,7 +253,7 @@ test_custom_labels_override() {
   gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present=true --no-headers | wc -l)
   if [[ "${labeled_pod_count}" -ne "${gpu_node_count}" ]]; then
     echo "Custom labels are missing from one or more NVIDIADriver/${NVIDIA_DRIVER_NAME} pods"
-    kubectl get pods -n "$TEST_NAMESPACE" -l "app.kubernetes.io/component=nvidia-driver" --show-labels
+    kubectl get pods -n "$TEST_NAMESPACE" -l "app.kubernetes.io/component=nvidia-driver" --show-labels || true
     exit 1
   fi
 }
@@ -290,7 +290,7 @@ wait_for_nvidiadriver_condition_message() {
 
         if [[ $((SECONDS - start_time)) -gt 120 ]]; then
             echo "timeout reached waiting for NVIDIADriver/${driver_name} status message"
-            kubectl get nvidiadriver/"${driver_name}" -o yaml
+            kubectl get nvidiadriver/"${driver_name}" -o yaml || true
             exit 1
         fi
 
@@ -315,7 +315,7 @@ wait_for_nvidiadriver_ready() {
 
         if [[ $((SECONDS - start_time)) -gt 120 ]]; then
             echo "timeout reached waiting for NVIDIADriver/${driver_name} to report Ready"
-            kubectl get nvidiadriver/"${driver_name}" -o yaml
+            kubectl get nvidiadriver/"${driver_name}" -o yaml || true
             exit 1
         fi
 

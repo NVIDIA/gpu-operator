@@ -6,7 +6,7 @@ check_pod_ready() {
 	local start_time=${SECONDS}
 	while :; do
 		echo "Checking $pod_label pod"
-		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
+		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} || true
 
 		echo "Checking $pod_label pod readiness"
 		is_pod_ready=$(kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null || echo "terminated")
@@ -28,7 +28,7 @@ check_pod_ready() {
 		fi
 
 		# Echo useful information on stdout
-		kubectl get pods -n ${TEST_NAMESPACE}
+		kubectl get pods -n ${TEST_NAMESPACE} || true
 
 		echo "Sleeping 5 seconds"
 		sleep 5
@@ -41,7 +41,7 @@ check_pod_deleted() {
 	local start_time=${SECONDS}
 	while :; do
 		echo "Checking $pod_label pod"
-		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE}
+		kubectl get pods -lapp=$pod_label -n ${TEST_NAMESPACE} || true
 
 		echo "Checking if $pod_label pod has been deleted"
 		# note: $(kubectl get pods <options> -o jsonpath='.items' | jq length) does not work for older kubectl clients
@@ -60,7 +60,7 @@ check_pod_deleted() {
 		fi
 
 		# Echo useful information on stdout
-		kubectl get pods -n ${TEST_NAMESPACE}
+		kubectl get pods -n ${TEST_NAMESPACE} || true
 
 		echo "Sleeping 5 seconds"
 		sleep 5
@@ -72,7 +72,7 @@ check_no_restarts() {
 	restartCount=$(kubectl get pod -lapp=$pod_label -n ${TEST_NAMESPACE} -o jsonpath='{.items[*].status.containerStatuses[0].restartCount}')
 	if [ $restartCount -gt 1 ]; then
 		echo "$pod_label restarted multiple times: $restartCount"
-		kubectl logs -p -lapp=$pod_label --all-containers -n ${TEST_NAMESPACE}
+		kubectl logs -p -lapp=$pod_label --all-containers -n ${TEST_NAMESPACE} || true
 		exit 1
 	fi
 	echo "Repeated restarts not observed for pod $pod_label"
@@ -120,7 +120,7 @@ collect_pod_logs() {
 		ns=$(echo "$pods" | jq -r ".[] | select(.name == \"$pod\") | .ns")
 		echo "Generating logs for pod: ${pod} ns: ${ns}"
 		echo "------------------------------------------------" >> "${log_dir}/${pod}.describe"
-		kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe"
+		kubectl -n "${ns}" describe pods "${pod}" >> "${log_dir}/${pod}.describe" || true
 		kubectl -n "${ns}" logs "${pod}" --all-containers=true > "${log_dir}/${pod}.logs" || true
 	done
 }
@@ -160,7 +160,7 @@ check_gpu_pod_ready() {
 		fi
 
 		# Echo useful information on stdout
-		kubectl get pods --all-namespaces
+		kubectl get pods --all-namespaces || true
 
 		if [[ "${elapsed}" -ge "${next_collection}" ]]; then
 			collect_pod_logs "${log_dir}" "${pods}"
@@ -169,7 +169,7 @@ check_gpu_pod_ready() {
 
 		echo "Generating cluster logs"
 		echo "------------------------------------------------" >> "${log_dir}/cluster.logs"
-		kubectl get --all-namespaces pods >> "${log_dir}/cluster.logs"
+		kubectl get --all-namespaces pods >> "${log_dir}/cluster.logs" || true
 
 		echo "Sleeping 5 seconds"
 		sleep 5;
@@ -182,7 +182,7 @@ check_nvidia_driver_pods_ready() {
 	local start_time=${SECONDS}
 	while :; do
 		echo "Checking nvidia driver pod"
-		kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE}
+		kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} || true
 
 		echo "Checking nvidia driver pod readiness"
 		is_pod_ready=$(kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -ojsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null || echo "terminated")
@@ -204,7 +204,7 @@ check_nvidia_driver_pods_ready() {
 		fi
 
 		# Echo useful information on stdout
-		kubectl get pods -n ${TEST_NAMESPACE}
+		kubectl get pods -n ${TEST_NAMESPACE} || true
 
 		echo "Sleeping 5 seconds"
 		sleep 5
@@ -215,34 +215,46 @@ check_no_driver_pod_restarts() {
 	restartCount=$(kubectl get pod -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o jsonpath='{.items[*].status.containerStatuses[0].restartCount}')
 	if [ $restartCount -gt 1 ]; then
 		echo "nvidia driver pod restarted multiple times: $restartCount"
-		kubectl logs -p -l "app.kubernetes.io/component=nvidia-driver" --all-containers -n ${TEST_NAMESPACE}
+		kubectl logs -p -l "app.kubernetes.io/component=nvidia-driver" --all-containers -n ${TEST_NAMESPACE} || true
 		exit 1
 	fi
 	echo "Repeated restarts not observed for the nvidia driver pod"
 	return 0
 }
 
+# Report that the cluster API could not be reached. The tests now run from a
+# runner outside the cluster, so any call can fail while the node restarts its
+# container runtime during a driver upgrade. Callers treat this as "not ready
+# yet" and keep retrying until their own deadline expires. The timestamp is
+# here so that a later run can show whether such an outage is brief or
+# permanent.
+api_unreachable() {
+	echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') WARNING: cluster API unreachable while ${1}; treating as not ready and retrying"
+}
+
+# Purely diagnostic. Every call here is guarded so that a debug dump can never
+# be the thing that ends the run.
 print_driver_upgrade_debug() {
 	echo "current state of driver upgrade"
-	kubectl get node -l nvidia.com/gpu.present \
-		-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers
+	kubectl get node -l nvidia.com/gpu.present --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" \
+		-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers || true
 
 	echo ""
 	echo "driver pods"
-	kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide || true
+	kubectl get pods -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" || true
 
 	echo ""
 	echo "gpu operator operands"
-	kubectl get pods -n ${TEST_NAMESPACE} -o wide || true
+	kubectl get pods -n ${TEST_NAMESPACE} -o wide --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" || true
 
 	echo ""
 	echo "driver daemonsets"
-	kubectl get daemonsets -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide || true
+	kubectl get daemonsets -l "app.kubernetes.io/component=nvidia-driver" -n ${TEST_NAMESPACE} -o wide --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" || true
 
 	echo ""
 	echo "NVIDIADriver status"
 	local nvidiadriver_status
-	if nvidiadriver_status=$(kubectl get nvidiadriver -o json 2>/dev/null); then
+	if nvidiadriver_status=$(kubectl get nvidiadriver -o json --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" 2>/dev/null); then
 		echo "${nvidiadriver_status}" | jq -r '
 			(["NAME", "DEFAULT", "STATE", "REASON", "MESSAGE"] | @tsv),
 			(
@@ -263,7 +275,6 @@ print_driver_upgrade_debug() {
 }
 
 wait_for_driver_upgrade_done() {
-	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
 	# SECONDS counts from shell start, so record a baseline and measure against it.
 	local start_time=${SECONDS}
 	local elapsed=0
@@ -271,20 +282,53 @@ wait_for_driver_upgrade_done() {
 	# much longer than the nominal sleep, so track a due time instead of testing
 	# the elapsed time for divisibility, which would skip dumps entirely.
 	local next_debug=0
+	local node_list=""
+	local upgraded_count=0
+	local upgrade_state=""
+
+	# The driver upgrade restarts the container runtime on the node, so from a
+	# runner outside the cluster every query below can fail for a while. A failed
+	# query means "not upgraded yet" and is retried until the deadline; it must
+	# never be read as the upgrade having finished.
+	gpu_node_count=""
+
 	echo "waiting for the gpu driver upgrade to complete"
 	while :; do
-		local upgraded_count=0
-		for node in $(kubectl get nodes -o NAME); do
-			upgrade_state=$(kubectl get $node -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}')
-			if [ "${upgrade_state}" = "upgrade-done" ]; then
-				upgraded_count=$((${upgraded_count} + 1))
+		upgraded_count=0
+
+		# Resolve the expected node count once and keep it. Re-reading it every
+		# iteration would risk sampling a transient count while the upgrade churns
+		# node labels, which could make the comparison below succeed early.
+		if [[ -z "${gpu_node_count}" ]]; then
+			if node_list=$(kubectl get node -l nvidia.com/gpu.present --no-headers --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}"); then
+				gpu_node_count=$(echo "${node_list}" | grep -c . || true)
+			else
+				api_unreachable "counting the GPU nodes"
 			fi
-		done
-		if [[ $upgraded_count -eq $gpu_node_count ]]; then
+		fi
+
+		if node_list=$(kubectl get nodes -o NAME --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}"); then
+			for node in ${node_list}; do
+				if upgrade_state=$(kubectl get "$node" -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}' --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}"); then
+					if [ "${upgrade_state}" = "upgrade-done" ]; then
+						upgraded_count=$((upgraded_count + 1))
+					fi
+				else
+					api_unreachable "reading the upgrade state of ${node}"
+				fi
+			done
+		else
+			api_unreachable "listing the nodes"
+		fi
+
+		# The node count guard keeps an unreachable API from being mistaken for a
+		# finished upgrade, which is what comparing 0 against an empty count would
+		# otherwise do.
+		if [[ -n "${gpu_node_count}" ]] && [[ $upgraded_count -eq $gpu_node_count ]]; then
 			echo "gpu driver upgrade completed successfully"
 			break;
 		else
-			echo "gpu driver still in progress. $upgraded_count/$gpu_node_count node(s) upgraded"
+			echo "gpu driver still in progress. $upgraded_count/${gpu_node_count:-unknown} node(s) upgraded"
 		fi
 
 		elapsed=$((SECONDS - start_time))
@@ -298,8 +342,8 @@ wait_for_driver_upgrade_done() {
 			print_driver_upgrade_debug
 			next_debug=$((elapsed + 30))
 		else
-			kubectl get node -l nvidia.com/gpu.present \
-				-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers
+			kubectl get node -l nvidia.com/gpu.present --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-15s}" \
+				-o custom-columns=NODE:.metadata.name,OWNER:.metadata.labels.nvidia\\.com/gpu-operator\\.driver\\.owner,UPGRADE_STATE:.metadata.labels.nvidia\\.com/gpu-driver-upgrade-state --no-headers || true
 		fi
 		
 		echo "Sleeping 5 seconds"
