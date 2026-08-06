@@ -1730,6 +1730,92 @@ func TestTransformDCGMExporter(t *testing.T) {
 				WithRuntimeClassName("nvidia").
 				WithAutomountServiceAccountToken(true),
 		},
+		{
+			description: "transform dcgm exporter with custom metrics configmap env",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "dcgm-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_EXPORTER_CONFIGMAP_DATA", Value: "gpu-operator:exporter-metrics-config-map"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_EXPORTER_CONFIGMAP_DATA", Value: "gpu-operator:exporter-metrics-config-map"},
+				},
+			}).WithRuntimeClassName("nvidia").
+				WithAutomountServiceAccountToken(true),
+		},
+		{
+			description: "transform dcgm exporter with configmap data env set to none",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "dcgm-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_EXPORTER_CONFIGMAP_DATA", Value: "none"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_EXPORTER_CONFIGMAP_DATA", Value: "none"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "transform dcgm exporter with pod labels enabled via raw env",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "dcgm-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
+					},
+				},
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(true),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "nvidia-dcgm:5555"},
+					{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
+				},
+			}).WithRuntimeClassName("nvidia").
+				WithAutomountServiceAccountToken(true),
+		},
 	}
 
 	for _, tc := range testCases {
