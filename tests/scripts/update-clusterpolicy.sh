@@ -150,7 +150,7 @@ test_gpu_sharing() {
     kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-test -n $TEST_NAMESPACE
     if [ $? -ne 0 ]; then
         echo "cannot run parallel pods with GPU sharing enabled"
-        kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
+        kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE || true
         exit 1
     fi
 

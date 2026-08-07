@@ -14,6 +14,7 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 
 # Set default values if not defined
 : ${HELM:="helm"}
+: ${KUBECTL_REQUEST_TIMEOUT:="15s"}
 : ${LOG_DIR:="/tmp/logs"}
 : ${PROJECT:="$(basename "${PROJECT_DIR}")"}
 : ${TEST_NAMESPACE:="test-operator"}
