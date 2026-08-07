@@ -69,12 +69,6 @@ log() {
     printf '%s\n' "$*" >&2
 }
 
-# Comma-separated stdlib prefixes. 'go list std' is GOOS-dependent.
-stdlib_prefixes() {
-    GOOS="$1" GOARCH="$2" go list std 2>/dev/null \
-        | cut -d'/' -f1 | LC_ALL=C sort -u | paste -sd ',' -
-}
-
 # Licenses that are themselves Markdown close a fixed ``` fence early and invert
 # every block after it, so open with one backtick more than the file's longest run.
 fence_for() {
@@ -153,25 +147,29 @@ prepare_workspace() {
 # --- collection ---
 
 collect_runtime() {
-    local platform goos goarch ignore save_dir
+    local platform goos goarch save_dir
 
     for platform in "${PLATFORMS[@]}"; do
         goos="${platform%/*}"
         goarch="${platform#*/}"
         log "Collecting licenses for ${goos}/${goarch}..."
 
-        # Nothing else is ignored: every distributed dependency belongs here,
-        # including restricted-license ones a policy check treats separately.
-        ignore="$(stdlib_prefixes "${goos}" "${goarch}"),${LOCAL_MODULE}"
         save_dir="${SAVE_ROOT}/${goos}_${goarch}"
 
+        # Only the local module is ignored. go-licenses already omits the
+        # standard library, and --ignore matches on plain STRING prefixes, not
+        # path segments: passing stdlib top-level names silently dropped every
+        # dependency starting with those letters — the token "go" (from go/ast,
+        # go/build) removed golang.org/x/*, google.golang.org/*, gopkg.in/*,
+        # go.uber.org/* and go.yaml.in/*, 18 modules in all. Keep this list
+        # minimal and never add a short, generic prefix.
         GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" save "${PACKAGES[@]}" \
             --save_path="${save_dir}" \
             --force \
-            --ignore="${ignore}"
+            --ignore="${LOCAL_MODULE}"
 
         GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" csv "${PACKAGES[@]}" \
-            --ignore="${ignore}" \
+            --ignore="${LOCAL_MODULE}" \
             >> "${COMBINED_CSV}"
 
         merge_licenses "${save_dir}" "${LICENSES_DIR}"
@@ -179,7 +177,7 @@ collect_runtime() {
 }
 
 collect_toolchain() {
-    local platform goos goarch save_dir ignore
+    local platform goos goarch save_dir
 
     read_tool_packages
 
@@ -192,7 +190,6 @@ collect_toolchain() {
         log "Collecting build toolchain licenses for ${goos}/${goarch}..."
 
         save_dir="${SAVE_ROOT}/tools/${goos}_${goarch}"
-        ignore="$(stdlib_prefixes "${goos}" "${goarch}")"
         (
             cd "${TOOLS_DIR}"
             # shellcheck disable=SC2030  # subshell-local on purpose: only the
@@ -201,9 +198,9 @@ collect_toolchain() {
             GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" save "${TOOL_PKGS[@]}" \
                 --save_path="${save_dir}" \
                 --force \
-                --ignore="${ignore}" >&2
+                --ignore="${LOCAL_MODULE}" >&2
             GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" csv "${TOOL_PKGS[@]}" \
-                --ignore="${ignore}"
+                --ignore="${LOCAL_MODULE}"
         ) >> "${TOOLS_CSV}"
 
         # Separate subtree so a module in both graphs cannot clobber the other copy.
@@ -370,6 +367,10 @@ emit_sections() {
 
 compose_document() {
     log "Composing ${OUTPUT}..."
+    # Build in a temp file and move into place, so a failure part way through
+    # does not leave the committed file truncated in a developer's worktree.
+    local tmp
+    tmp="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-notices-out.XXXXXX")"
     {
         cat <<'EOF'
 # Third-Party Notices
@@ -432,7 +433,11 @@ EOF
 
 EOF
         emit_sections "${TOOLS_INDEX}" "${LICENSES_DIR}/.tools" source
-    } > "${OUTPUT}"
+    } > "${tmp}"
+    mkdir -p "$(dirname "${OUTPUT}")"
+    mv "${tmp}" "${OUTPUT}"
+    # mktemp creates 0600; the committed file should be world-readable.
+    chmod 644 "${OUTPUT}"
 }
 
 # --- entry point ---
