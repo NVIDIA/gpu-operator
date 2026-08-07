@@ -73,7 +73,12 @@ log() {
 # every block after it, so open with one backtick more than the file's longest run.
 fence_for() {
     local file="$1" longest width
-    longest=$(grep -oE '`+' "${file}" 2>/dev/null \
+    # -a: without it a license containing a NUL byte is treated as binary and
+    # grep prints "Binary file ... matches" instead of the matches. Older greps
+    # put that on stdout and newer ones on stderr, so the measured width would
+    # differ by host — and would even vary with the path length. LC_ALL=C for
+    # the same reason it is on every sort here.
+    longest=$(LC_ALL=C grep -oaE '`+' "${file}" 2>/dev/null \
         | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')
     width=$(( longest + 1 ))
     (( width < 3 )) && width=3
@@ -141,7 +146,8 @@ prepare_workspace() {
     INDEX_FILE="$(mktemp "${t}-idx.XXXXXX")"
     TOOLS_CSV="$(mktemp "${t}-tools-csv.XXXXXX")"
     TOOLS_INDEX="$(mktemp "${t}-tools-idx.XXXXXX")"
-    trap 'rm -rf "${SAVE_ROOT}"; rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${TOOLS_CSV}" "${TOOLS_INDEX}"' EXIT
+    OUT_TMP="$(mktemp "${t}-out.XXXXXX")"
+    trap 'rm -rf "${SAVE_ROOT}"; rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${TOOLS_CSV}" "${TOOLS_INDEX}" "${OUT_TMP}"' EXIT
 }
 
 # --- collection ---
@@ -242,10 +248,13 @@ collapse_index() {
             if (!(pkg in url)) { url[pkg] = $2; order[++n] = pkg }
             if (!((pkg SUBSEP $3) in seen)) {
                 seen[pkg SUBSEP $3] = 1
-                # Count, do not test "pkg in lic": gawk instantiates the
-                # assignment target before evaluating the right-hand side, so
-                # that test is already true on the first row and every license
-                # would be prefixed with " / " on Linux but not on macOS.
+                # Count, do not test "pkg in lic". mawk and busybox awk
+                # instantiate the assignment target before evaluating the
+                # right-hand side, so that test is already true on the first row
+                # and every license comes out prefixed with " / ". BWK awk (the
+                # macOS default) and gawk do not, so the split is by awk
+                # implementation, not by OS — and mawk is /usr/bin/awk on stock
+                # Debian and Ubuntu. This form is correct on all of them.
                 lic[pkg] = (cnt[pkg]++ ? lic[pkg] " / " : "") $3
             }
         }
@@ -261,13 +270,33 @@ annotate_modules() {
         BEGIN {
             FS = OFS = ","
             while ((getline line < modfile) > 0) {
-                if (line ~ /^# /) {
-                    split(line, f, " ")
+                if (line !~ /^# /) continue
+                split(line, f, " ")
+                # "# <path> <version>", optionally "=> <path> <version>" for a
+                # replace. The replacement is what is actually vendored, so it
+                # is what the notices file must name. A filesystem replace has
+                # no version to report, so stop rather than misstate it.
+                if (f[4] == "=>" || f[3] == "=>") {
+                    r = (f[4] == "=>") ? 5 : 4
+                    if (f[r + 1] == "") {
+                        print "ERROR: " modfile " replaces " f[2] " with a local path;" > "/dev/stderr"
+                        print "teach tools/generate-notices how to attribute it." > "/dev/stderr"
+                        exit 1
+                    }
                     mods[++m] = f[2]
-                    vers[f[2]] = f[3]
+                    disp[f[2]] = f[r] "@" f[r + 1]
+                } else {
+                    mods[++m] = f[2]
+                    disp[f[2]] = f[2] "@" f[3]
                 }
             }
             close(modfile)
+            # A read error makes getline return -1 and the loop never runs,
+            # which would label every entry "unknown" without failing.
+            if (m == 0) {
+                print "ERROR: no module lines read from " modfile > "/dev/stderr"
+                exit 1
+            }
         }
         {
             best = ""
@@ -275,7 +304,7 @@ annotate_modules() {
                 mp = mods[i]
                 if (($1 == mp || index($1, mp "/") == 1) && length(mp) > length(best)) best = mp
             }
-            print $0, (best == "" ? "unknown" : best "@" vers[best])
+            print $0, (best == "" ? "unknown" : disp[best])
         }
     '
 }
@@ -289,6 +318,16 @@ build_indexes() {
         || die "go-licenses produced no entries for ${PACKAGES[*]} — refusing to write empty notices file."
     [[ -s "${TOOLS_INDEX}" ]] \
         || die "go-licenses produced no entries for the build toolchain — refusing to write incomplete notices file."
+
+    # Toolchain Source URLs come from go-licenses, which resolves non-github
+    # hosts over the network (GET <path>?go-get=1) and falls back to "Unknown"
+    # with a warning and a zero exit. Behind a proxy that blocks k8s.io the
+    # document would quietly lose ~17 URLs and look like a dependency change.
+    if cut -d, -f2 "${TOOLS_INDEX}" | grep -qx 'Unknown'; then
+        die "go-licenses could not resolve source URLs for some toolchain modules." \
+            "This usually means the network blocked a '?go-get=1' lookup. Re-run with" \
+            "access to the module hosts rather than committing a degraded file."
+    fi
 }
 
 # --- rendering ---
@@ -299,8 +338,11 @@ license_files_for() {
     local dir="$1" f
     [[ -d "${dir}" ]] || return 0
     while IFS= read -r -d '' f; do
+        # LC_ALL=C for the same reason it is on every sort here: under a Turkish
+        # locale glibc does not fold I to i, so this would stop matching LICENSE
+        # and every section would silently render "License text unavailable".
         if printf '%s' "$(basename "${f}")" \
-            | grep -qiE '^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$'; then
+            | LC_ALL=C grep -qiE '^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$'; then
             printf '%s\n' "${f}"
         fi
     done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
@@ -369,8 +411,6 @@ compose_document() {
     log "Composing ${OUTPUT}..."
     # Build in a temp file and move into place, so a failure part way through
     # does not leave the committed file truncated in a developer's worktree.
-    local tmp
-    tmp="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-notices-out.XXXXXX")"
     {
         cat <<'EOF'
 # Third-Party Notices
@@ -433,9 +473,9 @@ EOF
 
 EOF
         emit_sections "${TOOLS_INDEX}" "${LICENSES_DIR}/.tools" source
-    } > "${tmp}"
+    } > "${OUT_TMP}"
     mkdir -p "$(dirname "${OUTPUT}")"
-    mv "${tmp}" "${OUTPUT}"
+    cp "${OUT_TMP}" "${OUTPUT}"
     # mktemp creates 0600; the committed file should be world-readable.
     chmod 644 "${OUTPUT}"
 }
@@ -452,10 +492,12 @@ main() {
     build_indexes
     compose_document
 
+    # Index rows are per package, not per module: one module can own several
+    # (k8s.io/utils and its forked subpackage are two rows, one module).
     local runtime_count toolchain_count
     runtime_count=$(wc -l < "${INDEX_FILE}" | tr -d ' ')
     toolchain_count=$(wc -l < "${TOOLS_INDEX}" | tr -d ' ')
-    log "Wrote ${OUTPUT} (${runtime_count} Go runtime modules, ${toolchain_count} toolchain modules)"
+    log "Wrote ${OUTPUT} (${runtime_count} Go runtime packages, ${toolchain_count} toolchain packages)"
 }
 
 main "$@"
