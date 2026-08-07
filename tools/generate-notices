@@ -319,6 +319,14 @@ build_indexes() {
     [[ -s "${TOOLS_INDEX}" ]] \
         || die "go-licenses produced no entries for the build toolchain — refusing to write incomplete notices file."
 
+    # Runtime rows carry module@version from modules.txt; "unknown" means the
+    # longest-prefix match found nothing, which would silently understate what
+    # is shipped.
+    if cut -d, -f4 "${INDEX_FILE}" | grep -qx 'unknown'; then
+        die "could not resolve module@version for some runtime packages from ${MODULES_TXT}." \
+            "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
+    fi
+
     # Toolchain Source URLs come from go-licenses, which resolves non-github
     # hosts over the network (GET <path>?go-get=1) and falls back to "Unknown"
     # with a warning and a zero exit. Behind a proxy that blocks k8s.io the
