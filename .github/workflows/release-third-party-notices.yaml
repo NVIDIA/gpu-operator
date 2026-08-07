@@ -73,11 +73,16 @@ jobs:
 
       # Fail loudly rather than publishing a release with no attribution, or
       # attaching an empty file.
+      # Tag goes through the environment rather than being interpolated into the
+      # script, matching release.yaml and release-image-list.yaml. Git allows
+      # shell metacharacters in tag names.
       - name: Verify the notices file is present
+        env:
+          RELEASE_TAG_NAME: ${{ steps.vars.outputs.tag }}
         run: |
           set -euo pipefail
           if [ ! -s THIRD_PARTY_NOTICES.md ]; then
-            echo "::error::THIRD_PARTY_NOTICES.md is missing or empty at ${{ steps.vars.outputs.tag }}"
+            echo "::error::THIRD_PARTY_NOTICES.md is missing or empty at ${RELEASE_TAG_NAME}"
             exit 1
           fi
           echo "THIRD_PARTY_NOTICES.md: $(wc -l < THIRD_PARTY_NOTICES.md) lines"

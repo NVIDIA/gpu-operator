@@ -12,6 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Regenerates THIRD_PARTY_NOTICES.md and fails if it differs from the committed
+# copy, so a dependency change cannot land without refreshed attribution.
+#
+# This runs on every build rather than behind a changed-paths filter. A filter
+# was tried and dropped: the runtime inventory is the import closure of
+# ./cmd/..., so it changes when ordinary .go files change their imports, not
+# only when go.mod or vendor/ move. A filter keyed on dependency manifests
+# therefore passes green while the committed file goes stale, and the failure
+# then surfaces on main instead of on the PR that caused it. A few minutes of
+# runner time is worth more than a gate that can silently pass.
+
 name: Third-Party Notices Check
 
 on:
@@ -29,54 +40,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          # Regenerating compares against the committed file, and the filter
-          # below diffs against the base branch, so the full history is needed.
-          fetch-depth: 0
           persist-credentials: false
 
-      # Regenerating runs go-licenses once per platform and takes a couple of
-      # minutes, so only do it when something that can change the dependency
-      # inventory actually moved. The generator and its inputs are included
-      # alongside the dependencies: a change to either can alter the output.
-      - name: Check whether notices inputs changed
-        id: filter
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_REF_NAME}" = "main" ] || [[ "${GITHUB_REF_NAME}" == release-* ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Branch build - always verifying."
-            exit 0
-          fi
-          git fetch --no-tags --depth=1 origin main
-          changed=$(git diff --name-only "$(git merge-base HEAD FETCH_HEAD)" HEAD)
-          echo "Changed files:"
-          echo "${changed}"
-          if echo "${changed}" | grep -qE '^(go\.(mod|sum)|vendor/|tools/(go\.(mod|sum)|tools\.go|generate-notices)|multi-arch\.mk|versions\.mk|Makefile|THIRD_PARTY_NOTICES\.md)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No notices inputs touched - skipping regeneration."
-          fi
-
       - name: Get Golang version
-        if: steps.filter.outputs.changed == 'true'
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
 
       - name: Install Go
-        if: steps.filter.outputs.changed == 'true'
         uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
       - name: Setup Go Proxy
-        if: steps.filter.outputs.changed == 'true'
         id: setup-go-proxy
         uses: nv-gha-runners/setup-artifactory-go-proxy@main
 
       - name: Verify THIRD_PARTY_NOTICES.md is up to date
-        if: steps.filter.outputs.changed == 'true'
         env:
           GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
         run: make notices-check
