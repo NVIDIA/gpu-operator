@@ -59,7 +59,7 @@ The GPU Operator releases follow [calendar versioning](https://calver.org/).
 
 The NVIDIA GPU Operator source code is available on GitHub at https://github.com/NVIDIA/gpu-operator
 
-### <a name="source-code"></a> Documentation
+### <a name="documentation"></a> Documentation
 
 The official NVIDIA GPU Operator documentation is available at https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html
 
