@@ -62,7 +62,7 @@ jobs:
         if: steps.filter.outputs.changed == 'true'
         run: |
           GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
-          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
 
       - name: Install Go
         if: steps.filter.outputs.changed == 'true'
