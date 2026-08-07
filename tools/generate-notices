@@ -271,9 +271,9 @@ for platform in "${TOOLCHAIN_PLATFORMS[@]}"; do
     platform_save="${TOOLS_SAVE_ROOT}/${goos}_${goarch}"
     (
         cd "${TOOLS_DIR}"
-        # shellcheck disable=SC2030,SC2031  # subshell-local on purpose: only the
-    # tools module is read from the module cache; the outer -mod=vendor stands.
-    export GOFLAGS="-mod=readonly"
+        # shellcheck disable=SC2030,SC2031  # subshell-local on purpose: only
+        # the tools module is read from the cache; outer -mod=vendor stands.
+        export GOFLAGS="-mod=readonly"
         export GOOS="${goos}" GOARCH="${goarch}"
         tools_stdlib=$(go list std 2>/dev/null | cut -d'/' -f1 | LC_ALL=C sort -u | paste -sd ',' -)
         "${GO_LICENSES}" save "${TOOL_PKGS[@]}" \
@@ -295,11 +295,82 @@ for platform in "${TOOLCHAIN_PLATFORMS[@]}"; do
 done
 
 echo "Generating dependency index..." >&2
-# Deduplicate by package (first CSV field) and sort deterministically. LC_ALL=C
-# pins byte-ordering so macOS (BSD sort) and Linux (GNU sort) agree — locale
-# collation is the classic source of cross-platform diff noise.
-LC_ALL=C sort -t, -k1,1 -u "${COMBINED_CSV}" > "${INDEX_FILE}"
-LC_ALL=C sort -t, -k1,1 -u "${TOOLS_CSV}" > "${TOOLS_INDEX}"
+
+# Collapse the accumulated CSV rows to one row per package.
+#
+# go-licenses emits one row PER RECOGNIZED LICENSE, not per package: a library
+# whose license file matches several licenses produces several rows. In this
+# closure that is klauspost/compress (Apache-2.0 / BSD-3-Clause / MIT),
+# sigs.k8s.io/yaml, sigs.k8s.io/json and cyphar/filepath-securejoin
+# (BSD-3-Clause / MPL-2.0). Deduplicating on the package field alone would keep
+# exactly one of those classifications and silently drop the rest, which for
+# filepath-securejoin means hiding an MPL-2.0 disclosure behind a BSD-3-Clause
+# one. So join every distinct license for a package instead of discarding any.
+#
+# Discarding was also NON-DETERMINISTIC. 'sort -t, -k1,1 -u' compares only the
+# key, and BSD sort (macOS) then keeps whichever row came first in INPUT order,
+# while GNU sort (Linux CI) applies a last-resort whole-line comparison and
+# keeps the lexicographically smallest. Two hosts could therefore disagree on
+# which license survived — the exact flap the platform union exists to prevent.
+# Pre-sorting the whole line with 'sort -u' gives a total order with no ties,
+# so the collapse below is fully determined by content, not by input order.
+collapse_index() {
+    LC_ALL=C sort -u "$1" | awk -F, '
+        {
+            pkg = $1
+            if (!(pkg in url)) { url[pkg] = $2; order[++n] = pkg }
+            if (!((pkg SUBSEP $3) in seen)) {
+                seen[pkg SUBSEP $3] = 1
+                lic[pkg] = (pkg in lic) ? lic[pkg] " / " $3 : $3
+            }
+        }
+        END { for (i = 1; i <= n; i++) print order[i] "," url[order[i]] "," lic[order[i]] }
+    '
+}
+
+# Attach the providing module and its exact version to each runtime entry.
+#
+# go-licenses in vendor mode reports a Source URL under this repository at HEAD
+# (".../gpu-operator/blob/HEAD/vendor/..."), which is not a stable reference:
+# once main moves, an old released notices file points at different content,
+# and it names our vendor copy rather than the upstream project. vendor/
+# modules.txt records the exact module version behind every vendored package,
+# so emit "module@version" instead — immutable, upstream-identifying, and
+# derived offline. Packages map to the LONGEST matching module path, since a
+# license may sit at a subdirectory (e.g. klauspost/compress/zstd/internal/
+# xxhash) whose module root is shorter.
+MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
+if [[ ! -f "${MODULES_TXT}" ]]; then
+    echo "ERROR: ${MODULES_TXT} not found — run 'make notices' from the repo root." >&2
+    exit 1
+fi
+
+annotate_modules() {
+    awk -v modfile="${MODULES_TXT}" '
+        BEGIN {
+            FS = OFS = ","
+            while ((getline line < modfile) > 0) {
+                if (line ~ /^# /) {
+                    split(line, f, " ")
+                    mods[++m] = f[2]
+                    vers[f[2]] = f[3]
+                }
+            }
+            close(modfile)
+        }
+        {
+            best = ""
+            for (i = 1; i <= m; i++) {
+                mp = mods[i]
+                if (($1 == mp || index($1, mp "/") == 1) && length(mp) > length(best)) best = mp
+            }
+            print $0, (best == "" ? "unknown" : best "@" vers[best])
+        }
+    '
+}
+
+collapse_index "${COMBINED_CSV}" | annotate_modules > "${INDEX_FILE}"
+collapse_index "${TOOLS_CSV}" > "${TOOLS_INDEX}"
 
 if [[ ! -s "${INDEX_FILE}" ]]; then
     echo "ERROR: go-licenses produced no entries for ${PACKAGES[*]} — refusing to write empty notices file." >&2
@@ -312,10 +383,16 @@ fi
 
 # Render one '### <pkg>' section per index entry, with the verbatim text of
 # every license-bearing file the dependency ships.
+# ${3} selects what the provenance line shows: "module" uses the
+# module@version appended by annotate_modules (runtime entries, where the
+# go-licenses URL points at our vendor tree at HEAD and is not stable), and
+# "source" uses the go-licenses URL (toolchain entries, which resolve from the
+# module cache and already carry a versioned upstream link).
 emit_sections() {
-    local index="$1" root="$2" pkg url license license_files f lf fence
+    local index="$1" root="$2" provenance="$3"
+    local pkg url license module license_files f lf fence
 
-    while IFS=, read -r pkg url license; do
+    while IFS=, read -r pkg url license module; do
         [[ -z "${pkg}" ]] && continue
 
         # 'go-licenses save' may copy multiple files into the dependency
@@ -347,7 +424,11 @@ emit_sections() {
 
         printf '### %s\n\n' "${pkg}"
         printf '* License: %s\n' "${license:-Unknown}"
-        printf '* Source: %s\n\n' "${url:-n/a}"
+        if [[ "${provenance}" == "module" ]]; then
+            printf '* Module: %s\n\n' "${module:-unknown}"
+        else
+            printf '* Source: %s\n\n' "${url:-n/a}"
+        fi
 
         if (( ${#license_files[@]} > 0 )); then
             for lf in "${license_files[@]}"; do
@@ -367,13 +448,21 @@ emit_sections() {
 }
 
 emit_index_table() {
-    local index="$1" pkg url license
-    printf '| Package | License | Source |\n'
+    local index="$1" provenance="$2" pkg url license module
+    if [[ "${provenance}" == "module" ]]; then
+        printf '| Package | License | Module |\n'
+    else
+        printf '| Package | License | Source |\n'
+    fi
     printf '|---------|---------|--------|\n'
-    while IFS=, read -r pkg url license; do
+    while IFS=, read -r pkg url license module; do
         [[ -z "${pkg}" ]] && continue
         # shellcheck disable=SC2016  # backticks here are literal markdown, not command substitution.
-        printf '| `%s` | %s | %s |\n' "${pkg}" "${license:-Unknown}" "${url:-n/a}"
+        if [[ "${provenance}" == "module" ]]; then
+            printf '| `%s` | %s | `%s` |\n' "${pkg}" "${license:-Unknown}" "${module:-unknown}"
+        else
+            printf '| `%s` | %s | %s |\n' "${pkg}" "${license:-Unknown}" "${url:-n/a}"
+        fi
     done < "${index}"
 }
 
@@ -384,9 +473,8 @@ echo "Composing ${OUTPUT}..." >&2
 
 NVIDIA GPU Operator
 
-This file lists every third-party dependency the GPU Operator redistributes or
-builds with, along with the verbatim text of each dependency's license. Two
-surfaces are covered:
+This file covers the **Go dependencies** of the GPU Operator, with the verbatim
+text of each one's license. Two surfaces are covered:
 
 * **Runtime dependencies** — Go modules statically linked into the commands
   under `cmd/`, resolved as the union across every released image platform.
@@ -399,8 +487,20 @@ surfaces are covered:
   image; they are listed here so the full chain behind the released artifacts
   is attributable.
 
-Go standard library packages are excluded from both sections; they are covered
-by the license of the Go distribution itself.
+Go standard library packages are excluded; they are covered by the license of
+the Go distribution itself.
+
+Scope: this document does not inventory the non-Go contents of the released
+container image — the packages inherited from its base image, the BusyBox tree,
+the CUDA sample, or the CUDA compatibility libraries. Base image dependencies
+are covered by that image's own compliance process, and the remaining
+components are handled separately, including any source-distribution
+obligations they carry.
+
+Go runtime entries identify their dependency as `module@version` rather than a
+URL. `go-licenses` in vendor mode reports a link into this repository at `HEAD`,
+which stops describing the released content once `main` advances;
+`module@version` is immutable and names the upstream project directly.
 
 This file is generated. Run `make notices` to regenerate it; `make
 notices-check` verifies it is current.
@@ -409,7 +509,7 @@ notices-check` verifies it is current.
 
 EOF
 
-    emit_index_table "${INDEX_FILE}"
+    emit_index_table "${INDEX_FILE}" module
 
     cat <<'EOF'
 
@@ -417,7 +517,7 @@ EOF
 
 EOF
 
-    emit_index_table "${TOOLS_INDEX}"
+    emit_index_table "${TOOLS_INDEX}" source
 
     cat <<'EOF'
 
@@ -425,16 +525,16 @@ EOF
 
 EOF
 
-    emit_sections "${INDEX_FILE}" "${LICENSES_DIR}"
+    emit_sections "${INDEX_FILE}" "${LICENSES_DIR}" module
 
     cat <<'EOF'
 ## Build Toolchain License Texts
 
 EOF
 
-    emit_sections "${TOOLS_INDEX}" "${LICENSES_DIR}/.tools"
+    emit_sections "${TOOLS_INDEX}" "${LICENSES_DIR}/.tools" source
 } > "${OUTPUT}"
 
 RUNTIME_ENTRIES=$(wc -l < "${INDEX_FILE}" | tr -d ' ')
 TOOLS_ENTRIES=$(wc -l < "${TOOLS_INDEX}" | tr -d ' ')
-echo "Wrote ${OUTPUT} (${RUNTIME_ENTRIES} runtime modules, ${TOOLS_ENTRIES} toolchain modules)" >&2
+echo "Wrote ${OUTPUT} (${RUNTIME_ENTRIES} Go runtime modules, ${TOOLS_ENTRIES} toolchain modules)" >&2

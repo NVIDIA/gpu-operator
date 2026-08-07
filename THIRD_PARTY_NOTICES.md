@@ -2,9 +2,8 @@
 
 NVIDIA GPU Operator
 
-This file lists every third-party dependency the GPU Operator redistributes or
-builds with, along with the verbatim text of each dependency's license. Two
-surfaces are covered:
+This file covers the **Go dependencies** of the GPU Operator, with the verbatim
+text of each one's license. Two surfaces are covered:
 
 * **Runtime dependencies** — Go modules statically linked into the commands
   under `cmd/`, resolved as the union across every released image platform.
@@ -17,122 +16,134 @@ surfaces are covered:
   image; they are listed here so the full chain behind the released artifacts
   is attributable.
 
-Go standard library packages are excluded from both sections; they are covered
-by the license of the Go distribution itself.
+Go standard library packages are excluded; they are covered by the license of
+the Go distribution itself.
+
+Scope: this document does not inventory the non-Go contents of the released
+container image — the packages inherited from its base image, the BusyBox tree,
+the CUDA sample, or the CUDA compatibility libraries. Base image dependencies
+are covered by that image's own compliance process, and the remaining
+components are handled separately, including any source-distribution
+obligations they carry.
+
+Go runtime entries identify their dependency as `module@version` rather than a
+URL. `go-licenses` in vendor mode reports a link into this repository at `HEAD`,
+which stops describing the released content once `main` advances;
+`module@version` is immutable and names the upstream project directly.
 
 This file is generated. Run `make notices` to regenerate it; `make
 notices-check` verifies it is current.
 
 ## Runtime Dependency Index
 
-| Package | License | Source |
+| Package | License | Module |
 |---------|---------|--------|
-| `dario.cat/mergo` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/dario.cat/mergo/LICENSE |
-| `github.com/MakeNowJust/heredoc` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/MakeNowJust/heredoc/LICENSE |
-| `github.com/Masterminds/goutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/goutils/LICENSE.txt |
-| `github.com/Masterminds/semver/v3` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/semver/v3/LICENSE.txt |
-| `github.com/Masterminds/sprig/v3` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt |
-| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE |
-| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/go-nvlib/LICENSE |
-| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE |
-| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE |
-| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE |
-| `github.com/beorn7/perks/quantile` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/beorn7/perks/LICENSE |
-| `github.com/blang/semver/v4` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/blang/semver/v4/LICENSE |
-| `github.com/cespare/xxhash/v2` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/cespare/xxhash/v2/LICENSE.txt |
-| `github.com/chai2010/gettext-go` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/chai2010/gettext-go/LICENSE |
-| `github.com/cyphar/filepath-securejoin` | MPL-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/cyphar/filepath-securejoin/COPYING.md |
-| `github.com/davecgh/go-spew/spew` | ISC | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/davecgh/go-spew/LICENSE |
-| `github.com/docker/libtrust` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/docker/libtrust/LICENSE |
-| `github.com/emicklei/go-restful/v3` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/emicklei/go-restful/v3/LICENSE |
-| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/evanphx/json-patch/v5/LICENSE |
-| `github.com/exponent-io/jsonpath` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/exponent-io/jsonpath/LICENSE |
-| `github.com/fsnotify/fsnotify` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/fsnotify/fsnotify/LICENSE |
-| `github.com/fxamacker/cbor/v2` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/fxamacker/cbor/v2/LICENSE |
-| `github.com/go-errors/errors` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-errors/errors/LICENSE.MIT |
-| `github.com/go-logr/logr` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-logr/logr/LICENSE |
-| `github.com/go-logr/zapr` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-logr/zapr/LICENSE |
-| `github.com/go-openapi/jsonpointer` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/jsonpointer/LICENSE |
-| `github.com/go-openapi/jsonreference` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/jsonreference/LICENSE |
-| `github.com/go-openapi/swag` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/LICENSE |
-| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/cmdutils/LICENSE |
-| `github.com/go-openapi/swag/conv` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/conv/LICENSE |
-| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/fileutils/LICENSE |
-| `github.com/go-openapi/swag/jsonname` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/jsonname/LICENSE |
-| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/jsonutils/LICENSE |
-| `github.com/go-openapi/swag/loading` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/loading/LICENSE |
-| `github.com/go-openapi/swag/mangling` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/mangling/LICENSE |
-| `github.com/go-openapi/swag/netutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/netutils/LICENSE |
-| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/stringutils/LICENSE |
-| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/typeutils/LICENSE |
-| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/yamlutils/LICENSE |
-| `github.com/google/btree` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/btree/LICENSE |
-| `github.com/google/gnostic-models` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/gnostic-models/LICENSE |
-| `github.com/google/uuid` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/uuid/LICENSE |
-| `github.com/huandu/xstrings` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/huandu/xstrings/LICENSE |
-| `github.com/json-iterator/go` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/json-iterator/go/LICENSE |
-| `github.com/klauspost/compress` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/LICENSE |
-| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/internal/snapref/LICENSE |
-| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt |
-| `github.com/liggitt/tabwriter` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/liggitt/tabwriter/LICENSE |
-| `github.com/mitchellh/copystructure` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/copystructure/LICENSE |
-| `github.com/mitchellh/go-wordwrap` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md |
-| `github.com/mitchellh/reflectwalk` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/reflectwalk/LICENSE |
-| `github.com/moby/term` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/moby/term/LICENSE |
-| `github.com/modern-go/concurrent` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/modern-go/concurrent/LICENSE |
-| `github.com/modern-go/reflect2` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/modern-go/reflect2/LICENSE |
-| `github.com/monochromegane/go-gitignore` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/monochromegane/go-gitignore/LICENSE |
-| `github.com/munnerz/goautoneg` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/munnerz/goautoneg/LICENSE |
-| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/cgroups/LICENSE |
-| `github.com/opencontainers/go-digest` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/go-digest/LICENSE |
-| `github.com/opencontainers/runc/libcontainer/devices` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/runc/LICENSE |
-| `github.com/openshift/api` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/openshift/api/LICENSE |
-| `github.com/openshift/client-go` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/openshift/client-go/LICENSE |
-| `github.com/operator-framework/api/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/operator-framework/api/LICENSE |
-| `github.com/peterbourgon/diskv` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/peterbourgon/diskv/LICENSE |
-| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/pmezard/go-difflib/LICENSE |
-| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE |
-| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE |
-| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_golang/LICENSE |
-| `github.com/prometheus/client_model/go` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_model/LICENSE |
-| `github.com/prometheus/common` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/common/LICENSE |
-| `github.com/prometheus/procfs` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/procfs/LICENSE |
-| `github.com/regclient/regclient` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/regclient/regclient/LICENSE |
-| `github.com/russross/blackfriday/v2` | BSD-2-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/russross/blackfriday/v2/LICENSE.txt |
-| `github.com/shopspring/decimal` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/shopspring/decimal/LICENSE |
-| `github.com/sirupsen/logrus` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/sirupsen/logrus/LICENSE |
-| `github.com/spf13/cast` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/cast/LICENSE |
-| `github.com/spf13/cobra` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/cobra/LICENSE.txt |
-| `github.com/spf13/pflag` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/pflag/LICENSE |
-| `github.com/stretchr/testify/assert/yaml` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/stretchr/testify/LICENSE |
-| `github.com/ulikunitz/xz` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/ulikunitz/xz/LICENSE |
-| `github.com/urfave/cli/v3` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/urfave/cli/v3/LICENSE |
-| `github.com/x448/float16` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/x448/float16/LICENSE |
-| `github.com/xlab/treeprint` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/xlab/treeprint/LICENSE |
-| `k8s.io/api` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/api/LICENSE |
-| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apiextensions-apiserver/LICENSE |
-| `k8s.io/apimachinery/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apimachinery/LICENSE |
-| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE |
-| `k8s.io/cli-runtime/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/cli-runtime/LICENSE |
-| `k8s.io/client-go` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/LICENSE |
-| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE |
-| `k8s.io/client-go/third_party/forked/httpcache` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE |
-| `k8s.io/component-base/version` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/component-base/LICENSE |
-| `k8s.io/klog/v2` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/klog/v2/LICENSE |
-| `k8s.io/kube-openapi/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/LICENSE |
-| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE |
-| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE |
-| `k8s.io/kubectl/pkg` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kubectl/LICENSE |
-| `k8s.io/utils` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/LICENSE |
-| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE |
-| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE |
-| `sigs.k8s.io/controller-runtime` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/controller-runtime/LICENSE |
-| `sigs.k8s.io/json` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/json/LICENSE |
-| `sigs.k8s.io/kustomize/api` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/kustomize/api/LICENSE |
-| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE |
-| `sigs.k8s.io/randfill` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/randfill/LICENSE |
-| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE |
-| `sigs.k8s.io/yaml` | MIT | https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/yaml/LICENSE |
+| `dario.cat/mergo` | BSD-3-Clause | `dario.cat/mergo@v1.0.1` |
+| `github.com/MakeNowJust/heredoc` | MIT | `github.com/MakeNowJust/heredoc@v1.0.0` |
+| `github.com/Masterminds/goutils` | Apache-2.0 | `github.com/Masterminds/goutils@v1.1.1` |
+| `github.com/Masterminds/semver/v3` | MIT | `github.com/Masterminds/semver/v3@v3.5.0` |
+| `github.com/Masterminds/sprig/v3` | MIT | `github.com/Masterminds/sprig/v3@v3.3.0` |
+| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | `github.com/Mellanox/maintenance-operator/api@v0.3.0` |
+| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | `github.com/NVIDIA/go-nvlib@v0.12.0` |
+| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | `github.com/NVIDIA/k8s-kata-manager@v0.2.3` |
+| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | `github.com/NVIDIA/k8s-operator-libs@v0.0.0-20260629200812-d720f2557494` |
+| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | `github.com/NVIDIA/nvidia-container-toolkit@v1.20.0-rc.1` |
+| `github.com/beorn7/perks/quantile` | MIT | `github.com/beorn7/perks@v1.0.1` |
+| `github.com/blang/semver/v4` | MIT | `github.com/blang/semver/v4@v4.0.0` |
+| `github.com/cespare/xxhash/v2` | MIT | `github.com/cespare/xxhash/v2@v2.3.0` |
+| `github.com/chai2010/gettext-go` | BSD-3-Clause | `github.com/chai2010/gettext-go@v1.0.2` |
+| `github.com/cyphar/filepath-securejoin` | BSD-3-Clause / MPL-2.0 | `github.com/cyphar/filepath-securejoin@v0.7.0` |
+| `github.com/davecgh/go-spew/spew` | ISC | `github.com/davecgh/go-spew@v1.1.2-0.20180830191138-d8f796af33cc` |
+| `github.com/docker/libtrust` | Apache-2.0 | `github.com/docker/libtrust@v0.0.0-20160708172513-aabc10ec26b7` |
+| `github.com/emicklei/go-restful/v3` | MIT | `github.com/emicklei/go-restful/v3@v3.13.0` |
+| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | `github.com/evanphx/json-patch/v5@v5.9.11` |
+| `github.com/exponent-io/jsonpath` | MIT | `github.com/exponent-io/jsonpath@v0.0.0-20210407135951-1de76d718b3f` |
+| `github.com/fsnotify/fsnotify` | BSD-3-Clause | `github.com/fsnotify/fsnotify@v1.9.0` |
+| `github.com/fxamacker/cbor/v2` | MIT | `github.com/fxamacker/cbor/v2@v2.9.2` |
+| `github.com/go-errors/errors` | MIT | `github.com/go-errors/errors@v1.5.1` |
+| `github.com/go-logr/logr` | Apache-2.0 | `github.com/go-logr/logr@v1.4.4` |
+| `github.com/go-logr/zapr` | Apache-2.0 | `github.com/go-logr/zapr@v1.3.0` |
+| `github.com/go-openapi/jsonpointer` | Apache-2.0 | `github.com/go-openapi/jsonpointer@v0.22.4` |
+| `github.com/go-openapi/jsonreference` | Apache-2.0 | `github.com/go-openapi/jsonreference@v0.21.4` |
+| `github.com/go-openapi/swag` | Apache-2.0 | `github.com/go-openapi/swag@v0.25.4` |
+| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | `github.com/go-openapi/swag/cmdutils@v0.25.4` |
+| `github.com/go-openapi/swag/conv` | Apache-2.0 | `github.com/go-openapi/swag/conv@v0.25.4` |
+| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | `github.com/go-openapi/swag/fileutils@v0.25.4` |
+| `github.com/go-openapi/swag/jsonname` | Apache-2.0 | `github.com/go-openapi/swag/jsonname@v0.25.4` |
+| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | `github.com/go-openapi/swag/jsonutils@v0.25.4` |
+| `github.com/go-openapi/swag/loading` | Apache-2.0 | `github.com/go-openapi/swag/loading@v0.25.4` |
+| `github.com/go-openapi/swag/mangling` | Apache-2.0 | `github.com/go-openapi/swag/mangling@v0.25.4` |
+| `github.com/go-openapi/swag/netutils` | Apache-2.0 | `github.com/go-openapi/swag/netutils@v0.25.4` |
+| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | `github.com/go-openapi/swag/stringutils@v0.25.4` |
+| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | `github.com/go-openapi/swag/typeutils@v0.25.4` |
+| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | `github.com/go-openapi/swag/yamlutils@v0.25.4` |
+| `github.com/google/btree` | Apache-2.0 | `github.com/google/btree@v1.1.3` |
+| `github.com/google/gnostic-models` | Apache-2.0 | `github.com/google/gnostic-models@v0.7.1` |
+| `github.com/google/uuid` | BSD-3-Clause | `github.com/google/uuid@v1.6.0` |
+| `github.com/huandu/xstrings` | MIT | `github.com/huandu/xstrings@v1.5.0` |
+| `github.com/json-iterator/go` | MIT | `github.com/json-iterator/go@v1.1.12` |
+| `github.com/klauspost/compress` | Apache-2.0 / BSD-3-Clause / MIT | `github.com/klauspost/compress@v1.19.1` |
+| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | `github.com/klauspost/compress@v1.19.1` |
+| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | `github.com/klauspost/compress@v1.19.1` |
+| `github.com/liggitt/tabwriter` | BSD-3-Clause | `github.com/liggitt/tabwriter@v0.0.0-20181228230101-89fcab3d43de` |
+| `github.com/mitchellh/copystructure` | MIT | `github.com/mitchellh/copystructure@v1.2.0` |
+| `github.com/mitchellh/go-wordwrap` | MIT | `github.com/mitchellh/go-wordwrap@v1.0.1` |
+| `github.com/mitchellh/reflectwalk` | MIT | `github.com/mitchellh/reflectwalk@v1.0.2` |
+| `github.com/moby/term` | Apache-2.0 | `github.com/moby/term@v0.5.2` |
+| `github.com/modern-go/concurrent` | Apache-2.0 | `github.com/modern-go/concurrent@v0.0.0-20180306012644-bacd9c7ef1dd` |
+| `github.com/modern-go/reflect2` | Apache-2.0 | `github.com/modern-go/reflect2@v1.0.3-0.20250322232337-35a7c28c31ee` |
+| `github.com/monochromegane/go-gitignore` | MIT | `github.com/monochromegane/go-gitignore@v0.0.0-20200626010858-205db1a8cc00` |
+| `github.com/munnerz/goautoneg` | BSD-3-Clause | `github.com/munnerz/goautoneg@v0.0.0-20191010083416-a7dc8b61c822` |
+| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | `github.com/opencontainers/cgroups@v0.0.7` |
+| `github.com/opencontainers/go-digest` | Apache-2.0 | `github.com/opencontainers/go-digest@v1.0.0` |
+| `github.com/opencontainers/runc/libcontainer/devices` | Apache-2.0 | `github.com/opencontainers/runc@v1.4.3` |
+| `github.com/openshift/api` | Apache-2.0 | `github.com/openshift/api@v0.0.0-20260727141720-967cc4c36c9b` |
+| `github.com/openshift/client-go` | Apache-2.0 | `github.com/openshift/client-go@v0.0.0-20260723174158-ae2315de9d73` |
+| `github.com/operator-framework/api/pkg` | Apache-2.0 | `github.com/operator-framework/api@v0.45.0` |
+| `github.com/peterbourgon/diskv` | MIT | `github.com/peterbourgon/diskv@v2.0.1+incompatible` |
+| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | `github.com/pmezard/go-difflib@v1.0.1-0.20181226105442-5d4384ee4fb2` |
+| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring@v0.93.0` |
+| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | `github.com/prometheus/client_golang@v1.24.1` |
+| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | `github.com/prometheus/client_golang@v1.24.1` |
+| `github.com/prometheus/client_model/go` | Apache-2.0 | `github.com/prometheus/client_model@v0.6.2` |
+| `github.com/prometheus/common` | Apache-2.0 | `github.com/prometheus/common@v0.70.1` |
+| `github.com/prometheus/procfs` | Apache-2.0 | `github.com/prometheus/procfs@v0.21.1` |
+| `github.com/regclient/regclient` | Apache-2.0 | `github.com/regclient/regclient@v0.11.5` |
+| `github.com/russross/blackfriday/v2` | BSD-2-Clause | `github.com/russross/blackfriday/v2@v2.1.0` |
+| `github.com/shopspring/decimal` | MIT | `github.com/shopspring/decimal@v1.4.0` |
+| `github.com/sirupsen/logrus` | MIT | `github.com/sirupsen/logrus@v1.9.4` |
+| `github.com/spf13/cast` | MIT | `github.com/spf13/cast@v1.7.0` |
+| `github.com/spf13/cobra` | Apache-2.0 | `github.com/spf13/cobra@v1.10.2` |
+| `github.com/spf13/pflag` | BSD-3-Clause | `github.com/spf13/pflag@v1.0.10` |
+| `github.com/stretchr/testify/assert/yaml` | MIT | `github.com/stretchr/testify@v1.11.1` |
+| `github.com/ulikunitz/xz` | BSD-3-Clause | `github.com/ulikunitz/xz@v0.5.15` |
+| `github.com/urfave/cli/v3` | MIT | `github.com/urfave/cli/v3@v3.10.1` |
+| `github.com/x448/float16` | MIT | `github.com/x448/float16@v0.8.4` |
+| `github.com/xlab/treeprint` | MIT | `github.com/xlab/treeprint@v1.2.0` |
+| `k8s.io/api` | Apache-2.0 | `k8s.io/api@v0.36.3` |
+| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | `k8s.io/apiextensions-apiserver@v0.36.3` |
+| `k8s.io/apimachinery/pkg` | Apache-2.0 | `k8s.io/apimachinery@v0.36.3` |
+| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | `k8s.io/apimachinery@v0.36.3` |
+| `k8s.io/cli-runtime/pkg` | Apache-2.0 | `k8s.io/cli-runtime@v0.36.0` |
+| `k8s.io/client-go` | Apache-2.0 | `k8s.io/client-go@v0.36.3` |
+| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | `k8s.io/client-go@v0.36.3` |
+| `k8s.io/client-go/third_party/forked/httpcache` | MIT | `k8s.io/client-go@v0.36.3` |
+| `k8s.io/component-base/version` | Apache-2.0 | `k8s.io/component-base@v0.36.3` |
+| `k8s.io/klog/v2` | Apache-2.0 | `k8s.io/klog/v2@v2.140.0` |
+| `k8s.io/kube-openapi/pkg` | Apache-2.0 | `k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25` |
+| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | `k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25` |
+| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | `k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25` |
+| `k8s.io/kubectl/pkg` | Apache-2.0 | `k8s.io/kubectl@v0.36.0` |
+| `k8s.io/utils` | Apache-2.0 | `k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2` |
+| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | `k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2` |
+| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | `k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2` |
+| `sigs.k8s.io/controller-runtime` | Apache-2.0 | `sigs.k8s.io/controller-runtime@v0.24.1` |
+| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | `sigs.k8s.io/json@v0.0.0-20250730193827-2d320260d730` |
+| `sigs.k8s.io/kustomize/api` | Apache-2.0 | `sigs.k8s.io/kustomize/api@v0.21.1` |
+| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | `sigs.k8s.io/kustomize/kyaml@v0.21.1` |
+| `sigs.k8s.io/randfill` | Apache-2.0 | `sigs.k8s.io/randfill@v1.0.0` |
+| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | `sigs.k8s.io/structured-merge-diff/v6@v6.4.0` |
+| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | `sigs.k8s.io/yaml@v1.6.0` |
 
 ## Build Toolchain Dependency Index
 
@@ -190,21 +201,21 @@ notices-check` verifies it is current.
 | `k8s.io/utils` | Apache-2.0 | https://github.com/kubernetes/utils/blob/28399d86e0b5/LICENSE |
 | `k8s.io/utils/internal/third_party/forked/golang/net` | BSD-3-Clause | https://github.com/kubernetes/utils/blob/28399d86e0b5/internal/third_party/forked/golang/LICENSE |
 | `sigs.k8s.io/controller-tools` | Apache-2.0 | https://github.com/kubernetes-sigs/controller-tools/blob/v0.21.0/LICENSE |
-| `sigs.k8s.io/json` | Apache-2.0 | https://github.com/kubernetes-sigs/json/blob/2d320260d730/LICENSE |
+| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | https://github.com/kubernetes-sigs/json/blob/2d320260d730/LICENSE |
 | `sigs.k8s.io/kustomize/api` | Apache-2.0 | https://github.com/kubernetes-sigs/kustomize/blob/api/v0.21.1/api/LICENSE |
 | `sigs.k8s.io/kustomize/cmd/config` | Apache-2.0 | https://github.com/kubernetes-sigs/kustomize/blob/cmd/config/v0.21.1/cmd/config/LICENSE |
 | `sigs.k8s.io/kustomize/kustomize/v5` | Apache-2.0 | https://github.com/kubernetes-sigs/kustomize/blob/kustomize/v5.8.1/kustomize/LICENSE |
 | `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | https://github.com/kubernetes-sigs/kustomize/blob/kyaml/v0.21.1/kyaml/LICENSE |
 | `sigs.k8s.io/randfill` | Apache-2.0 | https://github.com/kubernetes-sigs/randfill/blob/v1.0.0/LICENSE |
 | `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | https://github.com/kubernetes-sigs/structured-merge-diff/blob/v6.4.0/LICENSE |
-| `sigs.k8s.io/yaml` | MIT | https://github.com/kubernetes-sigs/yaml/blob/v1.6.0/LICENSE |
+| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | https://github.com/kubernetes-sigs/yaml/blob/v1.6.0/LICENSE |
 
 ## Runtime Dependency License Texts
 
 ### dario.cat/mergo
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/dario.cat/mergo/LICENSE
+* Module: dario.cat/mergo@v1.0.1
 
 #### LICENSE
 
@@ -244,7 +255,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/MakeNowJust/heredoc
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/MakeNowJust/heredoc/LICENSE
+* Module: github.com/MakeNowJust/heredoc@v1.0.0
 
 #### LICENSE
 
@@ -277,7 +288,7 @@ THE SOFTWARE.
 ### github.com/Masterminds/goutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/goutils/LICENSE.txt
+* Module: github.com/Masterminds/goutils@v1.1.1
 
 #### LICENSE.txt
 
@@ -491,7 +502,7 @@ THE SOFTWARE.
 ### github.com/Masterminds/semver/v3
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/semver/v3/LICENSE.txt
+* Module: github.com/Masterminds/semver/v3@v3.5.0
 
 #### LICENSE.txt
 
@@ -522,7 +533,7 @@ THE SOFTWARE.
 ### github.com/Masterminds/sprig/v3
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt
+* Module: github.com/Masterminds/sprig/v3@v3.3.0
 
 #### LICENSE.txt
 
@@ -553,7 +564,7 @@ THE SOFTWARE.
 ### github.com/Mellanox/maintenance-operator/api/v1alpha1
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE
+* Module: github.com/Mellanox/maintenance-operator/api@v0.3.0
 
 #### LICENSE
 
@@ -766,7 +777,7 @@ THE SOFTWARE.
 ### github.com/NVIDIA/go-nvlib/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/go-nvlib/LICENSE
+* Module: github.com/NVIDIA/go-nvlib@v0.12.0
 
 #### LICENSE
 
@@ -990,7 +1001,7 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE
+* Module: github.com/NVIDIA/k8s-kata-manager@v0.2.3
 
 #### LICENSE
 
@@ -1204,7 +1215,7 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/k8s-operator-libs
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE
+* Module: github.com/NVIDIA/k8s-operator-libs@v0.0.0-20260629200812-d720f2557494
 
 #### LICENSE
 
@@ -1418,7 +1429,7 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/nvidia-container-toolkit
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE
+* Module: github.com/NVIDIA/nvidia-container-toolkit@v1.20.0-rc.1
 
 #### LICENSE
 
@@ -1632,7 +1643,7 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/beorn7/perks/quantile
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/beorn7/perks/LICENSE
+* Module: github.com/beorn7/perks@v1.0.1
 
 #### LICENSE
 
@@ -1664,7 +1675,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/blang/semver/v4
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/blang/semver/v4/LICENSE
+* Module: github.com/blang/semver/v4@v4.0.0
 
 #### LICENSE
 
@@ -1698,7 +1709,7 @@ THE SOFTWARE.
 ### github.com/cespare/xxhash/v2
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/cespare/xxhash/v2/LICENSE.txt
+* Module: github.com/cespare/xxhash/v2@v2.3.0
 
 #### LICENSE.txt
 
@@ -1732,7 +1743,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/chai2010/gettext-go
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/chai2010/gettext-go/LICENSE
+* Module: github.com/chai2010/gettext-go@v1.0.2
 
 #### LICENSE
 
@@ -1770,8 +1781,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/cyphar/filepath-securejoin
 
-* License: MPL-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/cyphar/filepath-securejoin/COPYING.md
+* License: BSD-3-Clause / MPL-2.0
+* Module: github.com/cyphar/filepath-securejoin@v0.7.0
 
 #### COPYING.md
 
@@ -2643,7 +2654,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 ### github.com/davecgh/go-spew/spew
 
 * License: ISC
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/davecgh/go-spew/LICENSE
+* Module: github.com/davecgh/go-spew@v1.1.2-0.20180830191138-d8f796af33cc
 
 #### LICENSE
 
@@ -2670,7 +2681,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### github.com/docker/libtrust
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/docker/libtrust/LICENSE
+* Module: github.com/docker/libtrust@v0.0.0-20160708172513-aabc10ec26b7
 
 #### LICENSE
 
@@ -2873,7 +2884,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### github.com/emicklei/go-restful/v3
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/emicklei/go-restful/v3/LICENSE
+* Module: github.com/emicklei/go-restful/v3@v3.13.0
 
 #### LICENSE
 
@@ -2906,7 +2917,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/evanphx/json-patch/v5
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/evanphx/json-patch/v5/LICENSE
+* Module: github.com/evanphx/json-patch/v5@v5.9.11
 
 #### LICENSE
 
@@ -2943,7 +2954,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/exponent-io/jsonpath
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/exponent-io/jsonpath/LICENSE
+* Module: github.com/exponent-io/jsonpath@v0.0.0-20210407135951-1de76d718b3f
 
 #### LICENSE
 
@@ -2976,7 +2987,7 @@ SOFTWARE.
 ### github.com/fsnotify/fsnotify
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/fsnotify/fsnotify/LICENSE
+* Module: github.com/fsnotify/fsnotify@v1.9.0
 
 #### LICENSE
 
@@ -3013,7 +3024,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/fxamacker/cbor/v2
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/fxamacker/cbor/v2/LICENSE
+* Module: github.com/fxamacker/cbor/v2@v2.9.2
 
 #### LICENSE
 
@@ -3045,7 +3056,7 @@ SOFTWARE.
 ### github.com/go-errors/errors
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-errors/errors/LICENSE.MIT
+* Module: github.com/go-errors/errors@v1.5.1
 
 #### LICENSE.MIT
 
@@ -3064,7 +3075,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-logr/logr
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-logr/logr/LICENSE
+* Module: github.com/go-logr/logr@v1.4.4
 
 #### LICENSE
 
@@ -3277,7 +3288,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-logr/zapr
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-logr/zapr/LICENSE
+* Module: github.com/go-logr/zapr@v1.3.0
 
 #### LICENSE
 
@@ -3490,7 +3501,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-openapi/jsonpointer
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/jsonpointer/LICENSE
+* Module: github.com/go-openapi/jsonpointer@v0.22.4
 
 #### LICENSE
 
@@ -3748,7 +3759,7 @@ limitations under the License.
 ### github.com/go-openapi/jsonreference
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/jsonreference/LICENSE
+* Module: github.com/go-openapi/jsonreference@v0.21.4
 
 #### LICENSE
 
@@ -4007,7 +4018,7 @@ limitations under the License.
 ### github.com/go-openapi/swag
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/LICENSE
+* Module: github.com/go-openapi/swag@v0.25.4
 
 #### LICENSE
 
@@ -4221,7 +4232,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/cmdutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/cmdutils/LICENSE
+* Module: github.com/go-openapi/swag/cmdutils@v0.25.4
 
 #### LICENSE
 
@@ -4435,7 +4446,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/conv
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/conv/LICENSE
+* Module: github.com/go-openapi/swag/conv@v0.25.4
 
 #### LICENSE
 
@@ -4649,7 +4660,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/fileutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/fileutils/LICENSE
+* Module: github.com/go-openapi/swag/fileutils@v0.25.4
 
 #### LICENSE
 
@@ -4863,7 +4874,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/jsonname
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/jsonname/LICENSE
+* Module: github.com/go-openapi/swag/jsonname@v0.25.4
 
 #### LICENSE
 
@@ -5077,7 +5088,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/jsonutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/jsonutils/LICENSE
+* Module: github.com/go-openapi/swag/jsonutils@v0.25.4
 
 #### LICENSE
 
@@ -5291,7 +5302,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/loading
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/loading/LICENSE
+* Module: github.com/go-openapi/swag/loading@v0.25.4
 
 #### LICENSE
 
@@ -5505,7 +5516,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/mangling
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/mangling/LICENSE
+* Module: github.com/go-openapi/swag/mangling@v0.25.4
 
 #### LICENSE
 
@@ -5719,7 +5730,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/netutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/netutils/LICENSE
+* Module: github.com/go-openapi/swag/netutils@v0.25.4
 
 #### LICENSE
 
@@ -5933,7 +5944,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/stringutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/stringutils/LICENSE
+* Module: github.com/go-openapi/swag/stringutils@v0.25.4
 
 #### LICENSE
 
@@ -6147,7 +6158,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/typeutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/typeutils/LICENSE
+* Module: github.com/go-openapi/swag/typeutils@v0.25.4
 
 #### LICENSE
 
@@ -6361,7 +6372,7 @@ limitations under the License.
 ### github.com/go-openapi/swag/yamlutils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/go-openapi/swag/yamlutils/LICENSE
+* Module: github.com/go-openapi/swag/yamlutils@v0.25.4
 
 #### LICENSE
 
@@ -6575,7 +6586,7 @@ limitations under the License.
 ### github.com/google/btree
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/btree/LICENSE
+* Module: github.com/google/btree@v1.1.3
 
 #### LICENSE
 
@@ -6789,7 +6800,7 @@ limitations under the License.
 ### github.com/google/gnostic-models
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/gnostic-models/LICENSE
+* Module: github.com/google/gnostic-models@v0.7.1
 
 #### LICENSE
 
@@ -7004,7 +7015,7 @@ limitations under the License.
 ### github.com/google/uuid
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/google/uuid/LICENSE
+* Module: github.com/google/uuid@v1.6.0
 
 #### LICENSE
 
@@ -7043,7 +7054,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/huandu/xstrings
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/huandu/xstrings/LICENSE
+* Module: github.com/huandu/xstrings@v1.5.0
 
 #### LICENSE
 
@@ -7077,7 +7088,7 @@ SOFTWARE.
 ### github.com/json-iterator/go
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/json-iterator/go/LICENSE
+* Module: github.com/json-iterator/go@v1.1.12
 
 #### LICENSE
 
@@ -7109,8 +7120,8 @@ SOFTWARE.
 
 ### github.com/klauspost/compress
 
-* License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/LICENSE
+* License: Apache-2.0 / BSD-3-Clause / MIT
+* Module: github.com/klauspost/compress@v1.19.1
 
 #### LICENSE
 
@@ -7426,7 +7437,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/klauspost/compress/internal/snapref
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/internal/snapref/LICENSE
+* Module: github.com/klauspost/compress@v1.19.1
 
 #### LICENSE
 
@@ -7465,7 +7476,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/klauspost/compress/zstd/internal/xxhash
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt
+* Module: github.com/klauspost/compress@v1.19.1
 
 #### LICENSE.txt
 
@@ -7499,7 +7510,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/liggitt/tabwriter
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/liggitt/tabwriter/LICENSE
+* Module: github.com/liggitt/tabwriter@v0.0.0-20181228230101-89fcab3d43de
 
 #### LICENSE
 
@@ -7538,7 +7549,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/mitchellh/copystructure
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/copystructure/LICENSE
+* Module: github.com/mitchellh/copystructure@v1.2.0
 
 #### LICENSE
 
@@ -7571,7 +7582,7 @@ THE SOFTWARE.
 ### github.com/mitchellh/go-wordwrap
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md
+* Module: github.com/mitchellh/go-wordwrap@v1.0.1
 
 #### LICENSE.md
 
@@ -7604,7 +7615,7 @@ THE SOFTWARE.
 ### github.com/mitchellh/reflectwalk
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/mitchellh/reflectwalk/LICENSE
+* Module: github.com/mitchellh/reflectwalk@v1.0.2
 
 #### LICENSE
 
@@ -7637,7 +7648,7 @@ THE SOFTWARE.
 ### github.com/moby/term
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/moby/term/LICENSE
+* Module: github.com/moby/term@v0.5.2
 
 #### LICENSE
 
@@ -7840,7 +7851,7 @@ THE SOFTWARE.
 ### github.com/modern-go/concurrent
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/modern-go/concurrent/LICENSE
+* Module: github.com/modern-go/concurrent@v0.0.0-20180306012644-bacd9c7ef1dd
 
 #### LICENSE
 
@@ -8053,7 +8064,7 @@ THE SOFTWARE.
 ### github.com/modern-go/reflect2
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/modern-go/reflect2/LICENSE
+* Module: github.com/modern-go/reflect2@v1.0.3-0.20250322232337-35a7c28c31ee
 
 #### LICENSE
 
@@ -8266,7 +8277,7 @@ THE SOFTWARE.
 ### github.com/monochromegane/go-gitignore
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/monochromegane/go-gitignore/LICENSE
+* Module: github.com/monochromegane/go-gitignore@v0.0.0-20200626010858-205db1a8cc00
 
 #### LICENSE
 
@@ -8299,7 +8310,7 @@ SOFTWARE.
 ### github.com/munnerz/goautoneg
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/munnerz/goautoneg/LICENSE
+* Module: github.com/munnerz/goautoneg@v0.0.0-20191010083416-a7dc8b61c822
 
 #### LICENSE
 
@@ -8342,7 +8353,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/opencontainers/cgroups/devices/config
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/cgroups/LICENSE
+* Module: github.com/opencontainers/cgroups@v0.0.7
 
 #### LICENSE
 
@@ -8555,7 +8566,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/opencontainers/go-digest
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/go-digest/LICENSE
+* Module: github.com/opencontainers/go-digest@v1.0.0
 
 #### LICENSE
 
@@ -8759,7 +8770,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/opencontainers/runc/libcontainer/devices
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/opencontainers/runc/LICENSE
+* Module: github.com/opencontainers/runc@v1.4.3
 
 #### LICENSE
 
@@ -8985,7 +8996,7 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 ### github.com/openshift/api
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/openshift/api/LICENSE
+* Module: github.com/openshift/api@v0.0.0-20260727141720-967cc4c36c9b
 
 #### LICENSE
 
@@ -9188,7 +9199,7 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 ### github.com/openshift/client-go
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/openshift/client-go/LICENSE
+* Module: github.com/openshift/client-go@v0.0.0-20260723174158-ae2315de9d73
 
 #### LICENSE
 
@@ -9391,7 +9402,7 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 ### github.com/operator-framework/api/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/operator-framework/api/LICENSE
+* Module: github.com/operator-framework/api@v0.45.0
 
 #### LICENSE
 
@@ -9604,7 +9615,7 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 ### github.com/peterbourgon/diskv
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/peterbourgon/diskv/LICENSE
+* Module: github.com/peterbourgon/diskv@v2.0.1+incompatible
 
 #### LICENSE
 
@@ -9635,7 +9646,7 @@ THE SOFTWARE.
 ### github.com/pmezard/go-difflib/difflib
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/pmezard/go-difflib/LICENSE
+* Module: github.com/pmezard/go-difflib@v1.0.1-0.20181226105442-5d4384ee4fb2
 
 #### LICENSE
 
@@ -9674,7 +9685,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE
+* Module: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring@v0.93.0
 
 #### LICENSE
 
@@ -9887,7 +9898,7 @@ Apache License
 ### github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE
+* Module: github.com/prometheus/client_golang@v1.24.1
 
 #### LICENSE
 
@@ -9926,7 +9937,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/prometheus/client_golang/prometheus
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_golang/LICENSE
+* Module: github.com/prometheus/client_golang@v1.24.1
 
 #### LICENSE
 
@@ -10163,7 +10174,7 @@ See source code for license details.
 ### github.com/prometheus/client_model/go
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/client_model/LICENSE
+* Module: github.com/prometheus/client_model@v0.6.2
 
 #### LICENSE
 
@@ -10387,7 +10398,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/prometheus/common
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/common/LICENSE
+* Module: github.com/prometheus/common@v0.70.1
 
 #### LICENSE
 
@@ -10611,7 +10622,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/prometheus/procfs
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/prometheus/procfs/LICENSE
+* Module: github.com/prometheus/procfs@v0.21.1
 
 #### LICENSE
 
@@ -10837,7 +10848,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/regclient/regclient
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/regclient/regclient/LICENSE
+* Module: github.com/regclient/regclient@v0.11.5
 
 #### LICENSE
 
@@ -11040,7 +11051,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/russross/blackfriday/v2
 
 * License: BSD-2-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/russross/blackfriday/v2/LICENSE.txt
+* Module: github.com/russross/blackfriday/v2@v2.1.0
 
 #### LICENSE.txt
 
@@ -11081,7 +11092,7 @@ Blackfriday is distributed under the Simplified BSD License:
 ### github.com/shopspring/decimal
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/shopspring/decimal/LICENSE
+* Module: github.com/shopspring/decimal@v1.4.0
 
 #### LICENSE
 
@@ -11138,7 +11149,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/sirupsen/logrus
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/sirupsen/logrus/LICENSE
+* Module: github.com/sirupsen/logrus@v1.9.4
 
 #### LICENSE
 
@@ -11171,7 +11182,7 @@ THE SOFTWARE.
 ### github.com/spf13/cast
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/cast/LICENSE
+* Module: github.com/spf13/cast@v1.7.0
 
 #### LICENSE
 
@@ -11203,7 +11214,7 @@ SOFTWARE.
 ### github.com/spf13/cobra
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/cobra/LICENSE.txt
+* Module: github.com/spf13/cobra@v1.10.2
 
 #### LICENSE.txt
 
@@ -11389,7 +11400,7 @@ SOFTWARE.
 ### github.com/spf13/pflag
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/spf13/pflag/LICENSE
+* Module: github.com/spf13/pflag@v1.0.10
 
 #### LICENSE
 
@@ -11429,7 +11440,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/stretchr/testify/assert/yaml
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/stretchr/testify/LICENSE
+* Module: github.com/stretchr/testify@v1.11.1
 
 #### LICENSE
 
@@ -11462,7 +11473,7 @@ SOFTWARE.
 ### github.com/ulikunitz/xz
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/ulikunitz/xz/LICENSE
+* Module: github.com/ulikunitz/xz@v0.5.15
 
 #### LICENSE
 
@@ -11500,7 +11511,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/urfave/cli/v3
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/urfave/cli/v3/LICENSE
+* Module: github.com/urfave/cli/v3@v3.10.1
 
 #### LICENSE
 
@@ -11533,7 +11544,7 @@ SOFTWARE.
 ### github.com/x448/float16
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/x448/float16/LICENSE
+* Module: github.com/x448/float16@v0.8.4
 
 #### LICENSE
 
@@ -11567,7 +11578,7 @@ SOFTWARE.
 ### github.com/xlab/treeprint
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/github.com/xlab/treeprint/LICENSE
+* Module: github.com/xlab/treeprint@v1.2.0
 
 #### LICENSE
 
@@ -11599,7 +11610,7 @@ THE SOFTWARE.
 ### k8s.io/api
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/api/LICENSE
+* Module: k8s.io/api@v0.36.3
 
 #### LICENSE
 
@@ -11813,7 +11824,7 @@ THE SOFTWARE.
 ### k8s.io/apiextensions-apiserver/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apiextensions-apiserver/LICENSE
+* Module: k8s.io/apiextensions-apiserver@v0.36.3
 
 #### LICENSE
 
@@ -12027,7 +12038,7 @@ THE SOFTWARE.
 ### k8s.io/apimachinery/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apimachinery/LICENSE
+* Module: k8s.io/apimachinery@v0.36.3
 
 #### LICENSE
 
@@ -12241,7 +12252,7 @@ THE SOFTWARE.
 ### k8s.io/apimachinery/third_party/forked/golang
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE
+* Module: k8s.io/apimachinery@v0.36.3
 
 #### LICENSE
 
@@ -12280,7 +12291,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/cli-runtime/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/cli-runtime/LICENSE
+* Module: k8s.io/cli-runtime@v0.36.0
 
 #### LICENSE
 
@@ -12494,7 +12505,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/client-go
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/LICENSE
+* Module: k8s.io/client-go@v0.36.3
 
 #### LICENSE
 
@@ -12708,7 +12719,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/client-go/third_party/forked/golang/template
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE
+* Module: k8s.io/client-go@v0.36.3
 
 #### LICENSE
 
@@ -12747,7 +12758,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/client-go/third_party/forked/httpcache
 
 * License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE
+* Module: k8s.io/client-go@v0.36.3
 
 #### LICENSE
 
@@ -12765,7 +12776,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 ### k8s.io/component-base/version
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/component-base/LICENSE
+* Module: k8s.io/component-base@v0.36.3
 
 #### LICENSE
 
@@ -12979,7 +12990,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 ### k8s.io/klog/v2
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/klog/v2/LICENSE
+* Module: k8s.io/klog/v2@v2.140.0
 
 #### LICENSE
 
@@ -13182,7 +13193,7 @@ third-party archives.
 ### k8s.io/kube-openapi/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/LICENSE
+* Module: k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25
 
 #### LICENSE
 
@@ -13396,7 +13407,7 @@ third-party archives.
 ### k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE
+* Module: k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25
 
 #### LICENSE
 
@@ -13435,7 +13446,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/kube-openapi/pkg/validation/spec
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE
+* Module: k8s.io/kube-openapi@v0.0.0-20260603220949-865597e52e25
 
 #### LICENSE
 
@@ -13649,7 +13660,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/kubectl/pkg
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/kubectl/LICENSE
+* Module: k8s.io/kubectl@v0.36.0
 
 #### LICENSE
 
@@ -13862,7 +13873,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/utils
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/LICENSE
+* Module: k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2
 
 #### LICENSE
 
@@ -14076,7 +14087,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/utils/internal/third_party/forked/golang
 
 * License: BSD-3-Clause
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE
+* Module: k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2
 
 #### LICENSE
 
@@ -14115,7 +14126,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/utils/third_party/forked/golang/btree
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE
+* Module: k8s.io/utils@v0.0.0-20260507154919-ff6756f316d2
 
 #### LICENSE
 
@@ -14328,7 +14339,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/controller-runtime
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/controller-runtime/LICENSE
+* Module: sigs.k8s.io/controller-runtime@v0.24.1
 
 #### LICENSE
 
@@ -14540,8 +14551,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/json
 
-* License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/json/LICENSE
+* License: Apache-2.0 / BSD-3-Clause
+* Module: sigs.k8s.io/json@v0.0.0-20250730193827-2d320260d730
 
 #### LICENSE
 
@@ -14791,7 +14802,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/kustomize/api
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/kustomize/api/LICENSE
+* Module: sigs.k8s.io/kustomize/api@v0.21.1
 
 #### LICENSE
 
@@ -15004,7 +15015,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/kustomize/kyaml
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE
+* Module: sigs.k8s.io/kustomize/kyaml@v0.21.1
 
 #### LICENSE
 
@@ -15217,7 +15228,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/randfill
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/randfill/LICENSE
+* Module: sigs.k8s.io/randfill@v1.0.0
 
 #### LICENSE
 
@@ -15461,7 +15472,7 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 ### sigs.k8s.io/structured-merge-diff/v6
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE
+* Module: sigs.k8s.io/structured-merge-diff/v6@v6.4.0
 
 #### LICENSE
 
@@ -15673,8 +15684,8 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/yaml
 
-* License: MIT
-* Source: https://github.com/NVIDIA/gpu-operator/blob/HEAD/vendor/sigs.k8s.io/yaml/LICENSE
+* License: Apache-2.0 / BSD-3-Clause / MIT
+* Module: sigs.k8s.io/yaml@v1.6.0
 
 #### LICENSE
 
@@ -23532,7 +23543,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/json
 
-* License: Apache-2.0
+* License: Apache-2.0 / BSD-3-Clause
 * Source: https://github.com/kubernetes-sigs/json/blob/2d320260d730/LICENSE
 
 #### LICENSE
@@ -25091,7 +25102,7 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/yaml
 
-* License: MIT
+* License: Apache-2.0 / BSD-3-Clause / MIT
 * Source: https://github.com/kubernetes-sigs/yaml/blob/v1.6.0/LICENSE
 
 #### LICENSE

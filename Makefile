@@ -193,8 +193,8 @@ license-check:
                exit 1; \
        fi
 
-# Generate THIRD_PARTY_NOTICES.md: every dependency's license, for both the
-# modules linked into the released image and the build toolchain.
+# Generate THIRD_PARTY_NOTICES.md: the license of every Go dependency, for both
+# the modules linked into the released image and the build toolchain.
 .PHONY: notices
 notices: install-tools
 	@bash tools/generate-notices
