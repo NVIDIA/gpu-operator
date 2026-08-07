@@ -13,64 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Generate a third-party notices file aggregating the licenses of every
-# third-party dependency the GPU Operator ships or builds with:
+# Writes THIRD_PARTY_NOTICES.md: an index of every Go dependency followed by the
+# verbatim text of each license. Two surfaces — the modules linked into the
+# commands under ./cmd (read offline from vendor/), and the build toolchain in
+# tools/go.mod (read from the module cache, since tools/ is not vendored).
+# Standard library packages are excluded; the Go distribution covers them.
 #
-#   - Go modules statically linked into the commands under ./cmd, four of
-#     which (gpu-operator, manage-crds, cleanup-gpuclusters, nvidia-validator)
-#     are copied into the released gpu-operator image. Collected offline from
-#     the committed vendor/ tree.
-#   - Go modules in the build toolchain (tools/go.mod: controller-gen,
-#     client-gen, kustomize, gcov2lcov, go-licenses). These are not
-#     redistributed, but they participate in producing the released artifacts,
-#     so their licenses are recorded here too. The tools module is not
-#     vendored, so this section reads from the module cache.
+# Why wrap go-licenses: it resolves one platform, the host's, and build-tagged
+# sources pull in different dependencies per platform. Running it once yields a
+# file that is incomplete (missing every non-host platform) and host-dependent,
+# so a freshness gate would flap between macOS and Linux CI. There is no
+# multi-GOOS union mode, so this runs it per target, unions, and sorts with
+# LC_ALL=C for byte-identical output anywhere.
 #
-# Output: THIRD_PARTY_NOTICES.md — a single self-contained file with an index
-# of every dependency followed by the verbatim text of each license.
-#
-# Standard library packages are excluded; they are covered by the license of
-# the Go distribution itself, which ships in the builder image and is not
-# redistributed in the runtime image.
-#
-# Why this wrapper instead of running go-licenses directly:
-#   go-licenses resolves the dependency graph for a SINGLE platform — the
-#   host's GOOS/GOARCH by default. The gpu-operator image is released for
-#   linux/amd64 and linux/arm64 (see multi-arch.mk), and Go's build-tagged
-#   sources pull in different transitive dependencies per platform. Running
-#   the tool once therefore produces a notices file that is (a) INCOMPLETE —
-#   missing the deps of every non-host platform — and (b) NON-REPRODUCIBLE — a
-#   macOS developer and a Linux CI runner emit different files, so a freshness
-#   gate would flap. go-licenses has no multi-GOOS "union" mode, so this script
-#   re-runs it once per released target, unions the results, and sorts
-#   deterministically (LC_ALL=C) to make the output complete and byte-identical
-#   on any host.
-#
-# Requirements:
-#   - go-licenses (pinned in tools/go.mod; install with 'make install-tools')
-#   - go (version pinned in versions.mk)
+# Requires go (versions.mk) and go-licenses (tools/go.mod; make install-tools).
 
 set -euo pipefail
 
 OUTPUT="${OUTPUT:-THIRD_PARTY_NOTICES.md}"
 LICENSES_DIR="${LICENSES_DIR:-.licenses-cache}"
 
-# ./cmd/... is exactly the set of commands 'make cmds' builds — CMDS in the
-# Makefile is a wildcard over ./cmd/*, and docker/Dockerfile builds the image
-# by running 'make cmds'. Scoping here rather than to ./... deliberately
-# excludes the e2e suite under tests/, which belongs to this module but is
-# never shipped; its ginkgo/gomega dependencies are not redistributed and do
-# not belong in a third-party notices file.
-#
-# This errs toward over-inclusion: the image copies four of these commands in,
-# while gpuop-cfg is a build/CI helper that is never shipped. Its dependencies
-# are listed anyway. Attributing slightly more than is redistributed is the
-# safe direction for a notices file; omitting something is not.
+# ./cmd/... is exactly what 'make cmds' builds (CMDS is a wildcard over ./cmd/*,
+# and the Dockerfile builds via 'make cmds'), so this tracks the build rather
+# than a hand-kept list. Scoping here rather than ./... drops the e2e suite,
+# which is in this module but never shipped. It over-includes gpuop-cfg, a build
+# helper that is not shipped either; listing slightly too much is the safe
+# direction for a notices file, omitting is not.
 PACKAGES=("./cmd/...")
 
-# Build toolchain. tools/tools.go pins the binaries that 'make install-tools'
-# installs; the list is read from there rather than duplicated so the two
-# cannot drift.
 TOOLS_DIR="${TOOLS_DIR:-tools}"
 TOOLS_FILE="${TOOLS_DIR}/tools.go"
 
@@ -79,12 +49,8 @@ if ! command -v go >/dev/null 2>&1; then
     exit 1
 fi
 
-# Prefer the repo-local copy installed by 'make install-tools' over whatever
-# happens to be on PATH, so the version pinned in tools/go.mod is the one that
-# actually runs.
-#
-# Resolved to an absolute path because the toolchain pass below runs from
-# ${TOOLS_DIR}, where a relative path would no longer point at the binary.
+# Prefer the repo-local copy so the version pinned in tools/go.mod is what runs.
+# Absolute, because the toolchain pass below runs from ${TOOLS_DIR}.
 if [[ -x "./bin/go-licenses" ]]; then
     GO_LICENSES="${PWD}/bin/go-licenses"
 elif command -v go-licenses >/dev/null 2>&1; then
@@ -100,13 +66,9 @@ if [[ ! -f "${TOOLS_FILE}" ]]; then
     exit 1
 fi
 
-# Emit a code fence long enough to contain a license file verbatim.
-#
-# Some licenses are Markdown and contain fenced blocks of their own. A fixed
-# ``` fence is closed early by that content, so the remainder of the license
-# renders as Markdown and every following block is inverted for the rest of
-# the document. CommonMark allows a longer opening fence, so use one backtick
-# more than the longest run present in the file.
+# Some licenses are Markdown and contain fenced blocks of their own, which close
+# a fixed ``` fence early and invert every block after it. CommonMark allows a
+# longer fence, so use one backtick more than the longest run in the file.
 fence_for() {
     local file="$1" longest
     longest=$(grep -oE '`+' "${file}" 2>/dev/null \
@@ -116,10 +78,8 @@ fence_for() {
     printf '%*s' "${width}" '' | tr ' ' '`'
 }
 
-# Guard against an unsafe LICENSES_DIR override before 'rm -rf' touches it.
-# The merged tree is rebuilt from scratch each run, so we remove any stale copy
-# first; a hostile or buggy override (empty, '/', '.', '..') would be
-# catastrophic.
+# The tree is rebuilt each run, so stale copies go first. Guard the override:
+# an empty, '/', '.' or '..' value would make this 'rm -rf' catastrophic.
 case "${LICENSES_DIR}" in
     ""|"/"|"."|"..")
         echo "ERROR: refusing to 'rm -rf' unsafe LICENSES_DIR='${LICENSES_DIR}'." >&2
@@ -129,27 +89,23 @@ esac
 rm -rf "${LICENSES_DIR}"
 mkdir -p "${LICENSES_DIR}"
 
-# Exclude the local module itself: this is a *third-party* notices file. The
-# module path does not vary by target platform, so compute it once.
+# Excluded below: this is a *third-party* notices file. Does not vary by
+# platform, so compute once.
 LOCAL_MODULE=$(go list -m 2>/dev/null || true)
 if [[ -z "${LOCAL_MODULE}" ]]; then
     echo "ERROR: could not determine local module path via 'go list -m'." >&2
     exit 1
 fi
 
-# The main module is vendored; read licenses out of vendor/ rather than the
-# module cache so this stays offline and matches exactly what is built.
+# Read from vendor/ so this stays offline and matches what is built. CGO is off
+# for every released binary, and disabling it here also lets go-licenses
+# cross-list each platform without a C toolchain.
 export GOFLAGS="-mod=vendor"
-# CGO is disabled for every released binary (see the 'cmds' target in the
-# Makefile). Disabling it here lets go-licenses cross-list each target platform
-# without a C toolchain.
 export CGO_ENABLED=0
 
-# The released image ships for multiple architectures (see multi-arch.mk).
-# This matrix MUST match those platforms; the guard below fails the run if it
-# drifts, so a new release target cannot silently produce an incomplete notices
-# file. The matrix is kept explicit rather than derived so it stays readable and
-# greppable — the guard enforces the coupling.
+# Must match the platforms the image is released for; the guard below fails the
+# run on drift, so a new target cannot silently yield an incomplete file. Kept
+# explicit rather than derived so it stays greppable.
 PLATFORMS=(
     "linux/amd64"
     "linux/arm64"
@@ -175,11 +131,9 @@ if [[ "${expected_platforms}" != "${actual_platforms}" ]]; then
     exit 1
 fi
 
-# Per-platform license trees are saved under a scratch root and merged into
-# ${LICENSES_DIR}; the combined CSV accumulates every platform's entries.
-# Explicit templates: macOS 'mktemp' with no template ignores TMPDIR and
+# Explicit mktemp templates: macOS mktemp ignores TMPDIR without one and
 # allocates under confstr(_CS_DARWIN_USER_TEMP_DIR), which makes the scratch
-# location unoverridable in sandboxed or otherwise restricted environments.
+# location unoverridable in sandboxed environments.
 SAVE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/gpu-operator-notices.XXXXXX")"
 COMBINED_CSV="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-notices-csv.XXXXXX")"
 INDEX_FILE="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-notices-idx.XXXXXX")"
@@ -192,28 +146,23 @@ for platform in "${PLATFORMS[@]}"; do
     goarch="${platform#*/}"
     echo "Collecting licenses for ${goos}/${goarch}..." >&2
 
-    # 'go list std' is GOOS-dependent (e.g. syscall/js exists only for wasm),
-    # so recompute the stdlib ignore set per target platform. Standard-library
-    # packages are excluded from the notices file.
+    # 'go list std' is GOOS-dependent (syscall/js is wasm-only), so recompute
+    # per target. --ignore takes comma-separated package path prefixes.
     stdlib_ignore=$(GOOS="${goos}" GOARCH="${goarch}" go list std 2>/dev/null \
         | cut -d'/' -f1 | LC_ALL=C sort -u | paste -sd ',' -)
-    # go-licenses --ignore takes a comma-separated list of package path prefixes.
     ignore="${stdlib_ignore},${LOCAL_MODULE}"
 
-    # 'go-licenses save' writes each dependency's license file to
-    # <save_path>/<import-path>/<original-filename>. We do NOT ignore anything
-    # beyond stdlib and the local module: the notices file MUST include every
-    # distributed dependency, including restricted-license deps that a policy
-    # check would treat separately.
+    # Nothing beyond stdlib and the local module is ignored: the notices file
+    # must include every distributed dependency, including restricted-license
+    # ones that a policy check would treat separately.
     platform_save="${SAVE_ROOT}/${goos}_${goarch}"
     GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" save "${PACKAGES[@]}" \
         --save_path="${platform_save}" \
         --force \
         --ignore="${ignore}"
 
-    # Merge into the shared tree. A module's license text is identical across
-    # platforms, so overwriting is a no-op; modules present on only one platform
-    # are preserved (union). 'cp -R src/.' copies directory contents in place.
+    # Union: license text is identical across platforms so overwrites are no-ops,
+    # and single-platform modules survive. 'cp -R src/.' copies contents in place.
     cp -R "${platform_save}/." "${LICENSES_DIR}/"
 
     GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" csv "${PACKAGES[@]}" \
@@ -221,12 +170,8 @@ for platform in "${PLATFORMS[@]}"; do
         >> "${COMBINED_CSV}"
 done
 
-# Build toolchain. tools/ is a separate module with no vendor directory, so
-# resolve it from the module cache; 'go mod download' populates it.
-#
-# tools.go carries a 'tools' build tag and imports main packages, so it cannot
-# be listed as a package; read the pinned import paths out of it directly, the
-# same way the install-tools target does.
+# tools.go carries a 'tools' build tag and imports main packages, so it cannot be
+# listed as a package; read the pinned paths out of it as install-tools does.
 TOOL_PKGS=()
 while IFS= read -r pkg; do
     [[ -n "${pkg}" ]] && TOOL_PKGS+=("${pkg}")
@@ -237,13 +182,9 @@ if (( ${#TOOL_PKGS[@]} == 0 )); then
     exit 1
 fi
 
-# Unlike the runtime binaries, these are host tools: they are built for
-# whatever machine runs 'make install-tools', which spans developer laptops
-# (darwin) as well as CI (linux). Resolving only the host graph would make this
-# section — and therefore THIRD_PARTY_NOTICES.md — differ between a macOS
-# developer and a Linux runner, which is exactly the flap that 'make
-# notices-check' exists to avoid. Union across every platform a maintainer
-# might build on so the output is host-independent.
+# Wider than the runtime matrix: these are host tools, built on developer
+# laptops as well as CI, so resolving only the host graph would make the output
+# differ between macOS and Linux.
 TOOLCHAIN_PLATFORMS=(
     "linux/amd64"
     "linux/arm64"
@@ -255,10 +196,8 @@ TOOLS_SAVE_ROOT="${SAVE_ROOT}/tools"
 mkdir -p "${LICENSES_DIR}/.tools"
 (
     cd "${TOOLS_DIR}"
-    # The tools module is not vendored; -mod=readonly matches how
-    # install-tools builds these binaries.
     # shellcheck disable=SC2030,SC2031  # subshell-local on purpose: only the
-    # tools module is read from the module cache; the outer -mod=vendor stands.
+    # tools module reads from the cache, the outer -mod=vendor stands.
     export GOFLAGS="-mod=readonly"
     go mod download
 ) >&2
@@ -271,8 +210,7 @@ for platform in "${TOOLCHAIN_PLATFORMS[@]}"; do
     platform_save="${TOOLS_SAVE_ROOT}/${goos}_${goarch}"
     (
         cd "${TOOLS_DIR}"
-        # shellcheck disable=SC2030,SC2031  # subshell-local on purpose: only
-        # the tools module is read from the cache; outer -mod=vendor stands.
+        # shellcheck disable=SC2030,SC2031  # subshell-local, as above.
         export GOFLAGS="-mod=readonly"
         export GOOS="${goos}" GOARCH="${goarch}"
         tools_stdlib=$(go list std 2>/dev/null | cut -d'/' -f1 | LC_ALL=C sort -u | paste -sd ',' -)
@@ -284,36 +222,27 @@ for platform in "${TOOLCHAIN_PLATFORMS[@]}"; do
             --ignore="${tools_stdlib}"
     ) >> "${TOOLS_CSV}"
 
-    # Toolchain licenses live in their own subtree so a module that appears in
-    # both the runtime and toolchain graphs cannot have one copy clobber the
-    # other. Same union semantics as the runtime pass above.
+    # Own subtree, so a module in both graphs cannot have one copy clobber the
+    # other. Module cache files are 0444 and 'cp -R' preserves that, which would
+    # make the next platform's copy fail; restore write permission each pass.
     cp -R "${platform_save}/." "${LICENSES_DIR}/.tools/"
-    # These files come from the Go module cache, which is read-only (0444), and
-    # 'cp -R' preserves that mode. The next platform's copy would then fail to
-    # overwrite the shared entries, so restore write permission after each pass.
     chmod -R u+w "${LICENSES_DIR}/.tools"
 done
 
 echo "Generating dependency index..." >&2
 
-# Collapse the accumulated CSV rows to one row per package.
+# One row per package, joining every license rather than picking one.
 #
-# go-licenses emits one row PER RECOGNIZED LICENSE, not per package: a library
-# whose license file matches several licenses produces several rows. In this
-# closure that is klauspost/compress (Apache-2.0 / BSD-3-Clause / MIT),
-# sigs.k8s.io/yaml, sigs.k8s.io/json and cyphar/filepath-securejoin
-# (BSD-3-Clause / MPL-2.0). Deduplicating on the package field alone would keep
-# exactly one of those classifications and silently drop the rest, which for
-# filepath-securejoin means hiding an MPL-2.0 disclosure behind a BSD-3-Clause
-# one. So join every distinct license for a package instead of discarding any.
+# go-licenses emits a row PER RECOGNIZED LICENSE, so a library whose license file
+# matches several produces several rows — here klauspost/compress, sigs.k8s.io/
+# yaml, sigs.k8s.io/json and cyphar/filepath-securejoin. Deduplicating on the
+# package field would keep one and drop the rest, hiding filepath-securejoin's
+# MPL-2.0 behind its BSD-3-Clause.
 #
-# Discarding was also NON-DETERMINISTIC. 'sort -t, -k1,1 -u' compares only the
-# key, and BSD sort (macOS) then keeps whichever row came first in INPUT order,
-# while GNU sort (Linux CI) applies a last-resort whole-line comparison and
-# keeps the lexicographically smallest. Two hosts could therefore disagree on
-# which license survived — the exact flap the platform union exists to prevent.
-# Pre-sorting the whole line with 'sort -u' gives a total order with no ties,
-# so the collapse below is fully determined by content, not by input order.
+# It was also non-deterministic: 'sort -k1,1 -u' compares only the key, and BSD
+# sort keeps whichever row came first in input order while GNU sort applies a
+# whole-line tiebreak, so two hosts could disagree. Sorting whole lines first
+# gives a total order, making this collapse depend on content, not input order.
 collapse_index() {
     LC_ALL=C sort -u "$1" | awk -F, '
         {
@@ -328,17 +257,11 @@ collapse_index() {
     '
 }
 
-# Attach the providing module and its exact version to each runtime entry.
-#
-# go-licenses in vendor mode reports a Source URL under this repository at HEAD
-# (".../gpu-operator/blob/HEAD/vendor/..."), which is not a stable reference:
-# once main moves, an old released notices file points at different content,
-# and it names our vendor copy rather than the upstream project. vendor/
-# modules.txt records the exact module version behind every vendored package,
-# so emit "module@version" instead — immutable, upstream-identifying, and
-# derived offline. Packages map to the LONGEST matching module path, since a
-# license may sit at a subdirectory (e.g. klauspost/compress/zstd/internal/
-# xxhash) whose module root is shorter.
+# In vendor mode go-licenses reports a URL into this repo at HEAD, which stops
+# describing released content once main moves and names our vendor copy rather
+# than upstream. modules.txt has the exact version, so emit module@version
+# instead. Longest-prefix match, since a license may sit in a subdirectory whose
+# module root is shorter (e.g. klauspost/compress/zstd/internal/xxhash).
 MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
 if [[ ! -f "${MODULES_TXT}" ]]; then
     echo "ERROR: ${MODULES_TXT} not found — run 'make notices' from the repo root." >&2
@@ -381,13 +304,9 @@ if [[ ! -s "${TOOLS_INDEX}" ]]; then
     exit 1
 fi
 
-# Render one '### <pkg>' section per index entry, with the verbatim text of
-# every license-bearing file the dependency ships.
-# ${3} selects what the provenance line shows: "module" uses the
-# module@version appended by annotate_modules (runtime entries, where the
-# go-licenses URL points at our vendor tree at HEAD and is not stable), and
-# "source" uses the go-licenses URL (toolchain entries, which resolve from the
-# module cache and already carry a versioned upstream link).
+# One '### <pkg>' section per entry. ${3} picks the provenance line: "module" for
+# runtime entries (annotated above), "source" for toolchain ones, which resolve
+# from the module cache and already carry a versioned upstream URL.
 emit_sections() {
     local index="$1" root="$2" provenance="$3"
     local pkg url license module license_files f lf fence
@@ -395,21 +314,12 @@ emit_sections() {
     while IFS=, read -r pkg url license module; do
         [[ -z "${pkg}" ]] && continue
 
-        # 'go-licenses save' may copy multiple files into the dependency
-        # directory (e.g. LICENSE plus NOTICE for Apache-2.0 modules, or
-        # LICENSE-MIT + LICENSE-APACHE for dual-licensed modules). Emit every
-        # one in deterministic (sorted) order so attribution is not silently
-        # lost. Use NUL-delimited reads to tolerate spaces.
-        #
-        # Keep only license-bearing files: 'go-licenses save' copies the whole
-        # module source for restricted licenses (MPL-2.0 and friends) to help
-        # satisfy their source-availability clauses, so those trees arrive with
-        # README.md, Makefile and .go sources alongside LICENSE. Emitting those
-        # verbatim is not what a notices file is for, and is not how source
-        # availability is actually discharged — we redistribute those modules
-        # unmodified, so the upstream repository is the source. The pattern
-        # still admits NOTICE and the dual-license variants that the emit loop
-        # exists to catch.
+        # A dependency may ship several license files (LICENSE plus NOTICE, or
+        # LICENSE-MIT plus LICENSE-APACHE), so emit all of them, sorted, to avoid
+        # losing attribution. Filter to license-bearing names: for restricted
+        # licenses 'go-licenses save' copies the whole module source, and dumping
+        # its README and .go files here is not what a notices file is for — we
+        # redistribute those modules unmodified, so upstream is the source.
         license_files=()
         if [[ -d "${root}/${pkg}" ]]; then
             while IFS= read -r -d '' f; do
@@ -457,7 +367,7 @@ emit_index_table() {
     printf '|---------|---------|--------|\n'
     while IFS=, read -r pkg url license module; do
         [[ -z "${pkg}" ]] && continue
-        # shellcheck disable=SC2016  # backticks here are literal markdown, not command substitution.
+        # shellcheck disable=SC2016  # backticks are literal markdown here.
         if [[ "${provenance}" == "module" ]]; then
             printf '| `%s` | %s | `%s` |\n' "${pkg}" "${license:-Unknown}" "${module:-unknown}"
         else
