@@ -193,6 +193,25 @@ license-check:
                exit 1; \
        fi
 
+# Generate THIRD_PARTY_NOTICES.md: the license of every Go dependency, for both
+# the modules linked into the released image and the build toolchain.
+.PHONY: notices
+notices: install-tools
+	@bash tools/generate-notices
+
+# Verify THIRD_PARTY_NOTICES.md is in sync with the dependency tree.
+.PHONY: notices-check
+notices-check:
+	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."
+	@# Cheap gate first, before spending minutes regenerating. git diff reports
+	@# nothing for an untracked path, so an uncommitted notices file would
+	@# otherwise pass this gate silently.
+	@git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null 2>&1 \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make notices' and commit the result."; exit 1; }
+	@$(MAKE) notices
+	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make notices' and commit the change."; exit 1; }
+
 # Apply go fmt to the codebase
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \

@@ -1,6 +1,9 @@
 /coverage.*
 lcov.info
 
+# Scratch tree of collected dependency licenses (see tools/generate-notices)
+/.licenses-cache
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

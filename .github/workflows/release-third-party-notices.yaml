@@ -1,0 +1,94 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Publishes THIRD_PARTY_NOTICES.md as a release asset, so the attribution for
+# what a release contains is distributed with it rather than only living in the
+# repository. The file is not copied into the runtime image, which keeps the
+# image size unchanged.
+#
+# The file is committed and the notices-check job proves it matches the tree, so
+# there is nothing to regenerate here — this uploads it from the tagged commit.
+#
+# Future option: nvcr.io already carries per-digest artifacts for this image
+# (sha256-<digest>.{sig,sbom,vex}) via the cosign tag scheme, since the registry
+# does not implement the OCI 1.1 referrers API. Publishing the notices there
+# would bind them to the exact image digest, but those artifacts are attached by
+# the downstream publishing pipeline rather than by this repository, so it is a
+# request to that pipeline rather than a change here.
+
+name: Release Third-Party Notices
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to attach the notices file to
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload-notices-to-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve release tag
+        id: vars
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          TAG="${EVENT_TAG:-${INPUT_TAG}}"
+          if [ -z "${TAG}" ]; then
+            echo "::error::could not determine the release tag"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      # Check out the tagged tree, not the default branch: the asset must
+      # describe the dependencies of the release it is attached to.
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.vars.outputs.tag }}
+          persist-credentials: false
+
+      # Fail loudly rather than publishing a release with no attribution, or
+      # attaching an empty file.
+      # Tag goes through the environment rather than being interpolated into the
+      # script, matching release.yaml and release-image-list.yaml. Git allows
+      # shell metacharacters in tag names.
+      - name: Verify the notices file is present
+        env:
+          RELEASE_TAG_NAME: ${{ steps.vars.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ ! -s THIRD_PARTY_NOTICES.md ]; then
+            echo "::error::THIRD_PARTY_NOTICES.md is missing or empty at ${RELEASE_TAG_NAME}"
+            exit 1
+          fi
+          echo "THIRD_PARTY_NOTICES.md: $(wc -l < THIRD_PARTY_NOTICES.md) lines"
+
+      - name: Attach notices to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG_NAME: ${{ steps.vars.outputs.tag }}
+        run: gh release upload "${RELEASE_TAG_NAME}" THIRD_PARTY_NOTICES.md --clobber
