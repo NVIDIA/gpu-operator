@@ -863,7 +863,7 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		require.Equal(t, spec.args, mainCtr.Args, "unexpected Args")
 	}
 	for _, env := range spec.env {
-		require.Contains(t, mainCtr.Env, env, "env var not present")
+		require.Contains(t, mainCtr.Env, corev1.EnvVar{Name: env.Name, Value: env.Value}, "env var not present")
 	}
 	// TODO: implement checks for other common fields (i.e. Resources, securityContext, Tolerations, etc.)
 
@@ -1536,6 +1536,14 @@ func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
 		cp.Spec.DCGMExporter.EnablePodLabels = ptr.To(true)
 	case "pod-uid-enabled":
 		cp.Spec.DCGMExporter.EnablePodUID = ptr.To(true)
+	case "pod-labels-env":
+		cp.Spec.DCGMExporter.Env = []gpuv1.EnvVar{
+			{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
+		}
+	case "configmap-data-env":
+		cp.Spec.DCGMExporter.Env = []gpuv1.EnvVar{
+			{Name: "DCGM_EXPORTER_CONFIGMAP_DATA", Value: "gpu-operator:custom-metrics"},
+		}
 	default:
 		return nil
 	}
@@ -1552,6 +1560,7 @@ func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
 		"dcgmExporterImage": "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu22.04",
 		"imagePullSecret":   "ngc-secret",
 		"clusterRoleExists": false,
+		"automountToken":    false,
 	}
 
 	switch testCase {
@@ -1566,11 +1575,24 @@ func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
 			"DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS": "true",
 		}
 		output["clusterRoleExists"] = true
+		output["automountToken"] = true
 	case "pod-uid-enabled":
 		output["env"] = map[string]string{
 			"DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID": "true",
 		}
 		output["clusterRoleExists"] = true
+		output["automountToken"] = true
+	case "pod-labels-env":
+		output["env"] = map[string]string{
+			"DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS": "true",
+		}
+		output["clusterRoleExists"] = true
+		output["automountToken"] = true
+	case "configmap-data-env":
+		output["env"] = map[string]string{
+			"DCGM_EXPORTER_CONFIGMAP_DATA": "gpu-operator:custom-metrics",
+		}
+		output["automountToken"] = true
 	default:
 		return nil
 	}
@@ -1605,6 +1627,16 @@ func TestDCGMExporter(t *testing.T) {
 			"PodUIDEnabled",
 			getDCGMExporterTestInput("pod-uid-enabled"),
 			getDCGMExporterTestOutput("pod-uid-enabled"),
+		},
+		{
+			"PodLabelsViaEnv",
+			getDCGMExporterTestInput("pod-labels-env"),
+			getDCGMExporterTestOutput("pod-labels-env"),
+		},
+		{
+			"ConfigMapDataViaEnv",
+			getDCGMExporterTestInput("configmap-data-env"),
+			getDCGMExporterTestOutput("configmap-data-env"),
 		},
 	}
 
@@ -1643,14 +1675,14 @@ func TestDCGMExporter(t *testing.T) {
 			if tc.output["clusterRoleExists"].(bool) {
 				require.NoError(t, clusterRoleGetErr, "ClusterRole should exist when pod metadata enrichment is enabled")
 				require.NoError(t, clusterRoleBindingGetErr, "ClusterRoleBinding should exist when pod metadata enrichment is enabled")
-				require.NotNil(t, ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be set when pod metadata enrichment is enabled")
-				require.True(t, *ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be true when pod metadata enrichment is enabled")
 			} else {
 				require.True(t, apierrors.IsNotFound(clusterRoleGetErr), "ClusterRole should not exist when pod metadata enrichment is disabled (got err=%v)", clusterRoleGetErr)
 				require.True(t, apierrors.IsNotFound(clusterRoleBindingGetErr), "ClusterRoleBinding should not exist when pod metadata enrichment is disabled (got err=%v)", clusterRoleBindingGetErr)
-				require.NotNil(t, ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be explicitly set false when pod metadata enrichment is disabled")
-				require.False(t, *ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should be false when pod metadata enrichment is disabled")
 			}
+
+			require.NotNil(t, ds.Spec.Template.Spec.AutomountServiceAccountToken, "AutomountServiceAccountToken should always be set explicitly")
+			require.Equal(t, tc.output["automountToken"].(bool), *ds.Spec.Template.Spec.AutomountServiceAccountToken,
+				"unexpected AutomountServiceAccountToken on daemonset nvidia-dcgm-exporter")
 
 			require.Equal(t, tc.output["dcgmExporterImage"], dcgmExporterImage, "Unexpected configuration for dcgm-exporter image")
 

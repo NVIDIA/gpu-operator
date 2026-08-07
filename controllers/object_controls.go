@@ -116,6 +116,17 @@ const (
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
 	// DCGMDefaultPort indicates default port bound to DCGM host engine
 	DCGMDefaultPort = 5555
+	// DCGMExporterConfigMapDataEnvName is the env name specifying the namespace:name
+	// ConfigMap with custom metrics
+	DCGMExporterConfigMapDataEnvName = "DCGM_EXPORTER_CONFIGMAP_DATA"
+	// DCGMExporterUndefinedConfigMapData is the exporter default meaning no ConfigMap is read
+	DCGMExporterUndefinedConfigMapData = "none"
+	// DCGMExporterPodLabelsEnvName is the env name enabling pod labels on metrics
+	DCGMExporterPodLabelsEnvName = "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS"
+	// DCGMExporterPodUIDEnvName is the env name enabling the pod UID label on metrics
+	DCGMExporterPodUIDEnvName = "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID"
+	// DCGMExporterPodLabelAllowlistEnvName is the env name holding the exported pod label allowlist
+	DCGMExporterPodLabelAllowlistEnvName = "DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX"
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 	// UseHostMOFEDEnvName indicates if MOFED driver is pre-installed on the host
@@ -446,7 +457,8 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
 	"nvidia-dcgm-exporter-read-pods": func(config *gpuv1.ClusterPolicySpec) bool {
-		return config.DCGMExporter.IsKubernetesPodMetadataEnabled()
+		return config.DCGMExporter.IsKubernetesPodMetadataEnabled() ||
+			dcgmExporterEnvEnablesPodMetadata(config.DCGMExporter.Env)
 	},
 }
 
@@ -1868,20 +1880,20 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// Inject pod-metadata enrichment env vars; RBAC is provisioned via the
 	// 0210/0310 assets and the SA token is mounted below.
 	if config.DCGMExporter.IsPodLabelsEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMExporterPodLabelsEnvName, "true")
 	}
 	if config.DCGMExporter.IsPodUIDEnabled() {
-		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID", "true")
+		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMExporterPodUIDEnvName, "true")
 	}
 	if len(config.DCGMExporter.PodLabelAllowlistRegex) > 0 {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]),
-			"DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX",
+			DCGMExporterPodLabelAllowlistEnvName,
 			strings.Join(config.DCGMExporter.PodLabelAllowlistRegex, ","))
 	}
 
-	// Override the base asset's automountServiceAccountToken=false when
-	// enrichment is on so the pod informer has client-go credentials.
-	if config.DCGMExporter.IsKubernetesPodMetadataEnabled() {
+	// Override the base asset's automountServiceAccountToken=false when the
+	// configuration reads from the Kubernetes API.
+	if config.DCGMExporter.IsKubernetesPodMetadataEnabled() || dcgmExporterEnvRequiresAPIAccess(config.DCGMExporter.Env) {
 		obj.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(true)
 	}
 
@@ -1926,6 +1938,36 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	}
 
 	return nil
+}
+
+// dcgmExporterEnvRequiresAPIAccess returns true if a user-provided env var makes
+// dcgm-exporter read from the Kubernetes API.
+func dcgmExporterEnvRequiresAPIAccess(envs []gpuv1.EnvVar) bool {
+	if dcgmExporterEnvEnablesPodMetadata(envs) {
+		return true
+	}
+	for _, env := range envs {
+		if env.Name == DCGMExporterConfigMapDataEnvName {
+			// the exporter treats "none" and "" as no ConfigMap read
+			if env.Value != "" && env.Value != DCGMExporterUndefinedConfigMapData {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// dcgmExporterEnvEnablesPodMetadata returns true if a user-provided env var turns
+// on pod metadata enrichment.
+func dcgmExporterEnvEnablesPodMetadata(envs []gpuv1.EnvVar) bool {
+	for _, env := range envs {
+		if env.Name == DCGMExporterPodLabelsEnvName || env.Name == DCGMExporterPodUIDEnvName {
+			if strings.EqualFold(env.Value, "true") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func addExtraAnnotations(obj *appsv1.DaemonSet, annotations map[string]string) {
