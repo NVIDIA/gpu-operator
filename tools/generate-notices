@@ -245,7 +245,11 @@ collapse_index() {
             if (!(pkg in url)) { url[pkg] = $2; order[++n] = pkg }
             if (!((pkg SUBSEP $3) in seen)) {
                 seen[pkg SUBSEP $3] = 1
-                lic[pkg] = (pkg in lic) ? lic[pkg] " / " $3 : $3
+                # Count, do not test "pkg in lic": gawk instantiates the
+                # assignment target before evaluating the right-hand side, so
+                # that test is already true on the first row and every license
+                # would be prefixed with " / " on Linux but not on macOS.
+                lic[pkg] = (cnt[pkg]++ ? lic[pkg] " / " : "") $3
             }
         }
         END { for (i = 1; i <= n; i++) print order[i] "," url[order[i]] "," lic[order[i]] }
