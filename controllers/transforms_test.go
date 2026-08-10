@@ -690,6 +690,24 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			}),
 		},
 		{
+			description: "existing tolerations preserved when daemonsets spec is empty",
+			ds: NewDaemonset().WithTolerations([]corev1.Toleration{
+				{
+					Key:      "nvidia.com/gpu",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{},
+			expectedDs: NewDaemonset().WithTolerations([]corev1.Toleration{
+				{
+					Key:      "nvidia.com/gpu",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			}),
+		},
+		{
 			description: "invalid updatestrategy configured",
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{

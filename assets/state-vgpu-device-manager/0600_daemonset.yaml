@@ -19,6 +19,10 @@ spec:
       nodeSelector:
         nvidia.com/gpu.deploy.vgpu-device-manager: "true"
       priorityClassName: system-node-critical
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       serviceAccountName: nvidia-vgpu-device-manager
       initContainers:
         - name: vgpu-manager-validation
