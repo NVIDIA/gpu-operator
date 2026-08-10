@@ -373,7 +373,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready"]
+              command: ["/bin/sh", "-c", "rm -f /run/nvidia/validations/.driver-ctr-ready /run/nvidia/validations/.driver-daemons-status"]
         {{- end }}
       {{- if and (.GPUDirectRDMA) (deref .GPUDirectRDMA.Enabled) }}
       - image: {{ .Driver.ImagePath }}
