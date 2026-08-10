@@ -50,7 +50,6 @@ import json
 import os
 import re
 import sys
-import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -85,14 +84,26 @@ def _build_ref(repository: str, image: str, version: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def _registry_token(registry_host: str, namespace: str) -> str:
-    """Obtain an anonymous Bearer token for pulling from nvcr.io.
+    """Obtain an anonymous Bearer token for listing image tags.
 
-    nvcr.io advertises:
-        WWW-Authenticate: Bearer realm="https://nvcr.io/proxy_auth",scope=""
+    nvcr.io uses a non-standard token endpoint:
+    WWW-Authenticate: Bearer realm="https://nvcr.io/proxy_auth",scope=""
     A GET to that realm with the desired scope returns {"token": "…"}.
+
+    GHCR exposes its token endpoint directly.
     """
     scope = f"repository:{namespace}:pull"
-    token_url = f"https://{registry_host}/proxy_auth?scope={urllib.parse.quote(scope)}"
+
+    if registry_host == "nvcr.io":
+        token_url = f"https://{registry_host}/proxy_auth?scope={urllib.parse.quote(scope)}"
+    elif registry_host == "ghcr.io":
+        token_url = (
+            f"https://{registry_host}/token?service=ghcr.io&"
+            f"scope={urllib.parse.quote(scope)}"
+        )
+    else:
+        raise ValueError(f"Registry tag discovery is not supported for {registry_host}")
+
     request = urllib.request.Request(token_url, headers={"Accept": "application/json"})
     with urllib.request.urlopen(request, timeout=15) as response:
         data = json.loads(response.read())
@@ -254,6 +265,14 @@ def _extract_operator_images(
         driver.get("repository", ""),
         driver.get("image", ""),
         (driver.get("version") or "").strip(),
+    )
+
+    # NVIDIA DRA Driver
+    dra_driver = values.get("draDriver", {})
+    add_image_ref(
+        dra_driver.get("repository", ""),
+        dra_driver.get("image", ""),
+        dra_driver.get("version", ""),
     )
 
     # k8s-driver-manager
