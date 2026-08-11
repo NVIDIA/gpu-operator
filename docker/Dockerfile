@@ -124,7 +124,7 @@ COPY deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml /opt/gpu-operat
 COPY deployments/gpu-operator/crds/nvidia.com_gpuclusters.yaml /opt/gpu-operator/nvidia.com_gpuclusters.yaml
 COPY deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml /opt/gpu-operator/nfd-api-crds.yaml
 
-USER 65532:65532
+USER 1000:1000
 
 COPY LICENSE /licenses/
 
