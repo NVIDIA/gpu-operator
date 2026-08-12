@@ -313,6 +313,8 @@ build-image:
 		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
+		--build-arg GIT_COMMIT_SHA_FULL="$(GIT_COMMIT_SHA_FULL)" \
+		--build-arg BUILD_TIMESTAMP="$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")" \
 		--build-arg GOPROXY="$(GOPROXY)" \
 		--file $(DOCKERFILE) $(CURDIR)
 

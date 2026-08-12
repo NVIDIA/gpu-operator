@@ -89,6 +89,8 @@ ENV NVIDIA_VISIBLE_DEVICES=void
 
 ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
+ARG GIT_COMMIT_SHA_FULL="unknown"
+ARG BUILD_TIMESTAMP
 
 LABEL io.k8s.display-name="NVIDIA GPU Operator"
 LABEL name="NVIDIA GPU Operator"
@@ -98,6 +100,15 @@ LABEL release="N/A"
 LABEL summary="Automate the management and monitoring of NVIDIA GPUs."
 LABEL description="See summary"
 LABEL vsc-ref=${GIT_COMMIT}
+LABEL org.opencontainers.base.name="nvcr.io/nvidia/distroless/cc"
+LABEL org.opencontainers.image.created="${BUILD_TIMESTAMP}"
+LABEL org.opencontainers.image.documentation="https://docs.nvidia.com/datacenter/cloud-native/gpu-operator"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT_SHA_FULL}"
+LABEL org.opencontainers.image.source="https://github.com/NVIDIA/gpu-operator.git"
+LABEL org.opencontainers.image.title="NVIDIA GPU Operator"
+LABEL org.opencontainers.image.url="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/gpu-operator"
+LABEL org.opencontainers.image.vendor="NVIDIA"
+LABEL org.opencontainers.image.version="${VERSION}"
 
 WORKDIR /
 
