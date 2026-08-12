@@ -193,6 +193,18 @@ license-check:
                exit 1; \
        fi
 
+.PHONY: third-party-notices
+third-party-notices: install-tools
+	@bash tools/generate-third-party-notices.sh
+
+.PHONY: check-third-party-notices
+check-third-party-notices: third-party-notices
+	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."
+	@git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null 2>&1 \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make third-party-notices' and commit the result."; exit 1; }
+	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
+
 # Apply go fmt to the codebase
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
