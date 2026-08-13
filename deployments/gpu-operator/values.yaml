@@ -230,7 +230,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.20.0-rc.1
+  version: v1.20.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
