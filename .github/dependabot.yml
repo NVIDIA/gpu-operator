@@ -8,6 +8,9 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      exclude:
+        - github.com/NVIDIA/*
     open-pull-requests-limit: 10
     labels:
       - dependencies
@@ -23,6 +26,9 @@ updates:
     directory: "/tools"
     schedule:
       interval: "daily"
+    cooldown:
+      exclude:
+        - github.com/NVIDIA/*
     labels:
       - dependencies
 
