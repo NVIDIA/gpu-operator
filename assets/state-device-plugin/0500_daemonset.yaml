@@ -35,6 +35,32 @@ spec:
           - name: run-nvidia-validations
             mountPath: /run/nvidia/validations
             mountPropagation: HostToContainer
+      # The cdi-validation init container will only be added when CDI is enabled in the operator.
+      # This init container ensures that the device-plugin does not start until a version of
+      # the toolkit container that has CDI enabled is running. This is implemented to prevent
+      # a possible race condition where a newer version of the device-plugin, with CDI enabled,
+      # starts running while an older version of the toolkit, which does not have CDI enabled,
+      # is still running.
+      - image: "FILLED BY THE OPERATOR"
+        name: cdi-validation
+        command: [ 'sh', '-c' ]
+        args:
+          - |
+            if [ -z "${NVIDIA_CTK_LIBCUDA_DIR}" ]; then
+              echo "waiting for NVIDIA Container Toolkit to be installed with CDI enabled"
+              echo "will sleep and then exit"
+              sleep 5
+              exit 1
+            fi
+        env:
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: all
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: run-nvidia-validations
+            mountPath: /run/nvidia/validations
+            mountPropagation: HostToContainer
       - image: "FILLED BY THE OPERATOR"
         name: config-manager-init
         command: ["config-manager"]
