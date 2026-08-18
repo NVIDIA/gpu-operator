@@ -24,3 +24,4 @@ spec:
     version: v1.35.4
     crictlVersion: v1.35.0
     calicoVersion: v3.31.5
+    remoteAccess: true
