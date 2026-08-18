@@ -80,18 +80,18 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
         with:
           persist-credentials: false
       - name: Download values override file
         if: ${{ inputs.use_values_override }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: values-overrides
           path: ${{ github.workspace }}
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.7
+        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -99,7 +99,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@v4
+        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
@@ -134,7 +134,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: containerd-e2e-test-logs
           path: ./logs/
@@ -148,18 +148,18 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
         with:
           persist-credentials: false
       - name: Download values override file
         if: ${{ inputs.use_values_override }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: values-overrides
           path: ${{ github.workspace }}
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.7
+        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -167,7 +167,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@v4
+        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
@@ -202,7 +202,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/

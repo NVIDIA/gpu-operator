@@ -37,13 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
         with:
           persist-credentials: false
 
       - name: Set up Helm
-        uses: azure/setup-helm@v5.0.1
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       - name: Set chart image repository
         env:
@@ -51,7 +51,7 @@ jobs:
         run: echo "OPERATOR_REPOSITORY=${OPERATOR_IMAGE%/*}" >> "${GITHUB_ENV}"
 
       - name: Update chart image repository
-        uses: mikefarah/yq@v4
+        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
         with:
           cmd: yq -i '.operator.repository = env(OPERATOR_REPOSITORY) | .validator.repository = env(OPERATOR_REPOSITORY)' deployments/gpu-operator/values.yaml
 
