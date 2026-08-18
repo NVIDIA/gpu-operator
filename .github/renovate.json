@@ -68,7 +68,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "docker/Dockerfile"
+        "docker/Dockerfile",
+        "docker/Dockerfile.devel"
       ],
       "matchStrings": [
         "FROM golang:(?<currentValue>\\d+\\.\\d+\\.\\d+)"

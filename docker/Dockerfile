@@ -14,7 +14,7 @@
 
 ARG CUDA_SAMPLES_VERSION=13.2
 
-FROM golang:1.26.6 AS builder
+FROM golang:1.26.6@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6 AS builder
 
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
@@ -40,7 +40,7 @@ ARG VERSION="unknown"
 ARG GIT_COMMIT="unknown"
 RUN make cmds
 
-FROM registry.access.redhat.com/ubi9/ubi:latest AS sample-builder
+FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:5426a8f45e80a07168a30ea24d84f266094b3756624a5508cc53927e6ee39e09 AS sample-builder
 
 RUN ARCH=$(uname -m) && OS_ARCH=${ARCH/amd64/x86_64} && OS_ARCH=${ARCH/aarch64/sbsa} && OS_ARCH=${ARCH/arm64/sbsa} \
     dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$OS_ARCH/cuda-rhel9.repo
@@ -73,7 +73,7 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
 # Build a static busybox layout: one binary plus applet symlinks (sh, rm,
 # ln, sleep, cat, ...) so PATH-resolved commands in init-container wrappers
 # and lifecycle hooks keep working on the non-*-dev* distroless base.
-FROM debian:trixie-slim AS shell
+FROM debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258 AS shell
 RUN apt-get update \
  && apt-get install -y --no-install-recommends busybox-static \
  && rm -rf /var/lib/apt/lists/* \
@@ -83,7 +83,7 @@ RUN apt-get update \
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.1.1
+FROM nvcr.io/nvidia/distroless/cc:v4.1.1@sha256:8679a8fdeb897906b22cd7cfecb17f9711271dbc6ce1da21354eef76afb11d1b
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
