@@ -31,13 +31,13 @@ jobs:
     outputs:
       artifact_name: ${{ steps.generate.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
         with:
           ref: ${{ github.event.release.tag_name }}
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Install PyYAML
@@ -53,7 +53,7 @@ jobs:
             --output "${ARTIFACT_NAME}"
           echo "artifact_name=${ARTIFACT_NAME}" >> "${GITHUB_OUTPUT}"
       - name: Upload image list artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.generate.outputs.artifact_name }}
           path: ${{ steps.generate.outputs.artifact_name }}
@@ -66,12 +66,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
         with:
           persist-credentials: false
       - name: Download image list artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ needs.generate-image-list.outputs.artifact_name }}
       - name: Attach image list to GitHub Release
