@@ -579,7 +579,7 @@ gpuCluster:
 # is managed by the GPUCluster CR (rendered only when
 # gpuCluster.deployCR=true).
 draDriver:
-  repository: registry.k8s.io/dra-driver-nvidia
+  repository: nvcr.io/nvidia
   image: dra-driver-nvidia-gpu
   version: v0.4.1
   imagePullPolicy: IfNotPresent
