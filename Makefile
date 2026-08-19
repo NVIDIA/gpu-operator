@@ -21,7 +21,6 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
-BUILDER_IMAGE ?= golang:$(GOLANG_VERSION)
 GOPROXY ?= https://proxy.golang.org,direct
 
 ifeq ($(IMAGE_NAME),)
@@ -157,7 +156,6 @@ DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 	if [ x"$(SKIP_IMAGE_BUILD)" = x"" ]; then \
 		$(DOCKER) build \
 			--progress=plain \
-			--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 			--tag $(BUILDIMAGE) \
 			-f $(^) \
 			docker; \
@@ -310,8 +308,6 @@ build-image:
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		--tag $(IMAGE) \
 		--build-arg VERSION="$(VERSION)" \
-		--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
-		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		--build-arg GIT_COMMIT_SHA_FULL="$(GIT_COMMIT_SHA_FULL)" \
 		--build-arg BUILD_TIMESTAMP="$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")" \
