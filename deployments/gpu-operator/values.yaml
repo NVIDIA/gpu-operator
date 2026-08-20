@@ -289,7 +289,7 @@ dcgm:
   enabled: false
   repository: nvcr.io/nvidia/cloud-native
   image: dcgm
-  version: 4.6.1-1-ubuntu24.04
+  version: 4.6.0-1-ubuntu24.04
   imagePullPolicy: IfNotPresent
   args: []
   env: []
