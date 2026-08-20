@@ -581,7 +581,7 @@ gpuCluster:
 draDriver:
   repository: nvcr.io/nvidia
   image: dra-driver-nvidia-gpu
-  version: v0.4.1
+  version: v0.5.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   # featureGates toggles DRA driver feature gates; rendered as FEATURE_GATES.
