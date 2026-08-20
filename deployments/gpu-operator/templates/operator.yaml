@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: "gpu-operator"
     nvidia.com/gpu-driver-upgrade-drain.skip: "true"
 spec:
-  replicas: 1
+  replicas: {{ .Values.operator.replicas | default 1 }}
   selector:
     matchLabels:
       app.kubernetes.io/component: "gpu-operator"
@@ -39,7 +39,9 @@ spec:
         imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
         command: ["gpu-operator"]
         args:
+        {{- if gt (int (.Values.operator.replicas | default 1)) 1 }}
         - --leader-elect
+        {{- end }}
       {{- if .Values.operator.logging.develMode }}
         - --zap-devel
       {{- else }}
