@@ -128,14 +128,14 @@ func InitOperatorMetrics() *OperatorMetrics {
 			promcli.GaugeOpts{
 				Namespace: operatorMetricsNamespace,
 				Name:      "openshift_driver_toolkit_nfd_too_old",
-				Help:      "1 if OCP DriverToolkit is enabled but NFD doesn't expose OSTREE labels, 0 otherwise",
+				Help:      "1 if OCP DriverToolkit was requested but NFD does not expose the required OSTREE labels, 0 otherwise",
 			},
 		),
 		openshiftDriverToolkitIsMissing: promcli.NewGauge(
 			promcli.GaugeOpts{
 				Namespace: operatorMetricsNamespace,
 				Name:      "openshift_driver_toolkit_imagestream_missing",
-				Help:      "1 if OCP DriverToolkit is enabled but its imagestream is not available, 0 otherwise",
+				Help:      "1 if OCP DriverToolkit was requested but its imagestream is not available, 0 otherwise",
 			},
 		),
 		openshiftDriverToolkitRhcosTagsMissing: promcli.NewGauge(
