@@ -48,11 +48,12 @@ spec:
       labels:
         severity: warning
       annotations:
-        summary: GPU Operator DriverToolkit is enabled but NFD too old to support it
+        summary: GPU Operator DriverToolkit was requested but could not be enabled because NFD is too old
         description: |
-          The DriverToolkit is enabled in the GPU Operator
-          ClusterPolicy, but the NFD version deployed in the cluster
-          is too old to support it.
+          The DriverToolkit was requested in the GPU Operator
+          ClusterPolicy, but it could not be enabled because the NFD
+          version deployed in the cluster does not expose the required
+          OSTREE labels.
     - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamMissing
       expr: |
         gpu_operator_openshift_driver_toolkit_enabled == -1
@@ -62,11 +63,12 @@ spec:
       labels:
         severity: warning
       annotations:
-        summary: GPU Operator DriverToolkit is enabled but the driver-toolkit imagestream is missing
+        summary: GPU Operator DriverToolkit was requested but could not be enabled because the driver-toolkit imagestream is missing
         description: |
-          The DriverToolkit is enabled in the GPU Operator
-          ClusterPolicy, but this version of OpenShift does not
-          support it (driver-toolkit imagestream is not available).
+          The DriverToolkit was requested in the GPU Operator
+          ClusterPolicy, but it could not be enabled because the
+          driver-toolkit imagestream is not available in this version
+          of OpenShift.
 
     - alert: GPUOperatorOpenshiftDriverToolkitEnabledImageStreamBroken
       expr: |
