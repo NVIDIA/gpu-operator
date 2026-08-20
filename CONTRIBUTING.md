@@ -79,6 +79,8 @@ To file feature requests, bugs, or questions, submit an issue at https://github.
 
 To contribute to the project, file a Pull Request at https://github.com/NVIDIA/gpu-operator/pulls. Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to sign their work.
 
+All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## <a name="signing"></a>Signing your work
 
 Want to hack on the NVIDIA GPU Operator? Awesome!
