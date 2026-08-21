@@ -165,6 +165,80 @@ func TestGetGPUNodeOSInfoListError(t *testing.T) {
 	require.Contains(t, err.Error(), "unable to list nodes with GPU present")
 }
 
+func TestStep(t *testing.T) {
+	expectedErr := errors.New("step failed")
+	driverCRDPolicy := &gpuv1.ClusterPolicy{
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		controller     ClusterPolicyController
+		expectedStatus gpuv1.State
+		expectedIndex  int
+		expectedError  error
+	}{
+		{
+			name: "normal state advances on success",
+			controller: ClusterPolicyController{
+				controls:   []controlFunc{{func(ClusterPolicyController) (gpuv1.State, error) { return gpuv1.Ready, nil }}},
+				stateNames: []string{"test-state"},
+			},
+			expectedStatus: gpuv1.Ready,
+			expectedIndex:  1,
+		},
+		{
+			name: "normal state does not advance on error",
+			controller: ClusterPolicyController{
+				controls:   []controlFunc{{func(ClusterPolicyController) (gpuv1.State, error) { return gpuv1.NotReady, expectedErr }}},
+				stateNames: []string{"test-state"},
+			},
+			expectedStatus: gpuv1.NotReady,
+			expectedIndex:  0,
+			expectedError:  expectedErr,
+		},
+		{
+			name: "driver cleanup advances on success",
+			controller: ClusterPolicyController{
+				ctx:        context.Background(),
+				client:     errorListClient{},
+				singleton:  driverCRDPolicy,
+				stateNames: []string{"state-driver"},
+			},
+			expectedStatus: gpuv1.Disabled,
+			expectedIndex:  1,
+		},
+		{
+			name: "driver cleanup does not advance on error",
+			controller: ClusterPolicyController{
+				ctx:        context.Background(),
+				client:     errorListClient{err: expectedErr},
+				singleton:  driverCRDPolicy,
+				stateNames: []string{"state-driver"},
+			},
+			expectedStatus: gpuv1.NotReady,
+			expectedIndex:  0,
+			expectedError:  expectedErr,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			status, err := tc.controller.step()
+
+			if tc.expectedError != nil {
+				require.ErrorIs(t, err, tc.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expectedStatus, status)
+			require.Equal(t, tc.expectedIndex, tc.controller.idx)
+		})
+	}
+}
+
 func TestGetGPUNodeOSInfoNoGPUNodes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
