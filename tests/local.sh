@@ -42,4 +42,6 @@ remote \
     GPU_MODE="${GPU_MODE}" \
     NGC_API_KEY="${NGC_API_KEY}" \
     VALUES_FILE="${VALUES_FILE:-}" \
+    HELM_CHART="${HELM_CHART:-}" \
+    HELM_CHART_VERSION="${HELM_CHART_VERSION:-}" \
         ${TEST_CASE}

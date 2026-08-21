@@ -90,6 +90,13 @@ jobs:
         with:
           name: values-overrides
           path: ${{ github.workspace }}
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: Verify the published Helm chart is available
+        env:
+          HELM_CHART: ${{ needs.publish-helm-oci-chart.outputs.chart_reference }}
+          HELM_CHART_VERSION: ${{ needs.publish-helm-oci-chart.outputs.chart_version }}
+        run: helm show chart "${HELM_CHART}" --version "${HELM_CHART_VERSION}"
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
         with:
@@ -124,6 +131,8 @@ jobs:
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          HELM_CHART: ${{ needs.publish-helm-oci-chart.outputs.chart_reference }}
+          HELM_CHART_VERSION: ${{ needs.publish-helm-oci-chart.outputs.chart_version }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"
@@ -158,6 +167,13 @@ jobs:
         with:
           name: values-overrides
           path: ${{ github.workspace }}
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: Verify the published Helm chart is available
+        env:
+          HELM_CHART: ${{ needs.publish-helm-oci-chart.outputs.chart_reference }}
+          HELM_CHART_VERSION: ${{ needs.publish-helm-oci-chart.outputs.chart_version }}
+        run: helm show chart "${HELM_CHART}" --version "${HELM_CHART_VERSION}"
       - name: Set up Holodeck
         uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
         with:
@@ -192,6 +208,8 @@ jobs:
         env:
           OPERATOR_VERSION: ${{ needs.variables.outputs.operator_version }}
           OPERATOR_IMAGE: ${{ needs.variables.outputs.operator_image }}
+          HELM_CHART: ${{ needs.publish-helm-oci-chart.outputs.chart_reference }}
+          HELM_CHART_VERSION: ${{ needs.publish-helm-oci-chart.outputs.chart_version }}
           GPU_PRODUCT_NAME: "Tesla-T4"
           SKIP_LAUNCH: "true"
           CONTAINER_RUNTIME: "containerd"

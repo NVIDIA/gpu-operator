@@ -7,14 +7,14 @@ test_nvidiadriver_helm_render_options() {
     local render_file
     render_file=$(mktemp)
 
-    ${HELM} template gpu-operator "${PROJECT_DIR}/deployments/gpu-operator" \
+    ${HELM} template gpu-operator "${HELM_CMD_ARGS[@]}" \
         -n "${TEST_NAMESPACE}" \
         --set driver.nvidiaDriverCRD.enabled=true \
         --set driver.nvidiaDriverCRD.deployDefaultCR=true > "${render_file}"
     grep -q "kind: NVIDIADriver" "${render_file}"
     grep -q "default: true" "${render_file}"
 
-    ${HELM} template gpu-operator "${PROJECT_DIR}/deployments/gpu-operator" \
+    ${HELM} template gpu-operator "${HELM_CMD_ARGS[@]}" \
         -n "${TEST_NAMESPACE}" \
         --set driver.nvidiaDriverCRD.enabled=true \
         --set driver.nvidiaDriverCRD.deployDefaultCR=false > "${render_file}"
@@ -23,7 +23,7 @@ test_nvidiadriver_helm_render_options() {
         exit 1
     fi
 
-    ${HELM} template gpu-operator "${PROJECT_DIR}/deployments/gpu-operator" \
+    ${HELM} template gpu-operator "${HELM_CMD_ARGS[@]}" \
         -n "${TEST_NAMESPACE}" \
         --set driver.nvidiaDriverCRD.enabled=false \
         --set driver.nvidiaDriverCRD.deployDefaultCR=true > "${render_file}"

@@ -174,7 +174,7 @@ if [[ -z "${operator_name}" ]]; then
 fi
 
 echo "Migrating Helm release/${operator_name} from ClusterPolicy driver management to NVIDIADriver"
-${HELM} upgrade "${operator_name}" "${PROJECT_DIR}/deployments/gpu-operator" \
+${HELM} upgrade "${operator_name}" "${HELM_CMD_ARGS[@]}" \
     -n "${TEST_NAMESPACE}" \
     --reuse-values \
     ${OPERATOR_OPTIONS:-} \
