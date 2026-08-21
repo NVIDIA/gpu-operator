@@ -19,7 +19,6 @@ package controllers
 import (
 	"io/fs"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -87,13 +86,19 @@ metadata:
 }
 
 func TestAllAssetsHaveManifestKind(t *testing.T) {
-	err := filepath.WalkDir("../assets", func(path string, entry fs.DirEntry, walkErr error) error {
+	root, err := os.OpenRoot("../assets")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, root.Close())
+	})
+
+	err = fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		require.NoError(t, walkErr)
 		if entry.IsDir() {
 			return nil
 		}
 
-		manifest, err := os.ReadFile(path)
+		manifest, err := root.ReadFile(path)
 		require.NoError(t, err)
 		kind, err := manifestKind(manifest)
 		require.NoErrorf(t, err, "failed to read kind from %s", path)
