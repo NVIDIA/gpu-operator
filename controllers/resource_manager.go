@@ -17,9 +17,9 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -29,11 +29,13 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedv1 "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	secv1 "github.com/openshift/api/security/v1"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -99,6 +101,17 @@ func getAssetsFrom(n *ClusterPolicyController, path string, openshiftVersion str
 	return manifests
 }
 
+func manifestKind(manifest []byte) (string, error) {
+	typeMeta := metav1.TypeMeta{}
+	if err := yaml.Unmarshal(manifest, &typeMeta); err != nil {
+		return "", fmt.Errorf("failed to decode manifest metadata: %w", err)
+	}
+	if typeMeta.Kind == "" {
+		return "", fmt.Errorf("manifest is missing kind")
+	}
+	return typeMeta.Kind, nil
+}
+
 func addResourcesControls(n *ClusterPolicyController, path string) (Resources, controlFunc) {
 	res := Resources{}
 	ctrl := controlFunc{}
@@ -108,12 +121,10 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	reg := regexp.MustCompile(`\b(\w*kind:\w*)\B.*\b`)
 
 	for _, m := range manifests {
-		kind := reg.FindString(string(m))
-		slce := strings.Split(kind, ":")
-		kind = strings.TrimSpace(slce[1])
+		kind, err := manifestKind(m)
+		panicIfError(err)
 
 		n.logger.V(1).Info("Looking for ", "Kind", kind, "in path:", path)
 
