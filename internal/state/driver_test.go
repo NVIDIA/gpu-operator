@@ -91,6 +91,33 @@ func getYAMLString(objs []*unstructured.Unstructured) (string, error) {
 	return sb.String(), nil
 }
 
+func findVolumeByName(volumes []corev1.Volume, name string) *corev1.Volume {
+	for i := range volumes {
+		if volumes[i].Name == name {
+			return &volumes[i]
+		}
+	}
+	return nil
+}
+
+func findVolumeMountByName(volumeMounts []corev1.VolumeMount, name string) *corev1.VolumeMount {
+	for i := range volumeMounts {
+		if volumeMounts[i].Name == name {
+			return &volumeMounts[i]
+		}
+	}
+	return nil
+}
+
+func findContainerByName(containers []corev1.Container, name string) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
 func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
 	for _, volumeMount := range volumeMounts {
 		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
@@ -653,6 +680,119 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 
 			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
 			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
+		})
+	}
+}
+
+func TestDriverPrecompiledLibModules(t *testing.T) {
+	const (
+		libModulesVolumeName     = "lib-modules"
+		driverContainerName      = "nvidia-driver-ctr"
+		precompiledKernelVersion = "5.14.21-150500.55.44-default"
+	)
+
+	state, err := NewStateDriver(
+		fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(),
+		"test-ns",
+		scheme.Scheme,
+		manifestDir)
+	require.NoError(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	clusterInfo := testClusterInfo{runtime: consts.Containerd}
+
+	testCases := []struct {
+		description             string
+		osRelease               string
+		osVersion               string
+		usePrecompiled          bool
+		expectLibModulesMounted bool
+	}{
+		{
+			description:             "sles with precompiled drivers mounts host /lib/modules",
+			osRelease:               "sles",
+			osVersion:               "15.6",
+			usePrecompiled:          true,
+			expectLibModulesMounted: true,
+		},
+		{
+			description:             "sl-micro with precompiled drivers mounts host /lib/modules",
+			osRelease:               "sl-micro",
+			osVersion:               "6.0",
+			usePrecompiled:          true,
+			expectLibModulesMounted: true,
+		},
+		{
+			description:             "sles without precompiled drivers does not mount host /lib/modules",
+			osRelease:               "sles",
+			osVersion:               "15.6",
+			usePrecompiled:          false,
+			expectLibModulesMounted: false,
+		},
+		{
+			description:             "ubuntu with precompiled drivers does not mount host /lib/modules",
+			osRelease:               "ubuntu",
+			osVersion:               "22.04",
+			usePrecompiled:          true,
+			expectLibModulesMounted: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			driver := &nvidiav1alpha1.NVIDIADriver{}
+			driver.Spec.UsePrecompiled = ptr.To(tc.usePrecompiled)
+
+			additionalConfigs, err := stateDriver.getDriverAdditionalConfigs(
+				context.Background(),
+				driver,
+				clusterInfo,
+				nodePool{osRelease: tc.osRelease, osVersion: tc.osVersion},
+			)
+			require.NoError(t, err)
+
+			renderData := getMinimalDriverRenderData()
+			renderData.Driver.Spec.UsePrecompiled = ptr.To(tc.usePrecompiled)
+			renderData.AdditionalConfigs = additionalConfigs
+			if tc.usePrecompiled {
+				renderData.Precompiled = &precompiledSpec{
+					KernelVersion:          precompiledKernelVersion,
+					SanitizedKernelVersion: precompiledKernelVersion,
+				}
+			}
+
+			objs, err := stateDriver.renderer.RenderObjects(
+				&render.TemplatingData{
+					Data: renderData,
+				})
+			require.NoError(t, err)
+
+			ds, err := getDaemonsetFromObjects(objs)
+			require.NoError(t, err)
+
+			libModulesVolume := findVolumeByName(ds.Spec.Template.Spec.Volumes, libModulesVolumeName)
+
+			driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, driverContainerName)
+			require.NotNil(t, driverContainer)
+
+			libModulesMount := findVolumeMountByName(driverContainer.VolumeMounts, libModulesVolumeName)
+
+			if !tc.expectLibModulesMounted {
+				assert.Nil(t, libModulesVolume, "unexpected lib-modules volume on the driver pod spec")
+				assert.Nil(t, libModulesMount, "unexpected lib-modules volume mount on nvidia-driver-ctr")
+				return
+			}
+
+			require.NotNil(t, libModulesVolume, "expected a lib-modules volume on the driver pod spec")
+			require.NotNil(t, libModulesVolume.HostPath)
+			assert.Equal(t, "/lib/modules", libModulesVolume.HostPath.Path)
+			require.NotNil(t, libModulesVolume.HostPath.Type)
+			assert.Equal(t, corev1.HostPathDirectory, *libModulesVolume.HostPath.Type)
+
+			require.NotNil(t, libModulesMount, "expected a lib-modules volume mount on nvidia-driver-ctr")
+			assert.Equal(t, "/run/host/lib/modules", libModulesMount.MountPath)
+			assert.True(t, libModulesMount.ReadOnly)
 		})
 	}
 }
