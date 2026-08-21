@@ -965,13 +965,13 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	if (n.stateNames[n.idx] == "state-driver" || n.stateNames[n.idx] == "state-vgpu-manager") &&
 		n.singleton.Spec.Driver.UseNvidiaDriverCRDType() {
 		n.logger.Info("NVIDIADriver CRD is enabled, cleaning up all NVIDIA driver daemonsets owned by ClusterPolicy")
-		n.idx++
 		// Cleanup all driver daemonsets owned by ClusterPolicy while keeping the
 		// running driver pods available until NVIDIADriver rolls replacements.
 		err := n.cleanupAllDriverDaemonSets(n.ctx, metav1.DeletePropagationOrphan)
 		if err != nil {
 			return gpuv1.NotReady, fmt.Errorf("failed to cleanup all NVIDIA driver daemonsets owned by ClusterPolicy: %w", err)
 		}
+		n.idx++
 		return gpuv1.Disabled, nil
 	}
 
