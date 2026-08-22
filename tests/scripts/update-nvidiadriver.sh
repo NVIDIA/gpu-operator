@@ -14,6 +14,9 @@ source ${SCRIPT_DIR}/checks.sh
 NVIDIA_DRIVER_NAME="${NVIDIA_DRIVER_NAME:-e2e-driver}"
 DEFAULT_NVIDIA_DRIVER_NAME="${DEFAULT_NVIDIA_DRIVER_NAME:-e2e-default-driver}"
 DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME="${DUPLICATE_DEFAULT_NVIDIA_DRIVER_NAME:-e2e-duplicate-default-driver}"
+SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME="${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME:-e2e-selector-conflict-driver}"
+SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME="${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME:-e2e-selector-conflict-overlap-driver}"
+SELECTOR_CONFLICT_LABEL="${SELECTOR_CONFLICT_LABEL:-e2e.nvidia.com/nvidiadriver-selector-conflict}"
 
 get_default_nvidiadriver_name() {
     kubectl get nvidiadriver -o json |
@@ -40,6 +43,20 @@ create_nvidiadriver_from() {
             spec: (.spec + {default: $default_driver})
         }
     ' | kubectl apply -f -
+}
+
+create_selector_conflict_nvidiadriver() {
+    local driver_name=$1
+
+    kubectl get nvidiadriver/"${DEFAULT_NVIDIA_DRIVER_NAME}" -o json |
+        jq --arg name "${driver_name}" --arg selector_key "${SELECTOR_CONFLICT_LABEL}" '
+            {
+                apiVersion: .apiVersion,
+                kind: .kind,
+                metadata: {name: $name},
+                spec: (.spec + {default: false, nodeSelector: {($selector_key): "enabled"}})
+            }
+        ' | kubectl apply -f -
 }
 
 unset_default_driver() {
@@ -347,7 +364,41 @@ test_multiple_default_drivers_are_not_ready() {
     wait_for_nvidiadriver_owner "${NVIDIA_DRIVER_NAME}"
 }
 
+test_selector_label_conflict_status_on_single_gpu_node() {
+    local gpu_nodes node gpu_node_count
+
+    mapfile -t gpu_nodes < <(kubectl get nodes -l nvidia.com/gpu.present=true -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+    gpu_node_count=${#gpu_nodes[@]}
+    if [[ "${gpu_node_count}" -ne 1 ]]; then
+        echo "Skipping selector-label conflict status test: expected exactly one GPU node, found ${gpu_node_count}"
+        kubectl get nodes -l nvidia.com/gpu.present=true -o wide
+        return 0
+    fi
+    node="${gpu_nodes[0]}"
+
+    echo "Testing selector-label conflict status on GPU node ${node}"
+    kubectl label node "${node}" "${SELECTOR_CONFLICT_LABEL}-" >/dev/null 2>&1 || true
+    kubectl delete nvidiadriver/"${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete nvidiadriver/"${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}" --ignore-not-found >/dev/null 2>&1 || true
+
+    wait_for_nvidiadriver_owner "${DEFAULT_NVIDIA_DRIVER_NAME}"
+    create_selector_conflict_nvidiadriver "${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}"
+    create_selector_conflict_nvidiadriver "${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}"
+    wait_for_nvidiadriver_ready "${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}"
+    wait_for_nvidiadriver_ready "${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}"
+    kubectl label node "${node}" "${SELECTOR_CONFLICT_LABEL}=enabled" --overwrite
+    wait_for_nvidiadriver_condition_message "${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}" "multiple NVIDIADrivers match the same node"
+    wait_for_nvidiadriver_condition_message "${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}" "multiple NVIDIADrivers match the same node"
+    assert_nvidiadriver_owner_count "${DEFAULT_NVIDIA_DRIVER_NAME}"
+    kubectl label node "${node}" "${SELECTOR_CONFLICT_LABEL}-"
+    wait_for_nvidiadriver_ready "${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}"
+    wait_for_nvidiadriver_ready "${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}"
+    kubectl delete nvidiadriver/"${SELECTOR_CONFLICT_NVIDIA_DRIVER_NAME}"
+    kubectl delete nvidiadriver/"${SELECTOR_CONFLICT_OVERLAP_NVIDIA_DRIVER_NAME}"
+}
+
 test_arbitrary_name_default_nvidiadriver
+test_selector_label_conflict_status_on_single_gpu_node
 create_nvidiadriver
 wait_for_nvidiadriver_owner "${NVIDIA_DRIVER_NAME}"
 wait_for_nvidiadriver_daemonsets "${NVIDIA_DRIVER_NAME}"
