@@ -193,7 +193,7 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	// might become stuck until the new reconcile loop is scheduled.
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
-	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
+	return ctrl.Result{RequeueAfter: plannedRequeueInterval}, nil
 }
 
 // reconcileNVIDIADriverUpgrades handles driver upgrade reconciliation when the NVIDIADriver CRD
@@ -316,7 +316,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 	// might become stuck until the new reconcile loop is scheduled.
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
-	return ctrl.Result{Requeue: true, RequeueAfter: plannedRequeueInterval}, nil
+	return ctrl.Result{RequeueAfter: plannedRequeueInterval}, nil
 }
 
 // removeNodeUpgradeStateLabels loops over nodes in the cluster and removes "nvidia.com/gpu-driver-upgrade-state"

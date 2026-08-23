@@ -27,11 +27,11 @@ linters:
       - linters:
           - staticcheck
         path: (.+)\.go$
-        text: 'SA1019: config.Driver.LicensingConfig.ConfigMapName is deprecated(.+)'
+        text: 'SA1019: \(github.com/NVIDIA/gpu-operator/api/nvidia/v1.DriverLicensingConfigSpec\).ConfigMapName is deprecated(.+)'
       - linters:
           - staticcheck
         path: (.+)\.go$
-        text: 'SA1019: cr.Spec.LicensingConfig.Name is deprecated(.+)'
+        text: 'SA1019: \(github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1.DriverLicensingConfigSpec\).Name is deprecated(.+)'
 formatters:
   enable:
     - gofmt
