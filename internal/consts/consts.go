@@ -67,9 +67,4 @@ const (
 
 	// DefaultNVIDIADriverName is the Helm-managed fallback NVIDIADriver.
 	DefaultNVIDIADriverName = "default"
-	// NVIDIADriverOwnerLabel is an operator-managed node label used to route each GPU node to one NVIDIADriver.
-	NVIDIADriverOwnerLabel = "nvidia.com/gpu-operator.driver.owner"
-
-	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
-	MinimumGDSVersionForOpenRM = "v2.17.5"
 )
