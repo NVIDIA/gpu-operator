@@ -23,7 +23,7 @@ require (
 	github.com/regclient/regclient v0.11.5
 	github.com/sirupsen/logrus v1.10.1
 	github.com/stretchr/testify v1.12.0
-	github.com/urfave/cli/v3 v3.10.1
+	github.com/urfave/cli/v3 v3.11.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/mod v0.40.0
 	k8s.io/api v0.36.4
