@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	kata_v1alpha1 "github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config"
@@ -2087,6 +2088,14 @@ func imagePath(repository string, image string, version string, imagePathEnvName
 
 // ImagePath sets image path for given component type
 func ImagePath(spec interface{}) (string, error) {
+	if spec == nil {
+		return "", fmt.Errorf("invalid nil spec to construct image path")
+	}
+	value := reflect.ValueOf(spec)
+	if value.Kind() == reflect.Ptr && value.IsNil() {
+		return "", fmt.Errorf("invalid nil spec to construct image path: %T", spec)
+	}
+
 	switch v := spec.(type) {
 	case *DriverSpec:
 		config := spec.(*DriverSpec)
@@ -2128,9 +2137,6 @@ func ImagePath(spec interface{}) (string, error) {
 		config := spec.(*DriverManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DRIVER_MANAGER_IMAGE")
 	case *GPUDirectStorageSpec:
-		if v == nil {
-			return "", fmt.Errorf("invalid nil GPUDirectStorageSpec to construct image path")
-		}
 		return imagePath(v.Repository, v.Image, v.Version, "GDS_IMAGE")
 	case *GDRCopySpec:
 		config := spec.(*GDRCopySpec)
