@@ -105,7 +105,7 @@ echo "Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
 
 if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 	echo "Using values file approach: ${VALUES_FILE}"
-	${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
+	${HELM} install "${HELM_CMD_ARGS[@]}" --generate-name \
 		-n "${TEST_NAMESPACE}" \
 		${EXTRA_VALUES_FILES} \
 		-f "${VALUES_FILE}" \
@@ -113,7 +113,7 @@ if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 		--wait
 else
 	echo "Using --set flags approach"
-	${HELM} install ${PROJECT_DIR}/deployments/gpu-operator --generate-name \
+	${HELM} install "${HELM_CMD_ARGS[@]}" --generate-name \
 		-n "${TEST_NAMESPACE}" \
 		${OPERATOR_OPTIONS} \
 		${TOOLKIT_CONTAINER_OPTIONS} \

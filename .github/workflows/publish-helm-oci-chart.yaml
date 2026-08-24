@@ -23,6 +23,13 @@ on:
       operator_version:
         required: true
         type: string
+    outputs:
+      chart_reference:
+        description: "The OCI reference of the published Helm chart"
+        value: ${{ jobs.publish-helm-chart.outputs.chart_reference }}
+      chart_version:
+        description: "The version of the published Helm chart"
+        value: ${{ jobs.publish-helm-chart.outputs.chart_version }}
 
 permissions:
   contents: read
@@ -36,6 +43,9 @@ jobs:
   publish-helm-chart:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      chart_reference: ${{ steps.publish.outputs.chart_reference }}
+      chart_version: ${{ steps.package.outputs.chart_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code
@@ -89,6 +99,7 @@ jobs:
           echo "chart_version=${CHART_VERSION}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish Helm OCI chart
+        id: publish
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           CHART_PACKAGE: ${{ steps.package.outputs.chart_package }}
@@ -100,4 +111,6 @@ jobs:
           CHART_REPOSITORY="oci://ghcr.io/${LOWERCASE_REPO_OWNER}/gpu-operator/charts"
 
           helm push "${CHART_PACKAGE}" "${CHART_REPOSITORY}"
+
+          echo "chart_reference=${CHART_REPOSITORY}/gpu-operator" >> "${GITHUB_OUTPUT}"
           echo "::notice::Published Helm chart to ${CHART_REPOSITORY}/gpu-operator:${CHART_VERSION}"

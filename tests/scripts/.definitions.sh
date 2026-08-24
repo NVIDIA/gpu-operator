@@ -26,3 +26,9 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 : ${PRIVATE_REGISTRY:="nvcr.io"}
 
 : ${GPU_MODE:="gpu"}
+
+CHART_REFERENCE="${HELM_CHART:-${PROJECT_DIR}/deployments/gpu-operator}"
+HELM_CMD_ARGS=("${CHART_REFERENCE}")
+if [[ -n "${HELM_CHART_VERSION:-}" ]]; then
+    HELM_CMD_ARGS+=(--version "${HELM_CHART_VERSION}")
+fi
