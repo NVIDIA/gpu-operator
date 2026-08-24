@@ -365,4 +365,8 @@ main() {
     log "Wrote ${OUTPUT} (${count} Go packages)"
 }
 
-main "$@"
+# Sourced by the tests and by tools/verify-license-urls.sh, which reuse these
+# functions without the side effects of a full run.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

@@ -203,6 +203,12 @@ check-third-party-notices: third-party-notices
 	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
 		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
 
+.PHONY: test-tools
+test-tools:
+	@for t in tools/*_test.sh; do \
+		bash "$$t" || exit 1; \
+	done
+
 # Apply go fmt to the codebase
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
