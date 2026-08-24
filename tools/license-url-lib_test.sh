@@ -16,7 +16,9 @@
 
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/test-helpers.sh disable=SC1091
 source "${HERE}/test-helpers.sh"
+# shellcheck source=tools/license-url-lib.sh disable=SC1091
 source "${HERE}/license-url-lib.sh"
 
 # The bug that silently broke proxy resolution for all ten uppercase modules.

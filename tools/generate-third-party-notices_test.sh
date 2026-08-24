@@ -17,7 +17,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=tools/test-helpers.sh
+# shellcheck source=tools/test-helpers.sh disable=SC1091
 source "${HERE}/test-helpers.sh"
 
 # If the guard ever regresses, sourcing must not overwrite the committed
@@ -25,7 +25,7 @@ source "${HERE}/test-helpers.sh"
 OUTPUT="$(mktemp)"
 export OUTPUT
 
-# shellcheck source=tools/generate-third-party-notices.sh
+# shellcheck source=tools/generate-third-party-notices.sh disable=SC1091
 source "${HERE}/generate-third-party-notices.sh"
 
 # If the guard is missing, sourcing runs the generator and exits before here.
@@ -73,6 +73,8 @@ assert_eq "https://example.invalid/xxhash" \
     "$(LICENSE_URLS="${urls_fixture}" location_for \
         github.com/klauspost/compress v1.19.1 zstd/internal/xxhash/LICENSE.txt)" \
     "location_for finds a nested license path"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
 assert_fails "location_for fails closed on a miss" \
     env LICENSE_URLS="${urls_fixture}" bash -c \
     'source "$1"; location_for github.com/nope v1.0.0 LICENSE' \
@@ -90,6 +92,8 @@ assert_eq "" \
     "$(VENDOR_DIR="${vendor_fixture}" license_dir_within_module \
         github.com/klauspost/compress github.com/klauspost/compress)" \
     "license_dir_within_module is empty at the module root"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
 assert_fails "license_dir_within_module fails when no license exists" \
     env VENDOR_DIR="${vendor_fixture}" bash -c \
     'source "$1"; license_dir_within_module github.com/absent/mod github.com/absent/mod' \
@@ -106,6 +110,8 @@ assert_eq '| Package | Module | Version | License | Location |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
        emit_index_table "${render}/index.csv" | sed -n 1p)" \
     "index header has five columns"
+# Expected literal Markdown, not shell expansion.
+# shellcheck disable=SC2016
 assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
        emit_index_table "${render}/index.csv" | sed -n 3p)" \
@@ -117,6 +123,8 @@ mismatch_index="${render}/mismatch-index.csv"
 cat > "${mismatch_index}" <<'IDX'
 github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klauspost/compress,v9.9.9
 IDX
+# $1/$2 are expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
 assert_fails "emit_index_table fails closed when the URL map has no entry for a row" \
     env LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
     bash -c 'source "$1"; emit_index_table "$2"' _ "${HERE}/generate-third-party-notices.sh" "${mismatch_index}"

@@ -27,9 +27,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=tools/license-url-lib.sh
+# shellcheck source=tools/license-url-lib.sh disable=SC1091
 source "${HERE}/license-url-lib.sh"
-# shellcheck source=tools/generate-third-party-notices.sh
+# shellcheck source=tools/generate-third-party-notices.sh disable=SC1091
 source "${HERE}/generate-third-party-notices.sh"
 
 REPOS_MAP="${REPOS_MAP:-tools/module-repos.tsv}"
@@ -105,9 +105,9 @@ main() {
     local tmp failures=0
     tmp="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-urls.XXXXXX")"
 
-    local package _ license module version repo subdir relative
+    local package _ module version repo subdir relative
     local origin_tag origin_hash plain pseudo lf name path_in_module want_sha found
-    while IFS=, read -r package _ license module version; do
+    while IFS=, read -r package _ _ module version; do
         [[ -z "${package}" ]] && continue
 
         repo="$(repo_field "${module}" repo)" \

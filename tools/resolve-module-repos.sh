@@ -27,7 +27,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=tools/license-url-lib.sh
+# shellcheck source=tools/license-url-lib.sh disable=SC1091
 source "${HERE}/license-url-lib.sh"
 
 MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
