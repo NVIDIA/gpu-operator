@@ -44,4 +44,79 @@ assert_eq '```' "$(fence_for "${fixture}")" "fence_for: minimum width is three"
 printf 'a ```` b\n' > "${fixture}"
 assert_eq '`````' "$(fence_for "${fixture}")" "fence_for: one wider than the longest run"
 
+modules_fixture="$(mktemp)"
+cat > "${modules_fixture}" <<'MODULES'
+# github.com/klauspost/compress v1.19.1
+## explicit
+# k8s.io/api v0.36.4
+MODULES
+
+index_input="$(mktemp)"
+cat > "${index_input}" <<'ROWS'
+github.com/klauspost/compress,ignored,Apache-2.0
+github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT
+k8s.io/api,ignored,Apache-2.0
+ROWS
+
+assert_eq "github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klauspost/compress,v1.19.1" \
+    "$(MODULES_TXT="${modules_fixture}" annotate_modules < "${index_input}" | sed -n 2p)" \
+    "annotate_modules appends module and version"
+assert_eq "k8s.io/api,ignored,Apache-2.0,k8s.io/api,v0.36.4" \
+    "$(MODULES_TXT="${modules_fixture}" annotate_modules < "${index_input}" | sed -n 3p)" \
+    "annotate_modules resolves a root module"
+
+urls_fixture="$(mktemp)"
+printf 'github.com/klauspost/compress\tv1.19.1\tLICENSE\thttps://example.invalid/root\n' > "${urls_fixture}"
+printf 'github.com/klauspost/compress\tv1.19.1\tzstd/internal/xxhash/LICENSE.txt\thttps://example.invalid/xxhash\n' >> "${urls_fixture}"
+
+assert_eq "https://example.invalid/xxhash" \
+    "$(LICENSE_URLS="${urls_fixture}" location_for \
+        github.com/klauspost/compress v1.19.1 zstd/internal/xxhash/LICENSE.txt)" \
+    "location_for finds a nested license path"
+assert_fails "location_for fails closed on a miss" \
+    env LICENSE_URLS="${urls_fixture}" bash -c \
+    'source tools/generate-third-party-notices.sh; location_for github.com/nope v1.0.0 LICENSE'
+
+vendor_fixture="$(mktemp -d)"
+mkdir -p "${vendor_fixture}/github.com/klauspost/compress/zstd/internal/xxhash"
+touch "${vendor_fixture}/github.com/klauspost/compress/LICENSE"
+touch "${vendor_fixture}/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt"
+assert_eq "zstd/internal/xxhash" \
+    "$(VENDOR_DIR="${vendor_fixture}" license_dir_within_module \
+        github.com/klauspost/compress/zstd/internal/xxhash github.com/klauspost/compress)" \
+    "license_dir_within_module finds the nearest enclosing license"
+assert_eq "" \
+    "$(VENDOR_DIR="${vendor_fixture}" license_dir_within_module \
+        github.com/klauspost/compress github.com/klauspost/compress)" \
+    "license_dir_within_module is empty at the module root"
+assert_fails "license_dir_within_module fails when no license exists" \
+    env VENDOR_DIR="${vendor_fixture}" bash -c \
+    'source tools/generate-third-party-notices.sh; license_dir_within_module github.com/absent/mod github.com/absent/mod'
+
+render="$(mktemp -d)"
+mkdir -p "${render}/cache/github.com/klauspost/compress/zstd/internal/xxhash"
+printf 'MIT text\n' > "${render}/cache/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt"
+cat > "${render}/index.csv" <<'IDX'
+github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klauspost/compress,v1.19.1
+IDX
+
+assert_eq '| Package | Module | Version | License | Location |' \
+    "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+       emit_index_table "${render}/index.csv" | sed -n 1p)" \
+    "index header has five columns"
+assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
+    "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+       emit_index_table "${render}/index.csv" | sed -n 3p)" \
+    "index row labels the link by filename"
+
+section="$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+    emit_sections "${render}/index.csv" "${render}/cache")"
+assert_eq "* Module: github.com/klauspost/compress" "$(printf '%s' "${section}" | sed -n 3p)" "section names the module"
+assert_eq "* Version: v1.19.1" "$(printf '%s' "${section}" | sed -n 4p)" "section names the version"
+assert_eq "<https://example.invalid/xxhash>" \
+    "$(printf '%s' "${section}" | LC_ALL=C grep -m1 '^<http')" "section prints the file URL"
+
+rm -rf "${vendor_fixture}" "${render}"
+rm -f "${modules_fixture}" "${index_input}" "${urls_fixture}"
+
 finish

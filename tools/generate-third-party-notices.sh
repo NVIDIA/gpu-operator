@@ -180,10 +180,10 @@ collapse_index() {
     '
 }
 
-# Rows carry module names from modules.txt rather than a URL: in vendor mode
-# go-licenses reports a URL into this repo at HEAD, which stops describing
-# released content once main moves. Versions are intentionally omitted because
-# the notices identify dependencies and their licenses, not an exact build.
+# Rows carry the module path and version from modules.txt rather than a URL:
+# in vendor mode go-licenses reports a URL into this repo at HEAD, which stops
+# describing released content once main moves and names our copy, not
+# upstream. The verified upstream location comes from tools/license-urls.tsv.
 # Longest prefix wins: a license may sit below the module root.
 annotate_modules() {
     awk -v modfile="${MODULES_TXT}" '
@@ -203,9 +203,11 @@ annotate_modules() {
                     }
                     mods[++m] = f[2]
                     disp[f[2]] = f[r]
+                    ver[f[2]] = f[r + 1]
                 } else {
                     mods[++m] = f[2]
                     disp[f[2]] = f[2]
+                    ver[f[2]] = f[3]
                 }
             }
             close(modfile)
@@ -221,7 +223,7 @@ annotate_modules() {
                 mp = mods[i]
                 if (($1 == mp || index($1, mp "/") == 1) && length(mp) > length(best)) best = mp
             }
-            print $0, (best == "" ? "unknown" : disp[best])
+            print $0, (best == "" ? "unknown" : disp[best]), (best == "" ? "unknown" : ver[best])
         }
     '
 }
@@ -235,6 +237,11 @@ build_indexes() {
 
     if cut -d, -f4 "${INDEX_FILE}" | LC_ALL=C grep -qx 'unknown'; then
         die "could not resolve module@version for some packages from ${MODULES_TXT}." \
+            "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
+    fi
+
+    if cut -d, -f5 "${INDEX_FILE}" | LC_ALL=C grep -qx 'unknown'; then
+        die "could not resolve a version for some packages from ${MODULES_TXT}." \
             "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
     fi
 
@@ -262,40 +269,106 @@ license_files_for() {
     done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
-emit_index_table() {
-    local index="$1" pkg _ license module
-    printf '| Package | License | Dependency |\n'
-    printf '|---------|---------|------------|\n'
+LICENSE_URLS="${LICENSE_URLS:-tools/license-urls.tsv}"
+VENDOR_DIR="${VENDOR_DIR:-vendor}"
 
-    while IFS=, read -r pkg _ license module; do
-        [[ -z "${pkg}" ]] && continue
+# Separate from check_prerequisites: tools/verify-license-urls.sh reuses the
+# collection stages to discover which license files the document will link, and
+# it is the command that produces this map, so it must run without it.
+require_url_map() {
+    [[ -f "${LICENSE_URLS}" ]] \
+        || die "${LICENSE_URLS} not found." \
+               "Run 'make third-party-notices-urls' (needs network) and commit the result."
+}
+
+# The directory whose license files govern PACKAGE, relative to MODULE. Walks
+# up from the package to the module root and takes the first directory holding
+# a license file, which is how go-licenses attributes them.
+license_dir_within_module() {
+    local module="$2" dir="$1" relative
+    while :; do
+        if [[ -n "$(license_files_for "${VENDOR_DIR}/${dir}")" ]]; then
+            relative="${dir#"${module}"}"
+            printf '%s' "${relative#/}"
+            return 0
+        fi
+        [[ "${dir}" == "${module}" ]] && return 1
+        [[ "${dir}" != */* ]] && return 1
+        dir="${dir%/*}"
+    done
+}
+
+location_for() {
+    local url
+    url="$(LC_ALL=C awk -F'\t' -v m="$1" -v v="$2" -v p="$3" \
+        '$1 == m && $2 == v && $3 == p { print $4; found = 1; exit }
+         END { exit !found }' "${LICENSE_URLS}")" || return 1
+    printf '%s' "${url}"
+}
+
+# ' / '-joined [filename](url) links, one per license file, mirroring how the
+# License column joins identifiers.
+location_cell() {
+    local package="$1" module="$2" version="$3"
+    local relative name license_path url cell="" lf
+    relative="$(license_dir_within_module "${package}" "${module}")" \
+        || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
+               "Run 'go mod vendor' and re-run."
+    while IFS= read -r lf; do
+        [[ -z "${lf}" ]] && continue
+        name="$(basename "${lf}")"
+        license_path="${relative:+${relative}/}${name}"
+        url="$(location_for "${module}" "${version}" "${license_path}")" \
+            || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${license_path}." \
+                   "Run 'make third-party-notices-urls' (needs network) and commit the result."
+        cell="${cell:+${cell} / }[${name}](${url})"
+    done < <(license_files_for "${LICENSES_DIR}/${package}")
+    printf '%s' "${cell}"
+}
+
+emit_index_table() {
+    local index="$1" package _ license module version
+    printf '| Package | Module | Version | License | Location |\n'
+    printf '|---------|--------|---------|---------|----------|\n'
+
+    while IFS=, read -r package _ license module version; do
+        [[ -z "${package}" ]] && continue
         # shellcheck disable=SC2016  # backticks are literal markdown here.
-        printf '| `%s` | %s | `%s` |\n' "${pkg}" "${license:-Unknown}" "${module:-unknown}"
+        printf '| `%s` | `%s` | %s | %s | %s |\n' \
+            "${package}" "${module:-unknown}" "${version:-unknown}" "${license:-Unknown}" \
+            "$(location_cell "${package}" "${module}" "${version}")"
     done < "${index}"
 }
 
 emit_sections() {
     local index="$1" root="$2"
-    local pkg _ license module files lf fence
+    local package _ license module version files lf fence relative name url
 
-    while IFS=, read -r pkg _ license module; do
-        [[ -z "${pkg}" ]] && continue
+    while IFS=, read -r package _ license module version; do
+        [[ -z "${package}" ]] && continue
 
-        printf '### %s\n\n' "${pkg}"
-        printf '* License: %s\n' "${license:-Unknown}"
-        printf '* Module: %s\n\n' "${module:-unknown}"
+        printf '### %s\n\n' "${package}"
+        printf '* Module: %s\n' "${module:-unknown}"
+        printf '* Version: %s\n' "${version:-unknown}"
+        printf '* License: %s\n\n' "${license:-Unknown}"
 
         files=()
         while IFS= read -r lf; do
             [[ -n "${lf}" ]] && files+=("${lf}")
-        done < <(license_files_for "${root}/${pkg}")
+        done < <(license_files_for "${root}/${package}")
 
         if (( ${#files[@]} == 0 )); then
             printf 'License text unavailable. See upstream source for the full license.\n'
         else
+            relative="$(license_dir_within_module "${package}" "${module}")" || relative=""
             for lf in "${files[@]}"; do
+                name="$(basename "${lf}")"
+                url="$(location_for "${module}" "${version}" "${relative:+${relative}/}${name}")" \
+                    || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${relative:+${relative}/}${name}." \
+                           "Run 'make third-party-notices-urls' (needs network) and commit the result."
                 fence="$(fence_for "${lf}")"
-                printf '#### %s\n\n' "$(basename "${lf}")"
+                printf '#### %s\n\n' "${name}"
+                printf '<%s>\n\n' "${url}"
                 printf '%stext\n' "${fence}"
                 cat "${lf}"
                 echo
@@ -308,6 +381,7 @@ emit_sections() {
 }
 
 compose_document() {
+    require_url_map
     log "Composing ${OUTPUT}..."
     {
         cat <<'EOF'
