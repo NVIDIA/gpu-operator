@@ -2128,8 +2128,10 @@ func ImagePath(spec interface{}) (string, error) {
 		config := spec.(*DriverManagerSpec)
 		return imagePath(config.Repository, config.Image, config.Version, "DRIVER_MANAGER_IMAGE")
 	case *GPUDirectStorageSpec:
-		config := spec.(*GPUDirectStorageSpec)
-		return imagePath(config.Repository, config.Image, config.Version, "GDS_IMAGE")
+		if v == nil {
+			return "", fmt.Errorf("invalid nil GPUDirectStorageSpec to construct image path")
+		}
+		return imagePath(v.Repository, v.Image, v.Version, "GDS_IMAGE")
 	case *GDRCopySpec:
 		config := spec.(*GDRCopySpec)
 		return imagePath(config.Repository, config.Image, config.Version, "GDRCOPY_IMAGE")
