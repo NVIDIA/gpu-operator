@@ -209,6 +209,12 @@ check-third-party-notices: third-party-notices
 third-party-notices-repos:
 	@bash tools/resolve-module-repos.sh
 
+# Needs network. Every URL is content-verified against the vendored copy before
+# it is written, so re-run this whenever a dependency version changes.
+.PHONY: third-party-notices-urls
+third-party-notices-urls: third-party-notices-repos
+	@bash tools/verify-license-urls.sh
+
 .PHONY: test-tools
 test-tools:
 	@for t in tools/*_test.sh; do \
