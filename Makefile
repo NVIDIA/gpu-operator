@@ -203,6 +203,12 @@ check-third-party-notices: third-party-notices
 	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
 		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
 
+# Needs network. Rarely run: keyed by module, so a version bump does not
+# invalidate it. Only a new dependency does.
+.PHONY: third-party-notices-repos
+third-party-notices-repos:
+	@bash tools/resolve-module-repos.sh
+
 .PHONY: test-tools
 test-tools:
 	@for t in tools/*_test.sh; do \
