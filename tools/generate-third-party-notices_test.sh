@@ -75,7 +75,8 @@ assert_eq "https://example.invalid/xxhash" \
     "location_for finds a nested license path"
 assert_fails "location_for fails closed on a miss" \
     env LICENSE_URLS="${urls_fixture}" bash -c \
-    'source tools/generate-third-party-notices.sh; location_for github.com/nope v1.0.0 LICENSE'
+    'source "$1"; location_for github.com/nope v1.0.0 LICENSE' \
+    _ "${HERE}/generate-third-party-notices.sh"
 
 vendor_fixture="$(mktemp -d)"
 mkdir -p "${vendor_fixture}/github.com/klauspost/compress/zstd/internal/xxhash"
@@ -91,7 +92,8 @@ assert_eq "" \
     "license_dir_within_module is empty at the module root"
 assert_fails "license_dir_within_module fails when no license exists" \
     env VENDOR_DIR="${vendor_fixture}" bash -c \
-    'source tools/generate-third-party-notices.sh; license_dir_within_module github.com/absent/mod github.com/absent/mod'
+    'source "$1"; license_dir_within_module github.com/absent/mod github.com/absent/mod' \
+    _ "${HERE}/generate-third-party-notices.sh"
 
 render="$(mktemp -d)"
 mkdir -p "${render}/cache/github.com/klauspost/compress/zstd/internal/xxhash"
@@ -117,7 +119,7 @@ github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klausp
 IDX
 assert_fails "emit_index_table fails closed when the URL map has no entry for a row" \
     env LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
-    bash -c 'source tools/generate-third-party-notices.sh; emit_index_table "$1"' _ "${mismatch_index}"
+    bash -c 'source "$1"; emit_index_table "$2"' _ "${HERE}/generate-third-party-notices.sh" "${mismatch_index}"
 
 section="$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
     emit_sections "${render}/index.csv" "${render}/cache")"

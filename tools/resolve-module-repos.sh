@@ -86,6 +86,7 @@ main() {
     trap 'rm -f "${tmp}"' EXIT
 
     local module version info repo prefix subdir meta converted
+    local unresolved_modules=""
     while read -r module version; do
         [[ -z "${module}" ]] && continue
 
@@ -118,6 +119,7 @@ main() {
         if [[ -z "${repo}" ]]; then
             log "UNRESOLVED ${module}: no repository could be determined"
             unresolved=$(( unresolved + 1 ))
+            unresolved_modules="${unresolved_modules}${unresolved_modules:+ }${module}"
             continue
         fi
 
@@ -135,9 +137,17 @@ main() {
         printf '%s\t%s\t%s\n' "${module}" "${repo}" "${subdir}" >> "${tmp}"
     done < <(LC_ALL=C grep '^# ' "${MODULES_TXT}" | awk '{print $2, $3}')
 
-    (( unresolved == 0 )) || die \
-        "${unresolved} module(s) could not be resolved to a repository." \
-        "Re-run; if the failure persists the module's vanity host is unreachable."
+    # A warning, not a die: this resolves every module in modules.txt, including
+    # the ten-odd build/test-only ones out of scope for the notices document, so
+    # an unreachable vanity host on one of those must not block refreshing
+    # notices for an unrelated shipped bump. Fail-closed is still preserved —
+    # tools/verify-license-urls.sh dies when an IN-SCOPE module has no entry in
+    # this map. Do not turn this back into a die without also scoping the loop
+    # above to shipped modules only.
+    if (( unresolved > 0 )); then
+        log "WARNING: ${unresolved} module(s) could not be resolved to a repository: ${unresolved_modules}"
+        log "Re-run; if the warning persists the module's vanity host is unreachable."
+    fi
 
     {
         printf '# Upstream repository for each vendored module.\n'

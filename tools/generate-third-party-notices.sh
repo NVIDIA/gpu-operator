@@ -52,7 +52,7 @@ fence_for() {
     # -a: a license holding a NUL byte would otherwise print "Binary file ...
     # matches" instead of the matches, on stdout or stderr depending on the grep.
     longest=$(LC_ALL=C grep -oaE '`+' "${file}" 2>/dev/null \
-        | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')
+        | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }' || true)
     width=$(( longest + 1 ))
     (( width < 3 )) && width=3
     printf '%*s' "${width}" '' | tr ' ' '`'
@@ -303,6 +303,7 @@ location_for() {
     url="$(LC_ALL=C awk -F'\t' -v m="$1" -v v="$2" -v p="$3" \
         '$1 == m && $2 == v && $3 == p { print $4; found = 1; exit }
          END { exit !found }' "${LICENSE_URLS}")" || return 1
+    [[ -n "${url}" ]] || return 1
     printf '%s' "${url}"
 }
 
@@ -323,6 +324,8 @@ location_cell() {
                    "Run 'make third-party-notices-urls' (needs network) and commit the result."
         cell="${cell:+${cell} / }[${name}](${url})"
     done < <(license_files_for "${LICENSES_DIR}/${package}")
+    [[ -n "${cell}" ]] || die "no license file for ${package} under ${LICENSES_DIR}." \
+                              "Run 'make third-party-notices' and re-run."
     printf '%s' "${cell}"
 }
 
@@ -361,7 +364,9 @@ emit_sections() {
         if (( ${#files[@]} == 0 )); then
             printf 'License text unavailable. See upstream source for the full license.\n'
         else
-            relative="$(license_dir_within_module "${package}" "${module}")" || relative=""
+            relative="$(license_dir_within_module "${package}" "${module}")" \
+                || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
+                       "Run 'go mod vendor' and re-run."
             for lf in "${files[@]}"; do
                 name="$(basename "${lf}")"
                 url="$(location_for "${module}" "${version}" "${relative:+${relative}/}${name}")" \
@@ -404,8 +409,8 @@ Each dependency is listed with the module that owns it, the version
 redistributed, and a link to the license file in that version's upstream
 source. Every link was verified by fetching it and comparing its contents
 against the copy vendored here, so each one resolves to the same license text
-reproduced below. Dependencies vendored only to build or test the operator are
-not redistributed and are not listed.
+reproduced below. Modules that no command under `cmd/` links — those vendored
+only for this module's own tests and build tooling — are not listed.
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at

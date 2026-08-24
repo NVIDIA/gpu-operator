@@ -152,8 +152,10 @@ main() {
         relative="$(license_dir_within_module "${package}" "${module}")" \
             || die "no license file found for ${package} under ${VENDOR_DIR}/${module}."
 
+        local license_file_count=0
         while IFS= read -r lf; do
             [[ -z "${lf}" ]] && continue
+            license_file_count=$(( license_file_count + 1 ))
             name="$(basename "${lf}")"
             path_in_module="${relative:+${relative}/}${name}"
             [[ -f "${VENDOR_DIR}/${module}/${path_in_module}" ]] \
@@ -192,6 +194,11 @@ main() {
             fi
             printf '%s\t%s\t%s\t%s\n' "${module}" "${version}" "${path_in_module}" "${found}" >> "${tmp}"
         done < <(license_files_for "${LICENSES_DIR}/${package}")
+
+        if (( license_file_count == 0 )); then
+            log "UNVERIFIED ${module}@${version} — no license file found for ${package}"
+            failures=$(( failures + 1 ))
+        fi
     done < "${INDEX_FILE}"
 
     (( failures == 0 )) || die \
