@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.12.0
-	github.com/NVIDIA/k8s-kata-manager v0.2.3
+	github.com/NVIDIA/gpu-operator/api v0.2603.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494
 	github.com/NVIDIA/nvidia-container-toolkit v1.20.0
 	github.com/cyphar/filepath-securejoin v0.7.0
@@ -44,6 +44,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/Mellanox/maintenance-operator/api v0.3.0 // indirect
+	github.com/NVIDIA/k8s-kata-manager v0.2.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -131,3 +132,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
+
+replace github.com/NVIDIA/gpu-operator/api => ./api
