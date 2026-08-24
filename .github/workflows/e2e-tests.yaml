@@ -106,7 +106,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
@@ -183,7 +183,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
