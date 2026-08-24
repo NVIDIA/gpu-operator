@@ -122,7 +122,7 @@ func TestAssignOwnersReturnsErrorWhenOwnerLabelUpdateFails(t *testing.T) {
 // With no drivers present, a node carrying an owner label must have it cleared,
 // which drives the removal (desiredOwner == "") patch branch.
 func TestAssignOwnersReturnsErrorWhenOwnerLabelRemovalFails(t *testing.T) {
-	node := gpuNode("gpu-node", map[string]string{consts.NVIDIADriverOwnerLabel: "stale-driver"})
+	node := gpuNode("gpu-node", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "stale-driver"})
 
 	c := fake.NewClientBuilder().
 		WithScheme(assignOwnersScheme(t)).

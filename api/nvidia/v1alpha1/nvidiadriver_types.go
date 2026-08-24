@@ -28,12 +28,17 @@ import (
 
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 
-	"github.com/NVIDIA/gpu-operator/internal/consts"
-	"github.com/NVIDIA/gpu-operator/internal/image"
+	"github.com/NVIDIA/gpu-operator/api/image"
 )
 
 const (
 	NVIDIADriverCRDName = "NVIDIADriver"
+
+	// NVIDIADriverOwnerLabel is an operator-managed node label used to route each GPU node to one NVIDIADriver.
+	NVIDIADriverOwnerLabel = "nvidia.com/gpu-operator.driver.owner"
+
+	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
+	MinimumGDSVersionForOpenRM = "v2.17.5"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -560,8 +565,8 @@ func (d *NVIDIADriver) ValidateNodeSelector() error {
 	if d.IsDefault() && len(d.Spec.NodeSelector) > 0 {
 		return fmt.Errorf("default NVIDIADriver %q cannot use nodeSelector", d.Name)
 	}
-	if _, ok := d.Spec.NodeSelector[consts.NVIDIADriverOwnerLabel]; ok {
-		return fmt.Errorf("NVIDIADriver %q nodeSelector cannot use reserved label %q", d.Name, consts.NVIDIADriverOwnerLabel)
+	if _, ok := d.Spec.NodeSelector[NVIDIADriverOwnerLabel]; ok {
+		return fmt.Errorf("NVIDIADriver %q nodeSelector cannot use reserved label %q", d.Name, NVIDIADriverOwnerLabel)
 	}
 	return nil
 }
@@ -734,7 +739,7 @@ func (d *NVIDIADriverSpec) IsOpenKernelModulesRequired() bool {
 	if !strings.HasPrefix(gdsVersion, "v") {
 		gdsVersion = fmt.Sprintf("v%s", gdsVersion)
 	}
-	if semver.Compare(gdsVersion, consts.MinimumGDSVersionForOpenRM) >= 0 {
+	if semver.Compare(gdsVersion, MinimumGDSVersionForOpenRM) >= 0 {
 		return true
 	}
 	return false

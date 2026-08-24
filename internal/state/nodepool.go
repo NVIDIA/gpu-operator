@@ -65,7 +65,7 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 	nodeSelector := map[string]string{}
 	maps.Copy(nodeSelector, cr.Spec.NodeSelector)
 	nodeSelector[consts.GPUPresentLabel] = "true"
-	nodeSelector[consts.NVIDIADriverOwnerLabel] = cr.Name
+	nodeSelector[nvidiav1alpha1.NVIDIADriverOwnerLabel] = cr.Name
 
 	nodeList := &corev1.NodeList{}
 	err := k8sClient.List(ctx, nodeList, client.MatchingLabels(nodeSelector))

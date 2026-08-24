@@ -46,7 +46,6 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -289,7 +288,7 @@ func clusterPolicyNotReadyMessage(statesNotReady, notReadyReasons []string) stri
 // nvidiaDriverUpgradeIncomplete reports whether any NVIDIADriver-owned Node has a pending, active, or failed upgrade.
 func (r *ClusterPolicyReconciler) nvidiaDriverUpgradeIncomplete(ctx context.Context) (bool, error) {
 	nodes := &corev1.NodeList{}
-	if err := r.List(ctx, nodes, client.HasLabels{consts.NVIDIADriverOwnerLabel}); err != nil {
+	if err := r.List(ctx, nodes, client.HasLabels{nvidiav1alpha1.NVIDIADriverOwnerLabel}); err != nil {
 		return false, fmt.Errorf("failed to list nodes for NVIDIADriver upgrade state: %w", err)
 	}
 
@@ -432,7 +431,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 // driverUpgradeLabelsChanged reports Node label changes that affect aggregate
 // NVIDIADriver rollout status.
 func driverUpgradeLabelsChanged(oldLabels, newLabels map[string]string) (bool, bool, bool) {
-	return oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+	return oldLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel] != newLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel],
 		oldLabels[upgrade.GetUpgradeStateLabelKey()] != newLabels[upgrade.GetUpgradeStateLabelKey()],
 		oldLabels[upgrade.GetUpgradeSkipNodeLabelKey()] != newLabels[upgrade.GetUpgradeSkipNodeLabelKey()]
 }
@@ -441,7 +440,7 @@ func driverUpgradeLabelsChanged(oldLabels, newLabels map[string]string) (bool, b
 // can affect ClusterPolicy rendering or aggregate NVIDIADriver upgrade status.
 func shouldReconcileClusterPolicyOnNodeDeletion(labels map[string]string) bool {
 	_, hasOSTreeLabel := labels[nfdOSTreeVersionLabelKey]
-	return (hasGPULabels(labels) && hasOSTreeLabel) || labels[consts.NVIDIADriverOwnerLabel] != ""
+	return (hasGPULabels(labels) && hasOSTreeLabel) || labels[nvidiav1alpha1.NVIDIADriverOwnerLabel] != ""
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -121,45 +121,45 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "rhel9.4-node",
 				Labels: map[string]string{
-					"pool":                        "gold",
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "rhel",
-					nfdOSVersionIDLabelKey:        "9.4",
-					nfdOSVersionIDMajorLabelKey:   "9",
+					"pool":                                "gold",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "rhel",
+					nfdOSVersionIDLabelKey:                "9.4",
+					nfdOSVersionIDMajorLabelKey:           "9",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "rhel9.5-node",
 				Labels: map[string]string{
-					"pool":                        "gold",
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "rhel",
-					nfdOSVersionIDLabelKey:        "9.5",
-					nfdOSVersionIDMajorLabelKey:   "9",
+					"pool":                                "gold",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "rhel",
+					nfdOSVersionIDLabelKey:                "9.5",
+					nfdOSVersionIDMajorLabelKey:           "9",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "ubuntu-node",
 				Labels: map[string]string{
-					"pool":                        "gold",
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "ubuntu",
-					nfdOSVersionIDLabelKey:        "22.04",
-					nfdOSVersionIDMajorLabelKey:   "22",
+					"pool":                                "gold",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "ubuntu",
+					nfdOSVersionIDLabelKey:                "22.04",
+					nfdOSVersionIDMajorLabelKey:           "22",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "other-pool-node",
 				Labels: map[string]string{
-					"pool":                        "silver",
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "ubuntu",
-					nfdOSVersionIDLabelKey:        "20.04",
-					nfdOSVersionIDMajorLabelKey:   "20",
+					"pool":                                "silver",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "ubuntu",
+					nfdOSVersionIDLabelKey:                "20.04",
+					nfdOSVersionIDMajorLabelKey:           "20",
 				},
 			}},
 		).
@@ -180,7 +180,7 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 	require.Contains(t, poolsByName, "rhel9")
 	require.Equal(t, "rhel", poolsByName["rhel9"].osRelease)
 	require.Equal(t, "gold", poolsByName["rhel9"].nodeSelector["pool"])
-	require.Equal(t, "driver-a", poolsByName["rhel9"].nodeSelector[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "driver-a", poolsByName["rhel9"].nodeSelector[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 	require.Equal(t, "", poolsByName["rhel9"].nodeSelector[nfdOSVersionIDLabelKey])
 	require.Equal(t, "9", poolsByName["rhel9"].nodeSelector[nfdOSVersionIDMajorLabelKey])
 
@@ -200,17 +200,17 @@ func TestGetNodePoolsSkipsNodesMissingNFDOSLabels(t *testing.T) {
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "missing-os-release",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSVersionIDLabelKey:        "9.4",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSVersionIDLabelKey:                "9.4",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "missing-os-version",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "rhel",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "rhel",
 				},
 			}},
 		).
@@ -234,22 +234,22 @@ func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "kernel-node",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "ubuntu",
-					nfdOSVersionIDLabelKey:        "22.04",
-					nfdOSVersionIDMajorLabelKey:   "22",
-					nfdKernelLabelKey:             "5.15.0-70-generic_x86_64",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "ubuntu",
+					nfdOSVersionIDLabelKey:                "22.04",
+					nfdOSVersionIDMajorLabelKey:           "22",
+					nfdKernelLabelKey:                     "5.15.0-70-generic_x86_64",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "missing-kernel-node",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "ubuntu",
-					nfdOSVersionIDLabelKey:        "22.04",
-					nfdOSVersionIDMajorLabelKey:   "22",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "ubuntu",
+					nfdOSVersionIDLabelKey:                "22.04",
+					nfdOSVersionIDMajorLabelKey:           "22",
 				},
 			}},
 		).
@@ -279,22 +279,22 @@ func TestGetNodePoolsPartitionsOpenShiftNodesByRHCOSVersion(t *testing.T) {
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "rhcos-node",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "rhcos",
-					nfdOSVersionIDLabelKey:        "4.14",
-					nfdOSVersionIDMajorLabelKey:   "4",
-					nfdOSTreeVersionLabelKey:      "414.92.202309282257",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "rhcos",
+					nfdOSVersionIDLabelKey:                "4.14",
+					nfdOSVersionIDMajorLabelKey:           "4",
+					nfdOSTreeVersionLabelKey:              "414.92.202309282257",
 				},
 			}},
 			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
 				Name: "missing-rhcos-node",
 				Labels: map[string]string{
-					consts.GPUPresentLabel:        "true",
-					consts.NVIDIADriverOwnerLabel: "driver-a",
-					nfdOSReleaseIDLabelKey:        "rhcos",
-					nfdOSVersionIDLabelKey:        "4.14",
-					nfdOSVersionIDMajorLabelKey:   "4",
+					consts.GPUPresentLabel:                "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+					nfdOSReleaseIDLabelKey:                "rhcos",
+					nfdOSVersionIDLabelKey:                "4.14",
+					nfdOSVersionIDMajorLabelKey:           "4",
 				},
 			}},
 		).

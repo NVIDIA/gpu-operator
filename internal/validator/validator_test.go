@@ -163,7 +163,7 @@ func TestCheckNodeSelectorIgnoresDeletingDefaultDriver(t *testing.T) {
 }
 
 func TestCheckNodeSelectorRejectsReservedOwnerLabel(t *testing.T) {
-	driver := makeTestDriver("", map[string]string{consts.NVIDIADriverOwnerLabel: "other-driver"}, false)
+	driver := makeTestDriver("", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "other-driver"}, false)
 
 	s := scheme.Scheme
 	err := nvidiav1alpha1.AddToScheme(s)
@@ -178,7 +178,7 @@ func TestCheckNodeSelectorRejectsReservedOwnerLabel(t *testing.T) {
 	err = nsv.Validate(context.Background(), driver)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "reserved label")
-	assert.Contains(t, err.Error(), consts.NVIDIADriverOwnerLabel)
+	assert.Contains(t, err.Error(), nvidiav1alpha1.NVIDIADriverOwnerLabel)
 }
 
 func TestCheckNodeSelectorRejectsDefaultDriverNodeSelector(t *testing.T) {
