@@ -12,6 +12,13 @@ shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
 Go distribution itself.
 
+Each dependency is listed with the module that owns it, the version
+redistributed, and a link to the license file in that version's upstream
+source. Every link was verified by fetching it and comparing its contents
+against the copy vendored here, so each one resolves to the same license text
+reproduced below. Dependencies vendored only to build or test the operator are
+not redistributed and are not listed.
+
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
 <https://developer.nvidia.com/w/distroless-oss/index.html>. A statically
@@ -22,141 +29,144 @@ carry.
 
 ## Dependency Index
 
-| Package | License | Dependency |
-|---------|---------|------------|
-| `dario.cat/mergo` | BSD-3-Clause | `dario.cat/mergo` |
-| `github.com/MakeNowJust/heredoc` | MIT | `github.com/MakeNowJust/heredoc` |
-| `github.com/Masterminds/goutils` | Apache-2.0 | `github.com/Masterminds/goutils` |
-| `github.com/Masterminds/semver/v3` | MIT | `github.com/Masterminds/semver/v3` |
-| `github.com/Masterminds/sprig/v3` | MIT | `github.com/Masterminds/sprig/v3` |
-| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | `github.com/Mellanox/maintenance-operator/api` |
-| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | `github.com/NVIDIA/go-nvlib` |
-| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | `github.com/NVIDIA/k8s-kata-manager` |
-| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | `github.com/NVIDIA/k8s-operator-libs` |
-| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | `github.com/NVIDIA/nvidia-container-toolkit` |
-| `github.com/beorn7/perks/quantile` | MIT | `github.com/beorn7/perks` |
-| `github.com/blang/semver/v4` | MIT | `github.com/blang/semver/v4` |
-| `github.com/cespare/xxhash/v2` | MIT | `github.com/cespare/xxhash/v2` |
-| `github.com/chai2010/gettext-go` | BSD-3-Clause | `github.com/chai2010/gettext-go` |
-| `github.com/cyphar/filepath-securejoin` | BSD-3-Clause / MPL-2.0 | `github.com/cyphar/filepath-securejoin` |
-| `github.com/davecgh/go-spew/spew` | ISC | `github.com/davecgh/go-spew` |
-| `github.com/docker/libtrust` | Apache-2.0 | `github.com/docker/libtrust` |
-| `github.com/emicklei/go-restful/v3` | MIT | `github.com/emicklei/go-restful/v3` |
-| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | `github.com/evanphx/json-patch/v5` |
-| `github.com/exponent-io/jsonpath` | MIT | `github.com/exponent-io/jsonpath` |
-| `github.com/fsnotify/fsnotify` | BSD-3-Clause | `github.com/fsnotify/fsnotify` |
-| `github.com/fxamacker/cbor/v2` | MIT | `github.com/fxamacker/cbor/v2` |
-| `github.com/go-errors/errors` | MIT | `github.com/go-errors/errors` |
-| `github.com/go-logr/logr` | Apache-2.0 | `github.com/go-logr/logr` |
-| `github.com/go-logr/zapr` | Apache-2.0 | `github.com/go-logr/zapr` |
-| `github.com/go-openapi/jsonpointer` | Apache-2.0 | `github.com/go-openapi/jsonpointer` |
-| `github.com/go-openapi/jsonreference` | Apache-2.0 | `github.com/go-openapi/jsonreference` |
-| `github.com/go-openapi/swag` | Apache-2.0 | `github.com/go-openapi/swag` |
-| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | `github.com/go-openapi/swag/cmdutils` |
-| `github.com/go-openapi/swag/conv` | Apache-2.0 | `github.com/go-openapi/swag/conv` |
-| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | `github.com/go-openapi/swag/fileutils` |
-| `github.com/go-openapi/swag/jsonname` | Apache-2.0 | `github.com/go-openapi/swag/jsonname` |
-| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | `github.com/go-openapi/swag/jsonutils` |
-| `github.com/go-openapi/swag/loading` | Apache-2.0 | `github.com/go-openapi/swag/loading` |
-| `github.com/go-openapi/swag/mangling` | Apache-2.0 | `github.com/go-openapi/swag/mangling` |
-| `github.com/go-openapi/swag/netutils` | Apache-2.0 | `github.com/go-openapi/swag/netutils` |
-| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | `github.com/go-openapi/swag/stringutils` |
-| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | `github.com/go-openapi/swag/typeutils` |
-| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | `github.com/go-openapi/swag/yamlutils` |
-| `github.com/google/btree` | Apache-2.0 | `github.com/google/btree` |
-| `github.com/google/gnostic-models` | Apache-2.0 | `github.com/google/gnostic-models` |
-| `github.com/google/uuid` | BSD-3-Clause | `github.com/google/uuid` |
-| `github.com/huandu/xstrings` | MIT | `github.com/huandu/xstrings` |
-| `github.com/json-iterator/go` | MIT | `github.com/json-iterator/go` |
-| `github.com/klauspost/compress` | Apache-2.0 / BSD-3-Clause / MIT | `github.com/klauspost/compress` |
-| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | `github.com/klauspost/compress` |
-| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | `github.com/klauspost/compress` |
-| `github.com/liggitt/tabwriter` | BSD-3-Clause | `github.com/liggitt/tabwriter` |
-| `github.com/mitchellh/copystructure` | MIT | `github.com/mitchellh/copystructure` |
-| `github.com/mitchellh/go-wordwrap` | MIT | `github.com/mitchellh/go-wordwrap` |
-| `github.com/mitchellh/reflectwalk` | MIT | `github.com/mitchellh/reflectwalk` |
-| `github.com/moby/term` | Apache-2.0 | `github.com/moby/term` |
-| `github.com/modern-go/concurrent` | Apache-2.0 | `github.com/modern-go/concurrent` |
-| `github.com/modern-go/reflect2` | Apache-2.0 | `github.com/modern-go/reflect2` |
-| `github.com/monochromegane/go-gitignore` | MIT | `github.com/monochromegane/go-gitignore` |
-| `github.com/munnerz/goautoneg` | BSD-3-Clause | `github.com/munnerz/goautoneg` |
-| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | `github.com/opencontainers/cgroups` |
-| `github.com/opencontainers/go-digest` | Apache-2.0 | `github.com/opencontainers/go-digest` |
-| `github.com/opencontainers/runc/libcontainer/devices` | Apache-2.0 | `github.com/opencontainers/runc` |
-| `github.com/openshift/api` | Apache-2.0 | `github.com/openshift/api` |
-| `github.com/openshift/client-go` | Apache-2.0 | `github.com/openshift/client-go` |
-| `github.com/operator-framework/api/pkg` | Apache-2.0 | `github.com/operator-framework/api` |
-| `github.com/peterbourgon/diskv` | MIT | `github.com/peterbourgon/diskv` |
-| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | `github.com/pmezard/go-difflib` |
-| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` |
-| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | `github.com/prometheus/client_golang` |
-| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | `github.com/prometheus/client_golang` |
-| `github.com/prometheus/client_model/go` | Apache-2.0 | `github.com/prometheus/client_model` |
-| `github.com/prometheus/common` | Apache-2.0 | `github.com/prometheus/common` |
-| `github.com/prometheus/procfs` | Apache-2.0 | `github.com/prometheus/procfs` |
-| `github.com/regclient/regclient` | Apache-2.0 | `github.com/regclient/regclient` |
-| `github.com/russross/blackfriday/v2` | BSD-2-Clause | `github.com/russross/blackfriday/v2` |
-| `github.com/shopspring/decimal` | MIT | `github.com/shopspring/decimal` |
-| `github.com/sirupsen/logrus` | MIT | `github.com/sirupsen/logrus` |
-| `github.com/spf13/cast` | MIT | `github.com/spf13/cast` |
-| `github.com/spf13/cobra` | Apache-2.0 | `github.com/spf13/cobra` |
-| `github.com/spf13/pflag` | BSD-3-Clause | `github.com/spf13/pflag` |
-| `github.com/stretchr/testify/assert/yaml` | MIT | `github.com/stretchr/testify` |
-| `github.com/ulikunitz/xz` | BSD-3-Clause | `github.com/ulikunitz/xz` |
-| `github.com/urfave/cli/v3` | MIT | `github.com/urfave/cli/v3` |
-| `github.com/x448/float16` | MIT | `github.com/x448/float16` |
-| `github.com/xlab/treeprint` | MIT | `github.com/xlab/treeprint` |
-| `go.uber.org/multierr` | MIT | `go.uber.org/multierr` |
-| `go.uber.org/zap` | MIT | `go.uber.org/zap` |
-| `go.yaml.in/yaml/v2` | Apache-2.0 | `go.yaml.in/yaml/v2` |
-| `go.yaml.in/yaml/v3` | MIT | `go.yaml.in/yaml/v3` |
-| `golang.org/x/crypto` | BSD-3-Clause | `golang.org/x/crypto` |
-| `golang.org/x/mod/semver` | BSD-3-Clause | `golang.org/x/mod` |
-| `golang.org/x/net` | BSD-3-Clause | `golang.org/x/net` |
-| `golang.org/x/oauth2` | BSD-3-Clause | `golang.org/x/oauth2` |
-| `golang.org/x/sync/errgroup` | BSD-3-Clause | `golang.org/x/sync` |
-| `golang.org/x/sys/unix` | BSD-3-Clause | `golang.org/x/sys` |
-| `golang.org/x/term` | BSD-3-Clause | `golang.org/x/term` |
-| `golang.org/x/text` | BSD-3-Clause | `golang.org/x/text` |
-| `golang.org/x/time/rate` | BSD-3-Clause | `golang.org/x/time` |
-| `gomodules.xyz/jsonpatch/v2` | Apache-2.0 | `gomodules.xyz/jsonpatch/v2` |
-| `google.golang.org/protobuf` | BSD-3-Clause | `google.golang.org/protobuf` |
-| `gopkg.in/evanphx/json-patch.v4` | BSD-3-Clause | `gopkg.in/evanphx/json-patch.v4` |
-| `gopkg.in/inf.v0` | BSD-3-Clause | `gopkg.in/inf.v0` |
-| `gopkg.in/yaml.v3` | MIT | `gopkg.in/yaml.v3` |
-| `k8s.io/api` | Apache-2.0 | `k8s.io/api` |
-| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | `k8s.io/apiextensions-apiserver` |
-| `k8s.io/apimachinery/pkg` | Apache-2.0 | `k8s.io/apimachinery` |
-| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | `k8s.io/apimachinery` |
-| `k8s.io/cli-runtime/pkg` | Apache-2.0 | `k8s.io/cli-runtime` |
-| `k8s.io/client-go` | Apache-2.0 | `k8s.io/client-go` |
-| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | `k8s.io/client-go` |
-| `k8s.io/client-go/third_party/forked/httpcache` | MIT | `k8s.io/client-go` |
-| `k8s.io/component-base/version` | Apache-2.0 | `k8s.io/component-base` |
-| `k8s.io/klog/v2` | Apache-2.0 | `k8s.io/klog/v2` |
-| `k8s.io/kube-openapi/pkg` | Apache-2.0 | `k8s.io/kube-openapi` |
-| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | `k8s.io/kube-openapi` |
-| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | `k8s.io/kube-openapi` |
-| `k8s.io/kubectl/pkg` | Apache-2.0 | `k8s.io/kubectl` |
-| `k8s.io/utils` | Apache-2.0 | `k8s.io/utils` |
-| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | `k8s.io/utils` |
-| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | `k8s.io/utils` |
-| `sigs.k8s.io/controller-runtime` | Apache-2.0 | `sigs.k8s.io/controller-runtime` |
-| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | `sigs.k8s.io/json` |
-| `sigs.k8s.io/kustomize/api` | Apache-2.0 | `sigs.k8s.io/kustomize/api` |
-| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | `sigs.k8s.io/kustomize/kyaml` |
-| `sigs.k8s.io/randfill` | Apache-2.0 | `sigs.k8s.io/randfill` |
-| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | `sigs.k8s.io/structured-merge-diff/v6` |
-| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | `sigs.k8s.io/yaml` |
+| Package | Module | Version | License | Location |
+|---------|--------|---------|---------|----------|
+| `dario.cat/mergo` | `dario.cat/mergo` | v1.0.1 | BSD-3-Clause | [LICENSE](https://github.com/imdario/mergo/blob/v1.0.1/LICENSE) |
+| `github.com/MakeNowJust/heredoc` | `github.com/MakeNowJust/heredoc` | v1.0.0 | MIT | [LICENSE](https://github.com/makenowjust/heredoc/blob/v1.0.0/LICENSE) |
+| `github.com/Masterminds/goutils` | `github.com/Masterminds/goutils` | v1.1.1 | Apache-2.0 | [LICENSE.txt](https://github.com/Masterminds/goutils/blob/v1.1.1/LICENSE.txt) |
+| `github.com/Masterminds/semver/v3` | `github.com/Masterminds/semver/v3` | v3.5.0 | MIT | [LICENSE.txt](https://github.com/Masterminds/semver/blob/v3.5.0/LICENSE.txt) |
+| `github.com/Masterminds/sprig/v3` | `github.com/Masterminds/sprig/v3` | v3.3.0 | MIT | [LICENSE.txt](https://github.com/Masterminds/sprig/blob/v3.3.0/LICENSE.txt) |
+| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | `github.com/Mellanox/maintenance-operator/api` | v0.3.0 | Apache-2.0 | [LICENSE](https://github.com/Mellanox/maintenance-operator/blob/api/v0.3.0/LICENSE) |
+| `github.com/NVIDIA/go-nvlib/pkg` | `github.com/NVIDIA/go-nvlib` | v0.12.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/go-nvlib/blob/v0.12.0/LICENSE) / [NOTICE](https://github.com/NVIDIA/go-nvlib/blob/v0.12.0/NOTICE) |
+| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | `github.com/NVIDIA/k8s-kata-manager` | v0.2.3 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/k8s-kata-manager/blob/v0.2.3/LICENSE) |
+| `github.com/NVIDIA/k8s-operator-libs` | `github.com/NVIDIA/k8s-operator-libs` | v0.0.0-20260629200812-d720f2557494 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/k8s-operator-libs/blob/d720f2557494/LICENSE) |
+| `github.com/NVIDIA/nvidia-container-toolkit` | `github.com/NVIDIA/nvidia-container-toolkit` | v1.20.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/nvidia-container-toolkit/blob/v1.20.0/LICENSE) |
+| `github.com/beorn7/perks/quantile` | `github.com/beorn7/perks` | v1.0.1 | MIT | [LICENSE](https://github.com/beorn7/perks/blob/v1.0.1/LICENSE) |
+| `github.com/blang/semver/v4` | `github.com/blang/semver/v4` | v4.0.0 | MIT | [LICENSE](https://github.com/blang/semver/blob/v4.0.0/LICENSE) |
+| `github.com/cespare/xxhash/v2` | `github.com/cespare/xxhash/v2` | v2.3.0 | MIT | [LICENSE.txt](https://github.com/cespare/xxhash/blob/v2.3.0/LICENSE.txt) |
+| `github.com/chai2010/gettext-go` | `github.com/chai2010/gettext-go` | v1.0.2 | BSD-3-Clause | [LICENSE](https://github.com/chai2010/gettext-go/blob/v1.0.2/LICENSE) |
+| `github.com/cyphar/filepath-securejoin` | `github.com/cyphar/filepath-securejoin` | v0.7.0 | BSD-3-Clause / MPL-2.0 | [COPYING.md](https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/COPYING.md) / [LICENSE.BSD](https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/LICENSE.BSD) / [LICENSE.MPL-2.0](https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/LICENSE.MPL-2.0) |
+| `github.com/davecgh/go-spew/spew` | `github.com/davecgh/go-spew` | v1.1.2-0.20180830191138-d8f796af33cc | ISC | [LICENSE](https://github.com/davecgh/go-spew/blob/d8f796af33cc/LICENSE) |
+| `github.com/docker/libtrust` | `github.com/docker/libtrust` | v0.0.0-20160708172513-aabc10ec26b7 | Apache-2.0 | [LICENSE](https://github.com/docker-archive-public/docker.libtrust/blob/aabc10ec26b7/LICENSE) |
+| `github.com/emicklei/go-restful/v3` | `github.com/emicklei/go-restful/v3` | v3.13.0 | MIT | [LICENSE](https://github.com/emicklei/go-restful/blob/v3.13.0/LICENSE) |
+| `github.com/evanphx/json-patch/v5` | `github.com/evanphx/json-patch/v5` | v5.9.11 | BSD-3-Clause | [LICENSE](https://github.com/evanphx/json-patch/blob/v5.9.11/LICENSE) |
+| `github.com/exponent-io/jsonpath` | `github.com/exponent-io/jsonpath` | v0.0.0-20210407135951-1de76d718b3f | MIT | [LICENSE](https://github.com/exponent-io/jsonpath/blob/1de76d718b3f/LICENSE) |
+| `github.com/fsnotify/fsnotify` | `github.com/fsnotify/fsnotify` | v1.9.0 | BSD-3-Clause | [LICENSE](https://github.com/fsnotify/fsnotify/blob/v1.9.0/LICENSE) |
+| `github.com/fxamacker/cbor/v2` | `github.com/fxamacker/cbor/v2` | v2.9.2 | MIT | [LICENSE](https://github.com/fxamacker/cbor/blob/v2.9.2/LICENSE) |
+| `github.com/go-errors/errors` | `github.com/go-errors/errors` | v1.5.1 | MIT | [LICENSE.MIT](https://github.com/go-errors/errors/blob/v1.5.1/LICENSE.MIT) |
+| `github.com/go-logr/logr` | `github.com/go-logr/logr` | v1.4.4 | Apache-2.0 | [LICENSE](https://github.com/go-logr/logr/blob/v1.4.4/LICENSE) |
+| `github.com/go-logr/zapr` | `github.com/go-logr/zapr` | v1.3.0 | Apache-2.0 | [LICENSE](https://github.com/go-logr/zapr/blob/v1.3.0/LICENSE) |
+| `github.com/go-openapi/jsonpointer` | `github.com/go-openapi/jsonpointer` | v0.22.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/jsonpointer/blob/v0.22.4/LICENSE) / [NOTICE](https://github.com/go-openapi/jsonpointer/blob/v0.22.4/NOTICE) |
+| `github.com/go-openapi/jsonreference` | `github.com/go-openapi/jsonreference` | v0.21.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/jsonreference/blob/v0.21.4/LICENSE) / [NOTICE](https://github.com/go-openapi/jsonreference/blob/v0.21.4/NOTICE) |
+| `github.com/go-openapi/swag` | `github.com/go-openapi/swag` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/cmdutils` | `github.com/go-openapi/swag/cmdutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/cmdutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/conv` | `github.com/go-openapi/swag/conv` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/conv/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/fileutils` | `github.com/go-openapi/swag/fileutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/fileutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/jsonname` | `github.com/go-openapi/swag/jsonname` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/jsonname/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/jsonutils` | `github.com/go-openapi/swag/jsonutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/jsonutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/loading` | `github.com/go-openapi/swag/loading` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/loading/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/mangling` | `github.com/go-openapi/swag/mangling` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/mangling/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/netutils` | `github.com/go-openapi/swag/netutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/netutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/stringutils` | `github.com/go-openapi/swag/stringutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/stringutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/typeutils` | `github.com/go-openapi/swag/typeutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/typeutils/v0.25.4/LICENSE) |
+| `github.com/go-openapi/swag/yamlutils` | `github.com/go-openapi/swag/yamlutils` | v0.25.4 | Apache-2.0 | [LICENSE](https://github.com/go-openapi/swag/blob/yamlutils/v0.25.4/LICENSE) |
+| `github.com/google/btree` | `github.com/google/btree` | v1.1.3 | Apache-2.0 | [LICENSE](https://github.com/google/btree/blob/v1.1.3/LICENSE) |
+| `github.com/google/gnostic-models` | `github.com/google/gnostic-models` | v0.7.1 | Apache-2.0 | [LICENSE](https://github.com/google/gnostic-models/blob/v0.7.1/LICENSE) |
+| `github.com/google/uuid` | `github.com/google/uuid` | v1.6.0 | BSD-3-Clause | [LICENSE](https://github.com/google/uuid/blob/v1.6.0/LICENSE) |
+| `github.com/huandu/xstrings` | `github.com/huandu/xstrings` | v1.5.0 | MIT | [LICENSE](https://github.com/huandu/xstrings/blob/v1.5.0/LICENSE) |
+| `github.com/json-iterator/go` | `github.com/json-iterator/go` | v1.1.12 | MIT | [LICENSE](https://github.com/json-iterator/go/blob/v1.1.12/LICENSE) |
+| `github.com/klauspost/compress` | `github.com/klauspost/compress` | v1.19.1 | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/klauspost/compress/blob/v1.19.1/LICENSE) |
+| `github.com/klauspost/compress/internal/snapref` | `github.com/klauspost/compress` | v1.19.1 | BSD-3-Clause | [LICENSE](https://github.com/klauspost/compress/blob/v1.19.1/internal/snapref/LICENSE) |
+| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | MIT | [LICENSE.txt](https://github.com/klauspost/compress/blob/v1.19.1/zstd/internal/xxhash/LICENSE.txt) |
+| `github.com/liggitt/tabwriter` | `github.com/liggitt/tabwriter` | v0.0.0-20181228230101-89fcab3d43de | BSD-3-Clause | [LICENSE](https://github.com/liggitt/tabwriter/blob/89fcab3d43de/LICENSE) |
+| `github.com/mitchellh/copystructure` | `github.com/mitchellh/copystructure` | v1.2.0 | MIT | [LICENSE](https://github.com/mitchellh/copystructure/blob/v1.2.0/LICENSE) |
+| `github.com/mitchellh/go-wordwrap` | `github.com/mitchellh/go-wordwrap` | v1.0.1 | MIT | [LICENSE.md](https://github.com/mitchellh/go-wordwrap/blob/v1.0.1/LICENSE.md) |
+| `github.com/mitchellh/reflectwalk` | `github.com/mitchellh/reflectwalk` | v1.0.2 | MIT | [LICENSE](https://github.com/mitchellh/reflectwalk/blob/v1.0.2/LICENSE) |
+| `github.com/moby/term` | `github.com/moby/term` | v0.5.2 | Apache-2.0 | [LICENSE](https://github.com/moby/term/blob/v0.5.2/LICENSE) |
+| `github.com/modern-go/concurrent` | `github.com/modern-go/concurrent` | v0.0.0-20180306012644-bacd9c7ef1dd | Apache-2.0 | [LICENSE](https://github.com/modern-go/concurrent/blob/bacd9c7ef1dd/LICENSE) |
+| `github.com/modern-go/reflect2` | `github.com/modern-go/reflect2` | v1.0.3-0.20250322232337-35a7c28c31ee | Apache-2.0 | [LICENSE](https://github.com/modern-go/reflect2/blob/35a7c28c31ee/LICENSE) |
+| `github.com/monochromegane/go-gitignore` | `github.com/monochromegane/go-gitignore` | v0.0.0-20200626010858-205db1a8cc00 | MIT | [LICENSE](https://github.com/monochromegane/go-gitignore/blob/205db1a8cc00/LICENSE) |
+| `github.com/munnerz/goautoneg` | `github.com/munnerz/goautoneg` | v0.0.0-20191010083416-a7dc8b61c822 | BSD-3-Clause | [LICENSE](https://github.com/munnerz/goautoneg/blob/a7dc8b61c822/LICENSE) |
+| `github.com/opencontainers/cgroups/devices/config` | `github.com/opencontainers/cgroups` | v0.0.7 | Apache-2.0 | [LICENSE](https://github.com/opencontainers/cgroups/blob/v0.0.7/LICENSE) |
+| `github.com/opencontainers/go-digest` | `github.com/opencontainers/go-digest` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/opencontainers/go-digest/blob/v1.0.0/LICENSE) |
+| `github.com/opencontainers/runc/libcontainer/devices` | `github.com/opencontainers/runc` | v1.4.3 | Apache-2.0 | [LICENSE](https://github.com/opencontainers/runc/blob/v1.4.3/LICENSE) / [NOTICE](https://github.com/opencontainers/runc/blob/v1.4.3/NOTICE) |
+| `github.com/openshift/api` | `github.com/openshift/api` | v0.0.0-20260727141720-967cc4c36c9b | Apache-2.0 | [LICENSE](https://github.com/openshift/api/blob/967cc4c36c9b/LICENSE) |
+| `github.com/openshift/client-go` | `github.com/openshift/client-go` | v0.0.0-20260723174158-ae2315de9d73 | Apache-2.0 | [LICENSE](https://github.com/openshift/client-go/blob/ae2315de9d73/LICENSE) |
+| `github.com/operator-framework/api/pkg` | `github.com/operator-framework/api` | v0.45.0 | Apache-2.0 | [LICENSE](https://github.com/operator-framework/api/blob/v0.45.0/LICENSE) |
+| `github.com/peterbourgon/diskv` | `github.com/peterbourgon/diskv` | v2.0.1+incompatible | MIT | [LICENSE](https://github.com/peterbourgon/diskv/blob/v2.0.1/LICENSE) |
+| `github.com/pmezard/go-difflib/difflib` | `github.com/pmezard/go-difflib` | v1.0.1-0.20181226105442-5d4384ee4fb2 | BSD-3-Clause | [LICENSE](https://github.com/pmezard/go-difflib/blob/5d4384ee4fb2/LICENSE) |
+| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | v0.93.1 | Apache-2.0 | [LICENSE](https://github.com/prometheus-operator/prometheus-operator/blob/pkg/apis/monitoring/v0.93.1/LICENSE) |
+| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | `github.com/prometheus/client_golang` | v1.24.1 | BSD-3-Clause | [LICENSE](https://github.com/prometheus/client_golang/blob/v1.24.1/internal/github.com/golang/gddo/LICENSE) |
+| `github.com/prometheus/client_golang/prometheus` | `github.com/prometheus/client_golang` | v1.24.1 | Apache-2.0 | [LICENSE](https://github.com/prometheus/client_golang/blob/v1.24.1/LICENSE) / [NOTICE](https://github.com/prometheus/client_golang/blob/v1.24.1/NOTICE) |
+| `github.com/prometheus/client_model/go` | `github.com/prometheus/client_model` | v0.6.2 | Apache-2.0 | [LICENSE](https://github.com/prometheus/client_model/blob/v0.6.2/LICENSE) / [NOTICE](https://github.com/prometheus/client_model/blob/v0.6.2/NOTICE) |
+| `github.com/prometheus/common` | `github.com/prometheus/common` | v0.70.1 | Apache-2.0 | [LICENSE](https://github.com/prometheus/common/blob/v0.70.1/LICENSE) / [NOTICE](https://github.com/prometheus/common/blob/v0.70.1/NOTICE) |
+| `github.com/prometheus/procfs` | `github.com/prometheus/procfs` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/prometheus/procfs/blob/v0.21.1/LICENSE) / [NOTICE](https://github.com/prometheus/procfs/blob/v0.21.1/NOTICE) |
+| `github.com/regclient/regclient` | `github.com/regclient/regclient` | v0.11.5 | Apache-2.0 | [LICENSE](https://github.com/regclient/regclient/blob/v0.11.5/LICENSE) |
+| `github.com/russross/blackfriday/v2` | `github.com/russross/blackfriday/v2` | v2.1.0 | BSD-2-Clause | [LICENSE.txt](https://github.com/russross/blackfriday/blob/v2.1.0/LICENSE.txt) |
+| `github.com/shopspring/decimal` | `github.com/shopspring/decimal` | v1.4.0 | MIT | [LICENSE](https://github.com/shopspring/decimal/blob/v1.4.0/LICENSE) |
+| `github.com/sirupsen/logrus` | `github.com/sirupsen/logrus` | v1.10.1 | MIT | [LICENSE](https://github.com/sirupsen/logrus/blob/v1.10.1/LICENSE) |
+| `github.com/spf13/cast` | `github.com/spf13/cast` | v1.7.0 | MIT | [LICENSE](https://github.com/spf13/cast/blob/v1.7.0/LICENSE) |
+| `github.com/spf13/cobra` | `github.com/spf13/cobra` | v1.10.2 | Apache-2.0 | [LICENSE.txt](https://github.com/spf13/cobra/blob/v1.10.2/LICENSE.txt) |
+| `github.com/spf13/pflag` | `github.com/spf13/pflag` | v1.0.10 | BSD-3-Clause | [LICENSE](https://github.com/spf13/pflag/blob/v1.0.10/LICENSE) |
+| `github.com/stretchr/testify/assert/yaml` | `github.com/stretchr/testify` | v1.12.0 | MIT | [LICENSE](https://github.com/stretchr/testify/blob/v1.12.0/LICENSE) |
+| `github.com/ulikunitz/xz` | `github.com/ulikunitz/xz` | v0.5.15 | BSD-3-Clause | [LICENSE](https://github.com/ulikunitz/xz/blob/v0.5.15/LICENSE) |
+| `github.com/urfave/cli/v3` | `github.com/urfave/cli/v3` | v3.10.1 | MIT | [LICENSE](https://github.com/urfave/cli/blob/v3.10.1/LICENSE) |
+| `github.com/x448/float16` | `github.com/x448/float16` | v0.8.4 | MIT | [LICENSE](https://github.com/x448/float16/blob/v0.8.4/LICENSE) |
+| `github.com/xlab/treeprint` | `github.com/xlab/treeprint` | v1.2.0 | MIT | [LICENSE](https://github.com/xlab/treeprint/blob/v1.2.0/LICENSE) |
+| `go.uber.org/multierr` | `go.uber.org/multierr` | v1.11.0 | MIT | [LICENSE.txt](https://github.com/uber-go/multierr/blob/v1.11.0/LICENSE.txt) |
+| `go.uber.org/zap` | `go.uber.org/zap` | v1.28.0 | MIT | [LICENSE](https://github.com/uber-go/zap/blob/v1.28.0/LICENSE) |
+| `go.yaml.in/yaml/v2` | `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 | [LICENSE](https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE) / [NOTICE](https://github.com/yaml/go-yaml/blob/v2.4.4/NOTICE) |
+| `go.yaml.in/yaml/v3` | `go.yaml.in/yaml/v3` | v3.0.4 | MIT | [LICENSE](https://github.com/yaml/go-yaml/blob/v3.0.4/LICENSE) / [NOTICE](https://github.com/yaml/go-yaml/blob/v3.0.4/NOTICE) |
+| `golang.org/x/crypto` | `golang.org/x/crypto` | v0.55.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/crypto/+/refs/tags/v0.55.0/LICENSE) |
+| `golang.org/x/mod/semver` | `golang.org/x/mod` | v0.40.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/mod/+/refs/tags/v0.40.0/LICENSE) |
+| `golang.org/x/net` | `golang.org/x/net` | v0.58.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/net/+/refs/tags/v0.58.0/LICENSE) |
+| `golang.org/x/oauth2` | `golang.org/x/oauth2` | v0.36.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/oauth2/+/refs/tags/v0.36.0/LICENSE) |
+| `golang.org/x/sync/errgroup` | `golang.org/x/sync` | v0.22.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/sync/+/refs/tags/v0.22.0/LICENSE) |
+| `golang.org/x/sys/unix` | `golang.org/x/sys` | v0.47.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/sys/+/refs/tags/v0.47.0/LICENSE) |
+| `golang.org/x/term` | `golang.org/x/term` | v0.45.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/term/+/refs/tags/v0.45.0/LICENSE) |
+| `golang.org/x/text` | `golang.org/x/text` | v0.41.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/text/+/refs/tags/v0.41.0/LICENSE) |
+| `golang.org/x/time/rate` | `golang.org/x/time` | v0.14.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/time/+/refs/tags/v0.14.0/LICENSE) |
+| `gomodules.xyz/jsonpatch/v2` | `gomodules.xyz/jsonpatch/v2` | v2.4.0 | Apache-2.0 | [LICENSE](https://github.com/gomodules/jsonpatch/blob/v2.4.0/LICENSE) |
+| `google.golang.org/protobuf` | `google.golang.org/protobuf` | v1.36.12-0.20260120151049-f2248ac996af | BSD-3-Clause | [LICENSE](https://go.googlesource.com/protobuf/+/f2248ac996af/LICENSE) |
+| `gopkg.in/evanphx/json-patch.v4` | `gopkg.in/evanphx/json-patch.v4` | v4.13.0 | BSD-3-Clause | [LICENSE](https://github.com/evanphx/json-patch/blob/v4.13.0/LICENSE) |
+| `gopkg.in/inf.v0` | `gopkg.in/inf.v0` | v0.9.1 | BSD-3-Clause | [LICENSE](https://github.com/go-inf/inf/blob/v0.9.1/LICENSE) |
+| `gopkg.in/yaml.v3` | `gopkg.in/yaml.v3` | v3.0.1 | MIT | [LICENSE](https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE) / [NOTICE](https://github.com/go-yaml/yaml/blob/v3.0.1/NOTICE) |
+| `k8s.io/api` | `k8s.io/api` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/api/blob/v0.36.4/LICENSE) |
+| `k8s.io/apiextensions-apiserver/pkg` | `k8s.io/apiextensions-apiserver` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/apiextensions-apiserver/blob/v0.36.4/LICENSE) |
+| `k8s.io/apimachinery/pkg` | `k8s.io/apimachinery` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/apimachinery/blob/v0.36.4/LICENSE) |
+| `k8s.io/apimachinery/third_party/forked/golang` | `k8s.io/apimachinery` | v0.36.4 | BSD-3-Clause | [LICENSE](https://github.com/kubernetes/apimachinery/blob/v0.36.4/third_party/forked/golang/LICENSE) |
+| `k8s.io/cli-runtime/pkg` | `k8s.io/cli-runtime` | v0.36.0 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/cli-runtime/blob/v0.36.0/LICENSE) |
+| `k8s.io/client-go` | `k8s.io/client-go` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/client-go/blob/v0.36.4/LICENSE) |
+| `k8s.io/client-go/third_party/forked/golang/template` | `k8s.io/client-go` | v0.36.4 | BSD-3-Clause | [LICENSE](https://github.com/kubernetes/client-go/blob/v0.36.4/third_party/forked/golang/LICENSE) |
+| `k8s.io/client-go/third_party/forked/httpcache` | `k8s.io/client-go` | v0.36.4 | MIT | [LICENSE](https://github.com/kubernetes/client-go/blob/v0.36.4/third_party/forked/httpcache/LICENSE) |
+| `k8s.io/component-base/version` | `k8s.io/component-base` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/component-base/blob/v0.36.4/LICENSE) |
+| `k8s.io/klog/v2` | `k8s.io/klog/v2` | v2.140.0 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/klog/blob/v2.140.0/LICENSE) |
+| `k8s.io/kube-openapi/pkg` | `k8s.io/kube-openapi` | v0.0.0-20260603220949-865597e52e25 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/kube-openapi/blob/865597e52e25/LICENSE) |
+| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | `k8s.io/kube-openapi` | v0.0.0-20260603220949-865597e52e25 | BSD-3-Clause | [LICENSE](https://github.com/kubernetes/kube-openapi/blob/865597e52e25/pkg/internal/third_party/go-json-experiment/json/LICENSE) |
+| `k8s.io/kube-openapi/pkg/validation/spec` | `k8s.io/kube-openapi` | v0.0.0-20260603220949-865597e52e25 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/kube-openapi/blob/865597e52e25/pkg/validation/spec/LICENSE) |
+| `k8s.io/kubectl/pkg` | `k8s.io/kubectl` | v0.36.0 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/kubectl/blob/v0.36.0/LICENSE) |
+| `k8s.io/utils` | `k8s.io/utils` | v0.0.0-20260507154919-ff6756f316d2 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/utils/blob/ff6756f316d2/LICENSE) |
+| `k8s.io/utils/internal/third_party/forked/golang` | `k8s.io/utils` | v0.0.0-20260507154919-ff6756f316d2 | BSD-3-Clause | [LICENSE](https://github.com/kubernetes/utils/blob/ff6756f316d2/internal/third_party/forked/golang/LICENSE) |
+| `k8s.io/utils/third_party/forked/golang/btree` | `k8s.io/utils` | v0.0.0-20260507154919-ff6756f316d2 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/utils/blob/ff6756f316d2/third_party/forked/golang/btree/LICENSE) |
+| `sigs.k8s.io/controller-runtime` | `sigs.k8s.io/controller-runtime` | v0.24.1 | Apache-2.0 | [LICENSE](https://github.com/kubernetes-sigs/controller-runtime/blob/v0.24.1/LICENSE) |
+| `sigs.k8s.io/json` | `sigs.k8s.io/json` | v0.0.0-20250730193827-2d320260d730 | Apache-2.0 / BSD-3-Clause | [LICENSE](https://github.com/kubernetes-sigs/json/blob/2d320260d730/LICENSE) |
+| `sigs.k8s.io/kustomize/api` | `sigs.k8s.io/kustomize/api` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/kubernetes-sigs/kustomize/blob/api/v0.21.1/LICENSE) |
+| `sigs.k8s.io/kustomize/kyaml` | `sigs.k8s.io/kustomize/kyaml` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/kubernetes-sigs/kustomize/blob/kyaml/v0.21.1/LICENSE) |
+| `sigs.k8s.io/randfill` | `sigs.k8s.io/randfill` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/kubernetes-sigs/randfill/blob/v1.0.0/LICENSE) / [NOTICE](https://github.com/kubernetes-sigs/randfill/blob/v1.0.0/NOTICE) |
+| `sigs.k8s.io/structured-merge-diff/v6` | `sigs.k8s.io/structured-merge-diff/v6` | v6.4.0 | Apache-2.0 | [LICENSE](https://github.com/kubernetes-sigs/structured-merge-diff/blob/v6.4.0/LICENSE) |
+| `sigs.k8s.io/yaml` | `sigs.k8s.io/yaml` | v1.6.0 | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/kubernetes-sigs/yaml/blob/v1.6.0/LICENSE) |
 
 ## License Texts
 
 ### dario.cat/mergo
 
-* License: BSD-3-Clause
 * Module: dario.cat/mergo
+* Version: v1.0.1
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/imdario/mergo/blob/v1.0.1/LICENSE>
 
 ```text
 Copyright (c) 2013 Dario Castañé. All rights reserved.
@@ -193,10 +203,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/MakeNowJust/heredoc
 
-* License: MIT
 * Module: github.com/MakeNowJust/heredoc
+* Version: v1.0.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/makenowjust/heredoc/blob/v1.0.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -226,10 +239,13 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/goutils
 
-* License: Apache-2.0
 * Module: github.com/Masterminds/goutils
+* Version: v1.1.1
+* License: Apache-2.0
 
 #### LICENSE.txt
+
+<https://github.com/Masterminds/goutils/blob/v1.1.1/LICENSE.txt>
 
 ```text
 
@@ -440,10 +456,13 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/semver/v3
 
-* License: MIT
 * Module: github.com/Masterminds/semver/v3
+* Version: v3.5.0
+* License: MIT
 
 #### LICENSE.txt
+
+<https://github.com/Masterminds/semver/blob/v3.5.0/LICENSE.txt>
 
 ```text
 Copyright (C) 2014-2019, Matt Butcher and Matt Farina
@@ -471,10 +490,13 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/sprig/v3
 
-* License: MIT
 * Module: github.com/Masterminds/sprig/v3
+* Version: v3.3.0
+* License: MIT
 
 #### LICENSE.txt
+
+<https://github.com/Masterminds/sprig/blob/v3.3.0/LICENSE.txt>
 
 ```text
 Copyright (C) 2013-2020 Masterminds
@@ -502,10 +524,13 @@ THE SOFTWARE.
 
 ### github.com/Mellanox/maintenance-operator/api/v1alpha1
 
-* License: Apache-2.0
 * Module: github.com/Mellanox/maintenance-operator/api
+* Version: v0.3.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/Mellanox/maintenance-operator/blob/api/v0.3.0/LICENSE>
 
 ```text
                                  Apache License
@@ -715,10 +740,13 @@ THE SOFTWARE.
 
 ### github.com/NVIDIA/go-nvlib/pkg
 
-* License: Apache-2.0
 * Module: github.com/NVIDIA/go-nvlib
+* Version: v0.12.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/NVIDIA/go-nvlib/blob/v0.12.0/LICENSE>
 
 ```text
 
@@ -928,6 +956,8 @@ THE SOFTWARE.
 
 #### NOTICE
 
+<https://github.com/NVIDIA/go-nvlib/blob/v0.12.0/NOTICE>
+
 ```text
 The file pkg/pciids/default_pci.ids is distributed under the 3-clause BSD License.
 Maintained by Albert Pool, Martin Mares, and other volunteers from
@@ -939,10 +969,13 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 
-* License: Apache-2.0
 * Module: github.com/NVIDIA/k8s-kata-manager
+* Version: v0.2.3
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/NVIDIA/k8s-kata-manager/blob/v0.2.3/LICENSE>
 
 ```text
 
@@ -1153,10 +1186,13 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-operator-libs
 
-* License: Apache-2.0
 * Module: github.com/NVIDIA/k8s-operator-libs
+* Version: v0.0.0-20260629200812-d720f2557494
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/NVIDIA/k8s-operator-libs/blob/d720f2557494/LICENSE>
 
 ```text
 
@@ -1367,10 +1403,13 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/nvidia-container-toolkit
 
-* License: Apache-2.0
 * Module: github.com/NVIDIA/nvidia-container-toolkit
+* Version: v1.20.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/NVIDIA/nvidia-container-toolkit/blob/v1.20.0/LICENSE>
 
 ```text
 
@@ -1581,10 +1620,13 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/beorn7/perks/quantile
 
-* License: MIT
 * Module: github.com/beorn7/perks
+* Version: v1.0.1
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/beorn7/perks/blob/v1.0.1/LICENSE>
 
 ```text
 Copyright (C) 2013 Blake Mizerany
@@ -1613,10 +1655,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/blang/semver/v4
 
-* License: MIT
 * Module: github.com/blang/semver/v4
+* Version: v4.0.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/blang/semver/blob/v4.0.0/LICENSE>
 
 ```text
 The MIT License
@@ -1647,10 +1692,13 @@ THE SOFTWARE.
 
 ### github.com/cespare/xxhash/v2
 
-* License: MIT
 * Module: github.com/cespare/xxhash/v2
+* Version: v2.3.0
+* License: MIT
 
 #### LICENSE.txt
+
+<https://github.com/cespare/xxhash/blob/v2.3.0/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -1681,10 +1729,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/chai2010/gettext-go
 
-* License: BSD-3-Clause
 * Module: github.com/chai2010/gettext-go
+* Version: v1.0.2
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/chai2010/gettext-go/blob/v1.0.2/LICENSE>
 
 ```text
 Copyright 2013 ChaiShushan <chaishushan{AT}gmail.com>. All rights reserved.
@@ -1720,10 +1771,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/cyphar/filepath-securejoin
 
-* License: BSD-3-Clause / MPL-2.0
 * Module: github.com/cyphar/filepath-securejoin
+* Version: v0.7.0
+* License: BSD-3-Clause / MPL-2.0
 
 #### COPYING.md
+
+<https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/COPYING.md>
 
 ````text
 ## COPYING ##
@@ -2178,6 +2232,8 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 #### LICENSE.BSD
 
+<https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/LICENSE.BSD>
+
 ```text
 Copyright (C) 2014-2015 Docker Inc & Go Authors. All rights reserved.
 Copyright (C) 2017-2024 SUSE LLC. All rights reserved.
@@ -2211,6 +2267,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 #### LICENSE.MPL-2.0
+
+<https://github.com/cyphar/filepath-securejoin/blob/v0.7.0/LICENSE.MPL-2.0>
 
 ```text
 Mozilla Public License Version 2.0
@@ -2592,10 +2650,13 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ### github.com/davecgh/go-spew/spew
 
-* License: ISC
 * Module: github.com/davecgh/go-spew
+* Version: v1.1.2-0.20180830191138-d8f796af33cc
+* License: ISC
 
 #### LICENSE
+
+<https://github.com/davecgh/go-spew/blob/d8f796af33cc/LICENSE>
 
 ```text
 ISC License
@@ -2619,10 +2680,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/docker/libtrust
 
-* License: Apache-2.0
 * Module: github.com/docker/libtrust
+* Version: v0.0.0-20160708172513-aabc10ec26b7
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/docker-archive-public/docker.libtrust/blob/aabc10ec26b7/LICENSE>
 
 ```text
 
@@ -2822,10 +2886,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/emicklei/go-restful/v3
 
-* License: MIT
 * Module: github.com/emicklei/go-restful/v3
+* Version: v3.13.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/emicklei/go-restful/blob/v3.13.0/LICENSE>
 
 ```text
 Copyright (c) 2012,2013 Ernest Micklei
@@ -2855,10 +2922,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/evanphx/json-patch/v5
 
-* License: BSD-3-Clause
 * Module: github.com/evanphx/json-patch/v5
+* Version: v5.9.11
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/evanphx/json-patch/blob/v5.9.11/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -2892,10 +2962,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/exponent-io/jsonpath
 
-* License: MIT
 * Module: github.com/exponent-io/jsonpath
+* Version: v0.0.0-20210407135951-1de76d718b3f
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/exponent-io/jsonpath/blob/1de76d718b3f/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -2925,10 +2998,13 @@ SOFTWARE.
 
 ### github.com/fsnotify/fsnotify
 
-* License: BSD-3-Clause
 * Module: github.com/fsnotify/fsnotify
+* Version: v1.9.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/fsnotify/fsnotify/blob/v1.9.0/LICENSE>
 
 ```text
 Copyright © 2012 The Go Authors. All rights reserved.
@@ -2962,10 +3038,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/fxamacker/cbor/v2
 
-* License: MIT
 * Module: github.com/fxamacker/cbor/v2
+* Version: v2.9.2
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/fxamacker/cbor/blob/v2.9.2/LICENSE>
 
 ```text
 MIT License
@@ -2994,10 +3073,13 @@ SOFTWARE.
 
 ### github.com/go-errors/errors
 
-* License: MIT
 * Module: github.com/go-errors/errors
+* Version: v1.5.1
+* License: MIT
 
 #### LICENSE.MIT
+
+<https://github.com/go-errors/errors/blob/v1.5.1/LICENSE.MIT>
 
 ```text
 Copyright (c) 2015 Conrad Irwin <conrad@bugsnag.com>
@@ -3013,10 +3095,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/logr
 
-* License: Apache-2.0
 * Module: github.com/go-logr/logr
+* Version: v1.4.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-logr/logr/blob/v1.4.4/LICENSE>
 
 ```text
                                  Apache License
@@ -3226,10 +3311,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/zapr
 
-* License: Apache-2.0
 * Module: github.com/go-logr/zapr
+* Version: v1.3.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-logr/zapr/blob/v1.3.0/LICENSE>
 
 ```text
                                  Apache License
@@ -3439,10 +3527,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-openapi/jsonpointer
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/jsonpointer
+* Version: v0.22.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/jsonpointer/blob/v0.22.4/LICENSE>
 
 ```text
                                  Apache License
@@ -3650,6 +3741,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ```
 
 #### NOTICE
+
+<https://github.com/go-openapi/jsonpointer/blob/v0.22.4/NOTICE>
 
 ```text
 Copyright 2015-2025 go-swagger maintainers
@@ -3697,10 +3790,13 @@ limitations under the License.
 
 ### github.com/go-openapi/jsonreference
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/jsonreference
+* Version: v0.21.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/jsonreference/blob/v0.21.4/LICENSE>
 
 ```text
 
@@ -3910,6 +4006,8 @@ limitations under the License.
 
 #### NOTICE
 
+<https://github.com/go-openapi/jsonreference/blob/v0.21.4/NOTICE>
+
 ```text
 Copyright 2015-2025 go-swagger maintainers
 
@@ -3956,10 +4054,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/v0.25.4/LICENSE>
 
 ```text
 
@@ -4170,10 +4271,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/cmdutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/cmdutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/cmdutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -4384,10 +4488,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/conv
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/conv
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/conv/v0.25.4/LICENSE>
 
 ```text
 
@@ -4598,10 +4705,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/fileutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/fileutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/fileutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -4812,10 +4922,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/jsonname
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/jsonname
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/jsonname/v0.25.4/LICENSE>
 
 ```text
 
@@ -5026,10 +5139,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/jsonutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/jsonutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/jsonutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -5240,10 +5356,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/loading
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/loading
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/loading/v0.25.4/LICENSE>
 
 ```text
 
@@ -5454,10 +5573,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/mangling
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/mangling
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/mangling/v0.25.4/LICENSE>
 
 ```text
 
@@ -5668,10 +5790,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/netutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/netutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/netutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -5882,10 +6007,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/stringutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/stringutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/stringutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -6096,10 +6224,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/typeutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/typeutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/typeutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -6310,10 +6441,13 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/yamlutils
 
-* License: Apache-2.0
 * Module: github.com/go-openapi/swag/yamlutils
+* Version: v0.25.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/go-openapi/swag/blob/yamlutils/v0.25.4/LICENSE>
 
 ```text
 
@@ -6524,10 +6658,13 @@ limitations under the License.
 
 ### github.com/google/btree
 
-* License: Apache-2.0
 * Module: github.com/google/btree
+* Version: v1.1.3
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/google/btree/blob/v1.1.3/LICENSE>
 
 ```text
 
@@ -6738,10 +6875,13 @@ limitations under the License.
 
 ### github.com/google/gnostic-models
 
-* License: Apache-2.0
 * Module: github.com/google/gnostic-models
+* Version: v0.7.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/google/gnostic-models/blob/v0.7.1/LICENSE>
 
 ```text
 
@@ -6953,10 +7093,13 @@ limitations under the License.
 
 ### github.com/google/uuid
 
-* License: BSD-3-Clause
 * Module: github.com/google/uuid
+* Version: v1.6.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/google/uuid/blob/v1.6.0/LICENSE>
 
 ```text
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
@@ -6992,10 +7135,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/huandu/xstrings
 
-* License: MIT
 * Module: github.com/huandu/xstrings
+* Version: v1.5.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/huandu/xstrings/blob/v1.5.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7026,10 +7172,13 @@ SOFTWARE.
 
 ### github.com/json-iterator/go
 
-* License: MIT
 * Module: github.com/json-iterator/go
+* Version: v1.1.12
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/json-iterator/go/blob/v1.1.12/LICENSE>
 
 ```text
 MIT License
@@ -7059,10 +7208,13 @@ SOFTWARE.
 
 ### github.com/klauspost/compress
 
-* License: Apache-2.0 / BSD-3-Clause / MIT
 * Module: github.com/klauspost/compress
+* Version: v1.19.1
+* License: Apache-2.0 / BSD-3-Clause / MIT
 
 #### LICENSE
+
+<https://github.com/klauspost/compress/blob/v1.19.1/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -7375,10 +7527,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/klauspost/compress/internal/snapref
 
-* License: BSD-3-Clause
 * Module: github.com/klauspost/compress
+* Version: v1.19.1
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/klauspost/compress/blob/v1.19.1/internal/snapref/LICENSE>
 
 ```text
 Copyright (c) 2011 The Snappy-Go Authors. All rights reserved.
@@ -7414,10 +7569,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/klauspost/compress/zstd/internal/xxhash
 
-* License: MIT
 * Module: github.com/klauspost/compress
+* Version: v1.19.1
+* License: MIT
 
 #### LICENSE.txt
+
+<https://github.com/klauspost/compress/blob/v1.19.1/zstd/internal/xxhash/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -7448,10 +7606,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/liggitt/tabwriter
 
-* License: BSD-3-Clause
 * Module: github.com/liggitt/tabwriter
+* Version: v0.0.0-20181228230101-89fcab3d43de
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/liggitt/tabwriter/blob/89fcab3d43de/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -7487,10 +7648,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/mitchellh/copystructure
 
-* License: MIT
 * Module: github.com/mitchellh/copystructure
+* Version: v1.2.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/mitchellh/copystructure/blob/v1.2.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7520,10 +7684,13 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/go-wordwrap
 
-* License: MIT
 * Module: github.com/mitchellh/go-wordwrap
+* Version: v1.0.1
+* License: MIT
 
 #### LICENSE.md
+
+<https://github.com/mitchellh/go-wordwrap/blob/v1.0.1/LICENSE.md>
 
 ```text
 The MIT License (MIT)
@@ -7553,10 +7720,13 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/reflectwalk
 
-* License: MIT
 * Module: github.com/mitchellh/reflectwalk
+* Version: v1.0.2
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/mitchellh/reflectwalk/blob/v1.0.2/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7586,10 +7756,13 @@ THE SOFTWARE.
 
 ### github.com/moby/term
 
-* License: Apache-2.0
 * Module: github.com/moby/term
+* Version: v0.5.2
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/moby/term/blob/v0.5.2/LICENSE>
 
 ```text
 
@@ -7789,10 +7962,13 @@ THE SOFTWARE.
 
 ### github.com/modern-go/concurrent
 
-* License: Apache-2.0
 * Module: github.com/modern-go/concurrent
+* Version: v0.0.0-20180306012644-bacd9c7ef1dd
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/modern-go/concurrent/blob/bacd9c7ef1dd/LICENSE>
 
 ```text
                                  Apache License
@@ -8002,10 +8178,13 @@ THE SOFTWARE.
 
 ### github.com/modern-go/reflect2
 
-* License: Apache-2.0
 * Module: github.com/modern-go/reflect2
+* Version: v1.0.3-0.20250322232337-35a7c28c31ee
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/modern-go/reflect2/blob/35a7c28c31ee/LICENSE>
 
 ```text
                                  Apache License
@@ -8215,10 +8394,13 @@ THE SOFTWARE.
 
 ### github.com/monochromegane/go-gitignore
 
-* License: MIT
 * Module: github.com/monochromegane/go-gitignore
+* Version: v0.0.0-20200626010858-205db1a8cc00
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/monochromegane/go-gitignore/blob/205db1a8cc00/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -8248,10 +8430,13 @@ SOFTWARE.
 
 ### github.com/munnerz/goautoneg
 
-* License: BSD-3-Clause
 * Module: github.com/munnerz/goautoneg
+* Version: v0.0.0-20191010083416-a7dc8b61c822
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/munnerz/goautoneg/blob/a7dc8b61c822/LICENSE>
 
 ```text
 Copyright (c) 2011, Open Knowledge Foundation Ltd.
@@ -8291,10 +8476,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/cgroups/devices/config
 
-* License: Apache-2.0
 * Module: github.com/opencontainers/cgroups
+* Version: v0.0.7
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/opencontainers/cgroups/blob/v0.0.7/LICENSE>
 
 ```text
                                  Apache License
@@ -8504,10 +8692,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/go-digest
 
-* License: Apache-2.0
 * Module: github.com/opencontainers/go-digest
+* Version: v1.0.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/opencontainers/go-digest/blob/v1.0.0/LICENSE>
 
 ```text
 
@@ -8708,10 +8899,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/runc/libcontainer/devices
 
-* License: Apache-2.0
 * Module: github.com/opencontainers/runc
+* Version: v1.4.3
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/opencontainers/runc/blob/v1.4.3/LICENSE>
 
 ```text
 
@@ -8910,6 +9104,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### NOTICE
 
+<https://github.com/opencontainers/runc/blob/v1.4.3/NOTICE>
+
 ```text
 runc
 
@@ -8934,10 +9130,13 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/openshift/api
 
-* License: Apache-2.0
 * Module: github.com/openshift/api
+* Version: v0.0.0-20260727141720-967cc4c36c9b
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/openshift/api/blob/967cc4c36c9b/LICENSE>
 
 ```text
 
@@ -9137,10 +9336,13 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/openshift/client-go
 
-* License: Apache-2.0
 * Module: github.com/openshift/client-go
+* Version: v0.0.0-20260723174158-ae2315de9d73
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/openshift/client-go/blob/ae2315de9d73/LICENSE>
 
 ```text
 
@@ -9340,10 +9542,13 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/operator-framework/api/pkg
 
-* License: Apache-2.0
 * Module: github.com/operator-framework/api
+* Version: v0.45.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/operator-framework/api/blob/v0.45.0/LICENSE>
 
 ```text
                                  Apache License
@@ -9553,10 +9758,13 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/peterbourgon/diskv
 
-* License: MIT
 * Module: github.com/peterbourgon/diskv
+* Version: v2.0.1+incompatible
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/peterbourgon/diskv/blob/v2.0.1/LICENSE>
 
 ```text
 Copyright (c) 2011-2012 Peter Bourgon
@@ -9584,10 +9792,13 @@ THE SOFTWARE.
 
 ### github.com/pmezard/go-difflib/difflib
 
-* License: BSD-3-Clause
 * Module: github.com/pmezard/go-difflib
+* Version: v1.0.1-0.20181226105442-5d4384ee4fb2
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/pmezard/go-difflib/blob/5d4384ee4fb2/LICENSE>
 
 ```text
 Copyright (c) 2013, Patrick Mezard
@@ -9623,10 +9834,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
-* License: Apache-2.0
 * Module: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
+* Version: v0.93.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/prometheus-operator/prometheus-operator/blob/pkg/apis/monitoring/v0.93.1/LICENSE>
 
 ```text
 Apache License
@@ -9836,10 +10050,13 @@ Apache License
 
 ### github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
 
-* License: BSD-3-Clause
 * Module: github.com/prometheus/client_golang
+* Version: v1.24.1
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/prometheus/client_golang/blob/v1.24.1/internal/github.com/golang/gddo/LICENSE>
 
 ```text
 Copyright (c) 2013 The Go Authors. All rights reserved.
@@ -9875,10 +10092,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus/client_golang/prometheus
 
-* License: Apache-2.0
 * Module: github.com/prometheus/client_golang
+* Version: v1.24.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/prometheus/client_golang/blob/v1.24.1/LICENSE>
 
 ```text
                                  Apache License
@@ -10086,6 +10306,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 #### NOTICE
+
+<https://github.com/prometheus/client_golang/blob/v1.24.1/NOTICE>
 
 ```text
 Prometheus instrumentation library for Go applications
@@ -10112,10 +10334,13 @@ See source code for license details.
 
 ### github.com/prometheus/client_model/go
 
-* License: Apache-2.0
 * Module: github.com/prometheus/client_model
+* Version: v0.6.2
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/prometheus/client_model/blob/v0.6.2/LICENSE>
 
 ```text
                                  Apache License
@@ -10323,6 +10548,8 @@ See source code for license details.
 ```
 
 #### NOTICE
+
+<https://github.com/prometheus/client_model/blob/v0.6.2/NOTICE>
 
 ```text
 Data model artifacts for Prometheus.
@@ -10336,10 +10563,13 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/common
 
-* License: Apache-2.0
 * Module: github.com/prometheus/common
+* Version: v0.70.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/prometheus/common/blob/v0.70.1/LICENSE>
 
 ```text
                                  Apache License
@@ -10547,6 +10777,8 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ```
 
 #### NOTICE
+
+<https://github.com/prometheus/common/blob/v0.70.1/NOTICE>
 
 ```text
 Common libraries shared by Prometheus Go components.
@@ -10560,10 +10792,13 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/procfs
 
-* License: Apache-2.0
 * Module: github.com/prometheus/procfs
+* Version: v0.21.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/prometheus/procfs/blob/v0.21.1/LICENSE>
 
 ```text
                                  Apache License
@@ -10771,6 +11006,8 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ```
 
 #### NOTICE
+
+<https://github.com/prometheus/procfs/blob/v0.21.1/NOTICE>
 
 ```text
 procfs provides functions to retrieve system, kernel and process
@@ -10786,10 +11023,13 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/regclient/regclient
 
-* License: Apache-2.0
 * Module: github.com/regclient/regclient
+* Version: v0.11.5
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/regclient/regclient/blob/v0.11.5/LICENSE>
 
 ```text
 
@@ -10989,10 +11229,13 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/russross/blackfriday/v2
 
-* License: BSD-2-Clause
 * Module: github.com/russross/blackfriday/v2
+* Version: v2.1.0
+* License: BSD-2-Clause
 
 #### LICENSE.txt
+
+<https://github.com/russross/blackfriday/blob/v2.1.0/LICENSE.txt>
 
 ```text
 Blackfriday is distributed under the Simplified BSD License:
@@ -11030,10 +11273,13 @@ Blackfriday is distributed under the Simplified BSD License:
 
 ### github.com/shopspring/decimal
 
-* License: MIT
 * Module: github.com/shopspring/decimal
+* Version: v1.4.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/shopspring/decimal/blob/v1.4.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11087,10 +11333,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/sirupsen/logrus
 
-* License: MIT
 * Module: github.com/sirupsen/logrus
+* Version: v1.10.1
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/sirupsen/logrus/blob/v1.10.1/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11120,10 +11369,13 @@ THE SOFTWARE.
 
 ### github.com/spf13/cast
 
-* License: MIT
 * Module: github.com/spf13/cast
+* Version: v1.7.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/spf13/cast/blob/v1.7.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11152,10 +11404,13 @@ SOFTWARE.
 
 ### github.com/spf13/cobra
 
-* License: Apache-2.0
 * Module: github.com/spf13/cobra
+* Version: v1.10.2
+* License: Apache-2.0
 
 #### LICENSE.txt
+
+<https://github.com/spf13/cobra/blob/v1.10.2/LICENSE.txt>
 
 ```text
                                 Apache License
@@ -11338,10 +11593,13 @@ SOFTWARE.
 
 ### github.com/spf13/pflag
 
-* License: BSD-3-Clause
 * Module: github.com/spf13/pflag
+* Version: v1.0.10
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/spf13/pflag/blob/v1.0.10/LICENSE>
 
 ```text
 Copyright (c) 2012 Alex Ogier. All rights reserved.
@@ -11378,10 +11636,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/stretchr/testify/assert/yaml
 
-* License: MIT
 * Module: github.com/stretchr/testify
+* Version: v1.12.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/stretchr/testify/blob/v1.12.0/LICENSE>
 
 ```text
 MIT License
@@ -11411,10 +11672,13 @@ SOFTWARE.
 
 ### github.com/ulikunitz/xz
 
-* License: BSD-3-Clause
 * Module: github.com/ulikunitz/xz
+* Version: v0.5.15
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/ulikunitz/xz/blob/v0.5.15/LICENSE>
 
 ```text
 Copyright (c) 2014-2022  Ulrich Kunitz
@@ -11449,10 +11713,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/urfave/cli/v3
 
-* License: MIT
 * Module: github.com/urfave/cli/v3
+* Version: v3.10.1
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/urfave/cli/blob/v3.10.1/LICENSE>
 
 ```text
 MIT License
@@ -11482,10 +11749,13 @@ SOFTWARE.
 
 ### github.com/x448/float16
 
-* License: MIT
 * Module: github.com/x448/float16
+* Version: v0.8.4
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/x448/float16/blob/v0.8.4/LICENSE>
 
 ```text
 MIT License
@@ -11516,10 +11786,13 @@ SOFTWARE.
 
 ### github.com/xlab/treeprint
 
-* License: MIT
 * Module: github.com/xlab/treeprint
+* Version: v1.2.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/xlab/treeprint/blob/v1.2.0/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11548,10 +11821,13 @@ THE SOFTWARE.
 
 ### go.uber.org/multierr
 
-* License: MIT
 * Module: go.uber.org/multierr
+* Version: v1.11.0
+* License: MIT
 
 #### LICENSE.txt
+
+<https://github.com/uber-go/multierr/blob/v1.11.0/LICENSE.txt>
 
 ```text
 Copyright (c) 2017-2021 Uber Technologies, Inc.
@@ -11579,10 +11855,13 @@ THE SOFTWARE.
 
 ### go.uber.org/zap
 
-* License: MIT
 * Module: go.uber.org/zap
+* Version: v1.28.0
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/uber-go/zap/blob/v1.28.0/LICENSE>
 
 ```text
 Copyright (c) 2016-2024 Uber Technologies, Inc.
@@ -11610,10 +11889,13 @@ THE SOFTWARE.
 
 ### go.yaml.in/yaml/v2
 
-* License: Apache-2.0
 * Module: go.yaml.in/yaml/v2
+* Version: v2.4.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE>
 
 ```text
                                  Apache License
@@ -11822,6 +12104,8 @@ THE SOFTWARE.
 
 #### NOTICE
 
+<https://github.com/yaml/go-yaml/blob/v2.4.4/NOTICE>
+
 ```text
 Copyright 2011-2016 Canonical Ltd.
 
@@ -11842,10 +12126,13 @@ limitations under the License.
 
 ### go.yaml.in/yaml/v3
 
-* License: MIT
 * Module: go.yaml.in/yaml/v3
+* Version: v3.0.4
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/yaml/go-yaml/blob/v3.0.4/LICENSE>
 
 ```text
 
@@ -11903,6 +12190,8 @@ limitations under the License.
 
 #### NOTICE
 
+<https://github.com/yaml/go-yaml/blob/v3.0.4/NOTICE>
+
 ```text
 Copyright 2011-2016 Canonical Ltd.
 
@@ -11923,10 +12212,13 @@ limitations under the License.
 
 ### golang.org/x/crypto
 
-* License: BSD-3-Clause
 * Module: golang.org/x/crypto
+* Version: v0.55.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/crypto/+/refs/tags/v0.55.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -11962,10 +12254,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/mod/semver
 
-* License: BSD-3-Clause
 * Module: golang.org/x/mod
+* Version: v0.40.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/mod/+/refs/tags/v0.40.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12001,10 +12296,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/net
 
-* License: BSD-3-Clause
 * Module: golang.org/x/net
+* Version: v0.58.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/net/+/refs/tags/v0.58.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12040,10 +12338,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/oauth2
 
-* License: BSD-3-Clause
 * Module: golang.org/x/oauth2
+* Version: v0.36.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/oauth2/+/refs/tags/v0.36.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12079,10 +12380,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/sync/errgroup
 
-* License: BSD-3-Clause
 * Module: golang.org/x/sync
+* Version: v0.22.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/sync/+/refs/tags/v0.22.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12118,10 +12422,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/sys/unix
 
-* License: BSD-3-Clause
 * Module: golang.org/x/sys
+* Version: v0.47.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/sys/+/refs/tags/v0.47.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12157,10 +12464,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/term
 
-* License: BSD-3-Clause
 * Module: golang.org/x/term
+* Version: v0.45.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/term/+/refs/tags/v0.45.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12196,10 +12506,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/text
 
-* License: BSD-3-Clause
 * Module: golang.org/x/text
+* Version: v0.41.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/text/+/refs/tags/v0.41.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12235,10 +12548,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/time/rate
 
-* License: BSD-3-Clause
 * Module: golang.org/x/time
+* Version: v0.14.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/time/+/refs/tags/v0.14.0/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12274,10 +12590,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gomodules.xyz/jsonpatch/v2
 
-* License: Apache-2.0
 * Module: gomodules.xyz/jsonpatch/v2
+* Version: v2.4.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/gomodules/jsonpatch/blob/v2.4.0/LICENSE>
 
 ```text
                                  Apache License
@@ -12488,10 +12807,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### google.golang.org/protobuf
 
-* License: BSD-3-Clause
 * Module: google.golang.org/protobuf
+* Version: v1.36.12-0.20260120151049-f2248ac996af
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://go.googlesource.com/protobuf/+/f2248ac996af/LICENSE>
 
 ```text
 Copyright (c) 2018 The Go Authors. All rights reserved.
@@ -12527,10 +12849,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/evanphx/json-patch.v4
 
-* License: BSD-3-Clause
 * Module: gopkg.in/evanphx/json-patch.v4
+* Version: v4.13.0
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/evanphx/json-patch/blob/v4.13.0/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -12564,10 +12889,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/inf.v0
 
-* License: BSD-3-Clause
 * Module: gopkg.in/inf.v0
+* Version: v0.9.1
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/go-inf/inf/blob/v0.9.1/LICENSE>
 
 ```text
 Copyright (c) 2012 Péter Surányi. Portions Copyright (c) 2009 The Go
@@ -12604,10 +12932,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/yaml.v3
 
-* License: MIT
 * Module: gopkg.in/yaml.v3
+* Version: v3.0.1
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE>
 
 ```text
 
@@ -12665,6 +12996,8 @@ limitations under the License.
 
 #### NOTICE
 
+<https://github.com/go-yaml/yaml/blob/v3.0.1/NOTICE>
+
 ```text
 Copyright 2011-2016 Canonical Ltd.
 
@@ -12685,10 +13018,13 @@ limitations under the License.
 
 ### k8s.io/api
 
-* License: Apache-2.0
 * Module: k8s.io/api
+* Version: v0.36.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/api/blob/v0.36.4/LICENSE>
 
 ```text
 
@@ -12899,10 +13235,13 @@ limitations under the License.
 
 ### k8s.io/apiextensions-apiserver/pkg
 
-* License: Apache-2.0
 * Module: k8s.io/apiextensions-apiserver
+* Version: v0.36.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/apiextensions-apiserver/blob/v0.36.4/LICENSE>
 
 ```text
 
@@ -13113,10 +13452,13 @@ limitations under the License.
 
 ### k8s.io/apimachinery/pkg
 
-* License: Apache-2.0
 * Module: k8s.io/apimachinery
+* Version: v0.36.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/apimachinery/blob/v0.36.4/LICENSE>
 
 ```text
 
@@ -13327,10 +13669,13 @@ limitations under the License.
 
 ### k8s.io/apimachinery/third_party/forked/golang
 
-* License: BSD-3-Clause
 * Module: k8s.io/apimachinery
+* Version: v0.36.4
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/kubernetes/apimachinery/blob/v0.36.4/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -13366,10 +13711,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/cli-runtime/pkg
 
-* License: Apache-2.0
 * Module: k8s.io/cli-runtime
+* Version: v0.36.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/cli-runtime/blob/v0.36.0/LICENSE>
 
 ```text
 
@@ -13580,10 +13928,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/client-go
 
-* License: Apache-2.0
 * Module: k8s.io/client-go
+* Version: v0.36.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/client-go/blob/v0.36.4/LICENSE>
 
 ```text
 
@@ -13794,10 +14145,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/client-go/third_party/forked/golang/template
 
-* License: BSD-3-Clause
 * Module: k8s.io/client-go
+* Version: v0.36.4
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/kubernetes/client-go/blob/v0.36.4/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -13833,10 +14187,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/client-go/third_party/forked/httpcache
 
-* License: MIT
 * Module: k8s.io/client-go
+* Version: v0.36.4
+* License: MIT
 
 #### LICENSE
+
+<https://github.com/kubernetes/client-go/blob/v0.36.4/third_party/forked/httpcache/LICENSE>
 
 ```text
 Copyright © 2012 Greg Jones (greg.jones@gmail.com)
@@ -13851,10 +14208,13 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/component-base/version
 
-* License: Apache-2.0
 * Module: k8s.io/component-base
+* Version: v0.36.4
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/component-base/blob/v0.36.4/LICENSE>
 
 ```text
 
@@ -14065,10 +14425,13 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/klog/v2
 
-* License: Apache-2.0
 * Module: k8s.io/klog/v2
+* Version: v2.140.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/klog/blob/v2.140.0/LICENSE>
 
 ```text
 Apache License
@@ -14268,10 +14631,13 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg
 
-* License: Apache-2.0
 * Module: k8s.io/kube-openapi
+* Version: v0.0.0-20260603220949-865597e52e25
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/kube-openapi/blob/865597e52e25/LICENSE>
 
 ```text
 
@@ -14482,10 +14848,13 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 
-* License: BSD-3-Clause
 * Module: k8s.io/kube-openapi
+* Version: v0.0.0-20260603220949-865597e52e25
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/kubernetes/kube-openapi/blob/865597e52e25/pkg/internal/third_party/go-json-experiment/json/LICENSE>
 
 ```text
 Copyright (c) 2020 The Go Authors. All rights reserved.
@@ -14521,10 +14890,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kube-openapi/pkg/validation/spec
 
-* License: Apache-2.0
 * Module: k8s.io/kube-openapi
+* Version: v0.0.0-20260603220949-865597e52e25
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/kube-openapi/blob/865597e52e25/pkg/validation/spec/LICENSE>
 
 ```text
 
@@ -14735,10 +15107,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kubectl/pkg
 
-* License: Apache-2.0
 * Module: k8s.io/kubectl
+* Version: v0.36.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/kubectl/blob/v0.36.0/LICENSE>
 
 ```text
                                  Apache License
@@ -14948,10 +15323,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils
 
-* License: Apache-2.0
 * Module: k8s.io/utils
+* Version: v0.0.0-20260507154919-ff6756f316d2
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/utils/blob/ff6756f316d2/LICENSE>
 
 ```text
 
@@ -15162,10 +15540,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils/internal/third_party/forked/golang
 
-* License: BSD-3-Clause
 * Module: k8s.io/utils
+* Version: v0.0.0-20260507154919-ff6756f316d2
+* License: BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/kubernetes/utils/blob/ff6756f316d2/internal/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -15201,10 +15582,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils/third_party/forked/golang/btree
 
-* License: Apache-2.0
 * Module: k8s.io/utils
+* Version: v0.0.0-20260507154919-ff6756f316d2
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes/utils/blob/ff6756f316d2/third_party/forked/golang/btree/LICENSE>
 
 ```text
 
@@ -15414,10 +15798,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/controller-runtime
 
-* License: Apache-2.0
 * Module: sigs.k8s.io/controller-runtime
+* Version: v0.24.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/controller-runtime/blob/v0.24.1/LICENSE>
 
 ```text
                                  Apache License
@@ -15627,10 +16014,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/json
 
-* License: Apache-2.0 / BSD-3-Clause
 * Module: sigs.k8s.io/json
+* Version: v0.0.0-20250730193827-2d320260d730
+* License: Apache-2.0 / BSD-3-Clause
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/json/blob/2d320260d730/LICENSE>
 
 ```text
 Files other than internal/golang/* licensed under:
@@ -15877,10 +16267,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/api
 
-* License: Apache-2.0
 * Module: sigs.k8s.io/kustomize/api
+* Version: v0.21.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/kustomize/blob/api/v0.21.1/LICENSE>
 
 ```text
                                  Apache License
@@ -16090,10 +16483,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/kyaml
 
-* License: Apache-2.0
 * Module: sigs.k8s.io/kustomize/kyaml
+* Version: v0.21.1
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/kustomize/blob/kyaml/v0.21.1/LICENSE>
 
 ```text
                                  Apache License
@@ -16303,10 +16699,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/randfill
 
-* License: Apache-2.0
 * Module: sigs.k8s.io/randfill
+* Version: v1.0.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/randfill/blob/v1.0.0/LICENSE>
 
 ```text
                                  Apache License
@@ -16516,6 +16915,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### NOTICE
 
+<https://github.com/kubernetes-sigs/randfill/blob/v1.0.0/NOTICE>
+
 ```text
 When donating the randfill project to the CNCF, we could not reach all the
 gofuzz contributors to sign the CNCF CLA. As such, according to the CNCF rules
@@ -16547,10 +16948,13 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/structured-merge-diff/v6
 
-* License: Apache-2.0
 * Module: sigs.k8s.io/structured-merge-diff/v6
+* Version: v6.4.0
+* License: Apache-2.0
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/structured-merge-diff/blob/v6.4.0/LICENSE>
 
 ```text
                                  Apache License
@@ -16760,10 +17164,13 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/yaml
 
-* License: Apache-2.0 / BSD-3-Clause / MIT
 * Module: sigs.k8s.io/yaml
+* Version: v1.6.0
+* License: Apache-2.0 / BSD-3-Clause / MIT
 
 #### LICENSE
+
+<https://github.com/kubernetes-sigs/yaml/blob/v1.6.0/LICENSE>
 
 ```text
 The MIT License (MIT)

@@ -12,25 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Regenerates THIRD_PARTY_NOTICES.md and fails if it differs from the committed
-# copy, so a dependency change cannot land without refreshed attribution. The
-# generator also fails when a license file has no verified URL in
-# tools/license-urls.tsv, which catches a bump that skipped
-# 'make third-party-notices-urls'. Link rot is caught separately by
-# third-party-notices-links.yaml.
+# Re-verifies every license URL against the vendored bytes. Links are proven
+# correct when written, but upstream can retag, rename or archive a repository
+# afterwards, and no offline gate can see that. This runs on a schedule rather
+# than per pull request so link rot does not block unrelated work.
 
-name: Third-Party Notices Check
+name: Third-Party Notices Link Check
 
 on:
-  workflow_call:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  check-third-party-notices:
-    runs-on: linux-amd64-cpu4
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      id-token: write
+  verify-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -47,11 +47,15 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Setup Go Proxy
-        id: setup-go-proxy
-        uses: nv-gha-runners/setup-artifactory-go-proxy@a15ec16ff434e8ca3b0f76919f902080e66ebc14 # main
-
-      - name: Verify THIRD_PARTY_NOTICES.md is up to date
+      - name: Re-verify every license URL
         env:
-          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
-        run: make check-third-party-notices
+          URLS_OUTPUT: /tmp/license-urls-fresh.tsv
+        run: make install-tools && bash tools/verify-license-urls.sh
+
+      - name: Compare against the committed map
+        run: |
+          if ! diff -u <(LC_ALL=C grep -v '^#' tools/license-urls.tsv) \
+                       <(LC_ALL=C grep -v '^#' /tmp/license-urls-fresh.tsv); then
+            echo "::error::A license URL no longer serves the vendored bytes. Upstream may have retagged or moved."
+            exit 1
+          fi

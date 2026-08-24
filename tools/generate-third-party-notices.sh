@@ -400,6 +400,13 @@ shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
 Go distribution itself.
 
+Each dependency is listed with the module that owns it, the version
+redistributed, and a link to the license file in that version's upstream
+source. Every link was verified by fetching it and comparing its contents
+against the copy vendored here, so each one resolves to the same license text
+reproduced below. Dependencies vendored only to build or test the operator are
+not redistributed and are not listed.
+
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
 <https://developer.nvidia.com/w/distroless-oss/index.html>. A statically
