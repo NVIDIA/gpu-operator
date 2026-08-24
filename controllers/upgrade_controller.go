@@ -45,7 +45,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
@@ -240,7 +239,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 	statesByNVD := make(map[string]*upgrade.ClusterUpgradeState)
 	for stateKey, nodeStates := range clusterState.NodeStates {
 		for _, nodeState := range nodeStates {
-			ownerName := nodeState.Node.Labels[gpuconsts.NVIDIADriverOwnerLabel]
+			ownerName := nodeState.Node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel]
 			if ownerName == "" {
 				reqLogger.V(consts.LogLevelInfo).Info("Node does not have nvidia.com/gpu-operator.driver.owner label, skipping ...", "NodeName", nodeState.Node.Name)
 				continue
@@ -355,7 +354,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Conte
 	r.Log.Info("Resetting node upgrade labels for NVIDIADriver", "name", nvdName)
 
 	nodeList := &corev1.NodeList{}
-	if err := r.List(ctx, nodeList, client.MatchingLabels{gpuconsts.NVIDIADriverOwnerLabel: nvdName}); err != nil {
+	if err := r.List(ctx, nodeList, client.MatchingLabels{nvidiav1alpha1.NVIDIADriverOwnerLabel: nvdName}); err != nil {
 		r.Log.Error(err, "Failed to list nodes for NVIDIADriver", "name", nvdName)
 		return err
 	}

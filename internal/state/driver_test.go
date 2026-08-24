@@ -875,17 +875,17 @@ func TestGetNodePoolsDoesNotAllowSelectorToOverrideOwnerLabel(t *testing.T) {
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "gpu-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "driver-a",
-			nfdOSReleaseIDLabelKey:        "ubuntu",
-			nfdOSVersionIDLabelKey:        "22.04",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+			nfdOSReleaseIDLabelKey:                "ubuntu",
+			nfdOSVersionIDLabelKey:                "22.04",
 		},
 	}}
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(node).Build()
 	driver := &nvidiav1alpha1.NVIDIADriver{
 		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
 		Spec: nvidiav1alpha1.NVIDIADriverSpec{
-			NodeSelector: map[string]string{consts.NVIDIADriverOwnerLabel: "driver-b"},
+			NodeSelector: map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-b"},
 		},
 	}
 
@@ -893,7 +893,7 @@ func TestGetNodePoolsDoesNotAllowSelectorToOverrideOwnerLabel(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, nodePools, 1)
-	require.Equal(t, "driver-a", nodePools[0].nodeSelector[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "driver-a", nodePools[0].nodeSelector[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestDriverPrecompiled(t *testing.T) {
