@@ -19,11 +19,23 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tools/test-helpers.sh
 source "${HERE}/test-helpers.sh"
+
+# If the guard ever regresses, sourcing must not overwrite the committed
+# notices file. OUTPUT is honoured by compose_document.
+OUTPUT="$(mktemp)"
+export OUTPUT
+
 # shellcheck source=tools/generate-third-party-notices.sh
 source "${HERE}/generate-third-party-notices.sh"
 
 # If the guard is missing, sourcing runs the generator and exits before here.
 assert_eq "sourced" "sourced" "sourcing the generator does not execute main"
+
+# Environment-independent: proves the guard is present rather than relying on
+# main failing fast, which it only does on a host without go-licenses.
+assert_eq "1" \
+    "$(LC_ALL=C grep -c 'BASH_SOURCE\[0\]' "${HERE}/generate-third-party-notices.sh")" \
+    "the generator guards main against running on source"
 
 fixture="$(mktemp)"
 trap 'rm -f "${fixture}"' EXIT
