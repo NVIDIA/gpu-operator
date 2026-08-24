@@ -220,29 +220,27 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				additionalCfgs.Volumes = append(additionalCfgs.Volumes, subscriptionVol)
 			}
 		}
+	}
 
-		// Mount /lib/modules for precompiled drivers on SUSE distributions.
-		// Those containers need access to host /lib/modules at runtime.
-		if cr.Spec.UsePrecompiledDrivers() && (pool.osRelease == "sles" || pool.osRelease == "sl-micro") {
-			logger.Info("Mounting /lib/modules into the driver container")
-			libModulesVolMount := corev1.VolumeMount{
-				Name:      "lib-modules",
-				MountPath: "/run/host/lib/modules",
-				ReadOnly:  true,
-			}
-			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, libModulesVolMount)
-
-			libModulesVol := corev1.Volume{
-				Name: "lib-modules",
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/lib/modules",
-						Type: ptr.To(corev1.HostPathDirectory),
-					},
-				},
-			}
-			additionalCfgs.Volumes = append(additionalCfgs.Volumes, libModulesVol)
+	if cr.Spec.UsePrecompiledDrivers() && (pool.osRelease == "sles" || pool.osRelease == "sl-micro") {
+		logger.Info("Mounting /lib/modules into the driver pod")
+		libModulesVolMount := corev1.VolumeMount{
+			Name:      "lib-modules",
+			MountPath: "/run/host/lib/modules",
+			ReadOnly:  true,
 		}
+		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, libModulesVolMount)
+
+		libModulesVol := corev1.Volume{
+			Name: "lib-modules",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/lib/modules",
+					Type: ptr.To(corev1.HostPathDirectory),
+				},
+			},
+		}
+		additionalCfgs.Volumes = append(additionalCfgs.Volumes, libModulesVol)
 	}
 
 	// mount any custom kernel module configuration parameters at /drivers
