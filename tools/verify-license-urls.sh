@@ -169,11 +169,16 @@ main() {
             paths+=( "${path_in_module}" )
 
             found=""
-            local try_ref try_path candidate
+            local try_ref try_path candidate rsha
             for try_ref in "${refs[@]}"; do
                 for try_path in "${paths[@]}"; do
                     candidate="$(blob_url "${repo}" "${try_ref}" "${try_path}")"
-                    if [[ "$(remote_sha "${candidate}")" == "${want_sha}" ]]; then
+                    # remote_sha's own exit status must gate the match: curl
+                    # failing (404, DNS, timeout, rate-limit) yields no bytes,
+                    # and sha256 of no bytes is a real, fixed hash value — so
+                    # checking only the printed string would treat a failed
+                    # fetch as a match against any zero-byte vendored file.
+                    if rsha="$(remote_sha "${candidate}")" && [[ "${rsha}" == "${want_sha}" ]]; then
                         found="${candidate}"
                         break 2
                     fi
