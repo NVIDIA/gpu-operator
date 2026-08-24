@@ -327,16 +327,17 @@ location_cell() {
 }
 
 emit_index_table() {
-    local index="$1" package _ license module version
+    local index="$1" package _ license module version location
     printf '| Package | Module | Version | License | Location |\n'
     printf '|---------|--------|---------|---------|----------|\n'
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
+        location="$(location_cell "${package}" "${module}" "${version}")"
         # shellcheck disable=SC2016  # backticks are literal markdown here.
         printf '| `%s` | `%s` | %s | %s | %s |\n' \
-            "${package}" "${module:-unknown}" "${version:-unknown}" "${license:-Unknown}" \
-            "$(location_cell "${package}" "${module}" "${version}")"
+            "${package}" "${module:-unknown}" "${version:-unknown}" \
+            "${license:-Unknown}" "${location}"
     done < "${index}"
 }
 

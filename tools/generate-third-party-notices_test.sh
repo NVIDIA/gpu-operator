@@ -109,6 +109,16 @@ assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/
        emit_index_table "${render}/index.csv" | sed -n 3p)" \
     "index row labels the link by filename"
 
+# Regression: a package whose module/version pair has no entry in the URL map
+# must abort the whole table, not render with a blank Location cell.
+mismatch_index="${render}/mismatch-index.csv"
+cat > "${mismatch_index}" <<'IDX'
+github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klauspost/compress,v9.9.9
+IDX
+assert_fails "emit_index_table fails closed when the URL map has no entry for a row" \
+    env LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+    bash -c 'source tools/generate-third-party-notices.sh; emit_index_table "$1"' _ "${mismatch_index}"
+
 section="$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
     emit_sections "${render}/index.csv" "${render}/cache")"
 assert_eq "* Module: github.com/klauspost/compress" "$(printf '%s' "${section}" | sed -n 3p)" "section names the module"
