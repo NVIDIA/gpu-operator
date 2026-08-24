@@ -61,7 +61,7 @@ jobs:
         run: echo "OPERATOR_REPOSITORY=${OPERATOR_IMAGE%/*}" >> "${GITHUB_ENV}"
 
       - name: Update chart image repository
-        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
         with:
           cmd: yq -i '.operator.repository = env(OPERATOR_REPOSITORY) | .validator.repository = env(OPERATOR_REPOSITORY)' deployments/gpu-operator/values.yaml
 
