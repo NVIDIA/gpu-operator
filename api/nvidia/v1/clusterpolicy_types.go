@@ -2092,7 +2092,7 @@ func ImagePath(spec interface{}) (string, error) {
 		return "", fmt.Errorf("invalid nil spec to construct image path")
 	}
 	value := reflect.ValueOf(spec)
-	if value.Kind() == reflect.Ptr && value.IsNil() {
+	if value.Kind() == reflect.Pointer && value.IsNil() {
 		return "", fmt.Errorf("invalid nil spec to construct image path: %T", spec)
 	}
 
