@@ -256,8 +256,8 @@ build_indexes() {
     fi
 }
 
-# License-bearing files, sorted. Filter by name: for restricted licenses
-# 'go-licenses save' copies the whole module source, which does not belong here.
+# Filter by name: for restricted licenses 'go-licenses save' copies the whole
+# module source, which does not belong here.
 license_files_for() {
     local search_dir="$1" license_file file_basename
     [[ -d "${search_dir}" ]] || return 0
@@ -289,9 +289,8 @@ require_url_map() {
                "Run 'make third-party-notices-urls' (needs network) and commit the result."
 }
 
-# The directory whose license files govern PACKAGE, relative to MODULE. Walks
-# up from the package to the module root and takes the first directory holding
-# a license file, which is how go-licenses attributes them.
+# The first enclosing directory holding a license file wins, which is how
+# go-licenses attributes them.
 license_dir_within_module() {
     local module="$2" dir="$1" relative
     while :; do
@@ -315,8 +314,7 @@ location_for() {
     printf '%s' "${url}"
 }
 
-# ' / '-joined [filename](url) links, one per license file, mirroring how the
-# License column joins identifiers.
+# Mirrors how the License column joins identifiers.
 location_cell() {
     local package="$1" module="$2" version="$3"
     local relative_license_dir license_file_name license_path url cell="" license_file governing_dir
