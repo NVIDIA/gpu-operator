@@ -245,6 +245,9 @@ E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-shared-dependencies:
 	@bash hack/validate-shared-dependencies.sh
 
+validate-published-api-module:
+	@bash hack/validate-published-api-module.sh "$(OPERATOR_TAG)"
+
 validate-modules:
 	@echo "- [api] Verifying that the dependencies have expected content..."
 	go -C $(API_DIR) mod verify
