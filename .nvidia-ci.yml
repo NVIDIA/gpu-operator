@@ -154,6 +154,8 @@ update-nspect:
   extends:
     - .update-nspect
   rules:
+    - if: $CI_COMMIT_TAG =~ /^api\/v/
+      when: never
     - if: $CI_COMMIT_TAG
   variables:
     OSRB_BUG_ID: "${OSRB_BUG_ID}"
@@ -180,6 +182,8 @@ ngc-image-publish:
   extends:
     - .publish-images
   rules:
+    - if: $CI_COMMIT_TAG =~ /^api\/v/
+      when: never
     - if: $CI_COMMIT_TAG
   needs:
     - job: update-nspect
