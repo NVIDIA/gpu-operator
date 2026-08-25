@@ -102,11 +102,11 @@ main() {
     collect_licenses
     build_indexes
 
-    local tmp failures=0
-    tmp="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-urls.XXXXXX")"
+    local verified_urls_tmp_file failures=0
+    verified_urls_tmp_file="$(mktemp "${TMPDIR:-/tmp}/gpu-operator-urls.XXXXXX")"
 
     local package _ module version repo subdir relative
-    local origin_tag origin_hash plain pseudo lf name path_in_module want_sha found
+    local origin_tag origin_hash plain_version pseudo_version_hash_value license_file name path_in_module want_sha found_url
     while IFS=, read -r package _ _ module version; do
         [[ -z "${package}" ]] && continue
 
@@ -124,22 +124,22 @@ main() {
         # commit only under its bare hash, so qualifying a hash the same way
         # 404s a pseudo-versioned module such as google.golang.org/protobuf.
         local tag_refs=() hash_refs=()
-        plain="$(normalize_version "${version}")"
-        pseudo="$(pseudo_version_hash "${version}")"
+        plain_version="$(normalize_version "${version}")"
+        pseudo_version_hash_value="$(pseudo_version_hash "${version}")"
         [[ -n "${origin_tag}" ]] && tag_refs+=( "${origin_tag}" )
-        if [[ -n "${pseudo}" ]]; then
-            hash_refs+=( "${pseudo}" )
+        if [[ -n "${pseudo_version_hash_value}" ]]; then
+            hash_refs+=( "${pseudo_version_hash_value}" )
         else
-            [[ -n "${subdir}" ]] && tag_refs+=( "${subdir}/${plain}" )
-            tag_refs+=( "${plain}" )
+            [[ -n "${subdir}" ]] && tag_refs+=( "${subdir}/${plain_version}" )
+            tag_refs+=( "${plain_version}" )
         fi
         [[ -n "${origin_hash}" ]] && hash_refs+=( "${origin_hash}" )
 
-        local refs=() r
+        local refs=() tag_ref
         if (( ${#tag_refs[@]} > 0 )); then
             case "${repo}" in
                 https://go.googlesource.com/*)
-                    for r in "${tag_refs[@]}"; do refs+=( "refs/tags/${r}" ); done
+                    for tag_ref in "${tag_refs[@]}"; do refs+=( "refs/tags/${tag_ref}" ); done
                     ;;
                 *)
                     refs+=( "${tag_refs[@]}" )
@@ -153,10 +153,10 @@ main() {
             || die "no license file found for ${package} under ${VENDOR_DIR}/${module}."
 
         local license_file_count=0
-        while IFS= read -r lf; do
-            [[ -z "${lf}" ]] && continue
+        while IFS= read -r license_file; do
+            [[ -z "${license_file}" ]] && continue
             license_file_count=$(( license_file_count + 1 ))
-            name="$(basename "${lf}")"
+            name="$(basename "${license_file}")"
             path_in_module="${relative:+${relative}/}${name}"
             [[ -f "${VENDOR_DIR}/${module}/${path_in_module}" ]] \
                 || die "${VENDOR_DIR}/${module}/${path_in_module} does not exist."
@@ -170,8 +170,8 @@ main() {
             [[ -n "${subdir}" ]] && paths+=( "${subdir}/${path_in_module}" )
             paths+=( "${path_in_module}" )
 
-            found=""
-            local try_ref try_path candidate rsha
+            found_url=""
+            local try_ref try_path candidate remote_sha_value
             for try_ref in "${refs[@]}"; do
                 for try_path in "${paths[@]}"; do
                     candidate="$(blob_url "${repo}" "${try_ref}" "${try_path}")"
@@ -180,19 +180,19 @@ main() {
                     # and sha256 of no bytes is a real, fixed hash value — so
                     # checking only the printed string would treat a failed
                     # fetch as a match against any zero-byte vendored file.
-                    if rsha="$(remote_sha "${candidate}")" && [[ "${rsha}" == "${want_sha}" ]]; then
-                        found="${candidate}"
+                    if remote_sha_value="$(remote_sha "${candidate}")" && [[ "${remote_sha_value}" == "${want_sha}" ]]; then
+                        found_url="${candidate}"
                         break 2
                     fi
                 done
             done
 
-            if [[ -z "${found}" ]]; then
+            if [[ -z "${found_url}" ]]; then
                 log "UNVERIFIED ${module}@${version} ${path_in_module}"
                 failures=$(( failures + 1 ))
                 continue
             fi
-            printf '%s\t%s\t%s\t%s\n' "${module}" "${version}" "${path_in_module}" "${found}" >> "${tmp}"
+            printf '%s\t%s\t%s\t%s\n' "${module}" "${version}" "${path_in_module}" "${found_url}" >> "${verified_urls_tmp_file}"
         done < <(license_files_for "${VENDOR_DIR}/${module}${relative:+/${relative}}")
 
         if (( license_file_count == 0 )); then
@@ -213,9 +213,9 @@ main() {
         printf '# sha256 matched against the vendored copy, so no entry is a dead or wrong link.\n'
         printf '# Covers the shipped set only: build- and test-only dependencies are excluded.\n'
         printf '# module\tversion\tlicense-path\turl\n'
-        LC_ALL=C sort -u "${tmp}"
+        LC_ALL=C sort -u "${verified_urls_tmp_file}"
     } > "${URLS_OUTPUT}"
-    rm -f "${tmp}"
+    rm -f "${verified_urls_tmp_file}"
 
     log "Wrote ${URLS_OUTPUT} ($(LC_ALL=C grep -vc '^#' "${URLS_OUTPUT}") verified URLs)"
     exit 0

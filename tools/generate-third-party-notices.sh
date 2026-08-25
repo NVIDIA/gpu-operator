@@ -48,14 +48,14 @@ log() {
 # Licenses that are themselves Markdown close a fixed ``` fence early and invert
 # every block after it, so open with one backtick more than the file's longest run.
 fence_for() {
-    local file="$1" longest width
+    local file="$1" longest_backtick_run fence_width
     # -a: a license holding a NUL byte would otherwise print "Binary file ...
     # matches" instead of the matches, on stdout or stderr depending on the grep.
-    longest=$(LC_ALL=C grep -oaE '`+' "${file}" 2>/dev/null \
+    longest_backtick_run=$(LC_ALL=C grep -oaE '`+' "${file}" 2>/dev/null \
         | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }' || true)
-    width=$(( longest + 1 ))
-    (( width < 3 )) && width=3
-    printf '%*s' "${width}" '' | tr ' ' '`'
+    fence_width=$(( longest_backtick_run + 1 ))
+    (( fence_width < 3 )) && fence_width=3
+    printf '%*s' "${fence_width}" '' | tr ' ' '`'
 }
 
 check_prerequisites() {
@@ -71,10 +71,10 @@ check_prerequisites() {
         die "go-licenses is not installed." "Install it with 'make install-tools'."
     fi
 
-    local f
-    for f in "${MULTI_ARCH_MK}" "${MODULES_TXT}"; do
-        [[ -f "${f}" ]] \
-            || die "${f} not found — run 'make third-party-notices' from the repo root."
+    local required_file
+    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}"; do
+        [[ -f "${required_file}" ]] \
+            || die "${required_file} not found — run 'make third-party-notices' from the repo root."
     done
 
     LOCAL_MODULE=$(go list -m 2>/dev/null || true)
@@ -113,10 +113,10 @@ prepare_workspace() {
     mkdir -p "${LICENSES_DIR}"
 
     # Explicit templates: macOS mktemp ignores TMPDIR without one.
-    local t="${TMPDIR:-/tmp}/gpu-operator-notices"
-    SAVE_ROOT="$(mktemp -d "${t}.XXXXXX")"
-    COMBINED_CSV="$(mktemp "${t}-csv.XXXXXX")"
-    INDEX_FILE="$(mktemp "${t}-idx.XXXXXX")"
+    local workspace_template="${TMPDIR:-/tmp}/gpu-operator-notices"
+    SAVE_ROOT="$(mktemp -d "${workspace_template}.XXXXXX")"
+    COMBINED_CSV="$(mktemp "${workspace_template}-csv.XXXXXX")"
+    INDEX_FILE="$(mktemp "${workspace_template}-idx.XXXXXX")"
 
     # Composed beside its destination, not under TMPDIR, so the last step is a
     # same-filesystem rename(2) rather than a copy-then-unlink.
@@ -259,22 +259,22 @@ build_indexes() {
 # License-bearing files, sorted. Filter by name: for restricted licenses
 # 'go-licenses save' copies the whole module source, which does not belong here.
 license_files_for() {
-    local dir="$1" f base
-    [[ -d "${dir}" ]] || return 0
-    while IFS= read -r -d '' f; do
-        base="$(basename "${f}")"
+    local search_dir="$1" license_file file_basename
+    [[ -d "${search_dir}" ]] || return 0
+    while IFS= read -r -d '' license_file; do
+        file_basename="$(basename "${license_file}")"
         # Exclude source files: the name pattern below also matches source
         # files that merely start with a license-shaped header, e.g.
         # k8s.io/kube-openapi/pkg/validation/spec/license.go, a Go file
         # beginning "// Copyright 2015 go-swagger maintainers".
-        case "${base}" in
+        case "${file_basename}" in
             *.go|*.c|*.h|*.s|*.py|*.sh|*.java|*.ts|*.js) continue ;;
         esac
-        if printf '%s' "${base}" \
+        if printf '%s' "${file_basename}" \
             | LC_ALL=C grep -qiE '^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$'; then
-            printf '%s\n' "${f}"
+            printf '%s\n' "${license_file}"
         fi
-    done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
+    done < <(find "${search_dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
 LICENSE_URLS="${LICENSE_URLS:-tools/license-urls.tsv}"
@@ -319,21 +319,21 @@ location_for() {
 # License column joins identifiers.
 location_cell() {
     local package="$1" module="$2" version="$3"
-    local relative name license_path url cell="" lf govern_dir
-    relative="$(license_dir_within_module "${package}" "${module}")" \
+    local relative_license_dir license_file_name license_path url cell="" license_file governing_dir
+    relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
         || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
                "Run 'go mod vendor' and re-run."
-    govern_dir="${VENDOR_DIR}/${module}${relative:+/${relative}}"
-    while IFS= read -r lf; do
-        [[ -z "${lf}" ]] && continue
-        name="$(basename "${lf}")"
-        license_path="${relative:+${relative}/}${name}"
+    governing_dir="${VENDOR_DIR}/${module}${relative_license_dir:+/${relative_license_dir}}"
+    while IFS= read -r license_file; do
+        [[ -z "${license_file}" ]] && continue
+        license_file_name="$(basename "${license_file}")"
+        license_path="${relative_license_dir:+${relative_license_dir}/}${license_file_name}"
         url="$(location_for "${module}" "${version}" "${license_path}")" \
             || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${license_path}." \
                    "Run 'make third-party-notices-urls' (needs network) and commit the result."
-        cell="${cell:+${cell} / }[${name}](${url})"
-    done < <(license_files_for "${govern_dir}")
-    [[ -n "${cell}" ]] || die "no license file for ${package} under ${govern_dir}." \
+        cell="${cell:+${cell} / }[${license_file_name}](${url})"
+    done < <(license_files_for "${governing_dir}")
+    [[ -n "${cell}" ]] || die "no license file for ${package} under ${governing_dir}." \
                               "Run 'go mod vendor' and re-run."
     printf '%s' "${cell}"
 }
@@ -355,7 +355,7 @@ emit_index_table() {
 
 emit_sections() {
     local index="$1"
-    local package _ license module version files lf fence relative name url govern_dir
+    local package _ license module version files license_file fence relative_license_dir license_file_name url governing_dir
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
@@ -365,29 +365,29 @@ emit_sections() {
         printf '* Version: %s\n' "${version:-unknown}"
         printf '* License: %s\n\n' "${license:-Unknown}"
 
-        relative="$(license_dir_within_module "${package}" "${module}")" \
+        relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
             || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
                    "Run 'go mod vendor' and re-run."
-        govern_dir="${VENDOR_DIR}/${module}${relative:+/${relative}}"
+        governing_dir="${VENDOR_DIR}/${module}${relative_license_dir:+/${relative_license_dir}}"
 
         files=()
-        while IFS= read -r lf; do
-            [[ -n "${lf}" ]] && files+=("${lf}")
-        done < <(license_files_for "${govern_dir}")
+        while IFS= read -r license_file; do
+            [[ -n "${license_file}" ]] && files+=("${license_file}")
+        done < <(license_files_for "${governing_dir}")
 
         if (( ${#files[@]} == 0 )); then
             printf 'License text unavailable. See upstream source for the full license.\n'
         else
-            for lf in "${files[@]}"; do
-                name="$(basename "${lf}")"
-                url="$(location_for "${module}" "${version}" "${relative:+${relative}/}${name}")" \
-                    || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${relative:+${relative}/}${name}." \
+            for license_file in "${files[@]}"; do
+                license_file_name="$(basename "${license_file}")"
+                url="$(location_for "${module}" "${version}" "${relative_license_dir:+${relative_license_dir}/}${license_file_name}")" \
+                    || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${relative_license_dir:+${relative_license_dir}/}${license_file_name}." \
                            "Run 'make third-party-notices-urls' (needs network) and commit the result."
-                fence="$(fence_for "${lf}")"
-                printf '#### %s\n\n' "${name}"
+                fence="$(fence_for "${license_file}")"
+                printf '#### %s\n\n' "${license_file_name}"
                 printf '<%s>\n\n' "${url}"
                 printf '%stext\n' "${fence}"
-                cat "${lf}"
+                cat "${license_file}"
                 echo
                 printf '%s\n' "${fence}"
                 echo
