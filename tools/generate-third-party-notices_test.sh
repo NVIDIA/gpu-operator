@@ -69,6 +69,12 @@ urls_fixture="$(mktemp)"
 printf 'github.com/klauspost/compress\tv1.19.1\tLICENSE\thttps://example.invalid/root\n' > "${urls_fixture}"
 printf 'github.com/klauspost/compress\tv1.19.1\tzstd/internal/xxhash/LICENSE.txt\thttps://example.invalid/xxhash\n' >> "${urls_fixture}"
 
+# No rows: exercises license_identifier_for's not-found path so the fixtures
+# below that do not care about overrides are unaffected by them, without
+# depending on the LICENSE_OVERRIDES default resolving from the test's cwd.
+empty_overrides_fixture="$(mktemp)"
+printf '# no overrides\n' > "${empty_overrides_fixture}"
+
 assert_eq "https://example.invalid/xxhash" \
     "$(LICENSE_URLS="${urls_fixture}" location_for \
         github.com/klauspost/compress v1.19.1 zstd/internal/xxhash/LICENSE.txt)" \
@@ -115,13 +121,13 @@ IDX
 
 assert_eq '| Package | Module | Version | License | Location |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
-       emit_index_table "${render}/index.csv" | sed -n 1p)" \
+       LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 1p)" \
     "index header has five columns"
 # Expected literal Markdown, not shell expansion.
 # shellcheck disable=SC2016
 assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
-       emit_index_table "${render}/index.csv" | sed -n 3p)" \
+       LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 3p)" \
     "index row labels the link by filename"
 
 # Regression: a package whose module/version pair has no entry in the URL map
@@ -134,16 +140,46 @@ IDX
 # shellcheck disable=SC2016
 assert_fails "emit_index_table fails closed when the URL map has no entry for a row" \
     env LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+    LICENSE_OVERRIDES="${empty_overrides_fixture}" \
     bash -c 'source "$1"; emit_index_table "$2"' _ "${HERE}/generate-third-party-notices.sh" "${mismatch_index}"
 
 section="$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
-    emit_sections "${render}/index.csv" "${render}/cache")"
+    LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_sections "${render}/index.csv" "${render}/cache")"
 assert_eq "* Module: github.com/klauspost/compress" "$(printf '%s' "${section}" | sed -n 3p)" "section names the module"
 assert_eq "* Version: v1.19.1" "$(printf '%s' "${section}" | sed -n 4p)" "section names the version"
 assert_eq "<https://example.invalid/xxhash>" \
     "$(printf '%s' "${section}" | LC_ALL=C grep -m1 '^<http')" "section prints the file URL"
 
+overrides_fixture="$(mktemp)"
+cat > "${overrides_fixture}" <<'OVERRIDES'
+# package	license	reason
+github.com/klauspost/compress	Apache-2.0 / MIT	test fixture
+github.com/klauspost/compress/zstd/internal/xxhash	Apache-2.0 / MIT	test fixture
+OVERRIDES
+
+assert_eq "Apache-2.0 / MIT" \
+    "$(LICENSE_OVERRIDES="${overrides_fixture}" license_identifier_for github.com/klauspost/compress Apache-2.0)" \
+    "license_identifier_for returns the override for a package that has one"
+assert_eq "MIT" \
+    "$(LICENSE_OVERRIDES="${overrides_fixture}" license_identifier_for k8s.io/api MIT)" \
+    "license_identifier_for returns the passed-in default for a package without an override"
+
+# Expected literal Markdown, not shell expansion.
+# shellcheck disable=SC2016
+assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | Apache-2.0 / MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
+    "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
+       LICENSE_OVERRIDES="${overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 3p)" \
+    "emit_index_table renders the overridden identifier in the License column"
+
+stale_overrides="$(mktemp)"
+printf 'github.com/absent/package\tApache-2.0 / MIT\ttest fixture\n' > "${stale_overrides}"
+# $1/$2 are expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
+assert_fails "check_override_coverage fails when an override names a package absent from the index" \
+    env LICENSE_OVERRIDES="${stale_overrides}" bash -c \
+    'source "$1"; check_override_coverage "$2"' _ "${HERE}/generate-third-party-notices.sh" "${render}/index.csv"
+
 rm -rf "${vendor_fixture}" "${render}"
-rm -f "${modules_fixture}" "${index_input}" "${urls_fixture}"
+rm -f "${modules_fixture}" "${index_input}" "${urls_fixture}" "${empty_overrides_fixture}" "${overrides_fixture}" "${stale_overrides}"
 
 finish

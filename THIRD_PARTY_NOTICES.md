@@ -115,8 +115,8 @@ carry.
 | `github.com/xlab/treeprint` | `github.com/xlab/treeprint` | v1.2.0 | MIT | [LICENSE](https://github.com/xlab/treeprint/blob/v1.2.0/LICENSE) |
 | `go.uber.org/multierr` | `go.uber.org/multierr` | v1.11.0 | MIT | [LICENSE.txt](https://github.com/uber-go/multierr/blob/v1.11.0/LICENSE.txt) |
 | `go.uber.org/zap` | `go.uber.org/zap` | v1.28.0 | MIT | [LICENSE](https://github.com/uber-go/zap/blob/v1.28.0/LICENSE) |
-| `go.yaml.in/yaml/v2` | `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 | [LICENSE](https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE) / [LICENSE.libyaml](https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE.libyaml) / [NOTICE](https://github.com/yaml/go-yaml/blob/v2.4.4/NOTICE) |
-| `go.yaml.in/yaml/v3` | `go.yaml.in/yaml/v3` | v3.0.4 | MIT | [LICENSE](https://github.com/yaml/go-yaml/blob/v3.0.4/LICENSE) / [NOTICE](https://github.com/yaml/go-yaml/blob/v3.0.4/NOTICE) |
+| `go.yaml.in/yaml/v2` | `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 / MIT | [LICENSE](https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE) / [LICENSE.libyaml](https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE.libyaml) / [NOTICE](https://github.com/yaml/go-yaml/blob/v2.4.4/NOTICE) |
+| `go.yaml.in/yaml/v3` | `go.yaml.in/yaml/v3` | v3.0.4 | Apache-2.0 / MIT | [LICENSE](https://github.com/yaml/go-yaml/blob/v3.0.4/LICENSE) / [NOTICE](https://github.com/yaml/go-yaml/blob/v3.0.4/NOTICE) |
 | `golang.org/x/crypto` | `golang.org/x/crypto` | v0.55.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/crypto/+/refs/tags/v0.55.0/LICENSE) / [PATENTS](https://go.googlesource.com/crypto/+/refs/tags/v0.55.0/PATENTS) |
 | `golang.org/x/mod/semver` | `golang.org/x/mod` | v0.40.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/mod/+/refs/tags/v0.40.0/LICENSE) / [PATENTS](https://go.googlesource.com/mod/+/refs/tags/v0.40.0/PATENTS) |
 | `golang.org/x/net` | `golang.org/x/net` | v0.58.0 | BSD-3-Clause | [LICENSE](https://go.googlesource.com/net/+/refs/tags/v0.58.0/LICENSE) / [PATENTS](https://go.googlesource.com/net/+/refs/tags/v0.58.0/PATENTS) |
@@ -130,7 +130,7 @@ carry.
 | `google.golang.org/protobuf` | `google.golang.org/protobuf` | v1.36.12-0.20260120151049-f2248ac996af | BSD-3-Clause | [LICENSE](https://go.googlesource.com/protobuf/+/f2248ac996af/LICENSE) / [PATENTS](https://go.googlesource.com/protobuf/+/f2248ac996af/PATENTS) |
 | `gopkg.in/evanphx/json-patch.v4` | `gopkg.in/evanphx/json-patch.v4` | v4.13.0 | BSD-3-Clause | [LICENSE](https://github.com/evanphx/json-patch/blob/v4.13.0/LICENSE) |
 | `gopkg.in/inf.v0` | `gopkg.in/inf.v0` | v0.9.1 | BSD-3-Clause | [LICENSE](https://github.com/go-inf/inf/blob/v0.9.1/LICENSE) |
-| `gopkg.in/yaml.v3` | `gopkg.in/yaml.v3` | v3.0.1 | MIT | [LICENSE](https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE) / [NOTICE](https://github.com/go-yaml/yaml/blob/v3.0.1/NOTICE) |
+| `gopkg.in/yaml.v3` | `gopkg.in/yaml.v3` | v3.0.1 | Apache-2.0 / MIT | [LICENSE](https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE) / [NOTICE](https://github.com/go-yaml/yaml/blob/v3.0.1/NOTICE) |
 | `k8s.io/api` | `k8s.io/api` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/api/blob/v0.36.4/LICENSE) |
 | `k8s.io/apiextensions-apiserver/pkg` | `k8s.io/apiextensions-apiserver` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/apiextensions-apiserver/blob/v0.36.4/LICENSE) |
 | `k8s.io/apimachinery/pkg` | `k8s.io/apimachinery` | v0.36.4 | Apache-2.0 | [LICENSE](https://github.com/kubernetes/apimachinery/blob/v0.36.4/LICENSE) |
@@ -12324,7 +12324,7 @@ THE SOFTWARE.
 
 * Module: go.yaml.in/yaml/v2
 * Version: v2.4.4
-* License: Apache-2.0
+* License: Apache-2.0 / MIT
 
 #### LICENSE
 
@@ -12600,7 +12600,7 @@ limitations under the License.
 
 * Module: go.yaml.in/yaml/v3
 * Version: v3.0.4
-* License: MIT
+* License: Apache-2.0 / MIT
 
 #### LICENSE
 
@@ -13676,7 +13676,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 * Module: gopkg.in/yaml.v3
 * Version: v3.0.1
-* License: MIT
+* License: Apache-2.0 / MIT
 
 #### LICENSE
 

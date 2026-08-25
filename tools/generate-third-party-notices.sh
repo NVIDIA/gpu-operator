@@ -72,7 +72,7 @@ check_prerequisites() {
     fi
 
     local required_file
-    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}"; do
+    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}"; do
         [[ -f "${required_file}" ]] \
             || die "${required_file} not found — run 'make third-party-notices' from the repo root."
     done
@@ -254,6 +254,22 @@ build_indexes() {
         die "go-licenses could not identify a license for some dependencies." \
             "Check the entries reported as Unknown before committing the file."
     fi
+
+    check_override_coverage "${INDEX_FILE}"
+}
+
+# A dropped dependency would otherwise leave its row in LICENSE_OVERRIDES
+# silently asserting a license for a package no longer shipped.
+check_override_coverage() {
+    local index="$1" override_package
+    while IFS=$'\t' read -r override_package _ _; do
+        case "${override_package}" in
+            ''|'#'*) continue ;;
+        esac
+        LC_ALL=C cut -d, -f1 "${index}" | LC_ALL=C grep -qFx "${override_package}" \
+            || die "${LICENSE_OVERRIDES} has a row for ${override_package}, which is not in the generated index." \
+                   "Remove that row from ${LICENSE_OVERRIDES} — the dependency was likely dropped."
+    done < "${LICENSE_OVERRIDES}"
 }
 
 # Filter by name: for restricted licenses 'go-licenses save' copies the whole
@@ -278,6 +294,7 @@ license_files_for() {
 }
 
 LICENSE_URLS="${LICENSE_URLS:-tools/license-urls.tsv}"
+LICENSE_OVERRIDES="${LICENSE_OVERRIDES:-tools/license-overrides.tsv}"
 VENDOR_DIR="${VENDOR_DIR:-vendor}"
 
 # Separate from check_prerequisites: tools/verify-license-urls.sh reuses the
@@ -287,6 +304,16 @@ require_url_map() {
     [[ -f "${LICENSE_URLS}" ]] \
         || die "${LICENSE_URLS} not found." \
                "Run 'make third-party-notices-urls' (needs network) and commit the result."
+}
+
+# A single license file can bundle more than one license, which go-licenses
+# reports as whichever one it scores highest; LICENSE_OVERRIDES corrects the
+# identifier by hand without touching the license text, which is unaffected.
+license_identifier_for() {
+    local package="$1" default_identifier="$2" override_identifier
+    override_identifier="$(LC_ALL=C awk -F'\t' -v pkg="${package}" \
+        '$1 == pkg { print $2; exit }' "${LICENSE_OVERRIDES}")"
+    printf '%s' "${override_identifier:-${default_identifier}}"
 }
 
 # The first enclosing directory holding a license file wins, which is how
@@ -337,31 +364,33 @@ location_cell() {
 }
 
 emit_index_table() {
-    local index="$1" package _ license module version location
+    local index="$1" package _ license module version location license_identifier
     printf '| Package | Module | Version | License | Location |\n'
     printf '|---------|--------|---------|---------|----------|\n'
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
         location="$(location_cell "${package}" "${module}" "${version}")"
+        license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
         # shellcheck disable=SC2016  # backticks are literal markdown here.
         printf '| `%s` | `%s` | %s | %s | %s |\n' \
             "${package}" "${module:-unknown}" "${version:-unknown}" \
-            "${license:-Unknown}" "${location}"
+            "${license_identifier}" "${location}"
     done < "${index}"
 }
 
 emit_sections() {
     local index="$1"
-    local package _ license module version files license_file fence relative_license_dir license_file_name url governing_dir
+    local package _ license module version files license_file fence relative_license_dir license_file_name url governing_dir license_identifier
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
 
+        license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
         printf '### %s\n\n' "${package}"
         printf '* Module: %s\n' "${module:-unknown}"
         printf '* Version: %s\n' "${version:-unknown}"
-        printf '* License: %s\n\n' "${license:-Unknown}"
+        printf '* License: %s\n\n' "${license_identifier}"
 
         relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
             || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
