@@ -111,6 +111,9 @@ operator:
     # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn)
     # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error)
     develMode: false
+  pprof:
+    # Bind address for the pprof profiling endpoint (e.g. ":6060"). Disabled when empty.
+    bindAddress: ""
   resources:
     limits:
       cpu: 500m

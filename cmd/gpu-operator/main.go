@@ -78,9 +78,12 @@ func main() {
 	var enableLeaderElection bool
 	var leaderElectionNamespace string
 	var probeAddr string
+	var pprofAddr string
 	var renewDeadline time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&pprofAddr, "pprof-bind-address", "",
+		"The address the pprof endpoint binds to (e.g. \":6060\"). Disabled when empty.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -136,6 +139,7 @@ func main() {
 		Scheme:                  scheme,
 		Metrics:                 metricsOptions,
 		HealthProbeBindAddress:  probeAddr,
+		PprofBindAddress:        pprofAddr,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionNamespace: leaderElectionNamespace,
 		LeaderElectionID:        "53822513.nvidia.com",
