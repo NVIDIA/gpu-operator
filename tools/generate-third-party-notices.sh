@@ -388,7 +388,6 @@ emit_sections() {
 
         license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
         printf '### %s\n\n' "${package}"
-        printf '* Module: %s\n' "${module:-unknown}"
         printf '* Version: %s\n' "${version:-unknown}"
         printf '* License: %s\n\n' "${license_identifier}"
 
@@ -443,9 +442,9 @@ shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
 Go distribution itself.
 
-Each dependency is listed with the module that owns it, the version
-redistributed, and a link to the license file in that version's upstream
-source. Every link was verified by fetching it and comparing its contents
+Each dependency is listed with the version redistributed and a link to the
+license file in that version's upstream source. Every link was verified by
+fetching it and comparing its contents
 against the copy vendored here, so each one resolves to the same license text
 reproduced below. Modules that no command under `cmd/` links — those vendored
 only for this module's own tests and build tooling — are not listed.

@@ -12,9 +12,9 @@ shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
 Go distribution itself.
 
-Each dependency is listed with the module that owns it, the version
-redistributed, and a link to the license file in that version's upstream
-source. Every link was verified by fetching it and comparing its contents
+Each dependency is listed with the version redistributed and a link to the
+license file in that version's upstream source. Every link was verified by
+fetching it and comparing its contents
 against the copy vendored here, so each one resolves to the same license text
 reproduced below. Modules that no command under `cmd/` links — those vendored
 only for this module's own tests and build tooling — are not listed.
@@ -160,7 +160,6 @@ carry.
 
 ### dario.cat/mergo
 
-* Module: dario.cat/mergo
 * Version: v1.0.1
 * License: BSD-3-Clause
 
@@ -203,7 +202,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/MakeNowJust/heredoc
 
-* Module: github.com/MakeNowJust/heredoc
 * Version: v1.0.0
 * License: MIT
 
@@ -239,7 +237,6 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/goutils
 
-* Module: github.com/Masterminds/goutils
 * Version: v1.1.1
 * License: Apache-2.0
 
@@ -456,7 +453,6 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/semver/v3
 
-* Module: github.com/Masterminds/semver/v3
 * Version: v3.5.0
 * License: MIT
 
@@ -490,7 +486,6 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/sprig/v3
 
-* Module: github.com/Masterminds/sprig/v3
 * Version: v3.3.0
 * License: MIT
 
@@ -524,7 +519,6 @@ THE SOFTWARE.
 
 ### github.com/Mellanox/maintenance-operator/api/v1alpha1
 
-* Module: github.com/Mellanox/maintenance-operator/api
 * Version: v0.3.0
 * License: Apache-2.0
 
@@ -740,7 +734,6 @@ THE SOFTWARE.
 
 ### github.com/NVIDIA/go-nvlib/pkg
 
-* Module: github.com/NVIDIA/go-nvlib
 * Version: v0.12.0
 * License: Apache-2.0
 
@@ -969,7 +962,6 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 
-* Module: github.com/NVIDIA/k8s-kata-manager
 * Version: v0.2.3
 * License: Apache-2.0
 
@@ -1186,7 +1178,6 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-operator-libs
 
-* Module: github.com/NVIDIA/k8s-operator-libs
 * Version: v0.0.0-20260629200812-d720f2557494
 * License: Apache-2.0
 
@@ -1403,7 +1394,6 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/nvidia-container-toolkit
 
-* Module: github.com/NVIDIA/nvidia-container-toolkit
 * Version: v1.20.0
 * License: Apache-2.0
 
@@ -1620,7 +1610,6 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/beorn7/perks/quantile
 
-* Module: github.com/beorn7/perks
 * Version: v1.0.1
 * License: MIT
 
@@ -1655,7 +1644,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/blang/semver/v4
 
-* Module: github.com/blang/semver/v4
 * Version: v4.0.0
 * License: MIT
 
@@ -1692,7 +1680,6 @@ THE SOFTWARE.
 
 ### github.com/cespare/xxhash/v2
 
-* Module: github.com/cespare/xxhash/v2
 * Version: v2.3.0
 * License: MIT
 
@@ -1729,7 +1716,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/chai2010/gettext-go
 
-* Module: github.com/chai2010/gettext-go
 * Version: v1.0.2
 * License: BSD-3-Clause
 
@@ -1771,7 +1757,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/cyphar/filepath-securejoin
 
-* Module: github.com/cyphar/filepath-securejoin
 * Version: v0.7.0
 * License: BSD-3-Clause / MPL-2.0
 
@@ -2650,7 +2635,6 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ### github.com/davecgh/go-spew/spew
 
-* Module: github.com/davecgh/go-spew
 * Version: v1.1.2-0.20180830191138-d8f796af33cc
 * License: ISC
 
@@ -2680,7 +2664,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/docker/libtrust
 
-* Module: github.com/docker/libtrust
 * Version: v0.0.0-20160708172513-aabc10ec26b7
 * License: Apache-2.0
 
@@ -2886,7 +2869,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/emicklei/go-restful/v3
 
-* Module: github.com/emicklei/go-restful/v3
 * Version: v3.13.0
 * License: MIT
 
@@ -2922,7 +2904,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/evanphx/json-patch/v5
 
-* Module: github.com/evanphx/json-patch/v5
 * Version: v5.9.11
 * License: BSD-3-Clause
 
@@ -2962,7 +2943,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/exponent-io/jsonpath
 
-* Module: github.com/exponent-io/jsonpath
 * Version: v0.0.0-20210407135951-1de76d718b3f
 * License: MIT
 
@@ -2998,7 +2978,6 @@ SOFTWARE.
 
 ### github.com/fsnotify/fsnotify
 
-* Module: github.com/fsnotify/fsnotify
 * Version: v1.9.0
 * License: BSD-3-Clause
 
@@ -3038,7 +3017,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/fxamacker/cbor/v2
 
-* Module: github.com/fxamacker/cbor/v2
 * Version: v2.9.2
 * License: MIT
 
@@ -3073,7 +3051,6 @@ SOFTWARE.
 
 ### github.com/go-errors/errors
 
-* Module: github.com/go-errors/errors
 * Version: v1.5.1
 * License: MIT
 
@@ -3095,7 +3072,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/logr
 
-* Module: github.com/go-logr/logr
 * Version: v1.4.4
 * License: Apache-2.0
 
@@ -3311,7 +3287,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/zapr
 
-* Module: github.com/go-logr/zapr
 * Version: v1.3.0
 * License: Apache-2.0
 
@@ -3527,7 +3502,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-openapi/jsonpointer
 
-* Module: github.com/go-openapi/jsonpointer
 * Version: v0.22.4
 * License: Apache-2.0
 
@@ -3790,7 +3764,6 @@ limitations under the License.
 
 ### github.com/go-openapi/jsonreference
 
-* Module: github.com/go-openapi/jsonreference
 * Version: v0.21.4
 * License: Apache-2.0
 
@@ -4054,7 +4027,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag
 
-* Module: github.com/go-openapi/swag
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -4271,7 +4243,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/cmdutils
 
-* Module: github.com/go-openapi/swag/cmdutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -4488,7 +4459,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/conv
 
-* Module: github.com/go-openapi/swag/conv
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -4705,7 +4675,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/fileutils
 
-* Module: github.com/go-openapi/swag/fileutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -4922,7 +4891,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/jsonname
 
-* Module: github.com/go-openapi/swag/jsonname
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -5139,7 +5107,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/jsonutils
 
-* Module: github.com/go-openapi/swag/jsonutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -5356,7 +5323,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/loading
 
-* Module: github.com/go-openapi/swag/loading
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -5573,7 +5539,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/mangling
 
-* Module: github.com/go-openapi/swag/mangling
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -5790,7 +5755,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/netutils
 
-* Module: github.com/go-openapi/swag/netutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -6007,7 +5971,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/stringutils
 
-* Module: github.com/go-openapi/swag/stringutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -6224,7 +6187,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/typeutils
 
-* Module: github.com/go-openapi/swag/typeutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -6441,7 +6403,6 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/yamlutils
 
-* Module: github.com/go-openapi/swag/yamlutils
 * Version: v0.25.4
 * License: Apache-2.0
 
@@ -6658,7 +6619,6 @@ limitations under the License.
 
 ### github.com/google/btree
 
-* Module: github.com/google/btree
 * Version: v1.1.3
 * License: Apache-2.0
 
@@ -6875,7 +6835,6 @@ limitations under the License.
 
 ### github.com/google/gnostic-models
 
-* Module: github.com/google/gnostic-models
 * Version: v0.7.1
 * License: Apache-2.0
 
@@ -7093,7 +7052,6 @@ limitations under the License.
 
 ### github.com/google/uuid
 
-* Module: github.com/google/uuid
 * Version: v1.6.0
 * License: BSD-3-Clause
 
@@ -7135,7 +7093,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/huandu/xstrings
 
-* Module: github.com/huandu/xstrings
 * Version: v1.5.0
 * License: MIT
 
@@ -7172,7 +7129,6 @@ SOFTWARE.
 
 ### github.com/json-iterator/go
 
-* Module: github.com/json-iterator/go
 * Version: v1.1.12
 * License: MIT
 
@@ -7208,7 +7164,6 @@ SOFTWARE.
 
 ### github.com/klauspost/compress
 
-* Module: github.com/klauspost/compress
 * Version: v1.19.1
 * License: Apache-2.0 / BSD-3-Clause / MIT
 
@@ -7527,7 +7482,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/klauspost/compress/internal/snapref
 
-* Module: github.com/klauspost/compress
 * Version: v1.19.1
 * License: BSD-3-Clause
 
@@ -7569,7 +7523,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/klauspost/compress/zstd/internal/xxhash
 
-* Module: github.com/klauspost/compress
 * Version: v1.19.1
 * License: MIT
 
@@ -7606,7 +7559,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/liggitt/tabwriter
 
-* Module: github.com/liggitt/tabwriter
 * Version: v0.0.0-20181228230101-89fcab3d43de
 * License: BSD-3-Clause
 
@@ -7648,7 +7600,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/mitchellh/copystructure
 
-* Module: github.com/mitchellh/copystructure
 * Version: v1.2.0
 * License: MIT
 
@@ -7684,7 +7635,6 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/go-wordwrap
 
-* Module: github.com/mitchellh/go-wordwrap
 * Version: v1.0.1
 * License: MIT
 
@@ -7720,7 +7670,6 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/reflectwalk
 
-* Module: github.com/mitchellh/reflectwalk
 * Version: v1.0.2
 * License: MIT
 
@@ -7756,7 +7705,6 @@ THE SOFTWARE.
 
 ### github.com/moby/term
 
-* Module: github.com/moby/term
 * Version: v0.5.2
 * License: Apache-2.0
 
@@ -7962,7 +7910,6 @@ THE SOFTWARE.
 
 ### github.com/modern-go/concurrent
 
-* Module: github.com/modern-go/concurrent
 * Version: v0.0.0-20180306012644-bacd9c7ef1dd
 * License: Apache-2.0
 
@@ -8178,7 +8125,6 @@ THE SOFTWARE.
 
 ### github.com/modern-go/reflect2
 
-* Module: github.com/modern-go/reflect2
 * Version: v1.0.3-0.20250322232337-35a7c28c31ee
 * License: Apache-2.0
 
@@ -8394,7 +8340,6 @@ THE SOFTWARE.
 
 ### github.com/monochromegane/go-gitignore
 
-* Module: github.com/monochromegane/go-gitignore
 * Version: v0.0.0-20200626010858-205db1a8cc00
 * License: MIT
 
@@ -8430,7 +8375,6 @@ SOFTWARE.
 
 ### github.com/munnerz/goautoneg
 
-* Module: github.com/munnerz/goautoneg
 * Version: v0.0.0-20191010083416-a7dc8b61c822
 * License: BSD-3-Clause
 
@@ -8476,7 +8420,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/cgroups/devices/config
 
-* Module: github.com/opencontainers/cgroups
 * Version: v0.0.7
 * License: Apache-2.0
 
@@ -8692,7 +8635,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/go-digest
 
-* Module: github.com/opencontainers/go-digest
 * Version: v1.0.0
 * License: Apache-2.0
 
@@ -9332,7 +9274,6 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### github.com/opencontainers/runc/libcontainer/devices
 
-* Module: github.com/opencontainers/runc
 * Version: v1.4.3
 * License: Apache-2.0
 
@@ -9563,7 +9504,6 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/openshift/api
 
-* Module: github.com/openshift/api
 * Version: v0.0.0-20260727141720-967cc4c36c9b
 * License: Apache-2.0
 
@@ -9769,7 +9709,6 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/openshift/client-go
 
-* Module: github.com/openshift/client-go
 * Version: v0.0.0-20260723174158-ae2315de9d73
 * License: Apache-2.0
 
@@ -9975,7 +9914,6 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/operator-framework/api/pkg
 
-* Module: github.com/operator-framework/api
 * Version: v0.45.0
 * License: Apache-2.0
 
@@ -10191,7 +10129,6 @@ See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ### github.com/peterbourgon/diskv
 
-* Module: github.com/peterbourgon/diskv
 * Version: v2.0.1+incompatible
 * License: MIT
 
@@ -10225,7 +10162,6 @@ THE SOFTWARE.
 
 ### github.com/pmezard/go-difflib/difflib
 
-* Module: github.com/pmezard/go-difflib
 * Version: v1.0.1-0.20181226105442-5d4384ee4fb2
 * License: BSD-3-Clause
 
@@ -10267,7 +10203,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
-* Module: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 * Version: v0.93.1
 * License: Apache-2.0
 
@@ -10483,7 +10418,6 @@ Apache License
 
 ### github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
 
-* Module: github.com/prometheus/client_golang
 * Version: v1.24.1
 * License: BSD-3-Clause
 
@@ -10525,7 +10459,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus/client_golang/prometheus
 
-* Module: github.com/prometheus/client_golang
 * Version: v1.24.1
 * License: Apache-2.0
 
@@ -10767,7 +10700,6 @@ See source code for license details.
 
 ### github.com/prometheus/client_model/go
 
-* Module: github.com/prometheus/client_model
 * Version: v0.6.2
 * License: Apache-2.0
 
@@ -10996,7 +10928,6 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/common
 
-* Module: github.com/prometheus/common
 * Version: v0.70.1
 * License: Apache-2.0
 
@@ -11225,7 +11156,6 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/procfs
 
-* Module: github.com/prometheus/procfs
 * Version: v0.21.1
 * License: Apache-2.0
 
@@ -11456,7 +11386,6 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/regclient/regclient
 
-* Module: github.com/regclient/regclient
 * Version: v0.11.5
 * License: Apache-2.0
 
@@ -11662,7 +11591,6 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/russross/blackfriday/v2
 
-* Module: github.com/russross/blackfriday/v2
 * Version: v2.1.0
 * License: BSD-2-Clause
 
@@ -11706,7 +11634,6 @@ Blackfriday is distributed under the Simplified BSD License:
 
 ### github.com/shopspring/decimal
 
-* Module: github.com/shopspring/decimal
 * Version: v1.4.0
 * License: MIT
 
@@ -11766,7 +11693,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/sirupsen/logrus
 
-* Module: github.com/sirupsen/logrus
 * Version: v1.10.1
 * License: MIT
 
@@ -11802,7 +11728,6 @@ THE SOFTWARE.
 
 ### github.com/spf13/cast
 
-* Module: github.com/spf13/cast
 * Version: v1.7.0
 * License: MIT
 
@@ -11837,7 +11762,6 @@ SOFTWARE.
 
 ### github.com/spf13/cobra
 
-* Module: github.com/spf13/cobra
 * Version: v1.10.2
 * License: Apache-2.0
 
@@ -12026,7 +11950,6 @@ SOFTWARE.
 
 ### github.com/spf13/pflag
 
-* Module: github.com/spf13/pflag
 * Version: v1.0.10
 * License: BSD-3-Clause
 
@@ -12069,7 +11992,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/stretchr/testify/assert/yaml
 
-* Module: github.com/stretchr/testify
 * Version: v1.12.0
 * License: MIT
 
@@ -12105,7 +12027,6 @@ SOFTWARE.
 
 ### github.com/ulikunitz/xz
 
-* Module: github.com/ulikunitz/xz
 * Version: v0.5.15
 * License: BSD-3-Clause
 
@@ -12146,7 +12067,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/urfave/cli/v3
 
-* Module: github.com/urfave/cli/v3
 * Version: v3.10.1
 * License: MIT
 
@@ -12182,7 +12102,6 @@ SOFTWARE.
 
 ### github.com/x448/float16
 
-* Module: github.com/x448/float16
 * Version: v0.8.4
 * License: MIT
 
@@ -12219,7 +12138,6 @@ SOFTWARE.
 
 ### github.com/xlab/treeprint
 
-* Module: github.com/xlab/treeprint
 * Version: v1.2.0
 * License: MIT
 
@@ -12254,7 +12172,6 @@ THE SOFTWARE.
 
 ### go.uber.org/multierr
 
-* Module: go.uber.org/multierr
 * Version: v1.11.0
 * License: MIT
 
@@ -12288,7 +12205,6 @@ THE SOFTWARE.
 
 ### go.uber.org/zap
 
-* Module: go.uber.org/zap
 * Version: v1.28.0
 * License: MIT
 
@@ -12322,7 +12238,6 @@ THE SOFTWARE.
 
 ### go.yaml.in/yaml/v2
 
-* Module: go.yaml.in/yaml/v2
 * Version: v2.4.4
 * License: Apache-2.0 / MIT
 
@@ -12598,7 +12513,6 @@ limitations under the License.
 
 ### go.yaml.in/yaml/v3
 
-* Module: go.yaml.in/yaml/v3
 * Version: v3.0.4
 * License: Apache-2.0 / MIT
 
@@ -12684,7 +12598,6 @@ limitations under the License.
 
 ### golang.org/x/crypto
 
-* Module: golang.org/x/crypto
 * Version: v0.55.0
 * License: BSD-3-Clause
 
@@ -12756,7 +12669,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/mod/semver
 
-* Module: golang.org/x/mod
 * Version: v0.40.0
 * License: BSD-3-Clause
 
@@ -12828,7 +12740,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/net
 
-* Module: golang.org/x/net
 * Version: v0.58.0
 * License: BSD-3-Clause
 
@@ -12900,7 +12811,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/oauth2
 
-* Module: golang.org/x/oauth2
 * Version: v0.36.0
 * License: BSD-3-Clause
 
@@ -12942,7 +12852,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/sync/errgroup
 
-* Module: golang.org/x/sync
 * Version: v0.22.0
 * License: BSD-3-Clause
 
@@ -13014,7 +12923,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/sys/unix
 
-* Module: golang.org/x/sys
 * Version: v0.47.0
 * License: BSD-3-Clause
 
@@ -13086,7 +12994,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/term
 
-* Module: golang.org/x/term
 * Version: v0.45.0
 * License: BSD-3-Clause
 
@@ -13158,7 +13065,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/text
 
-* Module: golang.org/x/text
 * Version: v0.41.0
 * License: BSD-3-Clause
 
@@ -13230,7 +13136,6 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/time/rate
 
-* Module: golang.org/x/time
 * Version: v0.14.0
 * License: BSD-3-Clause
 
@@ -13302,7 +13207,6 @@ shall terminate as of the date such litigation is filed.
 
 ### gomodules.xyz/jsonpatch/v2
 
-* Module: gomodules.xyz/jsonpatch/v2
 * Version: v2.4.0
 * License: Apache-2.0
 
@@ -13519,7 +13423,6 @@ shall terminate as of the date such litigation is filed.
 
 ### google.golang.org/protobuf
 
-* Module: google.golang.org/protobuf
 * Version: v1.36.12-0.20260120151049-f2248ac996af
 * License: BSD-3-Clause
 
@@ -13591,7 +13494,6 @@ shall terminate as of the date such litigation is filed.
 
 ### gopkg.in/evanphx/json-patch.v4
 
-* Module: gopkg.in/evanphx/json-patch.v4
 * Version: v4.13.0
 * License: BSD-3-Clause
 
@@ -13631,7 +13533,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/inf.v0
 
-* Module: gopkg.in/inf.v0
 * Version: v0.9.1
 * License: BSD-3-Clause
 
@@ -13674,7 +13575,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/yaml.v3
 
-* Module: gopkg.in/yaml.v3
 * Version: v3.0.1
 * License: Apache-2.0 / MIT
 
@@ -13760,7 +13660,6 @@ limitations under the License.
 
 ### k8s.io/api
 
-* Module: k8s.io/api
 * Version: v0.36.4
 * License: Apache-2.0
 
@@ -13977,7 +13876,6 @@ limitations under the License.
 
 ### k8s.io/apiextensions-apiserver/pkg
 
-* Module: k8s.io/apiextensions-apiserver
 * Version: v0.36.4
 * License: Apache-2.0
 
@@ -14194,7 +14092,6 @@ limitations under the License.
 
 ### k8s.io/apimachinery/pkg
 
-* Module: k8s.io/apimachinery
 * Version: v0.36.4
 * License: Apache-2.0
 
@@ -14411,7 +14308,6 @@ limitations under the License.
 
 ### k8s.io/apimachinery/third_party/forked/golang
 
-* Module: k8s.io/apimachinery
 * Version: v0.36.4
 * License: BSD-3-Clause
 
@@ -14483,7 +14379,6 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/cli-runtime/pkg
 
-* Module: k8s.io/cli-runtime
 * Version: v0.36.0
 * License: Apache-2.0
 
@@ -14700,7 +14595,6 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go
 
-* Module: k8s.io/client-go
 * Version: v0.36.4
 * License: Apache-2.0
 
@@ -14917,7 +14811,6 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go/third_party/forked/golang/template
 
-* Module: k8s.io/client-go
 * Version: v0.36.4
 * License: BSD-3-Clause
 
@@ -14989,7 +14882,6 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go/third_party/forked/httpcache
 
-* Module: k8s.io/client-go
 * Version: v0.36.4
 * License: MIT
 
@@ -15010,7 +14902,6 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/component-base/version
 
-* Module: k8s.io/component-base
 * Version: v0.36.4
 * License: Apache-2.0
 
@@ -15227,7 +15118,6 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/klog/v2
 
-* Module: k8s.io/klog/v2
 * Version: v2.140.0
 * License: Apache-2.0
 
@@ -15433,7 +15323,6 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg
 
-* Module: k8s.io/kube-openapi
 * Version: v0.0.0-20260603220949-865597e52e25
 * License: Apache-2.0
 
@@ -15650,7 +15539,6 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 
-* Module: k8s.io/kube-openapi
 * Version: v0.0.0-20260603220949-865597e52e25
 * License: BSD-3-Clause
 
@@ -15703,7 +15591,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kube-openapi/pkg/validation/spec
 
-* Module: k8s.io/kube-openapi
 * Version: v0.0.0-20260603220949-865597e52e25
 * License: Apache-2.0
 
@@ -15920,7 +15807,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kubectl/pkg
 
-* Module: k8s.io/kubectl
 * Version: v0.36.0
 * License: Apache-2.0
 
@@ -16136,7 +16022,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils
 
-* Module: k8s.io/utils
 * Version: v0.0.0-20260507154919-ff6756f316d2
 * License: Apache-2.0
 
@@ -16353,7 +16238,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils/internal/third_party/forked/golang
 
-* Module: k8s.io/utils
 * Version: v0.0.0-20260507154919-ff6756f316d2
 * License: BSD-3-Clause
 
@@ -16425,7 +16309,6 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/utils/third_party/forked/golang/btree
 
-* Module: k8s.io/utils
 * Version: v0.0.0-20260507154919-ff6756f316d2
 * License: Apache-2.0
 
@@ -16641,7 +16524,6 @@ shall terminate as of the date such litigation is filed.
 
 ### sigs.k8s.io/controller-runtime
 
-* Module: sigs.k8s.io/controller-runtime
 * Version: v0.24.1
 * License: Apache-2.0
 
@@ -16857,7 +16739,6 @@ shall terminate as of the date such litigation is filed.
 
 ### sigs.k8s.io/json
 
-* Module: sigs.k8s.io/json
 * Version: v0.0.0-20250730193827-2d320260d730
 * License: Apache-2.0 / BSD-3-Clause
 
@@ -17110,7 +16991,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/api
 
-* Module: sigs.k8s.io/kustomize/api
 * Version: v0.21.1
 * License: Apache-2.0
 
@@ -17326,7 +17206,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/kyaml
 
-* Module: sigs.k8s.io/kustomize/kyaml
 * Version: v0.21.1
 * License: Apache-2.0
 
@@ -17542,7 +17421,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/randfill
 
-* Module: sigs.k8s.io/randfill
 * Version: v1.0.0
 * License: Apache-2.0
 
@@ -17791,7 +17669,6 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/structured-merge-diff/v6
 
-* Module: sigs.k8s.io/structured-merge-diff/v6
 * Version: v6.4.0
 * License: Apache-2.0
 
@@ -18007,7 +17884,6 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/yaml
 
-* Module: sigs.k8s.io/yaml
 * Version: v1.6.0
 * License: Apache-2.0 / BSD-3-Clause / MIT
 

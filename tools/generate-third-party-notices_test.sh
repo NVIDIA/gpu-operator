@@ -145,8 +145,9 @@ assert_fails "emit_index_table fails closed when the URL map has no entry for a 
 
 section="$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
     LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_sections "${render}/index.csv" "${render}/cache")"
-assert_eq "* Module: github.com/klauspost/compress" "$(printf '%s' "${section}" | sed -n 3p)" "section names the module"
-assert_eq "* Version: v1.19.1" "$(printf '%s' "${section}" | sed -n 4p)" "section names the version"
+assert_eq "* Version: v1.19.1" "$(printf '%s' "${section}" | sed -n 3p)" "section names the version"
+assert_eq "* License: MIT" "$(printf '%s' "${section}" | sed -n 4p)" "section names the license"
+assert_eq "0" "$(printf '%s' "${section}" | LC_ALL=C grep -c '^\* Module: ')" "section no longer names the module"
 assert_eq "<https://example.invalid/xxhash>" \
     "$(printf '%s' "${section}" | LC_ALL=C grep -m1 '^<http')" "section prints the file URL"
 
