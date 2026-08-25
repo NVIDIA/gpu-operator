@@ -243,6 +243,9 @@ E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-shared-dependencies:
 	@bash hack/validate-shared-dependencies.sh
 
+validate-published-api-module:
+	@OPERATOR_VERSION="$(VERSION)" bash hack/validate-published-api-module.sh "$(OPERATOR_TAG)"
+
 .PHONY: update-vendor
 update-vendor:
 	go mod vendor
