@@ -36,6 +36,7 @@ jobs:
 
   code-scanning:
     permissions:
+      contents: read
       security-events: write
       packages: read
     uses: ./.github/workflows/code-scanning.yaml
