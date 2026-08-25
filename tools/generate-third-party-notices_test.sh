@@ -119,13 +119,13 @@ cat > "${render}/index.csv" <<'IDX'
 github.com/klauspost/compress/zstd/internal/xxhash,ignored,MIT,github.com/klauspost/compress,v1.19.1
 IDX
 
-assert_eq '| Package | Module | Version | License | Location |' \
+assert_eq '| Package | Version | License | Location |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
        LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 1p)" \
-    "index header has five columns"
+    "index header has four columns"
 # Expected literal Markdown, not shell expansion.
 # shellcheck disable=SC2016
-assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
+assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | v1.19.1 | MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
        LICENSE_OVERRIDES="${empty_overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 3p)" \
     "index row labels the link by filename"
@@ -166,7 +166,7 @@ assert_eq "MIT" \
 
 # Expected literal Markdown, not shell expansion.
 # shellcheck disable=SC2016
-assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | `github.com/klauspost/compress` | v1.19.1 | Apache-2.0 / MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
+assert_eq '| `github.com/klauspost/compress/zstd/internal/xxhash` | v1.19.1 | Apache-2.0 / MIT | [LICENSE.txt](https://example.invalid/xxhash) |' \
     "$(LICENSE_URLS="${urls_fixture}" VENDOR_DIR="${vendor_fixture}" LICENSES_DIR="${render}/cache" \
        LICENSE_OVERRIDES="${overrides_fixture}" emit_index_table "${render}/index.csv" | sed -n 3p)" \
     "emit_index_table renders the overridden identifier in the License column"

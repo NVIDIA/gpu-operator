@@ -365,16 +365,16 @@ location_cell() {
 
 emit_index_table() {
     local index="$1" package _ license module version location license_identifier
-    printf '| Package | Module | Version | License | Location |\n'
-    printf '|---------|--------|---------|---------|----------|\n'
+    printf '| Package | Version | License | Location |\n'
+    printf '|---------|---------|---------|----------|\n'
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
         location="$(location_cell "${package}" "${module}" "${version}")"
         license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
         # shellcheck disable=SC2016  # backticks are literal markdown here.
-        printf '| `%s` | `%s` | %s | %s | %s |\n' \
-            "${package}" "${module:-unknown}" "${version:-unknown}" \
+        printf '| `%s` | %s | %s | %s |\n' \
+            "${package}" "${version:-unknown}" \
             "${license_identifier}" "${location}"
     done < "${index}"
 }
