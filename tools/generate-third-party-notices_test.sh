@@ -80,6 +80,13 @@ assert_fails "location_for fails closed on a miss" \
     'source "$1"; location_for github.com/nope v1.0.0 LICENSE' \
     _ "${HERE}/generate-third-party-notices.sh"
 
+license_files_fixture="$(mktemp -d)"
+touch "${license_files_fixture}/LICENSE" "${license_files_fixture}/LICENSE.md" "${license_files_fixture}/license.go"
+assert_eq "$(printf '%s/LICENSE\n%s/LICENSE.md' "${license_files_fixture}" "${license_files_fixture}")" \
+    "$(license_files_for "${license_files_fixture}")" \
+    "license_files_for excludes a Go source file even when its name matches"
+rm -rf "${license_files_fixture}"
+
 vendor_fixture="$(mktemp -d)"
 mkdir -p "${vendor_fixture}/github.com/klauspost/compress/zstd/internal/xxhash"
 touch "${vendor_fixture}/github.com/klauspost/compress/LICENSE"

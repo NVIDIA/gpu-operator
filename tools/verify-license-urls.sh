@@ -193,7 +193,7 @@ main() {
                 continue
             fi
             printf '%s\t%s\t%s\t%s\n' "${module}" "${version}" "${path_in_module}" "${found}" >> "${tmp}"
-        done < <(license_files_for "${LICENSES_DIR}/${package}")
+        done < <(license_files_for "${VENDOR_DIR}/${module}${relative:+/${relative}}")
 
         if (( license_file_count == 0 )); then
             log "UNVERIFIED ${module}@${version} — no license file found for ${package}"

@@ -259,10 +259,18 @@ build_indexes() {
 # License-bearing files, sorted. Filter by name: for restricted licenses
 # 'go-licenses save' copies the whole module source, which does not belong here.
 license_files_for() {
-    local dir="$1" f
+    local dir="$1" f base
     [[ -d "${dir}" ]] || return 0
     while IFS= read -r -d '' f; do
-        if printf '%s' "$(basename "${f}")" \
+        base="$(basename "${f}")"
+        # Exclude source files: the name pattern below also matches source
+        # files that merely start with a license-shaped header, e.g.
+        # k8s.io/kube-openapi/pkg/validation/spec/license.go, a Go file
+        # beginning "// Copyright 2015 go-swagger maintainers".
+        case "${base}" in
+            *.go|*.c|*.h|*.s|*.py|*.sh|*.java|*.ts|*.js) continue ;;
+        esac
+        if printf '%s' "${base}" \
             | LC_ALL=C grep -qiE '^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$'; then
             printf '%s\n' "${f}"
         fi
@@ -311,10 +319,11 @@ location_for() {
 # License column joins identifiers.
 location_cell() {
     local package="$1" module="$2" version="$3"
-    local relative name license_path url cell="" lf
+    local relative name license_path url cell="" lf govern_dir
     relative="$(license_dir_within_module "${package}" "${module}")" \
         || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
                "Run 'go mod vendor' and re-run."
+    govern_dir="${VENDOR_DIR}/${module}${relative:+/${relative}}"
     while IFS= read -r lf; do
         [[ -z "${lf}" ]] && continue
         name="$(basename "${lf}")"
@@ -323,9 +332,9 @@ location_cell() {
             || die "${LICENSE_URLS} has no verified URL for ${module}@${version} ${license_path}." \
                    "Run 'make third-party-notices-urls' (needs network) and commit the result."
         cell="${cell:+${cell} / }[${name}](${url})"
-    done < <(license_files_for "${LICENSES_DIR}/${package}")
-    [[ -n "${cell}" ]] || die "no license file for ${package} under ${LICENSES_DIR}." \
-                              "Run 'make third-party-notices' and re-run."
+    done < <(license_files_for "${govern_dir}")
+    [[ -n "${cell}" ]] || die "no license file for ${package} under ${govern_dir}." \
+                              "Run 'go mod vendor' and re-run."
     printf '%s' "${cell}"
 }
 
@@ -345,8 +354,8 @@ emit_index_table() {
 }
 
 emit_sections() {
-    local index="$1" root="$2"
-    local package _ license module version files lf fence relative name url
+    local index="$1"
+    local package _ license module version files lf fence relative name url govern_dir
 
     while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
@@ -356,17 +365,19 @@ emit_sections() {
         printf '* Version: %s\n' "${version:-unknown}"
         printf '* License: %s\n\n' "${license:-Unknown}"
 
+        relative="$(license_dir_within_module "${package}" "${module}")" \
+            || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
+                   "Run 'go mod vendor' and re-run."
+        govern_dir="${VENDOR_DIR}/${module}${relative:+/${relative}}"
+
         files=()
         while IFS= read -r lf; do
             [[ -n "${lf}" ]] && files+=("${lf}")
-        done < <(license_files_for "${root}/${package}")
+        done < <(license_files_for "${govern_dir}")
 
         if (( ${#files[@]} == 0 )); then
             printf 'License text unavailable. See upstream source for the full license.\n'
         else
-            relative="$(license_dir_within_module "${package}" "${module}")" \
-                || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
-                       "Run 'go mod vendor' and re-run."
             for lf in "${files[@]}"; do
                 name="$(basename "${lf}")"
                 url="$(location_for "${module}" "${version}" "${relative:+${relative}/}${name}")" \
@@ -430,7 +441,7 @@ EOF
 ## License Texts
 
 EOF
-        emit_sections "${INDEX_FILE}" "${LICENSES_DIR}"
+        emit_sections "${INDEX_FILE}"
     } > "${OUT_TMP}"
     # mktemp creates 0600, so fix the mode before the rename. mv, not cp: the
     # rename is atomic, so a failed run leaves the previous document intact.
