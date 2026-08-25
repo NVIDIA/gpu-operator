@@ -149,7 +149,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
+CHECK_TARGETS := lint license-check validate-shared-dependencies validate-modules validate-generated-assets
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -241,6 +241,10 @@ sync-crds:
 
 TOOLS_DIR := $(PROJECT_DIR)/tools
 E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
+
+validate-shared-dependencies:
+	@bash hack/validate-shared-dependencies.sh
+
 validate-modules:
 	@echo "- [api] Verifying that the dependencies have expected content..."
 	go -C $(API_DIR) mod verify
