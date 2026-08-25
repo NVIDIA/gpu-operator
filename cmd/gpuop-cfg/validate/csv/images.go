@@ -19,41 +19,21 @@ package csv
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/regclient/regclient"
 	"github.com/regclient/regclient/types/ref"
+
+	"github.com/NVIDIA/gpu-operator/cmd/gpuop-cfg/internal/images"
 )
 
 func validateImages(ctx context.Context, csv *v1alpha1.ClusterServiceVersion) error {
-	// validate all 'relatedImages'
-	images := csv.Spec.RelatedImages
-	for _, image := range images {
-		err := validateImage(ctx, image.Image)
+	imagePaths := images.FromCSV(csv)
+
+	for _, path := range imagePaths {
+		err := validateImage(ctx, path)
 		if err != nil {
-			return fmt.Errorf("failed to validate image %s: %v", image.Name, err)
-		}
-	}
-
-	// get the gpu-operator deployment spec
-	deployment := csv.Spec.InstallStrategy.StrategySpec.DeploymentSpecs[0]
-	ctr := deployment.Spec.Template.Spec.Containers[0]
-
-	// validate the gpu-operator image
-	err := validateImage(ctx, ctr.Image)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", ctr.Image, err)
-	}
-
-	// validate all operand images configured as env vars
-	for _, env := range ctr.Env {
-		if !strings.HasSuffix(env.Name, "_IMAGE") {
-			continue
-		}
-		err = validateImage(ctx, env.Value)
-		if err != nil {
-			return fmt.Errorf("failed to validate image %s: %v", env.Name, err)
+			return fmt.Errorf("failed to validate image %s: %v", path, err)
 		}
 	}
 
