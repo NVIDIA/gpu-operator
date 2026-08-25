@@ -245,6 +245,9 @@ E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
 validate-shared-dependencies:
 	@bash hack/validate-shared-dependencies.sh
 
+validate-api-version-unpublished:
+	@bash hack/validate-api-version-unpublished.sh
+
 validate-published-api-module:
 	@bash hack/validate-published-api-module.sh "$(OPERATOR_TAG)"
 
