@@ -37,6 +37,9 @@ updates:
     directory: "/docker"
     schedule:
       interval: "daily"
+    ignore:
+      # golang is managed by Renovate.
+      - dependency-name: "golang"
 
   - package-ecosystem: "github-actions"
     directory: "/"
