@@ -1,0 +1,56 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: API Post-Tag Validation
+
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+    inputs:
+      operator_tag:
+        description: "Operator tag to validate"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-api-module:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout tagged code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.operator_tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Get Golang version
+        run: |
+          GOLANG_VERSION=$(grep "GOLANG_VERSION ?=" versions.mk)
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Validate published API module
+        env:
+          OPERATOR_TAG: ${{ github.event.inputs.operator_tag || github.ref_name }}
+        run: make validate-published-api-module OPERATOR_TAG="${OPERATOR_TAG}"
