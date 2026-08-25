@@ -14,10 +14,10 @@ Go distribution itself.
 
 Each dependency is listed with the version redistributed and a link to the
 license file in that version's upstream source. Every link was verified by
-fetching it and comparing its contents
-against the copy vendored here, so each one resolves to the same license text
-reproduced below. Modules that no command under `cmd/` links — those vendored
-only for this module's own tests and build tooling — are not listed.
+fetching it and comparing its contents against the copy vendored here, so each
+one resolves to the same license text reproduced below. Modules that no command
+under `cmd/` links are not listed; those are vendored only for this module's own
+tests and build tooling.
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
