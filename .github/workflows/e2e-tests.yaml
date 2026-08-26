@@ -55,6 +55,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   variables:
     uses: ./.github/workflows/variables.yaml

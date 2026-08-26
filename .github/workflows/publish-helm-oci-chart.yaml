@@ -33,7 +33,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: publish-helm-oci-chart-${{ inputs.operator_version }}
@@ -43,6 +42,9 @@ jobs:
   publish-helm-chart:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
     outputs:
       chart_reference: ${{ steps.publish.outputs.chart_reference }}
       chart_version: ${{ steps.package.outputs.chart_version }}

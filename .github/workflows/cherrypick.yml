@@ -21,9 +21,7 @@ on:
     types: [closed]
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 jobs:
   add-labels:
@@ -32,9 +30,13 @@ jobs:
     # Run on /cherry-pick comments on PRs
     if: |
       github.event_name == 'issue_comment' &&
-      github.event.issue.pull_request && 
+      github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/cherry-pick')
-    
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -62,7 +64,11 @@ jobs:
       github.event_name == 'pull_request_target' &&
       github.event.pull_request.merged == true &&
       contains(join(github.event.pull_request.labels.*.name, ','), 'cherry-pick/')
-    
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
     steps:
       - name: Checkout base branch repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

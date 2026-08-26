@@ -20,6 +20,9 @@ name: Third-Party Notices Check
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   check-third-party-notices:
     runs-on: linux-amd64-cpu4

@@ -30,6 +30,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   variables:
     runs-on: ubuntu-latest
@@ -147,6 +150,9 @@ jobs:
     needs: [variables, build-gpu-operator-arm64, build-gpu-operator-amd64]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         name: Check out code

@@ -17,6 +17,9 @@ name: "CodeQL"
 on:
   workflow_call: {}
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze Go code with CodeQL
