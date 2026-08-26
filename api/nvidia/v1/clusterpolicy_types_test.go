@@ -71,4 +71,18 @@ func TestImagePath(t *testing.T) {
 		assert.Empty(t, path)
 		assert.ErrorContains(t, err, "invalid type to construct image path")
 	})
+
+	t.Run("nil spec errors", func(t *testing.T) {
+		path, err := ImagePath(nil)
+		require.Error(t, err)
+		assert.Empty(t, path)
+		assert.ErrorContains(t, err, "invalid nil spec")
+	})
+
+	t.Run("typed nil spec errors", func(t *testing.T) {
+		path, err := ImagePath((*GPUDirectStorageSpec)(nil))
+		require.Error(t, err)
+		assert.Empty(t, path)
+		assert.ErrorContains(t, err, "invalid nil spec")
+	})
 }

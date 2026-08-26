@@ -106,17 +106,19 @@ func validateImages(ctx context.Context, spec *v1.ClusterPolicySpec) error {
 		return fmt.Errorf("failed to validate image %s: %v", path, err)
 	}
 
-	// GPUDirectStorage
-	path, err = v1.ImagePath(spec.GPUDirectStorage)
-	if err != nil {
-		return fmt.Errorf("failed to construct the image path: %v", err)
-	}
-	// For GDS driver, we must append the os-tag
-	path += "-ubuntu22.04"
+	// GPUDirectStorage is optional and nil when GDS is omitted from the ClusterPolicy.
+	if spec.GPUDirectStorage != nil {
+		path, err = v1.ImagePath(spec.GPUDirectStorage)
+		if err != nil {
+			return fmt.Errorf("failed to construct the image path: %v", err)
+		}
+		// For GDS driver, we must append the os-tag
+		path += "-ubuntu22.04"
 
-	err = validateImage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to validate image %s: %v", path, err)
+		err = validateImage(ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to validate image %s: %v", path, err)
+		}
 	}
 
 	// VFIOManager
