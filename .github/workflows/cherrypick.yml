@@ -70,11 +70,15 @@ jobs:
       issues: write
 
     steps:
+      - name: Capture base branch
+        id: base-branch
+        run: echo "ref=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout base branch repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ steps.base-branch.outputs.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract target branches from PR labels
