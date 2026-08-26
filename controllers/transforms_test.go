@@ -4652,6 +4652,84 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 	}
 }
 
+func TestTransformDriverMountsCustomConfigsInDriverToolkit(t *testing.T) {
+	repoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"custom.repo": "[custom-repo]",
+		},
+	}
+	certConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cert-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"custom.pem": "test-certificate",
+		},
+	}
+
+	ds := NewDaemonset().
+		WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithContainer(corev1.Container{Name: "openshift-driver-toolkit-ctr"})
+	config := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository:      "nvcr.io/nvidia",
+			Image:           "driver",
+			Version:         "580.126.16",
+			ImagePullPolicy: "IfNotPresent",
+			RepoConfig: &gpuv1.DriverRepoConfigSpec{
+				ConfigMapName: repoConfigMap.Name,
+			},
+			CertConfig: &gpuv1.DriverCertConfigSpec{
+				Name: certConfigMap.Name,
+			},
+		},
+	}
+	controller := ClusterPolicyController{
+		client:            fake.NewFakeClient(repoConfigMap, certConfigMap),
+		operatorNamespace: "test-ns",
+		gpuNodeOSRelease:  "rhcos",
+		gpuNodeOSTag:      "rhcos4.22",
+		ocpDriverToolkit: OpenShiftDriverToolkit{
+			enabled: true,
+		},
+	}
+
+	require.NoError(t, transformDriverContainer(ds.DaemonSet, config, controller))
+
+	driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.NotNil(t, driverContainer)
+	driverToolkitContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr")
+	require.NotNil(t, driverToolkitContainer)
+
+	expectedMounts := []corev1.VolumeMount{
+		{
+			Name:      repoConfigMap.Name,
+			ReadOnly:  true,
+			MountPath: "/etc/yum.repos.d/custom.repo",
+			SubPath:   "custom.repo",
+		},
+		{
+			Name:      certConfigMap.Name,
+			ReadOnly:  true,
+			MountPath: "/etc/pki/ca-trust/extracted/pem/custom.pem",
+			SubPath:   "custom.pem",
+		},
+	}
+	for _, expectedMount := range expectedMounts {
+		assert.Contains(t, driverContainer.VolumeMounts, expectedMount)
+		assert.Contains(t, driverToolkitContainer.VolumeMounts, expectedMount)
+	}
+
+	require.Len(t, ds.Spec.Template.Spec.Volumes, 2)
+	assert.Equal(t, repoConfigMap.Name, ds.Spec.Template.Spec.Volumes[0].Name)
+	assert.Equal(t, certConfigMap.Name, ds.Spec.Template.Spec.Volumes[1].Name)
+}
+
 func TestTransformDriverSubscriptionMounts(t *testing.T) {
 	repoConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

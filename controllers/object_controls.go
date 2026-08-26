@@ -3716,6 +3716,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		// Mount the repo config volume to the openshift-driver-toolkit container if it is enabled
+		if n.ocpDriverToolkit.enabled {
+			driverToolkitContainer := findContainerByName(podSpec.Containers, "openshift-driver-toolkit-ctr")
+			if driverToolkitContainer != nil {
+				driverToolkitContainer.VolumeMounts = append(driverToolkitContainer.VolumeMounts, volumeMounts...)
+			}
+		}
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 	}
 
@@ -3730,6 +3737,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
+		if n.ocpDriverToolkit.enabled {
+			driverToolkitContainer := findContainerByName(podSpec.Containers, "openshift-driver-toolkit-ctr")
+			if driverToolkitContainer != nil {
+				driverToolkitContainer.VolumeMounts = append(driverToolkitContainer.VolumeMounts, volumeMounts...)
+			}
+		}
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
 	}
 

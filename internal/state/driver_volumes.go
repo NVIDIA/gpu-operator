@@ -154,6 +154,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %w", err)
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
+			additionalCfgs.DriverToolkitVolumeMounts = append(additionalCfgs.DriverToolkitVolumeMounts, volumeMounts...)
 			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.RepoConfig.Name, itemsToInclude))
 		}
 
@@ -169,6 +170,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
+			additionalCfgs.DriverToolkitVolumeMounts = append(additionalCfgs.DriverToolkitVolumeMounts, volumeMounts...)
 			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
 		}
 
