@@ -33,6 +33,15 @@ github.com/NVIDIA/go-nvlib/pkg/nvpci
 github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
 github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
 github.com/NVIDIA/go-nvlib/pkg/pciids
+# github.com/NVIDIA/gpu-operator/api v0.2603.3 => ./api
+## explicit; go 1.26.3
+github.com/NVIDIA/gpu-operator/api/image
+github.com/NVIDIA/gpu-operator/api/nvidia/v1
+github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1
+github.com/NVIDIA/gpu-operator/api/versioned
+github.com/NVIDIA/gpu-operator/api/versioned/scheme
+github.com/NVIDIA/gpu-operator/api/versioned/typed/nvidia/v1
+github.com/NVIDIA/gpu-operator/api/versioned/typed/nvidia/v1alpha1
 # github.com/NVIDIA/k8s-kata-manager v0.2.3
 ## explicit; go 1.23.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
@@ -767,7 +776,6 @@ k8s.io/client-go/applyconfigurations/storagemigration/v1beta1
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
-k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/features
 k8s.io/client-go/gentype
@@ -1204,3 +1212,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# github.com/NVIDIA/gpu-operator/api => ./api

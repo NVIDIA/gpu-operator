@@ -21,6 +21,8 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(CURDIR)/versions.mk
 
 MODULE := github.com/NVIDIA/gpu-operator
+API_DIR := $(PROJECT_DIR)/api
+API_MODULE := $(MODULE)/api
 GOPROXY ?= https://proxy.golang.org,direct
 
 ifeq ($(IMAGE_NAME),)
@@ -103,20 +105,23 @@ undeploy:
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
+.PHONY: manifests
 manifests: install-tools
 	@echo "- Generating CRDs from the codebase"
-	$(CONTROLLER_GEN) rbac:roleName=gpu-operator-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=gpu-operator-role webhook paths="./..."
+	cd $(API_DIR) && $(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=$(PROJECT_DIR)/config/crd/bases
 
 # Generate code
+.PHONY: generate generate-clientset
 generate: install-tools
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	cd $(API_DIR) && $(CONTROLLER_GEN) object:headerFile="$(PROJECT_DIR)/hack/boilerplate.go.txt" paths="./..."
 
 generate-clientset: install-tools
-	$(CLIENT_GEN) --go-header-file=$(CURDIR)/hack/boilerplate.go.txt \
+	cd $(API_DIR) && $(CLIENT_GEN) --go-header-file=$(CURDIR)/hack/boilerplate.go.txt \
 		--clientset-name "versioned" \
-		--output-dir $(CURDIR)/api \
-		--output-pkg $(MODULE)/api \
-		--input-base $(CURDIR)/api \
+		--output-dir $(API_DIR) \
+		--output-pkg $(API_MODULE) \
+		--input-base $(API_DIR) \
 		--input nvidia/v1,nvidia/v1alpha1
 
 # Generate bundle manifests and metadata, then validate generated files.
@@ -144,7 +149,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
+CHECK_TARGETS := lint license-check validate-shared-dependencies validate-modules validate-generated-assets
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -207,6 +212,8 @@ check-third-party-notices: third-party-notices
 fmt:
 	go list -f '{{.Dir}}' $(MODULE)/... \
 		| xargs gofmt -s -l -d
+	go -C $(API_DIR) list -f '{{.Dir}}' ./... \
+		| xargs gofmt -s -l -d
 
 # Apply goimports -local github.com/NVIDIA/gpu-operator to the codebase
 goimports:
@@ -215,10 +222,12 @@ goimports:
 
 lint:
 	golangci-lint run ./...
+	cd $(API_DIR) && golangci-lint run --config $(PROJECT_DIR)/.golangci.yml ./...
 
 BUILD_FLAGS = -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
 build:
 	go build $(BUILD_FLAGS) ./...
+	go -C $(API_DIR) build ./...
 
 cmds: $(CMD_TARGETS)
 $(CMD_TARGETS): cmd-%:
@@ -232,7 +241,22 @@ sync-crds:
 
 TOOLS_DIR := $(PROJECT_DIR)/tools
 E2E_TESTS_DIR := $(PROJECT_DIR)/tests/e2e
+
+validate-shared-dependencies:
+	@bash hack/validate-shared-dependencies.sh
+
+validate-api-version-unpublished:
+	@bash hack/validate-api-version-unpublished.sh
+
+validate-published-api-module:
+	@bash hack/validate-published-api-module.sh "$(OPERATOR_TAG)"
+
 validate-modules:
+	@echo "- [api] Verifying that the dependencies have expected content..."
+	go -C $(API_DIR) mod verify
+	@echo "- [api] Checking for any unused/missing packages in go.mod..."
+	go -C $(API_DIR) mod tidy
+	@git diff --exit-code -- $(API_DIR)/go.sum $(API_DIR)/go.mod
 	@echo "- Verifying that the dependencies have expected content..."
 	go mod verify
 	@echo "- Checking for any unused/missing packages in go.mod..."
@@ -278,10 +302,14 @@ COVERAGE_FILE := coverage.out
 unit-test: build
 	go list -f {{.Dir}} $(MODULE)/... | grep -v /tests/e2e \
 		| xargs go test -v -coverprofile=$(COVERAGE_FILE)
+	go -C $(API_DIR) test -v -coverprofile=$(PROJECT_DIR)/$(COVERAGE_FILE).api ./...
+	{ head -n1 $(COVERAGE_FILE); tail -n+2 $(COVERAGE_FILE); tail -n+2 $(COVERAGE_FILE).api; } > $(COVERAGE_FILE).tmp
+	mv $(COVERAGE_FILE).tmp $(COVERAGE_FILE)
+	rm -f $(COVERAGE_FILE).api
 
 coverage: unit-test
 	cat $(COVERAGE_FILE) | grep -v "_mock.go" > $(COVERAGE_FILE).no-mocks
-	go tool cover -func=$(COVERAGE_FILE).no-mocks
+	GOFLAGS=-mod=readonly go tool cover -func=$(COVERAGE_FILE).no-mocks
 
 cov-report: coverage install-tools
 	$(GCOV2LCOV) -infile $(COVERAGE_FILE) -outfile lcov.info

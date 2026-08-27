@@ -35,7 +35,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestIsIncompleteDriverUpgradeState(t *testing.T) {
@@ -138,8 +137,8 @@ func TestNVIDIADriverUpgradeIncomplete(t *testing.T) {
 			name: "active upgrade state on NVIDIADriver-owned node",
 			nodes: []client.Object{
 				nodeWithLabels("gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel: "default",
-					upgradeStateLabel:                upgrade.UpgradeStatePodRestartRequired,
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStatePodRestartRequired,
 				}),
 			},
 			expected: true,
@@ -148,12 +147,12 @@ func TestNVIDIADriverUpgradeIncomplete(t *testing.T) {
 			name: "pending upgrade keeps rollout in progress after another node completes",
 			nodes: []client.Object{
 				nodeWithLabels("upgraded-gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel: "default",
-					upgradeStateLabel:                upgrade.UpgradeStateDone,
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStateDone,
 				}),
 				nodeWithLabels("pending-gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel: "default",
-					upgradeStateLabel:                upgrade.UpgradeStateUpgradeRequired,
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStateUpgradeRequired,
 				}),
 			},
 			expected: true,
@@ -171,8 +170,8 @@ func TestNVIDIADriverUpgradeIncomplete(t *testing.T) {
 			name: "failed upgrade state keeps rollout incomplete",
 			nodes: []client.Object{
 				nodeWithLabels("gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel: "default",
-					upgradeStateLabel:                upgrade.UpgradeStateFailed,
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStateFailed,
 				}),
 			},
 			expected: true,
@@ -181,8 +180,8 @@ func TestNVIDIADriverUpgradeIncomplete(t *testing.T) {
 			name: "completed upgrade state is not treated as in progress",
 			nodes: []client.Object{
 				nodeWithLabels("gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel: "default",
-					upgradeStateLabel:                upgrade.UpgradeStateDone,
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStateDone,
 				}),
 			},
 			expected: false,
@@ -191,9 +190,9 @@ func TestNVIDIADriverUpgradeIncomplete(t *testing.T) {
 			name: "skipped node is excluded from the upgrade aggregate",
 			nodes: []client.Object{
 				nodeWithLabels("skipped-gpu-node", map[string]string{
-					gpuconsts.NVIDIADriverOwnerLabel:     "default",
-					upgradeStateLabel:                    upgrade.UpgradeStateUpgradeRequired,
-					upgrade.GetUpgradeSkipNodeLabelKey(): "true",
+					nvidiav1alpha1.NVIDIADriverOwnerLabel: "default",
+					upgradeStateLabel:                     upgrade.UpgradeStateUpgradeRequired,
+					upgrade.GetUpgradeSkipNodeLabelKey():  "true",
 				}),
 			},
 			expected: false,
@@ -237,8 +236,8 @@ func TestDriverUpgradeLabelsChanged(t *testing.T) {
 	}{
 		{
 			name:         "driver ownership changes",
-			oldLabels:    map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "old-driver"},
-			newLabels:    map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "new-driver"},
+			oldLabels:    map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "old-driver"},
+			newLabels:    map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "new-driver"},
 			ownerChanged: true,
 		},
 		{
@@ -274,7 +273,7 @@ func TestShouldReconcileClusterPolicyOnNodeDeletion(t *testing.T) {
 		{
 			name: "NVIDIADriver-owned node",
 			labels: map[string]string{
-				gpuconsts.NVIDIADriverOwnerLabel: "driver-a",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
 			},
 			expected: true,
 		},
@@ -298,8 +297,8 @@ func TestClusterPolicyReconcileDriverUpgradeTransitions(t *testing.T) {
 	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
 	cp := clusterPolicyForUpgradeTest(true)
 	node := nodeWithLabels("gpu-node", map[string]string{
-		gpuconsts.NVIDIADriverOwnerLabel: "driver-a",
-		upgradeStateLabel:                upgrade.UpgradeStateDone,
+		nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+		upgradeStateLabel:                     upgrade.UpgradeStateDone,
 	})
 	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp, node)
 
@@ -349,8 +348,8 @@ func TestClusterPolicyReconcileBecomesReadyAfterIncompleteNodeDeletion(t *testin
 	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
 	cp := clusterPolicyForUpgradeTest(true)
 	node := nodeWithLabels("failed-gpu-node", map[string]string{
-		gpuconsts.NVIDIADriverOwnerLabel: "driver-a",
-		upgradeStateLabel:                upgrade.UpgradeStateFailed,
+		nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+		upgradeStateLabel:                     upgrade.UpgradeStateFailed,
 	})
 	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp, node)
 	request := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)}
@@ -372,8 +371,8 @@ func TestClusterPolicyReconcileDriverUpgradeFailureCases(t *testing.T) {
 	t.Run("one failed driver among multiple drivers keeps ClusterPolicy not ready", func(t *testing.T) {
 		cp := clusterPolicyForUpgradeTest(true)
 		r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp,
-			nodeWithLabels("completed", map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateDone}),
-			nodeWithLabels("failed", map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "driver-b", upgradeStateLabel: upgrade.UpgradeStateFailed}),
+			nodeWithLabels("completed", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateDone}),
+			nodeWithLabels("failed", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-b", upgradeStateLabel: upgrade.UpgradeStateFailed}),
 		)
 
 		result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
@@ -385,7 +384,7 @@ func TestClusterPolicyReconcileDriverUpgradeFailureCases(t *testing.T) {
 	t.Run("legacy driver management ignores upgrade labels", func(t *testing.T) {
 		cp := clusterPolicyForUpgradeTest(false)
 		r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp,
-			nodeWithLabels("failed", map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateFailed}),
+			nodeWithLabels("failed", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateFailed}),
 		)
 
 		_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
@@ -397,7 +396,7 @@ func TestClusterPolicyReconcileDriverUpgradeFailureCases(t *testing.T) {
 		cp := clusterPolicyForUpgradeTest(true)
 		calls := 0
 		r, _, metrics := newClusterPolicyUpgradeTestReconciler(t, cp,
-			nodeWithLabels("failed", map[string]string{gpuconsts.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateFailed}),
+			nodeWithLabels("failed", map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a", upgradeStateLabel: upgrade.UpgradeStateFailed}),
 		)
 		clusterPolicyCtrl.controls = []controlFunc{{func(ClusterPolicyController) (gpuv1.State, error) {
 			calls++
