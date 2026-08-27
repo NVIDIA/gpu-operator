@@ -139,7 +139,6 @@ spec:
                   used in the cluster
                 properties:
                   default:
-                    default: false
                     description: 'Deprecated: This field is no longer used. Setting
                       cdi.enabled=true will configure CDI as the default mechanism
                       for making GPUs accessible to containers.'
