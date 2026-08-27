@@ -328,6 +328,43 @@ var _ = Describe("ClusterPolicy Management", Label("clusterPolicy"), func() {
 		})
 	})
 
+	// test_device_plugin_disabled_env - Verify DEVICE_PLUGIN_ENABLED env var propagation
+	When("Disabling device plugin", Label("device-plugin", "toggle"), func() {
+		It("should set DEVICE_PLUGIN_ENABLED=false on node-status-exporter when device plugin is disabled", func(ctx context.Context) {
+			clusterPolicy := getClusterPolicyOrSkip(ctx, clusterPolicyClient, policyName)
+			originalState := clusterPolicy.Spec.DevicePlugin.Enabled
+			DeferCleanup(func(ctx context.Context) {
+				if originalState == nil || *originalState {
+					_ = clusterPolicyClient.EnableDevicePlugin(ctx, policyName)
+					waitForDaemonSetReady(ctx, daemonSetClient, testNamespace, "nvidia-device-plugin-daemonset")
+				}
+			})
+
+			err := clusterPolicyClient.DisableDevicePlugin(ctx, policyName)
+			Expect(err).NotTo(HaveOccurred(), "Failed to disable device plugin in ClusterPolicy")
+
+			verifyEnvInDaemonSet(ctx, daemonSetClient, testNamespace,
+				"nvidia-node-status-exporter", "DEVICE_PLUGIN_ENABLED", "false")
+		})
+
+		It("should set DEVICE_PLUGIN_ENABLED=true on node-status-exporter when device plugin is re-enabled", func(ctx context.Context) {
+			clusterPolicy := getClusterPolicyOrSkip(ctx, clusterPolicyClient, policyName)
+			originalState := clusterPolicy.Spec.DevicePlugin.Enabled
+			DeferCleanup(func(ctx context.Context) {
+				if originalState != nil && !*originalState {
+					_ = clusterPolicyClient.DisableDevicePlugin(ctx, policyName)
+				}
+			})
+
+			err := clusterPolicyClient.EnableDevicePlugin(ctx, policyName)
+			Expect(err).NotTo(HaveOccurred(), "Failed to enable device plugin in ClusterPolicy")
+
+			verifyEnvInDaemonSet(ctx, daemonSetClient, testNamespace,
+				"nvidia-node-status-exporter", "DEVICE_PLUGIN_ENABLED", "true")
+			waitForDaemonSetReady(ctx, daemonSetClient, testNamespace, "nvidia-device-plugin-daemonset")
+		})
+	})
+
 	// test_custom_labels_override - Test custom labels on daemonsets
 	When("Updating daemonset custom labels", Label("labels", "config"), func() {
 		It("should apply custom labels to all operand pods", func(ctx context.Context) {
