@@ -144,7 +144,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
+CHECK_TARGETS := lint license-check validate-modules validate-generated-assets test-tools
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -202,6 +202,24 @@ check-third-party-notices: third-party-notices
 		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make third-party-notices' and commit the result."; exit 1; }
 	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
 		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
+
+# Needs network. Rarely run: keyed by module, so a version bump does not
+# invalidate it. Only a new dependency does.
+.PHONY: third-party-notices-repos
+third-party-notices-repos:
+	@bash tools/resolve-module-repos.sh
+
+# Needs network. Every URL is content-verified against the vendored copy before
+# it is written, so re-run this whenever a dependency version changes.
+.PHONY: third-party-notices-urls
+third-party-notices-urls: third-party-notices-repos
+	@bash tools/verify-license-urls.sh
+
+.PHONY: test-tools
+test-tools:
+	@for t in tools/*_test.sh; do \
+		bash "$$t" || exit 1; \
+	done
 
 # Apply go fmt to the codebase
 fmt:
