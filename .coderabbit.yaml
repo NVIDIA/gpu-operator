@@ -1,0 +1,177 @@
+# SPDX-FileCopyrightText: Copyright (c) NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+tone_instructions: "Be direct, technical and brief. No praise or emoji. Skip style and formatting, which CI already gates. Without evidence in the diff, ask a question rather than assert a defect. Name the concrete failure each finding prevents."
+
+reviews:
+  # Only critical and major findings are posted inline. Everything else is
+  # collapsed into the summary instead of becoming its own review thread.
+  profile: quiet
+
+  # The pull request template already asks for a description and a testing note,
+  # so a generated walkthrough on top of it is noise.
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  review_status: false
+  in_progress_fortune: false
+  # This strips the "Prompt for AI Agents" block appended to every inline comment.
+  enable_prompt_for_ai_agents: false
+
+  # CI owns the merge gate, so we do not need another check run or commit status.
+  # Both keys are required because commit_status only applies while
+  # review_progress is disabled.
+  review_progress: false
+  commit_status: false
+
+  # CODEOWNERS already assigns reviewers, and cherry-pick/* labels drive real
+  # backport automation, so CodeRabbit must not guess at either.
+  suggested_reviewers: false
+  suggested_labels: false
+
+  auto_review:
+    # Each pull request is reviewed once. Pushes do not re-trigger a review, so
+    # request another pass with "@coderabbitai review" after addressing feedback.
+    auto_incremental_review: false
+    # These are regular expressions rather than globs. ".*" reviews pull requests
+    # into any base branch, which covers main, release-<calver> hotfixes, and
+    # stacked work merging one feature branch into another.
+    base_branches:
+      - ".*"
+    # About half of all pull requests are machine-generated. Renovate and the
+    # cherry-pick workflow both author as github-actions[bot], and a backport
+    # only replays commits that were already reviewed on main.
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "github-actions[bot]"
+    ignore_title_keywords:
+      - "WIP"
+      
+  path_filters:
+    - "!vendor/**"
+    - "!**/zz_generated.*.go"
+    - "!api/versioned/**"
+    - "!config/crd/bases/**"
+    - "!config/rbac/role.yaml"
+    # make sync-crds copies config/crd/bases verbatim into both of these.
+    - "!deployments/gpu-operator/crds/**"
+    - "!bundle/manifests/nvidia.com_*.yaml"
+    - "!bundle/manifests/resource.nvidia.com_*.yaml"
+    # This is the upstream node-feature-discovery subchart, vendored as-is.
+    - "!deployments/gpu-operator/charts/**"
+    # These are golden snapshots and deliberately malformed parser fixtures.
+    - "!**/testdata/**"
+    - "!go.sum"
+    - "!deployments/gpu-operator/Chart.lock"
+    # These are the packaged chart and generated index published to the gh-pages
+    # branch. 
+    - "!stable/**"
+
+  path_instructions:
+    - path: "{controllers,internal,cmd}/**/*.go"
+      instructions: |
+        Reconciliation code for a shipped operator. Below is a prioritized
+        list of failures to look out for:
+        - Flag reconcile logic that is not safe to run twice.
+        - Flag an error that is logged and then returned as success. That
+          suppresses the retry, so the object keeps its broken state until the
+          next watch event or resync.
+        - Flag an optional CRD field dereferenced without a nil check. These
+          fields are pointers, so the guard is field != nil && *field.
+        Do not comment on formatting, import order or naming.
+
+    - path: "api/**/*.go"
+      instructions: |
+        ClusterPolicy, GPUCluster and NVIDIADriver are released CRDs that users
+        have already applied. Treat as major any removed or renamed field or
+        json tag, a field made required, narrowed +kubebuilder:validation,
+        changed +kubebuilder:default, or changed Go type: each breaks existing
+        custom resources on upgrade.
+        New fields must be optional and carry omitempty.
+        Every new field is permanent API surface that must be supported across
+        upgrades. Ask for justification when a new field duplicates an existing
+        knob, could be derived from existing fields, or configures an
+        implementation detail that could live in a ConfigMap or annotation
+        instead. Spec holds user intent; status holds observed state; reject
+        fields that blur that line.
+        Editing these types requires regenerating the deepcopy and CRD assets,
+        so say so if the PR does not also update them.
+
+    - path: "{assets,manifests}/**/*.yaml"
+      instructions: |
+        Operand manifests baked into the operator image and applied to every GPU
+        node. manifests/state-* are Go templates rendered by internal/state.
+        assets/state-* are applied by controllers/object_controls.go and carry
+        literal placeholders such as "FILLED BY THE OPERATOR" that the
+        controller overwrites at runtime. Neither is a standalone YAML document,
+        so never report an unrendered template or a placeholder value as an
+        error.
+        Do flag RBAC broader than the operand needs, and securityContext,
+        hostPath or privileged changes that widen access to the node.
+
+    - path: "deployments/gpu-operator/{values.yaml,templates/**}"
+      instructions: |
+        The Helm chart is the supported install path. Flag a values.yaml key
+        added or renamed without a matching template reference (or the reverse),
+        and any default whose change alters behaviour for existing installs on
+        helm upgrade. Image repository/version pairs must stay consistent with
+        bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml.
+
+    - path: "**/*_test.go"
+      instructions: |
+        Flag assertions that would still pass if the behavior under test were
+        broken, and new operand or CRD behaviour that ships with no regression
+        test. Flag tests that mirror the implementation instead of checking
+        behavior — the expected value is computed the same way as the code
+        under test, or the test only checks that a mock was called. These break
+        on refactors without catching bugs.
+        Do not ask for tests covering generated or vendored code.
+
+  tools:
+    # The golang-checks workflow already runs this with the repository's own
+    # .golangci.yml.
+    golangci-lint:
+      enabled: false
+    # Every YAML file here is a Helm template, a Go template, or a manifest
+    # holding operator-filled placeholders.
+    yamllint:
+      enabled: false
+    checkov:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+
+  # CodeRabbit should never open unsolicited docstring or unit-test commits.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  # These post an advisory status block on every pull request, and CI already
+  # gates merges.
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+
+knowledge_base:
+  code_guidelines:
+    # This replaces the default patterns such as AGENTS.md and CLAUDE.md, none of
+    # which exist in this repo yet.
+    filePatterns:
+      - "CONTRIBUTING.md"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
