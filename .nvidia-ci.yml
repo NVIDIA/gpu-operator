@@ -62,36 +62,38 @@ image:gpu-operator:
     - echo "Skipped in internal CI"
 
 # The .scan step forms the base of the image scan operation performed before releasing
-# images.
+# images. pulse-cli pulls from the registry directly, so DinD is not required.
 .scan:
   stage: scan
   image: "${PULSE_IMAGE}"
+  services: []
   variables:
     IMAGE: "${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_ARCHIVE: "gpu-operator.tar"
   except:
     variables:
     - $CI_COMMIT_MESSAGE =~ /\[skip[ _-]scans?\]/i
     - $SKIP_SCANS && $SKIP_SCANS == "yes"
   before_script:
-    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
-    - docker pull --platform="${PLATFORM}" "${IMAGE}"
-    - docker save "${IMAGE}" -o "${IMAGE_ARCHIVE}"
+    - mkdir -p "$HOME/.docker"
+    - chmod 700 "$HOME/.docker"
+    - >
+      REGISTRY_AUTH="$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')"
+    - >
+      jq -n --arg registry "$CI_REGISTRY" --arg auth "$REGISTRY_AUTH"
+      '{auths: {($registry): {auth: $auth}}}' > "$HOME/.docker/config.json"
+    - export REGISTRY_AUTH_FILE="$HOME/.docker/config.json"
     - AuthHeader=$(echo -n $SSA_CLIENT_ID:$SSA_CLIENT_SECRET | base64 -w0)
     - >
       export SSA_TOKEN=$(curl --request POST --header "Authorization: Basic $AuthHeader" --header "Content-Type: application/x-www-form-urlencoded" ${SSA_ISSUER_URL} | jq ".access_token" |  tr -d '"')
     - if [ -z "$SSA_TOKEN" ]; then exit 1; else echo "SSA_TOKEN set!"; fi
   script:
-    - pulse-cli -n $NSPECT_ID --ssa $SSA_TOKEN scan -i $IMAGE_ARCHIVE -p $CONTAINER_POLICY -o
+    - echo "Scanning image ${IMAGE} for platform ${PLATFORM}"
+    - pulse-cli -n "${NSPECT_ID}" scan-image -i "${IMAGE}" --platform "${PLATFORM}" -p "${CONTAINER_POLICY}" --output-dir="scan-results" -o
   artifacts:
     when: always
     expire_in: 1 week
     paths:
-      - pulse-cli.log
-      - licenses.json
-      - sbom.json
-      - vulns.json
-      - policy_evaluation.json
+      - scan-results/**/*
 
 .scan:gpu-operator:
   extends:
