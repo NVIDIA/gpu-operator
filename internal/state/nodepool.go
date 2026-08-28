@@ -36,7 +36,6 @@ const (
 )
 
 // TODO: move this code to it's own module?
-// TODO: add unit tests
 type nodePool struct {
 	name         string
 	osRelease    string
