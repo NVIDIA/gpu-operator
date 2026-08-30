@@ -733,6 +733,22 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			}),
 		},
 		{
+			description: "gpu.deploy nodeSelector keys are not overridden",
+			ds: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				NodeSelector: map[string]string{
+					"nvidia.com/gpu.deploy.device-plugin": "false",
+					"karpenter.sh/nodepool":               "gpu",
+				},
+			},
+			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+				"karpenter.sh/nodepool":               "gpu",
+			}),
+		},
+		{
 			description: "affinity configured",
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{

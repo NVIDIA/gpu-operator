@@ -834,6 +834,9 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
 		}
 		for key, value := range config.Daemonsets.NodeSelector {
+			if strings.HasPrefix(key, "nvidia.com/gpu.deploy.") {
+				continue
+			}
 			obj.Spec.Template.Spec.NodeSelector[key] = value
 		}
 	}
