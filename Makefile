@@ -69,7 +69,6 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-GOOS ?= linux
 VERSION_PKG = github.com/NVIDIA/gpu-operator/internal/info
 
 PWD = $(shell pwd)
@@ -222,8 +221,7 @@ build:
 
 cmds: $(CMD_TARGETS)
 $(CMD_TARGETS): cmd-%:
-	CGO_ENABLED=0 GOOS=$(GOOS) \
-		go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
+	CGO_ENABLED=0 go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
 
 sync-crds:
 	@echo "- Syncing CRDs into Helm and OLM packages..."
