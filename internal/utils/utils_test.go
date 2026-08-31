@@ -135,7 +135,7 @@ func TestGetObjectHashIgnoreEmptyKeys(t *testing.T) {
 func TestIsEffectivelyZero(t *testing.T) {
 	tests := []struct {
 		name     string
-		value    interface{}
+		value    any
 		expected bool
 	}{
 		{"zero int", 0, true},

@@ -75,7 +75,6 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 	}
 
 	for _, node := range nodeList.Items {
-		node := node
 		nodeLabels := node.GetLabels()
 
 		nodePool := nodePool{}

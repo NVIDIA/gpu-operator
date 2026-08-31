@@ -50,7 +50,7 @@ func NewStateDRAValidation(
 	}, nil
 }
 
-func buildValidatorRenderData(_ context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (interface{}, error) {
+func buildValidatorRenderData(_ context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error) {
 	// Reuse the DRA driver spec for the image pull settings.
 	spec := cr.Spec.DRADriver
 	daemonsets := cr.Spec.Daemonsets

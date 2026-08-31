@@ -19,6 +19,7 @@ package nvidiadriver
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,9 +44,7 @@ func assignOwnersScheme(t *testing.T) *runtime.Scheme {
 
 func gpuNode(name string, extraLabels map[string]string) *corev1.Node {
 	labels := map[string]string{consts.GPUPresentLabel: "true"}
-	for k, v := range extraLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, extraLabels)
 	return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
 }
 

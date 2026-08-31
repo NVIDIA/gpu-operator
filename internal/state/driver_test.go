@@ -281,7 +281,7 @@ func TestDriverHostNetwork(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
-	renderData.Driver.Spec.HostNetwork = ptr.To(true)
+	renderData.Driver.Spec.HostNetwork = new(true)
 
 	objs, err := stateDriver.renderer.RenderObjects(
 		&render.TemplatingData{
@@ -315,7 +315,7 @@ func TestDriverRenderRDMA(t *testing.T) {
 	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
-		Enabled: ptr.To(true),
+		Enabled: new(true),
 	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
@@ -348,8 +348,8 @@ func TestDriverRDMAHostMOFED(t *testing.T) {
 	renderData.AdditionalConfigs = getSampleAdditionalConfigs()
 
 	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{
-		Enabled:      ptr.To(true),
-		UseHostMOFED: ptr.To(true),
+		Enabled:      new(true),
+		UseHostMOFED: new(true),
 	}
 
 	objs, err := stateDriver.renderer.RenderObjects(
@@ -476,7 +476,7 @@ func TestDriverGDS(t *testing.T) {
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
 		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
-			Enabled:          ptr.To(true),
+			Enabled:          new(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
 		},
 	}
@@ -514,7 +514,7 @@ func TestDriverGDRCopy(t *testing.T) {
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
 		Spec: &nvidiav1alpha1.GDRCopySpec{
-			Enabled:          ptr.To(true),
+			Enabled:          new(true),
 			ImagePullSecrets: []string{"ngc-secrets"},
 		},
 	}
@@ -571,7 +571,7 @@ func TestDriverGDRCopyOpenShift(t *testing.T) {
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1-rhcos4.13",
 		Spec: &nvidiav1alpha1.GDRCopySpec{
-			Enabled:          ptr.To(true),
+			Enabled:          new(true),
 			ImagePullSecrets: []string{"ngc-secret"},
 		},
 	}
@@ -742,7 +742,7 @@ func TestDriverPrecompiledLibModules(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			driver := &nvidiav1alpha1.NVIDIADriver{}
-			driver.Spec.UsePrecompiled = ptr.To(tc.usePrecompiled)
+			driver.Spec.UsePrecompiled = new(tc.usePrecompiled)
 
 			additionalConfigs, err := stateDriver.getDriverAdditionalConfigs(
 				context.Background(),
@@ -753,7 +753,7 @@ func TestDriverPrecompiledLibModules(t *testing.T) {
 			require.NoError(t, err)
 
 			renderData := getMinimalDriverRenderData()
-			renderData.Driver.Spec.UsePrecompiled = ptr.To(tc.usePrecompiled)
+			renderData.Driver.Spec.UsePrecompiled = new(tc.usePrecompiled)
 			renderData.AdditionalConfigs = additionalConfigs
 			if tc.usePrecompiled {
 				renderData.Precompiled = &precompiledSpec{
@@ -907,7 +907,7 @@ func TestDriverPrecompiled(t *testing.T) {
 	require.True(t, ok)
 
 	renderData := getMinimalDriverRenderData()
-	renderData.Driver.Spec.UsePrecompiled = ptr.To(true)
+	renderData.Driver.Spec.UsePrecompiled = new(true)
 	renderData.Driver.Name = "nvidia-gpu-driver-ubuntu22.04"
 	renderData.Driver.AppName = "nvidia-gpu-driver-ubuntu22.04-646cdfdb96"
 	renderData.Driver.ImagePath = "nvcr.io/nvidia/driver:535-5.4.0-150-generic-ubuntu22.04"
@@ -1268,7 +1268,7 @@ func TestDriverVGPULicensingSecret(t *testing.T) {
 
 	renderData.Driver.Spec.LicensingConfig = &nvidiav1alpha1.DriverLicensingConfigSpec{
 		SecretName: "licensing-config-secret",
-		NLSEnabled: ptr.To(true),
+		NLSEnabled: new(true),
 	}
 
 	renderData.AdditionalConfigs = &additionalConfigs{
@@ -1337,13 +1337,13 @@ func TestDriverSecretEnv(t *testing.T) {
 	renderData.GDS = &gdsDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
 		Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		},
 	}
 	renderData.GDRCopy = &gdrcopyDriverSpec{
 		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
 		Spec: &nvidiav1alpha1.GDRCopySpec{
-			Enabled: ptr.To(true),
+			Enabled: new(true),
 		},
 	}
 
@@ -1388,7 +1388,7 @@ func TestGetDriverSpecMultipleNodePools(t *testing.T) {
 		},
 		Spec: nvidiav1alpha1.NVIDIADriverSpec{
 			DriverType:     nvidiav1alpha1.GPU,
-			UsePrecompiled: ptr.To(true),
+			UsePrecompiled: new(true),
 			Repository:     "nvcr.io/nvidia",
 			Image:          "driver",
 			Version:        "535.104.05",

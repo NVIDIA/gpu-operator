@@ -87,7 +87,7 @@ func newStateSkel(
 }
 
 // renderObjects renders the state's manifests with the given templating data.
-func (s *stateSkel) renderObjects(ctx context.Context, data interface{}) ([]*unstructured.Unstructured, error) {
+func (s *stateSkel) renderObjects(ctx context.Context, data any) ([]*unstructured.Unstructured, error) {
 	logger := log.FromContext(ctx)
 	logger.V(consts.LogLevelDebug).Info("Rendering objects", "State:", s.name, "data", data)
 

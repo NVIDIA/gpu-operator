@@ -59,7 +59,7 @@ type TemplatingData struct {
 	// Funcs are additional Functions used during the templating process
 	Funcs template.FuncMap
 	// Data used for the rendering process
-	Data interface{}
+	Data any
 }
 
 // NewRenderer creates a Renderer object, that will render all template files provided.
@@ -102,7 +102,7 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplatingData)
 	tmpl := template.New(path.Base(filePath)).Funcs(sprig.FuncMap()).Option("missingkey=error")
 
 	tmpl.Funcs(template.FuncMap{
-		"yaml": func(obj interface{}) (string, error) {
+		"yaml": func(obj any) (string, error) {
 			yamlBytes, err := yamlConverter.Marshal(obj)
 			return string(yamlBytes), err
 		},

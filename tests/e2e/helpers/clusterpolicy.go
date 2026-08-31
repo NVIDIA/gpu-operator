@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	gpuclientset "github.com/NVIDIA/gpu-operator/api/versioned"
@@ -72,49 +71,49 @@ func (h *ClusterPolicyClient) UpdateDriverVersion(ctx context.Context, name, ver
 
 func (h *ClusterPolicyClient) EnableDCGM(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DCGM.Enabled = ptr.To(true)
+		clusterPolicy.Spec.DCGM.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDCGM(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DCGM.Enabled = ptr.To(false)
+		clusterPolicy.Spec.DCGM.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableDCGMExporter(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DCGMExporter.Enabled = ptr.To(true)
+		clusterPolicy.Spec.DCGMExporter.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDCGMExporter(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DCGMExporter.Enabled = ptr.To(false)
+		clusterPolicy.Spec.DCGMExporter.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableGFD(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = ptr.To(true)
+		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableGFD(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = ptr.To(false)
+		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableDevicePlugin(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DevicePlugin.Enabled = ptr.To(true)
+		clusterPolicy.Spec.DevicePlugin.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDevicePlugin(ctx context.Context, name string) error {
 	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DevicePlugin.Enabled = ptr.To(false)
+		clusterPolicy.Spec.DevicePlugin.Enabled = new(false)
 	})
 }
 

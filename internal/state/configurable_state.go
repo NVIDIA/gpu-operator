@@ -48,12 +48,12 @@ type configurableState struct {
 	// buildRenderData builds the operand-specific templating data from the resolved
 	// image path and DRA apiVersion. It receives ctx and the skeleton so operands that
 	// need the client or logging (e.g. dcgm-exporter's ServiceMonitor CRD probe) can use them.
-	buildRenderData func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (interface{}, error)
+	buildRenderData func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error)
 }
 
 var _ State = (*configurableState)(nil)
 
-func (s *configurableState) Sync(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) (SyncState, error) {
+func (s *configurableState) Sync(ctx context.Context, customResource any, infoCatalog InfoCatalog) (SyncState, error) {
 	cr, ok := customResource.(*nvidiav1alpha1.GPUCluster)
 	if !ok {
 		return SyncStateError, fmt.Errorf("GPUCluster CR not provided as input to Sync()")

@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -47,12 +47,10 @@ func podNodeNameIndexer(obj client.Object) []string {
 }
 
 // mergeLabels merges multiple label maps into one (last write wins).
-func mergeLabels(maps ...map[string]string) map[string]string {
+func mergeLabels(labels ...map[string]string) map[string]string {
 	out := make(map[string]string)
-	for _, m := range maps {
-		for k, v := range m {
-			out[k] = v
-		}
+	for _, labelSet := range labels {
+		maps.Copy(out, labelSet)
 	}
 	return out
 }
@@ -68,7 +66,7 @@ func TestNodeLabelingReconcileDefersDependentOperationsAfterGPULabelChanges(t *t
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
-				UseNvidiaDriverCRD: ptr.To(true),
+				UseNvidiaDriverCRD: new(true),
 			},
 		},
 	}
@@ -125,7 +123,7 @@ func TestNodeLabelingReconcileDoesNotDeferDependentOperationsForStateLabelChange
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
-				UseNvidiaDriverCRD: ptr.To(true),
+				UseNvidiaDriverCRD: new(true),
 			},
 		},
 	}
@@ -396,7 +394,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Mode:    string(gpuv1.KubeVirt),
 					},
 				},
@@ -418,7 +416,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Mode:    string(gpuv1.KubeVirt),
 					},
 				},
@@ -440,7 +438,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Mode:    string(gpuv1.Kata),
 					},
 				},
@@ -462,7 +460,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Mode:    string(gpuv1.Kata),
 					},
 				},
@@ -484,7 +482,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Mode:    string(gpuv1.KubeVirt),
 					},
 				},
@@ -509,7 +507,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					MIGManager: gpuv1.MIGManagerSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Config:  &gpuv1.MIGPartedConfigSpec{Default: migConfigDisabledValue},
 					},
 				},
@@ -533,7 +531,7 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 			clusterPolicy: &gpuv1.ClusterPolicy{
 				Spec: gpuv1.ClusterPolicySpec{
 					MIGManager: gpuv1.MIGManagerSpec{
-						Enabled: ptr.To(true),
+						Enabled: new(true),
 						Config:  &gpuv1.MIGPartedConfigSpec{Default: migConfigDisabledValue},
 					},
 				},
@@ -717,7 +715,7 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		Spec: corev1.PodSpec{
 			NodeName: "test-node",
 			ResourceClaims: []corev1.PodResourceClaim{
-				{Name: "gpu", ResourceClaimName: ptr.To("gpu-claim")},
+				{Name: "gpu", ResourceClaimName: new("gpu-claim")},
 			},
 		},
 		Status: corev1.PodStatus{Phase: corev1.PodRunning},
@@ -748,10 +746,10 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		// unpreparing them still needs the kubelet-plugin, so they must defer its removal.
 		adminClaim := gpuClaim.DeepCopy()
 		adminClaim.Name = "admin-claim"
-		adminClaim.Status.Allocation.Devices.Results[0].AdminAccess = ptr.To(true)
+		adminClaim.Status.Allocation.Devices.Results[0].AdminAccess = new(true)
 		adminPod := claimPod.DeepCopy()
 		adminPod.Name = "admin-pod"
-		adminPod.Spec.ResourceClaims[0].ResourceClaimName = ptr.To("admin-claim")
+		adminPod.Spec.ResourceClaims[0].ResourceClaimName = new("admin-claim")
 		nlc := &nodeLabelingController{
 			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(adminClaim, adminPod).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
@@ -1046,7 +1044,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              driverName,
-					DeletionTimestamp: ptr.To(metav1.Now()),
+					DeletionTimestamp: new(metav1.Now()),
 					Finalizers:        []string{"test-finalizer"},
 				},
 			}},

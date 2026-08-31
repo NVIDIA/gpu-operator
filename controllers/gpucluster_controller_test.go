@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -78,7 +77,7 @@ type fakeStateManager struct {
 	lastCatalog state.InfoCatalog
 }
 
-func (f *fakeStateManager) SyncState(_ context.Context, _ interface{}, catalog state.InfoCatalog) state.Results {
+func (f *fakeStateManager) SyncState(_ context.Context, _ any, catalog state.InfoCatalog) state.Results {
 	f.lastCatalog = catalog
 	return f.results
 }
@@ -160,7 +159,7 @@ func gccOwnedDaemonSet(name string, cr *nvidiav1alpha1.GPUCluster, claims bool, 
 				Kind:       "GPUCluster",
 				Name:       cr.Name,
 				UID:        cr.UID,
-				Controller: ptr.To(true),
+				Controller: new(true),
 			}},
 		},
 	}

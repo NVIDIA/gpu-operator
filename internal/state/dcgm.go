@@ -54,7 +54,7 @@ func NewStateDCGM(
 	}, nil
 }
 
-func buildDCGMRenderData(_ context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (interface{}, error) {
+func buildDCGMRenderData(_ context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error) {
 	daemonsets := cr.Spec.Daemonsets
 	return &dcgmRenderData{
 		DCGM:                    &dcgmSpec{Spec: cr.Spec.DCGM, ImagePath: imagePath},

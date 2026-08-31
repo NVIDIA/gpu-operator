@@ -39,9 +39,9 @@ type templateData struct {
 func checkRenderedUnstructured(objs []*unstructured.Unstructured, t *templateData) {
 	for idx, obj := range objs {
 		Expect(obj.GetKind()).To(Equal(fmt.Sprint("TestObj", idx+1)))
-		Expect(obj.Object["metadata"].(map[string]interface{})["name"].(string)).To(Equal(t.Foo))
-		Expect(obj.Object["spec"].(map[string]interface{})["attribute"].(string)).To(Equal(t.Bar))
-		Expect(obj.Object["spec"].(map[string]interface{})["anotherAttribute"].(string)).To(Equal(t.Baz))
+		Expect(obj.Object["metadata"].(map[string]any)["name"].(string)).To(Equal(t.Foo))
+		Expect(obj.Object["spec"].(map[string]any)["attribute"].(string)).To(Equal(t.Bar))
+		Expect(obj.Object["spec"].(map[string]any)["anotherAttribute"].(string)).To(Equal(t.Baz))
 	}
 }
 
@@ -155,9 +155,9 @@ var _ = Describe("Test Renderer builtin template functions and edge cases", func
 
 			data := &TemplatingData{
 				Data: struct {
-					Spec map[string]interface{}
+					Spec map[string]any
 				}{
-					Spec: map[string]interface{}{"attribute": "value"},
+					Spec: map[string]any{"attribute": "value"},
 				},
 			}
 
@@ -166,13 +166,13 @@ var _ = Describe("Test Renderer builtin template functions and edge cases", func
 			Expect(err).ToNot(HaveOccurred())
 			Expect(objs).To(HaveLen(1))
 			Expect(objs[0].GetKind()).To(Equal("TestObjYaml"))
-			spec := objs[0].Object["spec"].(map[string]interface{})
+			spec := objs[0].Object["spec"].(map[string]any)
 			Expect(spec["attribute"]).To(Equal("value"))
 		})
 	})
 
 	Context("Render template using the builtin 'deref' function", func() {
-		renderDeref := func(ptr *bool) []map[string]interface{} {
+		renderDeref := func(ptr *bool) []map[string]any {
 			content := strings.Join([]string{
 				"apiVersion: v1",
 				"kind: TestObjDeref",
@@ -190,9 +190,9 @@ var _ = Describe("Test Renderer builtin template functions and edge cases", func
 			objs, err := r.RenderObjects(data)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(objs).To(HaveLen(1))
-			specs := make([]map[string]interface{}, 0, len(objs))
+			specs := make([]map[string]any, 0, len(objs))
 			for _, o := range objs {
-				specs = append(specs, o.Object["spec"].(map[string]interface{}))
+				specs = append(specs, o.Object["spec"].(map[string]any))
 			}
 			return specs
 		}
@@ -229,7 +229,7 @@ var _ = Describe("Test Renderer builtin template functions and edge cases", func
 			objs, err := r.RenderObjects(data)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(objs).To(HaveLen(1))
-			name := objs[0].Object["metadata"].(map[string]interface{})["name"].(string)
+			name := objs[0].Object["metadata"].(map[string]any)["name"].(string)
 			Expect(name).To(Equal("LOWERED"))
 		})
 	})

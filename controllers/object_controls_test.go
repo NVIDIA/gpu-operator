@@ -44,7 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -587,7 +586,7 @@ func newCluster(nodes int, s *runtime.Scheme) (client.Client, error) {
 	// Build fake client
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 
-	for i := 0; i < nodes; i++ {
+	for i := range nodes {
 		ready := corev1.NodeCondition{Type: corev1.NodeReady, Status: corev1.ConditionTrue}
 		name := fmt.Sprintf("node%d", i)
 		n := &corev1.Node{
@@ -903,9 +902,9 @@ func getDriverTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getDriverTestOutput returns a map containing expected output for
 // driver test case. This function will grow as new test cases are added
-func getDriverTestOutput(testCase string) map[string]interface{} {
+func getDriverTestOutput(testCase string) map[string]any {
 	// default output
-	output := map[string]interface{}{
+	output := map[string]any{
 		"numDaemonsets":      1,
 		"nvPeerMemPresent":   false,
 		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:test",
@@ -930,7 +929,7 @@ func TestDriver(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1019,9 +1018,9 @@ func getDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getDevicePluginTestOutput returns a map containing expected output for
 // device-plugin test case. This function will grow as new test cases are added
-func getDevicePluginTestOutput(testCase string) map[string]interface{} {
+func getDevicePluginTestOutput(testCase string) map[string]any {
 	// default output
-	output := map[string]interface{}{
+	output := map[string]any{
 		"numDaemonsets":               1,
 		"configManagerInitPresent":    false,
 		"configManagerSidecarPresent": false,
@@ -1052,7 +1051,7 @@ func TestDevicePlugin(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1156,9 +1155,9 @@ func getVGPUManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getVGPUManagerTestOutput returns a map containing expected output for
 // driver test case. This function will grow as new test cases are added
-func getVGPUManagerTestOutput(testCase string) map[string]interface{} {
+func getVGPUManagerTestOutput(testCase string) map[string]any {
 	// default output
-	output := map[string]interface{}{
+	output := map[string]any{
 		"numDaemonsets":      1,
 		"driverImage":        "nvcr.io/nvidia/vgpu-manager:470.57.02-ubuntu22.04",
 		"driverManagerImage": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.3.0",
@@ -1182,7 +1181,7 @@ func TestVGPUManager(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1330,9 +1329,9 @@ func getSandboxDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getSandboxDevicePluginTestOutput returns a map containing expected output for
 // driver test case. This function will grow as new test cases are added
-func getSandboxDevicePluginTestOutput(testCase string) map[string]interface{} {
+func getSandboxDevicePluginTestOutput(testCase string) map[string]any {
 	// default output
-	output := map[string]interface{}{
+	output := map[string]any{
 		"numDaemonsets":   1,
 		"image":           "nvcr.io/nvidia/kubevirt-device-plugin:v1.1.0",
 		"imagePullSecret": "ngc-secret",
@@ -1354,7 +1353,7 @@ func TestSandboxDevicePlugin(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1436,8 +1435,8 @@ func getKataDevicePluginTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getKataDevicePluginTestOutput returns a map containing expected output for
 // kata device plugin test case.
-func getKataDevicePluginTestOutput(testCase string) map[string]interface{} {
-	output := map[string]interface{}{
+func getKataDevicePluginTestOutput(testCase string) map[string]any {
+	output := map[string]any{
 		"numDaemonsets":   1,
 		"image":           "nvcr.io/nvidia/kata-gpu-device-plugin:v0.0.1",
 		"imagePullSecret": "ngc-secret",
@@ -1459,7 +1458,7 @@ func TestKataDevicePlugin(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1533,9 +1532,9 @@ func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
 		dcgmEnabled := true
 		cp.Spec.DCGM.Enabled = &dcgmEnabled
 	case "pod-labels-enabled":
-		cp.Spec.DCGMExporter.EnablePodLabels = ptr.To(true)
+		cp.Spec.DCGMExporter.EnablePodLabels = new(true)
 	case "pod-uid-enabled":
-		cp.Spec.DCGMExporter.EnablePodUID = ptr.To(true)
+		cp.Spec.DCGMExporter.EnablePodUID = new(true)
 	case "pod-labels-env":
 		cp.Spec.DCGMExporter.Env = []gpuv1.EnvVar{
 			{Name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS", Value: "true"},
@@ -1553,9 +1552,9 @@ func getDCGMExporterTestInput(testCase string) *gpuv1.ClusterPolicy {
 
 // getDCGMExporterTestOutput returns a map containing expected output for
 // dcgm-exporter test case.
-func getDCGMExporterTestOutput(testCase string) map[string]interface{} {
+func getDCGMExporterTestOutput(testCase string) map[string]any {
 	// default output
-	output := map[string]interface{}{
+	output := map[string]any{
 		"numDaemonsets":     1,
 		"dcgmExporterImage": "nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu22.04",
 		"imagePullSecret":   "ngc-secret",
@@ -1606,7 +1605,7 @@ func TestDCGMExporter(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",
@@ -1772,7 +1771,7 @@ func TestServiceMonitor(t *testing.T) {
 			stateName:   "state-dcgm-exporter",
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
-				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: new(false)},
 			},
 			expectedState:          gpuv1.Ready,
 			expectedServiceMonitor: nil,
@@ -1783,8 +1782,8 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled:        ptr.To(true),
-					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(true)},
+					Enabled:        new(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: new(true)},
 				},
 			},
 			expectedState:          gpuv1.Ready,
@@ -1796,7 +1795,7 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 				},
 			},
 			expectedState:          gpuv1.Ready,
@@ -1808,7 +1807,7 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{},
 				},
 			},
@@ -1821,7 +1820,7 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  []client.Object{serviceMonitorCRD},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled:        ptr.To(true),
+					Enabled:        new(true),
 					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{},
 				},
 			},
@@ -1834,8 +1833,8 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  []client.Object{serviceMonitorCRD},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled:        ptr.To(true),
-					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: ptr.To(false)},
+					Enabled:        new(true),
+					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{Enabled: new(false)},
 				},
 			},
 			expectedState:          gpuv1.Disabled,
@@ -1854,7 +1853,7 @@ func TestServiceMonitor(t *testing.T) {
 			stateName:   "state-node-status-exporter",
 			k8sObjects:  []client.Object{serviceMonitorCRD},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
-				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{Enabled: ptr.To(false)},
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{Enabled: new(false)},
 			},
 			expectedState:          gpuv1.Disabled,
 			expectedServiceMonitor: nil,
@@ -1885,9 +1884,9 @@ func TestServiceMonitor(t *testing.T) {
 				Operator: gpuv1.OperatorSpec{
 					Metrics: gpuv1.OperatorMetricsSpec{
 						ServiceMonitor: &gpuv1.ServiceMonitorConfig{
-							Enabled:          ptr.To(true),
+							Enabled:          new(true),
 							Interval:         promv1.Duration("30s"),
-							HonorLabels:      ptr.To(true),
+							HonorLabels:      new(true),
 							AdditionalLabels: map[string]string{"custom": "label"},
 							Relabelings:      []*promv1.RelabelConfig{{Action: "drop"}},
 						},
@@ -1919,12 +1918,12 @@ func TestServiceMonitor(t *testing.T) {
 			k8sObjects:  []client.Object{serviceMonitorCRD},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					ServiceMonitor: &gpuv1.DCGMExporterServiceMonitorConfig{
-						Enabled:          ptr.To(true),
+						Enabled:          new(true),
 						Interval:         promv1.Duration("15s"),
 						ScrapeTimeout:    promv1.Duration("10s"),
-						HonorLabels:      ptr.To(true),
+						HonorLabels:      new(true),
 						AdditionalLabels: map[string]string{"a": "b"},
 						Relabelings:      []*promv1.RelabelConfig{{Action: "keep"}},
 					},
@@ -2034,7 +2033,7 @@ func TestService(t *testing.T) {
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
 						Type:                  corev1.ServiceTypeNodePort,
 						InternalTrafficPolicy: &localPolicy,
@@ -2057,7 +2056,7 @@ func TestService(t *testing.T) {
 			}},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 					ServiceSpec: &gpuv1.DCGMExporterServiceConfig{
 						Type:                  corev1.ServiceTypeNodePort,
 						InternalTrafficPolicy: &localPolicy,
@@ -2080,7 +2079,7 @@ func TestService(t *testing.T) {
 				},
 			}},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
-				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: ptr.To(false)},
+				DCGMExporter: gpuv1.DCGMExporterSpec{Enabled: new(false)},
 			},
 			expectedState: gpuv1.Disabled,
 			expectService: false,
@@ -2230,7 +2229,7 @@ func TestRuntimeClasses(t *testing.T) {
 			k8sVersion:  "v1.33.0",
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
-				CDI: gpuv1.CDIConfigSpec{Enabled: ptr.To(true)},
+				CDI: gpuv1.CDIConfigSpec{Enabled: new(true)},
 			},
 			expectedState:          gpuv1.Ready,
 			expectedRuntimeClasses: []string{"nvidia", "nvidia-legacy", "nvidia-cdi"},
@@ -2242,8 +2241,8 @@ func TestRuntimeClasses(t *testing.T) {
 			k8sObjects:  nil,
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
-					Enabled:          ptr.To(true),
-					NRIPluginEnabled: ptr.To(true),
+					Enabled:          new(true),
+					NRIPluginEnabled: new(true),
 				},
 			},
 			expectedState:          gpuv1.Ready,
@@ -2272,8 +2271,8 @@ func TestRuntimeClasses(t *testing.T) {
 			},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
-					Enabled:          ptr.To(true),
-					NRIPluginEnabled: ptr.To(true),
+					Enabled:          new(true),
+					NRIPluginEnabled: new(true),
 				},
 			},
 			expectedState:          gpuv1.Ready,
@@ -2335,8 +2334,8 @@ func getMIGManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 }
 
 // getMIGManagerTestOutput returns expected output for a MIG Manager test case
-func getMIGManagerTestOutput(testCase string) map[string]interface{} {
-	output := map[string]interface{}{
+func getMIGManagerTestOutput(testCase string) map[string]any {
+	output := map[string]any{
 		"numDaemonsets":          1,
 		"migManagerImage":        "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.5.0",
 		"imagePullSecret":        "ngc-secret",
@@ -2365,7 +2364,7 @@ func TestMIGManager(t *testing.T) {
 	testCases := []struct {
 		description   string
 		clusterPolicy *gpuv1.ClusterPolicy
-		output        map[string]interface{}
+		output        map[string]any
 	}{
 		{
 			"Default",

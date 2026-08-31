@@ -70,7 +70,7 @@ func NewStateDCGMExporter(
 	}, nil
 }
 
-func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (interface{}, error) {
+func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error) {
 	spec := cr.Spec.DCGMExporter
 
 	// When standalone DCGM is enabled the exporter targets it; otherwise it runs embedded.

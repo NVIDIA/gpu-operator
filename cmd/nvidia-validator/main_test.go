@@ -160,8 +160,8 @@ func TestResolveHostNvidiaSMI(t *testing.T) {
 				target := filepath.Join(hostRoot, name)
 				require.NoError(t, os.MkdirAll(filepath.Dir(target), 0755))
 
-				if strings.HasPrefix(contents, "symlink=") {
-					require.NoError(t, os.Symlink(strings.TrimPrefix(contents, "symlink="), target))
+				if after, ok := strings.CutPrefix(contents, "symlink="); ok {
+					require.NoError(t, os.Symlink(after, target))
 					continue
 				}
 
@@ -484,4 +484,22 @@ func TestMdevParentDevicesExist(t *testing.T) {
 
 	require.NoError(t, mock.AddMockA100Parent("0000:3b:00.0", 0))
 	require.True(t, mdevParentDevicesExist(mock))
+}
+
+func TestCountNvidiaDevices(t *testing.T) {
+	testCases := []struct {
+		name     string
+		output   string
+		expected int
+	}{
+		{name: "empty output", expected: 0},
+		{name: "no NVIDIA devices", output: "Intel Corporation\nAMD", expected: 0},
+		{name: "multiple NVIDIA devices", output: "NVIDIA GPU\nIntel\nnvidia controller", expected: 2},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, countNvidiaDevices(tc.output))
+		})
+	}
 }

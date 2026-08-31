@@ -55,13 +55,13 @@ func (f FailureError) Backtrace() string {
 var ErrFailure error = FailureError{}
 
 // ExpectNoError checks if "err" is set, and if so, fails assertion while logs the error.
-func ExpectNoError(err error, explain ...interface{}) {
+func ExpectNoError(err error, explain ...any) {
 	ExpectNoErrorWithOffset(1, err, explain...)
 }
 
 // ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logs the error at "offset" levels above its caller
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
-func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
+func ExpectNoErrorWithOffset(offset int, err error, explain ...any) {
 	if err == nil {
 		return
 	}

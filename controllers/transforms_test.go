@@ -190,7 +190,7 @@ func (d Daemonset) WithHostPID(enabled bool) Daemonset {
 }
 
 func (d Daemonset) WithAutomountServiceAccountToken(enabled bool) Daemonset {
-	d.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(enabled)
+	d.Spec.Template.Spec.AutomountServiceAccountToken = new(enabled)
 	return d
 }
 
@@ -722,17 +722,17 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{
 				PodSecurityContext: &corev1.PodSecurityContext{
-					RunAsUser:    ptr.To(int64(1000)),
-					RunAsGroup:   ptr.To(int64(3000)),
-					FSGroup:      ptr.To(int64(2000)),
-					RunAsNonRoot: ptr.To(true),
+					RunAsUser:    new(int64(1000)),
+					RunAsGroup:   new(int64(3000)),
+					FSGroup:      new(int64(2000)),
+					RunAsNonRoot: new(true),
 				},
 			},
 			expectedDs: NewDaemonset().WithPodSecurityContext(&corev1.PodSecurityContext{
-				RunAsUser:    ptr.To(int64(1000)),
-				RunAsGroup:   ptr.To(int64(3000)),
-				FSGroup:      ptr.To(int64(2000)),
-				RunAsNonRoot: ptr.To(true),
+				RunAsUser:    new(int64(1000)),
+				RunAsGroup:   new(int64(3000)),
+				FSGroup:      new(int64(2000)),
+				RunAsNonRoot: new(true),
 			}),
 		},
 	}
@@ -768,13 +768,13 @@ func TestApplyHostNetworkConfig(t *testing.T) {
 		},
 		{
 			name:            "hostNetwork true, should set hostNetwork and DNSPolicy",
-			hostNetwork:     ptr.To(true),
+			hostNetwork:     new(true),
 			expectEnabled:   true,
 			expectDNSPolicy: corev1.DNSClusterFirstWithHostNet,
 		},
 		{
 			name:            "hostNetwork false, should not set hostNetwork",
-			hostNetwork:     ptr.To(false),
+			hostNetwork:     new(false),
 			expectEnabled:   false,
 			expectDNSPolicy: "",
 		},
@@ -1913,7 +1913,7 @@ func TestTransformDCGM(t *testing.T) {
 			description: "dcgm enabled does not set remote engine env",
 			daemonset:   NewDaemonset().WithContainer(corev1.Container{Name: "dcgm"}),
 			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
-				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+				DCGM: gpuv1.DCGMSpec{Enabled: new(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
 			},
 			expectedDaemonset: NewDaemonset().WithContainer(corev1.Container{
 				Name:            "dcgm",
@@ -1928,7 +1928,7 @@ func TestTransformDCGM(t *testing.T) {
 				Env:  []corev1.EnvVar{{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"}},
 			}),
 			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
-				DCGM: gpuv1.DCGMSpec{Enabled: ptr.To(false), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
+				DCGM: gpuv1.DCGMSpec{Enabled: new(false), Repository: "nvcr.io/nvidia/cloud-native", Image: "dcgm", Version: "v1.0.0"},
 			},
 			expectedDaemonset: NewDaemonset().
 				WithContainer(corev1.Container{

@@ -5,6 +5,7 @@ linters:
     - gocritic
     - gosec
     - misspell
+    - modernize
     - unconvert
   settings:
     gosec:

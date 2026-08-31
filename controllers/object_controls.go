@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -219,7 +220,7 @@ const (
 )
 
 // rootUID represents user 0
-var rootUID = ptr.To(int64(0))
+var rootUID = new(int64(0))
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
 var RepoConfigPathMap = map[string]string{
@@ -805,9 +806,7 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 		if obj.Spec.Template.Annotations == nil {
 			obj.Spec.Template.Annotations = make(map[string]string)
 		}
-		for annoKey, annoVal := range dsSpec.Annotations {
-			obj.Spec.Template.Annotations[annoKey] = annoVal
-		}
+		maps.Copy(obj.Spec.Template.Annotations, dsSpec.Annotations)
 	}
 }
 
@@ -1483,7 +1482,7 @@ func transformRuntimeConfigAndSocketMounts(obj *appsv1.DaemonSet, runtime string
 	const runtimeConfigSourceFile = "file"
 	if runtimeConfigSources := getContainerEnv(container, "RUNTIME_CONFIG_SOURCE"); runtimeConfigSources != "" {
 		var sources []string
-		for _, runtimeConfigSource := range strings.Split(runtimeConfigSources, ",") {
+		for runtimeConfigSource := range strings.SplitSeq(runtimeConfigSources, ",") {
 			parts := strings.SplitN(runtimeConfigSource, "=", 2)
 			if len(parts) == 1 || parts[0] != runtimeConfigSourceFile {
 				sources = append(sources, runtimeConfigSource)
@@ -1896,7 +1895,7 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// Override the base asset's automountServiceAccountToken=false when the
 	// configuration reads from the Kubernetes API.
 	if config.DCGMExporter.IsKubernetesPodMetadataEnabled() || dcgmExporterEnvRequiresAPIAccess(config.DCGMExporter.Env) {
-		obj.Spec.Template.Spec.AutomountServiceAccountToken = ptr.To(true)
+		obj.Spec.Template.Spec.AutomountServiceAccountToken = new(true)
 	}
 
 	// mount configmap for custom metrics if provided by user
@@ -1976,9 +1975,7 @@ func addExtraAnnotations(obj *appsv1.DaemonSet, annotations map[string]string) {
 	if obj.Spec.Template.Annotations == nil {
 		obj.Spec.Template.Annotations = make(map[string]string)
 	}
-	for k, v := range annotations {
-		obj.Spec.Template.Annotations[k] = v
-	}
+	maps.Copy(obj.Spec.Template.Annotations, annotations)
 }
 
 // TransformDCGM transforms dcgm daemonset with required config as per ClusterPolicy
@@ -3380,7 +3377,7 @@ func transformOpenShiftDriverToolkitContainer(obj *appsv1.DaemonSet, config *gpu
 }
 
 // resolveDriverTag resolves image tag based on the OS of the worker node
-func resolveDriverTag(n ClusterPolicyController, driverSpec interface{}) (string, error) {
+func resolveDriverTag(n ClusterPolicyController, driverSpec any) (string, error) {
 	// obtain image path
 	var image string
 	var err error
@@ -4054,7 +4051,6 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	n.logger.V(2).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
 
 	for _, pod := range dsPods {
-		pod := pod
 		podRevisionHash, err := getPodControllerRevisionHash(ctx, &pod)
 		if err != nil {
 			n.logger.Error(
@@ -4250,7 +4246,6 @@ func (n ClusterPolicyController) cleanupAllDriverDaemonSets(ctx context.Context,
 	}
 
 	for _, ds := range list.Items {
-		ds := ds
 		// filter out DaemonSets which are not the NVIDIA driver/vgpu-manager
 		if strings.HasPrefix(ds.Name, commonDriverDaemonsetName) || strings.HasPrefix(ds.Name, commonVGPUManagerDaemonsetName) {
 			n.logger.Info("Deleting NVIDIA driver daemonset owned by ClusterPolicy", "Name", ds.Name, "PropagationPolicy", propagationPolicy)
@@ -4741,18 +4736,14 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Labels = make(map[string]string)
 	}
 
-	for labelKey, labelValue := range n.singleton.Spec.Daemonsets.Labels {
-		obj.Labels[labelKey] = labelValue
-	}
+	maps.Copy(obj.Labels, n.singleton.Spec.Daemonsets.Labels)
 
 	// Daemonsets will always have at least one annotation applied, so allocate if necessary
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
 	}
 
-	for annoKey, annoValue := range n.singleton.Spec.Daemonsets.Annotations {
-		obj.Annotations[annoKey] = annoValue
-	}
+	maps.Copy(obj.Annotations, n.singleton.Spec.Daemonsets.Annotations)
 
 	found := &appsv1.DaemonSet{}
 	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
@@ -4989,9 +4980,7 @@ func applyServiceMonitorCustomEdits(desiredState *gpuv1.ServiceMonitorConfig, cu
 		if currentState.Labels == nil {
 			currentState.Labels = map[string]string{}
 		}
-		for key, value := range desiredState.AdditionalLabels {
-			currentState.Labels[key] = value
-		}
+		maps.Copy(currentState.Labels, desiredState.AdditionalLabels)
 	}
 
 	// The following edits are endpoint-specific and require at least one endpoint
@@ -5247,7 +5236,6 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	// Delete all Kata RuntimeClasses
 	n.logger.Info("Kata Manager disabled, deleting all Kata RuntimeClasses")
 	for _, rc := range list.Items {
-		rc := rc
 		n.logger.V(1).Info("Deleting Kata RuntimeClass", "Name", rc.Name)
 		err := n.client.Delete(ctx, &rc)
 		if err != nil {
@@ -5281,7 +5269,6 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	for _, obj := range nvidiaRuntimeClasses {
-		obj := obj
 		// When CDI is disabled, do not create the additional 'nvidia-cdi' and
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.

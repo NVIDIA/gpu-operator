@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/utils/ptr"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -49,10 +48,10 @@ func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 				corev1.ResourceMemory: resource.MustParse("128Mi"),
 			},
 		},
-		Healthcheck: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: ptr.To(int32(52000))},
+		Healthcheck: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
 	}
 	cr.Spec.DRADriver.ComputeDomains = nvidiav1alpha1.DRADriverComputeDomainsSpec{
-		Enabled: ptr.To(true),
+		Enabled: new(true),
 		Controller: nvidiav1alpha1.DRADriverControllerSpec{
 			Env: []nvidiav1.EnvVar{{Name: "CD_CONTROLLER_EXTRA", Value: "1"}},
 		},
@@ -125,7 +124,7 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDCGMState(t)
 				cr := sampleGPUCluster()
-				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: ptr.To(true)}
+				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 				objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 				require.NoError(t, err)
 				return objs
@@ -147,7 +146,7 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			name: "gpucluster-dcgm-exporter-pod-metadata",
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDCGMExporterState(t, false)
-				cr := exporterCR(&nvidiav1.DCGMExporterSpec{EnablePodLabels: ptr.To(true)})
+				cr := exporterCR(&nvidiav1.DCGMExporterSpec{EnablePodLabels: new(true)})
 				objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 				require.NoError(t, err)
 				return objs
@@ -160,7 +159,7 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDCGMExporterState(t, false)
 				cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
-				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: ptr.To(true)}
+				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 				objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 				require.NoError(t, err)
 				return objs

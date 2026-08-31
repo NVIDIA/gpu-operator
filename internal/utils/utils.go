@@ -72,7 +72,7 @@ var spewPrinter = spew.ConfigState{
 }
 
 // GetObjectHash returns an FNV-32a hash of the full object (all fields).
-func GetObjectHash(obj interface{}) string {
+func GetObjectHash(obj any) string {
 	hasher := fnv.New32a()
 	spewPrinter.Fprintf(hasher, "%#v", obj)
 	return fmt.Sprint(hasher.Sum32())
@@ -81,7 +81,7 @@ func GetObjectHash(obj interface{}) string {
 // GetObjectHashIgnoreEmptyKeys returns an FNV-32a hash of only the non-zero
 // fields of a struct. Adding a new zero-valued field will not change
 // the digest. Embedded structs are flattened.
-func GetObjectHashIgnoreEmptyKeys(obj interface{}) string {
+func GetObjectHashIgnoreEmptyKeys(obj any) string {
 	hasher := fnv.New32a()
 	hashNonZeroFields(hasher, reflect.Indirect(reflect.ValueOf(obj)))
 	return fmt.Sprint(hasher.Sum32())
