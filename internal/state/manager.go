@@ -19,6 +19,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,7 @@ type Manager interface {
 }
 
 type stateManager struct {
+	crdKind   string
 	states    []State
 	client    client.Client
 	namespace string
@@ -48,6 +50,7 @@ func NewManager(crdKind string, namespace string, k8sClient client.Client, schem
 	}
 
 	manager := &stateManager{
+		crdKind:   crdKind,
 		namespace: namespace,
 		states:    states,
 		client:    k8sClient,
@@ -86,7 +89,9 @@ func (m *stateManager) SyncState(ctx context.Context, customResource any, infoCa
 	for _, state := range m.states {
 		logger.V(consts.LogLevelInfo).Info("Sync State", "Name", state.Name(), "Description", state.Description())
 		stateCtx := log.IntoContext(ctx, logger.WithName("state").WithName(state.Name()))
+		stateStart := time.Now()
 		ss, err := state.Sync(stateCtx, customResource, infoCatalog)
+		StateDurationSeconds.WithLabelValues(m.crdKind, state.Name()).Observe(time.Since(stateStart).Seconds())
 		result := Result{StateName: state.Name(), Status: ss, ErrInfo: err}
 		managerResult.StatesStatus = append(managerResult.StatesStatus, result)
 

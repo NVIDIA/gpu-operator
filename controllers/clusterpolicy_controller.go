@@ -47,6 +47,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/state"
 )
 
 const (
@@ -172,7 +173,12 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	statesNotReady := []string{}
 	notReadyReasons := []string{}
 	for {
+		stateName := clusterPolicyCtrl.stateNames[clusterPolicyCtrl.idx]
+		stateStart := time.Now()
 		status, statusError := clusterPolicyCtrl.step()
+		state.StateDurationSeconds.
+			WithLabelValues(gpuv1.ClusterPolicyCRDName, stateName).
+			Observe(time.Since(stateStart).Seconds())
 		if statusError != nil {
 			clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusNotReady)
 			clusterPolicyCtrl.operatorMetrics.reconciliationFailed.Inc()
