@@ -131,7 +131,7 @@ func NewStateDriver(
 	return state, nil
 }
 
-func (s *stateDriver) Sync(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) (SyncState, error) {
+func (s *stateDriver) Sync(ctx context.Context, customResource any, infoCatalog InfoCatalog) (SyncState, error) {
 	cr, ok := customResource.(*nvidiav1alpha1.NVIDIADriver)
 	if !ok {
 		return SyncStateError, fmt.Errorf("NVIDIADriver CR not provided as input to Sync()")
@@ -203,7 +203,6 @@ func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvid
 	}
 
 	for _, ds := range list.Items {
-		ds := ds
 		// Delete DaemonSets that are not in the desired list. This handles the case where
 		// the CR's nodeSelector changes and certain node pools no longer match.
 		if _, exists := desiredDaemonSetNames[ds.Name]; !exists {

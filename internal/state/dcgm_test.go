@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -65,10 +64,10 @@ func claimHasAdminAccess(t *testing.T, rct *unstructured.Unstructured) {
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Len(t, requests, 1)
-	req := requests[0].(map[string]interface{})
+	req := requests[0].(map[string]any)
 	// v1/v1beta2 nest under "exactly"; v1beta1 is flat. The test cluster serves v1.
 	device := req
-	if exactly, ok := req["exactly"].(map[string]interface{}); ok {
+	if exactly, ok := req["exactly"].(map[string]any); ok {
 		device = exactly
 	}
 	assert.Equal(t, "gpu.nvidia.com", device["deviceClassName"])
@@ -93,7 +92,7 @@ func TestDCGMDisabledByDefault(t *testing.T) {
 	assert.Empty(t, objs, "DCGM must default to disabled when enabled is nil")
 
 	// Explicitly disabled.
-	cr.Spec.DCGM.Enabled = ptr.To(false)
+	cr.Spec.DCGM.Enabled = new(false)
 	objs, err = s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
 	assert.Empty(t, objs, "DCGM must not render when explicitly disabled")
@@ -103,7 +102,7 @@ func TestDCGMEnabled(t *testing.T) {
 	s := newTestDCGMState(t)
 	cr := sampleGPUCluster()
 	cr.Spec.DCGM = &nvidiav1.DCGMSpec{
-		Enabled:    ptr.To(true),
+		Enabled:    new(true),
 		Repository: "nvcr.io/nvidia/cloud-native",
 		Image:      "dcgm",
 		Version:    "4.5.2",
@@ -145,14 +144,14 @@ func TestDCGMEnabled(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Len(t, port, 1)
-	assert.Equal(t, int64(5555), port[0].(map[string]interface{})["port"])
+	assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
 }
 
 func TestDCGMImageFromEnvFallback(t *testing.T) {
 	s := newTestDCGMState(t)
 	cr := sampleGPUCluster()
 	// No repository/image/version — must fall back to DCGM_IMAGE.
-	cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: ptr.To(true)}
+	cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)

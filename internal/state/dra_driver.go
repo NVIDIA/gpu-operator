@@ -76,7 +76,7 @@ func NewStateDRADriver(
 	return &stateDRADriver{stateSkel: skel}, nil
 }
 
-func (s *stateDRADriver) Sync(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) (SyncState, error) {
+func (s *stateDRADriver) Sync(ctx context.Context, customResource any, infoCatalog InfoCatalog) (SyncState, error) {
 	cr, ok := customResource.(*nvidiav1alpha1.GPUCluster)
 	if !ok {
 		return SyncStateError, fmt.Errorf("GPUCluster CR not provided as input to Sync()")

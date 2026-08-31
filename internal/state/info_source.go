@@ -28,7 +28,7 @@ func NewInfoCatalog() InfoCatalog {
 }
 
 // InfoSource represents an object that is a souce of information
-type InfoSource interface{}
+type InfoSource any
 
 // InfoCatalog is an information catalog to be used to retrieve infoSources. used for State implementation that require
 // additional helping functionality to perfrom the Sync operation. As more States are added,

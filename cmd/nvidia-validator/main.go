@@ -1317,8 +1317,8 @@ func (p *Plugin) runWorkload() error {
 	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
-		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")
-		for _, secret := range pullSecrets {
+		pullSecrets := strings.SplitSeq(os.Getenv(validatorImagePullSecretsEnvName), ",")
+		for secret := range pullSecrets {
 			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 	}
@@ -1385,7 +1385,7 @@ func (p *Plugin) runWorkload() error {
 
 // waits for the pod to be created
 func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name string, namespace string) error {
-	for i := 0; i < podCreationWaitRetries; i++ {
+	for range podCreationWaitRetries {
 		// check for the existence of the resource
 		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, name, meta_v1.GetOptions{})
 		if err != nil {
@@ -1581,8 +1581,8 @@ func (c *CUDA) runWorkload() error {
 	}
 
 	if os.Getenv(validatorImagePullSecretsEnvName) != "" {
-		pullSecrets := strings.Split(os.Getenv(validatorImagePullSecretsEnvName), ",")
-		for _, secret := range pullSecrets {
+		pullSecrets := strings.SplitSeq(os.Getenv(validatorImagePullSecretsEnvName), ",")
+		for secret := range pullSecrets {
 			pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secret})
 		}
 	}

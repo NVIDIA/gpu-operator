@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -72,32 +71,32 @@ func TestGPUPodSpecFilterResourceClaims(t *testing.T) {
 			name: "pod with a claim allocated by the NVIDIA GPU DRA driver",
 			objs: []runtime.Object{allocatedClaim("gpu-claim", "gpu.nvidia.com")},
 			pod: claimPod(corev1.PodRunning,
-				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: ptr.To("gpu-claim")}),
+				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: new("gpu-claim")}),
 			expected: true,
 		},
 		{
 			name: "pod with an admin-access claim is not a GPU pod",
 			objs: []runtime.Object{func() *resourcev1.ResourceClaim {
 				claim := allocatedClaim("admin-claim", "gpu.nvidia.com")
-				claim.Status.Allocation.Devices.Results[0].AdminAccess = ptr.To(true)
+				claim.Status.Allocation.Devices.Results[0].AdminAccess = new(true)
 				return claim
 			}()},
 			pod: claimPod(corev1.PodRunning,
-				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: ptr.To("admin-claim")}),
+				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: new("admin-claim")}),
 			expected: false,
 		},
 		{
 			name: "pod with a claim allocated by another DRA driver",
 			objs: []runtime.Object{allocatedClaim("nic-claim", "net.example.com")},
 			pod: claimPod(corev1.PodRunning,
-				corev1.PodResourceClaim{Name: "nic", ResourceClaimName: ptr.To("nic-claim")}),
+				corev1.PodResourceClaim{Name: "nic", ResourceClaimName: new("nic-claim")}),
 			expected: false,
 		},
 		{
 			name: "pod with an unallocated claim",
 			objs: []runtime.Object{allocatedClaim("pending-claim", "")},
 			pod: claimPod(corev1.PodRunning,
-				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: ptr.To("pending-claim")}),
+				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: new("pending-claim")}),
 			expected: false,
 		},
 		{
@@ -105,9 +104,9 @@ func TestGPUPodSpecFilterResourceClaims(t *testing.T) {
 			objs: []runtime.Object{allocatedClaim("pod-gpu-claim", "gpu.nvidia.com")},
 			pod: func() corev1.Pod {
 				p := claimPod(corev1.PodRunning,
-					corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("single-gpu")})
+					corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: new("single-gpu")})
 				p.Status.ResourceClaimStatuses = []corev1.PodResourceClaimStatus{
-					{Name: "gpu", ResourceClaimName: ptr.To("pod-gpu-claim")},
+					{Name: "gpu", ResourceClaimName: new("pod-gpu-claim")},
 				}
 				return p
 			}(),
@@ -116,14 +115,14 @@ func TestGPUPodSpecFilterResourceClaims(t *testing.T) {
 		{
 			name: "unresolvable claim counts as a GPU pod",
 			pod: claimPod(corev1.PodRunning,
-				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: ptr.To("missing-claim")}),
+				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: new("missing-claim")}),
 			expected: true,
 		},
 		{
 			name: "completed pod with a GPU claim is ignored",
 			objs: []runtime.Object{allocatedClaim("gpu-claim", "gpu.nvidia.com")},
 			pod: claimPod(corev1.PodSucceeded,
-				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: ptr.To("gpu-claim")}),
+				corev1.PodResourceClaim{Name: "gpu", ResourceClaimName: new("gpu-claim")}),
 			expected: false,
 		},
 	}

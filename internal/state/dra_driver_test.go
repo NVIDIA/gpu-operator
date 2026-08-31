@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -165,7 +164,7 @@ func TestDRADriverHealthcheckPortOverride(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
 	cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck = &nvidiav1alpha1.DRADriverHealthcheckSpec{
-		Port: ptr.To(int32(52000)),
+		Port: new(int32(52000)),
 	}
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
@@ -281,7 +280,7 @@ func TestDRADriverHealthcheckDisabled(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
 	cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck = &nvidiav1alpha1.DRADriverHealthcheckSpec{
-		Enabled: ptr.To(false),
+		Enabled: new(false),
 	}
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
@@ -380,7 +379,7 @@ func containerByName(t *testing.T, ds *appsv1.DaemonSet, name string) corev1.Con
 func TestDRADriverRenderComputeDomains(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
-	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
@@ -417,7 +416,7 @@ func TestDRADriverRenderComputeDomains(t *testing.T) {
 func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
-	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
@@ -470,7 +469,7 @@ func TestDRADriverDaemonsetsAnnotations(t *testing.T) {
 func TestDRADriverControllerInheritsGlobalConfig(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
-	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
 	cr.Spec.Daemonsets.Labels = map[string]string{"team": "platform"}
 	cr.Spec.Daemonsets.Annotations = map[string]string{"monitoring": "enabled"}
 	cr.Spec.Daemonsets.Tolerations = []corev1.Toleration{{
@@ -501,7 +500,7 @@ func TestDRADriverControllerInheritsGlobalConfig(t *testing.T) {
 func TestDRADriverKubeletPluginScheduling(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
-	cr.Spec.DRADriver.ComputeDomains.Enabled = ptr.To(true)
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
 	cr.Spec.Daemonsets.Tolerations = []corev1.Toleration{{Key: "ds-tol", Operator: corev1.TolerationOpExists}}
 	cr.Spec.Daemonsets.PriorityClassName = "ds-priority"
 

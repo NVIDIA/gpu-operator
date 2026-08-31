@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -257,7 +256,7 @@ func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
 	driver := &nvidiav1alpha1.NVIDIADriver{
 		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
 		Spec: nvidiav1alpha1.NVIDIADriverSpec{
-			UsePrecompiled: ptr.To(true),
+			UsePrecompiled: new(true),
 		},
 	}
 

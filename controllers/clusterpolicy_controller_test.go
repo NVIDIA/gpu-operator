@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -415,7 +414,7 @@ func TestClusterPolicyReconcileDriverUpgradeFailureCases(t *testing.T) {
 func clusterPolicyForUpgradeTest(useNvidiaDriverCRD bool) *gpuv1.ClusterPolicy {
 	return &gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
-		Spec:       gpuv1.ClusterPolicySpec{Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(useNvidiaDriverCRD)}},
+		Spec:       gpuv1.ClusterPolicySpec{Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(useNvidiaDriverCRD)}},
 	}
 }
 

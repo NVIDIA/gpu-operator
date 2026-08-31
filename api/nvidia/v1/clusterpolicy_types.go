@@ -2086,7 +2086,7 @@ func imagePath(repository string, image string, version string, imagePathEnvName
 }
 
 // ImagePath sets image path for given component type
-func ImagePath(spec interface{}) (string, error) {
+func ImagePath(spec any) (string, error) {
 	if spec == nil {
 		return "", fmt.Errorf("invalid nil spec to construct image path")
 	}

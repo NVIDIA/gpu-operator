@@ -24,6 +24,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math/rand"
 	"strings"
 	"time"
@@ -207,9 +208,7 @@ func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels
 		labels = make(map[string]string)
 	} else {
 		labelsCopy := make(map[string]string)
-		for k, v := range labels {
-			labelsCopy[k] = v
-		}
+		maps.Copy(labelsCopy, labels)
 		labels = labelsCopy
 	}
 

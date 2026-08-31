@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -128,7 +127,7 @@ func TestReconcile(t *testing.T) {
 	}{
 		{
 			name:   "ClusterPolicy has driver CRD false → reconciliation skips driver",
-			useCRD: ptr.To(false),
+			useCRD: new(false),
 			validator: &FakeNodeSelectorValidator{
 				CustomError: errors.New("fake list error"),
 			},
@@ -137,7 +136,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:             "driver CRD false with GPUCluster → reconciliation still skips driver",
-			useCRD:           ptr.To(false),
+			useCRD:           new(false),
 			gpuClusterExists: true,
 			validator: &FakeNodeSelectorValidator{
 				CustomError: errors.New("fake list error"),
@@ -147,7 +146,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:   "ClusterPolicy has driver CRD true but validator errors",
-			useCRD: ptr.To(true),
+			useCRD: new(true),
 			validator: &FakeNodeSelectorValidator{
 				CustomError: errors.New("fake list error"),
 			},
@@ -156,8 +155,8 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:          "ClusterPolicy has driver disabled and driver CRD true but validator errors",
-			useCRD:        ptr.To(true),
-			driverEnabled: ptr.To(false),
+			useCRD:        new(true),
+			driverEnabled: new(false),
 			validator: &FakeNodeSelectorValidator{
 				CustomError: errors.New("fake list error"),
 			},
@@ -166,11 +165,11 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:   "driver CRD true, no validator errors, use precompiled drivers and GDS enabled",
-			useCRD: ptr.To(true),
+			useCRD: new(true),
 			spec: nvidiav1alpha1.NVIDIADriverSpec{
-				UsePrecompiled: ptr.To(true),
+				UsePrecompiled: new(true),
 				GPUDirectStorage: &nvidiav1alpha1.GPUDirectStorageSpec{
-					Enabled: ptr.To(true),
+					Enabled: new(true),
 				},
 			},
 			validator: &FakeNodeSelectorValidator{
@@ -256,7 +255,7 @@ func TestReconcileStandalone(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
-				UseNvidiaDriverCRD: ptr.To(true),
+				UseNvidiaDriverCRD: new(true),
 			},
 			HostPaths: gpuv1.HostPathsSpec{RootFS: "/cp-root"},
 		},
@@ -349,7 +348,7 @@ func TestReconcileConflictSetsNotReadyState(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "default"},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
-				UseNvidiaDriverCRD: ptr.To(true),
+				UseNvidiaDriverCRD: new(true),
 			},
 		},
 	}
@@ -394,7 +393,7 @@ func TestReconcileMultipleDefaultDriversSetsNotReadyState(t *testing.T) {
 	cp := &gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "default"},
 		Spec: gpuv1.ClusterPolicySpec{
-			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
 		},
 	}
 

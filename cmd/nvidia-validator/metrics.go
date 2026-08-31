@@ -261,7 +261,7 @@ func runLsPCI() (string, error) {
 
 func countNvidiaDevices(lspciStdout string) int {
 	count := 0
-	for _, line := range strings.Split(lspciStdout, "\n") {
+	for line := range strings.SplitSeq(lspciStdout, "\n") {
 		if strings.Contains(strings.ToLower(line), "nvidia") {
 			count++
 		}

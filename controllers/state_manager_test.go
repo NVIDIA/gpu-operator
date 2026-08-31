@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -169,7 +168,7 @@ func TestStep(t *testing.T) {
 	expectedErr := errors.New("step failed")
 	driverCRDPolicy := &gpuv1.ClusterPolicy{
 		Spec: gpuv1.ClusterPolicySpec{
-			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: ptr.To(true)},
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
 		},
 	}
 
@@ -474,8 +473,8 @@ func TestValidateClusterPolicySpec(t *testing.T) {
 			description: "valid CDI object in spec",
 			spec: &gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
-					Enabled:          ptr.To(true),
-					NRIPluginEnabled: ptr.To(true),
+					Enabled:          new(true),
+					NRIPluginEnabled: new(true),
 				},
 			},
 		},
@@ -483,8 +482,8 @@ func TestValidateClusterPolicySpec(t *testing.T) {
 			description: "invalid CDI object in spec",
 			spec: &gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
-					Enabled:          ptr.To(false),
-					NRIPluginEnabled: ptr.To(true),
+					Enabled:          new(false),
+					NRIPluginEnabled: new(true),
 				},
 			},
 			err: errors.New("the NRI Plugin cannot be enabled when CDI is disabled"),
@@ -493,11 +492,11 @@ func TestValidateClusterPolicySpec(t *testing.T) {
 			description: "invalid CDI and Toolkit config combination",
 			spec: &gpuv1.ClusterPolicySpec{
 				CDI: gpuv1.CDIConfigSpec{
-					Enabled:          ptr.To(true),
-					NRIPluginEnabled: ptr.To(true),
+					Enabled:          new(true),
+					NRIPluginEnabled: new(true),
 				},
 				Toolkit: gpuv1.ToolkitSpec{
-					Enabled: ptr.To(false),
+					Enabled: new(false),
 				},
 			},
 			err: errors.New("the NRI Plugin cannot be enabled when the Container Toolkit is disabled"),
@@ -597,8 +596,8 @@ func TestRemoveAllGPUStateLabels(t *testing.T) {
 }
 
 func TestIsStateEnabled_SandboxAndKataDevicePlugin(t *testing.T) {
-	boolTrue := ptr.To(true)
-	boolFalse := ptr.To(false)
+	boolTrue := new(true)
+	boolFalse := new(false)
 	tests := []struct {
 		name           string
 		sandboxEnabled bool

@@ -30,7 +30,7 @@ import (
 
 type Manager interface {
 	GetWatchSources(ctrlManager) []SyncingSource
-	SyncState(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) Results
+	SyncState(ctx context.Context, customResource any, infoCatalog InfoCatalog) Results
 }
 
 type stateManager struct {
@@ -74,7 +74,7 @@ func (m *stateManager) GetWatchSources(ctrlManager ctrlManager) []SyncingSource 
 	return sources
 }
 
-func (m *stateManager) SyncState(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) Results {
+func (m *stateManager) SyncState(ctx context.Context, customResource any, infoCatalog InfoCatalog) Results {
 	logger := log.FromContext(ctx)
 	logger.V(consts.LogLevelInfo).Info("Syncing system state")
 

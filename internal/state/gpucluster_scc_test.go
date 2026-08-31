@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -97,7 +96,7 @@ func TestGPUClusterOperandSCCs(t *testing.T) {
 			render: func(t *testing.T, catalog InfoCatalog) []*unstructured.Unstructured {
 				s := newTestDCGMState(t)
 				cr := sampleGPUCluster()
-				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: ptr.To(true)}
+				cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 				objs, err := s.getManifestObjects(context.Background(), cr, catalog)
 				require.NoError(t, err)
 				return objs

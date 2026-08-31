@@ -34,6 +34,6 @@ const (
 type State interface {
 	Name() string
 	Description() string
-	Sync(ctx context.Context, customResource interface{}, infoCatalog InfoCatalog) (SyncState, error)
+	Sync(ctx context.Context, customResource any, infoCatalog InfoCatalog) (SyncState, error)
 	GetWatchSources(ctrlManager) map[string]SyncingSource
 }

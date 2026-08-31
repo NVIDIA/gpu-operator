@@ -113,7 +113,7 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 
 func TestDCGMExporterDisabled(t *testing.T) {
 	s := newTestDCGMExporterState(t, false)
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: ptr.To(false)})
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestDCGMExporterDisabled(t *testing.T) {
 func TestDCGMExporterRemoteEngineWhenDCGMEnabled(t *testing.T) {
 	s := newTestDCGMExporterState(t, false)
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
-	cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: ptr.To(true)}
+	cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
@@ -136,8 +136,8 @@ func TestDCGMExporterRemoteEngineWhenDCGMEnabled(t *testing.T) {
 func TestDCGMExporterPodMetadataEnrichment(t *testing.T) {
 	s := newTestDCGMExporterState(t, false)
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		EnablePodLabels:        ptr.To(true),
-		EnablePodUID:           ptr.To(true),
+		EnablePodLabels:        new(true),
+		EnablePodUID:           new(true),
 		PodLabelAllowlistRegex: []string{"^app$", "^team$"},
 	})
 
@@ -173,7 +173,7 @@ func TestDCGMExporterCustomMetricsConfig(t *testing.T) {
 func TestDCGMExporterHPCJobMapping(t *testing.T) {
 	s := newTestDCGMExporterState(t, false)
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		HPCJobMapping: &nvidiav1.DCGMExporterHPCJobMappingConfig{Enabled: ptr.To(true)},
+		HPCJobMapping: &nvidiav1.DCGMExporterHPCJobMappingConfig{Enabled: new(true)},
 	})
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
@@ -190,7 +190,7 @@ func TestDCGMExporterHPCJobMapping(t *testing.T) {
 func TestDCGMExporterServiceMonitorSkippedWithoutCRD(t *testing.T) {
 	s := newTestDCGMExporterState(t, false) // ServiceMonitor CRD not served
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		ServiceMonitor: &nvidiav1.ServiceMonitorConfig{Enabled: ptr.To(true)},
+		ServiceMonitor: &nvidiav1.ServiceMonitorConfig{Enabled: new(true)},
 	})
 
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
@@ -203,7 +203,7 @@ func TestDCGMExporterServiceMonitorRendered(t *testing.T) {
 	s := newTestDCGMExporterState(t, true) // ServiceMonitor CRD served
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
 		ServiceMonitor: &nvidiav1.ServiceMonitorConfig{
-			Enabled:  ptr.To(true),
+			Enabled:  new(true),
 			Interval: "15s",
 		},
 	})
