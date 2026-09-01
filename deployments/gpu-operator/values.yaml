@@ -132,8 +132,9 @@ operator:
     capabilities:
       drop:
         - ALL
-  # Optional pod dnsConfig (nameservers, searches, options).
-  # dnsConfig: {}
+  # Empty dnsPolicy keeps the cluster default (ClusterFirst).
+  dnsPolicy: ""
+  dnsConfig: {}
   # metrics:
   #   serviceMonitor:
   #     interval: 15s

@@ -32,10 +32,28 @@ spec:
       {{- end }}
       nodeSelector:
         {{- toYaml .Values.operator.nodeSelector | nindent 8 }}
+      {{- with .Values.operator.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.operator.dnsPolicy }}
+      dnsPolicy: {{ .Values.operator.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.operator.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cleanup-crd
           image: {{ include "gpu-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+        {{- with .Values.operator.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           command:
             - /usr/bin/manage-crds
           args:
@@ -46,5 +64,8 @@ spec:
         {{- if .Values.nfd.enabled }}
             - --filepath=/opt/gpu-operator/nfd-api-crds.yaml
         {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
       restartPolicy: OnFailure
 {{- end }}
