@@ -50,6 +50,9 @@ spec:
         - --zap-log-level={{- .Values.operator.logging.level }}
         {{- end }}
       {{- end }}
+      {{- if .Values.operator.pprof.bindAddress }}
+        - --pprof-bind-address={{ .Values.operator.pprof.bindAddress }}
+      {{- end }}
         env:
         - name: WATCH_NAMESPACE
           value: ""
