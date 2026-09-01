@@ -156,6 +156,8 @@ jobs:
             echo "NODE_SSH_HOST=ubuntu@${PUBLIC_DNS_NAME}"
             echo "NODE_SSH_KEY=${SSH_DIR}/id_rsa"
             echo "NODE_SSH_KNOWN_HOSTS=${SSH_DIR}/known_hosts"
+            echo "NODE_PUBLIC_DNS_NAME=${PUBLIC_DNS_NAME}"
+            echo "EGRESS_IP_AT_START=$(curl -fsS --max-time 15 https://api.ipify.org || echo unknown)"
           } >> "$GITHUB_ENV"
       - name: Verify cluster access
         run: |
@@ -194,6 +196,39 @@ jobs:
           kubectl get pods -A -o wide --request-timeout=15s > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp --request-timeout=15s > "${LOG_DIR}/events.txt" 2>&1 || true
           timeout 30s helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
+      - name: Diagnose cluster reachability
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-1
+        run: |
+          mkdir -p "${LOG_DIR}"
+          {
+            echo "runner egress IP at start: ${EGRESS_IP_AT_START:-unknown}"
+            echo "runner egress IP now:      $(curl -fsS --max-time 15 https://api.ipify.org || echo unavailable)"
+            echo
+            echo "--- kube API over HTTPS ---"
+            kubectl get --raw='/readyz' --request-timeout=15s || echo "kube API unreachable"
+            echo
+            echo "--- node over SSH (port 22) ---"
+            timeout 45 ssh -i "${NODE_SSH_KEY}" \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+              -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${NODE_SSH_KNOWN_HOSTS}" \
+              "${NODE_SSH_HOST}" 'uptime; ip -br addr; systemctl is-active kubelet containerd' \
+              || echo "ssh probe failed"
+            echo
+            echo "--- EC2 instance state ---"
+            if command -v aws >/dev/null; then
+              aws ec2 describe-instances \
+                --filters "Name=dns-name,Values=${NODE_PUBLIC_DNS_NAME}" \
+                --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name,Launch:LaunchTime}' \
+                --output json || echo "describe-instances failed"
+            else
+              echo "aws cli not installed on the runner"
+            fi
+          } > "${LOG_DIR}/reachability.txt" 2>&1 || true
+          cat "${LOG_DIR}/reachability.txt"
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -282,6 +317,8 @@ jobs:
             echo "NODE_SSH_HOST=ubuntu@${PUBLIC_DNS_NAME}"
             echo "NODE_SSH_KEY=${SSH_DIR}/id_rsa"
             echo "NODE_SSH_KNOWN_HOSTS=${SSH_DIR}/known_hosts"
+            echo "NODE_PUBLIC_DNS_NAME=${PUBLIC_DNS_NAME}"
+            echo "EGRESS_IP_AT_START=$(curl -fsS --max-time 15 https://api.ipify.org || echo unknown)"
           } >> "$GITHUB_ENV"
       - name: Verify cluster access
         run: |
@@ -320,6 +357,39 @@ jobs:
           kubectl get pods -A -o wide --request-timeout=15s > "${LOG_DIR}/pods.txt" 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp --request-timeout=15s > "${LOG_DIR}/events.txt" 2>&1 || true
           timeout 30s helm list -A > "${LOG_DIR}/helm-releases.txt" 2>&1 || true
+      - name: Diagnose cluster reachability
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-1
+        run: |
+          mkdir -p "${LOG_DIR}"
+          {
+            echo "runner egress IP at start: ${EGRESS_IP_AT_START:-unknown}"
+            echo "runner egress IP now:      $(curl -fsS --max-time 15 https://api.ipify.org || echo unavailable)"
+            echo
+            echo "--- kube API over HTTPS ---"
+            kubectl get --raw='/readyz' --request-timeout=15s || echo "kube API unreachable"
+            echo
+            echo "--- node over SSH (port 22) ---"
+            timeout 45 ssh -i "${NODE_SSH_KEY}" \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+              -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${NODE_SSH_KNOWN_HOSTS}" \
+              "${NODE_SSH_HOST}" 'uptime; ip -br addr; systemctl is-active kubelet containerd' \
+              || echo "ssh probe failed"
+            echo
+            echo "--- EC2 instance state ---"
+            if command -v aws >/dev/null; then
+              aws ec2 describe-instances \
+                --filters "Name=dns-name,Values=${NODE_PUBLIC_DNS_NAME}" \
+                --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name,Launch:LaunchTime}' \
+                --output json || echo "describe-instances failed"
+            else
+              echo "aws cli not installed on the runner"
+            fi
+          } > "${LOG_DIR}/reachability.txt" 2>&1 || true
+          cat "${LOG_DIR}/reachability.txt"
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
