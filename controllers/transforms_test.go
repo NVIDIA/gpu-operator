@@ -786,7 +786,7 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 						},
 					},
 				},
-			})
+			}),
 		},
 		{
 			description: "invalid updatestrategy configured",
