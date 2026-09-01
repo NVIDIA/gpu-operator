@@ -789,6 +789,67 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			}),
 		},
 		{
+			description: "node affinity merged additively with operand",
+			ds: NewDaemonset().WithAffinity(&corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "nvidia.com/gpu.deploy.device-plugin",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"true"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				Affinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "karpenter.sh/nodepool",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"gpu"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithAffinity(&corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "nvidia.com/gpu.deploy.device-plugin",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"true"},
+									},
+									{
+										Key:      "karpenter.sh/nodepool",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"gpu"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
 			description: "invalid updatestrategy configured",
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{

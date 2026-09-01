@@ -918,9 +918,9 @@ func mergeNodeAffinity(dst, src *corev1.NodeAffinity) *corev1.NodeAffinity {
 		if merged.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			merged.RequiredDuringSchedulingIgnoredDuringExecution = src.RequiredDuringSchedulingIgnoredDuringExecution.DeepCopy()
 		} else {
-			merged.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+			merged.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = mergeNodeSelectorTerms(
 				merged.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...,
+				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
 			)
 		}
 	}
@@ -929,6 +929,25 @@ func mergeNodeAffinity(dst, src *corev1.NodeAffinity) *corev1.NodeAffinity {
 			merged.PreferredDuringSchedulingIgnoredDuringExecution,
 			src.PreferredDuringSchedulingIgnoredDuringExecution...,
 		)
+	}
+	return merged
+}
+
+func mergeNodeSelectorTerms(dst, src []corev1.NodeSelectorTerm) []corev1.NodeSelectorTerm {
+	if len(dst) == 0 {
+		return append([]corev1.NodeSelectorTerm(nil), src...)
+	}
+	if len(src) == 0 {
+		return dst
+	}
+	merged := make([]corev1.NodeSelectorTerm, 0, len(dst)*len(src))
+	for _, dstTerm := range dst {
+		for _, srcTerm := range src {
+			merged = append(merged, corev1.NodeSelectorTerm{
+				MatchExpressions: append(append([]corev1.NodeSelectorRequirement(nil), dstTerm.MatchExpressions...), srcTerm.MatchExpressions...),
+				MatchFields:      append(append([]corev1.NodeSelectorRequirement(nil), dstTerm.MatchFields...), srcTerm.MatchFields...),
+			})
+		}
 	}
 	return merged
 }
