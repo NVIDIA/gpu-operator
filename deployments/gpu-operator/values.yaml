@@ -119,12 +119,11 @@ operator:
       cpu: 200m
       memory: 100Mi
   # Restricted defaults for the operator Deployment (not operand DaemonSets).
-  # UID/GID 1000 matches the operator image USER.
+  # Do not pin runAsUser/runAsGroup/fsGroup: the image already uses USER 1000:1000
+  # on vanilla Kubernetes, and a hardcoded UID fails OpenShift namespaces whose
+  # allocated range does not include 1000 (restricted-readonly SCC is MustRunAsRange).
   securityContext:
     runAsNonRoot: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
   containerSecurityContext:
