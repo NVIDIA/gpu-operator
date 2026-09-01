@@ -118,6 +118,23 @@ operator:
     requests:
       cpu: 200m
       memory: 100Mi
+  # Restricted defaults for the operator Deployment (not operand DaemonSets).
+  # UID/GID 1000 matches the operator image USER.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # Optional pod dnsConfig (nameservers, searches, options).
+  # dnsConfig: {}
   # metrics:
   #   serviceMonitor:
   #     interval: 15s
