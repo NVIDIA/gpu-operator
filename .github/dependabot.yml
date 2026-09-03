@@ -32,15 +32,6 @@ updates:
     labels:
       - dependencies
 
-  # Update GPU Operator base images.
-  - package-ecosystem: "docker"
-    directory: "/docker"
-    schedule:
-      interval: "daily"
-    ignore:
-      # golang is managed by Renovate.
-      - dependency-name: "golang"
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
