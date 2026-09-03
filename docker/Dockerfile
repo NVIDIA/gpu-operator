@@ -76,11 +76,8 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
 # Build a static busybox layout: one binary plus applet symlinks (sh, rm,
 # ln, sleep, cat, ...) so PATH-resolved commands in init-container wrappers
 # and lifecycle hooks keep working on the non-*-dev* distroless base.
-FROM debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258 AS shell
-RUN apt-get update \
- && apt-get install -y --no-install-recommends busybox-static \
- && rm -rf /var/lib/apt/lists/* \
- && mkdir /busybox \
+FROM busybox:1.38.0@sha256:dc2d74b28e4cf8984fa52af1f39bc7c3d9c73760b41a74d629f5d11b1ab28616 AS shell
+RUN mkdir /busybox \
  && cp /bin/busybox /busybox/busybox \
  && /busybox/busybox --install -s /busybox
 
