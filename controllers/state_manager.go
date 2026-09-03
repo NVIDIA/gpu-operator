@@ -993,11 +993,6 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 	return result, nil
 }
 
-// TODO
-// func (n ClusterPolicyController) validate() {
-//	 add custom validation functions
-// }
-
 func (n ClusterPolicyController) last() bool {
 	return n.idx == len(n.controls)
 }
