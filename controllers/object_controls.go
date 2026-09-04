@@ -828,11 +828,127 @@ func applyCommonDaemonsetConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPoli
 		obj.Spec.Template.Spec.Tolerations = config.Daemonsets.Tolerations
 	}
 
+	if len(config.Daemonsets.NodeSelector) > 0 {
+		if obj.Spec.Template.Spec.NodeSelector == nil {
+			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
+		for key, value := range config.Daemonsets.NodeSelector {
+			if _, exists := obj.Spec.Template.Spec.NodeSelector[key]; exists {
+				continue
+			}
+			obj.Spec.Template.Spec.NodeSelector[key] = value
+		}
+	}
+
+	if config.Daemonsets.Affinity != nil {
+		obj.Spec.Template.Spec.Affinity = mergeDaemonsetAffinity(obj.Spec.Template.Spec.Affinity, config.Daemonsets.Affinity)
+	}
+
 	// set pod-level security context if specified (applies as defaults to all containers in the pod)
 	if config.Daemonsets.PodSecurityContext != nil {
 		obj.Spec.Template.Spec.SecurityContext = config.Daemonsets.PodSecurityContext
 	}
 	return nil
+}
+
+func mergeDaemonsetAffinity(dst, src *corev1.Affinity) *corev1.Affinity {
+	if src == nil {
+		return dst
+	}
+	if dst == nil {
+		return src.DeepCopy()
+	}
+	merged := dst.DeepCopy()
+	if src.NodeAffinity != nil {
+		if merged.NodeAffinity == nil {
+			merged.NodeAffinity = src.NodeAffinity.DeepCopy()
+		} else {
+			merged.NodeAffinity = mergeNodeAffinity(merged.NodeAffinity, src.NodeAffinity)
+		}
+	}
+	if src.PodAffinity != nil {
+		if merged.PodAffinity == nil {
+			merged.PodAffinity = src.PodAffinity.DeepCopy()
+		} else {
+			if src.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				merged.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+					merged.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+					src.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution...,
+				)
+			}
+			if src.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+				merged.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+					merged.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+					src.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution...,
+				)
+			}
+		}
+	}
+	if src.PodAntiAffinity != nil {
+		if merged.PodAntiAffinity == nil {
+			merged.PodAntiAffinity = src.PodAntiAffinity.DeepCopy()
+		} else {
+			if src.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				merged.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+					merged.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+					src.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...,
+				)
+			}
+			if src.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+				merged.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+					merged.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+					src.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...,
+				)
+			}
+		}
+	}
+	return merged
+}
+
+func mergeNodeAffinity(dst, src *corev1.NodeAffinity) *corev1.NodeAffinity {
+	if src == nil {
+		return dst
+	}
+	if dst == nil {
+		return src.DeepCopy()
+	}
+	merged := dst.DeepCopy()
+	if src.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		if merged.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			merged.RequiredDuringSchedulingIgnoredDuringExecution = src.RequiredDuringSchedulingIgnoredDuringExecution.DeepCopy()
+		} else {
+			merged.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = mergeNodeSelectorTerms(
+				merged.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			)
+		}
+	}
+	if src.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		merged.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			merged.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution...,
+		)
+	}
+	return merged
+}
+
+func mergeNodeSelectorTerms(dst, src []corev1.NodeSelectorTerm) []corev1.NodeSelectorTerm {
+	if len(dst) == 0 {
+		return append([]corev1.NodeSelectorTerm(nil), src...)
+	}
+	if len(src) == 0 {
+		return dst
+	}
+	merged := make([]corev1.NodeSelectorTerm, 0, len(dst)*len(src))
+	for _, dstTerm := range dst {
+		for _, srcTerm := range src {
+			merged = append(merged, corev1.NodeSelectorTerm{
+				MatchExpressions: append(append([]corev1.NodeSelectorRequirement(nil), dstTerm.MatchExpressions...), srcTerm.MatchExpressions...),
+				MatchFields:      append(append([]corev1.NodeSelectorRequirement(nil), dstTerm.MatchFields...), srcTerm.MatchFields...),
+			})
+		}
+	}
+	return merged
 }
 
 // apply necessary transforms if a custom host root path is configured
