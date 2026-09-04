@@ -84,8 +84,9 @@ type precompiledSpec struct {
 }
 
 type additionalConfigs struct {
-	VolumeMounts []corev1.VolumeMount
-	Volumes      []corev1.Volume
+	VolumeMounts              []corev1.VolumeMount
+	DriverToolkitVolumeMounts []corev1.VolumeMount
+	Volumes                   []corev1.Volume
 }
 
 type driverRenderData struct {

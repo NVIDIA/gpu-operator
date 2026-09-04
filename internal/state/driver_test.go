@@ -869,6 +869,93 @@ func TestDriverOpenshiftDriverToolkit(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverOpenshiftDriverToolkitCustomConfigs(t *testing.T) {
+	const (
+		rhcosVersion = "422.92.202608252344-0"
+		toolkitImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:test"
+	)
+
+	repoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"custom.repo": "[custom-repo]",
+		},
+	}
+	certConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cert-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"custom.pem": "test-certificate",
+		},
+	}
+
+	state, err := NewStateDriver(
+		fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap, certConfigMap).Build(),
+		"test-ns",
+		scheme.Scheme,
+		manifestDir)
+	require.NoError(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			RepoConfig: &nvidiav1alpha1.DriverRepoConfigSpec{Name: repoConfigMap.Name},
+			CertConfig: &nvidiav1alpha1.DriverCertConfigSpec{Name: certConfigMap.Name},
+		},
+	}
+	additionalConfigs, err := stateDriver.getDriverAdditionalConfigs(
+		context.Background(),
+		driver,
+		testClusterInfo{runtime: consts.CRIO, openshiftVersion: "4.22"},
+		nodePool{osRelease: "rhcos", osVersion: "4.22"},
+	)
+	require.NoError(t, err)
+
+	renderData := getMinimalDriverRenderData()
+	renderData.Driver.Spec.RepoConfig = driver.Spec.RepoConfig
+	renderData.Driver.Spec.CertConfig = driver.Spec.CertConfig
+	renderData.AdditionalConfigs = additionalConfigs
+	renderData.Openshift = &openshiftSpec{
+		ToolkitImage: toolkitImage,
+		RHCOSVersion: rhcosVersion,
+	}
+	renderData.Runtime.OpenshiftDriverToolkitEnabled = true
+	renderData.Runtime.OpenshiftVersion = "4.22"
+
+	objs, err := stateDriver.renderer.RenderObjects(
+		&render.TemplatingData{
+			Data: renderData,
+		})
+	require.NoError(t, err)
+
+	ds, err := getDaemonsetFromObjects(objs)
+	require.NoError(t, err)
+
+	driverToolkitContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr")
+	require.NotNil(t, driverToolkitContainer)
+
+	repoMount := findVolumeMountByName(driverToolkitContainer.VolumeMounts, repoConfigMap.Name)
+	require.NotNil(t, repoMount)
+	assert.Equal(t, "/etc/yum.repos.d/custom.repo", repoMount.MountPath)
+	assert.Equal(t, "custom.repo", repoMount.SubPath)
+	assert.True(t, repoMount.ReadOnly)
+
+	certMount := findVolumeMountByName(driverToolkitContainer.VolumeMounts, certConfigMap.Name)
+	require.NotNil(t, certMount)
+	assert.Equal(t, "/etc/pki/ca-trust/extracted/pem/custom.pem", certMount.MountPath)
+	assert.Equal(t, "custom.pem", certMount.SubPath)
+	assert.True(t, certMount.ReadOnly)
+
+	assert.NotNil(t, findVolumeByName(ds.Spec.Template.Spec.Volumes, repoConfigMap.Name))
+	assert.NotNil(t, findVolumeByName(ds.Spec.Template.Spec.Volumes, certConfigMap.Name))
+}
+
 func TestGetNodePoolsDoesNotAllowSelectorToOverrideOwnerLabel(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 

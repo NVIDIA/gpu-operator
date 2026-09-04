@@ -630,6 +630,18 @@ spec:
             mountPath: /sys/module/firmware_class/parameters/path
           - name: nv-firmware
             mountPath: /lib/firmware
+        {{- if and .AdditionalConfigs .AdditionalConfigs.DriverToolkitVolumeMounts }}
+        {{- range .AdditionalConfigs.DriverToolkitVolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            {{- if .SubPath }}
+            subPath: {{ .SubPath }}
+            {{- end }}
+            {{- if .ReadOnly }}
+            readOnly: {{ .ReadOnly }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
         {{- if .Driver.Spec.Resources }}
         resources: {{ .Driver.Spec.Resources | yaml | nindent 10 }}
         {{- end }}
