@@ -343,6 +343,7 @@ kind: DeviceClass
 metadata:
   name: gpu.nvidia.com
 spec:
+  extendedResourceName: nvidia.com/gpu
   selectors:
   - cel:
       expression: device.driver == 'gpu.nvidia.com' && device.attributes['gpu.nvidia.com'].type
