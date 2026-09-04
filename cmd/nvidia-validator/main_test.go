@@ -345,3 +345,39 @@ func TestCountNvidiaDevices(t *testing.T) {
 		})
 	}
 }
+
+func TestSkipComponentValidation(t *testing.T) {
+	testCases := []struct {
+		name          string
+		component     string
+		statusFile    string
+		errorExpected bool
+	}{
+		{name: "toolkit", component: "toolkit", statusFile: toolkitStatusFile},
+		{name: "cuda", component: "cuda", statusFile: cudaStatusFile},
+		{name: "plugin", component: "plugin", statusFile: pluginStatusFile},
+		{name: "driver is not supported", component: "driver", errorExpected: true},
+		{name: "invalid component", component: "foo", errorExpected: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			origOutputDir := outputDirFlag
+			outputDirFlag = tmpDir
+			defer func() { outputDirFlag = origOutputDir }()
+
+			err := skipComponentValidation(tc.component)
+			if tc.errorExpected {
+				require.Error(t, err)
+				entries, readErr := os.ReadDir(tmpDir)
+				require.NoError(t, readErr)
+				require.Empty(t, entries, "no status file should be created")
+				return
+			}
+			require.NoError(t, err)
+			_, err = os.Stat(tmpDir + "/" + tc.statusFile)
+			require.NoError(t, err, "status file %s should be created", tc.statusFile)
+		})
+	}
+}

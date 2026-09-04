@@ -107,6 +107,9 @@ const (
 	ValidatorImagePullSecretsEnvName = "VALIDATOR_IMAGE_PULL_SECRETS"
 	// ValidatorRuntimeClassEnvName indicates env name of runtime class to be applied to validator pods
 	ValidatorRuntimeClassEnvName = "VALIDATOR_RUNTIME_CLASS"
+	// ValidatorSkipValidationEnvName indicates env name used to instruct a component validator to skip
+	// the actual validation and only create the component readiness status file
+	ValidatorSkipValidationEnvName = "SKIP_VALIDATION"
 	// MigStrategyEnvName indicates env name for passing MIG strategy
 	MigStrategyEnvName = "MIG_STRATEGY"
 	// MigPartedDefaultConfigMapName indicates name of ConfigMap containing default mig-parted config
@@ -2454,6 +2457,10 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			if podSpec.RuntimeClassName != nil {
 				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
 			}
+			// skip cuda validation if requested
+			if config.Validator.CUDA.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
+			}
 			// set/append environment variables for cuda-validation container
 			if len(config.Validator.CUDA.Env) > 0 {
 				for _, env := range config.Validator.CUDA.Env {
@@ -2479,6 +2486,10 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 			// apply mig-strategy env to spin off plugin-validation workload pod
 			setContainerEnv(&(podSpec.InitContainers[i]), MigStrategyEnvName, string(config.MIG.Strategy))
+			// skip plugin validation if requested
+			if config.Validator.Plugin.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
+			}
 			// set/append environment variables for plugin-validation container
 			if len(config.Validator.Plugin.Env) > 0 {
 				for _, env := range config.Validator.Plugin.Env {
@@ -2499,6 +2510,12 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				return nil
 			}
 		case "toolkit":
+			// skip toolkit validation if requested. Note that the init container is intentionally
+			// not removed: it still creates the 'toolkit-ready' status file which other operands
+			// (e.g. device-plugin, gpu-feature-discovery, dcgm-exporter, mig-manager) wait for.
+			if config.Validator.Toolkit.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
+			}
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {

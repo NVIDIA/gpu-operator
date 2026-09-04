@@ -2363,6 +2363,12 @@ spec:
                           - name
                           type: object
                         type: array
+                      skip:
+                        description: |-
+                          Skip indicates whether to skip the CUDA validation. When set to true, the
+                          cuda-validation init container does not run the validation and only creates the
+                          component readiness status file, so that other operands which depend on it are not blocked.
+                        type: boolean
                     type: object
                   driver:
                     description: Toolkit validator spec
@@ -2435,6 +2441,12 @@ spec:
                           - name
                           type: object
                         type: array
+                      skip:
+                        description: |-
+                          Skip indicates whether to skip the NVIDIA Device Plugin validation. When set to true, the
+                          plugin-validation init container does not run the validation and only creates the
+                          component readiness status file, so that other operands which depend on it are not blocked.
+                        type: boolean
                     type: object
                   repository:
                     description: Validator image repository
@@ -2487,6 +2499,12 @@ spec:
                           - name
                           type: object
                         type: array
+                      skip:
+                        description: |-
+                          Skip indicates whether to skip the NVIDIA Container Toolkit validation. When set to true, the
+                          toolkit-validation init container does not run the validation and only creates the
+                          component readiness status file, so that other operands which depend on it are not blocked.
+                        type: boolean
                     type: object
                   version:
                     description: Validator image tag

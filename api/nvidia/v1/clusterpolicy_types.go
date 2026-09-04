@@ -431,6 +431,15 @@ type ValidatorSpec struct {
 
 // PluginValidatorSpec defines validator spec for NVIDIA Device Plugin
 type PluginValidatorSpec struct {
+	// Skip indicates whether to skip the NVIDIA Device Plugin validation. When set to true, the
+	// plugin-validation init container does not run the validation and only creates the
+	// component readiness status file, so that other operands which depend on it are not blocked.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Skip NVIDIA Device Plugin validation"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Skip *bool `json:"skip,omitempty"`
+
 	// Optional: List of environment variables
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
@@ -440,6 +449,15 @@ type PluginValidatorSpec struct {
 
 // ToolkitValidatorSpec defines validator spec for NVIDIA Container Toolkit
 type ToolkitValidatorSpec struct {
+	// Skip indicates whether to skip the NVIDIA Container Toolkit validation. When set to true, the
+	// toolkit-validation init container does not run the validation and only creates the
+	// component readiness status file, so that other operands which depend on it are not blocked.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Skip NVIDIA Container Toolkit validation"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Skip *bool `json:"skip,omitempty"`
+
 	// Optional: List of environment variables
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
@@ -458,6 +476,15 @@ type DriverValidatorSpec struct {
 
 // CUDAValidatorSpec defines validator spec for CUDA validation workload pod
 type CUDAValidatorSpec struct {
+	// Skip indicates whether to skip the CUDA validation. When set to true, the
+	// cuda-validation init container does not run the validation and only creates the
+	// component readiness status file, so that other operands which depend on it are not blocked.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Skip CUDA validation"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Skip *bool `json:"skip,omitempty"`
+
 	// Optional: List of environment variables
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
@@ -2222,6 +2249,33 @@ func (d *DriverSpec) IsAutoUpgradeEnabled() bool {
 		return false
 	}
 	return d.UpgradePolicy.AutoUpgrade
+}
+
+// IsSkipped returns true if the NVIDIA Device Plugin validation is skipped
+func (p *PluginValidatorSpec) IsSkipped() bool {
+	if p.Skip == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *p.Skip
+}
+
+// IsSkipped returns true if the NVIDIA Container Toolkit validation is skipped
+func (t *ToolkitValidatorSpec) IsSkipped() bool {
+	if t.Skip == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *t.Skip
+}
+
+// IsSkipped returns true if the CUDA validation is skipped
+func (c *CUDAValidatorSpec) IsSkipped() bool {
+	if c.Skip == nil {
+		// default is false if not specified by user
+		return false
+	}
+	return *c.Skip
 }
 
 // IsEnabled returns true if device-plugin is enabled(default) through gpu-operator
