@@ -2223,9 +2223,12 @@ func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 // TransformVGPUDeviceManager transforms VGPU Device Manager daemonset with required config as per ClusterPolicy
 func TransformVGPUDeviceManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update validation container
-	err := transformValidationInitContainer(obj, config)
-	if err != nil {
+	if err := TransformValidatorComponent(config, &obj.Spec.Template.Spec, "vgpu-manager"); err != nil {
 		return err
+	}
+	// add any pull secrets needed for validation image
+	if len(config.Validator.ImagePullSecrets) > 0 {
+		addPullSecrets(&obj.Spec.Template.Spec, config.Validator.ImagePullSecrets)
 	}
 
 	// update image
