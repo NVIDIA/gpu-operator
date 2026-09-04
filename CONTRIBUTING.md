@@ -82,6 +82,9 @@ To contribute to the project, file a Pull Request at https://github.com/NVIDIA/g
 Before beginning implementation or opening a Pull Request for a significant change, first open an issue describing the problem or proposal.
 A significant change includes, but is not limited to, architectural changes, new features, breaking changes to API or behavior, and non-trivial bug fixes.
 
+Reviewers are automatically assigned to Pull Requests from the [OWNERS](CODEOWNERS) file.
+The approval / decision-making process is documented in [GOVERNANCE.md](GOVERNANCE.md)
+
 All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development Environment Setup
