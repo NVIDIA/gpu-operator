@@ -631,7 +631,8 @@ func TestApplyUpdateStrategyConfig(t *testing.T) {
 				UpdateStrategy: "RollingUpdate",
 				RollingUpdate: &gpuv1.RollingUpdateSpec{
 					MaxUnavailable: "10%abc",
-				}},
+				},
+			},
 			errorExpected: true,
 		},
 		{
@@ -733,7 +734,7 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			}),
 		},
 		{
-			description: "gpu.deploy nodeSelector keys are not overridden",
+			description: "existing nodeSelector keys are not overridden",
 			ds: NewDaemonset().WithNodeSelector(map[string]string{
 				"nvidia.com/gpu.deploy.device-plugin": "true",
 			}),
@@ -746,6 +747,22 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
 				"nvidia.com/gpu.deploy.device-plugin": "true",
 				"karpenter.sh/nodepool":               "gpu",
+			}),
+		},
+		{
+			description: "operand nodeSelector keys such as mps.capable are not overridden",
+			ds: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/mps.capable": "true",
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				NodeSelector: map[string]string{
+					"nvidia.com/mps.capable": "false",
+					"karpenter.sh/nodepool":  "gpu",
+				},
+			},
+			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/mps.capable": "true",
+				"karpenter.sh/nodepool":  "gpu",
 			}),
 		},
 		{
@@ -856,7 +873,8 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 				UpdateStrategy: "RollingUpdate",
 				RollingUpdate: &gpuv1.RollingUpdateSpec{
 					MaxUnavailable: "10%abc",
-				}},
+				},
+			},
 			errorExpected: true,
 		},
 		{
