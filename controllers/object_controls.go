@@ -182,6 +182,17 @@ const (
 	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
 	// KernelModuleTypeEnvName is the name of the driver-container envvar to set the desired kernel module type
 	KernelModuleTypeEnvName = "KERNEL_MODULE_TYPE"
+	// FabricModeEnvName is the name of the vGPU-manager-container envvar that
+	// selects the NVIDIA Fabric Manager mode (the FABRIC_MODE key in
+	// fabricmanager.cfg) on NVSwitch systems.
+	FabricModeEnvName = "FABRIC_MODE"
+	// FabricModeVGPUMultitenancy is the FABRIC_MODE value that starts Fabric
+	// Manager in vGPU multitenancy mode, required for SR-IOV vGPU on NVSwitch
+	// (HGX) systems. The Fabric Manager User Guide documents FABRIC_MODE=0
+	// (bare metal or full passthrough virtualization) as the default,
+	// FABRIC_MODE=1 as Shared NVSwitch multi-tenancy, and FABRIC_MODE=2 as
+	// vGPU multitenancy.
+	FabricModeVGPUMultitenancy = "2"
 	// MPSRootEnvName is the name of the envvar for configuring the MPS root
 	MPSRootEnvName = "MPS_ROOT"
 	// DefaultMPSRoot is the default MPS root path on the host
@@ -3863,6 +3874,18 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 		for _, env := range config.VGPUManager.Env {
 			setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
 		}
+	}
+
+	// On NVSwitch (HGX) systems, SR-IOV vGPU requires NVIDIA Fabric Manager to
+	// run in vGPU multitenancy mode (FABRIC_MODE=2) rather than the bare-metal
+	// default (FABRIC_MODE=0); otherwise a whole-card vGPU guest cannot
+	// initialize CUDA. Default the vGPU Manager container to FABRIC_MODE=2 so
+	// its entrypoint can configure fabricmanager.cfg accordingly on NVSwitch
+	// hosts. Non-NVSwitch vGPU hosts do not start Fabric Manager, so the value
+	// is ignored there. A user-provided FABRIC_MODE in VGPUManager.Env is
+	// applied above and takes precedence.
+	if getContainerEnv(container, FabricModeEnvName) == "" {
+		setContainerEnv(container, FabricModeEnvName, FabricModeVGPUMultitenancy)
 	}
 
 	// mount any custom kernel module configuration parameters at /drivers
