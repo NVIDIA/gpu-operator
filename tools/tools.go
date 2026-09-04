@@ -22,6 +22,7 @@ package tools
 import (
 	_ "github.com/google/go-licenses/v2"
 	_ "github.com/jandelgado/gcov2lcov"
+	_ "golang.org/x/tools/cmd/goimports"
 	_ "k8s.io/code-generator/cmd/client-gen"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 	_ "sigs.k8s.io/kustomize/kustomize/v5"
