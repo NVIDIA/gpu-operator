@@ -3935,6 +3935,21 @@ func transformValidationInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Clust
 			}
 		}
 
+		// Pass env for vgpu-manager-validation init container
+		if strings.HasPrefix(initContainer.Name, "vgpu-manager") {
+			setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			if len(config.Validator.VGPUManager.Env) > 0 {
+				for _, env := range config.Validator.VGPUManager.Env {
+					// Preserve the required execution settings defined by the manifest.
+					switch env.Name {
+					case "COMPONENT", "NODE_NAME", "WITH_WAIT":
+						continue
+					}
+					setContainerEnv(&(obj.Spec.Template.Spec.InitContainers[i]), env.Name, env.Value)
+				}
+			}
+		}
+
 		// update validation image
 		image, err := gpuv1.ImagePath(&config.Validator)
 		if err != nil {
