@@ -28,7 +28,7 @@ spec:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
         command: ['sh', '-c']
-        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ] && grep -q '^nvidia ' /proc/modules; do echo waiting for nvidia container stack and driver modules to be setup; sleep 5; done"]
         securityContext:
           privileged: true
         volumeMounts:
@@ -43,10 +43,19 @@ spec:
         ports:
         - name: "dcgm"
           containerPort: 5555
+        # A hostengine that started without NVML (e.g. before the driver
+        # modules were loaded) keeps listening on 5555 but sees no GPUs and
+        # never re-initialises, so the probe checks GPU visibility.
         livenessProbe:
-          tcpSocket:
-            port: 5555
-          initialDelaySeconds: 15
+          exec:
+            command:
+            - sh
+            - -c
+            - dcgmi discovery -l | grep -qE '^[1-9][0-9]* GPUs? found'
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 15
+          failureThreshold: 3
         readinessProbe:
           tcpSocket:
             port: 5555
