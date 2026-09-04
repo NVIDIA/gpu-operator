@@ -30,7 +30,7 @@ import (
 )
 
 type Interface interface {
-	Discovery() discovery.DiscoveryInterface
+	Discovery() discovery.DiscoveryInterfaces
 	NvidiaV1() nvidiav1.NvidiaV1Interface
 	NvidiaV1alpha1() nvidiav1alpha1.NvidiaV1alpha1Interface
 }
@@ -53,7 +53,7 @@ func (c *Clientset) NvidiaV1alpha1() nvidiav1alpha1.NvidiaV1alpha1Interface {
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterfaces {
 	if c == nil {
 		return nil
 	}
