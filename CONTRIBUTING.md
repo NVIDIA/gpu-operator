@@ -77,12 +77,47 @@ NVIDIA is willing to work with partners for adding platform support for the GPU 
 
 To file feature requests, bugs, or questions, submit an issue at https://github.com/NVIDIA/gpu-operator/issues
 
-To contribute to the project, file a Pull Request at https://github.com/NVIDIA/gpu-operator/pulls. Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to sign their work.
+To contribute to the project, file a Pull Request at https://github.com/NVIDIA/gpu-operator/pulls. Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to [sign](#signing) their work.
 
 Before beginning implementation or opening a Pull Request for a significant change, first open an issue describing the problem or proposal.
 A significant change includes, but is not limited to, architectural changes, new features, breaking changes to API or behavior, and non-trivial bug fixes.
 
 All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Development Environment Setup
+
+### Prerequisites
+* [Go](https://go.dev/doc/install) (see `go.mod` for the minimum required version)
+* [Docker](https://docs.docker.com/get-docker/) (for building container images)
+* [Helm v3](https://helm.sh/docs/intro/install/) (for rendering and/or installing the Helm chart)
+* [golangci-lint](https://golangci-lint.run/docs/welcome/install/) (for running `make lint`)
+
+Install additional development tools by running `make install-tools`.
+
+### Common make targets
+```console
+make build                      # compile
+make cmds                       # build all Go executables
+make build-image                # build the gpu-operator container image
+
+make unit-test                  # run unit tests
+make fmt                        # apply gofmt to codebase
+make goimports                  # apply goimports to the codebase
+make lint                       # lint codebase with golangci-lint
+
+make validate-generated-assets  # validate all generated code / assets are up-to-date
+
+make manifests                  # generate CRDs/RBAC from kubebuilder markers
+make generate                   # generate zz_generated.deepcopy.go
+make generate-clientsets        # generate clientsets for APIs
+make sync-crds                  # copy generated CRDs in config/crd/bases/* to helm chart and OLM bundle
+
+make validate-helm-values       # verify that images referenced in helm values are valid
+make validate-csv               # verify that images referenced in the OLM bundle's CSV file are valid
+
+make validate-modules           # verify that go.mod and go.sum are up-to-date
+make check-third-party-notices  # verify that `THIRD_PARTY_NOTICES.md` is up-to-date
+```
 
 ## <a name="signing"></a>Signing your work
 
