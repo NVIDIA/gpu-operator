@@ -1,0 +1,40 @@
+suite: device-plugin custom config
+templates:
+  - plugin_config.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: does not render the ConfigMap by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the ConfigMap when create=true but data is empty
+    set:
+      devicePlugin:
+        config:
+          create: true
+          name: device-plugin-config
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot when create=true and data is provided
+    set:
+      devicePlugin:
+        config:
+          create: true
+          name: device-plugin-config
+          default: default
+          data:
+            default: |-
+              version: v1
+              flags:
+                migStrategy: none
+            mig-single: |-
+              version: v1
+              flags:
+                migStrategy: single
+    asserts:
+      - matchSnapshot: {}
