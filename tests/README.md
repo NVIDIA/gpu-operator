@@ -1,5 +1,22 @@
 # GPU operator test utilities
 
+## Testing in CI
+CI no longer uses `local.sh` or `ci-run-e2e.sh`, and no longer syncs the project
+folder to the test instance. Those remain the developer path described below.
+
+Instead, the e2e workflow provisions a Holodeck environment with
+`kubernetes.remoteAccess` enabled, which gives the GitHub Actions runner a
+kubeconfig for the cluster. The case scripts (`cases/defaults.sh`,
+`cases/nvidia-driver.sh`) then run on the runner itself, and everything they do
+-- helm, kubectl, log collection -- goes over that kubeconfig.
+
+Only two operations still need a shell on the instance, and both go through
+`scripts/node-exec.sh`, which dispatches `scripts/node-operations.sh` over SSH:
+loading the `i2c_core` and `ipmi_msghandler` kernel modules, and killing the
+gpu-operator container for the operator restart test. With `NODE_SSH_HOST`
+unset, `node-exec.sh` runs the operation locally, so the developer path below is
+unaffected.
+
 ## Testing locally
 The `local.sh` script allows for triggering basic end-to-end testing of the GPU
 operator from a local machine.
