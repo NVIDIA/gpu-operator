@@ -2886,8 +2886,8 @@ func TestTransformValidatorComponent(t *testing.T) {
 					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
 					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
 					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
-					{Name: ValidatorSkipValidationEnvName, Value: "true"},
 					{Name: "foo", Value: "bar"},
+					{Name: ValidatorSkipValidationEnvName, Value: "true"},
 				},
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser: rootUID,
@@ -2976,13 +2976,45 @@ func TestTransformValidatorComponent(t *testing.T) {
 					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Env: []corev1.EnvVar{
-						{Name: ValidatorSkipValidationEnvName, Value: "true"},
 						{Name: "foo", Value: "bar"},
+						{Name: ValidatorSkipValidationEnvName, Value: "true"},
 					},
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: rootUID,
 					},
 				}),
+		},
+		{
+			description: "toolkit skip wins over a conflicting SKIP_VALIDATION user env entry",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Skip: newBoolPtr(true),
+						Env: []gpuv1.EnvVar{
+							{Name: "foo", Value: "bar"},
+							{Name: ValidatorSkipValidationEnvName, Value: "false"},
+						},
+					},
+				},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorSkipValidationEnvName, Value: "true"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}),
 		},
 		{
 			description: "toolkit validation not skipped when skip is explicitly false",

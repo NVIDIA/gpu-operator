@@ -2457,15 +2457,16 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			if podSpec.RuntimeClassName != nil {
 				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorRuntimeClassEnvName, *podSpec.RuntimeClassName)
 			}
-			// skip cuda validation if requested
-			if config.Validator.CUDA.IsSkipped() {
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
-			}
 			// set/append environment variables for cuda-validation container
 			if len(config.Validator.CUDA.Env) > 0 {
 				for _, env := range config.Validator.CUDA.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
+			}
+			// skip cuda validation if requested. Applied after the user-provided env so an
+			// explicit 'skip: true' cannot be undone by a conflicting SKIP_VALIDATION entry.
+			if config.Validator.CUDA.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
 			}
 		case "plugin":
 			// remove plugin init container from validator Daemonset if it is not enabled
@@ -2486,15 +2487,16 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 			// apply mig-strategy env to spin off plugin-validation workload pod
 			setContainerEnv(&(podSpec.InitContainers[i]), MigStrategyEnvName, string(config.MIG.Strategy))
-			// skip plugin validation if requested
-			if config.Validator.Plugin.IsSkipped() {
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
-			}
 			// set/append environment variables for plugin-validation container
 			if len(config.Validator.Plugin.Env) > 0 {
 				for _, env := range config.Validator.Plugin.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
+			}
+			// skip plugin validation if requested. Applied after the user-provided env so an
+			// explicit 'skip: true' cannot be undone by a conflicting SKIP_VALIDATION entry.
+			if config.Validator.Plugin.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
 			}
 		case "driver":
 			// set/append environment variables for driver-validation container
@@ -2510,17 +2512,19 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 				return nil
 			}
 		case "toolkit":
-			// skip toolkit validation if requested. Note that the init container is intentionally
-			// not removed: it still creates the 'toolkit-ready' status file which other operands
-			// (e.g. device-plugin, gpu-feature-discovery, dcgm-exporter, mig-manager) wait for.
-			if config.Validator.Toolkit.IsSkipped() {
-				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
-			}
 			// set/append environment variables for toolkit-validation container
 			if len(config.Validator.Toolkit.Env) > 0 {
 				for _, env := range config.Validator.Toolkit.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
 				}
+			}
+			// skip toolkit validation if requested. Note that the init container is intentionally
+			// not removed: it still creates the 'toolkit-ready' status file which other operands
+			// (e.g. device-plugin, gpu-feature-discovery, dcgm-exporter, mig-manager) wait for.
+			// Applied after the user-provided env so an explicit 'skip: true' cannot be undone by
+			// a conflicting SKIP_VALIDATION entry.
+			if config.Validator.Toolkit.IsSkipped() {
+				setContainerEnv(&(podSpec.InitContainers[i]), ValidatorSkipValidationEnvName, "true")
 			}
 		case "vfio-pci":
 			// set/append environment variables for vfio-pci-validation container
