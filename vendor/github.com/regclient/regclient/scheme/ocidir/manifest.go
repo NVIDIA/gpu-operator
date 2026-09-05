@@ -1,3 +1,17 @@
+// Copyright the regclient contributors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package ocidir
 
 import (
@@ -18,6 +32,7 @@ import (
 
 	"github.com/opencontainers/go-digest"
 
+	"github.com/regclient/regclient/internal/limitread"
 	"github.com/regclient/regclient/scheme"
 	"github.com/regclient/regclient/types"
 	"github.com/regclient/regclient/types/errs"
@@ -67,9 +82,9 @@ func (o *OCIDir) ManifestDelete(ctx context.Context, r ref.Ref, opts ...scheme.M
 	if err != nil {
 		return fmt.Errorf("failed to read index: %w", err)
 	}
-	for i := len(index.Manifests) - 1; i >= 0; i-- {
+	for i, v := range slices.Backward(index.Manifests) {
 		// remove matching entry from index
-		if r.Digest != "" && index.Manifests[i].Digest.String() == r.Digest {
+		if r.Digest != "" && v.Digest.String() == r.Digest {
 			changed = true
 			index.Manifests = slices.Delete(index.Manifests, i, i+1)
 		}
@@ -116,8 +131,11 @@ func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, e
 			return nil, err
 		}
 	}
+	if desc.Size > o.manifestMaxPull {
+		return nil, fmt.Errorf("manifest exceeds size limit, ref: %s, limit: %d, size: %d%.0w", r.CommonName(), o.manifestMaxPull, desc.Size, errs.ErrSizeLimitExceeded)
+	}
 	if desc.Digest == "" {
-		return nil, errs.ErrNotFound
+		return nil, fmt.Errorf("digest could not be determined for %s%.0w", r.CommonName(), errs.ErrNotFound)
 	}
 	if err = desc.Digest.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid digest in index: %s: %w", string(desc.Digest), err)
@@ -129,7 +147,11 @@ func (o *OCIDir) manifestGet(_ context.Context, r ref.Ref) (manifest.Manifest, e
 		return nil, fmt.Errorf("failed to open manifest: %w", err)
 	}
 	defer fd.Close()
-	mb, err := io.ReadAll(fd)
+	limit := desc.Size
+	if desc.Size <= 0 || desc.MediaType == mediatype.Docker1Manifest || desc.MediaType == mediatype.Docker1ManifestSigned {
+		limit = o.manifestMaxPull
+	}
+	mb, err := io.ReadAll(&limitread.LimitRead{Reader: fd, Limit: limit})
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
@@ -164,7 +186,7 @@ func (o *OCIDir) ManifestHead(ctx context.Context, r ref.Ref) (manifest.Manifest
 		}
 	}
 	if desc.Digest == "" {
-		return nil, errs.ErrNotFound
+		return nil, fmt.Errorf("digest could not be determined for %s%.0w", r.CommonName(), errs.ErrNotFound)
 	}
 	if err = desc.Digest.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid digest in index: %s: %w", string(desc.Digest), err)
