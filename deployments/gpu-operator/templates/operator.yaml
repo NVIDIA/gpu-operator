@@ -33,6 +33,17 @@ spec:
       {{- if .Values.operator.priorityClassName }}
       priorityClassName: {{ .Values.operator.priorityClassName }}
       {{- end }}
+      {{- with .Values.operator.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.operator.dnsPolicy }}
+      dnsPolicy: {{ .Values.operator.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.operator.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: gpu-operator
         image: {{ include "gpu-operator.fullimage" . }}
@@ -83,9 +94,19 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
       {{- end }}
+        {{- with .Values.operator.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp
         ports:
           - name: metrics
             containerPort: 8080
+      volumes:
+        - name: tmp
+          emptyDir: {}
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
