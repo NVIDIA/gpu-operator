@@ -2861,6 +2861,186 @@ func TestTransformValidatorComponent(t *testing.T) {
 			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
 		},
 		{
+			description: "cuda validation skipped",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "cuda-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					CUDA: gpuv1.CUDAValidatorSpec{
+						Skip: newBoolPtr(true),
+						Env:  []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+			},
+			component: "cuda",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "cuda-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorSkipValidationEnvName, Value: "true"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation skipped",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithRuntimeClassName("nvidia"),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Plugin: gpuv1.PluginValidatorSpec{
+						Skip: newBoolPtr(true),
+					},
+				},
+				MIG: gpuv1.MIGSpec{
+					Strategy: gpuv1.MIGStrategySingle,
+				},
+			},
+			component: "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "plugin-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+					{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+					{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					{Name: MigStrategyEnvName, Value: string(gpuv1.MIGStrategySingle)},
+					{Name: ValidatorSkipValidationEnvName, Value: "true"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
+		{
+			description: "plugin validation removed when plugin is disabled even if skipped",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithInitContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Plugin: gpuv1.PluginValidatorSpec{
+						Skip: newBoolPtr(true),
+					},
+				},
+				DevicePlugin: gpuv1.DevicePluginSpec{Enabled: newBoolPtr(false)},
+			},
+			component:   "plugin",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{Name: "dummy"}),
+		},
+		{
+			description: "toolkit validation skipped",
+			pod: NewPod().
+				WithInitContainer(corev1.Container{Name: "driver-validation"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Skip: newBoolPtr(true),
+						Env:  []gpuv1.EnvVar{{Name: "foo", Value: "bar"}},
+					},
+				},
+				Toolkit: gpuv1.ToolkitSpec{Enabled: newBoolPtr(false)},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().
+				WithInitContainer(corev1.Container{Name: "driver-validation"}).
+				WithInitContainer(corev1.Container{
+					Name:            "toolkit-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "foo", Value: "bar"},
+						{Name: ValidatorSkipValidationEnvName, Value: "true"},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}),
+		},
+		{
+			description: "toolkit skip wins over a conflicting SKIP_VALIDATION user env entry",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Skip: newBoolPtr(true),
+						Env: []gpuv1.EnvVar{
+							{Name: "foo", Value: "bar"},
+							{Name: ValidatorSkipValidationEnvName, Value: "false"},
+						},
+					},
+				},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "foo", Value: "bar"},
+					{Name: ValidatorSkipValidationEnvName, Value: "true"},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}),
+		},
+		{
+			description: "toolkit validation not skipped when skip is explicitly false",
+			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Skip: newBoolPtr(false),
+					},
+				},
+			},
+			component: "toolkit",
+			expectedPod: NewPod().WithInitContainer(corev1.Container{
+				Name:            "toolkit-validation",
+				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: rootUID,
+				},
+			}),
+		},
+		{
 			description: "toolkit validation",
 			pod:         NewPod().WithInitContainer(corev1.Container{Name: "toolkit-validation"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
@@ -3135,6 +3315,73 @@ func TestTransformValidator(t *testing.T) {
 					},
 				}).
 				WithPullSecret("pull-secret"),
+		},
+		{
+			// e.g. GKE with preinstalled toolkit and device plugin: the toolkit-validation init
+			// container must be kept (it creates the 'toolkit-ready' status file for other operands)
+			// but must not run the actual validation, and plugin-validation must be removed.
+			description: "toolkit validation skipped with toolkit and device plugin disabled",
+			ds: NewDaemonset().
+				WithInitContainer(corev1.Container{Name: "driver-validation"}).
+				WithInitContainer(corev1.Container{Name: "toolkit-validation"}).
+				WithInitContainer(corev1.Container{Name: "cuda-validation"}).
+				WithInitContainer(corev1.Container{Name: "plugin-validation"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "gpu-operator-validator",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Toolkit: gpuv1.ToolkitValidatorSpec{
+						Skip: newBoolPtr(true),
+					},
+				},
+				Toolkit:      gpuv1.ToolkitSpec{Enabled: newBoolPtr(false)},
+				DevicePlugin: gpuv1.DevicePluginSpec{Enabled: newBoolPtr(false)},
+			},
+			expectedDs: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "driver-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "toolkit-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: ValidatorSkipValidationEnvName, Value: "true"},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithInitContainer(corev1.Container{
+					Name:            "cuda-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: ValidatorImageEnvName, Value: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0"},
+						{Name: ValidatorImagePullPolicyEnvName, Value: "IfNotPresent"},
+						{Name: ValidatorRuntimeClassEnvName, Value: "nvidia"},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithContainer(corev1.Container{
+					Name:            "dummy",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
+				WithRuntimeClassName("nvidia"),
 		},
 	}
 

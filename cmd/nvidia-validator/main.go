@@ -138,6 +138,7 @@ var (
 	driverInstallDirFlag            string
 	driverInstallDirCtrPathFlag     string
 	driverValidationSkipGPUInitFlag bool
+	skipValidationFlag              bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -385,6 +386,13 @@ func main() {
 			Destination: &driverValidationSkipGPUInitFlag,
 			Sources:     cli.EnvVars("DRIVER_VALIDATION_SKIP_GPU_INIT"),
 		},
+		&cli.BoolFlag{
+			Name:        "skip-validation",
+			Value:       false,
+			Usage:       "skip the validation of the component and only create its readiness status file. Supported for the 'toolkit', 'cuda' and 'plugin' components.",
+			Destination: &skipValidationFlag,
+			Sources:     cli.EnvVars("SKIP_VALIDATION"),
+		},
 	}
 
 	// Log version info
@@ -540,6 +548,10 @@ func start(ctx context.Context, cli *cli.Command) error {
 }
 
 func validateComponent(ctx context.Context, componentFlag string) error {
+	if skipValidationFlag {
+		return skipComponentValidation(componentFlag)
+	}
+
 	switch componentFlag {
 	case "driver":
 		driver := &Driver{
@@ -653,6 +665,32 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 	default:
 		return fmt.Errorf("invalid component specified for validation: %s", componentFlag)
 	}
+}
+
+// skipComponentValidation skips the validation of the given component and only creates
+// its readiness status file, so that other operands waiting on the status file are not blocked.
+// This is only supported for components whose status file carries no additional information.
+func skipComponentValidation(component string) error {
+	var statusFile string
+	switch component {
+	case "toolkit":
+		statusFile = toolkitStatusFile
+	case "cuda":
+		statusFile = cudaStatusFile
+	case "plugin":
+		statusFile = pluginStatusFile
+	default:
+		return fmt.Errorf("skipping validation is not supported for component: %s", component)
+	}
+
+	log.Warnf("skipping validation of component %q as requested; creating status file %s without validation", component, statusFile)
+
+	// delete status file if already present
+	err := deleteStatusFile(outputDirFlag + "/" + statusFile)
+	if err != nil {
+		return err
+	}
+	return createStatusFile(outputDirFlag + "/" + statusFile)
 }
 
 func runCommand(command string, args []string, silent bool) error {

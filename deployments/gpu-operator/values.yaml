@@ -68,6 +68,18 @@ validator:
   hostNetwork: false
   plugin:
     env: []
+    # skip the device plugin validation (the 'plugin-ready' status file is still created)
+    skip: false
+  toolkit:
+    env: []
+    # skip the container toolkit validation, e.g. when the toolkit is preinstalled on the host and
+    # 'nvidia-smi' is not injected into containers that do not request a GPU resource (e.g. GKE COS).
+    # The 'toolkit-ready' status file is still created so that other operands are not blocked.
+    skip: false
+  cuda:
+    env: []
+    # skip the CUDA workload validation (the 'cuda-ready' status file is still created)
+    skip: false
 
 operator:
   repository: nvcr.io/nvidia
