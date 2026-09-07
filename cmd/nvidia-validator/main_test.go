@@ -364,10 +364,17 @@ func TestSkipComponentValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			origOutputDir := outputDirFlag
+			origSkip := skipValidationFlag
 			outputDirFlag = tmpDir
-			defer func() { outputDirFlag = origOutputDir }()
+			skipValidationFlag = true
+			defer func() {
+				outputDirFlag = origOutputDir
+				skipValidationFlag = origSkip
+			}()
 
-			err := skipComponentValidation(tc.component)
+			// Drive the real entry point so the test covers the SKIP_VALIDATION
+			// short-circuit in validateComponent, not just the helper.
+			err := validateComponent(context.Background(), tc.component)
 			if tc.errorExpected {
 				require.Error(t, err)
 				entries, readErr := os.ReadDir(tmpDir)
@@ -380,4 +387,24 @@ func TestSkipComponentValidation(t *testing.T) {
 			require.NoError(t, err, "status file %s should be created", tc.statusFile)
 		})
 	}
+}
+
+func TestValidateComponentDoesNotSkipWhenFlagUnset(t *testing.T) {
+	tmpDir := t.TempDir()
+	origOutputDir := outputDirFlag
+	origSkip := skipValidationFlag
+	outputDirFlag = tmpDir
+	skipValidationFlag = false
+	defer func() {
+		outputDirFlag = origOutputDir
+		skipValidationFlag = origSkip
+	}()
+
+	// With the flag unset, an unknown component must reach the regular
+	// switch and fail there, and no readiness file may be written.
+	err := validateComponent(context.Background(), "foo")
+	require.Error(t, err)
+	entries, readErr := os.ReadDir(tmpDir)
+	require.NoError(t, readErr)
+	require.Empty(t, entries)
 }
