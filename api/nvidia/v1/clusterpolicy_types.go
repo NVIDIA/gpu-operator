@@ -316,9 +316,6 @@ type DaemonsetsSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Optional: Set affinity for all Daemonsets
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Affinity for all Daemonsets"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:affinity"
