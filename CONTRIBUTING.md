@@ -61,7 +61,9 @@ The NVIDIA GPU Operator source code is available on GitHub at https://github.com
 
 ### <a name="documentation"></a> Documentation
 
-The official NVIDIA GPU Operator documentation is available at https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html
+The official NVIDIA GPU Operator documentation is available at https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html.
+
+For any questions or issues related to documentation, file an issue in our [documentation repository](https://github.com/NVIDIA/cloud-native-docs).
 
 ### <a name="container-images"></a> Container Images
 
