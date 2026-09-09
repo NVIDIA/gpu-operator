@@ -194,6 +194,11 @@ func (d Daemonset) WithAutomountServiceAccountToken(enabled bool) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithServiceAccountName(name string) Daemonset {
+	d.Spec.Template.Spec.ServiceAccountName = name
+	return d
+}
+
 func (d Daemonset) WithVolume(volume corev1.Volume) Daemonset {
 	d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, volume)
 	return d
@@ -5077,4 +5082,50 @@ func TestHashDriverInstallConfigZeroFieldInvariant(t *testing.T) {
 	changedDigest := utils.GetObjectHashIgnoreEmptyKeys(extended)
 	assert.NotEqual(t, originalDigest, changedDigest,
 		"a non-zero new field should change the digest")
+}
+
+// TestTransformDCGMExporterServiceAccount verifies that the DaemonSet references the
+// configured ServiceAccount and that leaving the configuration unset does not touch
+// the name carried by the asset.
+func TestTransformDCGMExporterServiceAccount(t *testing.T) {
+	testCases := map[string]struct {
+		serviceAccount     *gpuv1.DCGMExporterServiceAccountConfig
+		expectedNameChange string
+	}{
+		"unset keeps the asset value": {
+			serviceAccount:     nil,
+			expectedNameChange: "",
+		},
+		"explicit default keeps the asset value": {
+			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: DCGMExporterDefaultServiceAccountName},
+			expectedNameChange: "",
+		},
+		"custom name is applied": {
+			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+			expectedNameChange: "metrics-identity",
+		},
+		"custom name with create=false is applied": {
+			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+			expectedNameChange: "byo-sa",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ds := NewDaemonset().WithContainer(corev1.Container{Name: "dcgm-exporter"})
+			cpSpec := &gpuv1.ClusterPolicySpec{
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:     "nvcr.io/nvidia/k8s",
+					Image:          "dcgm-exporter",
+					Version:        "v1.0.0",
+					ServiceAccount: tc.serviceAccount,
+				},
+			}
+
+			err := TransformDCGMExporter(ds.DaemonSet, cpSpec,
+				ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedNameChange, ds.Spec.Template.Spec.ServiceAccountName)
+		})
+	}
 }

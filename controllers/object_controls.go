@@ -37,6 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,6 +118,9 @@ const (
 	DCGMRemoteEngineEnvName = "DCGM_REMOTE_HOSTENGINE_INFO"
 	// DCGMDefaultPort indicates default port bound to DCGM host engine
 	DCGMDefaultPort = 5555
+	// DCGMExporterDefaultServiceAccountName is the ServiceAccount the DCGM Exporter
+	// operands reference unless the user configures a different one.
+	DCGMExporterDefaultServiceAccountName = "nvidia-dcgm-exporter"
 	// DCGMExporterConfigMapDataEnvName is the env name specifying the namespace:name
 	// ConfigMap with custom metrics
 	DCGMExporterConfigMapDataEnvName = "DCGM_EXPORTER_CONFIGMAP_DATA"
@@ -332,22 +336,74 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
 // ServiceAccount creates ServiceAccount resource
+// isServiceAccountOwned reports whether the ServiceAccount exists and is controlled
+// by the ClusterPolicy being reconciled. A missing ServiceAccount counts as owned so
+// that callers fall through to a delete that is a no-op.
+func (n ClusterPolicyController) isServiceAccountOwned(ctx context.Context, obj *corev1.ServiceAccount) (bool, error) {
+	found := &corev1.ServiceAccount{}
+	if err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return metav1.IsControlledBy(found, n.singleton), nil
+}
+
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
+	// The DCGM Exporter ServiceAccount name is user-configurable.
+	isDCGMExporter := n.stateNames[state] == "state-dcgm-exporter"
+	if isDCGMExporter {
+		obj.Name = dcgmExporterServiceAccountName(&n.singleton.Spec)
+	}
+	// A ServiceAccount the user brings is only referenced, never managed: the
+	// operator must not create, adopt, mutate or delete it.
+	unmanaged := isDCGMExporter && !n.singleton.Spec.DCGMExporter.IsServiceAccountCreateEnabled()
+
 	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
+		if unmanaged {
+			return gpuv1.Disabled, nil
+		}
+		if isDCGMExporter {
+			// A ServiceAccount that carries no ClusterPolicy owner reference was not
+			// created by this operator -- for instance one the user had already
+			// provisioned under the configured name -- so it is left untouched.
+			owned, err := n.isServiceAccountOwned(ctx, obj)
+			if err != nil {
+				return gpuv1.NotReady, err
+			}
+			if !owned {
+				logger.V(1).Info("ServiceAccount is not owned by the ClusterPolicy, skipping deletion")
+				return gpuv1.Disabled, nil
+			}
+		}
 		err := n.client.Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
+	}
+
+	if unmanaged {
+		// Surface the misconfiguration here rather than leaving the DaemonSet
+		// pending on a ServiceAccount that does not exist.
+		found := &corev1.ServiceAccount{}
+		if err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Error(err, "ServiceAccount configured with create=false does not exist")
+			}
+			return gpuv1.NotReady, err
+		}
+		return gpuv1.Ready, nil
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
@@ -435,6 +491,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
+	rewriteDCGMExporterSubjects(obj.Subjects, n.stateNames[state], &n.singleton.Spec)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -465,12 +522,38 @@ var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
 	},
 }
 
+// dcgmExporterServiceAccountName returns the name of the ServiceAccount that every
+// DCGM Exporter operand -- the DaemonSet, its RBAC bindings and the OpenShift SCC --
+// has to reference.
+func dcgmExporterServiceAccountName(config *gpuv1.ClusterPolicySpec) string {
+	return config.DCGMExporter.GetServiceAccountName(DCGMExporterDefaultServiceAccountName)
+}
+
 func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
 	gate, ok := rbacGates[name]
 	if !ok {
 		return true
 	}
 	return gate(config)
+}
+
+// rewriteDCGMExporterSubjects points the DCGM Exporter ServiceAccount subjects at the
+// configured ServiceAccount. Only subjects naming the default ServiceAccount are
+// rewritten, so unrelated subjects -- such as the Prometheus one kept in
+// 0500_prom_rolebinding_openshift.yaml -- are preserved.
+func rewriteDCGMExporterSubjects(subjects []rbacv1.Subject, stateName string, config *gpuv1.ClusterPolicySpec) {
+	if stateName != "state-dcgm-exporter" {
+		return
+	}
+	saName := dcgmExporterServiceAccountName(config)
+	if saName == DCGMExporterDefaultServiceAccountName {
+		return
+	}
+	for idx := range subjects {
+		if subjects[idx].Kind == rbacv1.ServiceAccountKind && subjects[idx].Name == DCGMExporterDefaultServiceAccountName {
+			subjects[idx].Name = saName
+		}
+	}
 }
 
 // ClusterRole creates ClusterRole resource
@@ -554,6 +637,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	for idx := range obj.Subjects {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
+	rewriteDCGMExporterSubjects(obj.Subjects, n.stateNames[state], &n.singleton.Spec)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -1806,6 +1890,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set image pull secrets
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
 		addPullSecrets(&obj.Spec.Template.Spec, config.DCGMExporter.ImagePullSecrets)
+	}
+
+	// The asset already references the default ServiceAccount, so only a
+	// user-configured name has to be applied here.
+	if saName := dcgmExporterServiceAccountName(config); saName != DCGMExporterDefaultServiceAccountName {
+		obj.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
 	// merge extra annotations at the pod template level
@@ -4866,11 +4956,17 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		return gpuv1.Disabled, nil
 	}
 
+	// The SCC name and the openshift.io/scc annotation on the DaemonSet stay tied to
+	// the asset name; only the user entry follows the configured ServiceAccount.
+	sccServiceAccountName := obj.Name
+	if n.stateNames[state] == "state-dcgm-exporter" {
+		sccServiceAccountName = dcgmExporterServiceAccountName(&n.singleton.Spec)
+	}
 	for idx := range obj.Users {
 		if obj.Users[idx] != "FILLED BY THE OPERATOR" {
 			continue
 		}
-		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
+		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, sccServiceAccountName)
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {

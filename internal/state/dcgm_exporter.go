@@ -43,6 +43,10 @@ const (
 	dcgmExporterCustomCollectors      = "/etc/dcgm-exporter/dcgm-metrics.csv"
 	dcgmExporterDefaultKubeletRootDir = "/var/lib/kubelet"
 	dcgmExporterDefaultJobMappingDir  = "/var/lib/dcgm-exporter/job-mapping"
+
+	// dcgmExporterDefaultServiceAccountName is the ServiceAccount the DRA operands
+	// reference unless the user configures a different one.
+	dcgmExporterDefaultServiceAccountName = "nvidia-dcgm-exporter-dra"
 )
 
 func NewStateDCGMExporter(
@@ -140,6 +144,8 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 		PodResourcesDir:              filepath.Join(kubeletRootDir, "pod-resources"),
 		ServiceType:                  serviceType,
 		ServiceInternalTrafficPolicy: serviceInternalTrafficPolicy,
+		ServiceAccountName:           spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName),
+		CreateServiceAccount:         spec.IsServiceAccountCreateEnabled(),
 	}, nil
 }
 

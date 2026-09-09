@@ -1059,6 +1059,11 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Service configuration for NVIDIA DCGM Exporter"
 	ServiceSpec *DCGMExporterServiceConfig `json:"service,omitempty"`
 
+	// Optional: ServiceAccount configuration for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ServiceAccount configuration for NVIDIA DCGM Exporter"
+	ServiceAccount *DCGMExporterServiceAccountConfig `json:"serviceAccount,omitempty"`
+
 	// HostPID allows the DCGM-Exporter daemon set to access the host's PID namespace
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1146,6 +1151,30 @@ type DCGMExporterServiceConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Internal Traffic Policy for the DCGM Exporter K8s Service"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
+}
+
+// DCGMExporterServiceAccountConfig defines the ServiceAccount used by the NVIDIA
+// DCGM Exporter DaemonSet.
+// +kubebuilder:validation:XValidation:rule="!has(self.create) || self.create || (has(self.name) && size(self.name) > 0)",message="name is required when create is false"
+type DCGMExporterServiceAccountConfig struct {
+	// Name of the ServiceAccount used by the NVIDIA DCGM Exporter DaemonSet.
+	// Defaults to the operator-managed ServiceAccount when left empty.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ServiceAccount name for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
+
+	// Create indicates whether the operator manages the lifecycle of the DCGM
+	// Exporter ServiceAccount. Defaults to true. When set to false, a
+	// ServiceAccount with the configured name has to already exist in the
+	// operator namespace; the operator then only references it and never
+	// creates, adopts, mutates or deletes it.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Create the ServiceAccount for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Create *bool `json:"create,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment
@@ -2299,6 +2328,26 @@ func (e *DCGMExporterSpec) IsPodUIDEnabled() bool {
 // enrichment is enabled for DCGM Exporter.
 func (e *DCGMExporterSpec) IsKubernetesPodMetadataEnabled() bool {
 	return e.IsPodLabelsEnabled() || e.IsPodUIDEnabled()
+}
+
+// GetServiceAccountName returns the name of the ServiceAccount referenced by the
+// DCGM Exporter operands, falling back to defaultName when it is not configured.
+func (e *DCGMExporterSpec) GetServiceAccountName(defaultName string) string {
+	if e.ServiceAccount == nil || e.ServiceAccount.Name == "" {
+		return defaultName
+	}
+	return e.ServiceAccount.Name
+}
+
+// IsServiceAccountCreateEnabled returns true if the operator owns the lifecycle of
+// the DCGM Exporter ServiceAccount. When false the ServiceAccount is supplied by
+// the user and is never created, adopted, mutated or deleted by the operator.
+func (e *DCGMExporterSpec) IsServiceAccountCreateEnabled() bool {
+	if e.ServiceAccount == nil || e.ServiceAccount.Create == nil {
+		// default is true if not specified by user
+		return true
+	}
+	return *e.ServiceAccount.Create
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator

@@ -86,3 +86,47 @@ func TestImagePath(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid nil spec")
 	})
 }
+
+func TestDCGMExporterServiceAccount(t *testing.T) {
+	const defaultName = "nvidia-dcgm-exporter"
+
+	testCases := map[string]struct {
+		serviceAccount *DCGMExporterServiceAccountConfig
+		expectedName   string
+		expectedCreate bool
+	}{
+		"unset falls back to the default and is operator-managed": {
+			serviceAccount: nil,
+			expectedName:   defaultName,
+			expectedCreate: true,
+		},
+		"empty name falls back to the default": {
+			serviceAccount: &DCGMExporterServiceAccountConfig{},
+			expectedName:   defaultName,
+			expectedCreate: true,
+		},
+		"name only stays operator-managed": {
+			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+			expectedName:   "metrics-identity",
+			expectedCreate: true,
+		},
+		"create=false marks the ServiceAccount as user-provided": {
+			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+			expectedName:   "byo-sa",
+			expectedCreate: false,
+		},
+		"create=true is explicit operator management": {
+			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "managed-sa", Create: new(true)},
+			expectedName:   "managed-sa",
+			expectedCreate: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			spec := &DCGMExporterSpec{ServiceAccount: tc.serviceAccount}
+			require.Equal(t, tc.expectedName, spec.GetServiceAccountName(defaultName))
+			require.Equal(t, tc.expectedCreate, spec.IsServiceAccountCreateEnabled())
+		})
+	}
+}
