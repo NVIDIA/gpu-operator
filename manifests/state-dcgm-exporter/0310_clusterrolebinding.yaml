@@ -10,5 +10,5 @@ roleRef:
   name: nvidia-dcgm-exporter-dra-read-pods
 subjects:
 - kind: ServiceAccount
-  name: {{ .ServiceAccountName }}
+  name: {{ .ServiceAccountName | quote }}
   namespace: {{ .Namespace }}

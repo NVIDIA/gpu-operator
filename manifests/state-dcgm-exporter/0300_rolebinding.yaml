@@ -9,5 +9,5 @@ roleRef:
   name: nvidia-dcgm-exporter-dra
 subjects:
 - kind: ServiceAccount
-  name: {{ .ServiceAccountName }}
+  name: {{ .ServiceAccountName | quote }}
   namespace: {{ .Namespace }}

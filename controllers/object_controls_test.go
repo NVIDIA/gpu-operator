@@ -2683,6 +2683,24 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 		require.True(t, ok, "only a ServiceAccount owned by the ClusterPolicy may be deleted")
 	})
 
+	t.Run("a non-DCGM state deletes its ServiceAccount regardless of ownership", func(t *testing.T) {
+		// The ownership check is scoped to the DCGM Exporter; every other state keeps
+		// the previous unconditional cleanup on disable.
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).
+			WithObjects(serviceAccount(DCGMExporterDefaultServiceAccountName)).Build()
+		cp := clusterPolicy()
+		cp.Spec.Driver.Enabled = new(false)
+		n := newController(k8s, cp)
+		n.stateNames = []string{"state-driver"}
+
+		state, err := ServiceAccount(n)
+		require.NoError(t, err)
+		require.Equal(t, gpuv1.Disabled, state)
+
+		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+		require.False(t, ok)
+	})
+
 	t.Run("disabling the exporter deletes the ServiceAccount the operator owns", func(t *testing.T) {
 		cp := clusterPolicy()
 		owned := serviceAccount(DCGMExporterDefaultServiceAccountName)

@@ -17,10 +17,13 @@
 package v1
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"sigs.k8s.io/yaml"
 )
 
 func TestImagePath(t *testing.T) {
@@ -127,6 +130,41 @@ func TestDCGMExporterServiceAccount(t *testing.T) {
 			spec := &DCGMExporterSpec{ServiceAccount: tc.serviceAccount}
 			require.Equal(t, tc.expectedName, spec.GetServiceAccountName(defaultName))
 			require.Equal(t, tc.expectedCreate, spec.IsServiceAccountCreateEnabled())
+		})
+	}
+}
+
+// TestDCGMExporterServiceAccountCRDValidation pins the CEL rule that guards
+// `serviceAccount: {create: false}` without a name. The helpers cannot catch that
+// combination -- GetServiceAccountName falls back to the default and the operator
+// would then treat the default ServiceAccount as user-provided -- so the generated
+// CRD is the only safeguard before reconciliation.
+func TestDCGMExporterServiceAccountCRDValidation(t *testing.T) {
+	crds := map[string]string{
+		"ClusterPolicy": "../../../config/crd/bases/nvidia.com_clusterpolicies.yaml",
+		"GPUCluster":    "../../../config/crd/bases/nvidia.com_gpuclusters.yaml",
+	}
+
+	for kind, path := range crds {
+		t.Run(kind, func(t *testing.T) {
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			crd := &apiextensionsv1.CustomResourceDefinition{}
+			require.NoError(t, yaml.Unmarshal(data, crd))
+			require.NotEmpty(t, crd.Spec.Versions)
+
+			props := crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].
+				Properties["dcgmExporter"].Properties["serviceAccount"]
+			require.Contains(t, props.Properties, "name")
+			require.Contains(t, props.Properties, "create")
+
+			require.Len(t, props.XValidations, 1,
+				"the create/name consistency rule must survive CRD regeneration")
+			rule := props.XValidations[0]
+			require.Equal(t, "name is required when create is false", rule.Message)
+			require.Contains(t, rule.Rule, "self.create")
+			require.Contains(t, rule.Rule, "self.name")
 		})
 	}
 }

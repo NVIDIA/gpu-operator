@@ -40,7 +40,7 @@ spec:
       {{- end }}
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: {{ .ServiceAccountName }}
+      serviceAccountName: {{ .ServiceAccountName | quote }}
       automountServiceAccountToken: true
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
       # can pause it to drain dcgm-exporter off a node during a driver reload.
