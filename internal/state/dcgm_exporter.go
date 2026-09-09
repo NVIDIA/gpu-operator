@@ -174,7 +174,13 @@ func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, 
 			}
 			return err
 		}
-		return nil
+		// Handing the exporter over to a user-provided ServiceAccount supersedes the one a
+		// default install created. Skipped when the user brings the default name itself,
+		// since that is the object now being referenced.
+		if name == dcgmExporterDefaultServiceAccountName {
+			return nil
+		}
+		return s.deleteOwnedServiceAccount(ctx, cr, dcgmExporterDefaultServiceAccountName)
 	}
 
 	if name == dcgmExporterDefaultServiceAccountName {

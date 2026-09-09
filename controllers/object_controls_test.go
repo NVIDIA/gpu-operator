@@ -2650,6 +2650,48 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 		require.Empty(t, sa.OwnerReferences, "the operator must not take ownership of a user-provided ServiceAccount")
 	})
 
+	t.Run("handing over to a user-provided ServiceAccount reclaims the owned default", func(t *testing.T) {
+		cp := clusterPolicy()
+		previous := serviceAccount(DCGMExporterDefaultServiceAccountName)
+		require.NoError(t, controllerutil.SetControllerReference(cp, previous, testScheme))
+
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).
+			WithObjects(previous, serviceAccount(byoName)).Build()
+		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
+			Name: byoName, Create: new(false),
+		}
+		n := newController(k8s, cp)
+
+		state, err := ServiceAccount(n)
+		require.NoError(t, err)
+		require.Equal(t, gpuv1.Ready, state)
+
+		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+		require.False(t, ok, "the superseded default must be removed on the BYO hand-off")
+		sa, ok := getServiceAccount(t, k8s, byoName)
+		require.True(t, ok)
+		require.Empty(t, sa.OwnerReferences)
+	})
+
+	t.Run("bringing the default name keeps that ServiceAccount", func(t *testing.T) {
+		cp := clusterPolicy()
+		existing := serviceAccount(DCGMExporterDefaultServiceAccountName)
+		require.NoError(t, controllerutil.SetControllerReference(cp, existing, testScheme))
+
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(existing).Build()
+		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
+			Name: DCGMExporterDefaultServiceAccountName, Create: new(false),
+		}
+		n := newController(k8s, cp)
+
+		state, err := ServiceAccount(n)
+		require.NoError(t, err)
+		require.Equal(t, gpuv1.Ready, state)
+
+		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+		require.True(t, ok, "the referenced ServiceAccount must not be reclaimed")
+	})
+
 	t.Run("disabling the exporter keeps a user-provided ServiceAccount", func(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(serviceAccount(byoName)).Build()
 		cp := clusterPolicy()

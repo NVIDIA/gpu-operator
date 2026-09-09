@@ -426,6 +426,14 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 			}
 			return gpuv1.NotReady, err
 		}
+		// Handing the exporter over to a user-provided ServiceAccount supersedes the one a
+		// default install created. Skipped when the user brings the default name itself,
+		// since that is the object now being referenced.
+		if obj.Name != DCGMExporterDefaultServiceAccountName {
+			if err := n.deleteOwnedServiceAccount(ctx, DCGMExporterDefaultServiceAccountName, logger); err != nil {
+				return gpuv1.NotReady, err
+			}
+		}
 		return gpuv1.Ready, nil
 	}
 

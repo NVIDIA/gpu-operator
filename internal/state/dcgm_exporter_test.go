@@ -370,6 +370,50 @@ func TestDCGMExporterServiceAccountPreSync(t *testing.T) {
 		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
 	})
 
+	t.Run("create=false reclaims the operator-owned default", func(t *testing.T) {
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+		})
+		previous := userServiceAccount(dcgmExporterDefaultServiceAccountName)
+		previous.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+			Kind:       "GPUCluster",
+			Name:       cr.Name,
+			UID:        cr.UID,
+			Controller: new(true),
+		}}
+
+		s := newTestDCGMExporterStateWithObjects(t, previous, userServiceAccount("byo-sa"))
+		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
+
+		_, err := s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
+		require.True(t, apierrors.IsNotFound(err), "the superseded default must be removed")
+		_, err = s.getServiceAccount(ctx, "byo-sa")
+		require.NoError(t, err)
+	})
+
+	t.Run("create=false with the default name keeps that ServiceAccount", func(t *testing.T) {
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{
+				Name: dcgmExporterDefaultServiceAccountName, Create: new(false),
+			},
+		})
+		existing := userServiceAccount(dcgmExporterDefaultServiceAccountName)
+		existing.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+			Kind:       "GPUCluster",
+			Name:       cr.Name,
+			UID:        cr.UID,
+			Controller: new(true),
+		}}
+
+		s := newTestDCGMExporterStateWithObjects(t, existing)
+		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
+
+		_, err := s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
+		require.NoError(t, err, "the referenced ServiceAccount must not be reclaimed")
+	})
+
 	t.Run("a configured name refuses to take over an unowned ServiceAccount", func(t *testing.T) {
 		s := newTestDCGMExporterStateWithObjects(t, userServiceAccount("metrics-identity"))
 		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
