@@ -18,11 +18,16 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -71,6 +76,7 @@ func NewStateDCGMExporter(
 		},
 		imageEnvName:    dcgmExporterImageEnvName,
 		buildRenderData: buildDCGMExporterRenderData,
+		preSync:         checkDCGMExporterServiceAccount,
 	}, nil
 }
 
@@ -147,6 +153,78 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 		ServiceAccountName:           spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName),
 		CreateServiceAccount:         spec.IsServiceAccountCreateEnabled(),
 	}, nil
+}
+
+// checkDCGMExporterServiceAccount reconciles the parts of the ServiceAccount contract the
+// manifests cannot express: a ServiceAccount the user brings has to already exist, one the
+// operator would manage must not be an existing object owned by somebody else, and the
+// operator-owned default is removed once a different name takes over.
+func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	spec := cr.Spec.DCGMExporter
+	name := spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
+
+	if !spec.IsServiceAccountCreateEnabled() {
+		// The manifests omit the ServiceAccount entirely, so a missing one would leave
+		// the DaemonSet pending without any signal.
+		if _, err := s.getServiceAccount(ctx, name); err != nil {
+			if apierrors.IsNotFound(err) {
+				return fmt.Errorf(
+					"ServiceAccount %q configured with create=false does not exist in namespace %q",
+					name, s.namespace)
+			}
+			return err
+		}
+		return nil
+	}
+
+	if name == dcgmExporterDefaultServiceAccountName {
+		return nil
+	}
+
+	// Adopting an object the operator did not create would hand it to garbage collection
+	// on CR deletion, so a name that is already taken has to be opted into explicitly.
+	existing, err := s.getServiceAccount(ctx, name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if err == nil && !metav1.IsControlledBy(existing, cr) {
+		return fmt.Errorf(
+			"ServiceAccount %q already exists in namespace %q and is not managed by this GPUCluster; "+
+				"set dcgmExporter.serviceAccount.create to false to reference it",
+			name, s.namespace)
+	}
+
+	return s.deleteOwnedServiceAccount(ctx, cr, dcgmExporterDefaultServiceAccountName)
+}
+
+// getServiceAccount reads a ServiceAccount from the operand namespace.
+func (s *configurableState) getServiceAccount(ctx context.Context, name string) (*corev1.ServiceAccount, error) {
+	sa := &corev1.ServiceAccount{}
+	err := s.client.Get(ctx, types.NamespacedName{Namespace: s.namespace, Name: name}, sa)
+	return sa, err
+}
+
+// deleteOwnedServiceAccount removes a ServiceAccount left behind by a previous
+// configuration, but only when this CR owns it: an object the user provisioned under the
+// same name is left alone. Renaming from one custom name to another is not tracked, so
+// only the operator default is reclaimed here.
+func (s *configurableState) deleteOwnedServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, name string) error {
+	sa, err := s.getServiceAccount(ctx, name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !metav1.IsControlledBy(sa, cr) {
+		return nil
+	}
+	log.FromContext(ctx).V(consts.LogLevelInfo).Info(
+		"Removing the superseded dcgm-exporter ServiceAccount", "Name", name)
+	if err := s.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 // serviceMonitorCRDServed reports whether the cluster serves the monitoring.coreos.com

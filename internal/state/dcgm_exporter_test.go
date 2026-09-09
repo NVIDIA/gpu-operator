@@ -23,11 +23,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -59,6 +62,26 @@ func newTestDCGMExporterState(t *testing.T, serviceMonitorCRD bool) *configurabl
 }
 
 // exporterCR returns a sample CR with dcgm-exporter enabled and the given exporter spec.
+// newTestDCGMExporterStateWithObjects builds the state with a client that already holds
+// the given objects, for the ServiceAccount checks that read cluster state.
+func newTestDCGMExporterStateWithObjects(t *testing.T, objs ...client.Object) *configurableState {
+	t.Helper()
+	t.Setenv("DCGM_EXPORTER_IMAGE", "nvcr.io/nvidia/k8s/dcgm-exporter:test")
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(testScheme))
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(testScheme).
+		WithRESTMapper(restMapperWithServiceMonitor(false)).
+		WithObjects(objs...).
+		Build()
+	s, err := NewStateDCGMExporter(k8sClient, "test-operator", testScheme, dcgmExporterManifestDir)
+	require.NoError(t, err)
+	return s.(*configurableState)
+}
+
 func exporterCR(spec *nvidiav1.DCGMExporterSpec) *nvidiav1alpha1.GPUCluster {
 	cr := sampleGPUCluster()
 	cr.Spec.DCGMExporter = spec
@@ -234,4 +257,157 @@ func TestDCGMExporterServiceType(t *testing.T) {
 	assert.Equal(t, "NodePort", svcType)
 	itpValue, _, _ := unstructured.NestedString(svc.Object, "spec", "internalTrafficPolicy")
 	assert.Equal(t, "Local", itpValue)
+}
+
+// kindNames collects the names of every rendered object of the given kind.
+func kindNames(objs []*unstructured.Unstructured, kind string) []string {
+	var names []string
+	for _, o := range objs {
+		if o.GetKind() == kind {
+			names = append(names, o.GetName())
+		}
+	}
+	return names
+}
+
+// subjectNames collects the ServiceAccount subject names of a rendered RBAC binding.
+func subjectNames(t *testing.T, objs []*unstructured.Unstructured, kind, name string) []string {
+	t.Helper()
+	for _, o := range objs {
+		if o.GetKind() != kind || o.GetName() != name {
+			continue
+		}
+		subjects, found, err := unstructured.NestedSlice(o.Object, "subjects")
+		require.NoError(t, err)
+		require.True(t, found)
+		var names []string
+		for _, raw := range subjects {
+			subject, ok := raw.(map[string]any)
+			require.True(t, ok)
+			names = append(names, subject["name"].(string))
+		}
+		return names
+	}
+	t.Fatalf("%s %q not found in rendered objects", kind, name)
+	return nil
+}
+
+func TestDCGMExporterDefaultServiceAccount(t *testing.T) {
+	s := newTestDCGMExporterState(t, false)
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{dcgmExporterDefaultServiceAccountName}, kindNames(objs, "ServiceAccount"))
+	assert.Equal(t, dcgmExporterDefaultServiceAccountName,
+		findDaemonSet(t, objs).Spec.Template.Spec.ServiceAccountName)
+}
+
+func TestDCGMExporterCustomServiceAccountName(t *testing.T) {
+	s := newTestDCGMExporterState(t, false)
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+	})
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	// The operator still owns the ServiceAccount, only under the configured name.
+	assert.Equal(t, []string{"metrics-identity"}, kindNames(objs, "ServiceAccount"))
+	assert.Equal(t, "metrics-identity", findDaemonSet(t, objs).Spec.Template.Spec.ServiceAccountName)
+	assert.Equal(t, []string{"metrics-identity"},
+		subjectNames(t, objs, "RoleBinding", "nvidia-dcgm-exporter-dra"))
+	assert.Equal(t, []string{"metrics-identity"},
+		subjectNames(t, objs, "ClusterRoleBinding", "nvidia-dcgm-exporter-dra-read-pods"))
+	// The binding objects keep their own names.
+	assert.Equal(t, []string{"nvidia-dcgm-exporter-dra"}, kindNames(objs, "RoleBinding"))
+}
+
+func TestDCGMExporterUserProvidedServiceAccount(t *testing.T) {
+	s := newTestDCGMExporterState(t, false)
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+	})
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	// The operator must not render a ServiceAccount it does not own, but every
+	// operand still has to reference it.
+	assert.Empty(t, kindNames(objs, "ServiceAccount"))
+	assert.Equal(t, "byo-sa", findDaemonSet(t, objs).Spec.Template.Spec.ServiceAccountName)
+	assert.Equal(t, []string{"byo-sa"}, subjectNames(t, objs, "RoleBinding", "nvidia-dcgm-exporter-dra"))
+	assert.Equal(t, []string{"byo-sa"},
+		subjectNames(t, objs, "ClusterRoleBinding", "nvidia-dcgm-exporter-dra-read-pods"))
+}
+
+func TestDCGMExporterServiceAccountPreSync(t *testing.T) {
+	ctx := context.Background()
+
+	userServiceAccount := func(name string) *corev1.ServiceAccount {
+		return &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-operator"},
+		}
+	}
+
+	t.Run("create=false requires the ServiceAccount to exist", func(t *testing.T) {
+		s := newTestDCGMExporterState(t, false)
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+		})
+
+		err := checkDCGMExporterServiceAccount(ctx, s, cr)
+		require.ErrorContains(t, err, "byo-sa")
+	})
+
+	t.Run("create=false accepts an existing ServiceAccount", func(t *testing.T) {
+		s := newTestDCGMExporterStateWithObjects(t, userServiceAccount("byo-sa"))
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+		})
+
+		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
+	})
+
+	t.Run("a configured name refuses to take over an unowned ServiceAccount", func(t *testing.T) {
+		s := newTestDCGMExporterStateWithObjects(t, userServiceAccount("metrics-identity"))
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+		})
+
+		err := checkDCGMExporterServiceAccount(ctx, s, cr)
+		require.ErrorContains(t, err, "not managed by this GPUCluster")
+	})
+
+	t.Run("renaming reclaims the superseded operator-owned default", func(t *testing.T) {
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+		})
+		previous := userServiceAccount(dcgmExporterDefaultServiceAccountName)
+		previous.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+			Kind:       "GPUCluster",
+			Name:       cr.Name,
+			UID:        cr.UID,
+			Controller: new(true),
+		}}
+
+		s := newTestDCGMExporterStateWithObjects(t, previous)
+		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
+
+		_, err := s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
+		require.True(t, apierrors.IsNotFound(err), "the superseded default must be removed")
+	})
+
+	t.Run("renaming keeps a previous ServiceAccount the operator does not own", func(t *testing.T) {
+		s := newTestDCGMExporterStateWithObjects(t, userServiceAccount(dcgmExporterDefaultServiceAccountName))
+		cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+			ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
+		})
+
+		require.NoError(t, checkDCGMExporterServiceAccount(ctx, s, cr))
+		_, err := s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
+		require.NoError(t, err, "only an owned ServiceAccount may be reclaimed")
+	})
 }

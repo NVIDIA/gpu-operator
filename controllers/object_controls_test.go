@@ -2683,6 +2683,56 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 		require.True(t, ok, "only a ServiceAccount owned by the ClusterPolicy may be deleted")
 	})
 
+	t.Run("a configured name refuses to take over an unowned ServiceAccount", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).
+			WithObjects(serviceAccount("metrics-identity")).Build()
+		cp := clusterPolicy()
+		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
+		n := newController(k8s, cp)
+
+		state, err := ServiceAccount(n)
+		require.Error(t, err)
+		require.Equal(t, gpuv1.NotReady, state)
+
+		sa, ok := getServiceAccount(t, k8s, "metrics-identity")
+		require.True(t, ok)
+		require.Empty(t, sa.OwnerReferences, "an existing ServiceAccount must not be adopted")
+	})
+
+	t.Run("renaming reclaims the superseded operator-owned default", func(t *testing.T) {
+		cp := clusterPolicy()
+		previous := serviceAccount(DCGMExporterDefaultServiceAccountName)
+		require.NoError(t, controllerutil.SetControllerReference(cp, previous, testScheme))
+
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(previous).Build()
+		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
+		n := newController(k8s, cp)
+
+		state, err := ServiceAccount(n)
+		require.NoError(t, err)
+		require.Equal(t, gpuv1.Ready, state)
+
+		_, ok := getServiceAccount(t, k8s, "metrics-identity")
+		require.True(t, ok)
+		_, ok = getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+		require.False(t, ok, "the superseded default must be removed")
+	})
+
+	t.Run("renaming keeps a previous ServiceAccount the operator does not own", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(testScheme).
+			WithObjects(serviceAccount(DCGMExporterDefaultServiceAccountName)).Build()
+		cp := clusterPolicy()
+		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
+		n := newController(k8s, cp)
+
+		state, err := ServiceAccount(n)
+		require.NoError(t, err)
+		require.Equal(t, gpuv1.Ready, state)
+
+		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+		require.True(t, ok, "only an owned ServiceAccount may be reclaimed")
+	})
+
 	t.Run("a non-DCGM state deletes its ServiceAccount regardless of ownership", func(t *testing.T) {
 		// The ownership check is scoped to the DCGM Exporter; every other state keeps
 		// the previous unconditional cleanup on disable.

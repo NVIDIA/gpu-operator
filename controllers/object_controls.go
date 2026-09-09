@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -350,6 +351,28 @@ func (n ClusterPolicyController) isServiceAccountOwned(ctx context.Context, obj 
 	return metav1.IsControlledBy(found, n.singleton), nil
 }
 
+// deleteOwnedServiceAccount removes a ServiceAccount left behind by a previous
+// configuration, but only when this ClusterPolicy owns it: an object the user
+// provisioned under the same name is left alone.
+func (n ClusterPolicyController) deleteOwnedServiceAccount(ctx context.Context, name string, logger logr.Logger) error {
+	found := &corev1.ServiceAccount{}
+	err := n.client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, found)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !metav1.IsControlledBy(found, n.singleton) {
+		return nil
+	}
+	logger.V(1).Info("Removing the superseded dcgm-exporter ServiceAccount", "Name", name)
+	if err := n.client.Delete(ctx, found); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
@@ -406,18 +429,41 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
+	isRenamed := isDCGMExporter && obj.Name != DCGMExporterDefaultServiceAccountName
+	if isRenamed {
+		// Only a name the user chose can collide with an unrelated object; the default is
+		// left tolerant so an upgrade that lost the owner reference keeps converging.
+		owned, err := n.isServiceAccountOwned(ctx, obj)
+		if err != nil {
+			return gpuv1.NotReady, err
+		}
+		if !owned {
+			err := fmt.Errorf("ServiceAccount %q already exists in namespace %q and is not managed by this ClusterPolicy; "+
+				"set dcgmExporter.serviceAccount.create to false to reference it", obj.Name, obj.Namespace)
+			logger.Error(err, "Refusing to take over an existing ServiceAccount")
+			return gpuv1.NotReady, err
+		}
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
 	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, skipping update")
-			return gpuv1.Ready, nil
+		if !apierrors.IsAlreadyExists(err) {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
+		logger.Info("Found Resource, skipping update")
+	}
 
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
+	if isRenamed {
+		// A previous configuration may have left the operator-owned default behind.
+		// Renaming between two custom names is not tracked, so only the default is
+		// reclaimed here.
+		if err := n.deleteOwnedServiceAccount(ctx, DCGMExporterDefaultServiceAccountName, logger); err != nil {
+			return gpuv1.NotReady, err
+		}
 	}
 	return gpuv1.Ready, nil
 }
