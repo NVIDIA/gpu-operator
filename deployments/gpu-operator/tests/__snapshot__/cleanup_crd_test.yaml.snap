@@ -1,0 +1,48 @@
+should match snapshot:
+  1: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        helm.sh/hook: pre-delete
+        helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+        helm.sh/hook-weight: "1"
+      labels:
+        app.kubernetes.io/component: gpu-operator
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: v25.0.0
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: gpu-operator-cleanup-crd
+      namespace: gpu-operator
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: gpu-operator
+            app.kubernetes.io/instance: gpu-operator
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: gpu-operator
+            app.kubernetes.io/version: v25.0.0
+            helm.sh/chart: gpu-operator-v1.0.0-devel
+          name: gpu-operator-cleanup-crd
+        spec:
+          containers:
+            - args:
+                - delete
+                - --filepath=/opt/gpu-operator/nvidia.com_clusterpolicies.yaml
+                - --filepath=/opt/gpu-operator/nvidia.com_nvidiadrivers.yaml
+                - --filepath=/opt/gpu-operator/nfd-api-crds.yaml
+              command:
+                - /usr/bin/manage-crds
+              image: nvcr.io/nvidia/gpu-operator:v25.0.0
+              imagePullPolicy: IfNotPresent
+              name: cleanup-crd
+          restartPolicy: OnFailure
+          serviceAccountName: gpu-operator
+          tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/control-plane
+              operator: Equal
+              value: ""

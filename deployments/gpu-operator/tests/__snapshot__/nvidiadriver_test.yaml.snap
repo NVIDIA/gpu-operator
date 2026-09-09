@@ -1,0 +1,126 @@
+should match snapshot when CRD mode is enabled with defaults:
+  1: |
+    apiVersion: nvidia.com/v1alpha1
+    kind: NVIDIADriver
+    metadata:
+      name: default
+    spec:
+      driverType: gpu
+      gdrcopy:
+        enabled: false
+        image: gdrdrv
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v2.5.2
+      image: driver
+      kernelModuleType: auto
+      manager:
+        env: []
+        image: k8s-driver-manager
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v0.10.0
+      rdma:
+        enabled: false
+        useHostMofed: false
+      repository: nvcr.io/nvidia
+      startupProbe:
+        failureThreshold: 120
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 60
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists
+      usePrecompiled: false
+      version: 595.58.03
+should match snapshot when gds and gdrcopy are enabled:
+  1: |
+    apiVersion: nvidia.com/v1alpha1
+    kind: NVIDIADriver
+    metadata:
+      name: default
+    spec:
+      driverType: gpu
+      gdrcopy:
+        enabled: true
+        image: gdrdrv
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v2.5.2
+      gds:
+        enabled: true
+        image: nvidia-fs
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: 2.27.3
+      image: driver
+      kernelModuleType: auto
+      manager:
+        env: []
+        image: k8s-driver-manager
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v0.10.0
+      rdma:
+        enabled: false
+        useHostMofed: false
+      repository: nvcr.io/nvidia
+      startupProbe:
+        failureThreshold: 120
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 60
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists
+      usePrecompiled: false
+      version: 595.58.03
+should match snapshot with optional repoConfig, certConfig, kernelModuleConfig and licensing:
+  1: |
+    apiVersion: nvidia.com/v1alpha1
+    kind: NVIDIADriver
+    metadata:
+      name: default
+    spec:
+      certConfig:
+        name: my-cert
+      driverType: gpu
+      gdrcopy:
+        enabled: false
+        image: gdrdrv
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v2.5.2
+      image: driver
+      kernelModuleConfig:
+        name: my-kmod
+      kernelModuleType: auto
+      licensingConfig:
+        nlsEnabled: true
+        secretName: my-secret
+      manager:
+        env: []
+        image: k8s-driver-manager
+        imagePullPolicy: IfNotPresent
+        repository: nvcr.io/nvidia/cloud-native
+        version: v0.10.0
+      rdma:
+        enabled: false
+        useHostMofed: false
+      repoConfig:
+        name: my-repo
+      repository: nvcr.io/nvidia
+      startupProbe:
+        failureThreshold: 120
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 60
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists
+      usePrecompiled: false
+      version: 595.58.03
