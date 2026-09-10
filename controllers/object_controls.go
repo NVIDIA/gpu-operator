@@ -351,6 +351,49 @@ func (n ClusterPolicyController) isServiceAccountOwned(ctx context.Context, obj 
 	return metav1.IsControlledBy(found, n.singleton), nil
 }
 
+// dcgmExporterServiceAccountRenamed reports whether the exporter is configured to use a
+// ServiceAccount other than the operator default, i.e. whether a previously created
+// default ServiceAccount may have been superseded.
+func dcgmExporterServiceAccountRenamed(config *gpuv1.ClusterPolicySpec) bool {
+	return dcgmExporterServiceAccountName(config) != DCGMExporterDefaultServiceAccountName
+}
+
+// releaseServiceAccountOwnership drops this ClusterPolicy's controller reference from a
+// ServiceAccount the user has taken over. Without it the object stays garbage-collected
+// together with the ClusterPolicy even though the operator no longer manages it.
+func (n ClusterPolicyController) releaseServiceAccountOwnership(ctx context.Context, sa *corev1.ServiceAccount, logger logr.Logger) error {
+	if !metav1.IsControlledBy(sa, n.singleton) {
+		return nil
+	}
+	refs := make([]metav1.OwnerReference, 0, len(sa.OwnerReferences))
+	for _, ref := range sa.OwnerReferences {
+		if ref.UID == n.singleton.GetUID() {
+			continue
+		}
+		refs = append(refs, ref)
+	}
+	sa.OwnerReferences = refs
+	logger.V(1).Info("Releasing ownership of a user-provided ServiceAccount", "Name", sa.Name)
+	return n.client.Update(ctx, sa)
+}
+
+// cleanupSupersededDCGMExporterServiceAccount removes the operator-created default
+// ServiceAccount once a different one has taken over. It runs only after every control of
+// the state converged, so a failure part-way through reconciliation never leaves the
+// DaemonSet referencing a ServiceAccount that has already been deleted.
+func (n ClusterPolicyController) cleanupSupersededDCGMExporterServiceAccount(ctx context.Context) error {
+	if n.stateNames[n.idx] != "state-dcgm-exporter" || !n.isStateEnabled(n.stateNames[n.idx]) {
+		return nil
+	}
+	if !dcgmExporterServiceAccountRenamed(&n.singleton.Spec) {
+		// The configured ServiceAccount is the default one, so there is nothing it
+		// could have superseded.
+		return nil
+	}
+	logger := n.logger.WithValues("ServiceAccount", DCGMExporterDefaultServiceAccountName, "Namespace", n.operatorNamespace)
+	return n.deleteOwnedServiceAccount(ctx, DCGMExporterDefaultServiceAccountName, logger)
+}
+
 // deleteOwnedServiceAccount removes a ServiceAccount left behind by a previous
 // configuration, but only when this ClusterPolicy owns it: an object the user
 // provisioned under the same name is left alone.
@@ -426,19 +469,16 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 			}
 			return gpuv1.NotReady, err
 		}
-		// Handing the exporter over to a user-provided ServiceAccount supersedes the one a
-		// default install created. Skipped when the user brings the default name itself,
-		// since that is the object now being referenced.
-		if obj.Name != DCGMExporterDefaultServiceAccountName {
-			if err := n.deleteOwnedServiceAccount(ctx, DCGMExporterDefaultServiceAccountName, logger); err != nil {
-				return gpuv1.NotReady, err
-			}
+		// The same ServiceAccount may have been operator-managed before the user set
+		// create=false. Leaving the controller reference in place would garbage-collect
+		// their object together with the ClusterPolicy.
+		if err := n.releaseServiceAccountOwnership(ctx, found, logger); err != nil {
+			return gpuv1.NotReady, err
 		}
 		return gpuv1.Ready, nil
 	}
 
-	isRenamed := isDCGMExporter && obj.Name != DCGMExporterDefaultServiceAccountName
-	if isRenamed {
+	if isDCGMExporter && dcgmExporterServiceAccountRenamed(&n.singleton.Spec) {
 		// Only a name the user chose can collide with an unrelated object; the default is
 		// left tolerant so an upgrade that lost the owner reference keeps converging.
 		owned, err := n.isServiceAccountOwned(ctx, obj)
@@ -465,14 +505,9 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("Found Resource, skipping update")
 	}
 
-	if isRenamed {
-		// A previous configuration may have left the operator-owned default behind.
-		// Renaming between two custom names is not tracked, so only the default is
-		// reclaimed here.
-		if err := n.deleteOwnedServiceAccount(ctx, DCGMExporterDefaultServiceAccountName, logger); err != nil {
-			return gpuv1.NotReady, err
-		}
-	}
+	// Reclaiming the superseded default ServiceAccount is deferred to
+	// cleanupSupersededDCGMExporterServiceAccount, which runs once every control of this
+	// state has converged.
 	return gpuv1.Ready, nil
 }
 

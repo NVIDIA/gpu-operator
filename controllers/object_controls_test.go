@@ -2537,42 +2537,35 @@ func TestDriverPrecompiledLibModulesSuse(t *testing.T) {
 // TestDCGMExporterServiceAccountReconcile covers the ServiceAccount lifecycle for the
 // DCGM Exporter: the operator honours a configured name and, when the ServiceAccount is
 // supplied by the user, only references it -- it is never created, adopted or deleted.
+
+// TestDCGMExporterServiceAccountReconcile covers the ServiceAccount lifecycle for the
+// DCGM Exporter: the operator honours a configured name, and a ServiceAccount supplied by
+// the user is only referenced -- never created, adopted, mutated or deleted, and never
+// left carrying a ClusterPolicy owner reference that would garbage-collect it.
 func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 	const (
 		testNamespace = "test-namespace"
 		byoName       = "byo-metrics-identity"
+		customName    = "metrics-identity"
 	)
 
 	testScheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(testScheme))
 	require.NoError(t, gpuv1.AddToScheme(testScheme))
 
-	clusterPolicy := func() *gpuv1.ClusterPolicy {
+	newClusterPolicy := func() *gpuv1.ClusterPolicy {
 		return &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
 	}
 
-	newController := func(k8s client.Client, cp *gpuv1.ClusterPolicy) ClusterPolicyController {
-		return ClusterPolicyController{
-			client:            k8s,
-			ctx:               context.Background(),
-			singleton:         cp,
-			scheme:            testScheme,
-			operatorNamespace: testNamespace,
-			resources: []Resources{{
-				ServiceAccount: corev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
-				},
-			}},
-			stateNames: []string{"state-dcgm-exporter"},
-			idx:        0,
-			logger:     ctrl.Log.WithName("test"),
-		}
+	serviceAccount := func(name string) *corev1.ServiceAccount {
+		return &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace}}
 	}
 
-	serviceAccount := func(name string) *corev1.ServiceAccount {
-		return &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace},
-		}
+	ownedServiceAccount := func(t *testing.T, cp *gpuv1.ClusterPolicy, name string) *corev1.ServiceAccount {
+		t.Helper()
+		sa := serviceAccount(name)
+		require.NoError(t, controllerutil.SetControllerReference(cp, sa, testScheme))
+		return sa
 	}
 
 	getServiceAccount := func(t *testing.T, k8s client.Client, name string) (*corev1.ServiceAccount, bool) {
@@ -2586,229 +2579,274 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 		return found, true
 	}
 
-	t.Run("default configuration creates the default ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		cp := clusterPolicy()
-		n := newController(k8s, cp)
+	testCases := map[string]struct {
+		serviceAccount *gpuv1.DCGMExporterServiceAccountConfig
+		exporterState  *bool
+		stateName      string
+		// existing seeds the fake client; ownedExisting are seeded with a ClusterPolicy
+		// controller reference.
+		existing      []string
+		ownedExisting []string
+		expectedState gpuv1.State
+		expectedError bool
+		// assert runs after ServiceAccount(); present reports whether each name exists.
+		assert func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy)
+	}{
+		"default configuration creates the default ServiceAccount": {
+			expectedState: gpuv1.Ready,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.True(t, ok)
+				require.True(t, metav1.IsControlledBy(sa, cp))
+			},
+		},
+		"configured name creates that ServiceAccount instead of the default": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			expectedState:  gpuv1.Ready,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, customName)
+				require.True(t, ok)
+				_, ok = getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.False(t, ok, "the default ServiceAccount must not be created as well")
+			},
+		},
+		"a configured name refuses to take over an unowned ServiceAccount": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			existing:       []string{customName},
+			expectedState:  gpuv1.NotReady,
+			expectedError:  true,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, customName)
+				require.True(t, ok)
+				require.Empty(t, sa.OwnerReferences, "an existing ServiceAccount must not be adopted")
+			},
+		},
+		"create=false reports NotReady when the ServiceAccount is missing": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			expectedState:  gpuv1.NotReady,
+			expectedError:  true,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, byoName)
+				require.False(t, ok, "a user-provided ServiceAccount must never be created by the operator")
+			},
+		},
+		"create=false references an existing ServiceAccount without adopting it": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			existing:       []string{byoName},
+			expectedState:  gpuv1.Ready,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, byoName)
+				require.True(t, ok)
+				require.Empty(t, sa.OwnerReferences, "the operator must not take ownership of a user-provided ServiceAccount")
+			},
+		},
+		"create=false releases ownership of a ServiceAccount the operator had created": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{
+				Name: DCGMExporterDefaultServiceAccountName, Create: new(false),
+			},
+			ownedExisting: []string{DCGMExporterDefaultServiceAccountName},
+			expectedState: gpuv1.Ready,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.True(t, ok, "the referenced ServiceAccount must not be deleted")
+				require.False(t, metav1.IsControlledBy(sa, cp),
+					"the owner reference has to go, otherwise the user's ServiceAccount is garbage-collected with the ClusterPolicy")
+			},
+		},
+		"disabling the exporter keeps a user-provided ServiceAccount": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			exporterState:  new(false),
+			existing:       []string{byoName},
+			expectedState:  gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, byoName)
+				require.True(t, ok, "a user-provided ServiceAccount must survive disabling the exporter")
+			},
+		},
+		"disabling the exporter keeps a ServiceAccount the operator does not own": {
+			exporterState: new(false),
+			existing:      []string{DCGMExporterDefaultServiceAccountName},
+			expectedState: gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.True(t, ok, "only a ServiceAccount owned by the ClusterPolicy may be deleted")
+			},
+		},
+		"disabling the exporter deletes the ServiceAccount the operator owns": {
+			exporterState: new(false),
+			ownedExisting: []string{DCGMExporterDefaultServiceAccountName},
+			expectedState: gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.False(t, ok)
+			},
+		},
+		"a non-DCGM state deletes its ServiceAccount regardless of ownership": {
+			// The ownership check is scoped to the DCGM Exporter; every other state keeps
+			// the previous unconditional cleanup on disable.
+			stateName:     "state-driver",
+			existing:      []string{DCGMExporterDefaultServiceAccountName},
+			expectedState: gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.False(t, ok)
+			},
+		},
+	}
 
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cp := newClusterPolicy()
+			cp.Spec.DCGMExporter.ServiceAccount = tc.serviceAccount
+			cp.Spec.DCGMExporter.Enabled = tc.exporterState
 
-		sa, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.True(t, ok)
-		require.True(t, metav1.IsControlledBy(sa, cp))
-	})
+			objects := make([]client.Object, 0, len(tc.existing)+len(tc.ownedExisting))
+			for _, saName := range tc.existing {
+				objects = append(objects, serviceAccount(saName))
+			}
+			for _, saName := range tc.ownedExisting {
+				objects = append(objects, ownedServiceAccount(t, cp, saName))
+			}
 
-	t.Run("configured name creates that ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
-		n := newController(k8s, cp)
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()
+			stateName := tc.stateName
+			if stateName == "" {
+				stateName = "state-dcgm-exporter"
+			}
+			if stateName == "state-driver" {
+				cp.Spec.Driver.Enabled = new(false)
+			}
 
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         cp,
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				resources: []Resources{{
+					ServiceAccount: corev1.ServiceAccount{
+						ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
+					},
+				}},
+				stateNames: []string{stateName},
+				idx:        0,
+				logger:     ctrl.Log.WithName("test"),
+			}
 
-		_, ok := getServiceAccount(t, k8s, "metrics-identity")
-		require.True(t, ok)
-		_, ok = getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.False(t, ok, "the default ServiceAccount must not be created as well")
-	})
+			state, err := ServiceAccount(n)
+			if tc.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expectedState, state)
+			tc.assert(t, k8s, cp)
+		})
+	}
+}
 
-	t.Run("create=false reports NotReady when the ServiceAccount is missing", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
-			Name: byoName, Create: new(false),
-		}
-		n := newController(k8s, cp)
+// TestDCGMExporterSupersededServiceAccountCleanup covers the deferred reclaim of the
+// operator default. It runs only after every control of the state converged, so the
+// RoleBindings, SCC and DaemonSet already reference the replacement by then.
+func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
+	const (
+		testNamespace = "test-namespace"
+		customName    = "metrics-identity"
+	)
 
-		state, err := ServiceAccount(n)
-		require.Error(t, err)
-		require.True(t, apierrors.IsNotFound(err))
-		require.Equal(t, gpuv1.NotReady, state)
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, gpuv1.AddToScheme(testScheme))
 
-		_, ok := getServiceAccount(t, k8s, byoName)
-		require.False(t, ok, "a user-provided ServiceAccount must never be created by the operator")
-	})
+	testCases := map[string]struct {
+		serviceAccount *gpuv1.DCGMExporterServiceAccountConfig
+		exporterState  *bool
+		stateName      string
+		defaultOwned   bool
+		expectDeleted  bool
+	}{
+		"renaming reclaims the superseded operator-owned default": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			defaultOwned:   true,
+			expectDeleted:  true,
+		},
+		"handing over to a user-provided ServiceAccount reclaims the owned default": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName, Create: new(false)},
+			defaultOwned:   true,
+			expectDeleted:  true,
+		},
+		"a previous default the operator does not own is left alone": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			defaultOwned:   false,
+			expectDeleted:  false,
+		},
+		"the default name supersedes nothing": {
+			defaultOwned:  true,
+			expectDeleted: false,
+		},
+		"bringing the default name keeps that ServiceAccount": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{
+				Name: DCGMExporterDefaultServiceAccountName, Create: new(false),
+			},
+			defaultOwned:  true,
+			expectDeleted: false,
+		},
+		"a disabled exporter reclaims nothing here": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			exporterState:  new(false),
+			defaultOwned:   true,
+			expectDeleted:  false,
+		},
+		"another state reclaims nothing": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customName},
+			stateName:      "state-driver",
+			defaultOwned:   true,
+			expectDeleted:  false,
+		},
+	}
 
-	t.Run("create=false references an existing ServiceAccount without adopting it", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(serviceAccount(byoName)).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
-			Name: byoName, Create: new(false),
-		}
-		n := newController(k8s, cp)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
+			cp.Spec.DCGMExporter.ServiceAccount = tc.serviceAccount
+			cp.Spec.DCGMExporter.Enabled = tc.exporterState
 
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
+			previous := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName, Namespace: testNamespace},
+			}
+			if tc.defaultOwned {
+				require.NoError(t, controllerutil.SetControllerReference(cp, previous, testScheme))
+			}
 
-		sa, ok := getServiceAccount(t, k8s, byoName)
-		require.True(t, ok)
-		require.Empty(t, sa.OwnerReferences, "the operator must not take ownership of a user-provided ServiceAccount")
-	})
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(previous).Build()
+			stateName := tc.stateName
+			if stateName == "" {
+				stateName = "state-dcgm-exporter"
+			}
 
-	t.Run("handing over to a user-provided ServiceAccount reclaims the owned default", func(t *testing.T) {
-		cp := clusterPolicy()
-		previous := serviceAccount(DCGMExporterDefaultServiceAccountName)
-		require.NoError(t, controllerutil.SetControllerReference(cp, previous, testScheme))
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         cp,
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				stateNames:        []string{stateName},
+				idx:               0,
+				logger:            ctrl.Log.WithName("test"),
+			}
 
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).
-			WithObjects(previous, serviceAccount(byoName)).Build()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
-			Name: byoName, Create: new(false),
-		}
-		n := newController(k8s, cp)
+			require.NoError(t, n.cleanupSupersededDCGMExporterServiceAccount(context.Background()))
 
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.False(t, ok, "the superseded default must be removed on the BYO hand-off")
-		sa, ok := getServiceAccount(t, k8s, byoName)
-		require.True(t, ok)
-		require.Empty(t, sa.OwnerReferences)
-	})
-
-	t.Run("bringing the default name keeps that ServiceAccount", func(t *testing.T) {
-		cp := clusterPolicy()
-		existing := serviceAccount(DCGMExporterDefaultServiceAccountName)
-		require.NoError(t, controllerutil.SetControllerReference(cp, existing, testScheme))
-
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(existing).Build()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
-			Name: DCGMExporterDefaultServiceAccountName, Create: new(false),
-		}
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.True(t, ok, "the referenced ServiceAccount must not be reclaimed")
-	})
-
-	t.Run("disabling the exporter keeps a user-provided ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(serviceAccount(byoName)).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.Enabled = new(false)
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{
-			Name: byoName, Create: new(false),
-		}
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Disabled, state)
-
-		_, ok := getServiceAccount(t, k8s, byoName)
-		require.True(t, ok, "a user-provided ServiceAccount must survive disabling the exporter")
-	})
-
-	t.Run("disabling the exporter keeps a ServiceAccount the operator does not own", func(t *testing.T) {
-		// Same name as the operator default, but provisioned by the user beforehand.
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).
-			WithObjects(serviceAccount(DCGMExporterDefaultServiceAccountName)).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.Enabled = new(false)
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Disabled, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.True(t, ok, "only a ServiceAccount owned by the ClusterPolicy may be deleted")
-	})
-
-	t.Run("a configured name refuses to take over an unowned ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).
-			WithObjects(serviceAccount("metrics-identity")).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.Error(t, err)
-		require.Equal(t, gpuv1.NotReady, state)
-
-		sa, ok := getServiceAccount(t, k8s, "metrics-identity")
-		require.True(t, ok)
-		require.Empty(t, sa.OwnerReferences, "an existing ServiceAccount must not be adopted")
-	})
-
-	t.Run("renaming reclaims the superseded operator-owned default", func(t *testing.T) {
-		cp := clusterPolicy()
-		previous := serviceAccount(DCGMExporterDefaultServiceAccountName)
-		require.NoError(t, controllerutil.SetControllerReference(cp, previous, testScheme))
-
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(previous).Build()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		_, ok := getServiceAccount(t, k8s, "metrics-identity")
-		require.True(t, ok)
-		_, ok = getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.False(t, ok, "the superseded default must be removed")
-	})
-
-	t.Run("renaming keeps a previous ServiceAccount the operator does not own", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).
-			WithObjects(serviceAccount(DCGMExporterDefaultServiceAccountName)).Build()
-		cp := clusterPolicy()
-		cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"}
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.True(t, ok, "only an owned ServiceAccount may be reclaimed")
-	})
-
-	t.Run("a non-DCGM state deletes its ServiceAccount regardless of ownership", func(t *testing.T) {
-		// The ownership check is scoped to the DCGM Exporter; every other state keeps
-		// the previous unconditional cleanup on disable.
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).
-			WithObjects(serviceAccount(DCGMExporterDefaultServiceAccountName)).Build()
-		cp := clusterPolicy()
-		cp.Spec.Driver.Enabled = new(false)
-		n := newController(k8s, cp)
-		n.stateNames = []string{"state-driver"}
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Disabled, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.False(t, ok)
-	})
-
-	t.Run("disabling the exporter deletes the ServiceAccount the operator owns", func(t *testing.T) {
-		cp := clusterPolicy()
-		owned := serviceAccount(DCGMExporterDefaultServiceAccountName)
-		require.NoError(t, controllerutil.SetControllerReference(cp, owned, testScheme))
-
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(owned).Build()
-		cp.Spec.DCGMExporter.Enabled = new(false)
-		n := newController(k8s, cp)
-
-		state, err := ServiceAccount(n)
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Disabled, state)
-
-		_, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
-		require.False(t, ok)
-	})
+			found := &corev1.ServiceAccount{}
+			err := k8s.Get(context.Background(),
+				types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found)
+			if tc.expectDeleted {
+				require.True(t, apierrors.IsNotFound(err), "the superseded default must be reclaimed")
+			} else {
+				require.NoError(t, err, "this ServiceAccount must not be reclaimed")
+			}
+		})
+	}
 }
 
 // TestDCGMExporterRBACSubjects verifies that the RBAC bindings and the OpenShift SCC
@@ -2826,84 +2864,88 @@ func TestDCGMExporterRBACSubjects(t *testing.T) {
 	require.NoError(t, secv1.AddToScheme(testScheme))
 	require.NoError(t, gpuv1.AddToScheme(testScheme))
 
-	newController := func(k8s client.Client, spec gpuv1.ClusterPolicySpec, res Resources) ClusterPolicyController {
-		return ClusterPolicyController{
-			client:            k8s,
-			ctx:               context.Background(),
-			singleton:         &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}, Spec: spec},
-			scheme:            testScheme,
-			operatorNamespace: testNamespace,
-			resources:         []Resources{res},
-			stateNames:        []string{"state-dcgm-exporter"},
-			idx:               0,
-			logger:            ctrl.Log.WithName("test"),
-		}
-	}
-
-	customSpec := gpuv1.ClusterPolicySpec{
+	spec := gpuv1.ClusterPolicySpec{
 		DCGMExporter: gpuv1.DCGMExporterSpec{
 			EnablePodLabels: new(true),
 			ServiceAccount:  &gpuv1.DCGMExporterServiceAccountConfig{Name: customSA},
 		},
 	}
 
-	t.Run("RoleBinding subject follows the configured ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		res := Resources{RoleBinding: rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
-			Subjects: []rbacv1.Subject{
-				{Kind: rbacv1.ServiceAccountKind, Name: DCGMExporterDefaultServiceAccountName, Namespace: filled},
-				// Kept verbatim, mirroring 0500_prom_rolebinding_openshift.yaml.
-				{Kind: rbacv1.ServiceAccountKind, Name: "prometheus-k8s", Namespace: "openshift-monitoring"},
+	testCases := map[string]struct {
+		resources Resources
+		// control applies the object and returns the resulting state.
+		control func(ClusterPolicyController) (gpuv1.State, error)
+		assert  func(t *testing.T, k8s client.Client)
+	}{
+		"RoleBinding subject follows the configured ServiceAccount": {
+			resources: Resources{RoleBinding: rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.ServiceAccountKind, Name: DCGMExporterDefaultServiceAccountName, Namespace: filled},
+					// Kept verbatim, mirroring 0500_prom_rolebinding_openshift.yaml.
+					{Kind: rbacv1.ServiceAccountKind, Name: "prometheus-k8s", Namespace: "openshift-monitoring"},
+				},
+			}},
+			control: RoleBinding,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &rbacv1.RoleBinding{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found))
+				require.Equal(t, customSA, found.Subjects[0].Name)
+				require.Equal(t, testNamespace, found.Subjects[0].Namespace)
+				require.Equal(t, "prometheus-k8s", found.Subjects[1].Name)
+				require.Equal(t, "openshift-monitoring", found.Subjects[1].Namespace)
 			},
-		}}
-
-		state, err := RoleBinding(newController(k8s, customSpec, res))
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		found := &rbacv1.RoleBinding{}
-		require.NoError(t, k8s.Get(context.Background(),
-			types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found))
-		require.Equal(t, customSA, found.Subjects[0].Name)
-		require.Equal(t, testNamespace, found.Subjects[0].Namespace)
-		require.Equal(t, "prometheus-k8s", found.Subjects[1].Name)
-		require.Equal(t, "openshift-monitoring", found.Subjects[1].Namespace)
-	})
-
-	t.Run("ClusterRoleBinding subject follows the configured ServiceAccount", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		res := Resources{ClusterRoleBinding: rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: "nvidia-dcgm-exporter-read-pods"},
-			Subjects: []rbacv1.Subject{
-				{Kind: rbacv1.ServiceAccountKind, Name: DCGMExporterDefaultServiceAccountName, Namespace: filled},
+		},
+		"ClusterRoleBinding subject follows the configured ServiceAccount": {
+			resources: Resources{ClusterRoleBinding: rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "nvidia-dcgm-exporter-read-pods"},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.ServiceAccountKind, Name: DCGMExporterDefaultServiceAccountName, Namespace: filled},
+				},
+			}},
+			control: ClusterRoleBinding,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &rbacv1.ClusterRoleBinding{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: "nvidia-dcgm-exporter-read-pods"}, found))
+				require.Equal(t, customSA, found.Subjects[0].Name)
 			},
-		}}
+		},
+		"SCC user follows the ServiceAccount while the SCC name is unchanged": {
+			resources: Resources{SecurityContextConstraints: secv1.SecurityContextConstraints{
+				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
+				Users:      []string{filled},
+			}},
+			control: SecurityContextConstraints,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &secv1.SecurityContextConstraints{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found))
+				require.Equal(t, []string{fmt.Sprintf("system:serviceaccount:%s:%s", testNamespace, customSA)}, found.Users)
+			},
+		},
+	}
 
-		state, err := ClusterRoleBinding(newController(k8s, customSpec, res))
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}, Spec: spec},
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				resources:         []Resources{tc.resources},
+				stateNames:        []string{"state-dcgm-exporter"},
+				idx:               0,
+				logger:            ctrl.Log.WithName("test"),
+			}
 
-		found := &rbacv1.ClusterRoleBinding{}
-		require.NoError(t, k8s.Get(context.Background(),
-			types.NamespacedName{Namespace: testNamespace, Name: "nvidia-dcgm-exporter-read-pods"}, found))
-		require.Equal(t, customSA, found.Subjects[0].Name)
-	})
-
-	t.Run("SCC user follows the ServiceAccount while the SCC name is unchanged", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
-		res := Resources{SecurityContextConstraints: secv1.SecurityContextConstraints{
-			ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
-			Users:      []string{filled},
-		}}
-
-		state, err := SecurityContextConstraints(newController(k8s, customSpec, res))
-		require.NoError(t, err)
-		require.Equal(t, gpuv1.Ready, state)
-
-		found := &secv1.SecurityContextConstraints{}
-		require.NoError(t, k8s.Get(context.Background(),
-			types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found))
-		require.Equal(t, []string{fmt.Sprintf("system:serviceaccount:%s:%s", testNamespace, customSA)}, found.Users)
-	})
+			state, err := tc.control(n)
+			require.NoError(t, err)
+			require.Equal(t, gpuv1.Ready, state)
+			tc.assert(t, k8s)
+		})
+	}
 }

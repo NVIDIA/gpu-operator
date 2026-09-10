@@ -55,6 +55,11 @@ type configurableState struct {
 	// the state NotReady, so it is the place to surface a misconfiguration instead of
 	// applying objects that cannot converge.
 	preSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
+
+	// postSync runs after the manifests converged. Reclaiming objects a previous
+	// configuration superseded belongs here rather than in preSync: deleting them before
+	// the replacements exist would leave the operands referencing objects that are gone.
+	postSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 }
 
 var _ State = (*configurableState)(nil)
@@ -80,7 +85,18 @@ func (s *configurableState) Sync(ctx context.Context, customResource any, infoCa
 		}
 	}
 
-	return s.syncObjects(ctx, cr, objs)
+	syncState, err := s.syncObjects(ctx, cr, objs)
+	if err != nil || syncState != SyncStateReady {
+		return syncState, err
+	}
+
+	if s.postSync != nil {
+		if err := s.postSync(ctx, s, cr); err != nil {
+			return SyncStateNotReady, err
+		}
+	}
+
+	return syncState, nil
 }
 
 func (s *configurableState) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {

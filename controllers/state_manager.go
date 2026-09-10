@@ -987,6 +987,15 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		}
 	}
 
+	// Objects a previous configuration superseded are reclaimed only once every control
+	// of this state converged: deleting them earlier would leave the operands that still
+	// reference them pointing at objects that no longer exist.
+	if result == gpuv1.Ready {
+		if err := n.cleanupSupersededDCGMExporterServiceAccount(n.ctx); err != nil {
+			return gpuv1.NotReady, err
+		}
+	}
+
 	// move to next state
 	n.idx++
 
