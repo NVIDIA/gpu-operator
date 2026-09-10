@@ -12,6 +12,11 @@ nfd:
 psa:
   enabled: false
 
+# Network policies for the operator, dcgm-exporter and node-status-exporter.
+# When any component policy is enabled, a namespace-wide deny-all-ingress
+# policy is also created. It applies to Node Feature Discovery pods too, so
+# to allow ingress to them (e.g. metrics scraping) enable the subchart's own
+# policies via node-feature-discovery.<master|worker|gc|topologyUpdater>.networkPolicy.
 networkPolicy:
   enabled: false
   labels: {}
@@ -652,25 +657,11 @@ node-feature-discovery:
   priorityClassName: system-node-critical
   gc:
     enable: true
-    networkPolicy:
-      enabled: false
-      ingress:
-        from: []
-        ports:
-          - port: 8080
-            protocol: TCP
     replicaCount: 1
     serviceAccount:
       name: node-feature-discovery
       create: false
   worker:
-    networkPolicy:
-      enabled: false
-      ingress:
-        from: []
-        ports:
-          - port: 8080
-            protocol: TCP
     serviceAccount:
       name: node-feature-discovery
       # disable creation to avoid duplicate serviceaccount creation by master spec below
@@ -695,13 +686,6 @@ node-feature-discovery:
           deviceLabelFields:
           - vendor
   master:
-    networkPolicy:
-      enabled: false
-      ingress:
-        from: []
-        ports:
-          - port: 8080
-            protocol: TCP
     serviceAccount:
       name: node-feature-discovery
       create: true
@@ -711,11 +695,3 @@ node-feature-discovery:
       # resourceLabels: ["nvidia.com/feature-1","nvidia.com/feature-2"]
       # enableTaints: false
       # labelWhiteList: "nvidia.com/gpu"
-  topologyUpdater:
-    networkPolicy:
-      enabled: false
-      ingress:
-        from: []
-        ports:
-          - port: 8080
-            protocol: TCP
