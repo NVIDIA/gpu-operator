@@ -1,0 +1,173 @@
+# Node Problem Detector (NPD) with a custom plugin that publishes the
+# nvidia.com/GPUReady node condition. The probe runs nvidia-smi against the
+# node's driver installation; the Node Readiness Controller removes the
+# startup taint once the condition is True.
+#
+# See README.md in this directory for the full setup guide.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-problem-detector
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-problem-detector
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-problem-detector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-problem-detector
+subjects:
+  - kind: ServiceAccount
+    name: node-problem-detector
+    namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: npd-gpu-ready-config
+  namespace: kube-system
+data:
+  gpu-ready-monitor.json: |
+    {
+      "plugin": "custom",
+      "pluginConfig": {
+        "invoke_interval": "10s",
+        "timeout": "5s",
+        "max_output_length": 80,
+        "concurrency": 1
+      },
+      "source": "gpu-ready-monitor",
+      "metricsReporting": false,
+      "conditions": [
+        {
+          "type": "nvidia.com/GPUReady",
+          "reason": "GPUReadinessPending",
+          "message": "GPU readiness probe has not succeeded yet"
+        }
+      ],
+      "rules": [
+        {
+          "type": "permanent",
+          "condition": "nvidia.com/GPUReady",
+          "reason": "GPUReady",
+          "path": "/config/check-gpu-ready.sh",
+          "timeout": "5s"
+        }
+      ]
+    }
+  check-gpu-ready.sh: |
+    #!/bin/sh
+    # Exit 1 when the GPU is ready, exit 0 when it is not.
+    #
+    # NPD's permanent-rule contract is built for problem detection: exit 0
+    # means "no problem found" (condition stays False) and exit 1 means
+    # "problem found" (condition becomes True). nvidia.com/GPUReady reports
+    # a healthy state rather than a problem, so the exit codes are inverted
+    # compared to a typical health-check script.
+    #
+    # The driver can be installed two ways; probe both locations:
+    #   - driver container: rooted at /run/nvidia/driver on the host
+    #   - host-installed driver: nvidia-smi on the host PATH
+    if chroot /host/run/nvidia/driver nvidia-smi >/dev/null 2>&1; then
+      echo "nvidia-smi succeeded (driver container)"
+      exit 1
+    fi
+    if chroot /host nvidia-smi >/dev/null 2>&1; then
+      echo "nvidia-smi succeeded (host driver)"
+      exit 1
+    fi
+    echo "nvidia-smi failed: GPU driver not ready"
+    exit 0
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-problem-detector
+  namespace: kube-system
+  labels:
+    app: node-problem-detector
+spec:
+  selector:
+    matchLabels:
+      app: node-problem-detector
+  template:
+    metadata:
+      labels:
+        app: node-problem-detector
+    spec:
+      serviceAccountName: node-problem-detector
+      priorityClassName: system-node-critical
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        # NPD must run while the startup taint is still on the node --
+        # it publishes the condition that gets the taint removed.
+        # If the GPU node pool carries additional taints, add matching
+        # tolerations here.
+        - key: readiness.k8s.io/nvidia-gpu-not-ready
+          operator: Exists
+          effect: NoSchedule
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: npd
+          image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.20
+          command:
+            - /node-problem-detector
+            - --logtostderr
+            - --prometheus-port=0
+            - --config.custom-plugin-monitor=/config/gpu-ready-monitor.json
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            # nvidia-smi opens /dev/nvidia* device nodes through the
+            # hostPath mount, which requires a privileged container.
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: host
+              mountPath: /host
+              readOnly: true
+              # The driver container bind-mounts /run/nvidia/driver on the
+              # host after this pod starts; without propagation that mount
+              # stays invisible here and the probe never succeeds.
+              mountPropagation: HostToContainer
+      volumes:
+        - name: config
+          configMap:
+            name: npd-gpu-ready-config
+            # The probe script is executed directly from the mount.
+            defaultMode: 0755
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
