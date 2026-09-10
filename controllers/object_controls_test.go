@@ -1259,6 +1259,45 @@ func TestVGPUManagerAssets(t *testing.T) {
 	}
 }
 
+// TestOperandToolkitReadinessWaitsForLiveDriver verifies that every operand
+// launched through the NVIDIA runtime waits for a live Linux NVIDIA module, or
+// the supported WSL2 kernel path, as well as the toolkit status file.
+func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
+	manifests := []string{
+		"assets/gpu-feature-discovery/0500_daemonset.yaml",
+		"assets/state-dcgm-exporter/0800_daemonset.yaml",
+		"assets/state-dcgm/0400_dcgm.yml",
+		"assets/state-device-plugin/0500_daemonset.yaml",
+		"assets/state-mig-manager/0600_daemonset.yaml",
+		"assets/state-mps-control-daemon/0400_daemonset.yaml",
+	}
+
+	for _, manifest := range manifests {
+		t.Run(filepath.Base(filepath.Dir(manifest)), func(t *testing.T) {
+			buffer, err := os.ReadFile(filepath.Join(cfg.root, manifest))
+			require.NoError(t, err)
+
+			ds := appsv1.DaemonSet{}
+			ser := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+				json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
+			_, _, err = ser.Decode(buffer, nil, &ds)
+			require.NoError(t, err)
+
+			var args string
+			for _, initContainer := range ds.Spec.Template.Spec.InitContainers {
+				if initContainer.Name == "toolkit-validation" {
+					args = strings.Join(initContainer.Args, " ")
+					break
+				}
+			}
+			require.NotEmpty(t, args, "toolkit-validation init container not found")
+			expectedGate := "until [ -f /run/nvidia/validations/toolkit-ready ] && { grep -q '^nvidia ' /proc/modules || [ -e /dev/dxg ]; }; do"
+			require.True(t, strings.HasPrefix(args, expectedGate),
+				"toolkit readiness and a supported live-driver check must gate operand startup")
+		})
+	}
+}
+
 // TestVGPUDeviceManagerReadinessGate verifies that the vGPU Device Manager's
 // vgpu-manager-validation init container waits for the vGPU Manager readiness
 // status file written in BOTH deployment modes: vgpu-manager-ready (vGPU
