@@ -12,6 +12,20 @@ nfd:
 psa:
   enabled: false
 
+# Network policies for the operator, dcgm-exporter and node-status-exporter.
+# When any component policy is enabled, a namespace-wide deny-all-ingress
+# policy is also created. It applies to Node Feature Discovery pods too, so
+# to allow ingress to them (e.g. metrics scraping) enable the subchart's own
+# policies via node-feature-discovery.<master|worker|gc|topologyUpdater>.networkPolicy.
+networkPolicy:
+  enabled: false
+  labels: {}
+  annotations: {}
+  ingress:
+    from: []
+    # Ports to allow on all enabled component policies as native NetworkPolicyPort objects.
+    ports: []
+
 cdi:
   enabled: true
   nriPluginEnabled: false
@@ -121,6 +135,13 @@ operator:
     requests:
       cpu: 200m
       memory: 100Mi
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 8080
+          protocol: TCP
   # metrics:
   #   serviceMonitor:
   #     interval: 15s
@@ -310,6 +331,13 @@ dcgmExporter:
   resources: {}
   hostPID: false
   hostNetwork: false
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 9400
+          protocol: TCP
   # HPC job mapping configuration for correlating GPU metrics with HPC workload manager jobs
   # This is used by HPC workload managers like Slurm to label GPU metrics with job IDs
   # hpcJobMapping:
@@ -443,6 +471,13 @@ nodeStatusExporter:
   imagePullSecrets: []
   resources: {}
   hostNetwork: false
+  networkPolicy:
+    enabled: false
+    ingress:
+      from: []
+      ports:
+        - port: 8000
+          protocol: TCP
 
 gds:
   enabled: false

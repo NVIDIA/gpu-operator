@@ -1,0 +1,146 @@
+{{- $globalEnabled := .Values.networkPolicy.enabled | default false -}}
+{{- $globalFrom := .Values.networkPolicy.ingress.from | default (list) -}}
+{{- $globalPorts := .Values.networkPolicy.ingress.ports | default (list) -}}
+{{- $state := dict "denyAll" false -}}
+
+{{- $operatorNP := .Values.operator.networkPolicy | default dict -}}
+{{- if or $globalEnabled ($operatorNP.enabled | default false) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $operatorIngress := $operatorNP.ingress | default dict -}}
+{{- $operatorFrom := concat $globalFrom ($operatorIngress.from | default (list)) -}}
+{{- $operatorPorts := concat ($operatorIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $operatorPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: "gpu-operator"
+      app: "gpu-operator"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $operatorFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $operatorPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $dcgmNP := .Values.dcgmExporter.networkPolicy | default dict -}}
+{{- if and (.Values.dcgmExporter.enabled | default false) (or $globalEnabled ($dcgmNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $dcgmIngress := $dcgmNP.ingress | default dict -}}
+{{- $dcgmFrom := concat $globalFrom ($dcgmIngress.from | default (list)) -}}
+{{- $dcgmPorts := concat ($dcgmIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $dcgmPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-dcgm-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "dcgm-exporter"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app: "nvidia-dcgm-exporter"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $dcgmFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $dcgmPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- $nodeStatusNP := .Values.nodeStatusExporter.networkPolicy | default dict -}}
+{{- if and (.Values.nodeStatusExporter.enabled | default false) (or $globalEnabled ($nodeStatusNP.enabled | default false)) }}
+{{- $_ := set $state "denyAll" true -}}
+{{- $nodeStatusIngress := $nodeStatusNP.ingress | default dict -}}
+{{- $nodeStatusFrom := concat $globalFrom ($nodeStatusIngress.from | default (list)) -}}
+{{- $nodeStatusPorts := concat ($nodeStatusIngress.ports | default (list)) $globalPorts -}}
+{{- if gt (len $nodeStatusPorts) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-node-status-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "node-status-exporter"
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      app: "nvidia-node-status-exporter"
+  policyTypes:
+    - Ingress
+  ingress:
+    - {{- with $nodeStatusFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      ports:
+        {{- toYaml $nodeStatusPorts | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{- if (get $state "denyAll") }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gpu-operator-deny-all-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    {{- with .Values.networkPolicy.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.networkPolicy.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress: []
+{{- end }}
+
