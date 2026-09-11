@@ -149,6 +149,16 @@ func (d Daemonset) WithTolerations(tolerations []corev1.Toleration) Daemonset {
 	return d
 }
 
+func (d Daemonset) WithNodeSelector(nodeSelector map[string]string) Daemonset {
+	d.Spec.Template.Spec.NodeSelector = nodeSelector
+	return d
+}
+
+func (d Daemonset) WithAffinity(affinity *corev1.Affinity) Daemonset {
+	d.Spec.Template.Spec.Affinity = affinity
+	return d
+}
+
 func (d Daemonset) WithPodSecurityContext(psc *corev1.PodSecurityContext) Daemonset {
 	d.Spec.Template.Spec.SecurityContext = psc
 	return d
@@ -621,7 +631,8 @@ func TestApplyUpdateStrategyConfig(t *testing.T) {
 				UpdateStrategy: "RollingUpdate",
 				RollingUpdate: &gpuv1.RollingUpdateSpec{
 					MaxUnavailable: "10%abc",
-				}},
+				},
+			},
 			errorExpected: true,
 		},
 		{
@@ -708,13 +719,162 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 			}),
 		},
 		{
+			description: "nodeSelector configured",
+			ds: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				NodeSelector: map[string]string{
+					"karpenter.sh/nodepool": "gpu",
+				},
+			},
+			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+				"karpenter.sh/nodepool":               "gpu",
+			}),
+		},
+		{
+			description: "existing nodeSelector keys are not overridden",
+			ds: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				NodeSelector: map[string]string{
+					"nvidia.com/gpu.deploy.device-plugin": "false",
+					"karpenter.sh/nodepool":               "gpu",
+				},
+			},
+			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+				"karpenter.sh/nodepool":               "gpu",
+			}),
+		},
+		{
+			description: "operand nodeSelector keys such as mps.capable are not overridden",
+			ds: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/mps.capable": "true",
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				NodeSelector: map[string]string{
+					"nvidia.com/mps.capable": "false",
+					"karpenter.sh/nodepool":  "gpu",
+				},
+			},
+			expectedDs: NewDaemonset().WithNodeSelector(map[string]string{
+				"nvidia.com/mps.capable": "true",
+				"karpenter.sh/nodepool":  "gpu",
+			}),
+		},
+		{
+			description: "affinity configured",
+			ds:          NewDaemonset(),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				Affinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "karpenter.sh/nodepool",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"gpu"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithAffinity(&corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "karpenter.sh/nodepool",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"gpu"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			description: "node affinity merged additively with operand",
+			ds: NewDaemonset().WithAffinity(&corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "nvidia.com/gpu.deploy.device-plugin",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"true"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			dsSpec: gpuv1.DaemonsetsSpec{
+				Affinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "karpenter.sh/nodepool",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"gpu"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithAffinity(&corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "nvidia.com/gpu.deploy.device-plugin",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"true"},
+									},
+									{
+										Key:      "karpenter.sh/nodepool",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"gpu"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
 			description: "invalid updatestrategy configured",
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{
 				UpdateStrategy: "RollingUpdate",
 				RollingUpdate: &gpuv1.RollingUpdateSpec{
 					MaxUnavailable: "10%abc",
-				}},
+				},
+			},
 			errorExpected: true,
 		},
 		{
