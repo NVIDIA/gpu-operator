@@ -189,8 +189,8 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			// mounting host RHSM paths (/etc/pki/entitlement, redhat.repo, /etc/rhsm): they may
 			// be missing or not directories on minimal nodes, and are not needed when packages
 			// come only from the mounted repo ConfigMap.
-			if cr.Spec.IsRepoConfigEnabled() && pool.osRelease == "rhel" {
-				logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", pool.osVersion)
+			if cr.Spec.IsRepoConfigEnabled() && !cr.Spec.RepoConfig.UseHostSubscription && pool.osRelease == "rhel" {
+				logger.Info("Skipping host subscription mounts because repoConfig is enabled and useHostSubscription is false", "OS", pool.osVersion)
 			} else {
 				logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
 				pathToVolumeSource, err = getSubscriptionPathsToVolumeSources(pool.osRelease)
@@ -207,7 +207,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			sort.Strings(mountPaths)
 
 			for num, mountPath := range mountPaths {
-				volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+				volMountSubscriptionName := fmt.Sprintf("%s%d", consts.SubscriptionVolumeNamePrefix, num)
 
 				volMountSubscription := corev1.VolumeMount{
 					Name:      volMountSubscriptionName,

@@ -4688,7 +4688,7 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
 	mockClient := fake.NewFakeClient(repoConfigMap)
@@ -4698,8 +4698,11 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 		osRelease                   string
 		osTag                       string
 		repoConfigEnabled           bool
+		useHostSubscription         bool
+		transformTwice              bool
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
+		expectedSubscriptionMounts  map[string]string
 	}{
 		{
 			description:              "rhel with repo config skips host subscription mounts",
@@ -4717,6 +4720,30 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				"/etc/pki/entitlement":         corev1.HostPathDirectory,
 				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
 				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+			expectedSubscriptionMounts: map[string]string{
+				"/etc/pki/entitlement":         "/run/secrets/etc-pki-entitlement",
+				"/etc/yum.repos.d/redhat.repo": "/run/secrets/redhat.repo",
+				"/etc/rhsm":                    "/run/secrets/rhsm",
+			},
+		},
+		{
+			description:              "rhel with repo config and host subscription mounts host subscription paths",
+			osRelease:                "rhel",
+			osTag:                    "rhel8.10",
+			repoConfigEnabled:        true,
+			useHostSubscription:      true,
+			transformTwice:           true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+			expectedSubscriptionMounts: map[string]string{
+				"/etc/pki/entitlement":         "/run/secrets/etc-pki-entitlement",
+				"/etc/yum.repos.d/redhat.repo": "/run/secrets/redhat.repo",
+				"/etc/rhsm":                    "/run/secrets/rhsm",
 			},
 		},
 	}
@@ -4740,7 +4767,10 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				},
 			}
 			if tc.repoConfigEnabled {
-				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{ConfigMapName: "test-repo-config"}
+				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{
+					ConfigMapName:       "test-repo-config",
+					UseHostSubscription: tc.useHostSubscription,
+				}
 			}
 
 			err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
@@ -4752,22 +4782,77 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				gpuNodeOSTag:      tc.osTag,
 			})
 			require.NoError(t, err)
+			if tc.transformTwice {
+				err = TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
+					client:            mockClient,
+					runtime:           gpuv1.Containerd,
+					operatorNamespace: "test-ns",
+					logger:            ctrl.Log.WithName("test"),
+					gpuNodeOSRelease:  tc.osRelease,
+					gpuNodeOSTag:      tc.osTag,
+				})
+				require.NoError(t, err)
+			}
 
 			driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
 			require.NotNil(t, driverContainer)
 			assertSubscriptionHostPathVolumesForTransform(t, ds.Spec.Template.Spec.Volumes, tc.expectedSubscriptionHostMap)
+			assertSubscriptionVolumeMountPathsForTransform(t, ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts, tc.expectedSubscriptionMounts)
 			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMountForTransform(driverContainer.VolumeMounts))
+			assert.Equal(t, len(tc.expectedSubscriptionHostMap), subscriptionVolumeMountCountForTransform(driverContainer.VolumeMounts))
+			assert.Equal(t, len(tc.expectedSubscriptionHostMap), subscriptionVolumeCountForTransform(ds.Spec.Template.Spec.Volumes))
 		})
 	}
 }
 
 func hasSubscriptionVolumeMountForTransform(volumeMounts []corev1.VolumeMount) bool {
 	for _, volumeMount := range volumeMounts {
-		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
+		if strings.HasPrefix(volumeMount.Name, consts.SubscriptionVolumeNamePrefix) {
 			return true
 		}
 	}
 	return false
+}
+
+// subscriptionVolumeMountCountForTransform counts mounts managed by the subscription configuration.
+func subscriptionVolumeMountCountForTransform(volumeMounts []corev1.VolumeMount) int {
+	count := 0
+	for _, volumeMount := range volumeMounts {
+		if strings.HasPrefix(volumeMount.Name, consts.SubscriptionVolumeNamePrefix) {
+			count++
+		}
+	}
+	return count
+}
+
+// subscriptionVolumeCountForTransform counts volumes managed by the subscription configuration.
+func subscriptionVolumeCountForTransform(volumes []corev1.Volume) int {
+	count := 0
+	for _, volume := range volumes {
+		if strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) {
+			count++
+		}
+	}
+	return count
+}
+
+// assertSubscriptionVolumeMountPathsForTransform verifies that subscription volumes have the expected mount paths.
+func assertSubscriptionVolumeMountPathsForTransform(t *testing.T, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, expected map[string]string) {
+	t.Helper()
+
+	mountsByName := map[string]corev1.VolumeMount{}
+	for _, volumeMount := range volumeMounts {
+		mountsByName[volumeMount.Name] = volumeMount
+	}
+	for _, volume := range volumes {
+		if !strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) {
+			continue
+		}
+		require.NotNil(t, volume.HostPath)
+		volumeMount, found := mountsByName[volume.Name]
+		require.True(t, found, "missing volume mount for %q", volume.Name)
+		assert.Equal(t, expected[volume.HostPath.Path], volumeMount.MountPath)
+	}
 }
 
 func assertSubscriptionHostPathVolumesForTransform(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
@@ -4779,7 +4864,7 @@ func assertSubscriptionHostPathVolumesForTransform(t *testing.T, volumes []corev
 
 	actual := map[string]corev1.HostPathType{}
 	for _, volume := range volumes {
-		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+		if !strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) {
 			continue
 		}
 		require.NotNil(t, volume.HostPath)

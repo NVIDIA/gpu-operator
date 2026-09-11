@@ -120,11 +120,23 @@ func findContainerByName(containers []corev1.Container, name string) *corev1.Con
 
 func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
 	for _, volumeMount := range volumeMounts {
-		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
+		if strings.HasPrefix(volumeMount.Name, consts.SubscriptionVolumeNamePrefix) {
 			return true
 		}
 	}
 	return false
+}
+
+// assertUniqueVolumeMountPaths verifies that each volume mount has a distinct destination path.
+func assertUniqueVolumeMountPaths(t *testing.T, volumeMounts []corev1.VolumeMount) {
+	t.Helper()
+
+	mountPaths := map[string]struct{}{}
+	for _, volumeMount := range volumeMounts {
+		_, found := mountPaths[volumeMount.MountPath]
+		assert.Falsef(t, found, "duplicate volume mount path %q", volumeMount.MountPath)
+		mountPaths[volumeMount.MountPath] = struct{}{}
+	}
 }
 
 func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
@@ -136,7 +148,7 @@ func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, ex
 
 	actual := map[string]corev1.HostPathType{}
 	for _, volume := range volumes {
-		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+		if !strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) {
 			continue
 		}
 		require.NotNil(t, volume.HostPath)
@@ -628,7 +640,7 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
 
@@ -636,6 +648,7 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 		description                 string
 		osRelease                   string
 		repoConfigEnabled           bool
+		useHostSubscription         bool
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
 	}{
@@ -655,6 +668,18 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 				"/etc/rhsm":                    corev1.HostPathDirectory,
 			},
 		},
+		{
+			description:              "rhel with repo config and host subscription mounts host subscription paths",
+			osRelease:                "rhel",
+			repoConfigEnabled:        true,
+			useHostSubscription:      true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -667,7 +692,10 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 			}
 			driver := &nvidiav1alpha1.NVIDIADriver{}
 			if tc.repoConfigEnabled {
-				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
+				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{
+					Name:                "test-repo-config",
+					UseHostSubscription: tc.useHostSubscription,
+				}
 			}
 
 			configs, err := stateDriver.getDriverAdditionalConfigs(
@@ -680,6 +708,7 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 
 			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
 			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
+			assertUniqueVolumeMountPaths(t, configs.VolumeMounts)
 		})
 	}
 }

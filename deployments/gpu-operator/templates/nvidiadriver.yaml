@@ -65,6 +65,9 @@ spec:
   {{- if .Values.driver.repoConfig.configMapName }}
   repoConfig:
     name: {{ .Values.driver.repoConfig.configMapName }}
+    {{- if .Values.driver.repoConfig.useHostSubscription }}
+    useHostSubscription: true
+    {{- end }}
   {{- end }}
   {{- if .Values.driver.certConfig.name }}
   certConfig:
