@@ -21,6 +21,7 @@ import (
 	"errors"
 	"maps"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	"github.com/go-logr/logr"
@@ -28,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +43,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
-// podNodeNameIndexer mirrors the manager's spec.nodeName pod index for fake clients.
+// podNodeNameIndexer lets fake API readers emulate server-side node filtering.
 func podNodeNameIndexer(obj client.Object) []string {
 	return []string{obj.(*corev1.Pod).Spec.NodeName}
 }
@@ -600,7 +602,8 @@ func TestUpdateGPUStateLabelsDispatch(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			nlc := &nodeLabelingController{
-				client:        fake.NewClientBuilder().WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).Build(),
+				client:        fake.NewClientBuilder().Build(),
+				apiReader:     fake.NewClientBuilder().WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).Build(),
 				clusterPolicy: tc.clusterPolicy,
 				gpuCluster:    tc.gpuCluster,
 				logger:        logr.Discard(),
@@ -678,7 +681,8 @@ func TestUpdateGPUStateLabelsModeSweep(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			nlc := &nodeLabelingController{
-				client:        fake.NewClientBuilder().WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).Build(),
+				client:        fake.NewClientBuilder().Build(),
+				apiReader:     fake.NewClientBuilder().WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).Build(),
 				clusterPolicy: tc.clusterPolicy,
 				gpuCluster:    tc.gpuCluster,
 				logger:        logr.Discard(),
@@ -697,9 +701,11 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, resourcev1.AddToScheme(scheme))
+	// The operand cache has an index but cannot see application workloads.
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).Build()
 
 	gpuClaim := &resourcev1.ResourceClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: "gpu-claim", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "gpu-claim", Namespace: "application"},
 		Status: resourcev1.ResourceClaimStatus{
 			Allocation: &resourcev1.AllocationResult{
 				Devices: resourcev1.DeviceAllocationResult{
@@ -711,7 +717,7 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		},
 	}
 	claimPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "claim-pod", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "claim-pod", Namespace: "application"},
 		Spec: corev1.PodSpec{
 			NodeName: "test-node",
 			ResourceClaims: []corev1.PodResourceClaim{
@@ -730,7 +736,8 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 
 	t.Run("claim pod on node defers plugin label removal", func(t *testing.T) {
 		nlc := &nodeLabelingController{
-			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), claimPod.DeepCopy()).Build(),
+			client:        cachedClient,
+			apiReader:     fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), claimPod.DeepCopy()).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
 			logger:        logr.Discard(),
 		}
@@ -751,7 +758,8 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		adminPod.Name = "admin-pod"
 		adminPod.Spec.ResourceClaims[0].ResourceClaimName = new("admin-claim")
 		nlc := &nodeLabelingController{
-			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(adminClaim, adminPod).Build(),
+			client:        cachedClient,
+			apiReader:     fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).WithObjects(adminClaim, adminPod).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
 			logger:        logr.Discard(),
 		}
@@ -763,7 +771,8 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 
 	t.Run("no claim pods removes plugin label", func(t *testing.T) {
 		nlc := &nodeLabelingController{
-			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).Build(),
+			client:        cachedClient,
+			apiReader:     fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
 			logger:        logr.Discard(),
 		}
@@ -779,7 +788,8 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		terminating.DeletionTimestamp = &now
 		terminating.Finalizers = []string{"test/keep"}
 		nlc := &nodeLabelingController{
-			client:        fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, podNodeNameIndexKey, podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), terminating).Build(),
+			client:        cachedClient,
+			apiReader:     fake.NewClientBuilder().WithScheme(scheme).WithIndex(&corev1.Pod{}, "spec.nodeName", podNodeNameIndexer).WithObjects(gpuClaim.DeepCopy(), terminating).Build(),
 			clusterPolicy: &gpuv1.ClusterPolicy{},
 			logger:        logr.Discard(),
 		}
@@ -788,6 +798,167 @@ func TestDeferDRAPluginRemoval(t *testing.T) {
 		assert.Equal(t, "true", labels[draDriverDeployLabelKey])
 		assert.True(t, nlc.draPluginRemovalDeferred)
 	})
+}
+
+// Separate readers reproduce application workloads missing from the operand cache.
+// Intercept LIST to exercise continuation tokens, which the fake client does not implement.
+func TestNodeHasDRAClaimPodsPagination(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, resourcev1.AddToScheme(scheme))
+	claim := &resourcev1.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "gpu", Namespace: "application"},
+		Status: resourcev1.ResourceClaimStatus{Allocation: &resourcev1.AllocationResult{
+			Devices: resourcev1.DeviceAllocationResult{Results: []resourcev1.DeviceRequestAllocationResult{{Driver: NVIDIAGPUDRADriverName}}},
+		}},
+	}
+	otherClaim := claim.DeepCopy()
+	otherClaim.Name = "other"
+	otherClaim.Status.Allocation.Devices.Results[0].Driver = "other.example.com"
+	unallocatedClaim := claim.DeepCopy()
+	unallocatedClaim.Name = "unallocated"
+	unallocatedClaim.Status.Allocation = nil
+	pod := func(name string) corev1.Pod {
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "application"},
+			Spec:       corev1.PodSpec{NodeName: "gpu-node", ResourceClaims: []corev1.PodResourceClaim{{Name: "device", ResourceClaimName: new(name)}}},
+			Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		}
+	}
+	completed := pod("gpu")
+	completed.Status.Phase = corev1.PodSucceeded
+	terminating := *completed.DeepCopy()
+	now := metav1.Now()
+	terminating.DeletionTimestamp = &now
+	template := pod("gpu")
+	template.Spec.ResourceClaims[0].ResourceClaimName = nil
+	template.Spec.ResourceClaims[0].ResourceClaimTemplateName = new("template")
+	template.Status.ResourceClaimStatuses = []corev1.PodResourceClaimStatus{{Name: "device", ResourceClaimName: new("gpu")}}
+
+	for name, tc := range map[string]struct {
+		pages       [][]corev1.Pod
+		listErrorAt int
+		claimError  bool
+		blocked     bool
+		lists, gets int
+	}{
+		"stop before remaining pods and pages":   {pages: [][]corev1.Pod{{pod("gpu"), pod("missing")}, {pod("missing")}}, blocked: true, lists: 1, gets: 1},
+		"GPU claim on later page":                {pages: [][]corev1.Pod{{pod("other")}, {pod("gpu")}}, blocked: true, lists: 2, gets: 2},
+		"scan all pages before allowing removal": {pages: [][]corev1.Pod{{pod("other")}, {}}, lists: 2, gets: 1},
+		"missing claim blocks removal":           {pages: [][]corev1.Pod{{pod("missing")}}, blocked: true, lists: 1, gets: 1},
+		"claim read failure blocks removal":      {pages: [][]corev1.Pod{{pod("gpu")}}, claimError: true, blocked: true, lists: 1, gets: 1},
+		"initial list failure blocks removal":    {pages: [][]corev1.Pod{{}}, listErrorAt: 1, blocked: true, lists: 1},
+		"expired continuation blocks removal":    {pages: [][]corev1.Pod{{}, {}}, listErrorAt: 2, blocked: true, lists: 2},
+		"unallocated claim allows removal":       {pages: [][]corev1.Pod{{pod("unallocated")}}, lists: 1, gets: 1},
+		"completed pod needs no claim lookup":    {pages: [][]corev1.Pod{{completed}}, lists: 1},
+		"terminating terminal pod still blocks":  {pages: [][]corev1.Pod{{terminating}}, blocked: true, lists: 1, gets: 1},
+		"generated claim name is resolved":       {pages: [][]corev1.Pod{{template}}, blocked: true, lists: 1, gets: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lists, gets := 0, 0
+			reader := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(claim.DeepCopy(), otherClaim.DeepCopy(), unallocatedClaim.DeepCopy()).
+				WithInterceptorFuncs(interceptor.Funcs{
+					List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						options := (&client.ListOptions{}).ApplyOptions(opts)
+						require.Empty(t, options.Namespace, "application namespaces must be included")
+						require.NotNil(t, options.FieldSelector)
+						assert.Equal(t, "spec.nodeName=gpu-node", options.FieldSelector.String())
+						assert.EqualValues(t, 100, options.Limit)
+						expectedToken := ""
+						if lists > 0 {
+							expectedToken = "next-page"
+						}
+						assert.Equal(t, expectedToken, options.Continue)
+						lists++
+						if lists == tc.listErrorAt {
+							return apierrors.NewResourceExpired("list snapshot expired")
+						}
+						require.LessOrEqual(t, lists, len(tc.pages), "unexpected extra page request")
+						pods := list.(*corev1.PodList)
+						pods.Items = tc.pages[lists-1]
+						if lists < len(tc.pages) {
+							pods.Continue = "next-page"
+						}
+						return nil
+					},
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						gets++
+						assert.Equal(t, "application", key.Namespace)
+						if tc.claimError {
+							return errors.New("claim read unavailable")
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				}).Build()
+			nlc := &nodeLabelingController{client: fake.NewClientBuilder().Build(), apiReader: reader, logger: logr.Discard()}
+			assert.Equal(t, tc.blocked, nlc.nodeHasDRAClaimPods(t.Context(), "gpu-node"))
+			assert.Equal(t, tc.lists, lists)
+			assert.Equal(t, tc.gets, gets)
+		})
+	}
+}
+
+func TestDRAPluginRemovalRetriesUntilDrained(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	pending := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: mergeLabels(
+		map[string]string{gpuPCILabelKey: "true", commonGPULabelKey: commonGPULabelValue}, gpuClusterStateLabels,
+	)}}
+	stable := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "stable", Labels: map[string]string{
+		gpuPCILabelKey: "true", commonGPULabelKey: commonGPULabelValue,
+	}}}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pending, stable,
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cpu"}},
+		&gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}},
+	).Build()
+	blocked, readError := true, true
+	lists := 0
+	reader := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
+		List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			lists++
+			options := (&client.ListOptions{}).ApplyOptions(opts)
+			require.NotNil(t, options.FieldSelector)
+			assert.Equal(t, "spec.nodeName=pending", options.FieldSelector.String(), "only nodes awaiting plugin removal need reads")
+			if readError {
+				return errors.New("API unavailable")
+			}
+			if blocked {
+				list.(*corev1.PodList).Items = []corev1.Pod{{Spec: corev1.PodSpec{
+					ResourceClaims: []corev1.PodResourceClaim{{ResourceClaimName: new("gpu")}},
+				}}}
+			}
+			return nil
+		},
+		Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+			obj.(*resourcev1.ResourceClaim).Status.Allocation = &resourcev1.AllocationResult{
+				Devices: resourcev1.DeviceAllocationResult{Results: []resourcev1.DeviceRequestAllocationResult{{Driver: NVIDIAGPUDRADriverName}}},
+			}
+			return nil
+		},
+	}).Build()
+	r := &NodeLabelingReconciler{Client: c, apiReader: reader, Scheme: scheme, Log: logr.Discard()}
+	for _, phase := range []string{"API failure", "claim holder", "drained", "already removed"} {
+		t.Run(phase, func(t *testing.T) {
+			result, err := r.Reconcile(t.Context(), reconcile.Request{})
+			require.NoError(t, err)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(pending), pending))
+			if blocked {
+				assert.Equal(t, 30*time.Second, result.RequeueAfter)
+				assert.Equal(t, "true", pending.Labels[draDriverDeployLabelKey])
+			} else {
+				assert.Zero(t, result.RequeueAfter)
+				assert.NotContains(t, pending.Labels, draDriverDeployLabelKey)
+			}
+		})
+		if !readError {
+			blocked = false
+		}
+		readError = false
+	}
+	assert.Equal(t, 3, lists, "reads stop after the label is removed")
 }
 
 func TestModeSweepDeleteSets(t *testing.T) {

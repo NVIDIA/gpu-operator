@@ -45,10 +45,6 @@ import (
 
 const nodeLabelingControllerSingletonName = "cluster"
 
-// podNodeNameIndexKey indexes pods by spec.nodeName so per-node pod lookups don't
-// scan every pod in the cluster.
-const podNodeNameIndexKey = "spec.nodeName"
-
 // NodeLabelingReconciler applies GPU-Operator related labels and annotations to Kubernetes nodes.
 // All node label write operations for the GPU Operator are centralized here.
 type NodeLabelingReconciler struct {
@@ -56,6 +52,7 @@ type NodeLabelingReconciler struct {
 	Scheme    *runtime.Scheme
 	Namespace string
 	Log       logr.Logger
+	apiReader client.Reader
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
@@ -68,6 +65,7 @@ type nodeLabelingController struct {
 	clusterPolicy *gpuv1.ClusterPolicy
 	gpuCluster    *nvidiav1alpha1.GPUCluster
 	logger        logr.Logger
+	apiReader     client.Reader
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
 	// at least one node because pods holding gpu.nvidia.com claims are still present; the
@@ -150,6 +148,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		clusterPolicy: clusterPolicy,
 		gpuCluster:    gpuCluster,
 		logger:        r.Log,
+		apiReader:     r.apiReader,
 	}
 
 	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
@@ -189,8 +188,8 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if nlc.draPluginRemovalDeferred {
-		// Pod deletion events also retrigger reconciliation; the requeue is a backstop so
-		// the kubelet-plugin label falls off even if an event is missed.
+		// Application Pod deletions do not trigger this controller, so retry until
+		// claim holders are gone or previously failed API reads succeed.
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	return reconcile.Result{}, nil
@@ -398,22 +397,39 @@ func PodHasNVIDIAGPUClaim(ctx context.Context, c client.Reader, pod *corev1.Pod,
 // phase. Admin-access claims count too: the operands holding them wedge Terminating
 // if the plugin unregisters before their claims are unprepared.
 func (nlc *nodeLabelingController) nodeHasDRAClaimPods(ctx context.Context, nodeName string) bool {
-	podList := &corev1.PodList{}
-	if err := nlc.client.List(ctx, podList, client.MatchingFields{podNodeNameIndexKey: nodeName}); err != nil {
-		nlc.logger.Error(err, "failed to list pods; assuming the node still has GPU claim pods", "NodeName", nodeName)
+	if nlc.apiReader == nil {
+		nlc.logger.Info("DRA workload reader unavailable; deferring plugin removal", "NodeName", nodeName)
 		return true
 	}
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		terminal := pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
-		if terminal && pod.DeletionTimestamp == nil {
-			continue
-		}
-		if PodHasNVIDIAGPUClaim(ctx, nlc.client, pod, true) {
+	// The manager cache only sees operand namespaces. Read application workloads
+	// directly during teardown, limiting each page to avoid retaining a full node's
+	// Pods and stopping as soon as one claim holder requires the plugin.
+	const pageSize = 100
+	continueToken := ""
+	for {
+		podList := &corev1.PodList{}
+		if err := nlc.apiReader.List(ctx, podList,
+			client.MatchingFields{"spec.nodeName": nodeName},
+			client.Limit(pageSize), client.Continue(continueToken),
+		); err != nil {
+			nlc.logger.Error(err, "failed to list pods; assuming the node still has GPU claim pods", "NodeName", nodeName)
 			return true
 		}
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			terminal := pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
+			if terminal && pod.DeletionTimestamp == nil {
+				continue
+			}
+			if PodHasNVIDIAGPUClaim(ctx, nlc.apiReader, pod, true) {
+				return true
+			}
+		}
+		continueToken = podList.Continue
+		if continueToken == "" {
+			return false
+		}
 	}
-	return false
 }
 
 // removeLabelsFromNode deletes the given label keys from the node's labels map,
@@ -618,16 +634,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: nodeLabelingControllerSingletonName}}}
 	}
 
-	// Index pods by node name so nodeHasDRAClaimPods lists only the node's pods.
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, podNodeNameIndexKey, func(rawObj client.Object) []string {
-		pod := rawObj.(*corev1.Pod)
-		if pod.Spec.NodeName == "" {
-			return nil
-		}
-		return []string{pod.Spec.NodeName}
-	}); err != nil {
-		return fmt.Errorf("failed to add pod node-name index: %w", err)
-	}
+	r.apiReader = mgr.GetAPIReader()
 
 	c, err := controller.New("node-labeling-controller", mgr, controller.Options{
 		Reconciler:              r,
