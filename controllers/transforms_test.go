@@ -5078,3 +5078,219 @@ func TestHashDriverInstallConfigZeroFieldInvariant(t *testing.T) {
 	assert.NotEqual(t, originalDigest, changedDigest,
 		"a non-zero new field should change the digest")
 }
+
+// nodeLocalRepoVolumes returns the node-local package repository hostPath volumes
+// present in the given pod spec, keyed by host path.
+func nodeLocalRepoVolumes(t *testing.T, volumes []corev1.Volume) map[string]corev1.Volume {
+	t.Helper()
+
+	actual := map[string]corev1.Volume{}
+	for _, volume := range volumes {
+		if !strings.HasPrefix(volume.Name, "node-local-repo-") {
+			continue
+		}
+		require.NotNil(t, volume.HostPath, "volume %s must be a hostPath volume", volume.Name)
+		actual[volume.HostPath.Path] = volume
+	}
+	return actual
+}
+
+// nodeLocalRepoVolumeMounts returns the node-local package repository volume mounts
+// present on a container, keyed by mount path.
+func nodeLocalRepoVolumeMounts(volumeMounts []corev1.VolumeMount) map[string]corev1.VolumeMount {
+	actual := map[string]corev1.VolumeMount{}
+	for _, volumeMount := range volumeMounts {
+		if !strings.HasPrefix(volumeMount.Name, "node-local-repo-") {
+			continue
+		}
+		actual[volumeMount.MountPath] = volumeMount
+	}
+	return actual
+}
+
+// transformDriverForNodeLocalPaths runs TransformDriver against a minimal ClusterPolicy
+// configured with the given repo config settings, and returns the resulting DaemonSet.
+func transformDriverForNodeLocalPaths(t *testing.T, c client.Client, configMapName string,
+	nodeLocalPaths []string, usePrecompiled bool) (Daemonset, error) {
+	t.Helper()
+
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Repository:      "nvcr.io/nvidia",
+			Image:           "driver",
+			ImagePullPolicy: "IfNotPresent",
+			Version:         "580.126.16",
+			Manager: gpuv1.DriverManagerSpec{
+				Repository:      "nvcr.io/nvidia/cloud-native",
+				Image:           "k8s-driver-manager",
+				ImagePullPolicy: "IfNotPresent",
+				Version:         "v0.8.0",
+			},
+		},
+	}
+	if usePrecompiled {
+		cpSpec.Driver.UsePrecompiled = new(true)
+		// the precompiled path makes the DaemonSet kernel-version specific by writing
+		// into these maps, which the minimal fixture above leaves nil
+		ds.Labels = map[string]string{}
+		ds.Spec.Template.Labels = map[string]string{}
+		ds.Spec.Template.Spec.NodeSelector = map[string]string{}
+	}
+	if configMapName != "" || len(nodeLocalPaths) > 0 {
+		cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{
+			ConfigMapName:  configMapName,
+			NodeLocalPaths: nodeLocalPaths,
+		}
+	}
+
+	err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
+		client:            c,
+		runtime:           gpuv1.Containerd,
+		operatorNamespace: "test-ns",
+		logger:            ctrl.Log.WithName("test"),
+		gpuNodeOSRelease:  "ubuntu",
+		gpuNodeOSTag:      "ubuntu24.04",
+	})
+	return ds, err
+}
+
+func newNodeLocalRepoTestClient() client.Client {
+	return fake.NewFakeClient(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"local-packages.sources": "Types: deb",
+		},
+	})
+}
+
+func TestTransformDriverRepoConfigNodeLocalPaths(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	ds, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config",
+		[]string{"/opt/local-packages"}, false)
+	require.NoError(t, err)
+
+	volumes := nodeLocalRepoVolumes(t, ds.Spec.Template.Spec.Volumes)
+	require.Len(t, volumes, 1)
+	volume := volumes["/opt/local-packages"]
+	require.Equal(t, "node-local-repo-0", volume.Name)
+	require.NotNil(t, volume.HostPath.Type)
+	require.Equal(t, corev1.HostPathDirectory, *volume.HostPath.Type)
+
+	driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.NotNil(t, driverContainer)
+	mounts := nodeLocalRepoVolumeMounts(driverContainer.VolumeMounts)
+	require.Len(t, mounts, 1)
+	mount := mounts["/opt/local-packages"]
+	require.Equal(t, "node-local-repo-0", mount.Name)
+	require.True(t, mount.ReadOnly)
+
+	// the repo ConfigMap mount must still be applied alongside the host path
+	require.Contains(t, nodeLocalRepoTestConfigMapVolumeNames(ds.Spec.Template.Spec.Volumes), "test-repo-config")
+}
+
+func nodeLocalRepoTestConfigMapVolumeNames(volumes []corev1.Volume) []string {
+	var names []string
+	for _, volume := range volumes {
+		if volume.ConfigMap != nil {
+			names = append(names, volume.Name)
+		}
+	}
+	return names
+}
+
+func TestTransformDriverRepoConfigMultipleNodeLocalPathsSorted(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	ds, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config",
+		[]string{"/srv/pkgs", "/opt/local-packages"}, false)
+	require.NoError(t, err)
+
+	volumes := nodeLocalRepoVolumes(t, ds.Spec.Template.Spec.Volumes)
+	require.Len(t, volumes, 2)
+	require.Equal(t, "node-local-repo-0", volumes["/opt/local-packages"].Name)
+	require.Equal(t, "node-local-repo-1", volumes["/srv/pkgs"].Name)
+}
+
+func TestTransformDriverRepoConfigNodeLocalPathsWithoutConfigMapName(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	_, err := transformDriverForNodeLocalPaths(t, mockClient, "", []string{"/opt/local-packages"}, false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "configMapName is empty")
+}
+
+func TestTransformDriverRepoConfigNodeLocalPathsInvalidPath(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	_, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config",
+		[]string{"relative/path"}, false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not an absolute path")
+}
+
+func TestTransformDriverRepoConfigNodeLocalPathsIgnoredForPrecompiled(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	ds, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config",
+		[]string{"/opt/local-packages"}, true)
+	require.NoError(t, err)
+	require.Empty(t, nodeLocalRepoVolumes(t, ds.Spec.Template.Spec.Volumes))
+}
+
+// TestTransformDriverNoNodeLocalPaths is the regression guard for the feature being
+// opt-in: with the field unset, nothing named node-local-repo-* may appear.
+func TestTransformDriverNoNodeLocalPaths(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	ds, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config", nil, false)
+	require.NoError(t, err)
+	require.Empty(t, nodeLocalRepoVolumes(t, ds.Spec.Template.Spec.Volumes))
+
+	driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.NotNil(t, driverContainer)
+	require.Empty(t, nodeLocalRepoVolumeMounts(driverContainer.VolumeMounts))
+}
+
+// TestTransformDriverNodeLocalPathsChangeDigest pins the behaviour that changing the
+// node-local repository paths rolls the driver pods.
+func TestTransformDriverNodeLocalPathsChangeDigest(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	digestFor := func(nodeLocalPaths []string) string {
+		ds, err := transformDriverForNodeLocalPaths(t, mockClient, "test-repo-config", nodeLocalPaths, false)
+		require.NoError(t, err)
+		driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+		require.NotNil(t, driverContainer)
+		for _, env := range driverContainer.Env {
+			if env.Name == driverconfig.DriverConfigDigestEnvName {
+				return env.Value
+			}
+		}
+		t.Fatalf("%s env var not set on the driver container", driverconfig.DriverConfigDigestEnvName)
+		return ""
+	}
+
+	withoutPaths := digestFor(nil)
+	withPath := digestFor([]string{"/opt/local-packages"})
+	withOtherPath := digestFor([]string{"/srv/pkgs"})
+
+	require.NotEqual(t, withoutPaths, withPath, "adding a node-local path must change the driver config digest")
+	require.NotEqual(t, withPath, withOtherPath, "changing a node-local path must change the driver config digest")
+}
+
+// TestTransformDriverEmptyNodeLocalPathsWithEmptyConfigMapName covers what a default helm
+// install now produces: repoConfig present with an empty configMapName and an empty (but
+// non-nil) nodeLocalPaths list. This must be a no-op, not an error.
+func TestTransformDriverEmptyNodeLocalPathsWithEmptyConfigMapName(t *testing.T) {
+	mockClient := newNodeLocalRepoTestClient()
+
+	ds, err := transformDriverForNodeLocalPaths(t, mockClient, "", []string{}, false)
+	require.NoError(t, err)
+	require.Empty(t, nodeLocalRepoVolumes(t, ds.Spec.Template.Spec.Volumes))
+}

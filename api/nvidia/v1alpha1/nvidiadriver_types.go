@@ -453,6 +453,30 @@ type DriverRepoConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
+
+	// NodeLocalPaths is an optional list of absolute directory paths on the host which hold a
+	// node-local package repository referenced by the repository configuration in Name (for
+	// example "URIs: file:///opt/local-packages"). Each path is bind-mounted read-only into
+	// the NVIDIA driver container at the same path, so that the package manager running
+	// inside the container can resolve file:// repository URIs.
+	//
+	// Each directory must exist on every node targeted by the driver DaemonSet; the driver
+	// pod will not start on a node where it is missing. Ignored when precompiled drivers are
+	// used, and rejected when Name is empty.
+	//
+	// Packages installed from a node-local repository are compiled into a kernel module which
+	// is loaded into the host kernel, so the repository is part of the node's trusted
+	// computing base. The directory and all of its parents should be owned by root and not be
+	// group or world writable, and the repository should be GPG signed where possible.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:validation:items:MinLength=2
+	// +kubebuilder:validation:items:MaxLength=4096
+	// +kubebuilder:validation:items:Pattern="^/"
+	// +listType=set
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Node-local package repository paths"
+	NodeLocalPaths []string `json:"nodeLocalPaths,omitempty"`
 }
 
 // DriverLicensingConfigSpec defines licensing server configuration for NVIDIA Driver container
@@ -770,6 +794,15 @@ func (d *NVIDIADriverSpec) IsRepoConfigEnabled() bool {
 		return false
 	}
 	return d.RepoConfig.Name != ""
+}
+
+// RepoConfigNodeLocalPaths returns the node-local package repository host paths configured
+// for the driver, or nil if none are set.
+func (d *NVIDIADriverSpec) RepoConfigNodeLocalPaths() []string {
+	if d.RepoConfig == nil {
+		return nil
+	}
+	return d.RepoConfig.NodeLocalPaths
 }
 
 // IsCertConfigEnabled returns true if additional certificate config is provided

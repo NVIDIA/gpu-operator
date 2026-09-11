@@ -212,6 +212,17 @@ driver:
   # Private mirror repository configuration
   repoConfig:
     configMapName: ""
+    # Optional. Absolute directory paths on the host that hold a node-local package
+    # repository referenced by the repository configuration above, e.g. a deb822 source
+    # with "URIs: file:///opt/local-packages". Each path is bind-mounted read-only into
+    # the driver container at the same path. The directory must exist on every GPU node.
+    # Only used when configMapName is set and precompiled drivers are not in use.
+    #
+    # Packages installed from a node-local repository end up in a kernel module loaded
+    # into the host kernel, so the repository is part of the node's trusted computing
+    # base: it should be GPG signed, and the directory and all of its parents should be
+    # owned by root and not group or world writable.
+    nodeLocalPaths: []
   # custom ssl key/certificate configuration
   certConfig:
     name: ""

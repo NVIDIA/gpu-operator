@@ -1137,6 +1137,30 @@ spec:
                     properties:
                       configMapName:
                         type: string
+                      nodeLocalPaths:
+                        description: |-
+                          NodeLocalPaths is an optional list of absolute directory paths on the host which hold a
+                          node-local package repository referenced by the repository configuration in
+                          ConfigMapName (for example "URIs: file:///opt/local-packages"). Each path is
+                          bind-mounted read-only into the NVIDIA driver container at the same path, so that the
+                          package manager running inside the container can resolve file:// repository URIs.
+
+                          Each directory must exist on every node targeted by the driver DaemonSet; the driver
+                          pod will not start on a node where it is missing. Ignored when precompiled drivers are
+                          used, and rejected when ConfigMapName is empty.
+
+                          Packages installed from a node-local repository are compiled into a kernel module which
+                          is loaded into the host kernel, so the repository is part of the node's trusted
+                          computing base. The directory and all of its parents should be owned by root and not be
+                          group or world writable, and the repository should be GPG signed where possible.
+                        items:
+                          maxLength: 4096
+                          minLength: 2
+                          pattern: ^/
+                          type: string
+                        maxItems: 8
+                        type: array
+                        x-kubernetes-list-type: set
                     type: object
                   repository:
                     description: NVIDIA Driver image repository
