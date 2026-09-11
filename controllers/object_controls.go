@@ -3722,6 +3722,22 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
+
+		// expose any node-local package repositories referenced by the repo configuration
+		// (e.g. "URIs: file:///opt/local-packages") to the driver container
+		if len(config.Driver.RepoConfig.NodeLocalPaths) > 0 {
+			repoVolumes, repoVolumeMounts, err := utils.NodeLocalRepoVolumes(config.Driver.RepoConfig.NodeLocalPaths)
+			if err != nil {
+				return fmt.Errorf("ERROR: invalid repoConfig.nodeLocalPaths: %w", err)
+			}
+			n.logger.Info("Mounting node-local package repositories into the driver container",
+				"nodeLocalPaths", config.Driver.RepoConfig.NodeLocalPaths)
+			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, repoVolumeMounts...)
+			podSpec.Volumes = append(podSpec.Volumes, repoVolumes...)
+		}
+	} else if config.Driver.RepoConfig != nil && len(config.Driver.RepoConfig.NodeLocalPaths) > 0 {
+		return fmt.Errorf("ERROR: driver.repoConfig.nodeLocalPaths is set but driver.repoConfig.configMapName is empty; " +
+			"nodeLocalPaths only applies when a custom repository configuration is provided")
 	}
 
 	// set any custom ssl key/certificate configuration provided
