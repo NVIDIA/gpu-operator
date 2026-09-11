@@ -168,10 +168,10 @@ func newGPUNodeOS(name, ownerDriverName, osID, osVersion string) *corev1.Node {
 	return &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: name,
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: ownerDriverName,
-			nfdOSReleaseIDLabelKey:        osID,
-			nfdOSVersionIDLabelKey:        osVersion,
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: ownerDriverName,
+			nfdOSReleaseIDLabelKey:                osID,
+			nfdOSVersionIDLabelKey:                osVersion,
 		},
 	}}
 }

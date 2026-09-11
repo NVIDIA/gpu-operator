@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/NVIDIA/gpu-operator/api/image"
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/image"
 )
 
 const (

@@ -79,12 +79,12 @@ func AssignOwners(ctx context.Context, c client.Client) (bool, error) {
 
 		originalNode := node.DeepCopy()
 		if desiredOwner == "" {
-			delete(node.Labels, consts.NVIDIADriverOwnerLabel)
+			delete(node.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
 		} else {
 			if node.Labels == nil {
 				node.Labels = map[string]string{}
 			}
-			node.Labels[consts.NVIDIADriverOwnerLabel] = desiredOwner
+			node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel] = desiredOwner
 		}
 
 		if err := c.Patch(ctx, node, client.MergeFrom(originalNode)); err != nil {
@@ -151,7 +151,7 @@ func desiredOwnerForNode(
 
 // ownerLabelNeedsUpdate reports whether the node owner label differs from the desired owner.
 func ownerLabelNeedsUpdate(nodeLabels map[string]string, desiredOwner string) bool {
-	currentOwner, hasOwnerLabel := nodeLabels[consts.NVIDIADriverOwnerLabel]
+	currentOwner, hasOwnerLabel := nodeLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel]
 	if desiredOwner == "" {
 		return hasOwnerLabel
 	}
