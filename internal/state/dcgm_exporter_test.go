@@ -661,3 +661,89 @@ func TestDCGMExporterServiceAccountAdoptionGuardWiring(t *testing.T) {
 	assert.Empty(t, found.OwnerReferences)
 	assert.NotContains(t, found.Labels, consts.StateLabel)
 }
+
+// TestDCGMExporterServiceAccountReleasedOnDelete covers the combined transition: one
+// update both hands the ServiceAccount to the user with create=false and disables the
+// exporter. The generic state cleanup deletes every object carrying the state label, and
+// the ServiceAccount still carries it from when the operator managed it, so ownership has
+// to be released before that cleanup rather than in postSync -- which the disabled path
+// never reaches.
+func TestDCGMExporterServiceAccountReleasedOnDelete(t *testing.T) {
+	ctx := context.Background()
+	const byoName = "byo-sa"
+
+	testCases := map[string]struct {
+		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
+		existing       func(cr *nvidiav1alpha1.GPUCluster) []client.Object
+		// released must survive with neither this CR's owner reference nor the state label.
+		released []string
+		// untouched must keep whatever the operator put on it, ready to be swept.
+		untouched []string
+	}{
+		"create=false releases the ServiceAccount the operator used to own": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
+				return []client.Object{ownedServiceAccount(cr, byoName)}
+			},
+			released: []string{byoName},
+		},
+		"create=false on a ServiceAccount the operator never owned changes nothing": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
+				return []client.Object{unownedServiceAccount(byoName)}
+			},
+			released: []string{byoName},
+		},
+		"a managed ServiceAccount is left for the state cleanup to remove": {
+			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
+				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
+			},
+			untouched: []string{dcgmExporterDefaultServiceAccountName},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
+			s := newTestDCGMExporterStateWithObjects(t, tc.existing(cr)...)
+
+			require.NoError(t, releaseDCGMExporterServiceAccountOnDelete(ctx, s, cr))
+
+			for _, saName := range tc.released {
+				sa, err := s.getServiceAccount(ctx, saName)
+				require.NoError(t, err, "a user-provided ServiceAccount must never be deleted")
+				assert.False(t, metav1.IsControlledBy(sa, cr),
+					"the owner reference has to go, otherwise the user's ServiceAccount is garbage-collected with the GPUCluster")
+				assert.NotContains(t, sa.Labels, consts.StateLabel,
+					"the state label has to go, otherwise the state cleanup sweeps the user's ServiceAccount")
+			}
+			for _, saName := range tc.untouched {
+				sa, err := s.getServiceAccount(ctx, saName)
+				require.NoError(t, err)
+				assert.True(t, metav1.IsControlledBy(sa, cr))
+				assert.Contains(t, sa.Labels, consts.StateLabel)
+			}
+		})
+	}
+}
+
+// TestDCGMExporterSyncReleasesBeforeDeletion drives Sync() on a disabled exporter and
+// checks the hook actually runs on that path.
+func TestDCGMExporterSyncReleasesBeforeDeletion(t *testing.T) {
+	ctx := context.Background()
+	const byoName = "byo-sa"
+
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+		Enabled:        new(false),
+		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+	})
+	s := newTestDCGMExporterStateWithObjects(t, ownedServiceAccount(cr, byoName))
+
+	_, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	sa, err := s.getServiceAccount(ctx, byoName)
+	require.NoError(t, err, "the user's ServiceAccount must survive disabling the exporter")
+	assert.False(t, metav1.IsControlledBy(sa, cr))
+	assert.NotContains(t, sa.Labels, consts.StateLabel)
+}

@@ -80,6 +80,7 @@ func NewStateDCGMExporter(
 		buildRenderData: buildDCGMExporterRenderData,
 		preSync:         checkDCGMExporterServiceAccount,
 		postSync:        reconcileDCGMExporterServiceAccountOwnership,
+		preDelete:       releaseDCGMExporterServiceAccountOnDelete,
 	}, nil
 }
 
@@ -256,6 +257,28 @@ func reconcileDCGMExporterServiceAccountOwnership(ctx context.Context, s *config
 		return nil
 	}
 	return s.deleteOwnedServiceAccount(ctx, cr, dcgmExporterDefaultServiceAccountName)
+}
+
+// releaseDCGMExporterServiceAccountOnDelete hands a user-provided ServiceAccount back
+// before the state is torn down. Disabling the exporter deletes every object carrying
+// this state's label, and a ServiceAccount taken over with create=false still carries it
+// from when the operator managed it -- without this, turning the exporter off would
+// delete an object the operator no longer owns.
+func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	spec := cr.Spec.DCGMExporter
+	// A nil spec never named a ServiceAccount, and a managed one is meant to go with the
+	// state; only the user-provided case has to survive.
+	if spec == nil || spec.IsServiceAccountCreateEnabled() {
+		return nil
+	}
+	sa, err := s.getServiceAccount(ctx, spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return s.releaseServiceAccount(ctx, cr, sa)
 }
 
 // releaseServiceAccount drops this GPUCluster's controller reference and the state label

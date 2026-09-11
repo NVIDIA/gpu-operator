@@ -2653,6 +2653,33 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 					"the owner reference has to go, otherwise the user's ServiceAccount is garbage-collected with the ClusterPolicy")
 			},
 		},
+		"disabling the exporter releases a ServiceAccount the operator used to own": {
+			// The combined transition: the user takes the ServiceAccount over with
+			// create=false and disables the exporter in one update. Returning Disabled
+			// without releasing would leave the ClusterPolicy owner reference on it, so
+			// deleting the ClusterPolicy later garbage-collects the user's object.
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{
+				Name: DCGMExporterDefaultServiceAccountName, Create: new(false),
+			},
+			exporterState: new(false),
+			ownedExisting: []string{DCGMExporterDefaultServiceAccountName},
+			expectedState: gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
+				require.True(t, ok, "a user-provided ServiceAccount must never be deleted")
+				require.False(t, metav1.IsControlledBy(sa, cp),
+					"the owner reference has to go, otherwise disabling the exporter hands the user's ServiceAccount to garbage collection")
+			},
+		},
+		"disabling the exporter tolerates a user-provided ServiceAccount that is gone": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			exporterState:  new(false),
+			expectedState:  gpuv1.Disabled,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				_, ok := getServiceAccount(t, k8s, byoName)
+				require.False(t, ok)
+			},
+		},
 		"disabling the exporter keeps a user-provided ServiceAccount": {
 			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
 			exporterState:  new(false),
@@ -2946,6 +2973,96 @@ func TestDCGMExporterRBACSubjects(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, gpuv1.Ready, state)
 			tc.assert(t, k8s)
+		})
+	}
+}
+
+// TestDCGMExporterCleanupSurvivesDisabledControls pins the convergence rule in step():
+// a control that reports Disabled is intentionally off, not unfinished, so it must not
+// hold back the reclaim of the superseded ServiceAccount. Under the default exporter
+// configuration the optional read-pods ClusterRole and ClusterRoleBinding always report
+// Disabled, which previously made the reclaim unreachable.
+func TestDCGMExporterCleanupSurvivesDisabledControls(t *testing.T) {
+	const (
+		testNamespace = "test-namespace"
+		customName    = "metrics-identity"
+	)
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, gpuv1.AddToScheme(testScheme))
+
+	testCases := map[string]struct {
+		// states each fake control reports, in order.
+		states        []gpuv1.State
+		expectedState gpuv1.State
+		expectDeleted bool
+	}{
+		"every control ready": {
+			states:        []gpuv1.State{gpuv1.Ready, gpuv1.Ready},
+			expectedState: gpuv1.Ready,
+			expectDeleted: true,
+		},
+		"an optional control reporting disabled still counts as converged": {
+			states:        []gpuv1.State{gpuv1.Ready, gpuv1.Disabled},
+			expectedState: gpuv1.Disabled,
+			expectDeleted: true,
+		},
+		"a control still coming up holds the reclaim back": {
+			states:        []gpuv1.State{gpuv1.Ready, gpuv1.NotReady},
+			expectedState: gpuv1.NotReady,
+			expectDeleted: false,
+		},
+		"disabled and not-ready together still hold it back": {
+			states:        []gpuv1.State{gpuv1.Disabled, gpuv1.NotReady},
+			expectedState: gpuv1.NotReady,
+			expectDeleted: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
+			cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: customName}
+
+			superseded := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName, Namespace: testNamespace},
+			}
+			require.NoError(t, controllerutil.SetControllerReference(cp, superseded, testScheme))
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(superseded).Build()
+
+			// controlFunc is itself the slice of control functions for one state.
+			controls := make(controlFunc, 0, len(tc.states))
+			for _, want := range tc.states {
+				controls = append(controls, func(ClusterPolicyController) (gpuv1.State, error) {
+					return want, nil
+				})
+			}
+
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         cp,
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				stateNames:        []string{"state-dcgm-exporter"},
+				controls:          []controlFunc{controls},
+				idx:               0,
+				logger:            ctrl.Log.WithName("test"),
+			}
+
+			state, err := n.step()
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedState, state)
+
+			found := &corev1.ServiceAccount{}
+			getErr := k8s.Get(context.Background(),
+				types.NamespacedName{Namespace: testNamespace, Name: DCGMExporterDefaultServiceAccountName}, found)
+			if tc.expectDeleted {
+				require.True(t, apierrors.IsNotFound(getErr), "the superseded default must be reclaimed once the state converged")
+			} else {
+				require.NoError(t, getErr, "nothing may be reclaimed while a control is still coming up")
+			}
 		})
 	}
 }

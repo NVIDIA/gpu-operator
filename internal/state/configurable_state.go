@@ -60,6 +60,12 @@ type configurableState struct {
 	// configuration superseded belongs here rather than in preSync: deleting them before
 	// the replacements exist would leave the operands referencing objects that are gone.
 	postSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
+
+	// preDelete runs before the generic cleanup removes every object carrying this
+	// state's label. An object the user took over still carries that label from when the
+	// operator managed it, so anything that must outlive the state has to be handed back
+	// here -- the cleanup itself only looks at the label, not at ownership.
+	preDelete func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 }
 
 var _ State = (*configurableState)(nil)
@@ -76,6 +82,11 @@ func (s *configurableState) Sync(ctx context.Context, customResource any, infoCa
 	}
 
 	if len(objs) == 0 {
+		if s.preDelete != nil {
+			if err := s.preDelete(ctx, s, cr); err != nil {
+				return SyncStateNotReady, err
+			}
+		}
 		return s.handleStateObjectsDeletion(ctx)
 	}
 

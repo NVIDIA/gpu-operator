@@ -436,6 +436,20 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
 		if unmanaged {
+			// The object may have been operator-managed before create was set to false.
+			// Disabling the exporter must still hand it back, or it keeps this
+			// ClusterPolicy's owner reference and is garbage-collected along with it.
+			found := &corev1.ServiceAccount{}
+			if err := n.client.Get(ctx,
+				types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found); err != nil {
+				if apierrors.IsNotFound(err) {
+					return gpuv1.Disabled, nil
+				}
+				return gpuv1.NotReady, err
+			}
+			if err := n.releaseServiceAccountOwnership(ctx, found, logger); err != nil {
+				return gpuv1.NotReady, err
+			}
 			return gpuv1.Disabled, nil
 		}
 		if isDCGMExporter {
