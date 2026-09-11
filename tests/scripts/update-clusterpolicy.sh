@@ -150,7 +150,7 @@ test_gpu_sharing() {
     kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-test -n $TEST_NAMESPACE
     if [ $? -ne 0 ]; then
         echo "cannot run parallel pods with GPU sharing enabled"
-        kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
+        kubectl get pods -l app=nvidia-plugin-test -n "${TEST_NAMESPACE}" --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" || true
         exit 1
     fi
 
@@ -243,14 +243,22 @@ test_custom_labels_override() {
   for operand in $operands
   do
     echo "checking $operand labels"
-    for pod in $(kubectl get pods -n "$TEST_NAMESPACE" -l app="$operand" --output=jsonpath={.items..metadata.name})
+    if ! operand_pods=$(kubectl get pods -n "$TEST_NAMESPACE" -l app="$operand" --output=jsonpath={.items..metadata.name} --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+      echo "cannot list $operand pods to verify the overridden labels"
+      exit 1
+    fi
+    if [ -z "$operand_pods" ]; then
+      echo "no $operand pods found when verifying the overridden labels"
+      exit 1
+    fi
+    for pod in $operand_pods
     do
-      cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
+      cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath='{.metadata.labels.cloudprovider}' --request-timeout="${KUBECTL_REQUEST_TIMEOUT}")
       if [ "$cp_label_value" != "aws" ]; then
           echo "Custom Label cloudprovider is incorrect when clusterpolicy labels are overridden - $pod"
           exit 1
       fi
-      platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
+      platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath='{.metadata.labels.platform}' --request-timeout="${KUBECTL_REQUEST_TIMEOUT}")
       if [ "$platform_label_value" != "kubernetes" ]; then
           echo "Custom Label platform is incorrect when clusterpolicy labels are overridden - $pod"
           exit 1
