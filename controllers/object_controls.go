@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -3749,8 +3750,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
 		pathToVolumeSource := MountPathToVolumeSource{}
-		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && osID == "rhel" {
-			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", osID)
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" &&
+			!config.Driver.RepoConfig.UseHostSubscription && osID == "rhel" {
+			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled and useHostSubscription is false", "OS", osID)
 		} else {
 			n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
 			pathToVolumeSource, err = n.getSubscriptionPathsToVolumeSources()
@@ -3766,8 +3768,10 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		sort.Strings(mountPaths)
 
+		removeSubscriptionMountsAndVolumes(driverContainer, podSpec)
+
 		for num, mountPath := range mountPaths {
-			volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+			volMountSubscriptionName := fmt.Sprintf("%s%d", consts.SubscriptionVolumeNamePrefix, num)
 
 			volMountSubscription := corev1.VolumeMount{
 				Name:      volMountSubscriptionName,
@@ -3793,6 +3797,16 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 	return nil
+}
+
+// removeSubscriptionMountsAndVolumes removes mounts and volumes managed by the subscription configuration.
+func removeSubscriptionMountsAndVolumes(driverContainer *corev1.Container, podSpec *corev1.PodSpec) {
+	driverContainer.VolumeMounts = slices.DeleteFunc(driverContainer.VolumeMounts, func(volumeMount corev1.VolumeMount) bool {
+		return strings.HasPrefix(volumeMount.Name, consts.SubscriptionVolumeNamePrefix)
+	})
+	podSpec.Volumes = slices.DeleteFunc(podSpec.Volumes, func(volume corev1.Volume) bool {
+		return strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix)
+	})
 }
 
 func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, secretName string,

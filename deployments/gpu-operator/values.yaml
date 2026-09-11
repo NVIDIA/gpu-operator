@@ -223,6 +223,8 @@ driver:
   # Private mirror repository configuration
   repoConfig:
     configMapName: ""
+    # Mount the host RHEL subscription configuration with this repo configuration.
+    useHostSubscription: false
   # custom ssl key/certificate configuration
   certConfig:
     name: ""
