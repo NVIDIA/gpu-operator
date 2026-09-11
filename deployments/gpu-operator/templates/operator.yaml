@@ -40,6 +40,11 @@ spec:
         command: ["gpu-operator"]
         args:
         - --leader-elect
+      {{- with .Values.operator.leaderElection }}
+        {{- if .renewDeadline }}
+        - --leader-lease-renew-deadline={{ .renewDeadline }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.operator.logging.develMode }}
         - --zap-devel
       {{- else }}
