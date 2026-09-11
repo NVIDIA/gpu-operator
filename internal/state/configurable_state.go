@@ -49,6 +49,23 @@ type configurableState struct {
 	// image path and DRA apiVersion. It receives ctx and the skeleton so operands that
 	// need the client or logging (e.g. dcgm-exporter's ServiceMonitor CRD probe) can use them.
 	buildRenderData func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error)
+
+	// preSync runs after the manifests render but before they are applied, for operands
+	// that depend on cluster state the templates cannot express. Returning an error marks
+	// the state NotReady, so it is the place to surface a misconfiguration instead of
+	// applying objects that cannot converge.
+	preSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
+
+	// postSync runs after the manifests converged. Reclaiming objects a previous
+	// configuration superseded belongs here rather than in preSync: deleting them before
+	// the replacements exist would leave the operands referencing objects that are gone.
+	postSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
+
+	// preDelete runs before the generic cleanup removes every object carrying this
+	// state's label. An object the user took over still carries that label from when the
+	// operator managed it, so anything that must outlive the state has to be handed back
+	// here -- the cleanup itself only looks at the label, not at ownership.
+	preDelete func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 }
 
 var _ State = (*configurableState)(nil)
@@ -65,10 +82,32 @@ func (s *configurableState) Sync(ctx context.Context, customResource any, infoCa
 	}
 
 	if len(objs) == 0 {
+		if s.preDelete != nil {
+			if err := s.preDelete(ctx, s, cr); err != nil {
+				return SyncStateNotReady, err
+			}
+		}
 		return s.handleStateObjectsDeletion(ctx)
 	}
 
-	return s.syncObjects(ctx, cr, objs)
+	if s.preSync != nil {
+		if err := s.preSync(ctx, s, cr); err != nil {
+			return SyncStateNotReady, err
+		}
+	}
+
+	syncState, err := s.syncObjects(ctx, cr, objs)
+	if err != nil || syncState != SyncStateReady {
+		return syncState, err
+	}
+
+	if s.postSync != nil {
+		if err := s.postSync(ctx, s, cr); err != nil {
+			return SyncStateNotReady, err
+		}
+	}
+
+	return syncState, nil
 }
 
 func (s *configurableState) GetWatchSources(mgr ctrlManager) map[string]SyncingSource {
