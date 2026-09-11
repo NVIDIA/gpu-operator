@@ -345,3 +345,66 @@ func TestCountNvidiaDevices(t *testing.T) {
 		})
 	}
 }
+
+func TestSkipComponentValidation(t *testing.T) {
+	testCases := []struct {
+		name          string
+		component     string
+		statusFile    string
+		errorExpected bool
+	}{
+		{name: "toolkit", component: "toolkit", statusFile: toolkitStatusFile},
+		{name: "cuda", component: "cuda", statusFile: cudaStatusFile},
+		{name: "plugin", component: "plugin", statusFile: pluginStatusFile},
+		{name: "driver is not supported", component: "driver", errorExpected: true},
+		{name: "invalid component", component: "foo", errorExpected: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			origOutputDir := outputDirFlag
+			origSkip := skipValidationFlag
+			outputDirFlag = tmpDir
+			skipValidationFlag = true
+			defer func() {
+				outputDirFlag = origOutputDir
+				skipValidationFlag = origSkip
+			}()
+
+			// Drive the real entry point so the test covers the SKIP_VALIDATION
+			// short-circuit in validateComponent, not just the helper.
+			err := validateComponent(context.Background(), tc.component)
+			if tc.errorExpected {
+				require.Error(t, err)
+				entries, readErr := os.ReadDir(tmpDir)
+				require.NoError(t, readErr)
+				require.Empty(t, entries, "no status file should be created")
+				return
+			}
+			require.NoError(t, err)
+			_, err = os.Stat(tmpDir + "/" + tc.statusFile)
+			require.NoError(t, err, "status file %s should be created", tc.statusFile)
+		})
+	}
+}
+
+func TestValidateComponentDoesNotSkipWhenFlagUnset(t *testing.T) {
+	tmpDir := t.TempDir()
+	origOutputDir := outputDirFlag
+	origSkip := skipValidationFlag
+	outputDirFlag = tmpDir
+	skipValidationFlag = false
+	defer func() {
+		outputDirFlag = origOutputDir
+		skipValidationFlag = origSkip
+	}()
+
+	// With the flag unset, an unknown component must reach the regular
+	// switch and fail there, and no readiness file may be written.
+	err := validateComponent(context.Background(), "foo")
+	require.Error(t, err)
+	entries, readErr := os.ReadDir(tmpDir)
+	require.NoError(t, readErr)
+	require.Empty(t, entries)
+}

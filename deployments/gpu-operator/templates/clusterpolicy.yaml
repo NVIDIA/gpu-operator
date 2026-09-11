@@ -87,6 +87,9 @@ spec:
       {{- else }}
       env: []
       {{- end }}
+      {{- if .Values.validator.plugin.skip }}
+      skip: {{ .Values.validator.plugin.skip }}
+      {{- end }}
     {{- end }}
     {{- if .Values.validator.cuda }}
     cuda:
@@ -94,6 +97,9 @@ spec:
       env: {{ toYaml .Values.validator.cuda.env | nindent 8 }}
       {{- else }}
       env: []
+      {{- end }}
+      {{- if .Values.validator.cuda.skip }}
+      skip: {{ .Values.validator.cuda.skip }}
       {{- end }}
     {{- end }}
     {{- if .Values.validator.driver }}
@@ -110,6 +116,9 @@ spec:
       env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
       {{- else }}
       env: []
+      {{- end }}
+      {{- if .Values.validator.toolkit.skip }}
+      skip: {{ .Values.validator.toolkit.skip }}
       {{- end }}
     {{- end }}
     {{- if .Values.validator.vfioPCI }}
