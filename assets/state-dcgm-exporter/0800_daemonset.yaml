@@ -29,7 +29,7 @@ spec:
       - name: toolkit-validation
         image: "FILLED BY THE OPERATOR"
         command: ['sh', '-c']
-        args: ["until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done"]
+        args: ["until [ -f /run/nvidia/validations/toolkit-ready ] && grep -q '^nvidia ' /proc/modules; do echo waiting for nvidia container stack and driver modules to be setup; sleep 5; done"]
         securityContext:
           privileged: true
         volumeMounts:
