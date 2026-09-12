@@ -1,3 +1,17 @@
+// Copyright the regclient contributors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package regclient is used to access OCI registries.
 package regclient
 
@@ -31,6 +45,7 @@ const (
 type RegClient struct {
 	hosts       map[string]*config.Host
 	hostDefault *config.Host
+	ocidirOpts  []ocidir.Opts
 	regOpts     []reg.Opts
 	schemes     map[string]scheme.API
 	slog        *slog.Logger
@@ -76,12 +91,14 @@ func New(opts ...Opt) *RegClient {
 		reg.WithSlog(rc.slog),
 		reg.WithUserAgent(rc.userAgent),
 	)
+	rc.ocidirOpts = append(
+		rc.ocidirOpts,
+		ocidir.WithSlog(rc.slog),
+	)
 
 	// setup scheme's
 	rc.schemes["reg"] = reg.New(rc.regOpts...)
-	rc.schemes["ocidir"] = ocidir.New(
-		ocidir.WithSlog(rc.slog),
-	)
+	rc.schemes["ocidir"] = ocidir.New(rc.ocidirOpts...)
 
 	rc.slog.Debug("regclient initialized",
 		slog.String("VCSRef", info.VCSRef),
@@ -170,6 +187,16 @@ func WithDockerCredsFile(fname string) Opt {
 			return
 		}
 		rc.hostLoad("docker-file", configHosts)
+	}
+}
+
+// WithOCIDirOpts passes through opts to the ocidir scheme.
+func WithOCIDirOpts(opts ...ocidir.Opts) Opt {
+	return func(rc *RegClient) {
+		if len(opts) == 0 {
+			return
+		}
+		rc.ocidirOpts = append(rc.ocidirOpts, opts...)
 	}
 }
 

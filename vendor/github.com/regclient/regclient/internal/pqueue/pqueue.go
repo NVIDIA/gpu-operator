@@ -1,3 +1,17 @@
+// Copyright the regclient contributors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package pqueue implements a priority queue.
 package pqueue
 
@@ -166,8 +180,8 @@ func AcquireMulti[T any](ctx context.Context, e T, qList ...*Queue[T]) (context.
 		}
 	}
 	// delete nil entries
-	for i := len(qList) - 1; i >= 0; i-- {
-		if qList[i] == nil {
+	for i, q := range slices.Backward(qList) {
+		if q == nil {
 			qList = slices.Delete(qList, i, i+1)
 		}
 	}
@@ -230,8 +244,8 @@ func AcquireMulti[T any](ctx context.Context, e T, qList ...*Queue[T]) (context.
 	cleanup := func() {
 		ctxVal.qList = nil
 		// dequeue in reverse order to minimize chance of another AcquireMulti being freed and immediately blocking on the next queue
-		for i := len(doneList) - 1; i >= 0; i-- {
-			doneList[i]()
+		for _, d := range slices.Backward(doneList) {
+			d()
 		}
 	}
 	return newCtx, cleanup, nil

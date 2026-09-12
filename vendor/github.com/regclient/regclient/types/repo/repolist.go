@@ -1,3 +1,17 @@
+// Copyright the regclient contributors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package repo handles a list of repositories from a registry
 package repo
 
@@ -51,7 +65,7 @@ func New(opts ...Opts) (*RepoList, error) {
 		host:      conf.host,
 	}
 
-	mt := strings.Split(conf.mt, ";")[0] // "application/json; charset=utf-8" -> "application/json"
+	mt, _, _ := strings.Cut(conf.mt, ";") // "application/json; charset=utf-8" -> "application/json"
 	switch mt {
 	case "application/json", "text/plain":
 		err := json.Unmarshal(conf.raw, &rl)
