@@ -1,0 +1,116 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Manually triggered, and it publishes nothing: the document is left as a
+# workflow artifact for a human to review and attach where it is wanted. A
+# release asset is public and permanent, so putting one there is a decision, not
+# a side effect of running this.
+#
+# Only tags carrying this tooling can be generated. Tags from before it was
+# added contain no generator and no go-licenses entry in tools/tools.go, so
+# there is nothing at that ref to run.
+
+name: Third-Party Notices Release Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Release tag or full 40-character commit SHA'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: linux-amd64-cpu4
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # A branch name would let a document that looks frozen describe a moving
+      # target, so only an immutable ref is accepted.
+      - name: Validate the requested ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          if [[ ! "${INPUT_REF}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*|[0-9a-f]{40})$ ]]; then
+            echo "::error::'${INPUT_REF}' is not a release tag or a full 40-character commit SHA."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # Every license link in the document is pinned to this commit, and it is
+      # recorded in the job summary, because a tag alone does not pin one.
+      - name: Resolve the ref to a commit
+        id: resolve
+        run: echo "resolved_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Get Golang version
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
+
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@a15ec16ff434e8ca3b0f76919f902080e66ebc14 # main
+
+      - name: Generate the release notices
+        id: generate
+        env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+          INPUT_REF: ${{ inputs.ref }}
+          RESOLVED_SHA: ${{ steps.resolve.outputs.resolved_sha }}
+          # Whichever repository this runs in, so a fork's artifact cites the
+          # fork, where the commit it names actually exists.
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          make install-tools
+          bash tools/generate-third-party-notices.sh release \
+            --version "${INPUT_REF}" \
+            --commit "${RESOLVED_SHA}" \
+            --repo-url "${REPO_URL}"
+          echo "artifact_name=gpu-operator-${INPUT_REF}-THIRD_PARTY_NOTICES.md" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload the notices artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.generate.outputs.artifact_name }}
+          path: ${{ steps.generate.outputs.artifact_name }}
+          if-no-files-found: error
+
+      - name: Summarise
+        env:
+          ARTIFACT_NAME: ${{ steps.generate.outputs.artifact_name }}
+          RESOLVED_SHA: ${{ steps.resolve.outputs.resolved_sha }}
+        run: |
+          {
+            echo "### Third-party notices generated"
+            echo
+            echo "- Artifact: \`${ARTIFACT_NAME}\`"
+            echo "- Commit: \`${RESOLVED_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
