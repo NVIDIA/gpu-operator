@@ -379,6 +379,12 @@ type GDRCopySpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// UsePrecompiled indicates if deployment of GDRCopy using pre-compiled modules is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GDRCopy deployment using pre-compiled modules"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UsePrecompiled *bool `json:"usePrecompiled,omitempty"`
+
 	// GDRCopy diver image repository
 	// +kubebuilder:validation:Optional
 	Repository string `json:"repository,omitempty"`
@@ -640,6 +646,14 @@ func (d *GPUDirectStorageSpec) GetImagePath(osVersion string) (string, error) {
 	return image, nil
 }
 
+// UsePrecompiledDrivers returns true if usePrecompiled option is enabled in spec
+func (d *GDRCopySpec) UsePrecompiledDrivers() bool {
+	if d.UsePrecompiled == nil {
+		return false
+	}
+	return *d.UsePrecompiled
+}
+
 // GetImagePath returns the gdrcopy driver image path given the information
 // provided in GDRCopySpec and the osVersion passed as an argument.
 // The driver image path will be in the following format unless the spec
@@ -660,6 +674,32 @@ func (d *GDRCopySpec) GetImagePath(osVersion string) (string, error) {
 	_, err = ref.New(image)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse driver image path: %w", err)
+	}
+
+	return image, nil
+}
+
+// GetPrecompiledImagePath returns the precompiled gdrcopy image path for a
+// given os version and kernel version. Precompiled gdrcopy images follow
+// the following format:
+// <repository>/<image>:<gdrcopy-ver>-<kernel-ver>-<os-ver>
+func (d *GDRCopySpec) GetPrecompiledImagePath(osVersion string, kernelVersion string) (string, error) {
+	image, err := image.ImagePath(d.Repository, d.Image, d.Version, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to get image path from crd: %w", err)
+	}
+
+	// specifying a digest in the spec is not supported when using precompiled
+	if strings.Contains(image, "sha256:") {
+		return "", fmt.Errorf("specifying image digest is not supported when precompiled is enabled")
+	}
+
+	// append '-<kernelVersion>-<osVersion>' to the gdrcopy tag
+	image = fmt.Sprintf("%s-%s-%s", image, kernelVersion, osVersion)
+
+	_, err = ref.New(image)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse gdrcopy image path: %w", err)
 	}
 
 	return image, nil
