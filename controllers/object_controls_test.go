@@ -1259,14 +1259,10 @@ func TestVGPUManagerAssets(t *testing.T) {
 	}
 }
 
-// TestVGPUDeviceManagerReadinessGate verifies that the vGPU Device Manager's
-// vgpu-manager-validation init container waits for the vGPU Manager readiness
-// status file written in BOTH deployment modes: vgpu-manager-ready (vGPU
-// Manager deployed as a container) and host-vgpu-manager-ready (vGPU Manager
-// driver pre-installed on the host). The validator writes only the host-
-// prefixed file when the driver is pre-installed, so a gate that waits for the
-// container-managed file alone hangs indefinitely when driver.enabled=false.
-func TestVGPUDeviceManagerReadinessGate(t *testing.T) {
+// TestVGPUDeviceManagerValidationInitContainer verifies that the vGPU Device
+// Manager validates the vGPU Manager directly instead of depending on a status
+// file produced by the sandbox validator.
+func TestVGPUDeviceManagerValidationInitContainer(t *testing.T) {
 	manifestPath := filepath.Join(cfg.root, vGPUDeviceManagerAssetsPath, "0600_daemonset.yaml")
 	buffer, err := os.ReadFile(manifestPath)
 	require.NoError(t, err, "unable to read vGPU Device Manager daemonset asset")
@@ -1286,16 +1282,63 @@ func TestVGPUDeviceManagerReadinessGate(t *testing.T) {
 	}
 	require.NotNil(t, initCtr, "vgpu-manager-validation init container not found")
 
-	args := strings.Join(initCtr.Args, " ")
-	require.Contains(t, args, "/run/nvidia/validations/vgpu-manager-ready",
-		"readiness gate must wait for the container-managed vGPU Manager status file")
-	require.Contains(t, args, "/run/nvidia/validations/host-vgpu-manager-ready",
-		"readiness gate must also wait for the host-installed vGPU Manager status file (driver.enabled=false)")
-	// The two files must be combined with OR: the gate must pass when EITHER
-	// status file exists, since the validator only ever writes one of them.
-	// Guard against an accidental AND, which would re-break both modes.
-	require.Contains(t, args, "|| [ -f /run/nvidia/validations/host-vgpu-manager-ready",
-		"the two status files must be combined with OR, not AND, so the gate passes when either is present")
+	require.Equal(t, []string{"sh", "-c"}, initCtr.Command)
+	require.Equal(t, []string{"nvidia-validator"}, initCtr.Args)
+
+	withWait := findEnvVarByName(initCtr.Env, "WITH_WAIT")
+	require.NotNil(t, withWait)
+	require.Equal(t, "true", withWait.Value)
+	component := findEnvVarByName(initCtr.Env, "COMPONENT")
+	require.NotNil(t, component)
+	require.Equal(t, "vgpu-manager", component.Value)
+
+	nodeName := findEnvVarByName(initCtr.Env, "NODE_NAME")
+	require.NotNil(t, nodeName)
+	require.NotNil(t, nodeName.ValueFrom)
+	require.NotNil(t, nodeName.ValueFrom.FieldRef)
+	require.Equal(t, "spec.nodeName", nodeName.ValueFrom.FieldRef.FieldPath)
+
+	require.NotNil(t, initCtr.SecurityContext)
+	require.NotNil(t, initCtr.SecurityContext.SELinuxOptions)
+	require.Equal(t, "s0", initCtr.SecurityContext.SELinuxOptions.Level)
+
+	hostRoot := findVolumeMountByName(initCtr.VolumeMounts, "host-root")
+	require.NotNil(t, hostRoot)
+	require.Equal(t, "/host", hostRoot.MountPath)
+	require.True(t, hostRoot.ReadOnly)
+	require.NotNil(t, hostRoot.MountPropagation)
+	require.Equal(t, corev1.MountPropagationHostToContainer, *hostRoot.MountPropagation)
+
+	driverInstallDir := findVolumeMountByName(initCtr.VolumeMounts, "driver-install-dir")
+	require.NotNil(t, driverInstallDir)
+	require.Equal(t, "/run/nvidia/driver", driverInstallDir.MountPath)
+	require.True(t, driverInstallDir.ReadOnly)
+	require.NotNil(t, driverInstallDir.MountPropagation)
+	require.Equal(t, corev1.MountPropagationHostToContainer, *driverInstallDir.MountPropagation)
+
+	validations := findVolumeMountByName(initCtr.VolumeMounts, "run-nvidia-validations")
+	require.NotNil(t, validations)
+	require.Equal(t, "/run/nvidia/validations", validations.MountPath)
+	require.NotNil(t, validations.MountPropagation)
+	require.Equal(t, corev1.MountPropagationBidirectional, *validations.MountPropagation)
+}
+
+func findEnvVarByName(envVars []corev1.EnvVar, name string) *corev1.EnvVar {
+	for i := range envVars {
+		if envVars[i].Name == name {
+			return &envVars[i]
+		}
+	}
+	return nil
+}
+
+func findVolumeMountByName(volumeMounts []corev1.VolumeMount, name string) *corev1.VolumeMount {
+	for i := range volumeMounts {
+		if volumeMounts[i].Name == name {
+			return &volumeMounts[i]
+		}
+	}
+	return nil
 }
 
 // getSandboxDevicePluginTestInput return a ClusterPolicy instance for a particular

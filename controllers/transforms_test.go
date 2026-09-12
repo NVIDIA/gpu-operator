@@ -2279,6 +2279,12 @@ func TestTransformCCManager(t *testing.T) {
 }
 
 func TestTransformVGPUDeviceManager(t *testing.T) {
+	originalDefaultWorkload := defaultGPUWorkloadConfig
+	defaultGPUWorkloadConfig = "container"
+	t.Cleanup(func() {
+		defaultGPUWorkloadConfig = originalDefaultWorkload
+	})
+
 	resources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -2301,9 +2307,38 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 		{
 			description: "transform vgpu device manager",
 			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name: "vgpu-manager-validation",
+					Env: []corev1.EnvVar{
+						{Name: "WITH_WAIT", Value: "true"},
+						{Name: "COMPONENT", Value: "vgpu-manager"},
+						{
+							Name: "NODE_NAME",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+							},
+						},
+					},
+				}).
 				WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"}).
 				WithContainer(corev1.Container{Name: "sidecar"}),
 			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{secret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					VGPUManager: gpuv1.VGPUManagerValidatorSpec{
+						Env: []gpuv1.EnvVar{
+							{Name: "foo", Value: "bar"},
+							{Name: "COMPONENT", Value: "cuda"},
+							{Name: "NODE_NAME", Value: "invalid-override"},
+							{Name: "WITH_WAIT", Value: "false"},
+						},
+					},
+				},
 				VGPUDeviceManager: gpuv1.VGPUDeviceManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
 					Image:            "vgpu-device-manager",
@@ -2320,6 +2355,27 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 				},
 			},
 			expectedDaemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "vgpu-manager-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "WITH_WAIT", Value: "true"},
+						{Name: "COMPONENT", Value: "vgpu-manager"},
+						{
+							Name: "NODE_NAME",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+							},
+						},
+						{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: "container"},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: resources,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
 				WithContainer(corev1.Container{
 					Name:            "nvidia-vgpu-device-manager",
 					Image:           "nvcr.io/nvidia/cloud-native/vgpu-device-manager:v1.0.0",

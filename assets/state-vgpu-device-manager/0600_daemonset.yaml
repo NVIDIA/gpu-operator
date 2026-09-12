@@ -28,14 +28,29 @@ spec:
         - name: vgpu-manager-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
-          # The validator writes vgpu-manager-ready when the vGPU Manager is
-          # deployed as a container, and host-vgpu-manager-ready when the vGPU
-          # Manager driver is pre-installed on the host. Wait for either so this
-          # operand starts in both cases.
-          args: ["until [ -f /run/nvidia/validations/vgpu-manager-ready ] || [ -f /run/nvidia/validations/host-vgpu-manager-ready ]; do echo waiting for NVIDIA vGPU Manager to be setup; sleep 5; done"]
+          args: ["nvidia-validator"]
+          env:
+          - name: WITH_WAIT
+            value: "true"
+          - name: COMPONENT
+            value: vgpu-manager
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           securityContext:
             privileged: true
+            seLinuxOptions:
+              level: "s0"
           volumeMounts:
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: driver-install-dir
+              mountPath: /run/nvidia/driver
+              readOnly: true
+              mountPropagation: HostToContainer
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
               mountPropagation: Bidirectional
