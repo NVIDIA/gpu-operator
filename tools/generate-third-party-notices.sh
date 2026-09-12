@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Writes THIRD_PARTY_NOTICES.md for the Go modules linked into ./cmd/... .
 
 set -euo pipefail
 
@@ -28,7 +26,19 @@ VENDOR_DIR="${VENDOR_DIR:-vendor}"
 # archives. Constant rather than derived from the git remote, so the document
 # is byte-identical wherever it is generated and the CI diff stays meaningful.
 REPO_URL="${REPO_URL:-https://github.com/NVIDIA/gpu-operator}"
-LINK_REF="${LINK_REF:-main}"
+
+# repo: the document tracked on main, describing a moving target. It states no
+# version and cites main, which the CI check keeps in step with this file.
+# release: the artifact for one commit. It states the version of every
+# dependency and cites that commit, which cannot move even if a tag is
+# re-pointed later.
+#
+# A subcommand rather than an environment variable: an inherited variable would
+# silently redirect the output file, leaving THIRD_PARTY_NOTICES.md untouched
+# while 'make check-third-party-notices' reported success.
+MODE=""
+RELEASE_VERSION=""
+LINK_REF="main"
 LICENSE_OVERRIDES="${LICENSE_OVERRIDES:-tools/license-overrides.tsv}"
 
 PACKAGES=("./cmd/...")
@@ -171,8 +181,8 @@ collapse_index() {
 
 # Rows carry module names from modules.txt rather than a URL: in vendor mode
 # go-licenses reports a URL into this repo at HEAD, which stops describing
-# released content once main moves. Versions are intentionally omitted because
-# the notices identify dependencies and their licenses, not an exact build.
+# released content once main moves. The version is carried in both modes and
+# only its rendering is gated, so one index serves both documents.
 # Longest prefix wins: a license may sit below the module root.
 annotate_modules() {
     awk -v modfile="${MODULES_TXT}" '
@@ -192,9 +202,11 @@ annotate_modules() {
                     }
                     mods[++m] = f[2]
                     disp[f[2]] = f[r]
+                    ver[f[2]] = f[r + 1]
                 } else {
                     mods[++m] = f[2]
                     disp[f[2]] = f[2]
+                    ver[f[2]] = f[3]
                 }
             }
             close(modfile)
@@ -210,7 +222,7 @@ annotate_modules() {
                 mp = mods[i]
                 if (($1 == mp || index($1, mp "/") == 1) && length(mp) > length(best)) best = mp
             }
-            print $0, (best == "" ? "unknown" : disp[best])
+            print $0, (best == "" ? "unknown" : disp[best]), (best == "" ? "unknown" : ver[best])
         }
     '
 }
@@ -224,6 +236,11 @@ build_indexes() {
 
     if cut -d, -f4 "${INDEX_FILE}" | LC_ALL=C grep -qx 'unknown'; then
         die "could not resolve module@version for some packages from ${MODULES_TXT}." \
+            "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
+    fi
+
+    if cut -d, -f5 "${INDEX_FILE}" | LC_ALL=C grep -qx 'unknown'; then
+        die "could not resolve a version for some packages from ${MODULES_TXT}." \
             "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
     fi
 
@@ -335,12 +352,18 @@ location_cell() {
 }
 
 emit_index_table() {
-    local index="$1" package _ license module
+    local index="$1" package _ license module version
     local license_identifier relative_license_dir governing_dir location_markup
-    printf '| Package | License | Location |\n'
-    printf '|---------|---------|----------|\n'
 
-    while IFS=, read -r package _ license module; do
+    if [[ "${MODE}" == release ]]; then
+        printf '| Package | Version | License | Location |\n'
+        printf '|---------|---------|---------|----------|\n'
+    else
+        printf '| Package | License | Location |\n'
+        printf '|---------|---------|----------|\n'
+    fi
+
+    while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
 
         license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
@@ -355,21 +378,27 @@ emit_index_table() {
             || die "could not resolve a license location for ${package} (${module})."
 
         # shellcheck disable=SC2016  # backticks are literal markdown here.
-        printf '| `%s` | %s | %s |\n' \
-            "${package}" "${license_identifier}" "${location_markup}"
+        if [[ "${MODE}" == release ]]; then
+            printf '| `%s` | %s | %s | %s |\n' \
+                "${package}" "${version}" "${license_identifier}" "${location_markup}"
+        else
+            printf '| `%s` | %s | %s |\n' \
+                "${package}" "${license_identifier}" "${location_markup}"
+        fi
     done < "${index}"
 }
 
 emit_sections() {
     local index="$1"
-    local package _ license module files license_file fence
+    local package _ license module version files license_file fence
     local license_identifier relative_license_dir governing_dir file_name license_path
 
-    while IFS=, read -r package _ license module; do
+    while IFS=, read -r package _ license module version; do
         [[ -z "${package}" ]] && continue
 
         license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
         printf '### %s\n\n' "${package}"
+        [[ "${MODE}" == release ]] && printf '* Version: %s\n' "${version}"
         printf '* License: %s\n\n' "${license_identifier}"
 
         relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
@@ -405,11 +434,14 @@ emit_sections() {
 compose_document() {
     log "Composing ${OUTPUT}..."
     {
+        printf '# Third-Party Notices\n\n'
+        if [[ "${MODE}" == release ]]; then
+            printf 'NVIDIA GPU Operator %s\n\n' "${RELEASE_VERSION}"
+        else
+            printf 'NVIDIA GPU Operator\n\n'
+        fi
+
         cat <<'EOF'
-# Third-Party Notices
-
-NVIDIA GPU Operator
-
 This file lists every third-party dependency that GPU Operator redistributes,
 along with the verbatim text of each dependency's license. In particular, this
 covers all **Go modules** statically linked into the commands under `cmd/`,
@@ -420,11 +452,28 @@ shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
 Go distribution itself. Modules used only by this repository's tests and build
 tooling are not redistributed and are not listed.
+EOF
+
+        if [[ "${MODE}" == release ]]; then
+            cat <<'EOF'
+
+Each dependency is listed with the version redistributed, and its Location
+links to that license file as vendored at the commit this release was built
+from, so every link serves the exact text reproduced below it. Where a
+dependency ships more than one license-bearing file, such as a PATENTS or
+NOTICE alongside its LICENSE, each one is listed and reproduced.
+EOF
+        else
+            cat <<'EOF'
 
 Each dependency's Location links to its license file as vendored in this
 repository, so every link serves the exact text reproduced below it. Where
 a dependency ships more than one license-bearing file, such as a PATENTS or
 NOTICE alongside its LICENSE, each one is listed and reproduced.
+EOF
+        fi
+
+        cat <<'EOF'
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
@@ -452,7 +501,72 @@ EOF
     mv "${OUT_TMP}" "${OUTPUT}"
 }
 
+usage() {
+    cat >&2 <<'EOF'
+Usage:
+  generate-third-party-notices.sh repo    [--output FILE]
+  generate-third-party-notices.sh release --version VERSION --commit SHA \
+                                          [--repo-url URL] [--output FILE]
+
+  repo     the document tracked on main: no versions, cites main
+  release  the artifact for one commit: versions, cites that commit
+EOF
+    exit 2
+}
+
+parse_arguments() {
+    local output_given=""
+
+    [[ $# -gt 0 ]] || usage
+    MODE="$1"
+    shift
+    case "${MODE}" in repo|release) ;; *) usage ;; esac
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --version|--commit|--repo-url)
+                [[ "${MODE}" == release || "$1" == --repo-url ]] \
+                    || die "$1 is only valid for the release subcommand."
+                [[ $# -ge 2 ]] || die "$1 needs a value."
+                case "$1" in
+                    --version)  RELEASE_VERSION="$2" ;;
+                    --commit)   LINK_REF="$2" ;;
+                    --repo-url) REPO_URL="$2" ;;
+                esac
+                shift 2
+                ;;
+            --output)
+                [[ $# -ge 2 ]] || die "--output needs a value."
+                OUTPUT="$2"
+                output_given=1
+                shift 2
+                ;;
+            *)
+                usage
+                ;;
+        esac
+    done
+
+    if [[ "${MODE}" == release ]]; then
+        [[ -n "${RELEASE_VERSION}" ]] || die "the release subcommand needs --version."
+        # The version reaches a filename and a Markdown table cell, so it must
+        # not be able to escape either.
+        [[ "${RELEASE_VERSION}" != */* ]] \
+            || die "invalid --version '${RELEASE_VERSION}': must not contain '/'."
+        # A tag can be re-pointed at another commit later; a commit cannot, so
+        # the links are pinned to the commit even when a tag names the release.
+        [[ "${LINK_REF}" =~ ^[0-9a-f]{40}$ ]] \
+            || die "the release subcommand needs --commit with a full 40-character SHA."
+        [[ -n "${output_given}" ]] \
+            || OUTPUT="gpu-operator-${RELEASE_VERSION}-THIRD_PARTY_NOTICES.md"
+    else
+        [[ "${LINK_REF}" == main ]] || die "--commit is only valid for the release subcommand."
+    fi
+}
+
 main() {
+    parse_arguments "$@"
+
     check_prerequisites
     verify_platform_matrix
     prepare_workspace
@@ -466,4 +580,8 @@ main() {
     log "Wrote ${OUTPUT} (${count} Go packages)"
 }
 
-main "$@"
+# Sourced by the tests, which reuse these functions without the side effects of
+# a full run.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
