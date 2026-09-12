@@ -18,9 +18,18 @@
 set -euo pipefail
 
 OUTPUT="${OUTPUT:-THIRD_PARTY_NOTICES.md}"
-LICENSES_DIR="${LICENSES_DIR:-.licenses-cache}"
 MULTI_ARCH_MK="${MULTI_ARCH_MK:-multi-arch.mk}"
 MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
+VENDOR_DIR="${VENDOR_DIR:-vendor}"
+
+# Licenses are cited where they live in this repository rather than in each
+# dependency's own upstream repo: the link then serves the exact bytes
+# reproduced below it, and cannot rot when an upstream retags, renames or
+# archives. Constant rather than derived from the git remote, so the document
+# is byte-identical wherever it is generated and the CI diff stays meaningful.
+REPO_URL="${REPO_URL:-https://github.com/NVIDIA/gpu-operator}"
+LINK_REF="${LINK_REF:-main}"
+LICENSE_OVERRIDES="${LICENSE_OVERRIDES:-tools/license-overrides.tsv}"
 
 PACKAGES=("./cmd/...")
 
@@ -71,11 +80,13 @@ check_prerequisites() {
         die "go-licenses is not installed." "Install it with 'make install-tools'."
     fi
 
-    local f
-    for f in "${MULTI_ARCH_MK}" "${MODULES_TXT}"; do
-        [[ -f "${f}" ]] \
-            || die "${f} not found — run 'make third-party-notices' from the repo root."
+    local required_file
+    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}"; do
+        [[ -f "${required_file}" ]] \
+            || die "${required_file} not found — run 'make third-party-notices' from the repo root."
     done
+    [[ -d "${VENDOR_DIR}" ]] \
+        || die "${VENDOR_DIR} not found — run 'go mod vendor' and re-run."
 
     LOCAL_MODULE=$(go list -m 2>/dev/null || true)
     [[ -n "${LOCAL_MODULE}" ]] || die "could not determine local module path via 'go list -m'."
@@ -103,20 +114,10 @@ verify_platform_matrix() {
 }
 
 prepare_workspace() {
-    # An override of '', '/', '.' or '..' would make the rm -rf below fatal.
-    case "${LICENSES_DIR}" in
-        ""|"/"|"."|"..")
-            die "refusing to 'rm -rf' unsafe LICENSES_DIR='${LICENSES_DIR}'."
-            ;;
-    esac
-    rm -rf "${LICENSES_DIR}"
-    mkdir -p "${LICENSES_DIR}"
-
     # Explicit templates: macOS mktemp ignores TMPDIR without one.
-    local t="${TMPDIR:-/tmp}/gpu-operator-notices"
-    SAVE_ROOT="$(mktemp -d "${t}.XXXXXX")"
-    COMBINED_CSV="$(mktemp "${t}-csv.XXXXXX")"
-    INDEX_FILE="$(mktemp "${t}-idx.XXXXXX")"
+    local workspace_template="${TMPDIR:-/tmp}/gpu-operator-notices"
+    COMBINED_CSV="$(mktemp "${workspace_template}-csv.XXXXXX")"
+    INDEX_FILE="$(mktemp "${workspace_template}-idx.XXXXXX")"
 
     # Composed beside its destination, not under TMPDIR, so the last step is a
     # same-filesystem rename(2) rather than a copy-then-unlink.
@@ -125,40 +126,28 @@ prepare_workspace() {
     mkdir -p "${out_dir}"
     OUT_TMP="$(mktemp "${out_dir}/.$(basename "${OUTPUT}").XXXXXX")"
 
-    trap 'rm -rf "${SAVE_ROOT}"; rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${OUT_TMP}"' EXIT
+    trap 'rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${OUT_TMP}"' EXIT
 }
 
+# Only the classification is collected. License text is read from vendor/, which
+# holds the bytes actually redistributed, and holds the secondary files such as
+# PATENTS and NOTICE that 'go-licenses save' leaves behind when it copies just
+# the one file it classified.
 collect_licenses() {
-    local platform goos goarch save_dir
+    local platform goos goarch
 
     for platform in "${PLATFORMS[@]}"; do
         goos="${platform%/*}"
         goarch="${platform#*/}"
         log "Collecting licenses for ${goos}/${goarch}..."
 
-        save_dir="${SAVE_ROOT}/${goos}_${goarch}"
-
         # Only the local module: --ignore matches plain string prefixes, not
         # path segments, so a stdlib list's bare "go" would silently drop
         # golang.org/x/*, google.golang.org/* and gopkg.in/*.
-        GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" save "${PACKAGES[@]}" \
-            --save_path="${save_dir}" \
-            --force \
-            --ignore="${LOCAL_MODULE}"
-
         GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" csv "${PACKAGES[@]}" \
             --ignore="${LOCAL_MODULE}" \
             >> "${COMBINED_CSV}"
-
-        merge_licenses "${save_dir}" "${LICENSES_DIR}"
     done
-}
-
-# Module cache files are 0444 and cp preserves that, so restore write
-# permission or the next platform's copy fails.
-merge_licenses() {
-    cp -R "$1/." "$2/"
-    chmod -R u+w "$2"
 }
 
 # One row per package, joining licenses rather than picking one: go-licenses
@@ -247,57 +236,163 @@ build_indexes() {
         die "go-licenses could not identify a license for some dependencies." \
             "Check the entries reported as Unknown before committing the file."
     fi
+
+    check_override_coverage "${INDEX_FILE}"
 }
 
-# License-bearing files, sorted. Filter by name: for restricted licenses
-# 'go-licenses save' copies the whole module source, which does not belong here.
+# A dropped dependency would otherwise leave its row in LICENSE_OVERRIDES
+# silently asserting a license for a package no longer shipped.
+check_override_coverage() {
+    local index="$1" override_package
+    while IFS=$'\t' read -r override_package _ _; do
+        case "${override_package}" in
+            ''|'#'*) continue ;;
+        esac
+        LC_ALL=C cut -d, -f1 "${index}" | LC_ALL=C grep -qFx "${override_package}" \
+            || die "${LICENSE_OVERRIDES} has a row for ${override_package}, which is no longer shipped." \
+                   "Remove the row rather than leaving a stale license claim in the file."
+    done < "${LICENSE_OVERRIDES}"
+}
+
+# License-bearing files in one directory, sorted. Filter by name: these are
+# vendored module directories, so most of what they hold is source code.
+#
+# Parameter expansion and [[ =~ ]] rather than basename and grep: this runs for
+# every file of every scanned directory, and the subshell-per-file version cost
+# ~5,700 process spawns and about 40 seconds per run.
 license_files_for() {
-    local dir="$1" f
+    local dir="$1" license_file file_name
     [[ -d "${dir}" ]] || return 0
-    while IFS= read -r -d '' f; do
-        if printf '%s' "$(basename "${f}")" \
-            | LC_ALL=C grep -qiE '^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$'; then
-            printf '%s\n' "${f}"
+    while IFS= read -r -d '' license_file; do
+        file_name="${license_file##*/}"
+        # Exclude source files: the name pattern below also matches source files
+        # that merely start with a license-shaped header, such as
+        # k8s.io/kube-openapi/pkg/validation/spec/license.go, a Go file opening
+        # "// Copyright 2015 go-swagger maintainers".
+        case "${file_name}" in
+            *.go|*.c|*.h|*.s|*.py|*.sh|*.java|*.ts|*.js) continue ;;
+        esac
+        shopt -s nocasematch
+        if [[ "${file_name}" =~ ^(licen[cs]e|notice|copying|copyright|authors|patents)([-._].*)?$ ]]; then
+            shopt -u nocasematch
+            printf '%s\n' "${license_file}"
+            continue
         fi
+        shopt -u nocasematch
     done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
-emit_index_table() {
-    local index="$1" pkg _ license module
-    printf '| Package | License | Dependency |\n'
-    printf '|---------|---------|------------|\n'
+# The directory holding the license that governs a package, as a path relative to
+# the module root. A module may license a subtree separately, so the nearest
+# license walking up from the package wins; only if none is found up to the
+# module root does the package have no license of its own.
+license_dir_within_module() {
+    local package="$1" module="$2" dir="$1" relative
+    while :; do
+        if [[ -n "$(license_files_for "${VENDOR_DIR}/${dir}")" ]]; then
+            relative="${dir#"${module}"}"
+            printf '%s' "${relative#/}"
+            return 0
+        fi
+        [[ "${dir}" == "${module}" ]] && return 1
+        [[ "${dir}" != */* ]] && return 1
+        dir="${dir%/*}"
+    done
+}
 
-    while IFS=, read -r pkg _ license module; do
-        [[ -z "${pkg}" ]] && continue
+# go-licenses reports one identifier per file and scores a file bundling two
+# licenses as whichever it rates highest, which understates the terms. A curated
+# row wins over that guess.
+license_identifier_for() {
+    local package="$1" reported="$2" override
+    override=$(LC_ALL=C awk -F'\t' -v key="${package}" '
+        /^#/ { next }
+        $1 == key { print $2; found = 1; exit }
+        END { exit !found }
+    ' "${LICENSE_OVERRIDES}") && printf '%s' "${override}" && return 0
+    printf '%s' "${reported}"
+}
+
+# The license file as served by this repository at LINK_REF.
+license_url() {
+    local module="$1" license_path="$2"
+    printf '%s/blob/%s/vendor/%s/%s' "${REPO_URL}" "${LINK_REF}" "${module}" "${license_path}"
+}
+
+# Markdown links to every license file a package ships, joined when there is
+# more than one.
+location_cell() {
+    local governing_dir="$1" module="$2" relative_license_dir="$3"
+    local cell="" license_file file_name license_path
+    while IFS= read -r license_file; do
+        [[ -z "${license_file}" ]] && continue
+        file_name="${license_file##*/}"
+        license_path="${relative_license_dir:+${relative_license_dir}/}${file_name}"
+        cell+="${cell:+ / }[${file_name}]($(license_url "${module}" "${license_path}"))"
+    done < <(license_files_for "${governing_dir}")
+    [[ -n "${cell}" ]] || return 1
+    printf '%s' "${cell}"
+}
+
+emit_index_table() {
+    local index="$1" package _ license module
+    local license_identifier relative_license_dir governing_dir location_markup
+    printf '| Package | License | Location |\n'
+    printf '|---------|---------|----------|\n'
+
+    while IFS=, read -r package _ license module; do
+        [[ -z "${package}" ]] && continue
+
+        license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
+        relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
+            || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
+                   "Run 'go mod vendor' and re-run."
+        governing_dir="${VENDOR_DIR}/${module}${relative_license_dir:+/${relative_license_dir}}"
+
+        # Assigned before it is printed, so a package with no resolvable license
+        # aborts the run rather than rendering an empty Location cell.
+        location_markup="$(location_cell "${governing_dir}" "${module}" "${relative_license_dir}")" \
+            || die "could not resolve a license location for ${package} (${module})."
+
         # shellcheck disable=SC2016  # backticks are literal markdown here.
-        printf '| `%s` | %s | `%s` |\n' "${pkg}" "${license:-Unknown}" "${module:-unknown}"
+        printf '| `%s` | %s | %s |\n' \
+            "${package}" "${license_identifier}" "${location_markup}"
     done < "${index}"
 }
 
 emit_sections() {
-    local index="$1" root="$2"
-    local pkg _ license module files lf fence
+    local index="$1"
+    local package _ license module files license_file fence
+    local license_identifier relative_license_dir governing_dir file_name license_path
 
-    while IFS=, read -r pkg _ license module; do
-        [[ -z "${pkg}" ]] && continue
+    while IFS=, read -r package _ license module; do
+        [[ -z "${package}" ]] && continue
 
-        printf '### %s\n\n' "${pkg}"
-        printf '* License: %s\n' "${license:-Unknown}"
-        printf '* Module: %s\n\n' "${module:-unknown}"
+        license_identifier="$(license_identifier_for "${package}" "${license:-Unknown}")"
+        printf '### %s\n\n' "${package}"
+        printf '* License: %s\n\n' "${license_identifier}"
+
+        relative_license_dir="$(license_dir_within_module "${package}" "${module}")" \
+            || die "no license file found for ${package} under ${VENDOR_DIR}/${module}." \
+                   "Run 'go mod vendor' and re-run."
+        governing_dir="${VENDOR_DIR}/${module}${relative_license_dir:+/${relative_license_dir}}"
 
         files=()
-        while IFS= read -r lf; do
-            [[ -n "${lf}" ]] && files+=("${lf}")
-        done < <(license_files_for "${root}/${pkg}")
+        while IFS= read -r license_file; do
+            [[ -n "${license_file}" ]] && files+=("${license_file}")
+        done < <(license_files_for "${governing_dir}")
 
         if (( ${#files[@]} == 0 )); then
             printf 'License text unavailable. See upstream source for the full license.\n'
         else
-            for lf in "${files[@]}"; do
-                fence="$(fence_for "${lf}")"
-                printf '#### %s\n\n' "$(basename "${lf}")"
+            for license_file in "${files[@]}"; do
+                file_name="${license_file##*/}"
+                license_path="${relative_license_dir:+${relative_license_dir}/}${file_name}"
+                fence="$(fence_for "${license_file}")"
+                printf '#### %s\n\n' "${file_name}"
+                printf '<%s>\n\n' "$(license_url "${module}" "${license_path}")"
                 printf '%stext\n' "${fence}"
-                cat "${lf}"
+                cat "${license_file}"
                 echo
                 printf '%s\n' "${fence}"
                 echo
@@ -323,7 +418,13 @@ resolved as the union across every released image platform. The `gpu-operator`,
 `gpu-operator` image. The `gpuop-cfg` command is a build-time helper that is not
 shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
-Go distribution itself.
+Go distribution itself. Modules used only by this repository's tests and build
+tooling are not redistributed and are not listed.
+
+Each dependency's Location links to its license file as vendored in this
+repository, so every link serves the exact text reproduced below it. Where
+a dependency ships more than one license-bearing file, such as a PATENTS or
+NOTICE alongside its LICENSE, each one is listed and reproduced.
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
@@ -343,7 +444,7 @@ EOF
 ## License Texts
 
 EOF
-        emit_sections "${INDEX_FILE}" "${LICENSES_DIR}"
+        emit_sections "${INDEX_FILE}"
     } > "${OUT_TMP}"
     # mktemp creates 0600, so fix the mode before the rename. mv, not cp: the
     # rename is atomic, so a failed run leaves the previous document intact.

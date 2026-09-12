@@ -10,7 +10,13 @@ resolved as the union across every released image platform. The `gpu-operator`,
 `gpu-operator` image. The `gpuop-cfg` command is a build-time helper that is not
 shipped; its dependencies are listed here as well rather than excluded. Go
 standard library packages are excluded; they are covered by the license of the
-Go distribution itself.
+Go distribution itself. Modules used only by this repository's tests and build
+tooling are not redistributed and are not listed.
+
+Each dependency's Location links to its license file as vendored in this
+repository, so every link serves the exact text reproduced below it. Where
+a dependency ships more than one license-bearing file, such as a PATENTS or
+NOTICE alongside its LICENSE, each one is listed and reproduced.
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
@@ -22,140 +28,141 @@ carry.
 
 ## Dependency Index
 
-| Package | License | Dependency |
-|---------|---------|------------|
-| `dario.cat/mergo` | BSD-3-Clause | `dario.cat/mergo` |
-| `github.com/MakeNowJust/heredoc` | MIT | `github.com/MakeNowJust/heredoc` |
-| `github.com/Masterminds/goutils` | Apache-2.0 | `github.com/Masterminds/goutils` |
-| `github.com/Masterminds/semver/v3` | MIT | `github.com/Masterminds/semver/v3` |
-| `github.com/Masterminds/sprig/v3` | MIT | `github.com/Masterminds/sprig/v3` |
-| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | `github.com/Mellanox/maintenance-operator/api` |
-| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | `github.com/NVIDIA/go-nvlib` |
-| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | `github.com/NVIDIA/k8s-kata-manager` |
-| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | `github.com/NVIDIA/k8s-operator-libs` |
-| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | `github.com/NVIDIA/nvidia-container-toolkit` |
-| `github.com/beorn7/perks/quantile` | MIT | `github.com/beorn7/perks` |
-| `github.com/blang/semver/v4` | MIT | `github.com/blang/semver/v4` |
-| `github.com/cespare/xxhash/v2` | MIT | `github.com/cespare/xxhash/v2` |
-| `github.com/chai2010/gettext-go` | BSD-3-Clause | `github.com/chai2010/gettext-go` |
-| `github.com/cyphar/filepath-securejoin` | BSD-3-Clause / MPL-2.0 | `github.com/cyphar/filepath-securejoin` |
-| `github.com/davecgh/go-spew/spew` | ISC | `github.com/davecgh/go-spew` |
-| `github.com/docker/libtrust` | Apache-2.0 | `github.com/docker/libtrust` |
-| `github.com/emicklei/go-restful/v3` | MIT | `github.com/emicklei/go-restful/v3` |
-| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | `github.com/evanphx/json-patch/v5` |
-| `github.com/exponent-io/jsonpath` | MIT | `github.com/exponent-io/jsonpath` |
-| `github.com/fsnotify/fsnotify` | BSD-3-Clause | `github.com/fsnotify/fsnotify` |
-| `github.com/fxamacker/cbor/v2` | MIT | `github.com/fxamacker/cbor/v2` |
-| `github.com/go-errors/errors` | MIT | `github.com/go-errors/errors` |
-| `github.com/go-logr/logr` | Apache-2.0 | `github.com/go-logr/logr` |
-| `github.com/go-logr/zapr` | Apache-2.0 | `github.com/go-logr/zapr` |
-| `github.com/go-openapi/jsonpointer` | Apache-2.0 | `github.com/go-openapi/jsonpointer` |
-| `github.com/go-openapi/jsonreference` | Apache-2.0 | `github.com/go-openapi/jsonreference` |
-| `github.com/go-openapi/swag` | Apache-2.0 | `github.com/go-openapi/swag` |
-| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | `github.com/go-openapi/swag/cmdutils` |
-| `github.com/go-openapi/swag/conv` | Apache-2.0 | `github.com/go-openapi/swag/conv` |
-| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | `github.com/go-openapi/swag/fileutils` |
-| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | `github.com/go-openapi/swag/jsonutils` |
-| `github.com/go-openapi/swag/loading` | Apache-2.0 | `github.com/go-openapi/swag/loading` |
-| `github.com/go-openapi/swag/mangling` | Apache-2.0 | `github.com/go-openapi/swag/mangling` |
-| `github.com/go-openapi/swag/netutils` | Apache-2.0 | `github.com/go-openapi/swag/netutils` |
-| `github.com/go-openapi/swag/pools` | Apache-2.0 | `github.com/go-openapi/swag/pools` |
-| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | `github.com/go-openapi/swag/stringutils` |
-| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | `github.com/go-openapi/swag/typeutils` |
-| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | `github.com/go-openapi/swag/yamlutils` |
-| `github.com/google/btree` | Apache-2.0 | `github.com/google/btree` |
-| `github.com/google/gnostic-models` | Apache-2.0 | `github.com/google/gnostic-models` |
-| `github.com/google/uuid` | BSD-3-Clause | `github.com/google/uuid` |
-| `github.com/huandu/xstrings` | MIT | `github.com/huandu/xstrings` |
-| `github.com/json-iterator/go` | MIT | `github.com/json-iterator/go` |
-| `github.com/klauspost/compress` | Apache-2.0 / BSD-3-Clause / MIT | `github.com/klauspost/compress` |
-| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | `github.com/klauspost/compress` |
-| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | `github.com/klauspost/compress` |
-| `github.com/liggitt/tabwriter` | BSD-3-Clause | `github.com/liggitt/tabwriter` |
-| `github.com/mitchellh/copystructure` | MIT | `github.com/mitchellh/copystructure` |
-| `github.com/mitchellh/go-wordwrap` | MIT | `github.com/mitchellh/go-wordwrap` |
-| `github.com/mitchellh/reflectwalk` | MIT | `github.com/mitchellh/reflectwalk` |
-| `github.com/moby/sys/devices` | Apache-2.0 | `github.com/moby/sys/devices` |
-| `github.com/moby/term` | Apache-2.0 | `github.com/moby/term` |
-| `github.com/modern-go/concurrent` | Apache-2.0 | `github.com/modern-go/concurrent` |
-| `github.com/modern-go/reflect2` | Apache-2.0 | `github.com/modern-go/reflect2` |
-| `github.com/monochromegane/go-gitignore` | MIT | `github.com/monochromegane/go-gitignore` |
-| `github.com/munnerz/goautoneg` | BSD-3-Clause | `github.com/munnerz/goautoneg` |
-| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | `github.com/opencontainers/cgroups` |
-| `github.com/opencontainers/go-digest` | Apache-2.0 | `github.com/opencontainers/go-digest` |
-| `github.com/openshift/api` | Apache-2.0 | `github.com/openshift/api` |
-| `github.com/openshift/client-go` | Apache-2.0 | `github.com/openshift/client-go` |
-| `github.com/operator-framework/api/pkg` | Apache-2.0 | `github.com/operator-framework/api` |
-| `github.com/peterbourgon/diskv` | MIT | `github.com/peterbourgon/diskv` |
-| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | `github.com/pmezard/go-difflib` |
-| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` |
-| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | `github.com/prometheus/client_golang` |
-| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | `github.com/prometheus/client_golang` |
-| `github.com/prometheus/client_model/go` | Apache-2.0 | `github.com/prometheus/client_model` |
-| `github.com/prometheus/common` | Apache-2.0 | `github.com/prometheus/common` |
-| `github.com/prometheus/procfs` | Apache-2.0 | `github.com/prometheus/procfs` |
-| `github.com/regclient/regclient` | Apache-2.0 | `github.com/regclient/regclient` |
-| `github.com/russross/blackfriday/v2` | BSD-2-Clause | `github.com/russross/blackfriday/v2` |
-| `github.com/shopspring/decimal` | MIT | `github.com/shopspring/decimal` |
-| `github.com/sirupsen/logrus` | MIT | `github.com/sirupsen/logrus` |
-| `github.com/spf13/cast` | MIT | `github.com/spf13/cast` |
-| `github.com/spf13/cobra` | Apache-2.0 | `github.com/spf13/cobra` |
-| `github.com/spf13/pflag` | BSD-3-Clause | `github.com/spf13/pflag` |
-| `github.com/stretchr/testify/assert/yaml` | MIT | `github.com/stretchr/testify` |
-| `github.com/ulikunitz/xz` | BSD-3-Clause | `github.com/ulikunitz/xz` |
-| `github.com/urfave/cli/v3` | MIT | `github.com/urfave/cli/v3` |
-| `github.com/x448/float16` | MIT | `github.com/x448/float16` |
-| `github.com/xlab/treeprint` | MIT | `github.com/xlab/treeprint` |
-| `go.uber.org/multierr` | MIT | `go.uber.org/multierr` |
-| `go.uber.org/zap` | MIT | `go.uber.org/zap` |
-| `go.yaml.in/yaml/v2` | Apache-2.0 | `go.yaml.in/yaml/v2` |
-| `go.yaml.in/yaml/v3` | MIT | `go.yaml.in/yaml/v3` |
-| `golang.org/x/crypto` | BSD-3-Clause | `golang.org/x/crypto` |
-| `golang.org/x/mod/semver` | BSD-3-Clause | `golang.org/x/mod` |
-| `golang.org/x/net` | BSD-3-Clause | `golang.org/x/net` |
-| `golang.org/x/oauth2` | BSD-3-Clause | `golang.org/x/oauth2` |
-| `golang.org/x/sync/errgroup` | BSD-3-Clause | `golang.org/x/sync` |
-| `golang.org/x/sys/unix` | BSD-3-Clause | `golang.org/x/sys` |
-| `golang.org/x/term` | BSD-3-Clause | `golang.org/x/term` |
-| `golang.org/x/text` | BSD-3-Clause | `golang.org/x/text` |
-| `golang.org/x/time/rate` | BSD-3-Clause | `golang.org/x/time` |
-| `gomodules.xyz/jsonpatch/v2` | Apache-2.0 | `gomodules.xyz/jsonpatch/v2` |
-| `google.golang.org/protobuf` | BSD-3-Clause | `google.golang.org/protobuf` |
-| `gopkg.in/evanphx/json-patch.v4` | BSD-3-Clause | `gopkg.in/evanphx/json-patch.v4` |
-| `gopkg.in/inf.v0` | BSD-3-Clause | `gopkg.in/inf.v0` |
-| `k8s.io/api` | Apache-2.0 | `k8s.io/api` |
-| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | `k8s.io/apiextensions-apiserver` |
-| `k8s.io/apimachinery/pkg` | Apache-2.0 | `k8s.io/apimachinery` |
-| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | `k8s.io/apimachinery` |
-| `k8s.io/cli-runtime/pkg` | Apache-2.0 | `k8s.io/cli-runtime` |
-| `k8s.io/client-go` | Apache-2.0 | `k8s.io/client-go` |
-| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | `k8s.io/client-go` |
-| `k8s.io/client-go/third_party/forked/httpcache` | MIT | `k8s.io/client-go` |
-| `k8s.io/component-base/version` | Apache-2.0 | `k8s.io/component-base` |
-| `k8s.io/klog/v2` | Apache-2.0 | `k8s.io/klog/v2` |
-| `k8s.io/kube-openapi/pkg` | Apache-2.0 | `k8s.io/kube-openapi` |
-| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | `k8s.io/kube-openapi` |
-| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | `k8s.io/kube-openapi` |
-| `k8s.io/kubectl/pkg` | Apache-2.0 | `k8s.io/kubectl` |
-| `k8s.io/utils` | Apache-2.0 | `k8s.io/utils` |
-| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | `k8s.io/utils` |
-| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | `k8s.io/utils` |
-| `sigs.k8s.io/controller-runtime` | Apache-2.0 | `sigs.k8s.io/controller-runtime` |
-| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | `sigs.k8s.io/json` |
-| `sigs.k8s.io/kustomize/api` | Apache-2.0 | `sigs.k8s.io/kustomize/api` |
-| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | `sigs.k8s.io/kustomize/kyaml` |
-| `sigs.k8s.io/randfill` | Apache-2.0 | `sigs.k8s.io/randfill` |
-| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | `sigs.k8s.io/structured-merge-diff/v6` |
-| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | `sigs.k8s.io/yaml` |
+| Package | License | Location |
+|---------|---------|----------|
+| `dario.cat/mergo` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/dario.cat/mergo/LICENSE) |
+| `github.com/MakeNowJust/heredoc` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/MakeNowJust/heredoc/LICENSE) |
+| `github.com/Masterminds/goutils` | Apache-2.0 | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/goutils/LICENSE.txt) |
+| `github.com/Masterminds/semver/v3` | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/semver/v3/LICENSE.txt) |
+| `github.com/Masterminds/sprig/v3` | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt) |
+| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE) |
+| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/go-nvlib/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/go-nvlib/NOTICE) |
+| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE) |
+| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE) |
+| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE) |
+| `github.com/beorn7/perks/quantile` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/beorn7/perks/LICENSE) |
+| `github.com/blang/semver/v4` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/blang/semver/v4/LICENSE) |
+| `github.com/cespare/xxhash/v2` | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cespare/xxhash/v2/LICENSE.txt) |
+| `github.com/chai2010/gettext-go` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/chai2010/gettext-go/LICENSE) |
+| `github.com/cyphar/filepath-securejoin` | BSD-3-Clause / MPL-2.0 | [COPYING.md](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/COPYING.md) / [LICENSE.BSD](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD) / [LICENSE.MPL-2.0](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0) |
+| `github.com/davecgh/go-spew/spew` | ISC | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/davecgh/go-spew/LICENSE) |
+| `github.com/docker/libtrust` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/docker/libtrust/LICENSE) |
+| `github.com/emicklei/go-restful/v3` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/emicklei/go-restful/v3/LICENSE) |
+| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/evanphx/json-patch/v5/LICENSE) |
+| `github.com/exponent-io/jsonpath` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/exponent-io/jsonpath/LICENSE) |
+| `github.com/fsnotify/fsnotify` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/fsnotify/fsnotify/LICENSE) |
+| `github.com/fxamacker/cbor/v2` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/fxamacker/cbor/v2/LICENSE) |
+| `github.com/go-errors/errors` | MIT | [LICENSE.MIT](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-errors/errors/LICENSE.MIT) |
+| `github.com/go-logr/logr` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-logr/logr/LICENSE) |
+| `github.com/go-logr/zapr` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-logr/zapr/LICENSE) |
+| `github.com/go-openapi/jsonpointer` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonpointer/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonpointer/NOTICE) |
+| `github.com/go-openapi/jsonreference` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonreference/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonreference/NOTICE) |
+| `github.com/go-openapi/swag` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/LICENSE) |
+| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/cmdutils/LICENSE) |
+| `github.com/go-openapi/swag/conv` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/conv/LICENSE) |
+| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/fileutils/LICENSE) |
+| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/jsonutils/LICENSE) |
+| `github.com/go-openapi/swag/loading` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/loading/LICENSE) |
+| `github.com/go-openapi/swag/mangling` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/mangling/LICENSE) |
+| `github.com/go-openapi/swag/netutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/netutils/LICENSE) |
+| `github.com/go-openapi/swag/pools` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/pools/LICENSE) |
+| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/stringutils/LICENSE) |
+| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/typeutils/LICENSE) |
+| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/yamlutils/LICENSE) |
+| `github.com/google/btree` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/btree/LICENSE) |
+| `github.com/google/gnostic-models` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/gnostic-models/LICENSE) |
+| `github.com/google/uuid` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/uuid/LICENSE) |
+| `github.com/huandu/xstrings` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/huandu/xstrings/LICENSE) |
+| `github.com/json-iterator/go` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/json-iterator/go/LICENSE) |
+| `github.com/klauspost/compress` | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/LICENSE) |
+| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/internal/snapref/LICENSE) |
+| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt) |
+| `github.com/liggitt/tabwriter` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/liggitt/tabwriter/LICENSE) |
+| `github.com/mitchellh/copystructure` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/copystructure/LICENSE) |
+| `github.com/mitchellh/go-wordwrap` | MIT | [LICENSE.md](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md) |
+| `github.com/mitchellh/reflectwalk` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/reflectwalk/LICENSE) |
+| `github.com/moby/sys/devices` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/moby/sys/devices/LICENSE) |
+| `github.com/moby/term` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/moby/term/LICENSE) |
+| `github.com/modern-go/concurrent` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/modern-go/concurrent/LICENSE) |
+| `github.com/modern-go/reflect2` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/modern-go/reflect2/LICENSE) |
+| `github.com/monochromegane/go-gitignore` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/monochromegane/go-gitignore/LICENSE) |
+| `github.com/munnerz/goautoneg` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/munnerz/goautoneg/LICENSE) |
+| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/cgroups/LICENSE) |
+| `github.com/opencontainers/go-digest` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/go-digest/LICENSE) / [LICENSE.docs](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/go-digest/LICENSE.docs) |
+| `github.com/openshift/api` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/openshift/api/LICENSE) |
+| `github.com/openshift/client-go` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/openshift/client-go/LICENSE) |
+| `github.com/operator-framework/api/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/operator-framework/api/LICENSE) |
+| `github.com/peterbourgon/diskv` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/peterbourgon/diskv/LICENSE) |
+| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/pmezard/go-difflib/LICENSE) |
+| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE) |
+| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE) |
+| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/NOTICE) |
+| `github.com/prometheus/client_model/go` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_model/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_model/NOTICE) |
+| `github.com/prometheus/common` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/common/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/common/NOTICE) |
+| `github.com/prometheus/procfs` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/procfs/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/procfs/NOTICE) |
+| `github.com/regclient/regclient` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/regclient/regclient/LICENSE) |
+| `github.com/russross/blackfriday/v2` | BSD-2-Clause | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/russross/blackfriday/v2/LICENSE.txt) |
+| `github.com/shopspring/decimal` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/shopspring/decimal/LICENSE) |
+| `github.com/sirupsen/logrus` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/sirupsen/logrus/LICENSE) |
+| `github.com/spf13/cast` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/cast/LICENSE) |
+| `github.com/spf13/cobra` | Apache-2.0 | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/cobra/LICENSE.txt) |
+| `github.com/spf13/pflag` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/pflag/LICENSE) |
+| `github.com/stretchr/testify/assert/yaml` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/stretchr/testify/LICENSE) |
+| `github.com/ulikunitz/xz` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/ulikunitz/xz/LICENSE) |
+| `github.com/urfave/cli/v3` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/urfave/cli/v3/LICENSE) |
+| `github.com/x448/float16` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/x448/float16/LICENSE) |
+| `github.com/xlab/treeprint` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/xlab/treeprint/LICENSE) |
+| `go.uber.org/multierr` | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.uber.org/multierr/LICENSE.txt) |
+| `go.uber.org/zap` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.uber.org/zap/LICENSE) |
+| `go.yaml.in/yaml/v2` | Apache-2.0 AND MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/LICENSE) / [LICENSE.libyaml](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/LICENSE.libyaml) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/NOTICE) |
+| `go.yaml.in/yaml/v3` | Apache-2.0 AND MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v3/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v3/NOTICE) |
+| `golang.org/x/crypto` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/crypto/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/crypto/PATENTS) |
+| `golang.org/x/mod/semver` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/mod/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/mod/PATENTS) |
+| `golang.org/x/net` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/net/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/net/PATENTS) |
+| `golang.org/x/oauth2` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/oauth2/LICENSE) |
+| `golang.org/x/sync/errgroup` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sync/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sync/PATENTS) |
+| `golang.org/x/sys/unix` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sys/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sys/PATENTS) |
+| `golang.org/x/term` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/term/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/term/PATENTS) |
+| `golang.org/x/text` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/text/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/text/PATENTS) |
+| `golang.org/x/time/rate` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/time/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/time/PATENTS) |
+| `gomodules.xyz/jsonpatch/v2` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gomodules.xyz/jsonpatch/v2/LICENSE) |
+| `google.golang.org/protobuf` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/google.golang.org/protobuf/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/google.golang.org/protobuf/PATENTS) |
+| `gopkg.in/evanphx/json-patch.v4` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gopkg.in/evanphx/json-patch.v4/LICENSE) |
+| `gopkg.in/inf.v0` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gopkg.in/inf.v0/LICENSE) |
+| `k8s.io/api` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/api/LICENSE) |
+| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apiextensions-apiserver/LICENSE) |
+| `k8s.io/apimachinery/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/LICENSE) |
+| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS) |
+| `k8s.io/cli-runtime/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/cli-runtime/LICENSE) |
+| `k8s.io/client-go` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/LICENSE) |
+| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/golang/PATENTS) |
+| `k8s.io/client-go/third_party/forked/httpcache` | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE) |
+| `k8s.io/component-base/version` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/component-base/LICENSE) |
+| `k8s.io/klog/v2` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/klog/v2/LICENSE) |
+| `k8s.io/kube-openapi/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/LICENSE) |
+| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | [AUTHORS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS) / [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE) |
+| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE) |
+| `k8s.io/kubectl/pkg` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kubectl/LICENSE) |
+| `k8s.io/utils` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/LICENSE) |
+| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS) |
+| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE) |
+| `sigs.k8s.io/controller-runtime` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/controller-runtime/LICENSE) |
+| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/json/LICENSE) |
+| `sigs.k8s.io/kustomize/api` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/kustomize/api/LICENSE) |
+| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE) |
+| `sigs.k8s.io/randfill` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/randfill/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/randfill/NOTICE) |
+| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE) |
+| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/yaml/LICENSE) |
 
 ## License Texts
 
 ### dario.cat/mergo
 
 * License: BSD-3-Clause
-* Module: dario.cat/mergo
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/dario.cat/mergo/LICENSE>
 
 ```text
 Copyright (c) 2013 Dario Castañé. All rights reserved.
@@ -193,9 +200,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/MakeNowJust/heredoc
 
 * License: MIT
-* Module: github.com/MakeNowJust/heredoc
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/MakeNowJust/heredoc/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -226,9 +234,10 @@ THE SOFTWARE.
 ### github.com/Masterminds/goutils
 
 * License: Apache-2.0
-* Module: github.com/Masterminds/goutils
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/goutils/LICENSE.txt>
 
 ```text
 
@@ -440,9 +449,10 @@ THE SOFTWARE.
 ### github.com/Masterminds/semver/v3
 
 * License: MIT
-* Module: github.com/Masterminds/semver/v3
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/semver/v3/LICENSE.txt>
 
 ```text
 Copyright (C) 2014-2019, Matt Butcher and Matt Farina
@@ -471,9 +481,10 @@ THE SOFTWARE.
 ### github.com/Masterminds/sprig/v3
 
 * License: MIT
-* Module: github.com/Masterminds/sprig/v3
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt>
 
 ```text
 Copyright (C) 2013-2020 Masterminds
@@ -502,9 +513,10 @@ THE SOFTWARE.
 ### github.com/Mellanox/maintenance-operator/api/v1alpha1
 
 * License: Apache-2.0
-* Module: github.com/Mellanox/maintenance-operator/api
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE>
 
 ```text
                                  Apache License
@@ -715,9 +727,10 @@ THE SOFTWARE.
 ### github.com/NVIDIA/go-nvlib/pkg
 
 * License: Apache-2.0
-* Module: github.com/NVIDIA/go-nvlib
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/go-nvlib/LICENSE>
 
 ```text
 
@@ -927,6 +940,8 @@ THE SOFTWARE.
 
 #### NOTICE
 
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/go-nvlib/NOTICE>
+
 ```text
 The file pkg/pciids/default_pci.ids is distributed under the 3-clause BSD License.
 Maintained by Albert Pool, Martin Mares, and other volunteers from
@@ -939,9 +954,10 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 
 * License: Apache-2.0
-* Module: github.com/NVIDIA/k8s-kata-manager
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE>
 
 ```text
 
@@ -1153,9 +1169,10 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/k8s-operator-libs
 
 * License: Apache-2.0
-* Module: github.com/NVIDIA/k8s-operator-libs
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE>
 
 ```text
 
@@ -1367,9 +1384,10 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/NVIDIA/nvidia-container-toolkit
 
 * License: Apache-2.0
-* Module: github.com/NVIDIA/nvidia-container-toolkit
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE>
 
 ```text
 
@@ -1581,9 +1599,10 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 ### github.com/beorn7/perks/quantile
 
 * License: MIT
-* Module: github.com/beorn7/perks
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/beorn7/perks/LICENSE>
 
 ```text
 Copyright (C) 2013 Blake Mizerany
@@ -1613,9 +1632,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/blang/semver/v4
 
 * License: MIT
-* Module: github.com/blang/semver/v4
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/blang/semver/v4/LICENSE>
 
 ```text
 The MIT License
@@ -1647,9 +1667,10 @@ THE SOFTWARE.
 ### github.com/cespare/xxhash/v2
 
 * License: MIT
-* Module: github.com/cespare/xxhash/v2
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cespare/xxhash/v2/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -1681,9 +1702,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/chai2010/gettext-go
 
 * License: BSD-3-Clause
-* Module: github.com/chai2010/gettext-go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/chai2010/gettext-go/LICENSE>
 
 ```text
 Copyright 2013 ChaiShushan <chaishushan{AT}gmail.com>. All rights reserved.
@@ -1720,9 +1742,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/cyphar/filepath-securejoin
 
 * License: BSD-3-Clause / MPL-2.0
-* Module: github.com/cyphar/filepath-securejoin
 
 #### COPYING.md
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/COPYING.md>
 
 ````text
 ## COPYING ##
@@ -2177,6 +2200,8 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 #### LICENSE.BSD
 
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD>
+
 ```text
 Copyright (C) 2014-2015 Docker Inc & Go Authors. All rights reserved.
 Copyright (C) 2017-2024 SUSE LLC. All rights reserved.
@@ -2210,6 +2235,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 #### LICENSE.MPL-2.0
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0>
 
 ```text
 Mozilla Public License Version 2.0
@@ -2592,9 +2619,10 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 ### github.com/davecgh/go-spew/spew
 
 * License: ISC
-* Module: github.com/davecgh/go-spew
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/davecgh/go-spew/LICENSE>
 
 ```text
 ISC License
@@ -2619,9 +2647,10 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### github.com/docker/libtrust
 
 * License: Apache-2.0
-* Module: github.com/docker/libtrust
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/docker/libtrust/LICENSE>
 
 ```text
 
@@ -2822,9 +2851,10 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### github.com/emicklei/go-restful/v3
 
 * License: MIT
-* Module: github.com/emicklei/go-restful/v3
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/emicklei/go-restful/v3/LICENSE>
 
 ```text
 Copyright (c) 2012,2013 Ernest Micklei
@@ -2855,9 +2885,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/evanphx/json-patch/v5
 
 * License: BSD-3-Clause
-* Module: github.com/evanphx/json-patch/v5
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/evanphx/json-patch/v5/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -2892,9 +2923,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/exponent-io/jsonpath
 
 * License: MIT
-* Module: github.com/exponent-io/jsonpath
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/exponent-io/jsonpath/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -2925,9 +2957,10 @@ SOFTWARE.
 ### github.com/fsnotify/fsnotify
 
 * License: BSD-3-Clause
-* Module: github.com/fsnotify/fsnotify
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/fsnotify/fsnotify/LICENSE>
 
 ```text
 Copyright © 2012 The Go Authors. All rights reserved.
@@ -2962,9 +2995,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/fxamacker/cbor/v2
 
 * License: MIT
-* Module: github.com/fxamacker/cbor/v2
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/fxamacker/cbor/v2/LICENSE>
 
 ```text
 MIT License
@@ -2994,9 +3028,10 @@ SOFTWARE.
 ### github.com/go-errors/errors
 
 * License: MIT
-* Module: github.com/go-errors/errors
 
 #### LICENSE.MIT
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-errors/errors/LICENSE.MIT>
 
 ```text
 Copyright (c) 2015 Conrad Irwin <conrad@bugsnag.com>
@@ -3013,9 +3048,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-logr/logr
 
 * License: Apache-2.0
-* Module: github.com/go-logr/logr
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-logr/logr/LICENSE>
 
 ```text
                                  Apache License
@@ -3226,9 +3262,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-logr/zapr
 
 * License: Apache-2.0
-* Module: github.com/go-logr/zapr
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-logr/zapr/LICENSE>
 
 ```text
                                  Apache License
@@ -3439,9 +3476,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/go-openapi/jsonpointer
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/jsonpointer
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonpointer/LICENSE>
 
 ```text
                                  Apache License
@@ -3649,6 +3687,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ```
 
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonpointer/NOTICE>
 
 ```text
 Copyright 2015-2025 go-swagger maintainers
@@ -3697,9 +3737,10 @@ limitations under the License.
 ### github.com/go-openapi/jsonreference
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/jsonreference
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonreference/LICENSE>
 
 ```text
 
@@ -3909,6 +3950,8 @@ limitations under the License.
 
 #### NOTICE
 
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/jsonreference/NOTICE>
+
 ```text
 Copyright 2015-2025 go-swagger maintainers
 
@@ -3956,9 +3999,10 @@ limitations under the License.
 ### github.com/go-openapi/swag
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/LICENSE>
 
 ```text
 
@@ -4170,9 +4214,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/cmdutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/cmdutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/cmdutils/LICENSE>
 
 ```text
 
@@ -4384,9 +4429,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/conv
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/conv
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/conv/LICENSE>
 
 ```text
 
@@ -4598,9 +4644,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/fileutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/fileutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/fileutils/LICENSE>
 
 ```text
 
@@ -4812,9 +4859,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/jsonutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/jsonutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/jsonutils/LICENSE>
 
 ```text
 
@@ -5026,9 +5074,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/loading
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/loading
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/loading/LICENSE>
 
 ```text
 
@@ -5240,9 +5289,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/mangling
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/mangling
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/mangling/LICENSE>
 
 ```text
 
@@ -5454,9 +5504,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/netutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/netutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/netutils/LICENSE>
 
 ```text
 
@@ -5668,9 +5719,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/pools
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/pools
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/pools/LICENSE>
 
 ```text
 
@@ -5882,9 +5934,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/stringutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/stringutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/stringutils/LICENSE>
 
 ```text
 
@@ -6096,9 +6149,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/typeutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/typeutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/typeutils/LICENSE>
 
 ```text
 
@@ -6310,9 +6364,10 @@ limitations under the License.
 ### github.com/go-openapi/swag/yamlutils
 
 * License: Apache-2.0
-* Module: github.com/go-openapi/swag/yamlutils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/go-openapi/swag/yamlutils/LICENSE>
 
 ```text
 
@@ -6524,9 +6579,10 @@ limitations under the License.
 ### github.com/google/btree
 
 * License: Apache-2.0
-* Module: github.com/google/btree
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/btree/LICENSE>
 
 ```text
 
@@ -6738,9 +6794,10 @@ limitations under the License.
 ### github.com/google/gnostic-models
 
 * License: Apache-2.0
-* Module: github.com/google/gnostic-models
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/gnostic-models/LICENSE>
 
 ```text
 
@@ -6953,9 +7010,10 @@ limitations under the License.
 ### github.com/google/uuid
 
 * License: BSD-3-Clause
-* Module: github.com/google/uuid
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/google/uuid/LICENSE>
 
 ```text
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
@@ -6992,9 +7050,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/huandu/xstrings
 
 * License: MIT
-* Module: github.com/huandu/xstrings
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/huandu/xstrings/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7026,9 +7085,10 @@ SOFTWARE.
 ### github.com/json-iterator/go
 
 * License: MIT
-* Module: github.com/json-iterator/go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/json-iterator/go/LICENSE>
 
 ```text
 MIT License
@@ -7059,9 +7119,10 @@ SOFTWARE.
 ### github.com/klauspost/compress
 
 * License: Apache-2.0 / BSD-3-Clause / MIT
-* Module: github.com/klauspost/compress
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -7375,9 +7436,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### github.com/klauspost/compress/internal/snapref
 
 * License: BSD-3-Clause
-* Module: github.com/klauspost/compress
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/internal/snapref/LICENSE>
 
 ```text
 Copyright (c) 2011 The Snappy-Go Authors. All rights reserved.
@@ -7414,9 +7476,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/klauspost/compress/zstd/internal/xxhash
 
 * License: MIT
-* Module: github.com/klauspost/compress
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -7448,9 +7511,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/liggitt/tabwriter
 
 * License: BSD-3-Clause
-* Module: github.com/liggitt/tabwriter
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/liggitt/tabwriter/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -7487,9 +7551,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/mitchellh/copystructure
 
 * License: MIT
-* Module: github.com/mitchellh/copystructure
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/copystructure/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7520,9 +7585,10 @@ THE SOFTWARE.
 ### github.com/mitchellh/go-wordwrap
 
 * License: MIT
-* Module: github.com/mitchellh/go-wordwrap
 
 #### LICENSE.md
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md>
 
 ```text
 The MIT License (MIT)
@@ -7553,9 +7619,10 @@ THE SOFTWARE.
 ### github.com/mitchellh/reflectwalk
 
 * License: MIT
-* Module: github.com/mitchellh/reflectwalk
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/mitchellh/reflectwalk/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7586,9 +7653,10 @@ THE SOFTWARE.
 ### github.com/moby/sys/devices
 
 * License: Apache-2.0
-* Module: github.com/moby/sys/devices
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/moby/sys/devices/LICENSE>
 
 ```text
 
@@ -7800,9 +7868,10 @@ THE SOFTWARE.
 ### github.com/moby/term
 
 * License: Apache-2.0
-* Module: github.com/moby/term
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/moby/term/LICENSE>
 
 ```text
 
@@ -8003,9 +8072,10 @@ THE SOFTWARE.
 ### github.com/modern-go/concurrent
 
 * License: Apache-2.0
-* Module: github.com/modern-go/concurrent
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/modern-go/concurrent/LICENSE>
 
 ```text
                                  Apache License
@@ -8216,9 +8286,10 @@ THE SOFTWARE.
 ### github.com/modern-go/reflect2
 
 * License: Apache-2.0
-* Module: github.com/modern-go/reflect2
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/modern-go/reflect2/LICENSE>
 
 ```text
                                  Apache License
@@ -8429,9 +8500,10 @@ THE SOFTWARE.
 ### github.com/monochromegane/go-gitignore
 
 * License: MIT
-* Module: github.com/monochromegane/go-gitignore
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/monochromegane/go-gitignore/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -8462,9 +8534,10 @@ SOFTWARE.
 ### github.com/munnerz/goautoneg
 
 * License: BSD-3-Clause
-* Module: github.com/munnerz/goautoneg
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/munnerz/goautoneg/LICENSE>
 
 ```text
 Copyright (c) 2011, Open Knowledge Foundation Ltd.
@@ -8505,9 +8578,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/opencontainers/cgroups/devices/config
 
 * License: Apache-2.0
-* Module: github.com/opencontainers/cgroups
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/cgroups/LICENSE>
 
 ```text
                                  Apache License
@@ -8718,9 +8792,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/opencontainers/go-digest
 
 * License: Apache-2.0
-* Module: github.com/opencontainers/go-digest
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/go-digest/LICENSE>
 
 ```text
 
@@ -8918,13 +8993,447 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### LICENSE.docs
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/opencontainers/go-digest/LICENSE.docs>
+
+```text
+Attribution-ShareAlike 4.0 International
+
+=======================================================================
+
+Creative Commons Corporation ("Creative Commons") is not a law firm and
+does not provide legal services or legal advice. Distribution of
+Creative Commons public licenses does not create a lawyer-client or
+other relationship. Creative Commons makes its licenses and related
+information available on an "as-is" basis. Creative Commons gives no
+warranties regarding its licenses, any material licensed under their
+terms and conditions, or any related information. Creative Commons
+disclaims all liability for damages resulting from their use to the
+fullest extent possible.
+
+Using Creative Commons Public Licenses
+
+Creative Commons public licenses provide a standard set of terms and
+conditions that creators and other rights holders may use to share
+original works of authorship and other material subject to copyright
+and certain other rights specified in the public license below. The
+following considerations are for informational purposes only, are not
+exhaustive, and do not form part of our licenses.
+
+     Considerations for licensors: Our public licenses are
+     intended for use by those authorized to give the public
+     permission to use material in ways otherwise restricted by
+     copyright and certain other rights. Our licenses are
+     irrevocable. Licensors should read and understand the terms
+     and conditions of the license they choose before applying it.
+     Licensors should also secure all rights necessary before
+     applying our licenses so that the public can reuse the
+     material as expected. Licensors should clearly mark any
+     material not subject to the license. This includes other CC-
+     licensed material, or material used under an exception or
+     limitation to copyright. More considerations for licensors:
+	wiki.creativecommons.org/Considerations_for_licensors
+
+     Considerations for the public: By using one of our public
+     licenses, a licensor grants the public permission to use the
+     licensed material under specified terms and conditions. If
+     the licensor's permission is not necessary for any reason--for
+     example, because of any applicable exception or limitation to
+     copyright--then that use is not regulated by the license. Our
+     licenses grant only permissions under copyright and certain
+     other rights that a licensor has authority to grant. Use of
+     the licensed material may still be restricted for other
+     reasons, including because others have copyright or other
+     rights in the material. A licensor may make special requests,
+     such as asking that all changes be marked or described.
+     Although not required by our licenses, you are encouraged to
+     respect those requests where reasonable. More_considerations
+     for the public:
+	wiki.creativecommons.org/Considerations_for_licensees
+
+=======================================================================
+
+Creative Commons Attribution-ShareAlike 4.0 International Public
+License
+
+By exercising the Licensed Rights (defined below), You accept and agree
+to be bound by the terms and conditions of this Creative Commons
+Attribution-ShareAlike 4.0 International Public License ("Public
+License"). To the extent this Public License may be interpreted as a
+contract, You are granted the Licensed Rights in consideration of Your
+acceptance of these terms and conditions, and the Licensor grants You
+such rights in consideration of benefits the Licensor receives from
+making the Licensed Material available under these terms and
+conditions.
+
+
+Section 1 -- Definitions.
+
+  a. Adapted Material means material subject to Copyright and Similar
+     Rights that is derived from or based upon the Licensed Material
+     and in which the Licensed Material is translated, altered,
+     arranged, transformed, or otherwise modified in a manner requiring
+     permission under the Copyright and Similar Rights held by the
+     Licensor. For purposes of this Public License, where the Licensed
+     Material is a musical work, performance, or sound recording,
+     Adapted Material is always produced where the Licensed Material is
+     synched in timed relation with a moving image.
+
+  b. Adapter's License means the license You apply to Your Copyright
+     and Similar Rights in Your contributions to Adapted Material in
+     accordance with the terms and conditions of this Public License.
+
+  c. BY-SA Compatible License means a license listed at
+     creativecommons.org/compatiblelicenses, approved by Creative
+     Commons as essentially the equivalent of this Public License.
+
+  d. Copyright and Similar Rights means copyright and/or similar rights
+     closely related to copyright including, without limitation,
+     performance, broadcast, sound recording, and Sui Generis Database
+     Rights, without regard to how the rights are labeled or
+     categorized. For purposes of this Public License, the rights
+     specified in Section 2(b)(1)-(2) are not Copyright and Similar
+     Rights.
+
+  e. Effective Technological Measures means those measures that, in the
+     absence of proper authority, may not be circumvented under laws
+     fulfilling obligations under Article 11 of the WIPO Copyright
+     Treaty adopted on December 20, 1996, and/or similar international
+     agreements.
+
+  f. Exceptions and Limitations means fair use, fair dealing, and/or
+     any other exception or limitation to Copyright and Similar Rights
+     that applies to Your use of the Licensed Material.
+
+  g. License Elements means the license attributes listed in the name
+     of a Creative Commons Public License. The License Elements of this
+     Public License are Attribution and ShareAlike.
+
+  h. Licensed Material means the artistic or literary work, database,
+     or other material to which the Licensor applied this Public
+     License.
+
+  i. Licensed Rights means the rights granted to You subject to the
+     terms and conditions of this Public License, which are limited to
+     all Copyright and Similar Rights that apply to Your use of the
+     Licensed Material and that the Licensor has authority to license.
+
+  j. Licensor means the individual(s) or entity(ies) granting rights
+     under this Public License.
+
+  k. Share means to provide material to the public by any means or
+     process that requires permission under the Licensed Rights, such
+     as reproduction, public display, public performance, distribution,
+     dissemination, communication, or importation, and to make material
+     available to the public including in ways that members of the
+     public may access the material from a place and at a time
+     individually chosen by them.
+
+  l. Sui Generis Database Rights means rights other than copyright
+     resulting from Directive 96/9/EC of the European Parliament and of
+     the Council of 11 March 1996 on the legal protection of databases,
+     as amended and/or succeeded, as well as other essentially
+     equivalent rights anywhere in the world.
+
+  m. You means the individual or entity exercising the Licensed Rights
+     under this Public License. Your has a corresponding meaning.
+
+
+Section 2 -- Scope.
+
+  a. License grant.
+
+       1. Subject to the terms and conditions of this Public License,
+          the Licensor hereby grants You a worldwide, royalty-free,
+          non-sublicensable, non-exclusive, irrevocable license to
+          exercise the Licensed Rights in the Licensed Material to:
+
+            a. reproduce and Share the Licensed Material, in whole or
+               in part; and
+
+            b. produce, reproduce, and Share Adapted Material.
+
+       2. Exceptions and Limitations. For the avoidance of doubt, where
+          Exceptions and Limitations apply to Your use, this Public
+          License does not apply, and You do not need to comply with
+          its terms and conditions.
+
+       3. Term. The term of this Public License is specified in Section
+          6(a).
+
+       4. Media and formats; technical modifications allowed. The
+          Licensor authorizes You to exercise the Licensed Rights in
+          all media and formats whether now known or hereafter created,
+          and to make technical modifications necessary to do so. The
+          Licensor waives and/or agrees not to assert any right or
+          authority to forbid You from making technical modifications
+          necessary to exercise the Licensed Rights, including
+          technical modifications necessary to circumvent Effective
+          Technological Measures. For purposes of this Public License,
+          simply making modifications authorized by this Section 2(a)
+          (4) never produces Adapted Material.
+
+       5. Downstream recipients.
+
+            a. Offer from the Licensor -- Licensed Material. Every
+               recipient of the Licensed Material automatically
+               receives an offer from the Licensor to exercise the
+               Licensed Rights under the terms and conditions of this
+               Public License.
+
+            b. Additional offer from the Licensor -- Adapted Material.
+               Every recipient of Adapted Material from You
+               automatically receives an offer from the Licensor to
+               exercise the Licensed Rights in the Adapted Material
+               under the conditions of the Adapter's License You apply.
+
+            c. No downstream restrictions. You may not offer or impose
+               any additional or different terms or conditions on, or
+               apply any Effective Technological Measures to, the
+               Licensed Material if doing so restricts exercise of the
+               Licensed Rights by any recipient of the Licensed
+               Material.
+
+       6. No endorsement. Nothing in this Public License constitutes or
+          may be construed as permission to assert or imply that You
+          are, or that Your use of the Licensed Material is, connected
+          with, or sponsored, endorsed, or granted official status by,
+          the Licensor or others designated to receive attribution as
+          provided in Section 3(a)(1)(A)(i).
+
+  b. Other rights.
+
+       1. Moral rights, such as the right of integrity, are not
+          licensed under this Public License, nor are publicity,
+          privacy, and/or other similar personality rights; however, to
+          the extent possible, the Licensor waives and/or agrees not to
+          assert any such rights held by the Licensor to the limited
+          extent necessary to allow You to exercise the Licensed
+          Rights, but not otherwise.
+
+       2. Patent and trademark rights are not licensed under this
+          Public License.
+
+       3. To the extent possible, the Licensor waives any right to
+          collect royalties from You for the exercise of the Licensed
+          Rights, whether directly or through a collecting society
+          under any voluntary or waivable statutory or compulsory
+          licensing scheme. In all other cases the Licensor expressly
+          reserves any right to collect such royalties.
+
+
+Section 3 -- License Conditions.
+
+Your exercise of the Licensed Rights is expressly made subject to the
+following conditions.
+
+  a. Attribution.
+
+       1. If You Share the Licensed Material (including in modified
+          form), You must:
+
+            a. retain the following if it is supplied by the Licensor
+               with the Licensed Material:
+
+                 i. identification of the creator(s) of the Licensed
+                    Material and any others designated to receive
+                    attribution, in any reasonable manner requested by
+                    the Licensor (including by pseudonym if
+                    designated);
+
+                ii. a copyright notice;
+
+               iii. a notice that refers to this Public License;
+
+                iv. a notice that refers to the disclaimer of
+                    warranties;
+
+                 v. a URI or hyperlink to the Licensed Material to the
+                    extent reasonably practicable;
+
+            b. indicate if You modified the Licensed Material and
+               retain an indication of any previous modifications; and
+
+            c. indicate the Licensed Material is licensed under this
+               Public License, and include the text of, or the URI or
+               hyperlink to, this Public License.
+
+       2. You may satisfy the conditions in Section 3(a)(1) in any
+          reasonable manner based on the medium, means, and context in
+          which You Share the Licensed Material. For example, it may be
+          reasonable to satisfy the conditions by providing a URI or
+          hyperlink to a resource that includes the required
+          information.
+
+       3. If requested by the Licensor, You must remove any of the
+          information required by Section 3(a)(1)(A) to the extent
+          reasonably practicable.
+
+  b. ShareAlike.
+
+     In addition to the conditions in Section 3(a), if You Share
+     Adapted Material You produce, the following conditions also apply.
+
+       1. The Adapter's License You apply must be a Creative Commons
+          license with the same License Elements, this version or
+          later, or a BY-SA Compatible License.
+
+       2. You must include the text of, or the URI or hyperlink to, the
+          Adapter's License You apply. You may satisfy this condition
+          in any reasonable manner based on the medium, means, and
+          context in which You Share Adapted Material.
+
+       3. You may not offer or impose any additional or different terms
+          or conditions on, or apply any Effective Technological
+          Measures to, Adapted Material that restrict exercise of the
+          rights granted under the Adapter's License You apply.
+
+
+Section 4 -- Sui Generis Database Rights.
+
+Where the Licensed Rights include Sui Generis Database Rights that
+apply to Your use of the Licensed Material:
+
+  a. for the avoidance of doubt, Section 2(a)(1) grants You the right
+     to extract, reuse, reproduce, and Share all or a substantial
+     portion of the contents of the database;
+
+  b. if You include all or a substantial portion of the database
+     contents in a database in which You have Sui Generis Database
+     Rights, then the database in which You have Sui Generis Database
+     Rights (but not its individual contents) is Adapted Material,
+
+     including for purposes of Section 3(b); and
+  c. You must comply with the conditions in Section 3(a) if You Share
+     all or a substantial portion of the contents of the database.
+
+For the avoidance of doubt, this Section 4 supplements and does not
+replace Your obligations under this Public License where the Licensed
+Rights include other Copyright and Similar Rights.
+
+
+Section 5 -- Disclaimer of Warranties and Limitation of Liability.
+
+  a. UNLESS OTHERWISE SEPARATELY UNDERTAKEN BY THE LICENSOR, TO THE
+     EXTENT POSSIBLE, THE LICENSOR OFFERS THE LICENSED MATERIAL AS-IS
+     AND AS-AVAILABLE, AND MAKES NO REPRESENTATIONS OR WARRANTIES OF
+     ANY KIND CONCERNING THE LICENSED MATERIAL, WHETHER EXPRESS,
+     IMPLIED, STATUTORY, OR OTHER. THIS INCLUDES, WITHOUT LIMITATION,
+     WARRANTIES OF TITLE, MERCHANTABILITY, FITNESS FOR A PARTICULAR
+     PURPOSE, NON-INFRINGEMENT, ABSENCE OF LATENT OR OTHER DEFECTS,
+     ACCURACY, OR THE PRESENCE OR ABSENCE OF ERRORS, WHETHER OR NOT
+     KNOWN OR DISCOVERABLE. WHERE DISCLAIMERS OF WARRANTIES ARE NOT
+     ALLOWED IN FULL OR IN PART, THIS DISCLAIMER MAY NOT APPLY TO YOU.
+
+  b. TO THE EXTENT POSSIBLE, IN NO EVENT WILL THE LICENSOR BE LIABLE
+     TO YOU ON ANY LEGAL THEORY (INCLUDING, WITHOUT LIMITATION,
+     NEGLIGENCE) OR OTHERWISE FOR ANY DIRECT, SPECIAL, INDIRECT,
+     INCIDENTAL, CONSEQUENTIAL, PUNITIVE, EXEMPLARY, OR OTHER LOSSES,
+     COSTS, EXPENSES, OR DAMAGES ARISING OUT OF THIS PUBLIC LICENSE OR
+     USE OF THE LICENSED MATERIAL, EVEN IF THE LICENSOR HAS BEEN
+     ADVISED OF THE POSSIBILITY OF SUCH LOSSES, COSTS, EXPENSES, OR
+     DAMAGES. WHERE A LIMITATION OF LIABILITY IS NOT ALLOWED IN FULL OR
+     IN PART, THIS LIMITATION MAY NOT APPLY TO YOU.
+
+  c. The disclaimer of warranties and limitation of liability provided
+     above shall be interpreted in a manner that, to the extent
+     possible, most closely approximates an absolute disclaimer and
+     waiver of all liability.
+
+
+Section 6 -- Term and Termination.
+
+  a. This Public License applies for the term of the Copyright and
+     Similar Rights licensed here. However, if You fail to comply with
+     this Public License, then Your rights under this Public License
+     terminate automatically.
+
+  b. Where Your right to use the Licensed Material has terminated under
+     Section 6(a), it reinstates:
+
+       1. automatically as of the date the violation is cured, provided
+          it is cured within 30 days of Your discovery of the
+          violation; or
+
+       2. upon express reinstatement by the Licensor.
+
+     For the avoidance of doubt, this Section 6(b) does not affect any
+     right the Licensor may have to seek remedies for Your violations
+     of this Public License.
+
+  c. For the avoidance of doubt, the Licensor may also offer the
+     Licensed Material under separate terms or conditions or stop
+     distributing the Licensed Material at any time; however, doing so
+     will not terminate this Public License.
+
+  d. Sections 1, 5, 6, 7, and 8 survive termination of this Public
+     License.
+
+
+Section 7 -- Other Terms and Conditions.
+
+  a. The Licensor shall not be bound by any additional or different
+     terms or conditions communicated by You unless expressly agreed.
+
+  b. Any arrangements, understandings, or agreements regarding the
+     Licensed Material not stated herein are separate from and
+     independent of the terms and conditions of this Public License.
+
+
+Section 8 -- Interpretation.
+
+  a. For the avoidance of doubt, this Public License does not, and
+     shall not be interpreted to, reduce, limit, restrict, or impose
+     conditions on any use of the Licensed Material that could lawfully
+     be made without permission under this Public License.
+
+  b. To the extent possible, if any provision of this Public License is
+     deemed unenforceable, it shall be automatically reformed to the
+     minimum extent necessary to make it enforceable. If the provision
+     cannot be reformed, it shall be severed from this Public License
+     without affecting the enforceability of the remaining terms and
+     conditions.
+
+  c. No term or condition of this Public License will be waived and no
+     failure to comply consented to unless expressly agreed to by the
+     Licensor.
+
+  d. Nothing in this Public License constitutes or may be interpreted
+     as a limitation upon, or waiver of, any privileges and immunities
+     that apply to the Licensor or You, including from the legal
+     processes of any jurisdiction or authority.
+
+
+=======================================================================
+
+Creative Commons is not a party to its public licenses.
+Notwithstanding, Creative Commons may elect to apply one of its public
+licenses to material it publishes and in those instances will be
+considered the "Licensor." Except for the limited purpose of indicating
+that material is shared under a Creative Commons public license or as
+otherwise permitted by the Creative Commons policies published at
+creativecommons.org/policies, Creative Commons does not authorize the
+use of the trademark "Creative Commons" or any other trademark or logo
+of Creative Commons without its prior written consent including,
+without limitation, in connection with any unauthorized modifications
+to any of its public licenses or any other arrangements,
+understandings, or agreements concerning use of licensed material. For
+the avoidance of doubt, this paragraph does not form part of the public
+licenses.
+
+Creative Commons may be contacted at creativecommons.org.
+
+```
+
 
 ### github.com/openshift/api
 
 * License: Apache-2.0
-* Module: github.com/openshift/api
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/openshift/api/LICENSE>
 
 ```text
 
@@ -9125,9 +9634,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/openshift/client-go
 
 * License: Apache-2.0
-* Module: github.com/openshift/client-go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/openshift/client-go/LICENSE>
 
 ```text
 
@@ -9328,9 +9838,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/operator-framework/api/pkg
 
 * License: Apache-2.0
-* Module: github.com/operator-framework/api
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/operator-framework/api/LICENSE>
 
 ```text
                                  Apache License
@@ -9541,9 +10052,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/peterbourgon/diskv
 
 * License: MIT
-* Module: github.com/peterbourgon/diskv
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/peterbourgon/diskv/LICENSE>
 
 ```text
 Copyright (c) 2011-2012 Peter Bourgon
@@ -9572,9 +10084,10 @@ THE SOFTWARE.
 ### github.com/pmezard/go-difflib/difflib
 
 * License: BSD-3-Clause
-* Module: github.com/pmezard/go-difflib
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/pmezard/go-difflib/LICENSE>
 
 ```text
 Copyright (c) 2013, Patrick Mezard
@@ -9611,9 +10124,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
 * License: Apache-2.0
-* Module: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE>
 
 ```text
 Apache License
@@ -9824,9 +10338,10 @@ Apache License
 ### github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
 
 * License: BSD-3-Clause
-* Module: github.com/prometheus/client_golang
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE>
 
 ```text
 Copyright (c) 2013 The Go Authors. All rights reserved.
@@ -9863,9 +10378,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/prometheus/client_golang/prometheus
 
 * License: Apache-2.0
-* Module: github.com/prometheus/client_golang
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/LICENSE>
 
 ```text
                                  Apache License
@@ -10073,6 +10589,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_golang/NOTICE>
 
 ```text
 Prometheus instrumentation library for Go applications
@@ -10100,9 +10618,10 @@ See source code for license details.
 ### github.com/prometheus/client_model/go
 
 * License: Apache-2.0
-* Module: github.com/prometheus/client_model
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_model/LICENSE>
 
 ```text
                                  Apache License
@@ -10310,6 +10829,8 @@ See source code for license details.
 ```
 
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/client_model/NOTICE>
 
 ```text
 Data model artifacts for Prometheus.
@@ -10324,9 +10845,10 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/prometheus/common
 
 * License: Apache-2.0
-* Module: github.com/prometheus/common
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/common/LICENSE>
 
 ```text
                                  Apache License
@@ -10534,6 +11056,8 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ```
 
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/common/NOTICE>
 
 ```text
 Common libraries shared by Prometheus Go components.
@@ -10548,9 +11072,10 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/prometheus/procfs
 
 * License: Apache-2.0
-* Module: github.com/prometheus/procfs
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/procfs/LICENSE>
 
 ```text
                                  Apache License
@@ -10758,6 +11283,8 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ```
 
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/prometheus/procfs/NOTICE>
 
 ```text
 procfs provides functions to retrieve system, kernel and process
@@ -10774,9 +11301,10 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/regclient/regclient
 
 * License: Apache-2.0
-* Module: github.com/regclient/regclient
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/regclient/regclient/LICENSE>
 
 ```text
 
@@ -10977,9 +11505,10 @@ SoundCloud Ltd. (http://soundcloud.com/).
 ### github.com/russross/blackfriday/v2
 
 * License: BSD-2-Clause
-* Module: github.com/russross/blackfriday/v2
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/russross/blackfriday/v2/LICENSE.txt>
 
 ```text
 Blackfriday is distributed under the Simplified BSD License:
@@ -11018,9 +11547,10 @@ Blackfriday is distributed under the Simplified BSD License:
 ### github.com/shopspring/decimal
 
 * License: MIT
-* Module: github.com/shopspring/decimal
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/shopspring/decimal/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11075,9 +11605,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### github.com/sirupsen/logrus
 
 * License: MIT
-* Module: github.com/sirupsen/logrus
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/sirupsen/logrus/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11108,9 +11639,10 @@ THE SOFTWARE.
 ### github.com/spf13/cast
 
 * License: MIT
-* Module: github.com/spf13/cast
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/cast/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11140,9 +11672,10 @@ SOFTWARE.
 ### github.com/spf13/cobra
 
 * License: Apache-2.0
-* Module: github.com/spf13/cobra
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/cobra/LICENSE.txt>
 
 ```text
                                 Apache License
@@ -11326,9 +11859,10 @@ SOFTWARE.
 ### github.com/spf13/pflag
 
 * License: BSD-3-Clause
-* Module: github.com/spf13/pflag
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/spf13/pflag/LICENSE>
 
 ```text
 Copyright (c) 2012 Alex Ogier. All rights reserved.
@@ -11366,9 +11900,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/stretchr/testify/assert/yaml
 
 * License: MIT
-* Module: github.com/stretchr/testify
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/stretchr/testify/LICENSE>
 
 ```text
 MIT License
@@ -11399,9 +11934,10 @@ SOFTWARE.
 ### github.com/ulikunitz/xz
 
 * License: BSD-3-Clause
-* Module: github.com/ulikunitz/xz
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/ulikunitz/xz/LICENSE>
 
 ```text
 Copyright (c) 2014-2022  Ulrich Kunitz
@@ -11437,9 +11973,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### github.com/urfave/cli/v3
 
 * License: MIT
-* Module: github.com/urfave/cli/v3
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/urfave/cli/v3/LICENSE>
 
 ```text
 MIT License
@@ -11470,9 +12007,10 @@ SOFTWARE.
 ### github.com/x448/float16
 
 * License: MIT
-* Module: github.com/x448/float16
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/x448/float16/LICENSE>
 
 ```text
 MIT License
@@ -11504,9 +12042,10 @@ SOFTWARE.
 ### github.com/xlab/treeprint
 
 * License: MIT
-* Module: github.com/xlab/treeprint
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/github.com/xlab/treeprint/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11536,9 +12075,10 @@ THE SOFTWARE.
 ### go.uber.org/multierr
 
 * License: MIT
-* Module: go.uber.org/multierr
 
 #### LICENSE.txt
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.uber.org/multierr/LICENSE.txt>
 
 ```text
 Copyright (c) 2017-2021 Uber Technologies, Inc.
@@ -11567,9 +12107,10 @@ THE SOFTWARE.
 ### go.uber.org/zap
 
 * License: MIT
-* Module: go.uber.org/zap
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.uber.org/zap/LICENSE>
 
 ```text
 Copyright (c) 2016-2024 Uber Technologies, Inc.
@@ -11597,10 +12138,11 @@ THE SOFTWARE.
 
 ### go.yaml.in/yaml/v2
 
-* License: Apache-2.0
-* Module: go.yaml.in/yaml/v2
+* License: Apache-2.0 AND MIT
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/LICENSE>
 
 ```text
                                  Apache License
@@ -11807,7 +12349,48 @@ THE SOFTWARE.
 
 ```
 
+#### LICENSE.libyaml
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/LICENSE.libyaml>
+
+```text
+The following files were ported to Go from C files of libyaml, and thus
+are still covered by their original copyright and license:
+
+    apic.go
+    emitterc.go
+    parserc.go
+    readerc.go
+    scannerc.go
+    writerc.go
+    yamlh.go
+    yamlprivateh.go
+
+Copyright (c) 2006 Kirill Simonov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
 #### NOTICE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v2/NOTICE>
 
 ```text
 Copyright 2011-2016 Canonical Ltd.
@@ -11829,10 +12412,11 @@ limitations under the License.
 
 ### go.yaml.in/yaml/v3
 
-* License: MIT
-* Module: go.yaml.in/yaml/v3
+* License: Apache-2.0 AND MIT
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v3/LICENSE>
 
 ```text
 
@@ -11890,6 +12474,8 @@ limitations under the License.
 
 #### NOTICE
 
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/go.yaml.in/yaml/v3/NOTICE>
+
 ```text
 Copyright 2011-2016 Canonical Ltd.
 
@@ -11911,9 +12497,10 @@ limitations under the License.
 ### golang.org/x/crypto
 
 * License: BSD-3-Clause
-* Module: golang.org/x/crypto
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/crypto/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -11943,6 +12530,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/crypto/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -11950,9 +12567,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/mod/semver
 
 * License: BSD-3-Clause
-* Module: golang.org/x/mod
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/mod/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -11982,6 +12600,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/mod/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -11989,9 +12637,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/net
 
 * License: BSD-3-Clause
-* Module: golang.org/x/net
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/net/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12024,13 +12673,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/net/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### golang.org/x/oauth2
 
 * License: BSD-3-Clause
-* Module: golang.org/x/oauth2
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/oauth2/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12067,9 +12747,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/sync/errgroup
 
 * License: BSD-3-Clause
-* Module: golang.org/x/sync
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sync/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12099,6 +12780,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sync/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -12106,9 +12817,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/sys/unix
 
 * License: BSD-3-Clause
-* Module: golang.org/x/sys
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sys/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12138,6 +12850,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/sys/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -12145,9 +12887,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/term
 
 * License: BSD-3-Clause
-* Module: golang.org/x/term
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/term/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12177,6 +12920,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/term/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -12184,9 +12957,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/text
 
 * License: BSD-3-Clause
-* Module: golang.org/x/text
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/text/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12216,6 +12990,36 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+```
+
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/text/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
 
 ```
 
@@ -12223,9 +13027,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/time/rate
 
 * License: BSD-3-Clause
-* Module: golang.org/x/time
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/time/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12258,13 +13063,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/golang.org/x/time/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### gomodules.xyz/jsonpatch/v2
 
 * License: Apache-2.0
-* Module: gomodules.xyz/jsonpatch/v2
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gomodules.xyz/jsonpatch/v2/LICENSE>
 
 ```text
                                  Apache License
@@ -12476,9 +13312,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### google.golang.org/protobuf
 
 * License: BSD-3-Clause
-* Module: google.golang.org/protobuf
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/google.golang.org/protobuf/LICENSE>
 
 ```text
 Copyright (c) 2018 The Go Authors. All rights reserved.
@@ -12511,13 +13348,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/google.golang.org/protobuf/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### gopkg.in/evanphx/json-patch.v4
 
 * License: BSD-3-Clause
-* Module: gopkg.in/evanphx/json-patch.v4
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gopkg.in/evanphx/json-patch.v4/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -12552,9 +13420,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### gopkg.in/inf.v0
 
 * License: BSD-3-Clause
-* Module: gopkg.in/inf.v0
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/gopkg.in/inf.v0/LICENSE>
 
 ```text
 Copyright (c) 2012 Péter Surányi. Portions Copyright (c) 2009 The Go
@@ -12592,9 +13461,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/api
 
 * License: Apache-2.0
-* Module: k8s.io/api
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/api/LICENSE>
 
 ```text
 
@@ -12806,9 +13676,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/apiextensions-apiserver/pkg
 
 * License: Apache-2.0
-* Module: k8s.io/apiextensions-apiserver
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apiextensions-apiserver/LICENSE>
 
 ```text
 
@@ -13020,9 +13891,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/apimachinery/pkg
 
 * License: Apache-2.0
-* Module: k8s.io/apimachinery
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/LICENSE>
 
 ```text
 
@@ -13234,9 +14106,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/apimachinery/third_party/forked/golang
 
 * License: BSD-3-Clause
-* Module: k8s.io/apimachinery
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -13269,13 +14142,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### k8s.io/cli-runtime/pkg
 
 * License: Apache-2.0
-* Module: k8s.io/cli-runtime
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/cli-runtime/LICENSE>
 
 ```text
 
@@ -13487,9 +14391,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/client-go
 
 * License: Apache-2.0
-* Module: k8s.io/client-go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/LICENSE>
 
 ```text
 
@@ -13701,9 +14606,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/client-go/third_party/forked/golang/template
 
 * License: BSD-3-Clause
-* Module: k8s.io/client-go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -13736,13 +14642,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/golang/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### k8s.io/client-go/third_party/forked/httpcache
 
 * License: MIT
-* Module: k8s.io/client-go
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE>
 
 ```text
 Copyright © 2012 Greg Jones (greg.jones@gmail.com)
@@ -13758,9 +14695,10 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 ### k8s.io/component-base/version
 
 * License: Apache-2.0
-* Module: k8s.io/component-base
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/component-base/LICENSE>
 
 ```text
 
@@ -13972,9 +14910,10 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 ### k8s.io/klog/v2
 
 * License: Apache-2.0
-* Module: k8s.io/klog/v2
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/klog/v2/LICENSE>
 
 ```text
 Apache License
@@ -14175,9 +15114,10 @@ third-party archives.
 ### k8s.io/kube-openapi/pkg
 
 * License: Apache-2.0
-* Module: k8s.io/kube-openapi
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/LICENSE>
 
 ```text
 
@@ -14389,9 +15329,21 @@ third-party archives.
 ### k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 
 * License: BSD-3-Clause
-* Module: k8s.io/kube-openapi
+
+#### AUTHORS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS>
+
+```text
+# This source code refers to The Go Authors for copyright purposes.
+# The master list of authors is in the main Go distribution,
+# visible at https://tip.golang.org/AUTHORS.
+
+```
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE>
 
 ```text
 Copyright (c) 2020 The Go Authors. All rights reserved.
@@ -14428,9 +15380,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/kube-openapi/pkg/validation/spec
 
 * License: Apache-2.0
-* Module: k8s.io/kube-openapi
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE>
 
 ```text
 
@@ -14642,9 +15595,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/kubectl/pkg
 
 * License: Apache-2.0
-* Module: k8s.io/kubectl
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/kubectl/LICENSE>
 
 ```text
                                  Apache License
@@ -14855,9 +15809,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/utils
 
 * License: Apache-2.0
-* Module: k8s.io/utils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/LICENSE>
 
 ```text
 
@@ -15069,9 +16024,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### k8s.io/utils/internal/third_party/forked/golang
 
 * License: BSD-3-Clause
-* Module: k8s.io/utils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -15104,13 +16060,44 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
 
+#### PATENTS
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS>
+
+```text
+Additional IP Rights Grant (Patents)
+
+"This implementation" means the copyrightable works distributed by
+Google as part of the Go project.
+
+Google hereby grants to You a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable (except as stated in this section)
+patent license to make, have made, use, offer to sell, sell, import,
+transfer and otherwise run, modify and propagate the contents of this
+implementation of Go, where such license applies only to those patent
+claims, both currently owned or controlled by Google and acquired in
+the future, licensable by Google that are necessarily infringed by this
+implementation of Go.  This grant does not include claims that would be
+infringed only as a consequence of further modification of this
+implementation.  If you or your agent or exclusive licensee institute or
+order or agree to the institution of patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging
+that this implementation of Go or any code incorporated within this
+implementation of Go constitutes direct or contributory patent
+infringement, or inducement of patent infringement, then any patent
+rights granted to you under this License for this implementation of Go
+shall terminate as of the date such litigation is filed.
+
+```
+
 
 ### k8s.io/utils/third_party/forked/golang/btree
 
 * License: Apache-2.0
-* Module: k8s.io/utils
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE>
 
 ```text
 
@@ -15321,9 +16308,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/controller-runtime
 
 * License: Apache-2.0
-* Module: sigs.k8s.io/controller-runtime
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/controller-runtime/LICENSE>
 
 ```text
                                  Apache License
@@ -15534,9 +16522,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/json
 
 * License: Apache-2.0 / BSD-3-Clause
-* Module: sigs.k8s.io/json
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/json/LICENSE>
 
 ```text
 Files other than internal/golang/* licensed under:
@@ -15784,9 +16773,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/kustomize/api
 
 * License: Apache-2.0
-* Module: sigs.k8s.io/kustomize/api
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/kustomize/api/LICENSE>
 
 ```text
                                  Apache License
@@ -15997,9 +16987,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/kustomize/kyaml
 
 * License: Apache-2.0
-* Module: sigs.k8s.io/kustomize/kyaml
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE>
 
 ```text
                                  Apache License
@@ -16210,9 +17201,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### sigs.k8s.io/randfill
 
 * License: Apache-2.0
-* Module: sigs.k8s.io/randfill
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/randfill/LICENSE>
 
 ```text
                                  Apache License
@@ -16422,6 +17414,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### NOTICE
 
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/randfill/NOTICE>
+
 ```text
 When donating the randfill project to the CNCF, we could not reach all the
 gofuzz contributors to sign the CNCF CLA. As such, according to the CNCF rules
@@ -16454,9 +17448,10 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 ### sigs.k8s.io/structured-merge-diff/v6
 
 * License: Apache-2.0
-* Module: sigs.k8s.io/structured-merge-diff/v6
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE>
 
 ```text
                                  Apache License
@@ -16667,9 +17662,10 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 ### sigs.k8s.io/yaml
 
 * License: Apache-2.0 / BSD-3-Clause / MIT
-* Module: sigs.k8s.io/yaml
 
 #### LICENSE
+
+<https://github.com/NVIDIA/gpu-operator/blob/main/vendor/sigs.k8s.io/yaml/LICENSE>
 
 ```text
 The MIT License (MIT)
