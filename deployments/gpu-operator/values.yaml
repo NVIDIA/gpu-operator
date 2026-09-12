@@ -54,6 +54,14 @@ daemonsets:
     # maximum number of nodes to simultaneously apply pod updates on.
     # can be specified either as number or percentage of nodes. Default 1.
     maxUnavailable: "1"
+  # Optional: pod-level security context applied to ALL operand DaemonSets.
+  # Example (SELinux):
+  # podSecurityContext:
+  #   seLinuxOptions:
+  #     type: spc_t
+  #     level: s0
+  # Note: This must be rendered into ClusterPolicy by the Helm template.
+  # Per-operand overrides are not supported yet.
 
 validator:
   repository: nvcr.io/nvidia

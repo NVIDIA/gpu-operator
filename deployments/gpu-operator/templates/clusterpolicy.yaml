@@ -54,6 +54,9 @@ spec:
     rollingUpdate:
       maxUnavailable: {{ .Values.daemonsets.rollingUpdate.maxUnavailable | quote }}
     {{- end }}
+    {{- if .Values.daemonsets.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.daemonsets.podSecurityContext | nindent 6 }}
+    {{- end }}
   validator:
     {{- if .Values.validator.repository }}
     repository: {{ .Values.validator.repository }}
