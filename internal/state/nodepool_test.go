@@ -95,6 +95,20 @@ func TestGetOSTag(t *testing.T) {
 			expected:    "archlinuxrolling",
 			expectError: false,
 		},
+		{
+			description: "centos stream / scos maps to rhel major tag",
+			osRelease:   "centos",
+			osVersion:   "10",
+			expected:    "rhel10",
+			expectError: false,
+		},
+		{
+			description: "centos with minor version maps to rhel major tag",
+			osRelease:   "centos",
+			osVersion:   "10.0",
+			expected:    "rhel10",
+			expectError: false,
+		},
 	}
 
 	for _, test := range tests {

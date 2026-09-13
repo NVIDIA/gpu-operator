@@ -600,12 +600,17 @@ func (n *ClusterPolicyController) getGPUNodeOSInfo() (string, string, error) {
 	if !ok {
 		return "", "", fmt.Errorf("unable to retrieve OS version from label %s", nfdOSVersionIDLabelKey)
 	}
-	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag
+	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag.
+	// CentOS Stream / SCOS (OKD) reports ID=centos, but published driver images use the rhel tag family.
+	osTagName := osName
 	switch osName {
+	case "centos":
+		osTagName = "rhel"
+		fallthrough
 	case "ol", "rocky", "rhel":
 		osVersion = strings.Split(osVersion, ".")[0]
 	}
-	osTag := fmt.Sprintf("%s%s", osName, osVersion)
+	osTag := fmt.Sprintf("%s%s", osTagName, osVersion)
 
 	return osName, osTag, nil
 }

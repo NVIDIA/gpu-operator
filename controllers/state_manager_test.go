@@ -106,6 +106,18 @@ func TestGetGPUNodeOSInfo(t *testing.T) {
 			osVersion: "rolling",
 			expected:  "archlinuxrolling",
 		},
+		{
+			name:      "centos stream / scos maps to rhel major tag",
+			osName:    "centos",
+			osVersion: "10",
+			expected:  "rhel10",
+		},
+		{
+			name:      "centos with minor version maps to rhel major tag",
+			osName:    "centos",
+			osVersion: "10.0",
+			expected:  "rhel10",
+		},
 	}
 
 	for _, tc := range testCases {

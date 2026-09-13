@@ -153,13 +153,18 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 }
 
 func getOSTag(osRelease, osVersion string) (string, error) {
+	osID := osRelease
 	var osTagSuffix string
-	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag
+	// If the OS is RockyLinux, Oracle Linux or RHEL, we will omit the minor version when constructing the os image tag.
+	// CentOS Stream / SCOS (OKD) reports ID=centos, but published driver images use the rhel tag family.
 	switch osRelease {
+	case "centos":
+		osID = "rhel"
+		fallthrough
 	case "ol", "rocky", "rhel":
 		osTagSuffix = strings.Split(osVersion, ".")[0]
 	default:
 		osTagSuffix = osVersion
 	}
-	return fmt.Sprintf("%s%s", osRelease, osTagSuffix), nil
+	return fmt.Sprintf("%s%s", osID, osTagSuffix), nil
 }
