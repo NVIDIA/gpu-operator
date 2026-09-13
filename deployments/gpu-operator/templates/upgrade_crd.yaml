@@ -81,10 +81,27 @@ spec:
       {{- end }}
       nodeSelector:
         {{- toYaml .Values.operator.nodeSelector | nindent 8 }}
+      {{- with .Values.operator.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.operator.dnsPolicy }}
+      dnsPolicy: {{ .Values.operator.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.operator.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: upgrade-crd
           image: {{ include "gpu-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - /usr/bin/manage-crds
           args:
