@@ -7,7 +7,6 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/regclient/regclient.svg)](https://pkg.go.dev/github.com/regclient/regclient)
 ![License](https://img.shields.io/github/license/regclient/regclient)
-[![Go Report Card](https://goreportcard.com/badge/github.com/regclient/regclient)](https://goreportcard.com/report/github.com/regclient/regclient)
 [![GitHub Downloads](https://img.shields.io/github/downloads/regclient/regclient/total?label=GitHub%20downloads)](https://github.com/regclient/regclient/releases)
 
 regclient is a client interface to OCI conformant registries and content shipped with the OCI Image Layout.
