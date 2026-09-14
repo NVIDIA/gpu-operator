@@ -165,7 +165,10 @@ func (d Daemonset) WithPodAnnotations(annotations map[string]string) Daemonset {
 }
 
 func (d Daemonset) WithPullSecret(secret string) Daemonset {
-	d.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: secret}}
+	d.Spec.Template.Spec.ImagePullSecrets = append(
+		d.Spec.Template.Spec.ImagePullSecrets,
+		corev1.LocalObjectReference{Name: secret},
+	)
 	return d
 }
 
@@ -2279,6 +2282,12 @@ func TestTransformCCManager(t *testing.T) {
 }
 
 func TestTransformVGPUDeviceManager(t *testing.T) {
+	originalDefaultWorkload := defaultGPUWorkloadConfig
+	defaultGPUWorkloadConfig = "container"
+	t.Cleanup(func() {
+		defaultGPUWorkloadConfig = originalDefaultWorkload
+	})
+
 	resources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -2289,7 +2298,8 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("64Mi"),
 		},
 	}
-	secret := "pull-secret"
+	validatorSecret := "validator-pull-secret"
+	deviceManagerSecret := "device-manager-pull-secret"
 	mockEnv := []gpuv1.EnvVar{{Name: "foo", Value: "bar"}}
 
 	testCases := []struct {
@@ -2301,15 +2311,41 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 		{
 			description: "transform vgpu device manager",
 			daemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name: "vgpu-manager-validation",
+					Env: []corev1.EnvVar{
+						{Name: "WITH_WAIT", Value: "true"},
+						{Name: "COMPONENT", Value: "vgpu-manager"},
+						{
+							Name: "NODE_NAME",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+							},
+						},
+					},
+				}).
 				WithContainer(corev1.Container{Name: "nvidia-vgpu-device-manager"}).
 				WithContainer(corev1.Container{Name: "sidecar"}),
 			clusterPolicySpec: &gpuv1.ClusterPolicySpec{
+				Validator: gpuv1.ValidatorSpec{
+					Repository:       "nvcr.io/nvidia/cloud-native",
+					Image:            "gpu-operator-validator",
+					Version:          "v1.0.0",
+					ImagePullPolicy:  "IfNotPresent",
+					ImagePullSecrets: []string{validatorSecret},
+					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
+					VGPUManager: gpuv1.VGPUManagerValidatorSpec{
+						Env: []gpuv1.EnvVar{
+							{Name: "foo", Value: "bar"},
+						},
+					},
+				},
 				VGPUDeviceManager: gpuv1.VGPUDeviceManagerSpec{
 					Repository:       "nvcr.io/nvidia/cloud-native",
 					Image:            "vgpu-device-manager",
 					Version:          "v1.0.0",
 					ImagePullPolicy:  "IfNotPresent",
-					ImagePullSecrets: []string{secret},
+					ImagePullSecrets: []string{deviceManagerSecret},
 					Resources:        &gpuv1.ResourceRequirements{Limits: resources.Limits, Requests: resources.Requests},
 					Args:             []string{"--test-flag"},
 					Env:              mockEnv,
@@ -2320,6 +2356,27 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 				},
 			},
 			expectedDaemonset: NewDaemonset().
+				WithInitContainer(corev1.Container{
+					Name:            "vgpu-manager-validation",
+					Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env: []corev1.EnvVar{
+						{Name: "WITH_WAIT", Value: "true"},
+						{Name: "COMPONENT", Value: "vgpu-manager"},
+						{
+							Name: "NODE_NAME",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+							},
+						},
+						{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: "container"},
+						{Name: "foo", Value: "bar"},
+					},
+					Resources: resources,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: rootUID,
+					},
+				}).
 				WithContainer(corev1.Container{
 					Name:            "nvidia-vgpu-device-manager",
 					Image:           "nvcr.io/nvidia/cloud-native/vgpu-device-manager:v1.0.0",
@@ -2335,7 +2392,8 @@ func TestTransformVGPUDeviceManager(t *testing.T) {
 					Name:      "sidecar",
 					Resources: resources,
 				}).
-				WithPullSecret(secret),
+				WithPullSecret(validatorSecret).
+				WithPullSecret(deviceManagerSecret),
 		},
 	}
 
@@ -2935,7 +2993,7 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: "container"},
 					{Name: "foo", Value: "bar"},
 				},
 				SecurityContext: &corev1.SecurityContext{
