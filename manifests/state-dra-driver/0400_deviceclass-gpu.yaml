@@ -6,3 +6,6 @@ spec:
   selectors:
     - cel:
         expression: "device.driver == 'gpu.nvidia.com' && device.attributes['gpu.nvidia.com'].type == 'gpu'"
+{{- if eq .DeviceClassAPIVersion "resource.k8s.io/v1" }}
+  extendedResourceName: nvidia.com/gpu
+{{- end }}
