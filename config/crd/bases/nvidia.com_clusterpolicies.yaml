@@ -1137,6 +1137,10 @@ spec:
                     properties:
                       configMapName:
                         type: string
+                      useHostSubscription:
+                        description: UseHostSubscription mounts the host RHEL subscription
+                          configuration with this custom repo configuration.
+                        type: boolean
                     type: object
                   repository:
                     description: NVIDIA Driver image repository
