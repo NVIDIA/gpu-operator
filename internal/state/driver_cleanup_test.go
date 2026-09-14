@@ -324,7 +324,7 @@ func TestGetDriverAdditionalConfigsSLESSubscription(t *testing.T) {
 		nodePool{osRelease: "sles", osVersion: "15.5"},
 	)
 	require.NoError(t, err)
-	assert.True(t, hasSubscriptionVolumeMount(configs.VolumeMounts), "expected SLES subscription mounts")
+	assert.True(t, hasSubscriptionVolumeMount(configs.Volumes, configs.VolumeMounts), "expected SLES subscription mounts")
 }
 
 func TestGetDriverAdditionalConfigsUnsupportedCertOS(t *testing.T) {

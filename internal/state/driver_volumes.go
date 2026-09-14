@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -159,6 +160,7 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 
 		// set any custom ssl key/certificate configuration provided
 		if cr.Spec.IsCertConfigEnabled() {
+			sharedRepoConfig := cr.Spec.IsRepoConfigEnabled() && cr.Spec.RepoConfig.Name == cr.Spec.CertConfig.Name
 			destinationDir, err := getCertConfigPath(pool.osRelease)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
@@ -169,7 +171,9 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
-			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+			if !sharedRepoConfig {
+				additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+			}
 		}
 
 		runtime, err := info.GetContainerRuntime()
@@ -189,8 +193,8 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			// mounting host RHSM paths (/etc/pki/entitlement, redhat.repo, /etc/rhsm): they may
 			// be missing or not directories on minimal nodes, and are not needed when packages
 			// come only from the mounted repo ConfigMap.
-			if cr.Spec.IsRepoConfigEnabled() && pool.osRelease == "rhel" {
-				logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", pool.osVersion)
+			if cr.Spec.IsRepoConfigEnabled() && !cr.Spec.RepoConfig.UseHostSubscription && pool.osRelease == "rhel" {
+				logger.Info("Skipping host subscription mounts because repoConfig is enabled and useHostSubscription is false", "OS", pool.osVersion)
 			} else {
 				logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
 				pathToVolumeSource, err = getSubscriptionPathsToVolumeSources(pool.osRelease)
@@ -206,8 +210,16 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			}
 			sort.Strings(mountPaths)
 
-			for num, mountPath := range mountPaths {
-				volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+			usedVolumeNames := make(map[string]struct{}, len(additionalCfgs.Volumes)+len(mountPaths))
+			for _, volume := range additionalCfgs.Volumes {
+				usedVolumeNames[volume.Name] = struct{}{}
+			}
+			if cr.Spec.IsKernelModuleConfigEnabled() {
+				usedVolumeNames[cr.Spec.KernelModuleConfig.Name] = struct{}{}
+			}
+			volumeIndex := 0
+			for _, mountPath := range mountPaths {
+				volMountSubscriptionName := nextSubscriptionVolumeName(usedVolumeNames, &volumeIndex)
 
 				volMountSubscription := corev1.VolumeMount{
 					Name:      volMountSubscriptionName,
@@ -324,6 +336,24 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	}
 
 	return additionalCfgs, nil
+}
+
+// nextSubscriptionVolumeName returns an unused subscription volume name and records it as used.
+func nextSubscriptionVolumeName(usedVolumeNames map[string]struct{}, volumeIndex *int) string {
+	for {
+		volumeName := fmt.Sprintf("%s%d", consts.SubscriptionVolumeNamePrefix, *volumeIndex)
+		*volumeIndex += 1
+		if _, found := usedVolumeNames[volumeName]; found {
+			continue
+		}
+		usedVolumeNames[volumeName] = struct{}{}
+		return volumeName
+	}
+}
+
+// isHostSubscriptionVolume reports whether a volume is managed for host subscriptions.
+func isHostSubscriptionVolume(volume corev1.Volume) bool {
+	return strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) && volume.HostPath != nil
 }
 
 // getRepoConfigPath returns the standard OS specific path for repository configuration files
