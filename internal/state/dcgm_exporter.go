@@ -79,7 +79,7 @@ func NewStateDCGMExporter(
 		imageEnvName:    dcgmExporterImageEnvName,
 		buildRenderData: buildDCGMExporterRenderData,
 		preSync:         checkDCGMExporterServiceAccount,
-		postSync:        reconcileDCGMExporterServiceAccountOwnership,
+		postSync:        reclaimSupersededDCGMExporterServiceAccounts,
 		preDelete:       releaseDCGMExporterServiceAccountOnDelete,
 	}, nil
 }
@@ -159,10 +159,10 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 	}, nil
 }
 
-// checkDCGMExporterServiceAccount reconciles the parts of the ServiceAccount contract the
-// manifests cannot express: a ServiceAccount the user brings has to already exist, one the
-// operator would manage must not be an existing object owned by somebody else, and the
-// operator-owned default is removed once a different name takes over.
+// checkDCGMExporterServiceAccount runs before the manifests are applied and reconciles the
+// parts of the ServiceAccount contract the templates cannot express: a ServiceAccount the
+// user brings has to already exist and is handed back if the operator used to manage it,
+// and one the operator would manage must not be an existing object owned by somebody else.
 func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
 	spec := cr.Spec.DCGMExporter
 	name := spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
@@ -170,7 +170,8 @@ func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, 
 	if !spec.IsServiceAccountCreateEnabled() {
 		// The manifests omit the ServiceAccount entirely, so a missing one would leave
 		// the DaemonSet pending without any signal.
-		if _, err := s.getServiceAccount(ctx, name); err != nil {
+		sa, err := s.getServiceAccount(ctx, name)
+		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return fmt.Errorf(
 					"ServiceAccount %q configured with create=false does not exist in namespace %q",
@@ -178,7 +179,12 @@ func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, 
 			}
 			return err
 		}
-		return nil
+		// The same object may have been operator-managed before create was set to false.
+		// It is handed back here, before the operands sync, rather than once they
+		// converged: a DaemonSet that never becomes Ready would otherwise keep this CR's
+		// controller reference on the ServiceAccount indefinitely, and deleting the
+		// GPUCluster would garbage-collect an object the user now owns.
+		return s.releaseServiceAccount(ctx, cr, sa)
 	}
 
 	if name == dcgmExporterDefaultServiceAccountName {
@@ -230,33 +236,14 @@ func guardDCGMExporterServiceAccountAdoption(owner metav1.Object, current *unstr
 	return dcgmExporterServiceAccountTakeoverError(current.GetName(), current.GetNamespace())
 }
 
-// reconcileDCGMExporterServiceAccountOwnership runs once the manifests converged. It
-// reclaims the operator default a different ServiceAccount superseded, and releases
-// ownership of a ServiceAccount the user took over with create=false.
-func reconcileDCGMExporterServiceAccountOwnership(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
-	spec := cr.Spec.DCGMExporter
-	name := spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
-
-	if !spec.IsServiceAccountCreateEnabled() {
-		// The same object may have been operator-managed before create was set to false.
-		// Both the controller reference and the state label have to go, otherwise it is
-		// garbage-collected with the GPUCluster or swept by the state cleanup.
-		sa, err := s.getServiceAccount(ctx, name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		if err := s.releaseServiceAccount(ctx, cr, sa); err != nil {
-			return err
-		}
-	}
-
-	if name == dcgmExporterDefaultServiceAccountName {
-		return nil
-	}
-	return s.deleteOwnedServiceAccount(ctx, cr, dcgmExporterDefaultServiceAccountName)
+// reclaimSupersededDCGMExporterServiceAccounts runs once the manifests converged and removes
+// the ServiceAccounts this state created under a previous configuration. Waiting for
+// convergence matters here, unlike for the hand-back in checkDCGMExporterServiceAccount:
+// deleting a ServiceAccount the DaemonSet still referenced would leave its pods without an
+// identity, whereas releasing ownership changes nothing the operands can observe.
+func reclaimSupersededDCGMExporterServiceAccounts(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	return s.deleteSupersededServiceAccounts(ctx, cr,
+		cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName))
 }
 
 // releaseDCGMExporterServiceAccountOnDelete hands a user-provided ServiceAccount back
@@ -281,10 +268,15 @@ func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configura
 	return s.releaseServiceAccount(ctx, cr, sa)
 }
 
-// releaseServiceAccount drops this GPUCluster's controller reference and the state label
-// from a ServiceAccount the user now owns.
+// releaseServiceAccount hands a ServiceAccount the user now owns back to them by dropping
+// this GPUCluster's controller reference and the state label. Only a ServiceAccount this
+// state managed is touched: every operand of the GPUCluster carries its controller
+// reference, so checking ownership alone would also strip the reference and label off
+// another state's ServiceAccount when the user points create=false at it.
 func (s *configurableState) releaseServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, sa *corev1.ServiceAccount) error {
-	changed := false
+	if sa.Labels[consts.StateLabel] != s.name {
+		return nil
+	}
 	if metav1.IsControlledBy(sa, cr) {
 		refs := make([]metav1.OwnerReference, 0, len(sa.OwnerReferences))
 		for _, ref := range sa.OwnerReferences {
@@ -294,15 +286,8 @@ func (s *configurableState) releaseServiceAccount(ctx context.Context, cr *nvidi
 			refs = append(refs, ref)
 		}
 		sa.OwnerReferences = refs
-		changed = true
 	}
-	if _, ok := sa.Labels[consts.StateLabel]; ok {
-		delete(sa.Labels, consts.StateLabel)
-		changed = true
-	}
-	if !changed {
-		return nil
-	}
+	delete(sa.Labels, consts.StateLabel)
 	log.FromContext(ctx).V(consts.LogLevelInfo).Info(
 		"Releasing ownership of a user-provided dcgm-exporter ServiceAccount", "Name", sa.Name)
 	return s.client.Update(ctx, sa)
@@ -315,25 +300,29 @@ func (s *configurableState) getServiceAccount(ctx context.Context, name string) 
 	return sa, err
 }
 
-// deleteOwnedServiceAccount removes a ServiceAccount left behind by a previous
-// configuration, but only when this CR owns it: an object the user provisioned under the
-// same name is left alone. Renaming from one custom name to another is not tracked, so
-// only the operator default is reclaimed here.
-func (s *configurableState) deleteOwnedServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, name string) error {
-	sa, err := s.getServiceAccount(ctx, name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
+// deleteSupersededServiceAccounts removes every ServiceAccount carrying this state's label
+// that this CR controls, except the one named keep. Finding them by label rather than by
+// name is what covers a rename from one custom name to another, or back to the default: no
+// record of the previous configuration exists, but every ServiceAccount the state ever
+// created still carries its label. A ServiceAccount the user provisioned under one of those
+// names carries no controller reference from this CR and is left alone.
+func (s *configurableState) deleteSupersededServiceAccounts(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, keep string) error {
+	list := &corev1.ServiceAccountList{}
+	if err := s.client.List(ctx, list,
+		client.InNamespace(s.namespace),
+		client.MatchingLabels{consts.StateLabel: s.name}); err != nil {
+		return err
+	}
+	for i := range list.Items {
+		sa := &list.Items[i]
+		if sa.Name == keep || !metav1.IsControlledBy(sa, cr) {
+			continue
 		}
-		return err
-	}
-	if !metav1.IsControlledBy(sa, cr) {
-		return nil
-	}
-	log.FromContext(ctx).V(consts.LogLevelInfo).Info(
-		"Removing the superseded dcgm-exporter ServiceAccount", "Name", name)
-	if err := s.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
-		return err
+		log.FromContext(ctx).V(consts.LogLevelInfo).Info(
+			"Removing a dcgm-exporter ServiceAccount superseded by the configured one", "Name", sa.Name)
+		if err := s.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }

@@ -53,7 +53,9 @@ type configurableState struct {
 	// preSync runs after the manifests render but before they are applied, for operands
 	// that depend on cluster state the templates cannot express. Returning an error marks
 	// the state NotReady, so it is the place to surface a misconfiguration instead of
-	// applying objects that cannot converge.
+	// applying objects that cannot converge. It is also where an object the user took over
+	// is handed back: the hand-off must not wait on the operands converging, or a
+	// DaemonSet that never becomes Ready would hold the owner reference in place.
 	preSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 
 	// postSync runs after the manifests converged. Reclaiming objects a previous
