@@ -181,9 +181,10 @@ assert_fails "no subcommand is rejected" bash "${gen}"
 assert_fails "an unknown subcommand is rejected" bash "${gen}" notarealmode
 assert_fails "release without --version is rejected" bash "${gen}" release
 assert_fails "--version on repo is rejected" bash "${gen}" repo --version v1.2.3
-assert_fails "--commit on repo is rejected" bash "${gen}" repo --commit 0123456789abcdef0123456789abcdef01234567
-assert_fails "release without --commit is rejected" bash "${gen}" release --version v1.2.3
-assert_fails "release with a short SHA is rejected" bash "${gen}" release --version v1.2.3 --commit abc1234
+assert_fails "--link-ref on repo is rejected" bash "${gen}" repo --link-ref v1.2.3
+assert_fails "release without --link-ref is rejected" bash "${gen}" release --version v1.2.3
+assert_fails "release with a path-shaped link ref is rejected" \
+    bash "${gen}" release --version v1.2.3 --link-ref refs/heads/main
 assert_fails "a version containing a path separator is rejected" \
     bash "${gen}" release --version ../../etc/passwd
 assert_fails "an unknown flag is rejected" bash "${gen}" repo --nope
