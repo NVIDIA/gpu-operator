@@ -38,8 +38,12 @@ REPO_URL="${REPO_URL:-https://github.com/NVIDIA/gpu-operator}"
 MODE=""
 RELEASE_VERSION=""
 LINK_REF="main"
+BASE_IMAGE_REPOSITORY=""
+BASE_IMAGE_TAG=""
 LICENSE_OVERRIDES="${LICENSE_OVERRIDES:-tools/license-overrides.tsv}"
 DOCKERFILE="${DOCKERFILE:-docker/Dockerfile}"
+BUNDLED_COMPONENTS="${BUNDLED_COMPONENTS:-tools/bundled-components.tsv}"
+LICENSE_TEXTS_DIR="${LICENSE_TEXTS_DIR:-tools/licenses}"
 
 PACKAGES=("./cmd/...")
 
@@ -91,7 +95,7 @@ check_prerequisites() {
     fi
 
     local required_file
-    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}" "${DOCKERFILE}"; do
+    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}" "${DOCKERFILE}" "${BUNDLED_COMPONENTS}"; do
         [[ -f "${required_file}" ]] \
             || die "${required_file} not found — run 'make third-party-notices' from the repo root."
     done
@@ -379,12 +383,15 @@ base_image_from_dockerfile() {
 # NVIDIA publishes distroless sources per released version. A "-dev" tag is
 # built from the sources published under the corresponding release version, so
 # the suffix is dropped to find the index.
-emit_base_image_table() {
-    local repository tag image_name index_version
-    IFS=$'\t' read -r repository tag < <(base_image_from_dockerfile)
+resolve_base_image() {
+    IFS=$'\t' read -r BASE_IMAGE_REPOSITORY BASE_IMAGE_TAG < <(base_image_from_dockerfile)
+}
 
-    image_name="${repository##*/}"
-    index_version="${tag%-dev}"
+emit_base_image_table() {
+    local image_name index_version
+    [[ -n "${BASE_IMAGE_REPOSITORY}" ]] || resolve_base_image
+    image_name="${BASE_IMAGE_REPOSITORY##*/}"
+    index_version="${BASE_IMAGE_TAG%-dev}"
 
     cat <<'EOF'
 The base image's own sources are published per version. A `-dev` variant is
@@ -394,7 +401,153 @@ built from the sources published under the corresponding release version.
 |-------|---------|------|--------------------|
 EOF
     printf '| `%s` | `%s` | final runtime base | [NVIDIA Distroless OSS source index](https://developer.download.nvidia.com/distroless-oss/%s/%s/index.html) |\n' \
-        "${repository}" "${tag}" "${image_name}" "${index_version}"
+        "${BASE_IMAGE_REPOSITORY}" "${BASE_IMAGE_TAG}" "${image_name}" "${index_version}"
+}
+
+# An ARG's default value, as declared in the Dockerfile. awk rather than sed:
+# BSD sed has no \+, so the same expression matches on Linux and not on macOS.
+dockerfile_arg() {
+    local name="$1" value
+    value=$(LC_ALL=C awk -v name="${name}" '
+        $1 == "ARG" && index($2, name "=") == 1 { print substr($2, length(name) + 2); exit }
+    ' "${DOCKERFILE}")
+    [[ -n "${value}" ]] || return 1
+    printf '%s' "${value}"
+}
+
+# Substitutes ${ARG} references against the Dockerfile's declared defaults. A
+# release built with --build-arg overrides would not match, which is why the
+# base image itself is required to be a literal.
+expand_dockerfile_args() {
+    local text="$1" name value
+    while [[ "${text}" =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+        name="${BASH_REMATCH[1]}"
+        # Assigned first: a die here would only exit the substitution's
+        # subshell, and the expansion would silently produce an empty version.
+        value="$(dockerfile_arg "${name}")" \
+            || die "ARG ${name} has no default in ${DOCKERFILE}, so ${text} cannot be resolved."
+        text="${text//\$\{${name}\}/${value}}"
+    done
+    printf '%s' "${text}"
+}
+
+# Source paths the final stage copies out of an earlier build stage, in order.
+final_stage_copy_sources() {
+    LC_ALL=C awk -v base="${BASE_IMAGE_REPOSITORY}" '
+        $1 == "FROM" && index($2, base) == 1 { in_final = 1; next }
+        in_final && $1 == "COPY" && $2 ~ /^--from=/ { print $3 "\t" $4 }
+    ' "${DOCKERFILE}"
+}
+
+bundled_component_row() {
+    LC_ALL=C awk -F'\t' -v key="$1" '
+        /^#/ { next }
+        $1 == key { print; found = 1; exit }
+        END { exit !found }
+    ' "${BUNDLED_COMPONENTS}"
+}
+
+# Fails when the final stage copies something no row accounts for, so a new
+# component cannot reach the image without an attribution decision.
+check_bundled_coverage() {
+    local source_path destination expanded
+    while IFS=$'\t' read -r source_path destination; do
+        [[ -z "${source_path}" ]] && continue
+        expanded="$(expand_dockerfile_args "${source_path}")" || exit 1
+        bundled_component_row "${source_path}" >/dev/null \
+            || bundled_component_row "${expanded}" >/dev/null \
+            || die "${DOCKERFILE} copies ${source_path} into the released image, and ${BUNDLED_COMPONENTS} has no row for it." \
+                   "Add one saying what it is and under what terms it is redistributed."
+    done < <(final_stage_copy_sources)
+}
+
+# A version recorded by hand is only true of the image it was observed in, so
+# bumping that image must force someone to re-check it rather than letting the
+# document keep asserting the old one.
+check_recorded_versions() {
+    local source_path component provenance_digest
+    while IFS=$'\t' read -r source_path component _ _ _ _ _ provenance_digest _; do
+        case "${source_path}" in ''|'#'*) continue ;; esac
+        [[ "${provenance_digest}" == "-" ]] && continue
+        LC_ALL=C grep -qF "${provenance_digest}" "${DOCKERFILE}" \
+            || die "${BUNDLED_COMPONENTS} records ${component}'s version from ${provenance_digest}, which ${DOCKERFILE} no longer builds from." \
+                   "Re-check the version in the new image and update the row."
+    done < "${BUNDLED_COMPONENTS}"
+}
+
+emit_bundled_index() {
+    local source_path destination component disposition version license license_file source_url notes
+    local provenance_digest expanded row rendered_version rendered_source
+
+    cat <<'EOF'
+
+## Bundled Components
+
+The image also carries software that is not a Go module: binaries and libraries
+copied in by the Dockerfile. Components built from this repository are covered
+by the Dependency Index above and are not repeated here.
+
+| Component | Version | License | Notices and source |
+|-----------|---------|---------|--------------------|
+EOF
+
+    while IFS=$'\t' read -r source_path destination; do
+        [[ -z "${source_path}" ]] && continue
+        expanded="$(expand_dockerfile_args "${source_path}")" || exit 1
+        row="$(bundled_component_row "${source_path}")" || row="$(bundled_component_row "${expanded}")"
+        IFS=$'\t' read -r _ component disposition version license license_file source_url provenance_digest notes <<< "${row}"
+        # project and first-party components are not third party to NVIDIA.
+        case "${disposition}" in project|first-party) continue ;; esac
+
+        rendered_version="$(expand_dockerfile_args "${version}")" || exit 1
+        [[ "${rendered_version}" == "-" ]] && rendered_version="not pinned by the build"
+        rendered_source="$(expand_dockerfile_args "${source_url}")" || exit 1
+        printf '| `%s` | %s | %s | [source](%s) |\n' \
+            "${component}" "${rendered_version}" "${license}" "${rendered_source}"
+    done < <(final_stage_copy_sources)
+}
+
+emit_bundled_sections() {
+    local source_path destination component disposition version license license_file source_url notes
+    local provenance_digest expanded row rendered_version rendered_source text_path fence
+
+    printf '\n## Bundled Component License Texts\n\n'
+
+    while IFS=$'\t' read -r source_path destination; do
+        [[ -z "${source_path}" ]] && continue
+        expanded="$(expand_dockerfile_args "${source_path}")" || exit 1
+        row="$(bundled_component_row "${source_path}")" || row="$(bundled_component_row "${expanded}")"
+        IFS=$'\t' read -r _ component disposition version license license_file source_url provenance_digest notes <<< "${row}"
+        # project and first-party components are not third party to NVIDIA.
+        case "${disposition}" in project|first-party) continue ;; esac
+
+        rendered_version="$(expand_dockerfile_args "${version}")" || exit 1
+        [[ "${rendered_version}" == "-" ]] && rendered_version="not pinned by the build"
+
+        printf '### %s\n\n' "${component}"
+        printf '* Version: %s\n' "${rendered_version}"
+        printf '* License: %s\n' "${license}"
+        printf '* Installed at: `%s`\n' "$(expand_dockerfile_args "${destination}")"
+        rendered_source="$(expand_dockerfile_args "${source_url}")" || exit 1
+        printf '* Corresponding source: <%s>\n' "${rendered_source}"
+        [[ -n "${notes}" ]] && printf '* Note: %s\n' "${notes}"
+        printf '\n'
+
+        if [[ "${license_file}" == "-" ]]; then
+            printf 'Redistributed under NVIDIA terms rather than an open source license, so the text is referenced above rather than reproduced.\n\n'
+            continue
+        fi
+
+        text_path="${LICENSE_TEXTS_DIR}/${license_file}"
+        [[ -f "${text_path}" ]] \
+            || die "${BUNDLED_COMPONENTS} names ${license_file} for ${component}, which is missing from ${LICENSE_TEXTS_DIR}."
+        fence="$(fence_for "${text_path}")"
+        printf '#### %s\n\n' "${license_file##*/}"
+        printf '%stext\n' "${fence}"
+        cat "${text_path}"
+        echo
+        printf '%s\n\n' "${fence}"
+    done < <(final_stage_copy_sources)
 }
 
 emit_index_table() {
@@ -525,13 +678,13 @@ EOF
         if [[ "${MODE}" == release ]]; then
             cat <<'EOF'
 
-A statically compiled busybox binary is added to the image, which is licensed
-under GPLv2. The image also carries a CUDA sample and the CUDA compatibility
-libraries, which are handled separately, including any source-distribution
-obligations they carry.
+Software the Dockerfile adds on top of the base image is listed under Bundled
+Components below, with its license and corresponding source. NVIDIA's own
+components are not third party to NVIDIA and are out of scope here.
 
 EOF
             emit_base_image_table
+            emit_bundled_index
         else
             cat <<'EOF'
 
@@ -558,6 +711,10 @@ EOF
 
 EOF
         emit_sections "${INDEX_FILE}"
+
+        if [[ "${MODE}" == release ]]; then
+            emit_bundled_sections
+        fi
     } > "${OUT_TMP}"
     # mktemp creates 0600, so fix the mode before the rename. mv, not cp: the
     # rename is atomic, so a failed run leaves the previous document intact.
@@ -633,6 +790,11 @@ main() {
 
     check_prerequisites
     verify_platform_matrix
+    if [[ "${MODE}" == release ]]; then
+        resolve_base_image
+        check_bundled_coverage
+        check_recorded_versions
+    fi
     prepare_workspace
 
     collect_licenses
