@@ -241,6 +241,80 @@ assert_fails "a non-distroless base image is refused" \
 rm -f "${dockerfile_fixture}" "${dev_dockerfile}" "${interpolated_dockerfile}" \
       "${undigested_dockerfile}" "${foreign_dockerfile}"
 
+bundled_dockerfile="$(mktemp)"
+cat > "${bundled_dockerfile}" <<'DOCKERFILE'
+ARG CUDA_SAMPLES_VERSION=12.9
+FROM debian:trixie-slim@sha256:0000000000000000000000000000000000000000000000000000000000000000 AS shell
+FROM nvcr.io/nvidia/distroless/cc:v4.1.4@sha256:1111111111111111111111111111111111111111111111111111111111111111
+COPY --from=shell /busybox /busybox
+COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY assets /opt/gpu-operator/
+DOCKERFILE
+
+assert_eq "12.9" \
+    "$(DOCKERFILE="${bundled_dockerfile}" dockerfile_arg CUDA_SAMPLES_VERSION)" \
+    "dockerfile_arg reads an ARG default"
+assert_eq "/usr/local/cuda-12.9/compat" \
+    "$(DOCKERFILE="${bundled_dockerfile}" expand_dockerfile_args '/usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat')" \
+    "expand_dockerfile_args substitutes a declared ARG"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
+assert_fails "expand_dockerfile_args refuses an ARG with no default" \
+    env DOCKERFILE="${bundled_dockerfile}" bash -c \
+    'source "$1"; expand_dockerfile_args "${UNDECLARED_ARG}"' _ "${HERE}/generate-third-party-notices.sh"
+
+# Only COPY --from lines matter: a build-context COPY brings in repository
+# content, which the Dependency Index already covers.
+assert_eq "$(printf '/busybox\t/busybox\n/workspace/gpu-operator\t/usr/bin/')" \
+    "$(DOCKERFILE="${bundled_dockerfile}" BASE_IMAGE_REPOSITORY=nvcr.io/nvidia/distroless/cc \
+       final_stage_copy_sources)" \
+    "final_stage_copy_sources reads only the final stage's COPY --from lines"
+
+bundled_fixture="$(mktemp)"
+printf '# source_path\tcomponent\tdisposition\tversion\tlicense\tlicense_file\tsource_url\tnotes\n' > "${bundled_fixture}"
+printf '/workspace/gpu-operator\tgpu-operator\tproject\t-\t-\t-\t-\t\n' >> "${bundled_fixture}"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
+assert_fails "check_bundled_coverage fails when a copied path has no row" \
+    env DOCKERFILE="${bundled_dockerfile}" BUNDLED_COMPONENTS="${bundled_fixture}" \
+    BASE_IMAGE_REPOSITORY=nvcr.io/nvidia/distroless/cc bash -c \
+    'source "$1"; check_bundled_coverage' _ "${HERE}/generate-third-party-notices.sh"
+
+printf '/busybox\tbusybox\tthird-party\t-\tGPL-2.0-only\tabsent/LICENSE\thttps://example.invalid/src\t\n' >> "${bundled_fixture}"
+assert_eq "0" \
+    "$(DOCKERFILE="${bundled_dockerfile}" BUNDLED_COMPONENTS="${bundled_fixture}" \
+       BASE_IMAGE_REPOSITORY=nvcr.io/nvidia/distroless/cc bash -c \
+       'source "$1"; check_bundled_coverage' _ "${HERE}/generate-third-party-notices.sh" >/dev/null 2>&1; echo $?)" \
+    "check_bundled_coverage passes once every copied path has a row"
+
+# A row naming a licence text we do not ship would print an empty section.
+# shellcheck disable=SC2016
+assert_fails "emit_bundled_sections fails when the named licence text is missing" \
+    env DOCKERFILE="${bundled_dockerfile}" BUNDLED_COMPONENTS="${bundled_fixture}" \
+    LICENSE_TEXTS_DIR="${render}/no-licenses" \
+    BASE_IMAGE_REPOSITORY=nvcr.io/nvidia/distroless/cc bash -c \
+    'source "$1"; emit_bundled_sections' _ "${HERE}/generate-third-party-notices.sh"
+
+# A hand-recorded version outlives the image it was read from unless something
+# notices the image changed.
+recorded_fixture="$(mktemp)"
+printf '/busybox\tbusybox\tthird-party\t1:1.37.0-6\tGPL-2.0-only\tbusybox/LICENSE\thttps://example.invalid/copyright\tsha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\n' > "${recorded_fixture}"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
+assert_fails "check_recorded_versions fails when the recorded image is no longer built from" \
+    env DOCKERFILE="${bundled_dockerfile}" BUNDLED_COMPONENTS="${recorded_fixture}" bash -c \
+    'source "$1"; check_recorded_versions' _ "${HERE}/generate-third-party-notices.sh"
+
+printf '/busybox\tbusybox\tthird-party\t1:1.37.0-6\tGPL-2.0-only\tbusybox/LICENSE\thttps://example.invalid/copyright\tsha256:0000000000000000000000000000000000000000000000000000000000000000\t\n' > "${recorded_fixture}"
+assert_eq "0" \
+    "$(DOCKERFILE="${bundled_dockerfile}" BUNDLED_COMPONENTS="${recorded_fixture}" bash -c \
+       'source "$1"; check_recorded_versions' _ "${HERE}/generate-third-party-notices.sh" >/dev/null 2>&1; echo $?)" \
+    "check_recorded_versions passes while the recorded image is still in the Dockerfile"
+
+rm -f "${recorded_fixture}"
+
+rm -f "${bundled_dockerfile}" "${bundled_fixture}"
+
 rm -rf "${vendor_fixture}" "${render}"
 rm -f "${modules_fixture}" "${index_input}" "${empty_overrides_fixture}" "${overrides_fixture}" "${stale_overrides}"
 
