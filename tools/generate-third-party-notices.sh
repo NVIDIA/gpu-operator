@@ -726,11 +726,12 @@ usage() {
     cat >&2 <<'EOF'
 Usage:
   generate-third-party-notices.sh repo    [--output FILE]
-  generate-third-party-notices.sh release --version VERSION --commit SHA \
+  generate-third-party-notices.sh release --version VERSION --link-ref REF \
                                           [--repo-url URL] [--output FILE]
 
-  repo     the document tracked on main: no versions, cites main
-  release  the artifact for one commit: versions, cites that commit
+  repo      the document tracked on main: no versions, cites main
+  release   the artifact for one ref: versions, cites that ref
+  --link-ref  tag the release was cut from, or a full 40-character SHA
 EOF
     exit 2
 }
@@ -745,13 +746,13 @@ parse_arguments() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --version|--commit|--repo-url)
+            --version|--link-ref|--repo-url)
                 [[ "${MODE}" == release || "$1" == --repo-url ]] \
                     || die "$1 is only valid for the release subcommand."
                 [[ $# -ge 2 ]] || die "$1 needs a value."
                 case "$1" in
                     --version)  RELEASE_VERSION="$2" ;;
-                    --commit)   LINK_REF="$2" ;;
+                    --link-ref) LINK_REF="$2" ;;
                     --repo-url) REPO_URL="$2" ;;
                 esac
                 shift 2
@@ -770,18 +771,22 @@ parse_arguments() {
 
     if [[ "${MODE}" == release ]]; then
         [[ -n "${RELEASE_VERSION}" ]] || die "the release subcommand needs --version."
+        [[ -n "${LINK_REF}" && "${LINK_REF}" != main ]] \
+            || die "the release subcommand needs --link-ref."
         # The version reaches a filename and a Markdown table cell, so it must
         # not be able to escape either.
         [[ "${RELEASE_VERSION}" != */* ]] \
             || die "invalid --version '${RELEASE_VERSION}': must not contain '/'."
-        # A tag can be re-pointed at another commit later; a commit cannot, so
-        # the links are pinned to the commit even when a tag names the release.
-        [[ "${LINK_REF}" =~ ^[0-9a-f]{40}$ ]] \
-            || die "the release subcommand needs --commit with a full 40-character SHA."
+        # A tag reads better in a published document than a 40-character SHA.
+        # It is worth knowing that a tag can be re-pointed at another commit
+        # later, at which point these links serve bytes this document never
+        # described; a SHA cannot move, and is accepted for that reason.
+        [[ "${LINK_REF}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+            || die "invalid --link-ref '${LINK_REF}': expected a tag name or a full 40-character SHA."
         [[ -n "${output_given}" ]] \
             || OUTPUT="gpu-operator-${RELEASE_VERSION}-THIRD_PARTY_NOTICES.md"
     else
-        [[ "${LINK_REF}" == main ]] || die "--commit is only valid for the release subcommand."
+        [[ "${LINK_REF}" == main ]] || die "--link-ref is only valid for the release subcommand."
     fi
 }
 

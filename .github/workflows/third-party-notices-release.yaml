@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Manually triggered, and it publishes nothing: the document is left as a
-# workflow artifact for a human to review and attach where it is wanted. A
-# release asset is public and permanent, so putting one there is a decision, not
-# a side effect of running this.
+# Manually triggered, and it publishes nothing: the document is written outside
+# the checkout and left as a workflow artifact for a human to review and attach
+# where it is wanted. A release asset is public and permanent, so putting one
+# there is a decision, not a side effect of running this.
 #
 # Only tags carrying this tooling can be generated. Tags from before it was
 # added contain no generator and no go-licenses entry in tools/tools.go, so
@@ -59,8 +59,8 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
 
-      # Every license link in the document is pinned to this commit, and it is
-      # recorded in the job summary, because a tag alone does not pin one.
+      # Recorded in the job summary because a tag alone does not identify a
+      # commit, and a tag can be moved after this runs.
       - name: Resolve the ref to a commit
         id: resolve
         run: echo "resolved_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
@@ -84,23 +84,27 @@ jobs:
         env:
           GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
           INPUT_REF: ${{ inputs.ref }}
-          RESOLVED_SHA: ${{ steps.resolve.outputs.resolved_sha }}
           # Whichever repository this runs in, so a fork's artifact cites the
-          # fork, where the commit it names actually exists.
+          # fork, where the ref it names actually exists.
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           make install-tools
+          artifact_name="gpu-operator-${INPUT_REF}-THIRD_PARTY_NOTICES.md"
           bash tools/generate-third-party-notices.sh release \
             --version "${INPUT_REF}" \
-            --commit "${RESOLVED_SHA}" \
-            --repo-url "${REPO_URL}"
-          echo "artifact_name=gpu-operator-${INPUT_REF}-THIRD_PARTY_NOTICES.md" >> "${GITHUB_OUTPUT}"
+            --link-ref "${INPUT_REF}" \
+            --repo-url "${REPO_URL}" \
+            --output "${RUNNER_TEMP}/${artifact_name}"
+          {
+            echo "artifact_name=${artifact_name}"
+            echo "artifact_path=${RUNNER_TEMP}/${artifact_name}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Upload the notices artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.generate.outputs.artifact_name }}
-          path: ${{ steps.generate.outputs.artifact_name }}
+          path: ${{ steps.generate.outputs.artifact_path }}
           if-no-files-found: error
 
       - name: Summarise
