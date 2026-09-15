@@ -194,10 +194,6 @@ license-check:
 third-party-notices: install-tools
 	@bash tools/generate-third-party-notices.sh repo
 
-# Generates to a temporary file and compares, rather than regenerating in place
-# and running 'git diff'. An in-place check reports success whenever the
-# generator writes somewhere other than the committed path, so it would pass
-# without having compared anything.
 .PHONY: check-third-party-notices
 check-third-party-notices: install-tools
 	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."

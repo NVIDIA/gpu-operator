@@ -1,22 +1,6 @@
-# Curated license identifiers for packages whose license file bundles more
-# than one license as a single document. go-licenses classifies such a file
-# as whichever license it scores highest and reports only that one, so the
-# reported identifier understates the terms even though the license text
-# reproduced in THIRD_PARTY_NOTICES.md already carries every license in full.
-#
-# Join with SPDX 'AND' when every license listed applies to some part of the
-# component. A slash reads as a choice between them, which understates the
-# obligation for a file that is governed by both at once.
-#
-# Add a row here only when you have read the vendored license file yourself
-# and confirmed by eye which licenses it actually contains — do not derive
-# an entry by grepping license text for phrases, which cannot reliably tell
-# similar licenses apart (e.g. BSD-2-Clause vs BSD-3-Clause) and risks adding
-# a wrong claim to a legal document.
-#
-# A row for a package that is no longer shipped fails the generator, so a
-# dropped dependency cannot leave a stale license claim behind.
-#
-# package	license	reason
+# Curated identifiers for license files bundling more than one license.
+# Add a row only after reading the vendored file yourself; joining with SPDX
+# AND asserts both apply, and a slash would read as a choice between them.
+# package	license_identifier	observed_contents
 go.yaml.in/yaml/v2	Apache-2.0 AND MIT	ships LICENSE (Apache-2.0) and LICENSE.libyaml (MIT, for the Go port of libyaml) as two files; go-licenses reports only the Apache-2.0 LICENSE
 go.yaml.in/yaml/v3	Apache-2.0 AND MIT	single LICENSE opening "This project is covered by two different licenses: MIT and Apache", with a full-text MIT section and an Apache-2.0 section; go-licenses reports only MIT

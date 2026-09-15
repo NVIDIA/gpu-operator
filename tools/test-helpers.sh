@@ -27,14 +27,16 @@ assert_eq() {
     fi
 }
 
-# Output is captured so an expected failure does not pollute the log.
 assert_fails() {
     local description="$1"
     shift
+    local status=0 output
     TESTS_RUN=$(( TESTS_RUN + 1 ))
-    if "$@" >/dev/null 2>&1; then
+    output="$("$@" 2>&1)" || status=$?
+    if (( status == 0 )) || (( status == 127 )); then
         TESTS_FAILED=$(( TESTS_FAILED + 1 ))
-        printf 'FAIL: %s\n  expected non-zero exit, got 0\n' "${description}" >&2
+        printf 'FAIL: %s\n  expected a deliberate non-zero exit, got %d\n  output: %s\n' \
+            "${description}" "${status}" "${output}" >&2
     fi
 }
 

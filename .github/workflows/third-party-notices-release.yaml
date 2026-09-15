@@ -12,15 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Manually triggered, and it publishes nothing: the document is written outside
-# the checkout and left as a workflow artifact for a human to review and attach
-# where it is wanted. A release asset is public and permanent, so putting one
-# there is a decision, not a side effect of running this.
-#
-# Only tags carrying this tooling can be generated. Tags from before it was
-# added contain no generator and no go-licenses entry in tools/tools.go, so
-# there is nothing at that ref to run.
-
 name: Third-Party Notices Release Artifact
 
 on:
@@ -42,13 +33,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # A branch name would let a document that looks frozen describe a moving
-      # target, so only an immutable ref is accepted.
       - name: Validate the requested ref
         env:
           INPUT_REF: ${{ inputs.ref }}
         run: |
-          if [[ ! "${INPUT_REF}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*|[0-9a-f]{40})$ ]]; then
+          if [[ ! "${INPUT_REF}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*|[0-9a-fA-F]{40})$ ]]; then
             echo "::error::'${INPUT_REF}' is not a release tag or a full 40-character commit SHA."
             exit 1
           fi
@@ -57,10 +46,27 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.ref }}
+          fetch-depth: 0
           persist-credentials: false
 
-      # Recorded in the job summary because a tag alone does not identify a
-      # commit, and a tag can be moved after this runs.
+      - name: Require the ref to be a tag or a commit on one
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          if [[ "${INPUT_REF}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            if [[ "$(git rev-parse HEAD)" != "$(echo "${INPUT_REF}" | tr '[:upper:]' '[:lower:]')" ]]; then
+              echo "::error::${INPUT_REF} is not the checked-out commit."
+              exit 1
+            fi
+            exit 0
+          fi
+          tag_commit="$(git rev-parse --verify --quiet "refs/tags/${INPUT_REF}^{commit}")" \
+            || { echo "::error::'${INPUT_REF}' is not a tag in this repository."; exit 1; }
+          if [[ "$(git rev-parse HEAD)" != "${tag_commit}" ]]; then
+            echo "::error::tag '${INPUT_REF}' points at ${tag_commit}, not the checked-out commit."
+            exit 1
+          fi
+
       - name: Resolve the ref to a commit
         id: resolve
         run: echo "resolved_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
@@ -84,8 +90,6 @@ jobs:
         env:
           GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
           INPUT_REF: ${{ inputs.ref }}
-          # Whichever repository this runs in, so a fork's artifact cites the
-          # fork, where the ref it names actually exists.
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           make install-tools
