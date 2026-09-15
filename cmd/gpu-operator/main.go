@@ -28,7 +28,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
 	apiconfigv1 "github.com/openshift/api/config/v1"
@@ -51,7 +50,6 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 	"github.com/NVIDIA/gpu-operator/internal/predicates"
 	// +kubebuilder:scaffold:imports
@@ -126,15 +124,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	openshiftNamespace := consts.OpenshiftNamespace
-	cacheOptions := cache.Options{
-		DefaultNamespaces: map[string]cache.Config{
-			operatorNamespace: {},
-			// Also cache resources in the openshift namespace to retrieve ImageStreams when on an openshift  cluster
-			openshiftNamespace: {},
-		},
-	}
-
 	options := ctrl.Options{
 		Scheme:                  scheme,
 		Metrics:                 metricsOptions,
@@ -144,7 +133,8 @@ func main() {
 		LeaderElectionNamespace: leaderElectionNamespace,
 		LeaderElectionID:        "53822513.nvidia.com",
 		WebhookServer:           webhookServer,
-		Cache:                   cacheOptions,
+		Cache:                   operatorCacheOptions(operatorNamespace),
+		NewCache:                newOperatorCache,
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {
