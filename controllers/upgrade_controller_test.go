@@ -38,7 +38,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func TestSetDrainSpecPodSelector(t *testing.T) {
@@ -219,7 +218,7 @@ func nodeWithUpgradeState(name, owner string) *corev1.Node {
 		Labels: map[string]string{upgrade.GetUpgradeStateLabelKey(): "upgrade-required"},
 	}}
 	if owner != "" {
-		node.Labels[gpuconsts.NVIDIADriverOwnerLabel] = owner
+		node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel] = owner
 	}
 	return node
 }

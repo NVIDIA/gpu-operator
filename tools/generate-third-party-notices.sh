@@ -186,7 +186,7 @@ collapse_index() {
 # the notices identify dependencies and their licenses, not an exact build.
 # Longest prefix wins: a license may sit below the module root.
 annotate_modules() {
-    awk -v modfile="${MODULES_TXT}" '
+    awk -v modfile="${MODULES_TXT}" -v localmod="${LOCAL_MODULE}" '
         BEGIN {
             FS = OFS = ","
             while ((getline line < modfile) > 0) {
@@ -197,6 +197,9 @@ annotate_modules() {
                 if (f[4] == "=>" || f[3] == "=>") {
                     r = (f[4] == "=>") ? 5 : 4
                     if (f[r + 1] == "") {
+                        # Nested modules from this repository are first-party
+                        # and are already excluded by go-licenses.
+                        if (f[2] == localmod || index(f[2], localmod "/") == 1) continue
                         print "ERROR: " modfile " replaces " f[2] " with a local path;" > "/dev/stderr"
                         print "teach tools/generate-third-party-notices.sh how to attribute it." > "/dev/stderr"
                         exit 1
