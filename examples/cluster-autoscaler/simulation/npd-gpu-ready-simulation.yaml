@@ -1,0 +1,163 @@
+# Simulation variant of npd-gpu-ready.yaml for clusters without GPUs
+# (for example, a local kind cluster). Identical to the production manifest
+# except for two things: the probe script checks for a marker file on the
+# node instead of running nvidia-smi, and the container is not privileged
+# (reading a file does not need device access).
+#
+# Mark the simulated GPU ready (kind node names are docker containers):
+#   docker exec <node> mkdir -p /var/lib/gpu-ready-sim
+#   docker exec <node> touch /var/lib/gpu-ready-sim/ready
+# Flip it back:
+#   docker exec <node> rm /var/lib/gpu-ready-sim/ready
+#
+# The resource names match the production manifest on purpose. Two NPD
+# stacks with different names can run at the same time and overwrite each
+# other's condition updates. Apply one manifest or the other, not both.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-problem-detector
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-problem-detector
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-problem-detector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-problem-detector
+subjects:
+  - kind: ServiceAccount
+    name: node-problem-detector
+    namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: npd-gpu-ready-config
+  namespace: kube-system
+data:
+  gpu-ready-monitor.json: |
+    {
+      "plugin": "custom",
+      "pluginConfig": {
+        "invoke_interval": "10s",
+        "timeout": "5s",
+        "max_output_length": 80,
+        "concurrency": 1
+      },
+      "source": "gpu-ready-monitor",
+      "metricsReporting": false,
+      "conditions": [
+        {
+          "type": "nvidia.com/GPUReady",
+          "reason": "GPUReadinessPending",
+          "message": "GPU readiness probe has not succeeded yet"
+        }
+      ],
+      "rules": [
+        {
+          "type": "permanent",
+          "condition": "nvidia.com/GPUReady",
+          "reason": "GPUReady",
+          "path": "/config/check-gpu-ready.sh",
+          "timeout": "5s"
+        }
+      ]
+    }
+  check-gpu-ready.sh: |
+    #!/bin/sh
+    # Simulation probe: stands in for nvidia-smi on nodes without GPUs.
+    # The simulated GPU is ready when the marker file exists on the node.
+    #
+    # Exit 1 when ready, exit 0 when not. NPD's permanent-rule contract is
+    # built for problem detection (exit 1 = problem found = condition True),
+    # so the exit codes are inverted compared to a typical health check.
+    if [ -f /host/var/lib/gpu-ready-sim/ready ]; then
+      echo "marker file present: simulated GPU ready"
+      exit 1
+    fi
+    echo "marker file absent: simulated GPU not ready"
+    exit 0
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-problem-detector
+  namespace: kube-system
+  labels:
+    app: node-problem-detector
+spec:
+  selector:
+    matchLabels:
+      app: node-problem-detector
+  template:
+    metadata:
+      labels:
+        app: node-problem-detector
+    spec:
+      serviceAccountName: node-problem-detector
+      priorityClassName: system-node-critical
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: readiness.k8s.io/nvidia-gpu-not-ready
+          operator: Exists
+          effect: NoSchedule
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: npd
+          image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.20
+          command:
+            - /node-problem-detector
+            - --logtostderr
+            - --prometheus-port=0
+            - --config.custom-plugin-monitor=/config/gpu-ready-monitor.json
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: host
+              mountPath: /host
+              readOnly: true
+              # Matches the production manifest; see the comment there.
+              mountPropagation: HostToContainer
+      volumes:
+        - name: config
+          configMap:
+            name: npd-gpu-ready-config
+            # The probe script is executed directly from the mount.
+            defaultMode: 0755
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
