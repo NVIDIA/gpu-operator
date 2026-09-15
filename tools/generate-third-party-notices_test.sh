@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${HERE}/test-helpers.sh"
 
 # If the guard ever regresses, sourcing must not overwrite the committed
-# notices file. OUTPUT is honoured by compose_document.
+# notices file.
 OUTPUT="$(mktemp)"
 export OUTPUT
 
@@ -193,6 +193,53 @@ assert_fails "an unknown flag is rejected" bash "${gen}" repo --nope
 assert_eq "0" \
     "$(LC_ALL=C grep -c 'RELEASE_VERSION:-' "${gen}")" \
     "RELEASE_VERSION is never read from the environment"
+
+dockerfile_fixture="$(mktemp)"
+cat > "${dockerfile_fixture}" <<'DOCKERFILE'
+FROM golang:1.27.1@sha256:aaaabbbbccccddddeeeeffff00001111222233334444555566667777888899990 AS builder
+FROM nvcr.io/nvidia/distroless/cc:v4.1.4@sha256:b1deb9e97732ab5da2f1f6e0d3ac1e56bdc2df0a5bf900180662a4740f05957c
+DOCKERFILE
+assert_eq "$(printf 'nvcr.io/nvidia/distroless/cc\tv4.1.4')" \
+    "$(DOCKERFILE="${dockerfile_fixture}" base_image_from_dockerfile)" \
+    "base_image_from_dockerfile takes the final FROM, not a builder stage"
+
+# The index is published per release version, so a -dev tag resolves to it.
+dev_dockerfile="$(mktemp)"
+printf 'FROM nvcr.io/nvidia/distroless/cc:v4.0.6-dev@sha256:%064d\n' 0 > "${dev_dockerfile}"
+assert_eq "1" \
+    "$(DOCKERFILE="${dev_dockerfile}" emit_base_image_table | LC_ALL=C grep -c 'distroless-oss/cc/v4.0.6/index.html')" \
+    "emit_base_image_table strips a -dev suffix for the source index"
+assert_eq "1" \
+    "$(DOCKERFILE="${dev_dockerfile}" emit_base_image_table | LC_ALL=C grep -c '`v4.0.6-dev`')" \
+    "emit_base_image_table still reports the tag actually used"
+
+# A version we cannot resolve must stop the run rather than reach the document.
+interpolated_dockerfile="$(mktemp)"
+printf 'ARG CUDA_VERSION=13.2\nFROM nvcr.io/nvidia/distroless/cc:${CUDA_VERSION}@sha256:%064d\n' 0 > "${interpolated_dockerfile}"
+# $1 is expanded by the child bash -c, not here.
+# shellcheck disable=SC2016
+assert_fails "an ARG-interpolated base image tag is refused" \
+    env DOCKERFILE="${interpolated_dockerfile}" bash -c \
+    'source "$1"; base_image_from_dockerfile' _ "${HERE}/generate-third-party-notices.sh"
+
+undigested_dockerfile="$(mktemp)"
+printf 'FROM nvcr.io/nvidia/distroless/cc:v4.1.4\n' > "${undigested_dockerfile}"
+# shellcheck disable=SC2016
+assert_fails "a base image without a digest is refused" \
+    env DOCKERFILE="${undigested_dockerfile}" bash -c \
+    'source "$1"; base_image_from_dockerfile' _ "${HERE}/generate-third-party-notices.sh"
+
+# The source index only describes NVIDIA distroless images, so anything else
+# must not be linked to it.
+foreign_dockerfile="$(mktemp)"
+printf 'FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:%064d\n' 0 > "${foreign_dockerfile}"
+# shellcheck disable=SC2016
+assert_fails "a non-distroless base image is refused" \
+    env DOCKERFILE="${foreign_dockerfile}" bash -c \
+    'source "$1"; base_image_from_dockerfile' _ "${HERE}/generate-third-party-notices.sh"
+
+rm -f "${dockerfile_fixture}" "${dev_dockerfile}" "${interpolated_dockerfile}" \
+      "${undigested_dockerfile}" "${foreign_dockerfile}"
 
 rm -rf "${vendor_fixture}" "${render}"
 rm -f "${modules_fixture}" "${index_input}" "${empty_overrides_fixture}" "${overrides_fixture}" "${stale_overrides}"

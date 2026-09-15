@@ -20,11 +20,10 @@ MULTI_ARCH_MK="${MULTI_ARCH_MK:-multi-arch.mk}"
 MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
 VENDOR_DIR="${VENDOR_DIR:-vendor}"
 
-# Licenses are cited where they live in this repository rather than in each
-# dependency's own upstream repo: the link then serves the exact bytes
-# reproduced below it, and cannot rot when an upstream retags, renames or
-# archives. Constant rather than derived from the git remote, so the document
-# is byte-identical wherever it is generated and the CI diff stays meaningful.
+# Citing this repository rather than each dependency's upstream: the link then
+# serves the exact bytes reproduced below it, and cannot rot when an upstream
+# retags, renames or archives. Constant rather than derived from the git
+# remote, so the document is byte-identical wherever it is generated.
 REPO_URL="${REPO_URL:-https://github.com/NVIDIA/gpu-operator}"
 
 # repo: the document tracked on main, describing a moving target. It states no
@@ -40,6 +39,7 @@ MODE=""
 RELEASE_VERSION=""
 LINK_REF="main"
 LICENSE_OVERRIDES="${LICENSE_OVERRIDES:-tools/license-overrides.tsv}"
+DOCKERFILE="${DOCKERFILE:-docker/Dockerfile}"
 
 PACKAGES=("./cmd/...")
 
@@ -91,7 +91,7 @@ check_prerequisites() {
     fi
 
     local required_file
-    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}"; do
+    for required_file in "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${LICENSE_OVERRIDES}" "${DOCKERFILE}"; do
         [[ -f "${required_file}" ]] \
             || die "${required_file} not found — run 'make third-party-notices' from the repo root."
     done
@@ -194,33 +194,33 @@ annotate_modules() {
                 # A "=>" replacement is what is actually vendored, so it is what
                 # the file must name; a filesystem replace has no version.
                 if (f[4] == "=>" || f[3] == "=>") {
-                    r = (f[4] == "=>") ? 5 : 4
-                    if (f[r + 1] == "") {
+                    replacement_field = (f[4] == "=>") ? 5 : 4
+                    if (f[replacement_field + 1] == "") {
                         print "ERROR: " modfile " replaces " f[2] " with a local path;" > "/dev/stderr"
                         print "teach tools/generate-third-party-notices.sh how to attribute it." > "/dev/stderr"
                         exit 1
                     }
-                    mods[++m] = f[2]
-                    disp[f[2]] = f[r]
-                    ver[f[2]] = f[r + 1]
+                    module_paths[++module_count] = f[2]
+                    disp[f[2]] = f[replacement_field]
+                    ver[f[2]] = f[replacement_field + 1]
                 } else {
-                    mods[++m] = f[2]
+                    module_paths[++module_count] = f[2]
                     disp[f[2]] = f[2]
                     ver[f[2]] = f[3]
                 }
             }
             close(modfile)
             # A read error makes getline return -1 and the loop never run.
-            if (m == 0) {
+            if (module_count == 0) {
                 print "ERROR: no module lines read from " modfile > "/dev/stderr"
                 exit 1
             }
         }
         {
             best = ""
-            for (i = 1; i <= m; i++) {
-                mp = mods[i]
-                if (($1 == mp || index($1, mp "/") == 1) && length(mp) > length(best)) best = mp
+            for (i = 1; i <= module_count; i++) {
+                candidate = module_paths[i]
+                if (($1 == candidate || index($1, candidate "/") == 1) && length(candidate) > length(best)) best = candidate
             }
             print $0, (best == "" ? "unknown" : disp[best]), (best == "" ? "unknown" : ver[best])
         }
@@ -271,8 +271,8 @@ check_override_coverage() {
     done < "${LICENSE_OVERRIDES}"
 }
 
-# License-bearing files in one directory, sorted. Filter by name: these are
-# vendored module directories, so most of what they hold is source code.
+# Filter by name: these are vendored module directories, so most of what they
+# hold is source code.
 #
 # Parameter expansion and [[ =~ ]] rather than basename and grep: this runs for
 # every file of every scanned directory, and the subshell-per-file version cost
@@ -299,10 +299,9 @@ license_files_for() {
     done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
-# The directory holding the license that governs a package, as a path relative to
-# the module root. A module may license a subtree separately, so the nearest
-# license walking up from the package wins; only if none is found up to the
-# module root does the package have no license of its own.
+# A module may license a subtree separately, so the nearest license walking up
+# from the package wins; only if none is found up to the module root does the
+# package have no license of its own.
 license_dir_within_module() {
     local package="$1" module="$2" dir="$1" relative
     while :; do
@@ -330,14 +329,11 @@ license_identifier_for() {
     printf '%s' "${reported}"
 }
 
-# The license file as served by this repository at LINK_REF.
 license_url() {
     local module="$1" license_path="$2"
     printf '%s/blob/%s/vendor/%s/%s' "${REPO_URL}" "${LINK_REF}" "${module}" "${license_path}"
 }
 
-# Markdown links to every license file a package ships, joined when there is
-# more than one.
 location_cell() {
     local governing_dir="$1" module="$2" relative_license_dir="$3"
     local cell="" license_file file_name license_path
@@ -349,6 +345,56 @@ location_cell() {
     done < <(license_files_for "${governing_dir}")
     [[ -n "${cell}" ]] || return 1
     printf '%s' "${cell}"
+}
+
+# Only a pinned literal image is accepted. An ARG-interpolated tag cannot be
+# resolved without the build arguments the release was actually built with, and
+# guessing one would put a false version in a legal document.
+base_image_from_dockerfile() {
+    local from_line repository tag
+    from_line=$(LC_ALL=C grep -E '^FROM[[:space:]]' "${DOCKERFILE}" | tail -1)
+    [[ -n "${from_line}" ]] || die "no FROM instruction found in ${DOCKERFILE}."
+
+    # Same shape renovate pins against in .github/renovate.json.
+    # The tag charset is Docker's own, which excludes '$' and '{': an
+    # interpolated tag must not slip through as if it were a literal one.
+    [[ "${from_line}" =~ ^FROM[[:space:]]+([A-Za-z0-9._/-]+):([A-Za-z0-9_][A-Za-z0-9._-]*)@sha256:[0-9a-f]{64}[[:space:]]*$ ]] \
+        || die "the final FROM in ${DOCKERFILE} is not a digest-pinned literal image." \
+               "Teach base_image_from_dockerfile about it rather than publishing an unverified base image version." \
+               "  ${from_line}"
+
+    repository="${BASH_REMATCH[1]}"
+    tag="${BASH_REMATCH[2]}"
+
+    # The source index below is published per distroless image name. Any other
+    # base has its sources somewhere else, so refuse rather than link to a page
+    # that does not describe it.
+    [[ "${repository}" == nvcr.io/nvidia/distroless/* ]] \
+        || die "base image ${repository} is not an NVIDIA distroless image." \
+               "Its OSS source index is published elsewhere; teach the generator where before releasing."
+
+    printf '%s\t%s\n' "${repository}" "${tag}"
+}
+
+# NVIDIA publishes distroless sources per released version. A "-dev" tag is
+# built from the sources published under the corresponding release version, so
+# the suffix is dropped to find the index.
+emit_base_image_table() {
+    local repository tag image_name index_version
+    IFS=$'\t' read -r repository tag < <(base_image_from_dockerfile)
+
+    image_name="${repository##*/}"
+    index_version="${tag%-dev}"
+
+    cat <<'EOF'
+The base image's own sources are published per version. A `-dev` variant is
+built from the sources published under the corresponding release version.
+
+| Image | Version | Role | Notices and source |
+|-------|---------|------|--------------------|
+EOF
+    printf '| `%s` | `%s` | final runtime base | [NVIDIA Distroless OSS source index](https://developer.download.nvidia.com/distroless-oss/%s/%s/index.html) |\n' \
+        "${repository}" "${tag}" "${image_name}" "${index_version}"
 }
 
 emit_index_table() {
@@ -473,7 +519,21 @@ NOTICE alongside its LICENSE, each one is listed and reproduced.
 EOF
         fi
 
-        cat <<'EOF'
+        # The repo document names the base image in prose because it tracks a
+        # moving Dockerfile. A release describes one build, so it states the
+        # version that build used, read from the Dockerfile at that commit.
+        if [[ "${MODE}" == release ]]; then
+            cat <<'EOF'
+
+A statically compiled busybox binary is added to the image, which is licensed
+under GPLv2. The image also carries a CUDA sample and the CUDA compatibility
+libraries, which are handled separately, including any source-distribution
+obligations they carry.
+
+EOF
+            emit_base_image_table
+        else
+            cat <<'EOF'
 
 The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
 All of the OSS packages and source included in this image can be found at
@@ -482,6 +542,10 @@ compiled busybox binary is added to the image, which is licensed under GPLv2.
 The image also carries a CUDA sample and the CUDA compatibility libraries, which
 are handled separately, including any source-distribution obligations they
 carry.
+EOF
+        fi
+
+        cat <<'EOF'
 
 ## Dependency Index
 
