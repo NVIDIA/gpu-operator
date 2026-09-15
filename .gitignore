@@ -1,6 +1,7 @@
 /coverage.*
 lcov.info
 
+/.licenses-cache
 
 # Binaries for programs and plugins
 *.exe
@@ -34,4 +35,3 @@ kubeconfig
 
 # Bundle artifacts
 bundle.Dockerfile
-

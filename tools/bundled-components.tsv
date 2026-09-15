@@ -1,39 +1,10 @@
-# What each COPY --from in the Dockerfile's final stage puts into the released
-# image. Keyed by source path rather than by build stage: one stage can supply
-# several components under different terms, and a stage name is a refactorable
-# label with no stability contract.
-#
-# The generator fails when the final stage copies from a path with no row here,
-# so a new component cannot reach the image without an attribution decision.
-#
-# disposition:
-#   project          built from this repository; its dependencies are already
-#                    covered by the Dependency Index, so it is not listed again
-#   first-party      NVIDIA's own software, which is not third party to NVIDIA
-#                    and so is out of scope for this document
-#   third-party      redistributed third-party software; license text reproduced
-#
-# The guard covers every copied path regardless of disposition, so first-party
-# and project components are still accounted for here even though neither is
-# listed in the document.
-#
-# version: literal, or ${ARG} to read that ARG's default from the Dockerfile.
-# Use "-" where the build does not pin one and none has been established.
-#
-# provenance_digest: for a version recorded by hand rather than read from the
-# build, the digest of the image that version was observed in. The generator
-# fails when that digest is no longer in the Dockerfile, so bumping the builder
-# forces someone to re-check the version instead of shipping a stale one.
-# Use "-" when the version comes from the Dockerfile itself.
-#
-# license_file is relative to tools/licenses/ and must exist for third-party
-# rows. source_url is the corresponding source, which a copyleft license
-# obliges us to offer.
-#
-# source_path	component	disposition	version	license	license_file	source_url	provenance_digest	notes
+# disposition: project | first-party | third-party. Only third-party is listed;
+# every copied path needs a row so nothing reaches the image unattributed.
+# Write "-" for an absent value; an empty field is rejected.
+# source_path	component	disposition	version	license_identifier	license_file	notices_url	provenance_digest	attribution_note
 /busybox	busybox	third-party	1:1.37.0-6	GPL-2.0-only	busybox/LICENSE	https://sources.debian.org/data/main/b/busybox/1%3A1.37.0-6/debian/copyright	sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258	apt resolves the package at build time, so the version is the one Debian trixie ships for this builder digest
-/build/vectorAdd	vectorAdd	first-party	-	-	-	-	-	
-/usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat	CUDA compatibility libraries	first-party	-	-	-	-	-	
+/build/vectorAdd	vectorAdd	first-party	-	-	-	-	-	-
+/usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat	CUDA compatibility libraries	first-party	-	-	-	-	-	-
 /workspace/gpu-operator	gpu-operator	project	-	-	-	-	-	-
 /workspace/manage-crds	manage-crds	project	-	-	-	-	-	-
 /workspace/cleanup-gpuclusters	cleanup-gpuclusters	project	-	-	-	-	-	-
