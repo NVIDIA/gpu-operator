@@ -49,6 +49,12 @@ type stateSkel struct {
 	client    client.Client
 	scheme    *runtime.Scheme
 	renderer  render.Renderer
+
+	// adoptionGuard, when set, vetoes taking over an object that already exists and is
+	// not owned by the CR being reconciled. It runs after the create call reports
+	// AlreadyExists, which closes the window between an ownership check made earlier in
+	// the sync and the create itself.
+	adoptionGuard func(owner metav1.Object, current *unstructured.Unstructured) error
 }
 
 // Name provides the State name
@@ -102,7 +108,7 @@ func (s *stateSkel) renderObjects(ctx context.Context, data any) ([]*unstructure
 // state. Owner references make every object (including cluster-scoped ones) garbage
 // collected when the owning CR is deleted.
 func (s *stateSkel) syncObjects(ctx context.Context, owner metav1.Object, objs []*unstructured.Unstructured) (SyncState, error) {
-	err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
+	err := s.createOrUpdateObjs(ctx, owner, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(owner, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %w", err)
 		}
@@ -300,6 +306,7 @@ func (s *stateSkel) updateObj(ctx context.Context, obj *unstructured.Unstructure
 
 func (s *stateSkel) createOrUpdateObjs(
 	ctx context.Context,
+	owner metav1.Object,
 	setControllerReference func(obj *unstructured.Unstructured) error,
 	objs []*unstructured.Unstructured) error {
 	reqLogger := log.FromContext(ctx)
@@ -338,6 +345,15 @@ func (s *stateSkel) createOrUpdateObjs(
 		if err := s.getObj(ctx, currentObj); err != nil {
 			// Some error occurred
 			return err
+		}
+
+		// The object appeared between the checks made earlier in this sync and the
+		// create above, so its ownership has to be revalidated before it is merged
+		// into and updated with this CR's controller reference.
+		if s.adoptionGuard != nil {
+			if err := s.adoptionGuard(owner, currentObj); err != nil {
+				return err
+			}
 		}
 
 		if desiredObj.GetKind() == "DaemonSet" {

@@ -18,11 +18,17 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -43,6 +49,10 @@ const (
 	dcgmExporterCustomCollectors      = "/etc/dcgm-exporter/dcgm-metrics.csv"
 	dcgmExporterDefaultKubeletRootDir = "/var/lib/kubelet"
 	dcgmExporterDefaultJobMappingDir  = "/var/lib/dcgm-exporter/job-mapping"
+
+	// dcgmExporterDefaultServiceAccountName is the ServiceAccount the DRA operands
+	// reference unless the user configures a different one.
+	dcgmExporterDefaultServiceAccountName = "nvidia-dcgm-exporter-dra"
 )
 
 func NewStateDCGMExporter(
@@ -56,6 +66,7 @@ func NewStateDCGMExporter(
 	if err != nil {
 		return nil, err
 	}
+	skel.adoptionGuard = guardDCGMExporterServiceAccountAdoption
 	return &configurableState{
 		stateSkel: skel,
 		isEnabled: func(cr *nvidiav1alpha1.GPUCluster) bool {
@@ -67,6 +78,9 @@ func NewStateDCGMExporter(
 		},
 		imageEnvName:    dcgmExporterImageEnvName,
 		buildRenderData: buildDCGMExporterRenderData,
+		preSync:         checkDCGMExporterServiceAccount,
+		postSync:        reclaimSupersededDCGMExporterServiceAccounts,
+		preDelete:       releaseDCGMExporterServiceAccountOnDelete,
 	}, nil
 }
 
@@ -140,7 +154,177 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 		PodResourcesDir:              filepath.Join(kubeletRootDir, "pod-resources"),
 		ServiceType:                  serviceType,
 		ServiceInternalTrafficPolicy: serviceInternalTrafficPolicy,
+		ServiceAccountName:           spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName),
+		CreateServiceAccount:         spec.IsServiceAccountCreateEnabled(),
 	}, nil
+}
+
+// checkDCGMExporterServiceAccount runs before the manifests are applied and reconciles the
+// parts of the ServiceAccount contract the templates cannot express: a ServiceAccount the
+// user brings has to already exist and is handed back if the operator used to manage it,
+// and one the operator would manage must not be an existing object owned by somebody else.
+func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	spec := cr.Spec.DCGMExporter
+	name := spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
+
+	if !spec.IsServiceAccountCreateEnabled() {
+		// The manifests omit the ServiceAccount entirely, so a missing one would leave
+		// the DaemonSet pending without any signal.
+		sa, err := s.getServiceAccount(ctx, name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return fmt.Errorf(
+					"ServiceAccount %q configured with create=false does not exist in namespace %q",
+					name, s.namespace)
+			}
+			return err
+		}
+		// The same object may have been operator-managed before create was set to false.
+		// It is handed back here, before the operands sync, rather than once they
+		// converged: a DaemonSet that never becomes Ready would otherwise keep this CR's
+		// controller reference on the ServiceAccount indefinitely, and deleting the
+		// GPUCluster would garbage-collect an object the user now owns.
+		return s.releaseServiceAccount(ctx, cr, sa)
+	}
+
+	if name == dcgmExporterDefaultServiceAccountName {
+		return nil
+	}
+
+	// Adopting an object the operator did not create would hand it to garbage collection
+	// on CR deletion, so a name that is already taken has to be opted into explicitly.
+	// guardDCGMExporterServiceAccountAdoption re-checks this after the create call, for
+	// an object that appears in between.
+	existing, err := s.getServiceAccount(ctx, name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if err == nil && !metav1.IsControlledBy(existing, cr) {
+		return dcgmExporterServiceAccountTakeoverError(name, s.namespace)
+	}
+
+	return nil
+}
+
+// dcgmExporterServiceAccountTakeoverError is the error returned when the configured
+// ServiceAccount exists but belongs to somebody else.
+func dcgmExporterServiceAccountTakeoverError(name, namespace string) error {
+	return fmt.Errorf(
+		"ServiceAccount %q already exists in namespace %q and is not managed by this GPUCluster; "+
+			"set dcgmExporter.serviceAccount.create to false to reference it",
+		name, namespace)
+}
+
+// guardDCGMExporterServiceAccountAdoption stops createOrUpdateObjs from taking over a
+// ServiceAccount that appeared between the preSync ownership check and the create call.
+// Without it the AlreadyExists path would stamp this CR's controller reference onto an
+// object somebody else owns, handing it to garbage collection with the GPUCluster.
+func guardDCGMExporterServiceAccountAdoption(owner metav1.Object, current *unstructured.Unstructured) error {
+	if current.GetKind() != "ServiceAccount" {
+		return nil
+	}
+	for _, ref := range current.GetOwnerReferences() {
+		if ref.Controller != nil && *ref.Controller && ref.UID == owner.GetUID() {
+			return nil
+		}
+	}
+	if current.GetName() == dcgmExporterDefaultServiceAccountName && len(current.GetOwnerReferences()) == 0 {
+		// The operator default may predate owner references (upgrade from an older
+		// release), so it stays adoptable.
+		return nil
+	}
+	return dcgmExporterServiceAccountTakeoverError(current.GetName(), current.GetNamespace())
+}
+
+// reclaimSupersededDCGMExporterServiceAccounts runs once the manifests converged and removes
+// the ServiceAccounts this state created under a previous configuration. Waiting for
+// convergence matters here, unlike for the hand-back in checkDCGMExporterServiceAccount:
+// deleting a ServiceAccount the DaemonSet still referenced would leave its pods without an
+// identity, whereas releasing ownership changes nothing the operands can observe.
+func reclaimSupersededDCGMExporterServiceAccounts(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	return s.deleteSupersededServiceAccounts(ctx, cr,
+		cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName))
+}
+
+// releaseDCGMExporterServiceAccountOnDelete hands a user-provided ServiceAccount back
+// before the state is torn down. Disabling the exporter deletes every object carrying
+// this state's label, and a ServiceAccount taken over with create=false still carries it
+// from when the operator managed it -- without this, turning the exporter off would
+// delete an object the operator no longer owns.
+func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	spec := cr.Spec.DCGMExporter
+	// A nil spec never named a ServiceAccount, and a managed one is meant to go with the
+	// state; only the user-provided case has to survive.
+	if spec == nil || spec.IsServiceAccountCreateEnabled() {
+		return nil
+	}
+	sa, err := s.getServiceAccount(ctx, spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return s.releaseServiceAccount(ctx, cr, sa)
+}
+
+// releaseServiceAccount hands a ServiceAccount the user now owns back to them by dropping
+// this GPUCluster's controller reference and the state label. Only a ServiceAccount this
+// state managed is touched: every operand of the GPUCluster carries its controller
+// reference, so checking ownership alone would also strip the reference and label off
+// another state's ServiceAccount when the user points create=false at it.
+func (s *configurableState) releaseServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, sa *corev1.ServiceAccount) error {
+	if sa.Labels[consts.StateLabel] != s.name {
+		return nil
+	}
+	if metav1.IsControlledBy(sa, cr) {
+		refs := make([]metav1.OwnerReference, 0, len(sa.OwnerReferences))
+		for _, ref := range sa.OwnerReferences {
+			if ref.UID == cr.GetUID() {
+				continue
+			}
+			refs = append(refs, ref)
+		}
+		sa.OwnerReferences = refs
+	}
+	delete(sa.Labels, consts.StateLabel)
+	log.FromContext(ctx).V(consts.LogLevelInfo).Info(
+		"Releasing ownership of a user-provided dcgm-exporter ServiceAccount", "Name", sa.Name)
+	return s.client.Update(ctx, sa)
+}
+
+// getServiceAccount reads a ServiceAccount from the operand namespace.
+func (s *configurableState) getServiceAccount(ctx context.Context, name string) (*corev1.ServiceAccount, error) {
+	sa := &corev1.ServiceAccount{}
+	err := s.client.Get(ctx, types.NamespacedName{Namespace: s.namespace, Name: name}, sa)
+	return sa, err
+}
+
+// deleteSupersededServiceAccounts removes every ServiceAccount carrying this state's label
+// that this CR controls, except the one named keep. Finding them by label rather than by
+// name is what covers a rename from one custom name to another, or back to the default: no
+// record of the previous configuration exists, but every ServiceAccount the state ever
+// created still carries its label. A ServiceAccount the user provisioned under one of those
+// names carries no controller reference from this CR and is left alone.
+func (s *configurableState) deleteSupersededServiceAccounts(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, keep string) error {
+	list := &corev1.ServiceAccountList{}
+	if err := s.client.List(ctx, list,
+		client.InNamespace(s.namespace),
+		client.MatchingLabels{consts.StateLabel: s.name}); err != nil {
+		return err
+	}
+	for i := range list.Items {
+		sa := &list.Items[i]
+		if sa.Name == keep || !metav1.IsControlledBy(sa, cr) {
+			continue
+		}
+		log.FromContext(ctx).V(consts.LogLevelInfo).Info(
+			"Removing a dcgm-exporter ServiceAccount superseded by the configured one", "Name", sa.Name)
+		if err := s.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // serviceMonitorCRDServed reports whether the cluster serves the monitoring.coreos.com
