@@ -76,6 +76,8 @@ operator:
   #version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  # leaderElection:
+  #   renewDeadline: 60s
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia
