@@ -1,9 +1,6 @@
-// Package v1 defiles version 1 of OCI image-spec types
-package v1
-
 // Contents of this folder refer to types defined at <https://github.com/opencontainers/image-spec> with the following license:
-
 // Copyright 2016 The Linux Foundation
+// Copyright the regclient contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,3 +13,6 @@ package v1
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Package v1 defiles version 1 of OCI image-spec types
+package v1
