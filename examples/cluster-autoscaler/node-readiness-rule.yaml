@@ -1,0 +1,33 @@
+# NodeReadinessRule for the Node Readiness Controller (NRC).
+#
+# NRC removes the startup taint from a node once the nvidia.com/GPUReady
+# condition (published by NPD, see npd-gpu-ready.yaml) is True.
+#
+# Notes:
+#   - The taint key must use the readiness.k8s.io/ prefix; the CRD rejects
+#     other prefixes. The same key must appear in the node pool template,
+#     the cluster-autoscaler --startup-taint flag, the GPU Operator
+#     toleration values, and the NPD DaemonSet tolerations. See README.md.
+#   - On a cluster with existing GPU nodes, preview with spec.dryRun: true
+#     first -- NRC adds the taint to matching nodes whose condition is not
+#     True, in both enforcement modes. See README.md prerequisites step 4.
+#   - bootstrap-only acts once per node: after removing the taint, NRC
+#     records the readiness.k8s.io/bootstrap-completed-nvidia-gpu-readiness
+#     annotation on the node and ignores it afterwards. Use `continuous` to
+#     also re-taint nodes whose condition later turns False (day-2 gating).
+apiVersion: readiness.node.x-k8s.io/v1alpha1
+kind: NodeReadinessRule
+metadata:
+  name: nvidia-gpu-readiness
+spec:
+  conditions:
+    - type: nvidia.com/GPUReady
+      requiredStatus: "True"
+  taint:
+    key: readiness.k8s.io/nvidia-gpu-not-ready
+    effect: NoSchedule
+    value: pending
+  enforcementMode: bootstrap-only
+  nodeSelector:
+    matchLabels:
+      nvidia.com/gpu.present: "true"
