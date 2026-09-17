@@ -47,6 +47,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -2567,7 +2568,7 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 	ownedServiceAccount := func(t *testing.T, cp *gpuv1.ClusterPolicy, name string) *corev1.ServiceAccount {
 		t.Helper()
 		sa := serviceAccount(name)
-		markDCGMExporterServiceAccount(sa)
+		dcgmExporterServiceAccountMarker.Apply(sa)
 		require.NoError(t, controllerutil.SetControllerReference(cp, sa, testScheme))
 		return sa
 	}
@@ -2612,7 +2613,7 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 				sa, ok := getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
 				require.True(t, ok)
 				require.True(t, metav1.IsControlledBy(sa, cp))
-				require.True(t, isDCGMExporterServiceAccount(sa),
+				require.True(t, dcgmExporterServiceAccountMarker.Matches(sa.Labels),
 					"the label is how the operator finds this ServiceAccount again after a rename")
 			},
 		},
@@ -2622,7 +2623,7 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
 				sa, ok := getServiceAccount(t, k8s, customName)
 				require.True(t, ok)
-				require.True(t, isDCGMExporterServiceAccount(sa))
+				require.True(t, dcgmExporterServiceAccountMarker.Matches(sa.Labels))
 				_, ok = getServiceAccount(t, k8s, DCGMExporterDefaultServiceAccountName)
 				require.False(t, ok, "the default ServiceAccount must not be created as well")
 			},
@@ -2636,6 +2637,22 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 				sa, ok := getServiceAccount(t, k8s, customName)
 				require.True(t, ok)
 				require.Empty(t, sa.OwnerReferences, "an existing ServiceAccount must not be adopted")
+			},
+		},
+		"a configured name refuses another operand's ServiceAccount": {
+			// The ClusterPolicy controls nvidia-driver too, so the owner reference alone
+			// would pass and the exporter would run with the driver's identity.
+			serviceAccount:         &gpuv1.DCGMExporterServiceAccountConfig{Name: driverName},
+			otherComponentExisting: []string{driverName},
+			expectedState:          gpuv1.NotReady,
+			expectedError:          true,
+			assert: func(t *testing.T, k8s client.Client, cp *gpuv1.ClusterPolicy) {
+				sa, ok := getServiceAccount(t, k8s, driverName)
+				require.True(t, ok)
+				require.True(t, metav1.IsControlledBy(sa, cp),
+					"the other operand keeps its ServiceAccount")
+				require.False(t, dcgmExporterServiceAccountMarker.Matches(sa.Labels),
+					"the exporter must not claim another operand's ServiceAccount")
 			},
 		},
 		"create=false reports NotReady when the ServiceAccount is missing": {
@@ -2842,6 +2859,73 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 	}
 }
 
+// TestDCGMExporterServiceAccountCreateRace covers the window between the availability
+// check and the create call: an unrelated ServiceAccount that appears in between makes
+// Create report AlreadyExists, which must not be taken as success without revalidating
+// what is actually there.
+func TestDCGMExporterServiceAccountCreateRace(t *testing.T) {
+	const (
+		testNamespace = "test-namespace"
+		customName    = "metrics-identity"
+	)
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, gpuv1.AddToScheme(testScheme))
+
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
+	cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: customName}
+
+	// Somebody else's account, already in the cluster.
+	intruder := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: customName, Namespace: testNamespace},
+	}
+
+	// The first Get -- the availability check -- reports the name as free; the object is
+	// there by the time Create runs, which is the race being reproduced.
+	var firstGet bool
+	k8s := fake.NewClientBuilder().
+		WithScheme(testScheme).
+		WithObjects(intruder).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*corev1.ServiceAccount); ok && !firstGet {
+					firstGet = true
+					return apierrors.NewNotFound(corev1.Resource("serviceaccounts"), key.Name)
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
+
+	n := ClusterPolicyController{
+		client:            k8s,
+		ctx:               context.Background(),
+		singleton:         cp,
+		scheme:            testScheme,
+		operatorNamespace: testNamespace,
+		resources: []Resources{{
+			ServiceAccount: corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
+			},
+		}},
+		stateNames: []string{"state-dcgm-exporter"},
+		idx:        0,
+		logger:     ctrl.Log.WithName("test"),
+	}
+
+	state, err := ServiceAccount(n)
+	require.Error(t, err, "AlreadyExists must not pass an account the exporter does not manage")
+	require.Equal(t, gpuv1.NotReady, state)
+
+	found := &corev1.ServiceAccount{}
+	require.NoError(t, k8s.Get(context.Background(),
+		types.NamespacedName{Namespace: testNamespace, Name: customName}, found))
+	require.Empty(t, found.OwnerReferences, "the intruding ServiceAccount must not be adopted")
+	require.False(t, dcgmExporterServiceAccountMarker.Matches(found.Labels),
+		"the intruding ServiceAccount must not be claimed by the exporter")
+}
+
 // TestDCGMExporterSupersededServiceAccountCleanup covers the deferred reclaim that runs once
 // every control of the state converged, when the RoleBindings, SCC and DaemonSet already
 // reference the configured ServiceAccount. Candidates are found by the exporter label
@@ -2857,7 +2941,21 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 
 	testScheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, appsv1.AddToScheme(testScheme))
 	require.NoError(t, gpuv1.AddToScheme(testScheme))
+
+	// exporterDaemonSet is what the cleanup reads to confirm the operands moved to the
+	// configured account before anything is deleted.
+	exporterDaemonSet := func(serviceAccount string) *appsv1.DaemonSet {
+		return &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{Name: dcgmExporterDaemonSetName, Namespace: testNamespace},
+			Spec: appsv1.DaemonSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{ServiceAccountName: serviceAccount},
+				},
+			},
+		}
+	}
 
 	testCases := map[string]struct {
 		serviceAccount *gpuv1.DCGMExporterServiceAccountConfig
@@ -2869,8 +2967,13 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 		owned          []string
 		unowned        []string
 		otherComponent []string
-		expectDeleted  []string
-		expectKept     []string
+		// deployedServiceAccount is what the live DaemonSet references. Empty means no
+		// DaemonSet is deployed at all.
+		deployedServiceAccount string
+		// noDaemonSet seeds no DaemonSet even when a name would be implied.
+		noDaemonSet   bool
+		expectDeleted []string
+		expectKept    []string
 	}{
 		"the default name supersedes nothing": {
 			owned:      []string{DCGMExporterDefaultServiceAccountName},
@@ -2931,6 +3034,23 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 			owned:          []string{DCGMExporterDefaultServiceAccountName},
 			expectKept:     []string{DCGMExporterDefaultServiceAccountName},
 		},
+		"a DaemonSet still on the previous account defers the reclaim": {
+			// DaemonSet() reports Ready without touching the live object when no GPU
+			// node is detected, so convergence alone would delete an account still in
+			// use. Nothing may go until the deployed DaemonSet has moved.
+			serviceAccount:         &gpuv1.DCGMExporterServiceAccountConfig{Name: customA},
+			owned:                  []string{DCGMExporterDefaultServiceAccountName, customA},
+			deployedServiceAccount: DCGMExporterDefaultServiceAccountName,
+			expectKept:             []string{DCGMExporterDefaultServiceAccountName, customA},
+		},
+		"no deployed DaemonSet reclaims freely": {
+			// Nothing references a ServiceAccount, so there is nothing to protect.
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customA},
+			owned:          []string{DCGMExporterDefaultServiceAccountName, customA},
+			noDaemonSet:    true,
+			expectDeleted:  []string{DCGMExporterDefaultServiceAccountName},
+			expectKept:     []string{customA},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -2942,7 +3062,7 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 			var objects []client.Object
 			for _, saName := range tc.owned {
 				sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: saName, Namespace: testNamespace}}
-				markDCGMExporterServiceAccount(sa)
+				dcgmExporterServiceAccountMarker.Apply(sa)
 				require.NoError(t, controllerutil.SetControllerReference(cp, sa, testScheme))
 				objects = append(objects, sa)
 			}
@@ -2955,6 +3075,15 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 				sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: saName, Namespace: testNamespace}}
 				require.NoError(t, controllerutil.SetControllerReference(cp, sa, testScheme))
 				objects = append(objects, sa)
+			}
+
+			if !tc.noDaemonSet {
+				deployed := tc.deployedServiceAccount
+				if deployed == "" {
+					// The operands converged on the configured account.
+					deployed = cp.Spec.DCGMExporter.GetServiceAccountName(DCGMExporterDefaultServiceAccountName)
+				}
+				objects = append(objects, exporterDaemonSet(deployed))
 			}
 
 			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()
@@ -3102,6 +3231,7 @@ func TestDCGMExporterCleanupSurvivesDisabledControls(t *testing.T) {
 
 	testScheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, appsv1.AddToScheme(testScheme))
 	require.NoError(t, gpuv1.AddToScheme(testScheme))
 
 	testCases := map[string]struct {
@@ -3142,9 +3272,19 @@ func TestDCGMExporterCleanupSurvivesDisabledControls(t *testing.T) {
 			superseded := &corev1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName, Namespace: testNamespace},
 			}
-			markDCGMExporterServiceAccount(superseded)
+			dcgmExporterServiceAccountMarker.Apply(superseded)
 			require.NoError(t, controllerutil.SetControllerReference(cp, superseded, testScheme))
-			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(superseded).Build()
+			// The deployed DaemonSet already references the configured account, so only
+			// the convergence rule under test decides the outcome.
+			deployed := &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: dcgmExporterDaemonSetName, Namespace: testNamespace},
+				Spec: appsv1.DaemonSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{ServiceAccountName: customName},
+					},
+				},
+			}
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(superseded, deployed).Build()
 
 			// controlFunc is itself the slice of control functions for one state.
 			controls := make(controlFunc, 0, len(tc.states))

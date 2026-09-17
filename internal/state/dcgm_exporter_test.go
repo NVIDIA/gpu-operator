@@ -480,7 +480,17 @@ func TestDCGMExporterServiceAccountPreSync(t *testing.T) {
 			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
 				return []client.Object{unownedServiceAccount(customName)}
 			},
-			expectedError: "not managed by this GPUCluster",
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
+		},
+		"a configured name refuses a sibling operand's ServiceAccount": {
+			// The GPUCluster controls nvidia-dcgm-dra as well, so the owner reference
+			// alone would pass and the sync would relabel it into this state.
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "nvidia-dcgm-dra"},
+			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
+				return []client.Object{otherStateServiceAccount(cr, "nvidia-dcgm-dra")}
+			},
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
+			stillManaged:  []string{"nvidia-dcgm-dra"},
 		},
 		"a configured name accepts the ServiceAccount it already owns": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
@@ -510,6 +520,10 @@ func TestDCGMExporterServiceAccountPreSync(t *testing.T) {
 			err := checkDCGMExporterServiceAccount(ctx, s, cr)
 			if tc.expectedError != "" {
 				require.ErrorContains(t, err, tc.expectedError)
+				// A refusal must leave the object it refused exactly as it was.
+				for _, saName := range tc.stillManaged {
+					requireStillManaged(t, ctx, s, cr, saName)
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -649,12 +663,17 @@ func TestDCGMExporterSupersededServiceAccountReclaim(t *testing.T) {
 func TestDCGMExporterServiceAccountAdoptionGuard(t *testing.T) {
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
 
-	current := func(kind, name string, refs []metav1.OwnerReference) *unstructured.Unstructured {
+	// current builds the object the sync found already present. state is the value of
+	// the state label it carries, empty for none.
+	current := func(kind, name string, refs []metav1.OwnerReference, state string) *unstructured.Unstructured {
 		obj := &unstructured.Unstructured{}
 		obj.SetKind(kind)
 		obj.SetName(name)
 		obj.SetNamespace("test-operator")
 		obj.SetOwnerReferences(refs)
+		if state != "" {
+			obj.SetLabels(map[string]string{consts.StateLabel: state})
+		}
 		return obj
 	}
 	ourRef := []metav1.OwnerReference{{
@@ -677,26 +696,37 @@ func TestDCGMExporterServiceAccountAdoptionGuard(t *testing.T) {
 		expectedError string
 	}{
 		"another kind is not this guard's business": {
-			current: current("ConfigMap", "metrics-identity", foreignRef),
+			current: current("ConfigMap", "metrics-identity", foreignRef, ""),
 		},
-		"a ServiceAccount this CR already controls is ours to update": {
-			current: current("ServiceAccount", "metrics-identity", ourRef),
+		"a ServiceAccount this state already manages is ours to update": {
+			current: current("ServiceAccount", "metrics-identity", ourRef, "state-dcgm-exporter"),
+		},
+		"a sibling operand's ServiceAccount is refused": {
+			// The GPUCluster controls it too, so the owner reference alone would pass
+			// and the sync would relabel it into this state.
+			current:       current("ServiceAccount", "nvidia-dcgm-dra", ourRef, "state-dcgm"),
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
+		},
+		"a ServiceAccount this CR controls but no state claims is refused": {
+			current:       current("ServiceAccount", "metrics-identity", ourRef, ""),
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
 		},
 		"a ServiceAccount somebody else controls is refused": {
-			current:       current("ServiceAccount", "metrics-identity", foreignRef),
-			expectedError: "not managed by this GPUCluster",
+			current:       current("ServiceAccount", "metrics-identity", foreignRef, ""),
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
 		},
 		"an unowned ServiceAccount under a configured name is refused": {
-			current:       current("ServiceAccount", "metrics-identity", nil),
-			expectedError: "not managed by this GPUCluster",
+			current:       current("ServiceAccount", "metrics-identity", nil, ""),
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
 		},
 		"the operator default without owner references stays adoptable": {
-			// It predates owner references, i.e. an upgrade from an older release.
-			current: current("ServiceAccount", dcgmExporterDefaultServiceAccountName, nil),
+			// It predates owner references, i.e. an upgrade from an older release. An
+			// account with no owner reference cannot be a sibling operand's.
+			current: current("ServiceAccount", dcgmExporterDefaultServiceAccountName, nil, ""),
 		},
 		"the operator default somebody else controls is refused": {
-			current:       current("ServiceAccount", dcgmExporterDefaultServiceAccountName, foreignRef),
-			expectedError: "not managed by this GPUCluster",
+			current:       current("ServiceAccount", dcgmExporterDefaultServiceAccountName, foreignRef, ""),
+			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
 		},
 	}
 
@@ -745,7 +775,7 @@ func TestDCGMExporterServiceAccountAdoptionGuardWiring(t *testing.T) {
 
 	err := skel.createOrUpdateObjs(ctx, cr, func(*unstructured.Unstructured) error { return nil },
 		[]*unstructured.Unstructured{desired})
-	require.ErrorContains(t, err, "not managed by this GPUCluster")
+	require.ErrorContains(t, err, "not managed by the DCGM Exporter of this GPUCluster")
 
 	// The object the guard refused must be left exactly as it was found.
 	found, err := (&configurableState{stateSkel: *skel}).getServiceAccount(ctx, "metrics-identity")

@@ -34,6 +34,7 @@ import (
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/ownership"
 )
 
 const (
@@ -53,7 +54,19 @@ const (
 	// dcgmExporterDefaultServiceAccountName is the ServiceAccount the DRA operands
 	// reference unless the user configures a different one.
 	dcgmExporterDefaultServiceAccountName = "nvidia-dcgm-exporter-dra"
+
+	// dcgmExporterStateName is this state's name, and the value syncObjects writes into
+	// the state label of every object it applies.
+	dcgmExporterStateName = "state-dcgm-exporter"
 )
+
+// dcgmExporterServiceAccountMarker identifies the ServiceAccounts this state created.
+// It reuses the state label rather than introducing a new one so that accounts created
+// by an earlier release are still recognized after an upgrade.
+var dcgmExporterServiceAccountMarker = ownership.Marker{
+	Key:   consts.StateLabel,
+	Value: dcgmExporterStateName,
+}
 
 func NewStateDCGMExporter(
 	k8sClient client.Client,
@@ -199,7 +212,11 @@ func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, 
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if err == nil && !metav1.IsControlledBy(existing, cr) {
+	if err == nil && !ownership.IsManaged(existing, cr, dcgmExporterServiceAccountMarker) {
+		// Being controlled by this GPUCluster is not enough: it controls every operand's
+		// ServiceAccount, so a configured name pointing at a sibling operand's account
+		// (nvidia-dcgm-dra, nvidia-dra-validator) would pass. Adopting one would stamp
+		// this state's label onto it and hand its lifecycle to the exporter.
 		return dcgmExporterServiceAccountTakeoverError(name, s.namespace)
 	}
 
@@ -209,10 +226,7 @@ func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, 
 // dcgmExporterServiceAccountTakeoverError is the error returned when the configured
 // ServiceAccount exists but belongs to somebody else.
 func dcgmExporterServiceAccountTakeoverError(name, namespace string) error {
-	return fmt.Errorf(
-		"ServiceAccount %q already exists in namespace %q and is not managed by this GPUCluster; "+
-			"set dcgmExporter.serviceAccount.create to false to reference it",
-		name, namespace)
+	return ownership.ConflictError("GPUCluster", name, namespace)
 }
 
 // guardDCGMExporterServiceAccountAdoption stops createOrUpdateObjs from taking over a
@@ -223,14 +237,16 @@ func guardDCGMExporterServiceAccountAdoption(owner metav1.Object, current *unstr
 	if current.GetKind() != "ServiceAccount" {
 		return nil
 	}
-	for _, ref := range current.GetOwnerReferences() {
-		if ref.Controller != nil && *ref.Controller && ref.UID == owner.GetUID() {
-			return nil
-		}
+	// The marker is required alongside the controller reference: a sibling operand's
+	// ServiceAccount carries the same reference, and adopting one would relabel it into
+	// this state.
+	if ownership.IsManaged(current, owner, dcgmExporterServiceAccountMarker) {
+		return nil
 	}
 	if current.GetName() == dcgmExporterDefaultServiceAccountName && len(current.GetOwnerReferences()) == 0 {
 		// The operator default may predate owner references (upgrade from an older
-		// release), so it stays adoptable.
+		// release), so it stays adoptable. An account with no owner reference at all
+		// cannot be a sibling operand's, so this does not reopen the case above.
 		return nil
 	}
 	return dcgmExporterServiceAccountTakeoverError(current.GetName(), current.GetNamespace())
@@ -274,19 +290,10 @@ func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configura
 // reference, so checking ownership alone would also strip the reference and label off
 // another state's ServiceAccount when the user points create=false at it.
 func (s *configurableState) releaseServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, sa *corev1.ServiceAccount) error {
-	if sa.Labels[consts.StateLabel] != s.name {
+	if !dcgmExporterServiceAccountMarker.Matches(sa.Labels) {
 		return nil
 	}
-	if metav1.IsControlledBy(sa, cr) {
-		refs := make([]metav1.OwnerReference, 0, len(sa.OwnerReferences))
-		for _, ref := range sa.OwnerReferences {
-			if ref.UID == cr.GetUID() {
-				continue
-			}
-			refs = append(refs, ref)
-		}
-		sa.OwnerReferences = refs
-	}
+	ownership.ReleaseOwner(sa, cr.GetUID())
 	delete(sa.Labels, consts.StateLabel)
 	log.FromContext(ctx).V(consts.LogLevelInfo).Info(
 		"Releasing ownership of a user-provided dcgm-exporter ServiceAccount", "Name", sa.Name)
@@ -310,12 +317,12 @@ func (s *configurableState) deleteSupersededServiceAccounts(ctx context.Context,
 	list := &corev1.ServiceAccountList{}
 	if err := s.client.List(ctx, list,
 		client.InNamespace(s.namespace),
-		client.MatchingLabels{consts.StateLabel: s.name}); err != nil {
+		dcgmExporterServiceAccountMarker.Selector()); err != nil {
 		return err
 	}
 	for i := range list.Items {
 		sa := &list.Items[i]
-		if sa.Name == keep || !metav1.IsControlledBy(sa, cr) {
+		if sa.Name == keep || !ownership.IsManaged(sa, cr, dcgmExporterServiceAccountMarker) {
 			continue
 		}
 		log.FromContext(ctx).V(consts.LogLevelInfo).Info(
