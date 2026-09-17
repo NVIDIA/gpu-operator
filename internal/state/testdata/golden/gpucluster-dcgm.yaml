@@ -103,6 +103,25 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    app: nvidia-dcgm
+    app.kubernetes.io/component: nvidia-dcgm
+  name: nvidia-dcgm
+  namespace: test-operator
+spec:
+  internalTrafficPolicy: Local
+  ports:
+  - name: dcgm
+    port: 5555
+    protocol: TCP
+    targetPort: 5555
+  selector:
+    app: nvidia-dcgm-dra
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
     app: nvidia-dcgm-dra
     app.kubernetes.io/component: nvidia-dcgm
   name: nvidia-dcgm-dra
