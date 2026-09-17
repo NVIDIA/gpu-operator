@@ -384,6 +384,14 @@ func unownedServiceAccount(name string) *corev1.ServiceAccount {
 	}
 }
 
+// selfLabelledServiceAccount returns a ServiceAccount the user created and labelled with
+// this state's label themselves. The operator never owned it, so it is not ours to mutate.
+func selfLabelledServiceAccount(name string) *corev1.ServiceAccount {
+	sa := unownedServiceAccount(name)
+	sa.Labels = map[string]string{consts.StateLabel: "state-dcgm-exporter"}
+	return sa
+}
+
 // otherStateServiceAccount returns a ServiceAccount another state of the same GPUCluster
 // manages: it carries the CR's controller reference like every operand object does, but
 // not this state's label.
@@ -801,9 +809,11 @@ func TestDCGMExporterServiceAccountReleasedOnDelete(t *testing.T) {
 		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
 		existing       func(cr *nvidiav1alpha1.GPUCluster) []client.Object
 		// released must survive with neither this CR's owner reference nor the state
-		// label; stillManaged must keep whatever the operator put on it.
-		released     []string
-		stillManaged []string
+		// label; stillManaged must keep whatever the operator put on it;
+		// untouchedLabel must keep the label the user put on it themselves.
+		released       []string
+		stillManaged   []string
+		untouchedLabel []string
 	}{
 		"create=false releases the ServiceAccount the operator used to own": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
@@ -826,6 +836,16 @@ func TestDCGMExporterServiceAccountReleasedOnDelete(t *testing.T) {
 			},
 			stillManaged: []string{driverName},
 		},
+		"create=false leaves an account the user labelled themselves alone": {
+			// The label says "an exporter account", not "an account this CR owns".
+			// Stripping it off an account the operator never created would edit the
+			// user's object, which the unmanaged contract forbids.
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
+				return []client.Object{selfLabelledServiceAccount(byoName)}
+			},
+			untouchedLabel: []string{byoName},
+		},
 		"a managed ServiceAccount is left for the state cleanup to remove": {
 			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
 				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
@@ -846,6 +866,12 @@ func TestDCGMExporterServiceAccountReleasedOnDelete(t *testing.T) {
 			}
 			for _, saName := range tc.stillManaged {
 				requireStillManaged(t, ctx, s, cr, saName)
+			}
+			for _, saName := range tc.untouchedLabel {
+				sa, err := s.getServiceAccount(ctx, saName)
+				require.NoError(t, err)
+				assert.Contains(t, sa.Labels, consts.StateLabel,
+					"a label the user set on their own ServiceAccount must not be removed")
 			}
 		})
 	}

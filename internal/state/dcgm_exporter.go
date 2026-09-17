@@ -286,11 +286,11 @@ func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configura
 
 // releaseServiceAccount hands a ServiceAccount the user now owns back to them by dropping
 // this GPUCluster's controller reference and the state label. Only a ServiceAccount this
-// state managed is touched: every operand of the GPUCluster carries its controller
-// reference, so checking ownership alone would also strip the reference and label off
-// another state's ServiceAccount when the user points create=false at it.
+// state actually managed is touched, which takes both halves: the controller reference
+// alone would match another state's account, and the marker alone would match an account
+// the user labelled themselves -- neither is ours to mutate.
 func (s *configurableState) releaseServiceAccount(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, sa *corev1.ServiceAccount) error {
-	if !dcgmExporterServiceAccountMarker.Matches(sa.Labels) {
+	if !ownership.IsManaged(sa, cr, dcgmExporterServiceAccountMarker) {
 		return nil
 	}
 	ownership.ReleaseOwner(sa, cr.GetUID())
