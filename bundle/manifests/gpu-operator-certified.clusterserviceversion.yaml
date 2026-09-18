@@ -251,7 +251,7 @@ spec:
     - name: nvidia-dra-driver-image
       image: nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.0@sha256:9b46984c0eb18def60e2b9817b874275f4b5b08d12d491de4f1a7b91b51d706c
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless@sha256:613ab03c11d442fd960ff515f547e9921537454a712d08160bc8f677f89f1c35
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003
     - name: dcgm-image
       image: nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubi10@sha256:92080d86d04c265f7fc0b8e1cd95dff94d3ab57de6a6474c3c483e4c2ada5dea
     - name: container-toolkit-image
@@ -1125,7 +1125,7 @@ spec:
                   - name: "DCGM_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubi10@sha256:92080d86d04c265f7fc0b8e1cd95dff94d3ab57de6a6474c3c483e4c2ada5dea"
                   - name: "DCGM_EXPORTER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless@sha256:613ab03c11d442fd960ff515f547e9921537454a712d08160bc8f677f89f1c35"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003"
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.20.0@sha256:a61ba9fd8efb82f3a79f877f7580e02c1e8e7593f62473644bc9c79e315c3312"
                   - name: "DRIVER_IMAGE"
