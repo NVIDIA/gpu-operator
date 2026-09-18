@@ -82,8 +82,10 @@ func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
 		priorityClassName string
 		want              string
 	}{
-		"custom": {priorityClassName: "custom-gpu-priority", want: "custom-gpu-priority"},
-		"unset":  {priorityClassName: "", want: "system-node-critical"},
+		"custom":       {priorityClassName: "custom-gpu-priority", want: "custom-gpu-priority"},
+		"unset":        {priorityClassName: "", want: "system-node-critical"},
+		"yaml-boolean": {priorityClassName: "on", want: "on"},
+		"yaml-null":    {priorityClassName: "null", want: "null"},
 	}
 	for stateName, newState := range states {
 		t.Run(stateName, func(t *testing.T) {

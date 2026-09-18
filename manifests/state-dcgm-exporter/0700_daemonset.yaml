@@ -39,7 +39,7 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" }}
+      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" | quote }}
       serviceAccountName: nvidia-dcgm-exporter-dra
       automountServiceAccountToken: true
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
