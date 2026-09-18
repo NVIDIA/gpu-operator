@@ -18,12 +18,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -138,6 +140,7 @@ var (
 	driverInstallDirFlag            string
 	driverInstallDirCtrPathFlag     string
 	driverValidationSkipGPUInitFlag bool
+	commitMIGModeWithResetFlag      bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -241,6 +244,11 @@ const (
 	shell = "sh"
 	// defaultVGPUReadinessTimeout is the default timeout for waiting for the vGPU stack to be ready
 	defaultVGPUReadinessTimeout = 5 * time.Minute
+	// migModeEnabled is the value nvidia-smi is expected to report for
+	// mig.mode.current and mig.mode.pending when MIG mode is enabled; anything
+	// that does not match it (e.g. "Disabled", or "[N/A]" on GPUs without MIG
+	// support) is treated as not enabled.
+	migModeEnabled = "Enabled"
 	// constants for driver components
 	GDRCOPY       = "gdrcopy"
 	NVIDIAFS      = "nvidia-fs"
@@ -384,6 +392,16 @@ func main() {
 			Usage:       "validate the driver with 'nvidia-smi --version' to avoid initializing GPUs, e.g. when GPUs are bound to vfio-pci",
 			Destination: &driverValidationSkipGPUInitFlag,
 			Sources:     cli.EnvVars("DRIVER_VALIDATION_SKIP_GPU_INIT"),
+		},
+		&cli.BoolFlag{
+			Name:  "commit-mig-mode-with-gpu-reset",
+			Value: false,
+			Usage: "on the vGPU (sandbox) workload path, commit a pending-but-uncommitted MIG-mode enable " +
+				"by performing a targeted GPU reset (nvidia-smi --gpu-reset) during vGPU Manager validation. " +
+				"This is destructive: it resets the GPU. It only acts on GPUs that have an uncommitted MIG-mode " +
+				"enable, no SR-IOV VFs enabled, and no running compute processes. Disabled by default.",
+			Destination: &commitMIGModeWithResetFlag,
+			Sources:     cli.EnvVars("COMMIT_MIG_MODE_WITH_GPU_RESET"),
 		},
 	}
 
@@ -1701,6 +1719,15 @@ func (v *VGPUManager) validate() error {
 		return err
 	}
 
+	// Commit a MIG-mode enable that was requested but never applied, so
+	// MIG-backed vGPU devices can be created. Runs before waitForParentDevices,
+	// since the reset is skipped once VFs are present. Opt-in and best-effort:
+	// disabled by default, and on failure we fall through, preserving the
+	// prior behavior for setups where MIG mode is committed by other means.
+	if err := commitMIGMode(hostDriver); err != nil {
+		log.Warnf("Unable to commit pending MIG mode, continuing: %v", err)
+	}
+
 	log.Info("Waiting for parent devices to be available...")
 	if err := waitForParentDevices(ctx, defaultVGPUReadinessTimeout); err != nil {
 		return fmt.Errorf("vGPU Manager parent devices not ready: %w", err)
@@ -1735,6 +1762,205 @@ func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	}
 
 	return hostDriver, runCommand(command, args, silent)
+}
+
+// migMode holds the current and pending MIG-mode state of a single GPU as
+// reported by nvidia-smi (e.g. "Enabled", "Disabled", or "[N/A]").
+type migMode struct {
+	current string
+	pending string
+}
+
+// needsCommit reports whether the GPU has a MIG-mode enable that has been
+// requested (pending) but not yet applied (current). It deliberately covers
+// only the enable direction: a pending disable is left alone.
+func (m migMode) needsCommit() bool {
+	return strings.EqualFold(m.pending, migModeEnabled) && !strings.EqualFold(m.current, migModeEnabled)
+}
+
+// shouldResetForMIGCommit reports whether a GPU should be reset to commit a
+// pending MIG-mode enable, given its observed state. A reset is warranted
+// only when all of the following hold:
+//
+//   - the MIG-mode enable is requested but not yet applied (needsCommit);
+//   - no SR-IOV VFs are enabled;
+//   - no compute processes are running on the GPU.
+func shouldResetForMIGCommit(mode migMode, numVFs uint64, busy bool) bool {
+	return mode.needsCommit() && numVFs == 0 && !busy
+}
+
+// normalizePCIAddress lowercases a PCI address and re-renders its domain as
+// minimum-width hex (four digits, wider if the value needs it) so addresses
+// from nvidia-smi (e.g. "00000000:41:00.0") and go-nvlib (e.g. "0000:41:00.0")
+// compare equal.
+func normalizePCIAddress(address string) string {
+	address = strings.ToLower(strings.TrimSpace(address))
+	domain, rest, found := strings.Cut(address, ":")
+	if !found {
+		return address
+	}
+	value, err := strconv.ParseUint(domain, 16, 32)
+	if err != nil {
+		return address
+	}
+	return fmt.Sprintf("%04x:%s", value, rest)
+}
+
+// parseMIGModes parses the CSV output of
+// 'nvidia-smi --query-gpu=pci.bus_id,mig.mode.current,mig.mode.pending
+// --format=csv,noheader' into a map keyed by normalized PCI address. Lines that
+// do not have exactly three fields (e.g. blank lines) are skipped.
+func parseMIGModes(output string) map[string]migMode {
+	modes := make(map[string]migMode)
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ",")
+		if len(fields) != 3 {
+			continue
+		}
+		address := normalizePCIAddress(fields[0])
+		modes[address] = migMode{
+			current: strings.TrimSpace(fields[1]),
+			pending: strings.TrimSpace(fields[2]),
+		}
+	}
+	return modes
+}
+
+// vgpuNvidiaSMI returns the root to chroot into to run the vGPU Manager driver
+// tooling and the nvidia-smi to invoke inside it: the host root and the resolved
+// host nvidia-smi when the driver is pre-installed on the host, or the
+// containerized driver install dir and a bare "nvidia-smi" otherwise.
+//
+// It mirrors the resolution runValidation performs. Resolving matters on the
+// host path because chroot execs a bare name through the validator's own PATH,
+// which does not cover two of the locations searched on the host (/opt/bin
+// and the WSL path).
+func vgpuNvidiaSMI(hostDriver bool, hostRootCtrPath string) (driverRoot, nvidiaSMI string, err error) {
+	if !hostDriver {
+		return defaultDriverInstallDir, "nvidia-smi", nil
+	}
+	nvidiaSMIPath, err := resolveHostNvidiaSMI(hostRootCtrPath)
+	if err != nil {
+		return "", "", fmt.Errorf("error resolving host nvidia-smi: %w", err)
+	}
+	return "/host", nvidiaSMIPath, nil
+}
+
+// queryMIGModes returns the MIG-mode state of the GPUs nvidia-smi reports,
+// keyed by normalized PCI address, by invoking nvidia-smi inside the driver
+// root.
+func queryMIGModes(driverRoot, nvidiaSMI string) (map[string]migMode, error) {
+	args := []string{
+		driverRoot, nvidiaSMI,
+		"--query-gpu=pci.bus_id,mig.mode.current,mig.mode.pending",
+		"--format=csv,noheader",
+	}
+	out, err := exec.Command("chroot", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("error querying MIG mode: %w", err)
+	}
+	return parseMIGModes(string(out)), nil
+}
+
+// gpuHasRunningProcesses reports whether the GPU at the given PCI address has
+// any running compute processes. It is a fast-path guard covering compute
+// clients; 'nvidia-smi --gpu-reset' independently refuses to reset a GPU that
+// is in use, which also covers clients this query does not enumerate. On query
+// error it returns the error and the caller skips the GPU (fail-closed), so an
+// uncertain GPU is left untouched.
+func gpuHasRunningProcesses(driverRoot, nvidiaSMI, address string) (bool, error) {
+	args := []string{
+		driverRoot, nvidiaSMI,
+		"-i", address,
+		"--query-compute-apps=pid",
+		"--format=csv,noheader",
+	}
+	out, err := exec.Command("chroot", args...).Output()
+	if err != nil {
+		return false, fmt.Errorf("error querying running compute processes: %w", err)
+	}
+	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// commitMIGMode commits a pending-but-uncommitted MIG-mode enable on the vGPU
+// (sandbox) workload path by performing a targeted GPU reset, so MIG-backed
+// vGPU devices can be created.
+//
+// The reset (nvidia-smi --gpu-reset) is destructive: it clears GPU state, and
+// nvidia-smi refuses it outright while the GPU is in use. It runs only when
+// explicitly enabled (commit-mig-mode-with-gpu-reset, off by default), and
+// only resets a GPU that all of the following hold for:
+//
+//   - the caller is on the vGPU path: commitMIGMode is reached only from
+//     VGPUManager.validate(), which early-returns for other workloads;
+//   - the GPU has a MIG-mode enable that is requested but not yet applied
+//     (mig.mode.pending == Enabled, mig.mode.current != Enabled);
+//   - the GPU has no SR-IOV VFs enabled;
+//   - the GPU has no running compute processes.
+//
+// It is best-effort: reset failures are aggregated and returned, and the
+// caller logs and continues so setups that commit MIG mode by other means
+// keep working.
+func commitMIGMode(hostDriver bool) error {
+	if !commitMIGModeWithResetFlag {
+		return nil
+	}
+
+	gpus, err := nvpci.New().GetGPUs()
+	if err != nil {
+		return fmt.Errorf("error getting GPUs: %w", err)
+	}
+
+	driverRoot, nvidiaSMI, err := vgpuNvidiaSMI(hostDriver, "/host")
+	if err != nil {
+		return err
+	}
+
+	migModes, err := queryMIGModes(driverRoot, nvidiaSMI)
+	if err != nil {
+		return err
+	}
+
+	var resetErrs []error
+	for _, gpu := range gpus {
+		address := normalizePCIAddress(gpu.Address)
+
+		mode, ok := migModes[address]
+		if !ok || !mode.needsCommit() {
+			continue
+		}
+
+		var numVFs uint64
+		if gpu.SriovInfo.IsPF() {
+			numVFs = gpu.SriovInfo.PhysicalFunction.NumVFs
+		}
+		if numVFs > 0 {
+			log.Warnf("Skipping GPU reset on %s: %d SR-IOV VF(s) still enabled", gpu.Address, numVFs)
+			continue
+		}
+
+		busy, err := gpuHasRunningProcesses(driverRoot, nvidiaSMI, gpu.Address)
+		if err != nil {
+			log.Warnf("Skipping GPU reset on %s: unable to confirm it is idle: %v", gpu.Address, err)
+			continue
+		}
+
+		if !shouldResetForMIGCommit(mode, numVFs, busy) {
+			log.Warnf("Skipping GPU reset on %s: running compute processes present", gpu.Address)
+			continue
+		}
+
+		log.Infof("Committing pending MIG-mode enable on GPU %s via targeted GPU reset", gpu.Address)
+		if err := runCommand("chroot", []string{driverRoot, nvidiaSMI, "-i", gpu.Address, "--gpu-reset"}, false); err != nil {
+			resetErrs = append(resetErrs, fmt.Errorf("gpu %s: %w", gpu.Address, err))
+		}
+	}
+
+	return errors.Join(resetErrs...)
 }
 
 // waitForParentDevices polls until the vGPU stack is ready — either NVIDIA
