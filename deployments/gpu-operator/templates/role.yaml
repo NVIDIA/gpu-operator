@@ -105,3 +105,4 @@ rules:
   - watch
   - create
   - update
+  - delete

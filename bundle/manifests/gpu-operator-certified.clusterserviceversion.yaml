@@ -1058,6 +1058,7 @@ spec:
           - watch
           - create
           - update
+          - delete
       deployments:
       - name: gpu-operator
         spec:
