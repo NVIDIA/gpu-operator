@@ -350,17 +350,12 @@ var dcgmExporterServiceAccountMarker = ownership.Marker{
 	Value: "nvidia-dcgm-exporter",
 }
 
-// checkDCGMExporterServiceAccountAvailable reports whether the configured ServiceAccount
-// may be created or adopted: it has to be absent, or an account this ClusterPolicy
-// created for the exporter. Ownership alone is not enough -- the ClusterPolicy controls
-// every operand's ServiceAccount, so a configured name such as nvidia-driver would pass
-// and the exporter would end up running with another operand's identity.
-func (n ClusterPolicyController) checkDCGMExporterServiceAccountAvailable(ctx context.Context, obj *corev1.ServiceAccount) error {
+// checkDCGMExporterServiceAccountOwnership validates an existing account. NotFound is
+// returned to the caller: it permits an initial create, but after AlreadyExists it
+// means the cache has not observed the object and reconciliation must retry.
+func (n ClusterPolicyController) checkDCGMExporterServiceAccountOwnership(ctx context.Context, obj *corev1.ServiceAccount) error {
 	found := &corev1.ServiceAccount{}
-	if err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
+	if err := n.client.Get(ctx, client.ObjectKeyFromObject(obj), found); err != nil {
 		return err
 	}
 	if ownership.IsManaged(found, n.singleton, dcgmExporterServiceAccountMarker) {
@@ -470,7 +465,7 @@ func (n ClusterPolicyController) deleteOwnedDCGMExporterServiceAccounts(ctx cont
 			continue
 		}
 		logger.V(1).Info("Removing a dcgm-exporter ServiceAccount the operator no longer uses", "Name", sa.Name)
-		if err := n.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
+		if err := ownership.DeleteObserved(ctx, n.client, sa); err != nil {
 			return err
 		}
 	}
@@ -534,7 +529,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	// left tolerant so an upgrade that lost the owner reference keeps converging.
 	guardTakeover := isDCGMExporter && dcgmExporterServiceAccountRenamed(&n.singleton.Spec)
 	if guardTakeover {
-		if err := n.checkDCGMExporterServiceAccountAvailable(ctx, obj); err != nil {
+		if err := n.checkDCGMExporterServiceAccountOwnership(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
 			logger.Error(err, "Refusing to take over an existing ServiceAccount")
 			return gpuv1.NotReady, err
 		}
@@ -553,7 +548,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		// to be revalidated: AlreadyExists must not silently hand the exporter an
 		// account it does not manage.
 		if guardTakeover {
-			if err := n.checkDCGMExporterServiceAccountAvailable(ctx, obj); err != nil {
+			if err := n.checkDCGMExporterServiceAccountOwnership(ctx, obj); err != nil {
 				logger.Error(err, "Refusing to use an existing ServiceAccount")
 				return gpuv1.NotReady, err
 			}

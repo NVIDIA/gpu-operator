@@ -66,7 +66,7 @@ type configurableState struct {
 	// preDelete runs before the generic cleanup removes every object carrying this
 	// state's label. An object the user took over still carries that label from when the
 	// operator managed it, so anything that must outlive the state has to be handed back
-	// here -- the cleanup itself only looks at the label, not at ownership.
+	// here. The deletion filter separately protects objects the operator never owned.
 	preDelete func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 }
 
@@ -89,7 +89,7 @@ func (s *configurableState) Sync(ctx context.Context, customResource any, infoCa
 				return SyncStateNotReady, err
 			}
 		}
-		return s.handleStateObjectsDeletion(ctx)
+		return s.handleStateObjectsDeletion(ctx, cr)
 	}
 
 	if s.preSync != nil {

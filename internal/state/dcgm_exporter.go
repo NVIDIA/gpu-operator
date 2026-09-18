@@ -80,6 +80,7 @@ func NewStateDCGMExporter(
 		return nil, err
 	}
 	skel.adoptionGuard = guardDCGMExporterServiceAccountAdoption
+	skel.deletionFilter = canDeleteDCGMExporterObject
 	return &configurableState{
 		stateSkel: skel,
 		isEnabled: func(cr *nvidiav1alpha1.GPUCluster) bool {
@@ -284,6 +285,21 @@ func releaseDCGMExporterServiceAccountOnDelete(ctx context.Context, s *configura
 	return s.releaseServiceAccount(ctx, cr, sa)
 }
 
+// canDeleteDCGMExporterObject protects unmanaged accounts in the generic state sweep,
+// including accounts users labelled themselves. Exclude the configured BYO account
+// even if the cache still contains its owner reference from before preDelete released it.
+func canDeleteDCGMExporterObject(owner metav1.Object, obj *unstructured.Unstructured) bool {
+	if obj.GetAPIVersion() != "v1" || obj.GetKind() != "ServiceAccount" {
+		return true
+	}
+	cr := owner.(*nvidiav1alpha1.GPUCluster)
+	if spec := cr.Spec.DCGMExporter; spec != nil && !spec.IsServiceAccountCreateEnabled() &&
+		obj.GetName() == spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName) {
+		return false
+	}
+	return ownership.IsManaged(obj, owner, dcgmExporterServiceAccountMarker)
+}
+
 // releaseServiceAccount hands a ServiceAccount the user now owns back to them by dropping
 // this GPUCluster's controller reference and the state label. Only a ServiceAccount this
 // state actually managed is touched, which takes both halves: the controller reference
@@ -327,7 +343,7 @@ func (s *configurableState) deleteSupersededServiceAccounts(ctx context.Context,
 		}
 		log.FromContext(ctx).V(consts.LogLevelInfo).Info(
 			"Removing a dcgm-exporter ServiceAccount superseded by the configured one", "Name", sa.Name)
-		if err := s.client.Delete(ctx, sa); err != nil && !apierrors.IsNotFound(err) {
+		if err := ownership.DeleteObserved(ctx, s.client, sa); err != nil {
 			return err
 		}
 	}

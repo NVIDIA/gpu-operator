@@ -27,8 +27,10 @@
 package ownership
 
 import (
+	"context"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,4 +101,16 @@ func ConflictError(ownerKind, name, namespace string) error {
 		"ServiceAccount %q already exists in namespace %q and is not managed by the DCGM Exporter of this %s; "+
 			"set dcgmExporter.serviceAccount.create to false to reference it",
 		name, namespace, ownerKind)
+}
+
+// DeleteObserved deletes only the object version whose ownership was checked. UID
+// protects a replacement with the same name; resourceVersion protects a concurrent
+// ownership hand-off on the same object. Conflicts are left for the next reconciliation.
+func DeleteObserved(ctx context.Context, c client.Client, obj client.Object) error {
+	uid, version := obj.GetUID(), obj.GetResourceVersion()
+	err := c.Delete(ctx, obj, client.Preconditions{UID: &uid, ResourceVersion: &version})
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		return nil
+	}
+	return err
 }

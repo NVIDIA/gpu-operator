@@ -18,6 +18,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,9 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -78,9 +81,18 @@ func newTestDCGMExporterStateWithObjects(t *testing.T, objs ...client.Object) *c
 	require.NoError(t, rbacv1.AddToScheme(testScheme))
 	require.NoError(t, nvidiav1alpha1.AddToScheme(testScheme))
 
+	// Disabled Sync must exercise real cleanup, rather than skip every kind as unserved.
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion})
+	for _, gvk := range []schema.GroupVersionKind{
+		corev1.SchemeGroupVersion.WithKind("ServiceAccount"),
+		corev1.SchemeGroupVersion.WithKind("ConfigMap"),
+		appsv1.SchemeGroupVersion.WithKind("DaemonSet"),
+	} {
+		mapper.Add(gvk, meta.RESTScopeNamespace)
+	}
 	k8sClient := fake.NewClientBuilder().
 		WithScheme(testScheme).
-		WithRESTMapper(restMapperWithServiceMonitor(false)).
+		WithRESTMapper(mapper).
 		WithObjects(objs...).
 		WithStatusSubresource(&appsv1.DaemonSet{}).
 		Build()
@@ -930,4 +942,119 @@ func TestDCGMExporterSyncReleasesBeforeOperandsConverge(t *testing.T) {
 	requireReleased(t, ctx, s, cr, byoName)
 	_, err = s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
 	require.NoError(t, err, "the superseded default is reclaimed only once the operands converged")
+}
+
+// Exercise the whole disabled-state cleanup, not just the ownership-release hook.
+func TestDCGMExporterDisabledSyncPreservesUnmanagedAccounts(t *testing.T) {
+	for name, released := range map[string]bool{"self-labelled user account": false, "managed account handed back": true} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)}})
+			sa := selfLabelledServiceAccount("byo-sa")
+			if released {
+				sa = ownedServiceAccount(cr, sa.Name)
+			}
+			sa.Annotations = map[string]string{"example.com/identity": "keep-me"}
+			// A different user account with the same label is not ours to delete either.
+			other := selfLabelledServiceAccount("another-user-sa")
+			old := ownedServiceAccount(cr, "previous-managed-sa")
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "exporter-config", Namespace: "test-operator", Labels: map[string]string{consts.StateLabel: dcgmExporterStateName}}}
+			s := newTestDCGMExporterStateWithObjects(t, sa, other, old, cm)
+			_, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			found, err := s.getServiceAccount(ctx, sa.Name)
+			require.NoError(t, err)
+			require.Equal(t, sa.Annotations, found.Annotations)
+			if released {
+				requireReleased(t, ctx, s, cr, sa.Name)
+			} else {
+				require.Equal(t, sa.Labels, found.Labels)
+				require.Empty(t, found.OwnerReferences)
+			}
+			_, err = s.getServiceAccount(ctx, other.Name)
+			require.NoError(t, err)
+			_, err = s.getServiceAccount(ctx, old.Name)
+			require.True(t, apierrors.IsNotFound(err))
+			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})))
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.Equal(t, SyncState(SyncStateIgnore), state, "preserved accounts must not keep cleanup pending")
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountDeletionRace(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disabled=%t", disabled), func(t *testing.T) {
+			ctx := context.Background()
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(!disabled)})
+			old := ownedServiceAccount(cr, "previous-sa")
+			old.UID = "old-uid"
+			s := newTestDCGMExporterStateWithObjects(t, old)
+			var deletes int
+			s.client = interceptor.NewClient(s.client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				if obj.GetName() != old.Name {
+					return c.Delete(ctx, obj, opts...)
+				}
+				deletes++
+				require.NoError(t, c.Delete(ctx, old))
+				replacement := selfLabelledServiceAccount(old.Name)
+				replacement.UID = "replacement-uid"
+				require.NoError(t, c.Create(ctx, replacement))
+				options := (&client.DeleteOptions{}).ApplyOptions(opts)
+				// The fake client does not implement UID preconditions; emulate the API server.
+				if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != replacement.UID {
+					return apierrors.NewConflict(corev1.Resource("serviceaccounts"), obj.GetName(), fmt.Errorf("UID changed"))
+				}
+				return c.Delete(ctx, obj, opts...)
+			}})
+			if disabled {
+				_, err := s.Sync(ctx, cr, draSupportedCatalog())
+				require.NoError(t, err)
+			} else {
+				require.NoError(t, reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr))
+			}
+			require.Equal(t, 1, deletes)
+			found, err := s.getServiceAccount(ctx, old.Name)
+			require.NoError(t, err)
+			require.Equal(t, types.UID("replacement-uid"), found.UID)
+			require.Empty(t, found.OwnerReferences)
+		})
+	}
+}
+
+func TestDCGMExporterDeletionFilterScope(t *testing.T) {
+	for name, test := range map[string]struct {
+		spec    *nvidiav1.DCGMExporterSpec
+		generic bool
+		deleted bool
+	}{
+		"omitted exporter still deletes managed accounts":        {deleted: true},
+		"disabled managed exporter deletes managed accounts":     {spec: &nvidiav1.DCGMExporterSpec{Enabled: new(false)}, deleted: true},
+		"BYO account is excluded even with stale owner metadata": {spec: &nvidiav1.DCGMExporterSpec{Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics", Create: new(false)}}},
+		"operands without a filter retain label-based cleanup":   {generic: true, deleted: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			cr := exporterCR(test.spec)
+			sa := ownedServiceAccount(cr, "metrics")
+			if test.generic {
+				sa.OwnerReferences = nil
+			}
+			s := newTestDCGMExporterStateWithObjects(t, sa)
+			if test.generic {
+				s.deletionFilter = nil
+			}
+			// Simulate a stale list following ownership release by calling the sweep directly.
+			found, err := s.deleteStateRelatedObjects(ctx, cr)
+			require.NoError(t, err)
+			require.Equal(t, test.deleted, found)
+			_, err = s.getServiceAccount(ctx, sa.Name)
+			if test.deleted {
+				require.True(t, apierrors.IsNotFound(err))
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/ownership"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -55,6 +56,10 @@ type stateSkel struct {
 	// AlreadyExists, which closes the window between an ownership check made earlier in
 	// the sync and the create itself.
 	adoptionGuard func(owner metav1.Object, current *unstructured.Unstructured) error
+
+	// deletionFilter excludes externally managed objects from label-based cleanup.
+	// A nil filter preserves the cleanup policy of existing operands.
+	deletionFilter func(owner metav1.Object, current *unstructured.Unstructured) bool
 }
 
 // Name provides the State name
@@ -387,11 +392,11 @@ func (s *stateSkel) addStateSpecificLabels(obj *unstructured.Unstructured) {
 	obj.SetLabels(labels)
 }
 
-func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, error) {
+func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context, owner metav1.Object) (SyncState, error) {
 	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info(
 		"State spec in CR is nil, deleting existing objects if needed", "State:", s.name)
-	found, err := s.deleteStateRelatedObjects(ctx)
+	found, err := s.deleteStateRelatedObjects(ctx, owner)
 	if err != nil {
 		return SyncStateError, fmt.Errorf("failed to delete k8s objects: %w", err)
 	}
@@ -402,7 +407,7 @@ func (s *stateSkel) handleStateObjectsDeletion(ctx context.Context) (SyncState, 
 	return SyncStateIgnore, nil
 }
 
-func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error) {
+func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context, owner metav1.Object) (bool, error) {
 	stateLabel := map[string]string{
 		consts.StateLabel: s.name,
 	}
@@ -432,13 +437,13 @@ func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error)
 			}
 			return false, err
 		}
-		if len(l.Items) > 0 {
-			found = true
-		}
 		for _, obj := range l.Items {
+			if s.deletionFilter != nil && !s.deletionFilter(owner, &obj) {
+				continue
+			}
+			found = true
 			if obj.GetDeletionTimestamp() == nil {
-				err := s.client.Delete(ctx, &obj)
-				if err != nil && !apierrors.IsNotFound(err) {
+				if err := ownership.DeleteObserved(ctx, s.client, &obj); err != nil {
 					return true, err
 				}
 			}

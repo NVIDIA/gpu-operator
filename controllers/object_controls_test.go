@@ -2864,66 +2864,70 @@ func TestDCGMExporterServiceAccountReconcile(t *testing.T) {
 // Create report AlreadyExists, which must not be taken as success without revalidating
 // what is actually there.
 func TestDCGMExporterServiceAccountCreateRace(t *testing.T) {
-	const (
-		testNamespace = "test-namespace"
-		customName    = "metrics-identity"
-	)
+	for _, staleReads := range []int{1, 2} {
+		t.Run(fmt.Sprintf("stale reads %d", staleReads), func(t *testing.T) {
+			const (
+				testNamespace = "test-namespace"
+				customName    = "metrics-identity"
+			)
 
-	testScheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(testScheme))
-	require.NoError(t, gpuv1.AddToScheme(testScheme))
+			testScheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(testScheme))
+			require.NoError(t, gpuv1.AddToScheme(testScheme))
 
-	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
-	cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: customName}
+			cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}}
+			cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: customName}
 
-	// Somebody else's account, already in the cluster.
-	intruder := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{Name: customName, Namespace: testNamespace},
+			// Somebody else's account, already in the cluster.
+			intruder := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: customName, Namespace: testNamespace},
+			}
+
+			// The first Get -- the availability check -- reports the name as free; the object is
+			// there by the time Create runs, which is the race being reproduced.
+			var gets int
+			k8s := fake.NewClientBuilder().
+				WithScheme(testScheme).
+				WithObjects(intruder).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*corev1.ServiceAccount); ok && gets < staleReads {
+							gets++
+							return apierrors.NewNotFound(corev1.Resource("serviceaccounts"), key.Name)
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				}).
+				Build()
+
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         cp,
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				resources: []Resources{{
+					ServiceAccount: corev1.ServiceAccount{
+						ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
+					},
+				}},
+				stateNames: []string{"state-dcgm-exporter"},
+				idx:        0,
+				logger:     ctrl.Log.WithName("test"),
+			}
+
+			state, err := ServiceAccount(n)
+			require.Error(t, err, "AlreadyExists must not pass an account the exporter does not manage")
+			require.Equal(t, gpuv1.NotReady, state)
+
+			found := &corev1.ServiceAccount{}
+			require.NoError(t, k8s.Get(context.Background(),
+				types.NamespacedName{Namespace: testNamespace, Name: customName}, found))
+			require.Empty(t, found.OwnerReferences, "the intruding ServiceAccount must not be adopted")
+			require.False(t, dcgmExporterServiceAccountMarker.Matches(found.Labels),
+				"the intruding ServiceAccount must not be claimed by the exporter")
+		})
 	}
-
-	// The first Get -- the availability check -- reports the name as free; the object is
-	// there by the time Create runs, which is the race being reproduced.
-	var firstGet bool
-	k8s := fake.NewClientBuilder().
-		WithScheme(testScheme).
-		WithObjects(intruder).
-		WithInterceptorFuncs(interceptor.Funcs{
-			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if _, ok := obj.(*corev1.ServiceAccount); ok && !firstGet {
-					firstGet = true
-					return apierrors.NewNotFound(corev1.Resource("serviceaccounts"), key.Name)
-				}
-				return c.Get(ctx, key, obj, opts...)
-			},
-		}).
-		Build()
-
-	n := ClusterPolicyController{
-		client:            k8s,
-		ctx:               context.Background(),
-		singleton:         cp,
-		scheme:            testScheme,
-		operatorNamespace: testNamespace,
-		resources: []Resources{{
-			ServiceAccount: corev1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName},
-			},
-		}},
-		stateNames: []string{"state-dcgm-exporter"},
-		idx:        0,
-		logger:     ctrl.Log.WithName("test"),
-	}
-
-	state, err := ServiceAccount(n)
-	require.Error(t, err, "AlreadyExists must not pass an account the exporter does not manage")
-	require.Equal(t, gpuv1.NotReady, state)
-
-	found := &corev1.ServiceAccount{}
-	require.NoError(t, k8s.Get(context.Background(),
-		types.NamespacedName{Namespace: testNamespace, Name: customName}, found))
-	require.Empty(t, found.OwnerReferences, "the intruding ServiceAccount must not be adopted")
-	require.False(t, dcgmExporterServiceAccountMarker.Matches(found.Labels),
-		"the intruding ServiceAccount must not be claimed by the exporter")
 }
 
 // TestDCGMExporterSupersededServiceAccountCleanup covers the deferred reclaim that runs once
@@ -3318,6 +3322,53 @@ func TestDCGMExporterCleanupSurvivesDisabledControls(t *testing.T) {
 			} else {
 				require.NoError(t, getErr, "nothing may be reclaimed while a control is still coming up")
 			}
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountDeletionRace(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disabled=%t", disabled), func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, appsv1.AddToScheme(scheme))
+			require.NoError(t, gpuv1.AddToScheme(scheme))
+			cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy", UID: "policy-uid"}}
+			cp.Spec.DCGMExporter.Enabled = new(!disabled)
+			old := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "previous-sa", Namespace: "test-operator", UID: "old-uid"}}
+			dcgmExporterServiceAccountMarker.Apply(old)
+			require.NoError(t, controllerutil.SetControllerReference(cp, old, scheme))
+			var deletes int
+			k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(old).WithInterceptorFuncs(interceptor.Funcs{
+				Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					deletes++
+					require.NoError(t, c.Delete(ctx, old))
+					replacement := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: old.Name, Namespace: old.Namespace, UID: "replacement-uid"}}
+					dcgmExporterServiceAccountMarker.Apply(replacement)
+					require.NoError(t, c.Create(ctx, replacement))
+					options := (&client.DeleteOptions{}).ApplyOptions(opts)
+					// The fake client does not implement UID preconditions; emulate the API server.
+					if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != replacement.UID {
+						return apierrors.NewConflict(corev1.Resource("serviceaccounts"), obj.GetName(), fmt.Errorf("UID changed"))
+					}
+					return c.Delete(ctx, obj, opts...)
+				},
+			}).Build()
+			n := ClusterPolicyController{client: k8s, ctx: ctx, singleton: cp, scheme: scheme, operatorNamespace: old.Namespace,
+				stateNames: []string{"state-dcgm-exporter"}, resources: []Resources{{ServiceAccount: corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName}}}}, logger: ctrl.Log.WithName("test")}
+			if disabled {
+				state, err := ServiceAccount(n)
+				require.NoError(t, err)
+				require.Equal(t, gpuv1.Disabled, state)
+			} else {
+				require.NoError(t, n.cleanupSupersededDCGMExporterServiceAccount(ctx))
+			}
+			require.Equal(t, 1, deletes)
+			found := &corev1.ServiceAccount{}
+			require.NoError(t, k8s.Get(ctx, client.ObjectKeyFromObject(old), found))
+			require.Equal(t, types.UID("replacement-uid"), found.UID)
+			require.Empty(t, found.OwnerReferences)
 		})
 	}
 }
