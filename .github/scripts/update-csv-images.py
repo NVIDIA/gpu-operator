@@ -35,12 +35,14 @@ def represent_literal_block(dumper, data):
 yaml.SafeDumper.add_representer(LiteralBlock, represent_literal_block)
 
 
+# DCGM is intentionally omitted from these mappings. The OLM bundle uses a
+# UBI-based DCGM image while the Helm chart uses Ubuntu, so its CSV reference
+# must remain independent from values.yaml.
 RELATED_IMAGE_COMPONENTS = {
     "gpu-operator-image": "operator",
     "nvidia-dra-driver-image": "draDriver",
     "gpu-operator-validator-image": "validator",
     "dcgm-exporter-image": "dcgmExporter",
-    "dcgm-image": "dcgm",
     "container-toolkit-image": "toolkit",
     "device-plugin-image": "devicePlugin",
     "gpu-feature-discovery-image": "gfd",
@@ -59,7 +61,6 @@ ENV_IMAGE_COMPONENTS = {
     "DRA_DRIVER_IMAGE": "draDriver",
     "GFD_IMAGE": "gfd",
     "CONTAINER_TOOLKIT_IMAGE": "toolkit",
-    "DCGM_IMAGE": "dcgm",
     "DCGM_EXPORTER_IMAGE": "dcgmExporter",
     "DEVICE_PLUGIN_IMAGE": "devicePlugin",
     "DRIVER_MANAGER_IMAGE": "driver.manager",
@@ -73,6 +74,7 @@ ENV_IMAGE_COMPONENTS = {
 }
 
 OS_SPECIFIC_COMPONENTS = {"driver", "gdrcopy"}
+APP_VERSION_COMPONENTS = {"operator", "validator"}
 DRIVER_RELATED_IMAGES = {
     "default": "driver-image",
     "580": "driver-image-580",
@@ -154,6 +156,8 @@ def build_image_ref_candidates(
 
     if repository:
         version = (version or "").strip()
+        if not version and component_path in APP_VERSION_COMPONENTS:
+            version = (chart.get("appVersion") or "").strip()
         if not image or not version:
             return []
         return [f"{repository}/{image}:{version}"]
@@ -353,6 +357,12 @@ def main():
     values = load_yaml(args.values)
     chart = load_yaml(args.chart)
     csv = load_yaml(args.csv)
+
+    # Helm packages RCs with the release tag as appVersion. Mirror that value
+    # here so OLM operator and validator images resolve identically when their
+    # versions are omitted from values.yaml.
+    if args.release_tag:
+        chart["appVersion"] = args.release_tag
 
     image_refs = {}
     component_names = set(RELATED_IMAGE_COMPONENTS.values()) | set(ENV_IMAGE_COMPONENTS.values())

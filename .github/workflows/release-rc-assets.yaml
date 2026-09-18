@@ -324,7 +324,7 @@ jobs:
 
           missing_images=()
           while IFS= read -r image || [[ -n "${image}" ]]; do
-            [[ -z "${image}" ]] && continue
+            [[ -z "${image}" || "${image}" == \#* ]] && continue
             if ! regctl manifest head "${image}" >/dev/null; then
               missing_images+=("${image}")
             fi
