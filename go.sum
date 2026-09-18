@@ -20,8 +20,8 @@ github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDs
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494 h1:j+tWK79l9AouBulQps7rxILLhy2fWYcEhH4zgYjth/o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494/go.mod h1:L+aiCiTKN63AX9SWz/F8pv9Jw9FIfI+dAEr7VA+KowE=
-github.com/NVIDIA/nvidia-container-toolkit v1.20.1-0.20260914195404-24761af0847d h1:EohfuePTDH9WnCmpFx2b7UpeqrNYXtBAilRDUUVtnig=
-github.com/NVIDIA/nvidia-container-toolkit v1.20.1-0.20260914195404-24761af0847d/go.mod h1:OQJdjp+WlM4jh1ItpNWkHOy3gc2CuNhjEDkYynybelg=
+github.com/NVIDIA/nvidia-container-toolkit v1.20.1 h1:DsE0Pnu2XAl7IC00W2tmld7i/GerwnZGzRbmChj295Q=
+github.com/NVIDIA/nvidia-container-toolkit v1.20.1/go.mod h1:8Wes3Zi3GAXHt3mYynZo3yPof02+3GwpCArqS/qaq/A=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
