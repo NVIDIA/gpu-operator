@@ -43,12 +43,51 @@ if (commits.length === 0) {
 }
 
 core.info(`Backporting PR #${prNumber}: "${prTitle}"`);
-core.info(`Commits to cherry-pick: ${commits.length}`);
-commits.forEach((commit, index) => {
-  core.info(`  ${index + 1}. ${commit.sha.substring(0, 7)} - ${commit.commit.message.split('\n')[0]}`);
-});
 
 const { execSync } = require('child_process');
+
+// A squash or rebase merge rewrites the head commits listCommits returns, and GitHub
+// deletes the head branch, so cherry-pick what actually landed on the base branch.
+const baseRef = pullRequest.base.ref;
+const mergeSha = pullRequest.merge_commit_sha;
+execSync(`git fetch origin +refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`, { stdio: 'inherit' });
+
+// Exit 1 = not an ancestor, 128 = not in the clone; both mean unusable.
+const isOnBase = (sha) => {
+  try {
+    execSync(`git merge-base --is-ancestor ${sha} refs/remotes/origin/${baseRef}`, { stdio: 'pipe' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+let picks = commits.map(c => ({ sha: c.sha, subject: c.commit.message.split('\n')[0] }));
+let pickError = null;
+
+if (!picks.every(p => isOnBase(p.sha))) {
+  if (!mergeSha || !isOnBase(mergeSha)) {
+    pickError = `PR #${prNumber} is not on \`${baseRef}\`, and neither is merge_commit_sha \`${mergeSha || 'none'}\`. Please cherry-pick manually.`;
+  } else {
+    // A rebase replays every commit and preserves subjects, leaving merge_commit_sha as
+    // the tip of the range. A squash lands one commit, whose subject differs.
+    const landed = execSync(`git log --format='%H %s' -n ${picks.length} ${mergeSha}`, { encoding: 'utf-8' })
+      .trim().split('\n').reverse()
+      .map(l => ({ sha: l.split(' ')[0], subject: l.slice(l.indexOf(' ') + 1) }));
+    const matched = landed.filter(c => picks.some(p => p.subject === c.subject)).length;
+    if (matched && matched !== picks.length) {
+      pickError = `PR #${prNumber} looks rebase-merged, but only ${matched} of its ${picks.length} commits are on \`${baseRef}\`. Please cherry-pick manually.`;
+    } else {
+      picks = matched ? landed : [landed[landed.length - 1]];
+      core.info(`PR was ${matched ? 'rebase' : 'squash'}-merged - cherry-picking from ${baseRef}`);
+    }
+  }
+}
+
+core.info(`Commits to cherry-pick: ${picks.length}`);
+picks.forEach((pick, index) => {
+  core.info(`  ${index + 1}. ${pick.sha.substring(0, 7)} - ${pick.subject}`);
+});
 
 const results = [];
 
@@ -58,17 +97,19 @@ for (const targetBranch of branches) {
   core.info(`========================================`);
   const backportBranch = `backport-${prNumber}-to-${targetBranch}`;
   try {
+    if (pickError) {
+      throw new Error(pickError);
+    }
     // Create/reset backport branch from target release branch
     core.info(`Creating/resetting branch ${backportBranch} from ${targetBranch}`);
     execSync(`git fetch origin ${targetBranch}:${targetBranch}`, { stdio: 'inherit' });
     execSync(`git checkout -B ${backportBranch} ${targetBranch}`, { stdio: 'inherit' });
     // Cherry-pick each commit from the PR
     let hasConflicts = false;
-    for (let i = 0; i < commits.length; i++) {
-      const commit = commits[i];
-      const commitSha = commit.sha;
-      const commitMessage = commit.commit.message.split('\n')[0];
-      core.info(`Cherry-picking commit ${i + 1}/${commits.length}: ${commitSha.substring(0, 7)} - ${commitMessage}`);
+    for (let i = 0; i < picks.length; i++) {
+      const commitSha = picks[i].sha;
+      const commitMessage = picks[i].subject;
+      core.info(`Cherry-picking commit ${i + 1}/${picks.length}: ${commitSha.substring(0, 7)} - ${commitMessage}`);
       try {
         execSync(`git cherry-pick -m 1 -x ${commitSha}`, { 
           encoding: 'utf-8',
@@ -112,7 +153,7 @@ for (const targetBranch of branches) {
     const existingPR = existingPRs.length > 0 ? existingPRs[0] : null;
     
     // Create pull request
-    const commitList = commits.map(c => `- \`${c.sha.substring(0, 7)}\` ${c.commit.message.split('\n')[0]}`).join('\n');
+    const commitList = picks.map(p => `- \`${p.sha.substring(0, 7)}\` ${p.subject}`).join('\n');
     
     // Build PR body based on conflict status
     let prBody = `🤖 **Automated backport of #${prNumber} to \`${targetBranch}\`**\n\n`;
@@ -123,7 +164,7 @@ for (const targetBranch of branches) {
 Original PR: #${prNumber}
 Original Author: @${prAuthor}
 
-**Cherry-picked commits (${commits.length}):**
+**Cherry-picked commits (${picks.length}):**
 ${commitList}
 
 **Next Steps:**
@@ -151,7 +192,7 @@ git push --force-with-lease origin ${backportBranch}
 Original PR: #${prNumber}
 Original Author: @${prAuthor}
 
-**Cherry-picked commits (${commits.length}):**
+**Cherry-picked commits (${picks.length}):**
 ${commitList}
 
 This backport was automatically created by the backport bot.`;
