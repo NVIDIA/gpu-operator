@@ -16,9 +16,10 @@
 """Generate a complete list of container images that could be pulled and deployed
 by the GPU Operator.
 
-Parses the Helm chart's values.yaml (and the bundled NFD subchart) to produce a
-plain-text file with one fully-qualified image reference per line.  The list is
-suitable for pre-pulling images in air-gapped environments.
+Parses the Helm chart's values.yaml, the bundled NFD subchart, and the OLM
+ClusterServiceVersion to produce a source-grouped plain-text file. Each image
+entry is a fully-qualified reference suitable for pre-pulling in air-gapped
+environments.
 
 For components whose images are OS-specific (driver, nvidia-fs/GDS, gdrdrv/GDRCopy)
 the script queries the container registry to enumerate all available OS-variant tags
@@ -38,6 +39,8 @@ Options:
                            (default: deployments/gpu-operator/charts/node-feature-discovery/values.yaml)
     --nfd-chart     PATH   Path to the bundled NFD Chart.yaml
                            (default: deployments/gpu-operator/charts/node-feature-discovery/Chart.yaml)
+    --csv           PATH   Path to the OLM ClusterServiceVersion
+                           (default: bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml)
     --output        PATH   Write image list to PATH instead of stdout
     --no-nfd               Exclude the NFD subchart images from the output
     --skip-registry        Skip registry tag lookups (use version from values.yaml as-is)
@@ -145,6 +148,38 @@ def _fetch_all_tags(registry_host: str, namespace: str) -> list[str]:
                 tags_url = None
 
     return tags
+
+
+def _resolve_image_digest(image_reference: str) -> str:
+    """Return a tag-and-digest reference for an image tag."""
+    registry_host, repository_and_tag = image_reference.split("/", 1)
+    namespace, separator, tag = repository_and_tag.rpartition(":")
+    if not separator:
+        raise ValueError(f"Image reference does not contain a tag: {image_reference}")
+
+    token = _registry_token(registry_host, namespace)
+    manifest_url = (
+        f"https://{registry_host}/v2/{namespace}/manifests/"
+        f"{urllib.parse.quote(tag, safe='')}"
+    )
+    request = urllib.request.Request(
+        manifest_url,
+        method="HEAD",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": ", ".join([
+                "application/vnd.oci.image.index.v1+json",
+                "application/vnd.docker.distribution.manifest.list.v2+json",
+                "application/vnd.oci.image.manifest.v1+json",
+                "application/vnd.docker.distribution.manifest.v2+json",
+            ]),
+        },
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        digest = response.headers.get("Docker-Content-Digest")
+    if not digest:
+        raise RuntimeError(f"No digest returned for {image_reference}")
+    return f"{image_reference}@{digest}"
 
 
 def _parse_link_next(link_header: str) -> str | None:
@@ -424,6 +459,62 @@ def _extract_nfd_images(nfd_values: dict, nfd_chart: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# OLM bundle image extraction
+# ---------------------------------------------------------------------------
+
+def _extract_olm_images(
+    csv: dict,
+    gpu_operator_image: str | None = None,
+) -> list[str]:
+    """Return image references declared by the OLM bundle.
+
+    OLM uses ``spec.relatedImages`` to declare every image that the operator
+    can reference. Preserve digest-pinned references, except for the GPU
+    Operator image, which must match the reference used by the Helm chart.
+    """
+    spec = csv.get("spec")
+    related_images = spec.get("relatedImages") if isinstance(spec, dict) else None
+    if not isinstance(related_images, list):
+        raise ValueError("OLM CSV does not contain spec.relatedImages")
+
+    images: set[str] = set()
+    for related_image in related_images:
+        if not isinstance(related_image, dict):
+            raise ValueError("OLM CSV contains an invalid relatedImages entry")
+        image_reference = str(related_image.get("image") or "").strip()
+        if not image_reference:
+            raise ValueError("OLM CSV contains an invalid relatedImages entry")
+        if (
+            gpu_operator_image
+            and related_image.get("name") in {
+                "gpu-operator-image",
+                "gpu-operator-validator-image",
+            }
+        ):
+            image_reference = gpu_operator_image
+        images.add(image_reference)
+    return sorted(images)
+
+
+def _format_image_list(
+    helm_images: list[str],
+    olm_images: list[str],
+) -> str:
+    """Format image references in source-specific sections."""
+    helm_images = sorted(set(helm_images))
+    olm_images = sorted(set(olm_images))
+
+    sections = []
+    if helm_images:
+        sections.append(
+            "# Helm chart images (including NFD)\n" + "\n".join(helm_images)
+        )
+    if olm_images:
+        sections.append("# OLM bundle images\n" + "\n".join(olm_images))
+    return "\n\n".join(sections) + "\n"
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -432,6 +523,12 @@ def _parse_args() -> argparse.Namespace:
     repo_root = os.path.join(script_dir, "..", "..")
     chart_dir = os.path.join(repo_root, "deployments", "gpu-operator")
     nfd_dir = os.path.join(chart_dir, "charts", "node-feature-discovery")
+    csv_path = os.path.join(
+        repo_root,
+        "bundle",
+        "manifests",
+        "gpu-operator-certified.clusterserviceversion.yaml",
+    )
 
     parser = argparse.ArgumentParser(
         description="Generate a list of all container images required by the GPU Operator.",
@@ -460,6 +557,12 @@ def _parse_args() -> argparse.Namespace:
         default=os.path.join(nfd_dir, "Chart.yaml"),
         metavar="PATH",
         help="Path to the bundled NFD subchart Chart.yaml",
+    )
+    parser.add_argument(
+        "--csv",
+        default=csv_path,
+        metavar="PATH",
+        help="Path to the OLM ClusterServiceVersion",
     )
     parser.add_argument(
         "--output",
@@ -503,7 +606,7 @@ def main() -> None:
         sys.exit(1)
 
     # Collect GPU Operator component images
-    all_images: list[str] = _extract_operator_images(
+    helm_images: list[str] = _extract_operator_images(
         values, app_version, args.skip_registry, args.gpu_operator_version
     )
 
@@ -512,17 +615,30 @@ def main() -> None:
         try:
             nfd_values = _load_yaml(args.nfd_values)
             nfd_chart = _load_yaml(args.nfd_chart)
-            all_images += _extract_nfd_images(nfd_values, nfd_chart)
+            helm_images += _extract_nfd_images(nfd_values, nfd_chart)
         except FileNotFoundError as exc:
             print(f"Warning: NFD chart not found ({exc}); skipping NFD images. "
                   "Run 'helm dependency update deployments/gpu-operator' to fetch it, "
                   "or pass --no-nfd to suppress this warning.",
                   file=sys.stderr)
 
-    # Deduplicate and sort
-    all_images = sorted(set(all_images))
+    csv = _load_yaml(args.csv)
+    operator = values.get("operator") or {}
+    gpu_operator_image = _build_ref(
+        operator.get("repository", ""),
+        operator.get("image", ""),
+        operator.get("version")
+        or args.gpu_operator_version
+        or app_version,
+    )
+    if gpu_operator_image and not args.skip_registry:
+        gpu_operator_image = _resolve_image_digest(gpu_operator_image)
+    olm_images = _extract_olm_images(csv, gpu_operator_image)
 
-    output_text = "\n".join(all_images) + "\n"
+    output_text = _format_image_list(
+        helm_images,
+        olm_images,
+    )
 
     if args.output:
         with open(args.output, "w") as file_handle:
