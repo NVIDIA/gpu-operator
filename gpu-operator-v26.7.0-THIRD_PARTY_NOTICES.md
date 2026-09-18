@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-NVIDIA GPU Operator
+NVIDIA GPU Operator v26.7.0
 
 This file lists every third-party dependency that GPU Operator redistributes,
 along with the verbatim text of each dependency's license. In particular, this
@@ -18,151 +18,165 @@ repository, so every link serves the exact text reproduced below it. Where a
 dependency ships more than one license-bearing file, such as a PATENTS or
 NOTICE alongside its LICENSE, each one is listed and reproduced.
 
-The `gpu-operator` image uses `nvcr.io/nvidia/distroless/cc` as a base image.
-All of the OSS packages and source included in this image can be found at
-<https://developer.nvidia.com/w/distroless-oss/index.html>. A statically
-compiled busybox binary is added to the image, which is licensed under GPLv2.
-The image also carries a CUDA sample and the CUDA compatibility libraries, which
-are handled separately, including any source-distribution obligations they
-carry.
+Software the Dockerfile adds on top of the base image is listed under Bundled
+Components below, with its license and corresponding source. NVIDIA's own
+components are not third party to NVIDIA and are out of scope here.
+
+The base image's own sources are published per version. A `-dev` variant is
+built from the sources published under the corresponding release version.
+
+| Image | Version | Role | Notices and source |
+|-------|---------|------|--------------------|
+| `nvcr.io/nvidia/distroless/cc` | `v4.1.4` | final runtime base | [NVIDIA Distroless OSS source index](https://developer.download.nvidia.com/distroless-oss/cc/v4.1.4/index.html) |
+
+## Bundled Components
+
+The image also carries software that is not a Go module, copied in by the
+Dockerfile. Components built from this repository are covered by the Dependency
+Index above and are not repeated here.
+
+| Component | Version | License | Notices and source |
+|-----------|---------|---------|--------------------|
+| `busybox` | 1:1.37.0-6 | GPL-2.0-only | [source](https://sources.debian.org/data/main/b/busybox/1%3A1.37.0-6/debian/copyright) |
 
 ## Dependency Index
 
-| Package | License | Location |
-|---------|---------|----------|
-| `dario.cat/mergo` | BSD-3-Clause | [LICENSE](vendor/dario.cat/mergo/LICENSE) |
-| `github.com/MakeNowJust/heredoc` | MIT | [LICENSE](vendor/github.com/MakeNowJust/heredoc/LICENSE) |
-| `github.com/Masterminds/goutils` | Apache-2.0 | [LICENSE.txt](vendor/github.com/Masterminds/goutils/LICENSE.txt) |
-| `github.com/Masterminds/semver/v3` | MIT | [LICENSE.txt](vendor/github.com/Masterminds/semver/v3/LICENSE.txt) |
-| `github.com/Masterminds/sprig/v3` | MIT | [LICENSE.txt](vendor/github.com/Masterminds/sprig/v3/LICENSE.txt) |
-| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | Apache-2.0 | [LICENSE](vendor/github.com/Mellanox/maintenance-operator/api/LICENSE) |
-| `github.com/NVIDIA/go-nvlib/pkg` | Apache-2.0 | [LICENSE](vendor/github.com/NVIDIA/go-nvlib/LICENSE) / [NOTICE](vendor/github.com/NVIDIA/go-nvlib/NOTICE) |
-| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | Apache-2.0 | [LICENSE](vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE) |
-| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | [LICENSE](vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE) |
-| `github.com/NVIDIA/nvidia-container-toolkit` | Apache-2.0 | [LICENSE](vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE) |
-| `github.com/beorn7/perks/quantile` | MIT | [LICENSE](vendor/github.com/beorn7/perks/LICENSE) |
-| `github.com/blang/semver/v4` | MIT | [LICENSE](vendor/github.com/blang/semver/v4/LICENSE) |
-| `github.com/cespare/xxhash/v2` | MIT | [LICENSE.txt](vendor/github.com/cespare/xxhash/v2/LICENSE.txt) |
-| `github.com/chai2010/gettext-go` | BSD-3-Clause | [LICENSE](vendor/github.com/chai2010/gettext-go/LICENSE) |
-| `github.com/cyphar/filepath-securejoin` | BSD-3-Clause / MPL-2.0 | [COPYING.md](vendor/github.com/cyphar/filepath-securejoin/COPYING.md) / [LICENSE.BSD](vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD) / [LICENSE.MPL-2.0](vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0) |
-| `github.com/davecgh/go-spew/spew` | ISC | [LICENSE](vendor/github.com/davecgh/go-spew/LICENSE) |
-| `github.com/docker/libtrust` | Apache-2.0 | [LICENSE](vendor/github.com/docker/libtrust/LICENSE) |
-| `github.com/emicklei/go-restful/v3` | MIT | [LICENSE](vendor/github.com/emicklei/go-restful/v3/LICENSE) |
-| `github.com/evanphx/json-patch/v5` | BSD-3-Clause | [LICENSE](vendor/github.com/evanphx/json-patch/v5/LICENSE) |
-| `github.com/exponent-io/jsonpath` | MIT | [LICENSE](vendor/github.com/exponent-io/jsonpath/LICENSE) |
-| `github.com/fsnotify/fsnotify` | BSD-3-Clause | [LICENSE](vendor/github.com/fsnotify/fsnotify/LICENSE) |
-| `github.com/fxamacker/cbor/v2` | MIT | [LICENSE](vendor/github.com/fxamacker/cbor/v2/LICENSE) |
-| `github.com/go-errors/errors` | MIT | [LICENSE.MIT](vendor/github.com/go-errors/errors/LICENSE.MIT) |
-| `github.com/go-logr/logr` | Apache-2.0 | [LICENSE](vendor/github.com/go-logr/logr/LICENSE) |
-| `github.com/go-logr/zapr` | Apache-2.0 | [LICENSE](vendor/github.com/go-logr/zapr/LICENSE) |
-| `github.com/go-openapi/jsonpointer` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/jsonpointer/LICENSE) / [NOTICE](vendor/github.com/go-openapi/jsonpointer/NOTICE) |
-| `github.com/go-openapi/jsonreference` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/jsonreference/LICENSE) / [NOTICE](vendor/github.com/go-openapi/jsonreference/NOTICE) |
-| `github.com/go-openapi/swag` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/LICENSE) |
-| `github.com/go-openapi/swag/cmdutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/cmdutils/LICENSE) |
-| `github.com/go-openapi/swag/conv` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/conv/LICENSE) |
-| `github.com/go-openapi/swag/fileutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/fileutils/LICENSE) |
-| `github.com/go-openapi/swag/jsonutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/jsonutils/LICENSE) |
-| `github.com/go-openapi/swag/loading` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/loading/LICENSE) |
-| `github.com/go-openapi/swag/mangling` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/mangling/LICENSE) |
-| `github.com/go-openapi/swag/netutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/netutils/LICENSE) |
-| `github.com/go-openapi/swag/pools` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/pools/LICENSE) |
-| `github.com/go-openapi/swag/stringutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/stringutils/LICENSE) |
-| `github.com/go-openapi/swag/typeutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/typeutils/LICENSE) |
-| `github.com/go-openapi/swag/yamlutils` | Apache-2.0 | [LICENSE](vendor/github.com/go-openapi/swag/yamlutils/LICENSE) |
-| `github.com/google/btree` | Apache-2.0 | [LICENSE](vendor/github.com/google/btree/LICENSE) |
-| `github.com/google/gnostic-models` | Apache-2.0 | [LICENSE](vendor/github.com/google/gnostic-models/LICENSE) |
-| `github.com/google/uuid` | BSD-3-Clause | [LICENSE](vendor/github.com/google/uuid/LICENSE) |
-| `github.com/huandu/xstrings` | MIT | [LICENSE](vendor/github.com/huandu/xstrings/LICENSE) |
-| `github.com/json-iterator/go` | MIT | [LICENSE](vendor/github.com/json-iterator/go/LICENSE) |
-| `github.com/klauspost/compress` | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](vendor/github.com/klauspost/compress/LICENSE) |
-| `github.com/klauspost/compress/internal/snapref` | BSD-3-Clause | [LICENSE](vendor/github.com/klauspost/compress/internal/snapref/LICENSE) |
-| `github.com/klauspost/compress/zstd/internal/xxhash` | MIT | [LICENSE.txt](vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt) |
-| `github.com/liggitt/tabwriter` | BSD-3-Clause | [LICENSE](vendor/github.com/liggitt/tabwriter/LICENSE) |
-| `github.com/mitchellh/copystructure` | MIT | [LICENSE](vendor/github.com/mitchellh/copystructure/LICENSE) |
-| `github.com/mitchellh/go-wordwrap` | MIT | [LICENSE.md](vendor/github.com/mitchellh/go-wordwrap/LICENSE.md) |
-| `github.com/mitchellh/reflectwalk` | MIT | [LICENSE](vendor/github.com/mitchellh/reflectwalk/LICENSE) |
-| `github.com/moby/sys/devices` | Apache-2.0 | [LICENSE](vendor/github.com/moby/sys/devices/LICENSE) |
-| `github.com/moby/term` | Apache-2.0 | [LICENSE](vendor/github.com/moby/term/LICENSE) |
-| `github.com/modern-go/concurrent` | Apache-2.0 | [LICENSE](vendor/github.com/modern-go/concurrent/LICENSE) |
-| `github.com/modern-go/reflect2` | Apache-2.0 | [LICENSE](vendor/github.com/modern-go/reflect2/LICENSE) |
-| `github.com/monochromegane/go-gitignore` | MIT | [LICENSE](vendor/github.com/monochromegane/go-gitignore/LICENSE) |
-| `github.com/munnerz/goautoneg` | BSD-3-Clause | [LICENSE](vendor/github.com/munnerz/goautoneg/LICENSE) |
-| `github.com/opencontainers/cgroups/devices/config` | Apache-2.0 | [LICENSE](vendor/github.com/opencontainers/cgroups/LICENSE) |
-| `github.com/opencontainers/go-digest` | Apache-2.0 | [LICENSE](vendor/github.com/opencontainers/go-digest/LICENSE) / [LICENSE.docs](vendor/github.com/opencontainers/go-digest/LICENSE.docs) |
-| `github.com/openshift/api` | Apache-2.0 | [LICENSE](vendor/github.com/openshift/api/LICENSE) |
-| `github.com/openshift/client-go` | Apache-2.0 | [LICENSE](vendor/github.com/openshift/client-go/LICENSE) |
-| `github.com/operator-framework/api/pkg` | Apache-2.0 | [LICENSE](vendor/github.com/operator-framework/api/LICENSE) |
-| `github.com/peterbourgon/diskv` | MIT | [LICENSE](vendor/github.com/peterbourgon/diskv/LICENSE) |
-| `github.com/pmezard/go-difflib/difflib` | BSD-3-Clause | [LICENSE](vendor/github.com/pmezard/go-difflib/LICENSE) |
-| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | Apache-2.0 | [LICENSE](vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE) |
-| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | BSD-3-Clause | [LICENSE](vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE) |
-| `github.com/prometheus/client_golang/prometheus` | Apache-2.0 | [LICENSE](vendor/github.com/prometheus/client_golang/LICENSE) / [NOTICE](vendor/github.com/prometheus/client_golang/NOTICE) |
-| `github.com/prometheus/client_model/go` | Apache-2.0 | [LICENSE](vendor/github.com/prometheus/client_model/LICENSE) / [NOTICE](vendor/github.com/prometheus/client_model/NOTICE) |
-| `github.com/prometheus/common` | Apache-2.0 | [LICENSE](vendor/github.com/prometheus/common/LICENSE) / [NOTICE](vendor/github.com/prometheus/common/NOTICE) |
-| `github.com/prometheus/procfs` | Apache-2.0 | [LICENSE](vendor/github.com/prometheus/procfs/LICENSE) / [NOTICE](vendor/github.com/prometheus/procfs/NOTICE) |
-| `github.com/regclient/regclient` | Apache-2.0 | [LICENSE](vendor/github.com/regclient/regclient/LICENSE) |
-| `github.com/russross/blackfriday/v2` | BSD-2-Clause | [LICENSE.txt](vendor/github.com/russross/blackfriday/v2/LICENSE.txt) |
-| `github.com/shopspring/decimal` | MIT | [LICENSE](vendor/github.com/shopspring/decimal/LICENSE) |
-| `github.com/sirupsen/logrus` | MIT | [LICENSE](vendor/github.com/sirupsen/logrus/LICENSE) |
-| `github.com/spf13/cast` | MIT | [LICENSE](vendor/github.com/spf13/cast/LICENSE) |
-| `github.com/spf13/cobra` | Apache-2.0 | [LICENSE.txt](vendor/github.com/spf13/cobra/LICENSE.txt) |
-| `github.com/spf13/pflag` | BSD-3-Clause | [LICENSE](vendor/github.com/spf13/pflag/LICENSE) |
-| `github.com/stretchr/testify/assert/yaml` | MIT | [LICENSE](vendor/github.com/stretchr/testify/LICENSE) |
-| `github.com/ulikunitz/xz` | BSD-3-Clause | [LICENSE](vendor/github.com/ulikunitz/xz/LICENSE) |
-| `github.com/urfave/cli/v3` | MIT | [LICENSE](vendor/github.com/urfave/cli/v3/LICENSE) |
-| `github.com/x448/float16` | MIT | [LICENSE](vendor/github.com/x448/float16/LICENSE) |
-| `github.com/xlab/treeprint` | MIT | [LICENSE](vendor/github.com/xlab/treeprint/LICENSE) |
-| `go.uber.org/multierr` | MIT | [LICENSE.txt](vendor/go.uber.org/multierr/LICENSE.txt) |
-| `go.uber.org/zap` | MIT | [LICENSE](vendor/go.uber.org/zap/LICENSE) |
-| `go.yaml.in/yaml/v2` | Apache-2.0 AND MIT | [LICENSE](vendor/go.yaml.in/yaml/v2/LICENSE) / [LICENSE.libyaml](vendor/go.yaml.in/yaml/v2/LICENSE.libyaml) / [NOTICE](vendor/go.yaml.in/yaml/v2/NOTICE) |
-| `go.yaml.in/yaml/v3` | Apache-2.0 AND MIT | [LICENSE](vendor/go.yaml.in/yaml/v3/LICENSE) / [NOTICE](vendor/go.yaml.in/yaml/v3/NOTICE) |
-| `golang.org/x/crypto` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/crypto/LICENSE) / [PATENTS](vendor/golang.org/x/crypto/PATENTS) |
-| `golang.org/x/mod/semver` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/mod/LICENSE) / [PATENTS](vendor/golang.org/x/mod/PATENTS) |
-| `golang.org/x/net` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/net/LICENSE) / [PATENTS](vendor/golang.org/x/net/PATENTS) |
-| `golang.org/x/oauth2` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/oauth2/LICENSE) |
-| `golang.org/x/sync/errgroup` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/sync/LICENSE) / [PATENTS](vendor/golang.org/x/sync/PATENTS) |
-| `golang.org/x/sys/unix` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/sys/LICENSE) / [PATENTS](vendor/golang.org/x/sys/PATENTS) |
-| `golang.org/x/term` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/term/LICENSE) / [PATENTS](vendor/golang.org/x/term/PATENTS) |
-| `golang.org/x/text` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/text/LICENSE) / [PATENTS](vendor/golang.org/x/text/PATENTS) |
-| `golang.org/x/time/rate` | BSD-3-Clause | [LICENSE](vendor/golang.org/x/time/LICENSE) / [PATENTS](vendor/golang.org/x/time/PATENTS) |
-| `gomodules.xyz/jsonpatch/v2` | Apache-2.0 | [LICENSE](vendor/gomodules.xyz/jsonpatch/v2/LICENSE) |
-| `google.golang.org/protobuf` | BSD-3-Clause | [LICENSE](vendor/google.golang.org/protobuf/LICENSE) / [PATENTS](vendor/google.golang.org/protobuf/PATENTS) |
-| `gopkg.in/evanphx/json-patch.v4` | BSD-3-Clause | [LICENSE](vendor/gopkg.in/evanphx/json-patch.v4/LICENSE) |
-| `gopkg.in/inf.v0` | BSD-3-Clause | [LICENSE](vendor/gopkg.in/inf.v0/LICENSE) |
-| `k8s.io/api` | Apache-2.0 | [LICENSE](vendor/k8s.io/api/LICENSE) |
-| `k8s.io/apiextensions-apiserver/pkg` | Apache-2.0 | [LICENSE](vendor/k8s.io/apiextensions-apiserver/LICENSE) |
-| `k8s.io/apimachinery/pkg` | Apache-2.0 | [LICENSE](vendor/k8s.io/apimachinery/LICENSE) |
-| `k8s.io/apimachinery/third_party/forked/golang` | BSD-3-Clause | [LICENSE](vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE) / [PATENTS](vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS) |
-| `k8s.io/cli-runtime/pkg` | Apache-2.0 | [LICENSE](vendor/k8s.io/cli-runtime/LICENSE) |
-| `k8s.io/client-go` | Apache-2.0 | [LICENSE](vendor/k8s.io/client-go/LICENSE) |
-| `k8s.io/client-go/third_party/forked/golang/template` | BSD-3-Clause | [LICENSE](vendor/k8s.io/client-go/third_party/forked/golang/LICENSE) / [PATENTS](vendor/k8s.io/client-go/third_party/forked/golang/PATENTS) |
-| `k8s.io/client-go/third_party/forked/httpcache` | MIT | [LICENSE](vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE) |
-| `k8s.io/component-base/version` | Apache-2.0 | [LICENSE](vendor/k8s.io/component-base/LICENSE) |
-| `k8s.io/klog/v2` | Apache-2.0 | [LICENSE](vendor/k8s.io/klog/v2/LICENSE) |
-| `k8s.io/kube-openapi/pkg` | Apache-2.0 | [LICENSE](vendor/k8s.io/kube-openapi/LICENSE) |
-| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | BSD-3-Clause | [AUTHORS](vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS) / [LICENSE](vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE) |
-| `k8s.io/kube-openapi/pkg/validation/spec` | Apache-2.0 | [LICENSE](vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE) |
-| `k8s.io/kubectl/pkg` | Apache-2.0 | [LICENSE](vendor/k8s.io/kubectl/LICENSE) |
-| `k8s.io/utils` | Apache-2.0 | [LICENSE](vendor/k8s.io/utils/LICENSE) |
-| `k8s.io/utils/internal/third_party/forked/golang` | BSD-3-Clause | [LICENSE](vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE) / [PATENTS](vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS) |
-| `k8s.io/utils/third_party/forked/golang/btree` | Apache-2.0 | [LICENSE](vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE) |
-| `sigs.k8s.io/controller-runtime` | Apache-2.0 | [LICENSE](vendor/sigs.k8s.io/controller-runtime/LICENSE) |
-| `sigs.k8s.io/json` | Apache-2.0 / BSD-3-Clause | [LICENSE](vendor/sigs.k8s.io/json/LICENSE) |
-| `sigs.k8s.io/kustomize/api` | Apache-2.0 | [LICENSE](vendor/sigs.k8s.io/kustomize/api/LICENSE) |
-| `sigs.k8s.io/kustomize/kyaml` | Apache-2.0 | [LICENSE](vendor/sigs.k8s.io/kustomize/kyaml/LICENSE) |
-| `sigs.k8s.io/randfill` | Apache-2.0 | [LICENSE](vendor/sigs.k8s.io/randfill/LICENSE) / [NOTICE](vendor/sigs.k8s.io/randfill/NOTICE) |
-| `sigs.k8s.io/structured-merge-diff/v6` | Apache-2.0 | [LICENSE](vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE) |
-| `sigs.k8s.io/yaml` | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](vendor/sigs.k8s.io/yaml/LICENSE) |
+| Package | Version | License | Location |
+|---------|---------|---------|----------|
+| `dario.cat/mergo` | v1.0.1 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/dario.cat/mergo/LICENSE) |
+| `github.com/MakeNowJust/heredoc` | v1.0.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/MakeNowJust/heredoc/LICENSE) |
+| `github.com/Masterminds/goutils` | v1.1.1 | Apache-2.0 | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/goutils/LICENSE.txt) |
+| `github.com/Masterminds/semver/v3` | v3.5.0 | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/semver/v3/LICENSE.txt) |
+| `github.com/Masterminds/sprig/v3` | v3.3.0 | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt) |
+| `github.com/Mellanox/maintenance-operator/api/v1alpha1` | v0.3.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE) |
+| `github.com/NVIDIA/go-nvlib/pkg` | v0.12.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/go-nvlib/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/go-nvlib/NOTICE) |
+| `github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config` | v0.2.3 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE) |
+| `github.com/NVIDIA/k8s-operator-libs` | v0.0.0-20260629200812-d720f2557494 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE) |
+| `github.com/NVIDIA/nvidia-container-toolkit` | v1.20.1-0.20260914195404-24761af0847d | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE) |
+| `github.com/beorn7/perks/quantile` | v1.0.1 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/beorn7/perks/LICENSE) |
+| `github.com/blang/semver/v4` | v4.0.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/blang/semver/v4/LICENSE) |
+| `github.com/cespare/xxhash/v2` | v2.3.0 | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cespare/xxhash/v2/LICENSE.txt) |
+| `github.com/chai2010/gettext-go` | v1.0.2 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/chai2010/gettext-go/LICENSE) |
+| `github.com/cyphar/filepath-securejoin` | v0.7.0 | BSD-3-Clause / MPL-2.0 | [COPYING.md](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/COPYING.md) / [LICENSE.BSD](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD) / [LICENSE.MPL-2.0](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0) |
+| `github.com/davecgh/go-spew/spew` | v1.1.2-0.20180830191138-d8f796af33cc | ISC | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/davecgh/go-spew/LICENSE) |
+| `github.com/docker/libtrust` | v0.0.0-20160708172513-aabc10ec26b7 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/docker/libtrust/LICENSE) |
+| `github.com/emicklei/go-restful/v3` | v3.13.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/emicklei/go-restful/v3/LICENSE) |
+| `github.com/evanphx/json-patch/v5` | v5.9.11 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/evanphx/json-patch/v5/LICENSE) |
+| `github.com/exponent-io/jsonpath` | v0.0.0-20210407135951-1de76d718b3f | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/exponent-io/jsonpath/LICENSE) |
+| `github.com/fsnotify/fsnotify` | v1.9.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/fsnotify/fsnotify/LICENSE) |
+| `github.com/fxamacker/cbor/v2` | v2.9.2 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/fxamacker/cbor/v2/LICENSE) |
+| `github.com/go-errors/errors` | v1.5.1 | MIT | [LICENSE.MIT](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-errors/errors/LICENSE.MIT) |
+| `github.com/go-logr/logr` | v1.4.4 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-logr/logr/LICENSE) |
+| `github.com/go-logr/zapr` | v1.3.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-logr/zapr/LICENSE) |
+| `github.com/go-openapi/jsonpointer` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonpointer/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonpointer/NOTICE) |
+| `github.com/go-openapi/jsonreference` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonreference/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonreference/NOTICE) |
+| `github.com/go-openapi/swag` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/LICENSE) |
+| `github.com/go-openapi/swag/cmdutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/cmdutils/LICENSE) |
+| `github.com/go-openapi/swag/conv` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/conv/LICENSE) |
+| `github.com/go-openapi/swag/fileutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/fileutils/LICENSE) |
+| `github.com/go-openapi/swag/jsonutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/jsonutils/LICENSE) |
+| `github.com/go-openapi/swag/loading` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/loading/LICENSE) |
+| `github.com/go-openapi/swag/mangling` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/mangling/LICENSE) |
+| `github.com/go-openapi/swag/netutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/netutils/LICENSE) |
+| `github.com/go-openapi/swag/pools` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/pools/LICENSE) |
+| `github.com/go-openapi/swag/stringutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/stringutils/LICENSE) |
+| `github.com/go-openapi/swag/typeutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/typeutils/LICENSE) |
+| `github.com/go-openapi/swag/yamlutils` | v0.27.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/yamlutils/LICENSE) |
+| `github.com/google/btree` | v1.1.3 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/btree/LICENSE) |
+| `github.com/google/gnostic-models` | v0.7.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/gnostic-models/LICENSE) |
+| `github.com/google/uuid` | v1.6.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/uuid/LICENSE) |
+| `github.com/huandu/xstrings` | v1.5.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/huandu/xstrings/LICENSE) |
+| `github.com/json-iterator/go` | v1.1.12 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/json-iterator/go/LICENSE) |
+| `github.com/klauspost/compress` | v1.19.1 | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/LICENSE) |
+| `github.com/klauspost/compress/internal/snapref` | v1.19.1 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/internal/snapref/LICENSE) |
+| `github.com/klauspost/compress/zstd/internal/xxhash` | v1.19.1 | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt) |
+| `github.com/liggitt/tabwriter` | v0.0.0-20181228230101-89fcab3d43de | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/liggitt/tabwriter/LICENSE) |
+| `github.com/mitchellh/copystructure` | v1.2.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/copystructure/LICENSE) |
+| `github.com/mitchellh/go-wordwrap` | v1.0.1 | MIT | [LICENSE.md](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md) |
+| `github.com/mitchellh/reflectwalk` | v1.0.2 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/reflectwalk/LICENSE) |
+| `github.com/moby/sys/devices` | v0.1.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/moby/sys/devices/LICENSE) |
+| `github.com/moby/term` | v0.5.2 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/moby/term/LICENSE) |
+| `github.com/modern-go/concurrent` | v0.0.0-20180306012644-bacd9c7ef1dd | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/modern-go/concurrent/LICENSE) |
+| `github.com/modern-go/reflect2` | v1.0.3-0.20250322232337-35a7c28c31ee | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/modern-go/reflect2/LICENSE) |
+| `github.com/monochromegane/go-gitignore` | v0.0.0-20200626010858-205db1a8cc00 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/monochromegane/go-gitignore/LICENSE) |
+| `github.com/munnerz/goautoneg` | v0.0.0-20191010083416-a7dc8b61c822 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/munnerz/goautoneg/LICENSE) |
+| `github.com/opencontainers/cgroups/devices/config` | v0.0.9 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/cgroups/LICENSE) |
+| `github.com/opencontainers/go-digest` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/go-digest/LICENSE) / [LICENSE.docs](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/go-digest/LICENSE.docs) |
+| `github.com/openshift/api` | v0.0.0-20260727141720-967cc4c36c9b | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/openshift/api/LICENSE) |
+| `github.com/openshift/client-go` | v0.0.0-20260723174158-ae2315de9d73 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/openshift/client-go/LICENSE) |
+| `github.com/operator-framework/api/pkg` | v0.45.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/operator-framework/api/LICENSE) |
+| `github.com/peterbourgon/diskv` | v2.0.1+incompatible | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/peterbourgon/diskv/LICENSE) |
+| `github.com/pmezard/go-difflib/difflib` | v1.0.1-0.20181226105442-5d4384ee4fb2 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/pmezard/go-difflib/LICENSE) |
+| `github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring` | v0.93.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE) |
+| `github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil` | v1.24.1 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE) |
+| `github.com/prometheus/client_golang/prometheus` | v1.24.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/NOTICE) |
+| `github.com/prometheus/client_model/go` | v0.6.2 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_model/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_model/NOTICE) |
+| `github.com/prometheus/common` | v0.70.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/common/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/common/NOTICE) |
+| `github.com/prometheus/procfs` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/procfs/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/procfs/NOTICE) |
+| `github.com/regclient/regclient` | v0.11.5 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/regclient/regclient/LICENSE) |
+| `github.com/russross/blackfriday/v2` | v2.1.0 | BSD-2-Clause | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/russross/blackfriday/v2/LICENSE.txt) |
+| `github.com/shopspring/decimal` | v1.4.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/shopspring/decimal/LICENSE) |
+| `github.com/sirupsen/logrus` | v1.10.2 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/sirupsen/logrus/LICENSE) |
+| `github.com/spf13/cast` | v1.7.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/cast/LICENSE) |
+| `github.com/spf13/cobra` | v1.10.2 | Apache-2.0 | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/cobra/LICENSE.txt) |
+| `github.com/spf13/pflag` | v1.0.10 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/pflag/LICENSE) |
+| `github.com/stretchr/testify/assert/yaml` | v1.12.1 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/stretchr/testify/LICENSE) |
+| `github.com/ulikunitz/xz` | v0.5.15 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/ulikunitz/xz/LICENSE) |
+| `github.com/urfave/cli/v3` | v3.11.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/urfave/cli/v3/LICENSE) |
+| `github.com/x448/float16` | v0.8.4 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/x448/float16/LICENSE) |
+| `github.com/xlab/treeprint` | v1.2.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/xlab/treeprint/LICENSE) |
+| `go.uber.org/multierr` | v1.11.0 | MIT | [LICENSE.txt](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.uber.org/multierr/LICENSE.txt) |
+| `go.uber.org/zap` | v1.28.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.uber.org/zap/LICENSE) |
+| `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 AND MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/LICENSE) / [LICENSE.libyaml](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/LICENSE.libyaml) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/NOTICE) |
+| `go.yaml.in/yaml/v3` | v3.0.5 | Apache-2.0 AND MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v3/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v3/NOTICE) |
+| `golang.org/x/crypto` | v0.55.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/crypto/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/crypto/PATENTS) |
+| `golang.org/x/mod/semver` | v0.41.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/mod/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/mod/PATENTS) |
+| `golang.org/x/net` | v0.58.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/net/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/net/PATENTS) |
+| `golang.org/x/oauth2` | v0.36.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/oauth2/LICENSE) |
+| `golang.org/x/sync/errgroup` | v0.22.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sync/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sync/PATENTS) |
+| `golang.org/x/sys/unix` | v0.48.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sys/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sys/PATENTS) |
+| `golang.org/x/term` | v0.45.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/term/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/term/PATENTS) |
+| `golang.org/x/text` | v0.41.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/text/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/text/PATENTS) |
+| `golang.org/x/time/rate` | v0.15.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/time/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/time/PATENTS) |
+| `gomodules.xyz/jsonpatch/v2` | v2.4.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gomodules.xyz/jsonpatch/v2/LICENSE) |
+| `google.golang.org/protobuf` | v1.36.12-0.20260120151049-f2248ac996af | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/google.golang.org/protobuf/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/google.golang.org/protobuf/PATENTS) |
+| `gopkg.in/evanphx/json-patch.v4` | v4.13.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gopkg.in/evanphx/json-patch.v4/LICENSE) |
+| `gopkg.in/inf.v0` | v0.9.1 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gopkg.in/inf.v0/LICENSE) |
+| `k8s.io/api` | v0.37.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/api/LICENSE) |
+| `k8s.io/apiextensions-apiserver/pkg` | v0.37.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apiextensions-apiserver/LICENSE) |
+| `k8s.io/apimachinery/pkg` | v0.37.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/LICENSE) |
+| `k8s.io/apimachinery/third_party/forked/golang` | v0.37.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS) |
+| `k8s.io/cli-runtime/pkg` | v0.36.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/cli-runtime/LICENSE) |
+| `k8s.io/client-go` | v0.37.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/LICENSE) |
+| `k8s.io/client-go/third_party/forked/golang/template` | v0.37.0 | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/golang/PATENTS) |
+| `k8s.io/client-go/third_party/forked/httpcache` | v0.37.0 | MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE) |
+| `k8s.io/component-base/version` | v0.37.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/component-base/LICENSE) |
+| `k8s.io/klog/v2` | v2.140.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/klog/v2/LICENSE) |
+| `k8s.io/kube-openapi/pkg` | v0.0.0-20260721132016-d427ff9ee9ad | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/LICENSE) |
+| `k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json` | v0.0.0-20260721132016-d427ff9ee9ad | BSD-3-Clause | [AUTHORS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS) / [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE) |
+| `k8s.io/kube-openapi/pkg/validation/spec` | v0.0.0-20260721132016-d427ff9ee9ad | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE) |
+| `k8s.io/kubectl/pkg` | v0.36.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kubectl/LICENSE) |
+| `k8s.io/utils` | v0.0.0-20260626114624-be93311217bd | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/LICENSE) |
+| `k8s.io/utils/internal/third_party/forked/golang` | v0.0.0-20260626114624-be93311217bd | BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE) / [PATENTS](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS) |
+| `k8s.io/utils/third_party/forked/golang/btree` | v0.0.0-20260626114624-be93311217bd | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE) |
+| `sigs.k8s.io/controller-runtime` | v0.24.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/controller-runtime/LICENSE) |
+| `sigs.k8s.io/json` | v0.0.0-20250730193827-2d320260d730 | Apache-2.0 / BSD-3-Clause | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/json/LICENSE) |
+| `sigs.k8s.io/kustomize/api` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/kustomize/api/LICENSE) |
+| `sigs.k8s.io/kustomize/kyaml` | v0.21.1 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE) |
+| `sigs.k8s.io/randfill` | v1.0.0 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/randfill/LICENSE) / [NOTICE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/randfill/NOTICE) |
+| `sigs.k8s.io/structured-merge-diff/v6` | v6.4.2 | Apache-2.0 | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE) |
+| `sigs.k8s.io/yaml` | v1.6.0 | Apache-2.0 / BSD-3-Clause / MIT | [LICENSE](https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/yaml/LICENSE) |
 
 ## License Texts
 
 ### dario.cat/mergo
 
+* Version: v1.0.1
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/dario.cat/mergo/LICENSE](vendor/dario.cat/mergo/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/dario.cat/mergo/LICENSE>
 
 ```text
 Copyright (c) 2013 Dario Castañé. All rights reserved.
@@ -199,11 +213,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/MakeNowJust/heredoc
 
+* Version: v1.0.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/MakeNowJust/heredoc/LICENSE](vendor/github.com/MakeNowJust/heredoc/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/MakeNowJust/heredoc/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -233,11 +248,12 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/goutils
 
+* Version: v1.1.1
 * License: Apache-2.0
 
 #### LICENSE.txt
 
-[vendor/github.com/Masterminds/goutils/LICENSE.txt](vendor/github.com/Masterminds/goutils/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/goutils/LICENSE.txt>
 
 ```text
 
@@ -448,11 +464,12 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/semver/v3
 
+* Version: v3.5.0
 * License: MIT
 
 #### LICENSE.txt
 
-[vendor/github.com/Masterminds/semver/v3/LICENSE.txt](vendor/github.com/Masterminds/semver/v3/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/semver/v3/LICENSE.txt>
 
 ```text
 Copyright (C) 2014-2019, Matt Butcher and Matt Farina
@@ -480,11 +497,12 @@ THE SOFTWARE.
 
 ### github.com/Masterminds/sprig/v3
 
+* Version: v3.3.0
 * License: MIT
 
 #### LICENSE.txt
 
-[vendor/github.com/Masterminds/sprig/v3/LICENSE.txt](vendor/github.com/Masterminds/sprig/v3/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Masterminds/sprig/v3/LICENSE.txt>
 
 ```text
 Copyright (C) 2013-2020 Masterminds
@@ -512,11 +530,12 @@ THE SOFTWARE.
 
 ### github.com/Mellanox/maintenance-operator/api/v1alpha1
 
+* Version: v0.3.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/Mellanox/maintenance-operator/api/LICENSE](vendor/github.com/Mellanox/maintenance-operator/api/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/Mellanox/maintenance-operator/api/LICENSE>
 
 ```text
                                  Apache License
@@ -726,11 +745,12 @@ THE SOFTWARE.
 
 ### github.com/NVIDIA/go-nvlib/pkg
 
+* Version: v0.12.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/NVIDIA/go-nvlib/LICENSE](vendor/github.com/NVIDIA/go-nvlib/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/go-nvlib/LICENSE>
 
 ```text
 
@@ -940,7 +960,7 @@ THE SOFTWARE.
 
 #### NOTICE
 
-[vendor/github.com/NVIDIA/go-nvlib/NOTICE](vendor/github.com/NVIDIA/go-nvlib/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/go-nvlib/NOTICE>
 
 ```text
 The file pkg/pciids/default_pci.ids is distributed under the 3-clause BSD License.
@@ -953,11 +973,12 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
 
+* Version: v0.2.3
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE](vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/k8s-kata-manager/LICENSE>
 
 ```text
 
@@ -1168,11 +1189,12 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/k8s-operator-libs
 
+* Version: v0.0.0-20260629200812-d720f2557494
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE](vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/k8s-operator-libs/LICENSE>
 
 ```text
 
@@ -1383,11 +1405,12 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/NVIDIA/nvidia-container-toolkit
 
+* Version: v1.20.1-0.20260914195404-24761af0847d
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE](vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/NVIDIA/nvidia-container-toolkit/LICENSE>
 
 ```text
 
@@ -1598,11 +1621,12 @@ the PCI ID Project at https://pci-ids.ucw.cz/.
 
 ### github.com/beorn7/perks/quantile
 
+* Version: v1.0.1
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/beorn7/perks/LICENSE](vendor/github.com/beorn7/perks/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/beorn7/perks/LICENSE>
 
 ```text
 Copyright (C) 2013 Blake Mizerany
@@ -1631,11 +1655,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/blang/semver/v4
 
+* Version: v4.0.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/blang/semver/v4/LICENSE](vendor/github.com/blang/semver/v4/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/blang/semver/v4/LICENSE>
 
 ```text
 The MIT License
@@ -1666,11 +1691,12 @@ THE SOFTWARE.
 
 ### github.com/cespare/xxhash/v2
 
+* Version: v2.3.0
 * License: MIT
 
 #### LICENSE.txt
 
-[vendor/github.com/cespare/xxhash/v2/LICENSE.txt](vendor/github.com/cespare/xxhash/v2/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cespare/xxhash/v2/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -1701,11 +1727,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/chai2010/gettext-go
 
+* Version: v1.0.2
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/chai2010/gettext-go/LICENSE](vendor/github.com/chai2010/gettext-go/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/chai2010/gettext-go/LICENSE>
 
 ```text
 Copyright 2013 ChaiShushan <chaishushan{AT}gmail.com>. All rights reserved.
@@ -1741,11 +1768,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/cyphar/filepath-securejoin
 
+* Version: v0.7.0
 * License: BSD-3-Clause / MPL-2.0
 
 #### COPYING.md
 
-[vendor/github.com/cyphar/filepath-securejoin/COPYING.md](vendor/github.com/cyphar/filepath-securejoin/COPYING.md)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/COPYING.md>
 
 ````text
 ## COPYING ##
@@ -2200,7 +2228,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 #### LICENSE.BSD
 
-[vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD](vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/LICENSE.BSD>
 
 ```text
 Copyright (C) 2014-2015 Docker Inc & Go Authors. All rights reserved.
@@ -2236,7 +2264,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### LICENSE.MPL-2.0
 
-[vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0](vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0>
 
 ```text
 Mozilla Public License Version 2.0
@@ -2618,11 +2646,12 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ### github.com/davecgh/go-spew/spew
 
+* Version: v1.1.2-0.20180830191138-d8f796af33cc
 * License: ISC
 
 #### LICENSE
 
-[vendor/github.com/davecgh/go-spew/LICENSE](vendor/github.com/davecgh/go-spew/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/davecgh/go-spew/LICENSE>
 
 ```text
 ISC License
@@ -2646,11 +2675,12 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/docker/libtrust
 
+* Version: v0.0.0-20160708172513-aabc10ec26b7
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/docker/libtrust/LICENSE](vendor/github.com/docker/libtrust/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/docker/libtrust/LICENSE>
 
 ```text
 
@@ -2850,11 +2880,12 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ### github.com/emicklei/go-restful/v3
 
+* Version: v3.13.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/emicklei/go-restful/v3/LICENSE](vendor/github.com/emicklei/go-restful/v3/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/emicklei/go-restful/v3/LICENSE>
 
 ```text
 Copyright (c) 2012,2013 Ernest Micklei
@@ -2884,11 +2915,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/evanphx/json-patch/v5
 
+* Version: v5.9.11
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/evanphx/json-patch/v5/LICENSE](vendor/github.com/evanphx/json-patch/v5/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/evanphx/json-patch/v5/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -2922,11 +2954,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/exponent-io/jsonpath
 
+* Version: v0.0.0-20210407135951-1de76d718b3f
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/exponent-io/jsonpath/LICENSE](vendor/github.com/exponent-io/jsonpath/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/exponent-io/jsonpath/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -2956,11 +2989,12 @@ SOFTWARE.
 
 ### github.com/fsnotify/fsnotify
 
+* Version: v1.9.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/fsnotify/fsnotify/LICENSE](vendor/github.com/fsnotify/fsnotify/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/fsnotify/fsnotify/LICENSE>
 
 ```text
 Copyright © 2012 The Go Authors. All rights reserved.
@@ -2994,11 +3028,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/fxamacker/cbor/v2
 
+* Version: v2.9.2
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/fxamacker/cbor/v2/LICENSE](vendor/github.com/fxamacker/cbor/v2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/fxamacker/cbor/v2/LICENSE>
 
 ```text
 MIT License
@@ -3027,11 +3062,12 @@ SOFTWARE.
 
 ### github.com/go-errors/errors
 
+* Version: v1.5.1
 * License: MIT
 
 #### LICENSE.MIT
 
-[vendor/github.com/go-errors/errors/LICENSE.MIT](vendor/github.com/go-errors/errors/LICENSE.MIT)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-errors/errors/LICENSE.MIT>
 
 ```text
 Copyright (c) 2015 Conrad Irwin <conrad@bugsnag.com>
@@ -3047,11 +3083,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/logr
 
+* Version: v1.4.4
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-logr/logr/LICENSE](vendor/github.com/go-logr/logr/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-logr/logr/LICENSE>
 
 ```text
                                  Apache License
@@ -3261,11 +3298,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-logr/zapr
 
+* Version: v1.3.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-logr/zapr/LICENSE](vendor/github.com/go-logr/zapr/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-logr/zapr/LICENSE>
 
 ```text
                                  Apache License
@@ -3475,11 +3513,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/go-openapi/jsonpointer
 
+* Version: v1.0.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/jsonpointer/LICENSE](vendor/github.com/go-openapi/jsonpointer/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonpointer/LICENSE>
 
 ```text
                                  Apache License
@@ -3688,7 +3727,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #### NOTICE
 
-[vendor/github.com/go-openapi/jsonpointer/NOTICE](vendor/github.com/go-openapi/jsonpointer/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonpointer/NOTICE>
 
 ```text
 Copyright 2015-2025 go-swagger maintainers
@@ -3736,11 +3775,12 @@ limitations under the License.
 
 ### github.com/go-openapi/jsonreference
 
+* Version: v1.0.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/jsonreference/LICENSE](vendor/github.com/go-openapi/jsonreference/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonreference/LICENSE>
 
 ```text
 
@@ -3950,7 +3990,7 @@ limitations under the License.
 
 #### NOTICE
 
-[vendor/github.com/go-openapi/jsonreference/NOTICE](vendor/github.com/go-openapi/jsonreference/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/jsonreference/NOTICE>
 
 ```text
 Copyright 2015-2025 go-swagger maintainers
@@ -3998,11 +4038,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/LICENSE](vendor/github.com/go-openapi/swag/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/LICENSE>
 
 ```text
 
@@ -4213,11 +4254,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/cmdutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/cmdutils/LICENSE](vendor/github.com/go-openapi/swag/cmdutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/cmdutils/LICENSE>
 
 ```text
 
@@ -4428,11 +4470,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/conv
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/conv/LICENSE](vendor/github.com/go-openapi/swag/conv/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/conv/LICENSE>
 
 ```text
 
@@ -4643,11 +4686,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/fileutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/fileutils/LICENSE](vendor/github.com/go-openapi/swag/fileutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/fileutils/LICENSE>
 
 ```text
 
@@ -4858,11 +4902,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/jsonutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/jsonutils/LICENSE](vendor/github.com/go-openapi/swag/jsonutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/jsonutils/LICENSE>
 
 ```text
 
@@ -5073,11 +5118,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/loading
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/loading/LICENSE](vendor/github.com/go-openapi/swag/loading/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/loading/LICENSE>
 
 ```text
 
@@ -5288,11 +5334,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/mangling
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/mangling/LICENSE](vendor/github.com/go-openapi/swag/mangling/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/mangling/LICENSE>
 
 ```text
 
@@ -5503,11 +5550,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/netutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/netutils/LICENSE](vendor/github.com/go-openapi/swag/netutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/netutils/LICENSE>
 
 ```text
 
@@ -5718,11 +5766,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/pools
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/pools/LICENSE](vendor/github.com/go-openapi/swag/pools/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/pools/LICENSE>
 
 ```text
 
@@ -5933,11 +5982,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/stringutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/stringutils/LICENSE](vendor/github.com/go-openapi/swag/stringutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/stringutils/LICENSE>
 
 ```text
 
@@ -6148,11 +6198,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/typeutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/typeutils/LICENSE](vendor/github.com/go-openapi/swag/typeutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/typeutils/LICENSE>
 
 ```text
 
@@ -6363,11 +6414,12 @@ limitations under the License.
 
 ### github.com/go-openapi/swag/yamlutils
 
+* Version: v0.27.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/go-openapi/swag/yamlutils/LICENSE](vendor/github.com/go-openapi/swag/yamlutils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/go-openapi/swag/yamlutils/LICENSE>
 
 ```text
 
@@ -6578,11 +6630,12 @@ limitations under the License.
 
 ### github.com/google/btree
 
+* Version: v1.1.3
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/google/btree/LICENSE](vendor/github.com/google/btree/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/btree/LICENSE>
 
 ```text
 
@@ -6793,11 +6846,12 @@ limitations under the License.
 
 ### github.com/google/gnostic-models
 
+* Version: v0.7.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/google/gnostic-models/LICENSE](vendor/github.com/google/gnostic-models/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/gnostic-models/LICENSE>
 
 ```text
 
@@ -7009,11 +7063,12 @@ limitations under the License.
 
 ### github.com/google/uuid
 
+* Version: v1.6.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/google/uuid/LICENSE](vendor/github.com/google/uuid/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/google/uuid/LICENSE>
 
 ```text
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
@@ -7049,11 +7104,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/huandu/xstrings
 
+* Version: v1.5.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/huandu/xstrings/LICENSE](vendor/github.com/huandu/xstrings/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/huandu/xstrings/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7084,11 +7140,12 @@ SOFTWARE.
 
 ### github.com/json-iterator/go
 
+* Version: v1.1.12
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/json-iterator/go/LICENSE](vendor/github.com/json-iterator/go/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/json-iterator/go/LICENSE>
 
 ```text
 MIT License
@@ -7118,11 +7175,12 @@ SOFTWARE.
 
 ### github.com/klauspost/compress
 
+* Version: v1.19.1
 * License: Apache-2.0 / BSD-3-Clause / MIT
 
 #### LICENSE
 
-[vendor/github.com/klauspost/compress/LICENSE](vendor/github.com/klauspost/compress/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -7435,11 +7493,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ### github.com/klauspost/compress/internal/snapref
 
+* Version: v1.19.1
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/klauspost/compress/internal/snapref/LICENSE](vendor/github.com/klauspost/compress/internal/snapref/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/internal/snapref/LICENSE>
 
 ```text
 Copyright (c) 2011 The Snappy-Go Authors. All rights reserved.
@@ -7475,11 +7534,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/klauspost/compress/zstd/internal/xxhash
 
+* Version: v1.19.1
 * License: MIT
 
 #### LICENSE.txt
 
-[vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt](vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/klauspost/compress/zstd/internal/xxhash/LICENSE.txt>
 
 ```text
 Copyright (c) 2016 Caleb Spare
@@ -7510,11 +7570,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/liggitt/tabwriter
 
+* Version: v0.0.0-20181228230101-89fcab3d43de
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/liggitt/tabwriter/LICENSE](vendor/github.com/liggitt/tabwriter/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/liggitt/tabwriter/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -7550,11 +7611,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/mitchellh/copystructure
 
+* Version: v1.2.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/mitchellh/copystructure/LICENSE](vendor/github.com/mitchellh/copystructure/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/copystructure/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7584,11 +7646,12 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/go-wordwrap
 
+* Version: v1.0.1
 * License: MIT
 
 #### LICENSE.md
 
-[vendor/github.com/mitchellh/go-wordwrap/LICENSE.md](vendor/github.com/mitchellh/go-wordwrap/LICENSE.md)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/go-wordwrap/LICENSE.md>
 
 ```text
 The MIT License (MIT)
@@ -7618,11 +7681,12 @@ THE SOFTWARE.
 
 ### github.com/mitchellh/reflectwalk
 
+* Version: v1.0.2
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/mitchellh/reflectwalk/LICENSE](vendor/github.com/mitchellh/reflectwalk/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/mitchellh/reflectwalk/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -7652,11 +7716,12 @@ THE SOFTWARE.
 
 ### github.com/moby/sys/devices
 
+* Version: v0.1.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/moby/sys/devices/LICENSE](vendor/github.com/moby/sys/devices/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/moby/sys/devices/LICENSE>
 
 ```text
 
@@ -7867,11 +7932,12 @@ THE SOFTWARE.
 
 ### github.com/moby/term
 
+* Version: v0.5.2
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/moby/term/LICENSE](vendor/github.com/moby/term/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/moby/term/LICENSE>
 
 ```text
 
@@ -8071,11 +8137,12 @@ THE SOFTWARE.
 
 ### github.com/modern-go/concurrent
 
+* Version: v0.0.0-20180306012644-bacd9c7ef1dd
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/modern-go/concurrent/LICENSE](vendor/github.com/modern-go/concurrent/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/modern-go/concurrent/LICENSE>
 
 ```text
                                  Apache License
@@ -8285,11 +8352,12 @@ THE SOFTWARE.
 
 ### github.com/modern-go/reflect2
 
+* Version: v1.0.3-0.20250322232337-35a7c28c31ee
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/modern-go/reflect2/LICENSE](vendor/github.com/modern-go/reflect2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/modern-go/reflect2/LICENSE>
 
 ```text
                                  Apache License
@@ -8499,11 +8567,12 @@ THE SOFTWARE.
 
 ### github.com/monochromegane/go-gitignore
 
+* Version: v0.0.0-20200626010858-205db1a8cc00
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/monochromegane/go-gitignore/LICENSE](vendor/github.com/monochromegane/go-gitignore/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/monochromegane/go-gitignore/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -8533,11 +8602,12 @@ SOFTWARE.
 
 ### github.com/munnerz/goautoneg
 
+* Version: v0.0.0-20191010083416-a7dc8b61c822
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/munnerz/goautoneg/LICENSE](vendor/github.com/munnerz/goautoneg/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/munnerz/goautoneg/LICENSE>
 
 ```text
 Copyright (c) 2011, Open Knowledge Foundation Ltd.
@@ -8577,11 +8647,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/cgroups/devices/config
 
+* Version: v0.0.9
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/opencontainers/cgroups/LICENSE](vendor/github.com/opencontainers/cgroups/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/cgroups/LICENSE>
 
 ```text
                                  Apache License
@@ -8791,11 +8862,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/opencontainers/go-digest
 
+* Version: v1.0.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/opencontainers/go-digest/LICENSE](vendor/github.com/opencontainers/go-digest/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/go-digest/LICENSE>
 
 ```text
 
@@ -8995,7 +9067,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### LICENSE.docs
 
-[vendor/github.com/opencontainers/go-digest/LICENSE.docs](vendor/github.com/opencontainers/go-digest/LICENSE.docs)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/opencontainers/go-digest/LICENSE.docs>
 
 ```text
 Attribution-ShareAlike 4.0 International
@@ -9429,11 +9501,12 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### github.com/openshift/api
 
+* Version: v0.0.0-20260727141720-967cc4c36c9b
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/openshift/api/LICENSE](vendor/github.com/openshift/api/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/openshift/api/LICENSE>
 
 ```text
 
@@ -9633,11 +9706,12 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### github.com/openshift/client-go
 
+* Version: v0.0.0-20260723174158-ae2315de9d73
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/openshift/client-go/LICENSE](vendor/github.com/openshift/client-go/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/openshift/client-go/LICENSE>
 
 ```text
 
@@ -9837,11 +9911,12 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### github.com/operator-framework/api/pkg
 
+* Version: v0.45.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/operator-framework/api/LICENSE](vendor/github.com/operator-framework/api/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/operator-framework/api/LICENSE>
 
 ```text
                                  Apache License
@@ -10051,11 +10126,12 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### github.com/peterbourgon/diskv
 
+* Version: v2.0.1+incompatible
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/peterbourgon/diskv/LICENSE](vendor/github.com/peterbourgon/diskv/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/peterbourgon/diskv/LICENSE>
 
 ```text
 Copyright (c) 2011-2012 Peter Bourgon
@@ -10083,11 +10159,12 @@ THE SOFTWARE.
 
 ### github.com/pmezard/go-difflib/difflib
 
+* Version: v1.0.1-0.20181226105442-5d4384ee4fb2
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/pmezard/go-difflib/LICENSE](vendor/github.com/pmezard/go-difflib/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/pmezard/go-difflib/LICENSE>
 
 ```text
 Copyright (c) 2013, Patrick Mezard
@@ -10123,11 +10200,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 
+* Version: v0.93.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE](vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/LICENSE>
 
 ```text
 Apache License
@@ -10337,11 +10415,12 @@ Apache License
 
 ### github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
 
+* Version: v1.24.1
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE](vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/internal/github.com/golang/gddo/LICENSE>
 
 ```text
 Copyright (c) 2013 The Go Authors. All rights reserved.
@@ -10377,11 +10456,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/prometheus/client_golang/prometheus
 
+* Version: v1.24.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/prometheus/client_golang/LICENSE](vendor/github.com/prometheus/client_golang/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/LICENSE>
 
 ```text
                                  Apache License
@@ -10590,7 +10670,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### NOTICE
 
-[vendor/github.com/prometheus/client_golang/NOTICE](vendor/github.com/prometheus/client_golang/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_golang/NOTICE>
 
 ```text
 Prometheus instrumentation library for Go applications
@@ -10617,11 +10697,12 @@ See source code for license details.
 
 ### github.com/prometheus/client_model/go
 
+* Version: v0.6.2
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/prometheus/client_model/LICENSE](vendor/github.com/prometheus/client_model/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_model/LICENSE>
 
 ```text
                                  Apache License
@@ -10830,7 +10911,7 @@ See source code for license details.
 
 #### NOTICE
 
-[vendor/github.com/prometheus/client_model/NOTICE](vendor/github.com/prometheus/client_model/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/client_model/NOTICE>
 
 ```text
 Data model artifacts for Prometheus.
@@ -10844,11 +10925,12 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/common
 
+* Version: v0.70.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/prometheus/common/LICENSE](vendor/github.com/prometheus/common/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/common/LICENSE>
 
 ```text
                                  Apache License
@@ -11057,7 +11139,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 #### NOTICE
 
-[vendor/github.com/prometheus/common/NOTICE](vendor/github.com/prometheus/common/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/common/NOTICE>
 
 ```text
 Common libraries shared by Prometheus Go components.
@@ -11071,11 +11153,12 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/prometheus/procfs
 
+* Version: v0.21.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/prometheus/procfs/LICENSE](vendor/github.com/prometheus/procfs/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/procfs/LICENSE>
 
 ```text
                                  Apache License
@@ -11284,7 +11367,7 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 #### NOTICE
 
-[vendor/github.com/prometheus/procfs/NOTICE](vendor/github.com/prometheus/procfs/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/prometheus/procfs/NOTICE>
 
 ```text
 procfs provides functions to retrieve system, kernel and process
@@ -11300,11 +11383,12 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/regclient/regclient
 
+* Version: v0.11.5
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/github.com/regclient/regclient/LICENSE](vendor/github.com/regclient/regclient/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/regclient/regclient/LICENSE>
 
 ```text
 
@@ -11504,11 +11588,12 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 ### github.com/russross/blackfriday/v2
 
+* Version: v2.1.0
 * License: BSD-2-Clause
 
 #### LICENSE.txt
 
-[vendor/github.com/russross/blackfriday/v2/LICENSE.txt](vendor/github.com/russross/blackfriday/v2/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/russross/blackfriday/v2/LICENSE.txt>
 
 ```text
 Blackfriday is distributed under the Simplified BSD License:
@@ -11546,11 +11631,12 @@ Blackfriday is distributed under the Simplified BSD License:
 
 ### github.com/shopspring/decimal
 
+* Version: v1.4.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/shopspring/decimal/LICENSE](vendor/github.com/shopspring/decimal/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/shopspring/decimal/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11604,11 +11690,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### github.com/sirupsen/logrus
 
+* Version: v1.10.2
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/sirupsen/logrus/LICENSE](vendor/github.com/sirupsen/logrus/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/sirupsen/logrus/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11638,11 +11725,12 @@ THE SOFTWARE.
 
 ### github.com/spf13/cast
 
+* Version: v1.7.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/spf13/cast/LICENSE](vendor/github.com/spf13/cast/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/cast/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -11671,11 +11759,12 @@ SOFTWARE.
 
 ### github.com/spf13/cobra
 
+* Version: v1.10.2
 * License: Apache-2.0
 
 #### LICENSE.txt
 
-[vendor/github.com/spf13/cobra/LICENSE.txt](vendor/github.com/spf13/cobra/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/cobra/LICENSE.txt>
 
 ```text
                                 Apache License
@@ -11858,11 +11947,12 @@ SOFTWARE.
 
 ### github.com/spf13/pflag
 
+* Version: v1.0.10
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/spf13/pflag/LICENSE](vendor/github.com/spf13/pflag/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/spf13/pflag/LICENSE>
 
 ```text
 Copyright (c) 2012 Alex Ogier. All rights reserved.
@@ -11899,11 +11989,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/stretchr/testify/assert/yaml
 
+* Version: v1.12.1
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/stretchr/testify/LICENSE](vendor/github.com/stretchr/testify/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/stretchr/testify/LICENSE>
 
 ```text
 MIT License
@@ -11933,11 +12024,12 @@ SOFTWARE.
 
 ### github.com/ulikunitz/xz
 
+* Version: v0.5.15
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/github.com/ulikunitz/xz/LICENSE](vendor/github.com/ulikunitz/xz/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/ulikunitz/xz/LICENSE>
 
 ```text
 Copyright (c) 2014-2022  Ulrich Kunitz
@@ -11972,11 +12064,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### github.com/urfave/cli/v3
 
+* Version: v3.11.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/urfave/cli/v3/LICENSE](vendor/github.com/urfave/cli/v3/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/urfave/cli/v3/LICENSE>
 
 ```text
 MIT License
@@ -12006,11 +12099,12 @@ SOFTWARE.
 
 ### github.com/x448/float16
 
+* Version: v0.8.4
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/x448/float16/LICENSE](vendor/github.com/x448/float16/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/x448/float16/LICENSE>
 
 ```text
 MIT License
@@ -12041,11 +12135,12 @@ SOFTWARE.
 
 ### github.com/xlab/treeprint
 
+* Version: v1.2.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/github.com/xlab/treeprint/LICENSE](vendor/github.com/xlab/treeprint/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/github.com/xlab/treeprint/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -12074,11 +12169,12 @@ THE SOFTWARE.
 
 ### go.uber.org/multierr
 
+* Version: v1.11.0
 * License: MIT
 
 #### LICENSE.txt
 
-[vendor/go.uber.org/multierr/LICENSE.txt](vendor/go.uber.org/multierr/LICENSE.txt)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.uber.org/multierr/LICENSE.txt>
 
 ```text
 Copyright (c) 2017-2021 Uber Technologies, Inc.
@@ -12106,11 +12202,12 @@ THE SOFTWARE.
 
 ### go.uber.org/zap
 
+* Version: v1.28.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/go.uber.org/zap/LICENSE](vendor/go.uber.org/zap/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.uber.org/zap/LICENSE>
 
 ```text
 Copyright (c) 2016-2024 Uber Technologies, Inc.
@@ -12138,11 +12235,12 @@ THE SOFTWARE.
 
 ### go.yaml.in/yaml/v2
 
+* Version: v2.4.4
 * License: Apache-2.0 AND MIT
 
 #### LICENSE
 
-[vendor/go.yaml.in/yaml/v2/LICENSE](vendor/go.yaml.in/yaml/v2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/LICENSE>
 
 ```text
                                  Apache License
@@ -12351,7 +12449,7 @@ THE SOFTWARE.
 
 #### LICENSE.libyaml
 
-[vendor/go.yaml.in/yaml/v2/LICENSE.libyaml](vendor/go.yaml.in/yaml/v2/LICENSE.libyaml)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/LICENSE.libyaml>
 
 ```text
 The following files were ported to Go from C files of libyaml, and thus
@@ -12390,7 +12488,7 @@ SOFTWARE.
 
 #### NOTICE
 
-[vendor/go.yaml.in/yaml/v2/NOTICE](vendor/go.yaml.in/yaml/v2/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v2/NOTICE>
 
 ```text
 Copyright 2011-2016 Canonical Ltd.
@@ -12412,11 +12510,12 @@ limitations under the License.
 
 ### go.yaml.in/yaml/v3
 
+* Version: v3.0.5
 * License: Apache-2.0 AND MIT
 
 #### LICENSE
 
-[vendor/go.yaml.in/yaml/v3/LICENSE](vendor/go.yaml.in/yaml/v3/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v3/LICENSE>
 
 ```text
 
@@ -12474,7 +12573,7 @@ limitations under the License.
 
 #### NOTICE
 
-[vendor/go.yaml.in/yaml/v3/NOTICE](vendor/go.yaml.in/yaml/v3/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/go.yaml.in/yaml/v3/NOTICE>
 
 ```text
 Copyright 2011-2016 Canonical Ltd.
@@ -12496,11 +12595,12 @@ limitations under the License.
 
 ### golang.org/x/crypto
 
+* Version: v0.55.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/crypto/LICENSE](vendor/golang.org/x/crypto/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/crypto/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12535,7 +12635,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/crypto/PATENTS](vendor/golang.org/x/crypto/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/crypto/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12566,11 +12666,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/mod/semver
 
+* Version: v0.41.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/mod/LICENSE](vendor/golang.org/x/mod/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/mod/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12605,7 +12706,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/mod/PATENTS](vendor/golang.org/x/mod/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/mod/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12636,11 +12737,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/net
 
+* Version: v0.58.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/net/LICENSE](vendor/golang.org/x/net/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/net/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12675,7 +12777,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/net/PATENTS](vendor/golang.org/x/net/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/net/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12706,11 +12808,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/oauth2
 
+* Version: v0.36.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/oauth2/LICENSE](vendor/golang.org/x/oauth2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/oauth2/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12746,11 +12849,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### golang.org/x/sync/errgroup
 
+* Version: v0.22.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/sync/LICENSE](vendor/golang.org/x/sync/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sync/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12785,7 +12889,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/sync/PATENTS](vendor/golang.org/x/sync/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sync/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12816,11 +12920,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/sys/unix
 
+* Version: v0.48.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/sys/LICENSE](vendor/golang.org/x/sys/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sys/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12855,7 +12960,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/sys/PATENTS](vendor/golang.org/x/sys/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/sys/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12886,11 +12991,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/term
 
+* Version: v0.45.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/term/LICENSE](vendor/golang.org/x/term/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/term/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12925,7 +13031,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/term/PATENTS](vendor/golang.org/x/term/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/term/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -12956,11 +13062,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/text
 
+* Version: v0.41.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/text/LICENSE](vendor/golang.org/x/text/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/text/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -12995,7 +13102,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/text/PATENTS](vendor/golang.org/x/text/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/text/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -13026,11 +13133,12 @@ shall terminate as of the date such litigation is filed.
 
 ### golang.org/x/time/rate
 
+* Version: v0.15.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/golang.org/x/time/LICENSE](vendor/golang.org/x/time/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/time/LICENSE>
 
 ```text
 Copyright 2009 The Go Authors.
@@ -13065,7 +13173,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/golang.org/x/time/PATENTS](vendor/golang.org/x/time/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/golang.org/x/time/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -13096,11 +13204,12 @@ shall terminate as of the date such litigation is filed.
 
 ### gomodules.xyz/jsonpatch/v2
 
+* Version: v2.4.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/gomodules.xyz/jsonpatch/v2/LICENSE](vendor/gomodules.xyz/jsonpatch/v2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gomodules.xyz/jsonpatch/v2/LICENSE>
 
 ```text
                                  Apache License
@@ -13311,11 +13420,12 @@ shall terminate as of the date such litigation is filed.
 
 ### google.golang.org/protobuf
 
+* Version: v1.36.12-0.20260120151049-f2248ac996af
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/google.golang.org/protobuf/LICENSE](vendor/google.golang.org/protobuf/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/google.golang.org/protobuf/LICENSE>
 
 ```text
 Copyright (c) 2018 The Go Authors. All rights reserved.
@@ -13350,7 +13460,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/google.golang.org/protobuf/PATENTS](vendor/google.golang.org/protobuf/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/google.golang.org/protobuf/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -13381,11 +13491,12 @@ shall terminate as of the date such litigation is filed.
 
 ### gopkg.in/evanphx/json-patch.v4
 
+* Version: v4.13.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/gopkg.in/evanphx/json-patch.v4/LICENSE](vendor/gopkg.in/evanphx/json-patch.v4/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gopkg.in/evanphx/json-patch.v4/LICENSE>
 
 ```text
 Copyright (c) 2014, Evan Phoenix
@@ -13419,11 +13530,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gopkg.in/inf.v0
 
+* Version: v0.9.1
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/gopkg.in/inf.v0/LICENSE](vendor/gopkg.in/inf.v0/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/gopkg.in/inf.v0/LICENSE>
 
 ```text
 Copyright (c) 2012 Péter Surányi. Portions Copyright (c) 2009 The Go
@@ -13460,11 +13572,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/api
 
+* Version: v0.37.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/api/LICENSE](vendor/k8s.io/api/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/api/LICENSE>
 
 ```text
 
@@ -13675,11 +13788,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/apiextensions-apiserver/pkg
 
+* Version: v0.37.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/apiextensions-apiserver/LICENSE](vendor/k8s.io/apiextensions-apiserver/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apiextensions-apiserver/LICENSE>
 
 ```text
 
@@ -13890,11 +14004,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/apimachinery/pkg
 
+* Version: v0.37.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/apimachinery/LICENSE](vendor/k8s.io/apimachinery/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/LICENSE>
 
 ```text
 
@@ -14105,11 +14220,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/apimachinery/third_party/forked/golang
 
+* Version: v0.37.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE](vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -14144,7 +14260,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS](vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/apimachinery/third_party/forked/golang/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -14175,11 +14291,12 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/cli-runtime/pkg
 
+* Version: v0.36.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/cli-runtime/LICENSE](vendor/k8s.io/cli-runtime/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/cli-runtime/LICENSE>
 
 ```text
 
@@ -14390,11 +14507,12 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go
 
+* Version: v0.37.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/client-go/LICENSE](vendor/k8s.io/client-go/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/LICENSE>
 
 ```text
 
@@ -14605,11 +14723,12 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go/third_party/forked/golang/template
 
+* Version: v0.37.0
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/k8s.io/client-go/third_party/forked/golang/LICENSE](vendor/k8s.io/client-go/third_party/forked/golang/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -14644,7 +14763,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/k8s.io/client-go/third_party/forked/golang/PATENTS](vendor/k8s.io/client-go/third_party/forked/golang/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/golang/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -14675,11 +14794,12 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/client-go/third_party/forked/httpcache
 
+* Version: v0.37.0
 * License: MIT
 
 #### LICENSE
 
-[vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE](vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/client-go/third_party/forked/httpcache/LICENSE>
 
 ```text
 Copyright © 2012 Greg Jones (greg.jones@gmail.com)
@@ -14694,11 +14814,12 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/component-base/version
 
+* Version: v0.37.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/component-base/LICENSE](vendor/k8s.io/component-base/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/component-base/LICENSE>
 
 ```text
 
@@ -14909,11 +15030,12 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### k8s.io/klog/v2
 
+* Version: v2.140.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/klog/v2/LICENSE](vendor/k8s.io/klog/v2/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/klog/v2/LICENSE>
 
 ```text
 Apache License
@@ -15113,11 +15235,12 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg
 
+* Version: v0.0.0-20260721132016-d427ff9ee9ad
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/kube-openapi/LICENSE](vendor/k8s.io/kube-openapi/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/LICENSE>
 
 ```text
 
@@ -15328,11 +15451,12 @@ third-party archives.
 
 ### k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json
 
+* Version: v0.0.0-20260721132016-d427ff9ee9ad
 * License: BSD-3-Clause
 
 #### AUTHORS
 
-[vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS](vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/AUTHORS>
 
 ```text
 # This source code refers to The Go Authors for copyright purposes.
@@ -15343,7 +15467,7 @@ third-party archives.
 
 #### LICENSE
 
-[vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE](vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/LICENSE>
 
 ```text
 Copyright (c) 2020 The Go Authors. All rights reserved.
@@ -15379,11 +15503,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kube-openapi/pkg/validation/spec
 
+* Version: v0.0.0-20260721132016-d427ff9ee9ad
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE](vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kube-openapi/pkg/validation/spec/LICENSE>
 
 ```text
 
@@ -15594,11 +15719,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/kubectl/pkg
 
+* Version: v0.36.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/kubectl/LICENSE](vendor/k8s.io/kubectl/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/kubectl/LICENSE>
 
 ```text
                                  Apache License
@@ -15808,11 +15934,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils
 
+* Version: v0.0.0-20260626114624-be93311217bd
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/utils/LICENSE](vendor/k8s.io/utils/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/LICENSE>
 
 ```text
 
@@ -16023,11 +16150,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### k8s.io/utils/internal/third_party/forked/golang
 
+* Version: v0.0.0-20260626114624-be93311217bd
 * License: BSD-3-Clause
 
 #### LICENSE
 
-[vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE](vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/internal/third_party/forked/golang/LICENSE>
 
 ```text
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -16062,7 +16190,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### PATENTS
 
-[vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS](vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/internal/third_party/forked/golang/PATENTS>
 
 ```text
 Additional IP Rights Grant (Patents)
@@ -16093,11 +16221,12 @@ shall terminate as of the date such litigation is filed.
 
 ### k8s.io/utils/third_party/forked/golang/btree
 
+* Version: v0.0.0-20260626114624-be93311217bd
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE](vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/k8s.io/utils/third_party/forked/golang/btree/LICENSE>
 
 ```text
 
@@ -16307,11 +16436,12 @@ shall terminate as of the date such litigation is filed.
 
 ### sigs.k8s.io/controller-runtime
 
+* Version: v0.24.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/controller-runtime/LICENSE](vendor/sigs.k8s.io/controller-runtime/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/controller-runtime/LICENSE>
 
 ```text
                                  Apache License
@@ -16521,11 +16651,12 @@ shall terminate as of the date such litigation is filed.
 
 ### sigs.k8s.io/json
 
+* Version: v0.0.0-20250730193827-2d320260d730
 * License: Apache-2.0 / BSD-3-Clause
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/json/LICENSE](vendor/sigs.k8s.io/json/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/json/LICENSE>
 
 ```text
 Files other than internal/golang/* licensed under:
@@ -16772,11 +16903,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/api
 
+* Version: v0.21.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/kustomize/api/LICENSE](vendor/sigs.k8s.io/kustomize/api/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/kustomize/api/LICENSE>
 
 ```text
                                  Apache License
@@ -16986,11 +17118,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/kustomize/kyaml
 
+* Version: v0.21.1
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/kustomize/kyaml/LICENSE](vendor/sigs.k8s.io/kustomize/kyaml/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/kustomize/kyaml/LICENSE>
 
 ```text
                                  Apache License
@@ -17200,11 +17333,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### sigs.k8s.io/randfill
 
+* Version: v1.0.0
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/randfill/LICENSE](vendor/sigs.k8s.io/randfill/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/randfill/LICENSE>
 
 ```text
                                  Apache License
@@ -17414,7 +17548,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #### NOTICE
 
-[vendor/sigs.k8s.io/randfill/NOTICE](vendor/sigs.k8s.io/randfill/NOTICE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/randfill/NOTICE>
 
 ```text
 When donating the randfill project to the CNCF, we could not reach all the
@@ -17447,11 +17581,12 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/structured-merge-diff/v6
 
+* Version: v6.4.2
 * License: Apache-2.0
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE](vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/structured-merge-diff/v6/LICENSE>
 
 ```text
                                  Apache License
@@ -17661,11 +17796,12 @@ Submitted on behalf of a third-party: @disconnect3d (Disconnect3d)
 
 ### sigs.k8s.io/yaml
 
+* Version: v1.6.0
 * License: Apache-2.0 / BSD-3-Clause / MIT
 
 #### LICENSE
 
-[vendor/sigs.k8s.io/yaml/LICENSE](vendor/sigs.k8s.io/yaml/LICENSE)
+<https://github.com/NVIDIA/gpu-operator/blob/v26.7.0/vendor/sigs.k8s.io/yaml/LICENSE>
 
 ```text
 The MIT License (MIT)
@@ -17977,4 +18113,369 @@ Apache license:
 
 ```
 
+
+
+## Bundled Component License Texts
+
+### busybox
+
+* Version: 1:1.37.0-6
+* License: GPL-2.0-only
+* Installed at: `/busybox`
+* Notices and source: <https://sources.debian.org/data/main/b/busybox/1%3A1.37.0-6/debian/copyright>
+* Note: apt resolves the package at build time, so the version is the one Debian trixie ships for this builder digest
+
+#### LICENSE
+
+```text
+--- A note on GPL versions
+
+BusyBox is distributed under version 2 of the General Public License (included
+in its entirety, below).  Version 2 is the only version of this license which
+this version of BusyBox (or modified versions derived from this one) may be
+distributed under.
+
+------------------------------------------------------------------------
+		    GNU GENERAL PUBLIC LICENSE
+		       Version 2, June 1991
+
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.
+     51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+			    Preamble
+
+  The licenses for most software are designed to take away your
+freedom to share and change it.  By contrast, the GNU General Public
+License is intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.  This
+General Public License applies to most of the Free Software
+Foundation's software and to any other program whose authors commit to
+using it.  (Some other Free Software Foundation software is covered by
+the GNU Library General Public License instead.)  You can apply it to
+your programs, too.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+this service if you wish), that you receive source code or can get it
+if you want it, that you can change the software or use pieces of it
+in new free programs; and that you know you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the rights.
+These restrictions translate to certain responsibilities for you if you
+distribute copies of the software, or if you modify it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must give the recipients all the rights that
+you have.  You must make sure that they, too, receive or can get the
+source code.  And you must show them these terms so they know their
+rights.
+
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.
+
+  Also, for each author's protection and ours, we want to make certain
+that everyone understands that there is no warranty for this free
+software.  If the software is modified by someone else and passed on, we
+want its recipients to know that what they have is not the original, so
+that any problems introduced by others will not reflect on the original
+authors' reputations.
+
+  Finally, any free program is threatened constantly by software
+patents.  We wish to avoid the danger that redistributors of a free
+program will individually obtain patent licenses, in effect making the
+program proprietary.  To prevent this, we have made it clear that any
+patent must be licensed for everyone's free use or not licensed at all.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+		    GNU GENERAL PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. This License applies to any program or other work which contains
+a notice placed by the copyright holder saying it may be distributed
+under the terms of this General Public License.  The "Program", below,
+refers to any such program or work, and a "work based on the Program"
+means either the Program or any derivative work under copyright law:
+that is to say, a work containing the Program or a portion of it,
+either verbatim or with modifications and/or translated into another
+language.  (Hereinafter, translation is included without limitation in
+the term "modification".)  Each licensee is addressed as "you".
+
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program
+is covered only if its contents constitute a work based on the
+Program (independent of having been made by running the Program).
+Whether that is true depends on what the Program does.
+
+  1. You may copy and distribute verbatim copies of the Program's
+source code as you receive it, in any medium, provided that you
+conspicuously and appropriately publish on each copy an appropriate
+copyright notice and disclaimer of warranty; keep intact all the
+notices that refer to this License and to the absence of any warranty;
+and give any other recipients of the Program a copy of this License
+along with the Program.
+
+You may charge a fee for the physical act of transferring a copy, and
+you may at your option offer warranty protection in exchange for a fee.
+
+  2. You may modify your copy or copies of the Program or any portion
+of it, thus forming a work based on the Program, and copy and
+distribute such modifications or work under the terms of Section 1
+above, provided that you also meet all of these conditions:
+
+    a) You must cause the modified files to carry prominent notices
+    stating that you changed the files and the date of any change.
+
+    b) You must cause any work that you distribute or publish, that in
+    whole or in part contains or is derived from the Program or any
+    part thereof, to be licensed as a whole at no charge to all third
+    parties under the terms of this License.
+
+    c) If the modified program normally reads commands interactively
+    when run, you must cause it, when started running for such
+    interactive use in the most ordinary way, to print or display an
+    announcement including an appropriate copyright notice and a
+    notice that there is no warranty (or else, saying that you provide
+    a warranty) and that users may redistribute the program under
+    these conditions, and telling the user how to view a copy of this
+    License.  (Exception: if the Program itself is interactive but
+    does not normally print such an announcement, your work based on
+    the Program is not required to print an announcement.)
+
+These requirements apply to the modified work as a whole.  If
+identifiable sections of that work are not derived from the Program,
+and can be reasonably considered independent and separate works in
+themselves, then this License, and its terms, do not apply to those
+sections when you distribute them as separate works.  But when you
+distribute the same sections as part of a whole which is a work based
+on the Program, the distribution of the whole must be on the terms of
+this License, whose permissions for other licensees extend to the
+entire whole, and thus to each and every part regardless of who wrote it.
+
+Thus, it is not the intent of this section to claim rights or contest
+your rights to work written entirely by you; rather, the intent is to
+exercise the right to control the distribution of derivative or
+collective works based on the Program.
+
+In addition, mere aggregation of another work not based on the Program
+with the Program (or with a work based on the Program) on a volume of
+a storage or distribution medium does not bring the other work under
+the scope of this License.
+
+  3. You may copy and distribute the Program (or a work based on it,
+under Section 2) in object code or executable form under the terms of
+Sections 1 and 2 above provided that you also do one of the following:
+
+    a) Accompany it with the complete corresponding machine-readable
+    source code, which must be distributed under the terms of Sections
+    1 and 2 above on a medium customarily used for software interchange; or,
+
+    b) Accompany it with a written offer, valid for at least three
+    years, to give any third party, for a charge no more than your
+    cost of physically performing source distribution, a complete
+    machine-readable copy of the corresponding source code, to be
+    distributed under the terms of Sections 1 and 2 above on a medium
+    customarily used for software interchange; or,
+
+    c) Accompany it with the information you received as to the offer
+    to distribute corresponding source code.  (This alternative is
+    allowed only for noncommercial distribution and only if you
+    received the program in object code or executable form with such
+    an offer, in accord with Subsection b above.)
+
+The source code for a work means the preferred form of the work for
+making modifications to it.  For an executable work, complete source
+code means all the source code for all modules it contains, plus any
+associated interface definition files, plus the scripts used to
+control compilation and installation of the executable.  However, as a
+special exception, the source code distributed need not include
+anything that is normally distributed (in either source or binary
+form) with the major components (compiler, kernel, and so on) of the
+operating system on which the executable runs, unless that component
+itself accompanies the executable.
+
+If distribution of executable or object code is made by offering
+access to copy from a designated place, then offering equivalent
+access to copy the source code from the same place counts as
+distribution of the source code, even though third parties are not
+compelled to copy the source along with the object code.
+
+  4. You may not copy, modify, sublicense, or distribute the Program
+except as expressly provided under this License.  Any attempt
+otherwise to copy, modify, sublicense or distribute the Program is
+void, and will automatically terminate your rights under this License.
+However, parties who have received copies, or rights, from you under
+this License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+  5. You are not required to accept this License, since you have not
+signed it.  However, nothing else grants you permission to modify or
+distribute the Program or its derivative works.  These actions are
+prohibited by law if you do not accept this License.  Therefore, by
+modifying or distributing the Program (or any work based on the
+Program), you indicate your acceptance of this License to do so, and
+all its terms and conditions for copying, distributing or modifying
+the Program or works based on it.
+
+  6. Each time you redistribute the Program (or any work based on the
+Program), the recipient automatically receives a license from the
+original licensor to copy, distribute or modify the Program subject to
+these terms and conditions.  You may not impose any further
+restrictions on the recipients' exercise of the rights granted herein.
+You are not responsible for enforcing compliance by third parties to
+this License.
+
+  7. If, as a consequence of a court judgment or allegation of patent
+infringement or for any other reason (not limited to patent issues),
+conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot
+distribute so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you
+may not distribute the Program at all.  For example, if a patent
+license would not permit royalty-free redistribution of the Program by
+all those who receive copies directly or indirectly through you, then
+the only way you could satisfy both it and this License would be to
+refrain entirely from distribution of the Program.
+
+If any portion of this section is held invalid or unenforceable under
+any particular circumstance, the balance of the section is intended to
+apply and the section as a whole is intended to apply in other
+circumstances.
+
+It is not the purpose of this section to induce you to infringe any
+patents or other property right claims or to contest validity of any
+such claims; this section has the sole purpose of protecting the
+integrity of the free software distribution system, which is
+implemented by public license practices.  Many people have made
+generous contributions to the wide range of software distributed
+through that system in reliance on consistent application of that
+system; it is up to the author/donor to decide if he or she is willing
+to distribute software through any other system and a licensee cannot
+impose that choice.
+
+This section is intended to make thoroughly clear what is believed to
+be a consequence of the rest of this License.
+
+  8. If the distribution and/or use of the Program is restricted in
+certain countries either by patents or by copyrighted interfaces, the
+original copyright holder who places the Program under this License
+may add an explicit geographical distribution limitation excluding
+those countries, so that distribution is permitted only in or among
+countries not thus excluded.  In such case, this License incorporates
+the limitation as if written in the body of this License.
+
+  9. The Free Software Foundation may publish revised and/or new versions
+of the General Public License from time to time.  Such new versions will
+be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+Each version is given a distinguishing version number.  If the Program
+specifies a version number of this License which applies to it and "any
+later version", you have the option of following the terms and conditions
+either of that version or of any later version published by the Free
+Software Foundation.  If the Program does not specify a version number of
+this License, you may choose any version ever published by the Free Software
+Foundation.
+
+  10. If you wish to incorporate parts of the Program into other free
+programs whose distribution conditions are different, write to the author
+to ask for permission.  For software which is copyrighted by the Free
+Software Foundation, write to the Free Software Foundation; we sometimes
+make exceptions for this.  Our decision will be guided by the two goals
+of preserving the free status of all derivatives of our free software and
+of promoting the sharing and reuse of software generally.
+
+			    NO WARRANTY
+
+  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
+PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+		     END OF TERMS AND CONDITIONS
+
+	    How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+convey the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+
+Also add information on how to contact you by electronic and paper mail.
+
+If the program is interactive, make it output a short notice like this
+when it starts in an interactive mode:
+
+    Gnomovision version 69, Copyright (C) year  name of author
+    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+
+The hypothetical commands `show w' and `show c' should show the appropriate
+parts of the General Public License.  Of course, the commands you use may
+be called something other than `show w' and `show c'; they could even be
+mouse-clicks or menu items--whatever suits your program.
+
+You should also get your employer (if you work as a programmer) or your
+school, if any, to sign a "copyright disclaimer" for the program, if
+necessary.  Here is a sample; alter the names:
+
+  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+  `Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+  <signature of Ty Coon>, 1 April 1989
+  Ty Coon, President of Vice
+
+This General Public License does not permit incorporating your program into
+proprietary programs.  If your program is a subroutine library, you may
+consider it more useful to permit linking proprietary applications with the
+library.  If this is what you want to do, use the GNU Library General
+Public License instead of this License.
+
+```
 
