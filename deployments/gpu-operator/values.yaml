@@ -254,7 +254,7 @@ toolkit:
   enabled: true
   repository: nvcr.io/nvidia/k8s
   image: container-toolkit
-  version: v1.20.0
+  version: v1.20.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   env: []
