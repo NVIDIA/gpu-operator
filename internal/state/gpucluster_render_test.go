@@ -72,6 +72,41 @@ func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 	return cr
 }
 
+func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
+	states := map[string]func(*testing.T) *configurableState{
+		"dcgm":          newTestDCGMState,
+		"dcgm-exporter": func(t *testing.T) *configurableState { return newTestDCGMExporterState(t, false) },
+		"dra-validator": newTestDRAValidationState,
+	}
+	tests := map[string]struct {
+		priorityClassName string
+		want              string
+	}{
+		"custom":       {priorityClassName: "custom-gpu-priority", want: "custom-gpu-priority"},
+		"unset":        {priorityClassName: "", want: "system-node-critical"},
+		"yaml-boolean": {priorityClassName: "on", want: "on"},
+		"yaml-null":    {priorityClassName: "null", want: "null"},
+	}
+	for stateName, newState := range states {
+		t.Run(stateName, func(t *testing.T) {
+			for name, tc := range tests {
+				t.Run(name, func(t *testing.T) {
+					s := newState(t)
+					cr := sampleGPUCluster()
+					cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
+					cr.Spec.DCGMExporter = &nvidiav1.DCGMExporterSpec{Enabled: new(true)}
+					cr.Spec.Daemonsets.PriorityClassName = tc.priorityClassName
+
+					objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+					require.NoError(t, err)
+					ds := findDaemonSet(t, objs)
+					require.Equal(t, tc.want, ds.Spec.Template.Spec.PriorityClassName)
+				})
+			}
+		})
+	}
+}
+
 // TestGPUClusterRenderGolden renders each GPUCluster operand's manifests end to end and
 // byte-compares the full YAML stream against fixtures in testdata/golden, so unintended
 // template changes surface as diffs (mirroring the NVIDIADriver renderer tests).
