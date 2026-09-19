@@ -62,6 +62,7 @@ const (
 	sandboxDevicePluginAssetsPath = "assets/state-sandbox-device-plugin"
 	kataDevicePluginAssetsPath    = "assets/state-kata-device-plugin"
 	devicePluginAssetsPath        = "assets/state-device-plugin/"
+	dcgmAssetsPath                = "assets/state-dcgm/"
 	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
 	migManagerAssetsPath          = "assets/state-mig-manager/"
 	vGPUDeviceManagerAssetsPath   = "assets/state-vgpu-device-manager/"
@@ -772,6 +773,24 @@ func testDaemonsetCommon(t *testing.T, cp *gpuv1.ClusterPolicy, component string
 		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DCGMExporter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get mainCtrImage for dcgm-exporter: %v", err)
+		}
+	case "DCGM":
+		spec = commonDaemonsetSpec{
+			repository:       cp.Spec.DCGM.Repository,
+			image:            cp.Spec.DCGM.Image,
+			version:          cp.Spec.DCGM.Version,
+			imagePullPolicy:  cp.Spec.DCGM.ImagePullPolicy,
+			imagePullSecrets: getImagePullSecrets(cp.Spec.DCGM.ImagePullSecrets),
+			args:             cp.Spec.DCGM.Args,
+			env:              cp.Spec.DCGM.Env,
+			resources:        cp.Spec.DCGM.Resources,
+		}
+		dsLabel = "nvidia-dcgm"
+		mainCtrName = "nvidia-dcgm-ctr"
+		manifestFile = filepath.Join(cfg.root, dcgmAssetsPath)
+		mainCtrImage, err = gpuv1.ImagePath(&cp.Spec.DCGM)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get mainCtrImage for dcgm: %v", err)
 		}
 	case "MIGManager":
 		spec = commonDaemonsetSpec{
@@ -1679,6 +1698,63 @@ func getDCGMExporterTestOutput(testCase string) map[string]any {
 	}
 
 	return output
+}
+
+func TestDCGMCommonLabelEnforcement(t *testing.T) {
+	testCases := []struct {
+		description string
+		component   string
+		label       string
+		configure   func(*gpuv1.ClusterPolicy)
+	}{
+		{
+			description: "DCGM",
+			component:   "DCGM",
+			label:       "nvidia.com/gpu-operator.dcgm",
+			configure: func(cp *gpuv1.ClusterPolicy) {
+				enabled := true
+				cp.Spec.DCGM.Enabled = &enabled
+				cp.Spec.DCGM.Repository = "nvcr.io/nvidia/cloud-native"
+				cp.Spec.DCGM.Image = "dcgm"
+				cp.Spec.DCGM.Version = "3.3.0-1-ubuntu22.04"
+			},
+		},
+		{
+			description: "DCGMExporter",
+			component:   "DCGMExporter",
+			label:       "nvidia.com/gpu-operator.dcgm-exporter",
+			configure: func(cp *gpuv1.ClusterPolicy) {
+				cp.Spec.DCGMExporter.Repository = "nvcr.io/nvidia/k8s"
+				cp.Spec.DCGMExporter.Image = "dcgm-exporter"
+				cp.Spec.DCGMExporter.Version = "3.3.0-3.2.0-ubuntu22.04"
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			cp := clusterPolicy.DeepCopy()
+			cp.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+			cp.Spec.Validator.Image = "gpu-operator-validator"
+			cp.Spec.Validator.Version = "v23.9.2"
+			tc.configure(cp)
+			cp.Spec.Daemonsets.Labels = map[string]string{
+				tc.label: "false",
+				"custom": "label",
+			}
+
+			ds, err := testDaemonsetCommon(t, cp, tc.component, 1)
+			require.NoError(t, err)
+			require.NotNil(t, ds)
+			require.Equal(t, "true", ds.Labels[tc.label])
+			require.Equal(t, "true", ds.Spec.Template.Labels[tc.label])
+			require.Equal(t, "label", ds.Labels["custom"])
+			require.Equal(t, "label", ds.Spec.Template.Labels["custom"])
+
+			require.NoError(t, removeState(&clusterPolicyController, clusterPolicyController.idx-1))
+			clusterPolicyController.idx--
+		})
+	}
 }
 
 // TestDCGMExporter tests that the GPU Operator correctly deploys the dcgm-exporter daemonset

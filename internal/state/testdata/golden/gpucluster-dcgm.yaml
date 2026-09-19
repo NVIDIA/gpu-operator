@@ -53,6 +53,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-dcgm-dra
+    nvidia.com/gpu-operator.dcgm: "true"
   name: nvidia-dcgm-dra
   namespace: test-operator
 spec:
@@ -63,6 +64,7 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-dra
+        nvidia.com/gpu-operator.dcgm: "true"
     spec:
       containers:
       - image: nvcr.io/nvidia/cloud-native/dcgm:test
@@ -96,6 +98,24 @@ spec:
         operator: Exists
   updateStrategy:
     type: RollingUpdate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nvidia-dcgm
+  name: nvidia-dcgm
+  namespace: test-operator
+spec:
+  internalTrafficPolicy: Local
+  ports:
+  - name: dcgm
+    port: 5555
+    protocol: TCP
+    targetPort: 5555
+  selector:
+    app: nvidia-dcgm-dra
+  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service
