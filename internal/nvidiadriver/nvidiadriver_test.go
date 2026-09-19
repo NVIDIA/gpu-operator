@@ -89,9 +89,9 @@ func TestNodeMatchesSelector(t *testing.T) {
 		{
 			description: "existing owner label does not affect user selector matching",
 			nodeLabels: map[string]string{
-				consts.GPUPresentLabel:        "true",
-				consts.NVIDIADriverOwnerLabel: "old-driver",
-				"region":                      "us-east-1",
+				consts.GPUPresentLabel:                "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: "old-driver",
+				"region":                              "us-east-1",
 			},
 			selector: map[string]string{"region": "us-east-1"},
 			expected: true,
@@ -99,19 +99,19 @@ func TestNodeMatchesSelector(t *testing.T) {
 		{
 			description: "reserved owner selector follows exact label matching",
 			nodeLabels: map[string]string{
-				consts.GPUPresentLabel:        "true",
-				consts.NVIDIADriverOwnerLabel: "demo-gold",
+				consts.GPUPresentLabel:                "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-gold",
 			},
-			selector: map[string]string{consts.NVIDIADriverOwnerLabel: "demo-gold"},
+			selector: map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-gold"},
 			expected: true,
 		},
 		{
 			description: "reserved owner selector does not match a different owner",
 			nodeLabels: map[string]string{
-				consts.GPUPresentLabel:        "true",
-				consts.NVIDIADriverOwnerLabel: "demo-silver",
+				consts.GPUPresentLabel:                "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-silver",
 			},
-			selector: map[string]string{consts.NVIDIADriverOwnerLabel: "demo-gold"},
+			selector: map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-gold"},
 			expected: false,
 		},
 	}
@@ -155,8 +155,8 @@ func TestAssignNVIDIADriverOwnersGivesSpecificDriversPrecedence(t *testing.T) {
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "default-node"}, defaultNode))
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "specific-node"}, specificNode))
-	require.Equal(t, consts.DefaultNVIDIADriverName, defaultNode.Labels[consts.NVIDIADriverOwnerLabel])
-	require.Equal(t, "h100-driver", specificNode.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, consts.DefaultNVIDIADriverName, defaultNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
+	require.Equal(t, "h100-driver", specificNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestAssignNVIDIADriverOwnersAllowsMissingDefaultDriver(t *testing.T) {
@@ -172,7 +172,7 @@ func TestAssignNVIDIADriverOwnersAllowsMissingDefaultDriver(t *testing.T) {
 	}
 	unmatchedNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name:   "unmatched-node",
-		Labels: map[string]string{consts.GPUPresentLabel: "true", consts.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName},
+		Labels: map[string]string{consts.GPUPresentLabel: "true", nvidiav1alpha1.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName},
 	}}
 	specificNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name:   "specific-node",
@@ -187,8 +187,8 @@ func TestAssignNVIDIADriverOwnersAllowsMissingDefaultDriver(t *testing.T) {
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "unmatched-node"}, unmatchedNode))
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "specific-node"}, specificNode))
-	require.NotContains(t, unmatchedNode.Labels, consts.NVIDIADriverOwnerLabel)
-	require.Equal(t, "h100-driver", specificNode.Labels[consts.NVIDIADriverOwnerLabel])
+	require.NotContains(t, unmatchedNode.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
+	require.Equal(t, "h100-driver", specificNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestAssignNVIDIADriverOwnersIgnoresDeletingDrivers(t *testing.T) {
@@ -210,9 +210,9 @@ func TestAssignNVIDIADriverOwnersIgnoresDeletingDrivers(t *testing.T) {
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "gpu-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "demo-gold",
-			"nodepool":                    "gold",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-gold",
+			"nodepool":                            "gold",
 		},
 	}}
 
@@ -223,7 +223,7 @@ func TestAssignNVIDIADriverOwnersIgnoresDeletingDrivers(t *testing.T) {
 	require.True(t, changed)
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node"}, node))
-	require.NotContains(t, node.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, node.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
 }
 
 func TestAssignNVIDIADriverOwnersUsesDefaultDriverWithArbitraryName(t *testing.T) {
@@ -247,7 +247,7 @@ func TestAssignNVIDIADriverOwnersUsesDefaultDriverWithArbitraryName(t *testing.T
 	require.True(t, changed)
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node"}, node))
-	require.Equal(t, "fallback-driver", node.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "fallback-driver", node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestAssignNVIDIADriverOwnersReturnsFalseWhenOwnersAreCurrent(t *testing.T) {
@@ -268,16 +268,16 @@ func TestAssignNVIDIADriverOwnersReturnsFalseWhenOwnersAreCurrent(t *testing.T) 
 	defaultNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "default-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName,
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName,
 		},
 	}}
 	specificNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "specific-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "h100-driver",
-			"nodepool":                    "h100",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "h100-driver",
+			"nodepool":                            "h100",
 		},
 	}}
 
@@ -314,7 +314,7 @@ func TestAssignNVIDIADriverOwnersErrorsOnMultipleDefaultDrivers(t *testing.T) {
 	require.Contains(t, err.Error(), "multiple default NVIDIADrivers found")
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node"}, node))
-	require.NotContains(t, node.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, node.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
 }
 
 func TestAssignNVIDIADriverOwnersRejectsReservedOwnerLabelSelector(t *testing.T) {
@@ -325,14 +325,14 @@ func TestAssignNVIDIADriverOwnersRejectsReservedOwnerLabelSelector(t *testing.T)
 	driver := &nvidiav1alpha1.NVIDIADriver{
 		ObjectMeta: metav1.ObjectMeta{Name: "bad-driver"},
 		Spec: nvidiav1alpha1.NVIDIADriverSpec{
-			NodeSelector: map[string]string{consts.NVIDIADriverOwnerLabel: "other-driver"},
+			NodeSelector: map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "other-driver"},
 		},
 	}
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "gpu-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "existing-driver",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "existing-driver",
 		},
 	}}
 
@@ -342,10 +342,10 @@ func TestAssignNVIDIADriverOwnersRejectsReservedOwnerLabelSelector(t *testing.T)
 	require.Error(t, err)
 	require.False(t, changed)
 	require.Contains(t, err.Error(), "reserved label")
-	require.Contains(t, err.Error(), consts.NVIDIADriverOwnerLabel)
+	require.Contains(t, err.Error(), nvidiav1alpha1.NVIDIADriverOwnerLabel)
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node"}, node))
-	require.Equal(t, "existing-driver", node.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "existing-driver", node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestAssignNVIDIADriverOwnersRejectsDefaultDriverNodeSelector(t *testing.T) {
@@ -372,7 +372,7 @@ func TestAssignNVIDIADriverOwnersRejectsDefaultDriverNodeSelector(t *testing.T) 
 	}}
 	unmatchedNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name:   "unmatched-node",
-		Labels: map[string]string{consts.GPUPresentLabel: "true", consts.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName},
+		Labels: map[string]string{consts.GPUPresentLabel: "true", nvidiav1alpha1.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName},
 	}}
 	specificNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name:   "specific-node",
@@ -390,9 +390,9 @@ func TestAssignNVIDIADriverOwnersRejectsDefaultDriverNodeSelector(t *testing.T) 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "default-node"}, defaultNode))
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "unmatched-node"}, unmatchedNode))
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "specific-node"}, specificNode))
-	require.NotContains(t, defaultNode.Labels, consts.NVIDIADriverOwnerLabel)
-	require.Equal(t, consts.DefaultNVIDIADriverName, unmatchedNode.Labels[consts.NVIDIADriverOwnerLabel])
-	require.NotContains(t, specificNode.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, defaultNode.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
+	require.Equal(t, consts.DefaultNVIDIADriverName, unmatchedNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
+	require.NotContains(t, specificNode.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
 }
 
 func TestAssignNVIDIADriverOwnersDoesNotFallbackToDefaultOnUserDriverConflict(t *testing.T) {
@@ -419,9 +419,9 @@ func TestAssignNVIDIADriverOwnersDoesNotFallbackToDefaultOnUserDriverConflict(t 
 	conflictedNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "conflicted-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "driver-a",
-			"nodepool":                    "shared",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "driver-a",
+			"nodepool":                            "shared",
 		},
 	}}
 
@@ -433,7 +433,7 @@ func TestAssignNVIDIADriverOwnersDoesNotFallbackToDefaultOnUserDriverConflict(t 
 	require.Contains(t, err.Error(), "multiple NVIDIADrivers match the same node")
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "conflicted-node"}, conflictedNode))
-	require.Equal(t, "driver-a", conflictedNode.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "driver-a", conflictedNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestAssignNVIDIADriverOwnersDoesNotChangeOwnersWhenAnyUserDriverConflicts(t *testing.T) {
@@ -457,17 +457,17 @@ func TestAssignNVIDIADriverOwnersDoesNotChangeOwnersWhenAnyUserDriverConflicts(t
 	goldNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "gold-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: "demo-gold",
-			"region":                      "us-east-1",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: "demo-gold",
+			"region":                              "us-east-1",
 		},
 	}}
 	defaultNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name: "default-node",
 		Labels: map[string]string{
-			consts.GPUPresentLabel:        "true",
-			consts.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName,
-			"region":                      "us-east-2",
+			consts.GPUPresentLabel:                "true",
+			nvidiav1alpha1.NVIDIADriverOwnerLabel: consts.DefaultNVIDIADriverName,
+			"region":                              "us-east-2",
 		},
 	}}
 
@@ -480,6 +480,6 @@ func TestAssignNVIDIADriverOwnersDoesNotChangeOwnersWhenAnyUserDriverConflicts(t
 
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gold-node"}, goldNode))
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "default-node"}, defaultNode))
-	require.Equal(t, "demo-gold", goldNode.Labels[consts.NVIDIADriverOwnerLabel])
-	require.Equal(t, consts.DefaultNVIDIADriverName, defaultNode.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "demo-gold", goldNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
+	require.Equal(t, consts.DefaultNVIDIADriverName, defaultNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
