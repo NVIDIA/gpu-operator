@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -233,6 +234,10 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
 	CCCapableLabelKey = "nvidia.com/cc.capable"
+	// devicePluginDeployLabelKey gates whether the nvidia-device-plugin DaemonSet
+	// is scheduled on the node. Users set it to "false" to disable the plugin
+	// on a per-node basis.
+	devicePluginDeployLabelKey = "nvidia.com/gpu.deploy.device-plugin"
 	// appComponentLabelKey indicates the label key of the component
 	appComponentLabelKey = "app.kubernetes.io/component"
 	// wslNvidiaSMIPath indicates the path to the nvidia-smi binary on WSL
@@ -1153,6 +1158,10 @@ func (p *Plugin) validate() error {
 	p.setKubeClient(kubeClient)
 
 	err = p.validateGPUResource()
+	if errors.Is(err, errDevicePluginDisabled) {
+		log.Info("Device plugin is disabled on this node, skipping GPU resource validation")
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1404,7 +1413,35 @@ func (p *Plugin) countGPUResources() (int64, error) {
 	return count, nil
 }
 
+// errDevicePluginDisabled signals validate() that the device plugin is not
+// expected to publish GPU capacity on this node, so plugin validation should be
+// skipped without failing the operator-validator pod. Returned by
+// validateGPUResource when isDevicePluginDisabledOnNode holds for the node.
+var errDevicePluginDisabled = errors.New("device plugin is disabled on this node")
+
+// isDevicePluginDisabledOnNode reports whether the nvidia-device-plugin is
+// intentionally not running on the given node because a user explicitly disabled
+// it via nvidia.com/gpu.deploy.device-plugin=false. In that case the
+// operator-validator's plugin-validation step must not wait for GPU capacity
+// that will never appear.
+func isDevicePluginDisabledOnNode(node *corev1.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.GetLabels()[devicePluginDeployLabelKey] == "false"
+}
+
 func (p *Plugin) validateGPUResource() error {
+	// Skip the retry loop entirely when the device plugin is not expected to
+	// advertise GPU capacity on this node.
+	node, err := getNode(p.ctx, p.kubeClient)
+	if err != nil {
+		return fmt.Errorf("unable to fetch node by name %s to check for GPU resources: %s", nodeNameFlag, err)
+	}
+	if isDevicePluginDisabledOnNode(node) {
+		return errDevicePluginDisabled
+	}
+
 	for retry := 1; retry <= gpuResourceDiscoveryWaitRetries; retry++ {
 		// get node info to check discovered GPU resources
 		node, err := getNode(p.ctx, p.kubeClient)
