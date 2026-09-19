@@ -18,7 +18,9 @@ package utils
 
 import (
 	"context"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -195,6 +197,29 @@ func TestGetStringHash(t *testing.T) {
 		actual := GetStringHash(tc.input)
 		assert.Equal(t, tc.expected, actual)
 	}
+}
+
+func TestPrependPathListEnvvar(t *testing.T) {
+	const envvar = "GPU_OPERATOR_TEST_PATH"
+
+	t.Setenv(envvar, strings.Join([]string{"existing", "path"}, string(os.PathListSeparator)))
+
+	assert.Equal(
+		t,
+		strings.Join([]string{"first", "second", "existing", "path"}, string(os.PathListSeparator)),
+		PrependPathListEnvvar(envvar, "first", "second"),
+	)
+	assert.Equal(t, os.Getenv(envvar), PrependPathListEnvvar(envvar))
+}
+
+func TestSetEnvVar(t *testing.T) {
+	envvars := []string{"FIRST=one", "TARGET=old", "TARGET_SUFFIX=preserved"}
+
+	assert.Equal(
+		t,
+		[]string{"FIRST=one", "TARGET_SUFFIX=preserved", "TARGET=new"},
+		SetEnvVar(envvars, "TARGET", "new"),
+	)
 }
 
 func TestEnsureFinalizer(t *testing.T) {
