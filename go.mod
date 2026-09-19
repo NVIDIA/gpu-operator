@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.12.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494
-	github.com/NVIDIA/nvidia-container-toolkit v1.20.1-0.20260914195404-24761af0847d
+	github.com/NVIDIA/nvidia-container-toolkit v1.20.1
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.4
@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.10.1
 	go.uber.org/zap v1.28.0
-	golang.org/x/mod v0.40.0
+	golang.org/x/mod v0.41.0
 	k8s.io/api v0.36.3
 	k8s.io/apiextensions-apiserver v0.36.3
 	k8s.io/apimachinery v0.36.3
