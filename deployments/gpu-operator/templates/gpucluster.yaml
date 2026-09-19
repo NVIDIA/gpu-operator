@@ -124,6 +124,9 @@ spec:
     {{- if .Values.dcgmExporter.serviceMonitor }}
     serviceMonitor: {{ toYaml .Values.dcgmExporter.serviceMonitor | nindent 6 }}
     {{- end }}
+    {{- if .Values.dcgmExporter.serviceAccount }}
+    serviceAccount: {{ toYaml .Values.dcgmExporter.serviceAccount | nindent 6 }}
+    {{- end }}
     {{- if and (.Values.dcgmExporter.config) (.Values.dcgmExporter.config.name) }}
     config:
       name: {{ .Values.dcgmExporter.config.name }}

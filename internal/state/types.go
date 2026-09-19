@@ -111,6 +111,10 @@ type dcgmExporterRenderData struct {
 	PodResourcesDir              string
 	ServiceType                  string
 	ServiceInternalTrafficPolicy string
+	// ServiceAccountName is the ServiceAccount the operands reference; CreateServiceAccount
+	// reports whether the operator owns its lifecycle (false = supplied by the user).
+	ServiceAccountName   string
+	CreateServiceAccount bool
 }
 
 // validatorRenderData is the templating data for the DRA validator manifests. It
