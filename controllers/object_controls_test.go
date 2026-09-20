@@ -2920,6 +2920,7 @@ func TestDCGMExporterServiceAccountCreateRace(t *testing.T) {
 			require.Error(t, err, "AlreadyExists must not pass an account the exporter does not manage")
 			require.Equal(t, gpuv1.NotReady, state)
 
+			gets = staleReads // Inspect the live object, not the simulated stale cache.
 			found := &corev1.ServiceAccount{}
 			require.NoError(t, k8s.Get(context.Background(),
 				types.NamespacedName{Namespace: testNamespace, Name: customName}, found))
@@ -3359,16 +3360,25 @@ func TestDCGMExporterServiceAccountDeletionRace(t *testing.T) {
 				stateNames: []string{"state-dcgm-exporter"}, resources: []Resources{{ServiceAccount: corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName}}}}, logger: ctrl.Log.WithName("test")}
 			if disabled {
 				state, err := ServiceAccount(n)
-				require.NoError(t, err)
-				require.Equal(t, gpuv1.Disabled, state)
+				require.True(t, apierrors.IsConflict(err))
+				require.Equal(t, gpuv1.NotReady, state)
 			} else {
-				require.NoError(t, n.cleanupSupersededDCGMExporterServiceAccount(ctx))
+				require.True(t, apierrors.IsConflict(n.cleanupSupersededDCGMExporterServiceAccount(ctx)))
 			}
 			require.Equal(t, 1, deletes)
 			found := &corev1.ServiceAccount{}
 			require.NoError(t, k8s.Get(ctx, client.ObjectKeyFromObject(old), found))
 			require.Equal(t, types.UID("replacement-uid"), found.UID)
 			require.Empty(t, found.OwnerReferences)
+			// Retry with the replacement visible: it is not ours, so cleanup skips it.
+			if disabled {
+				state, err := ServiceAccount(n)
+				require.NoError(t, err)
+				require.Equal(t, gpuv1.Disabled, state)
+			} else {
+				require.NoError(t, n.cleanupSupersededDCGMExporterServiceAccount(ctx))
+			}
+			require.Equal(t, 1, deletes)
 		})
 	}
 }

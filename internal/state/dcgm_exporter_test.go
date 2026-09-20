@@ -1009,16 +1009,25 @@ func TestDCGMExporterServiceAccountDeletionRace(t *testing.T) {
 				return c.Delete(ctx, obj, opts...)
 			}})
 			if disabled {
-				_, err := s.Sync(ctx, cr, draSupportedCatalog())
-				require.NoError(t, err)
+				status, err := s.Sync(ctx, cr, draSupportedCatalog())
+				require.True(t, apierrors.IsConflict(err))
+				require.Equal(t, SyncState(SyncStateError), status)
 			} else {
-				require.NoError(t, reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr))
+				require.True(t, apierrors.IsConflict(reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr)))
 			}
 			require.Equal(t, 1, deletes)
 			found, err := s.getServiceAccount(ctx, old.Name)
 			require.NoError(t, err)
 			require.Equal(t, types.UID("replacement-uid"), found.UID)
 			require.Empty(t, found.OwnerReferences)
+			if disabled {
+				status, err := s.Sync(ctx, cr, draSupportedCatalog())
+				require.NoError(t, err)
+				require.Equal(t, SyncState(SyncStateIgnore), status)
+			} else {
+				require.NoError(t, reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr))
+			}
+			require.Equal(t, 1, deletes)
 		})
 	}
 }
@@ -1057,4 +1066,72 @@ func TestDCGMExporterDeletionFilterScope(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDCGMExporterAdoptionRejectsStaleManagedAccount(t *testing.T) {
+	ctx := t.Context()
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics"}})
+	cached := ownedServiceAccount(cr, "metrics")
+	cached.UID, cached.ResourceVersion = "old-uid", "10"
+	replacement := selfLabelledServiceAccount("metrics")
+	replacement.UID, replacement.ResourceVersion = "new-uid", "20"
+	s := newTestDCGMExporterStateWithObjects(t, replacement)
+	base := s.client
+	s.client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		if key == client.ObjectKeyFromObject(cached) {
+			switch obj := obj.(type) {
+			case *corev1.ServiceAccount:
+				*obj = *cached.DeepCopy()
+				return nil
+			case *unstructured.Unstructured:
+				data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cached)
+				require.NoError(t, err)
+				obj.Object = data
+				obj.SetAPIVersion("v1")
+				obj.SetKind("ServiceAccount")
+				return nil
+			}
+		}
+		return c.Get(ctx, key, obj, opts...)
+	}})
+	desired := &unstructured.Unstructured{}
+	desired.SetAPIVersion("v1")
+	desired.SetKind("ServiceAccount")
+	desired.SetName(cached.Name)
+	desired.SetNamespace(cached.Namespace)
+	err := s.createOrUpdateObjs(ctx, cr, func(*unstructured.Unstructured) error { return nil }, []*unstructured.Unstructured{desired})
+	require.True(t, apierrors.IsConflict(err), "GPUCluster updates must also validate the observed resource version")
+	found := &corev1.ServiceAccount{}
+	require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(replacement), found))
+	require.Equal(t, replacement.UID, found.UID)
+	require.Empty(t, found.OwnerReferences)
+	require.Equal(t, replacement.Labels, found.Labels)
+}
+
+func TestDCGMExporterDisabledSyncRetriesMetadataConflict(t *testing.T) {
+	ctx := t.Context()
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	old := ownedServiceAccount(cr, "previous")
+	s := newTestDCGMExporterStateWithObjects(t, old)
+	deletes := 0
+	s.client = interceptor.NewClient(s.client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+		deletes++
+		if deletes == 1 {
+			current := &corev1.ServiceAccount{}
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(old), current))
+			current.Annotations = map[string]string{"example.com/last-audit": "updated"}
+			require.NoError(t, c.Update(ctx, current))
+		}
+		return c.Delete(ctx, obj, opts...)
+	}})
+	status, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.True(t, apierrors.IsConflict(err))
+	require.Equal(t, SyncState(SyncStateError), status)
+	status, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateNotReady), status)
+	status, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateIgnore), status)
+	require.Equal(t, 2, deletes)
 }

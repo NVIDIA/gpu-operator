@@ -350,18 +350,24 @@ var dcgmExporterServiceAccountMarker = ownership.Marker{
 	Value: "nvidia-dcgm-exporter",
 }
 
-// checkDCGMExporterServiceAccountOwnership validates an existing account. NotFound is
-// returned to the caller: it permits an initial create, but after AlreadyExists it
-// means the cache has not observed the object and reconciliation must retry.
-func (n ClusterPolicyController) checkDCGMExporterServiceAccountOwnership(ctx context.Context, obj *corev1.ServiceAccount) error {
+// ensureDCGMExporterServiceAccount creates a missing account or validates the exact
+// version whose ownership we observed. Re-reading the cache after AlreadyExists is
+// insufficient: it can still contain the managed account a user has replaced.
+func (n ClusterPolicyController) ensureDCGMExporterServiceAccount(ctx context.Context, obj *corev1.ServiceAccount) error {
 	found := &corev1.ServiceAccount{}
 	if err := n.client.Get(ctx, client.ObjectKeyFromObject(obj), found); err != nil {
-		return err
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// AlreadyExists must also retry, so the next reconcile validates the account
+		// through the existing-object path rather than trusting the cached absence.
+		return n.client.Create(ctx, obj)
 	}
-	if ownership.IsManaged(found, n.singleton, dcgmExporterServiceAccountMarker) {
-		return nil
+	if !ownership.IsManaged(found, n.singleton, dcgmExporterServiceAccountMarker) {
+		return ownership.ConflictError("ClusterPolicy", obj.Name, obj.Namespace)
 	}
-	return ownership.ConflictError("ClusterPolicy", obj.Name, obj.Namespace)
+	base := found.DeepCopy()
+	return n.client.Patch(ctx, found, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{}))
 }
 
 // dcgmExporterServiceAccountRenamed reports whether the exporter is configured to use a
@@ -525,33 +531,20 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	// Only a name the user chose can collide with an unrelated object; the default is
-	// left tolerant so an upgrade that lost the owner reference keeps converging.
-	guardTakeover := isDCGMExporter && dcgmExporterServiceAccountRenamed(&n.singleton.Spec)
-	if guardTakeover {
-		if err := n.checkDCGMExporterServiceAccountOwnership(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
-			logger.Error(err, "Refusing to take over an existing ServiceAccount")
-			return gpuv1.NotReady, err
-		}
-	}
-
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
 
-	if err := n.client.Create(ctx, obj); err != nil {
+	// The operator default keeps its historical upgrade behavior. A configured
+	// name must be validated against the server before later controls bind to it.
+	if isDCGMExporter && dcgmExporterServiceAccountRenamed(&n.singleton.Spec) {
+		if err := n.ensureDCGMExporterServiceAccount(ctx, obj); err != nil {
+			return gpuv1.NotReady, err
+		}
+	} else if err := n.client.Create(ctx, obj); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
-		}
-		// The object appeared between the check above and this create, so ownership has
-		// to be revalidated: AlreadyExists must not silently hand the exporter an
-		// account it does not manage.
-		if guardTakeover {
-			if err := n.checkDCGMExporterServiceAccountOwnership(ctx, obj); err != nil {
-				logger.Error(err, "Refusing to use an existing ServiceAccount")
-				return gpuv1.NotReady, err
-			}
 		}
 		logger.Info("Found Resource, skipping update")
 	}

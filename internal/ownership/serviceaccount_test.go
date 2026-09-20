@@ -69,9 +69,12 @@ func TestDeleteObserved(t *testing.T) {
 				return c.Delete(ctx, obj, opts...)
 			}})
 			err := DeleteObserved(ctx, wrapped, observed)
-			if test.failure != nil {
+			switch {
+			case test.failure != nil:
 				require.ErrorIs(t, err, test.failure)
-			} else {
+			case test.changed:
+				require.True(t, apierrors.IsConflict(err), "a conflict must trigger reconciliation, not mark cleanup successful")
+			default:
 				require.NoError(t, err)
 			}
 			current := &corev1.ServiceAccount{}

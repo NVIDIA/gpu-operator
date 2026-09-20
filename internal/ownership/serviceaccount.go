@@ -105,11 +105,12 @@ func ConflictError(ownerKind, name, namespace string) error {
 
 // DeleteObserved deletes only the object version whose ownership was checked. UID
 // protects a replacement with the same name; resourceVersion protects a concurrent
-// ownership hand-off on the same object. Conflicts are left for the next reconciliation.
+// ownership hand-off on the same object. Return conflicts to schedule a retry: a
+// metadata update can conflict even when the object is still ours to delete.
 func DeleteObserved(ctx context.Context, c client.Client, obj client.Object) error {
 	uid, version := obj.GetUID(), obj.GetResourceVersion()
 	err := c.Delete(ctx, obj, client.Preconditions{UID: &uid, ResourceVersion: &version})
-	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	return err
