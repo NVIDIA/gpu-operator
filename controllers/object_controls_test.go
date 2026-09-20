@@ -2536,10 +2536,6 @@ func TestDriverPrecompiledLibModulesSuse(t *testing.T) {
 }
 
 // TestDCGMExporterServiceAccountReconcile covers the ServiceAccount lifecycle for the
-// DCGM Exporter: the operator honours a configured name and, when the ServiceAccount is
-// supplied by the user, only references it -- it is never created, adopted or deleted.
-
-// TestDCGMExporterServiceAccountReconcile covers the ServiceAccount lifecycle for the
 // DCGM Exporter: the operator honours a configured name, and a ServiceAccount supplied by
 // the user is only referenced -- never created, adopted, mutated or deleted, and never
 // left carrying a ClusterPolicy owner reference that would garbage-collect it.
@@ -2977,6 +2973,8 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 		deployedServiceAccount string
 		// noDaemonSet seeds no DaemonSet even when a name would be implied.
 		noDaemonSet   bool
+		generation    int64
+		daemonStatus  appsv1.DaemonSetStatus
 		expectDeleted []string
 		expectKept    []string
 	}{
@@ -2994,6 +2992,28 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customA, Create: new(false)},
 			owned:          []string{DCGMExporterDefaultServiceAccountName},
 			unowned:        []string{customA},
+			expectDeleted:  []string{DCGMExporterDefaultServiceAccountName},
+			expectKept:     []string{customA},
+		},
+		"new template with old ready status preserves the old account": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customA},
+			owned:          []string{DCGMExporterDefaultServiceAccountName, customA},
+			generation:     2,
+			daemonStatus:   appsv1.DaemonSetStatus{ObservedGeneration: 1, DesiredNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberAvailable: 1},
+			expectKept:     []string{DCGMExporterDefaultServiceAccountName, customA},
+		},
+		"unfinished rollout preserves the old account": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customA},
+			owned:          []string{DCGMExporterDefaultServiceAccountName, customA},
+			generation:     2,
+			daemonStatus:   appsv1.DaemonSetStatus{ObservedGeneration: 2, DesiredNumberScheduled: 2, UpdatedNumberScheduled: 1, NumberAvailable: 1},
+			expectKept:     []string{DCGMExporterDefaultServiceAccountName, customA},
+		},
+		"completed rollout reclaims the old account": {
+			serviceAccount: &gpuv1.DCGMExporterServiceAccountConfig{Name: customA},
+			owned:          []string{DCGMExporterDefaultServiceAccountName, customA},
+			generation:     2,
+			daemonStatus:   appsv1.DaemonSetStatus{ObservedGeneration: 2, DesiredNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberAvailable: 1},
 			expectDeleted:  []string{DCGMExporterDefaultServiceAccountName},
 			expectKept:     []string{customA},
 		},
@@ -3088,7 +3108,10 @@ func TestDCGMExporterSupersededServiceAccountCleanup(t *testing.T) {
 					// The operands converged on the configured account.
 					deployed = cp.Spec.DCGMExporter.GetServiceAccountName(DCGMExporterDefaultServiceAccountName)
 				}
-				objects = append(objects, exporterDaemonSet(deployed))
+				ds := exporterDaemonSet(deployed)
+				ds.Generation = tc.generation
+				ds.Status = tc.daemonStatus
+				objects = append(objects, ds)
 			}
 
 			k8s := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()

@@ -414,8 +414,8 @@ func (n ClusterPolicyController) cleanupSupersededDCGMExporterServiceAccount(ctx
 		// Nothing is deployed, so nothing references a ServiceAccount.
 	case err != nil:
 		return err
-	case ds.Spec.Template.Spec.ServiceAccountName != configured:
-		logger.V(1).Info("DCGM Exporter DaemonSet still references another ServiceAccount, deferring cleanup",
+	case ds.Spec.Template.Spec.ServiceAccountName != configured || !isDaemonSetRollingUpdateComplete(ds):
+		logger.V(1).Info("DCGM Exporter DaemonSet has not finished switching ServiceAccounts, deferring cleanup",
 			"Deployed", ds.Spec.Template.Spec.ServiceAccountName, "Configured", configured)
 		return nil
 	}

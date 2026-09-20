@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -259,8 +260,24 @@ func guardDCGMExporterServiceAccountAdoption(owner metav1.Object, current *unstr
 // deleting a ServiceAccount the DaemonSet still referenced would leave its pods without an
 // identity, whereas releasing ownership changes nothing the operands can observe.
 func reclaimSupersededDCGMExporterServiceAccounts(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
-	return s.deleteSupersededServiceAccounts(ctx, cr,
-		cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName))
+	configured := cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
+	// A cache read after syncObjects can still show the previous ready DaemonSet,
+	// or the new template with status from the previous generation. Neither proves
+	// that the pods stopped using the old identity.
+	ds := &appsv1.DaemonSet{}
+	err := s.client.Get(ctx, types.NamespacedName{Namespace: s.namespace, Name: "nvidia-dcgm-exporter-dra"}, ds)
+	switch {
+	case apierrors.IsNotFound(err):
+		// No deployed DaemonSet references the superseded accounts.
+	case err != nil:
+		return err
+	case ds.Spec.Template.Spec.ServiceAccountName != configured ||
+		ds.Status.ObservedGeneration < ds.Generation ||
+		ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled ||
+		ds.Status.NumberAvailable != ds.Status.DesiredNumberScheduled:
+		return nil
+	}
+	return s.deleteSupersededServiceAccounts(ctx, cr, configured)
 }
 
 // releaseDCGMExporterServiceAccountOnDelete hands a user-provided ServiceAccount back

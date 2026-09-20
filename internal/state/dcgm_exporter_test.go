@@ -336,6 +336,16 @@ func TestDCGMExporterServiceAccountRendering(t *testing.T) {
 			created:        customName,
 			referenced:     customName,
 		},
+		"a numeric-looking name remains a string": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "123"},
+			created:        "123",
+			referenced:     "123",
+		},
+		"a boolean-looking name remains a string": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "true"},
+			created:        "true",
+			referenced:     "true",
+		},
 		"create=false references the ServiceAccount without rendering it": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
 			created:        "",
@@ -1134,4 +1144,65 @@ func TestDCGMExporterDisabledSyncRetriesMetadataConflict(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, SyncState(SyncStateIgnore), status)
 	require.Equal(t, 2, deletes)
+}
+
+// A successful update can still be followed by the old ready DaemonSet in the cache,
+// or by the new template with readiness counters from the previous generation.
+func TestDCGMExporterSyncWaitsForServiceAccountRollout(t *testing.T) {
+	for _, staleTemplate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("stale template=%t", staleTemplate), func(t *testing.T) {
+			ctx := t.Context()
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "new-metrics"}})
+			cr.UID = "cluster-uid"
+			old := ownedServiceAccount(cr, "old-metrics")
+			s := newTestDCGMExporterStateWithObjects(t, old)
+			objs, err := s.getManifestObjects(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			ds := findDaemonSet(t, objs)
+			ds.Spec.Template.Spec.ServiceAccountName = old.Name
+			ds.Generation = 1
+			ds.Status = appsv1.DaemonSetStatus{ObservedGeneration: 1, DesiredNumberScheduled: 1, CurrentNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberAvailable: 1, NumberReady: 1}
+			require.NoError(t, s.client.Create(ctx, ds))
+			server := s.client
+			cached := ds.DeepCopy()
+			s.client = interceptor.NewClient(server.(client.WithWatch), interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if staleTemplate && key == client.ObjectKeyFromObject(cached) {
+						switch out := obj.(type) {
+						case *appsv1.DaemonSet:
+							*out = *cached.DeepCopy()
+							return nil
+						case *unstructured.Unstructured:
+							if out.GetKind() == "DaemonSet" {
+								data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cached)
+								out.Object = data
+								return err
+							}
+						}
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					if obj.GetObjectKind().GroupVersionKind().Kind == "DaemonSet" {
+						obj.SetGeneration(2) // The fake client does not advance generations.
+					}
+					return c.Update(ctx, obj, opts...)
+				},
+			})
+			_, err = s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.NoError(t, server.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{}), "keep the old identity until the new template has rolled out")
+
+			// Once the cache and DaemonSet controller catch up, cleanup must finish.
+			s.client = server
+			require.NoError(t, server.Get(ctx, client.ObjectKeyFromObject(ds), ds))
+			require.Equal(t, "new-metrics", ds.Spec.Template.Spec.ServiceAccountName)
+			ds.Status.ObservedGeneration = ds.Generation
+			require.NoError(t, server.Status().Update(ctx, ds))
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.Equal(t, SyncState(SyncStateReady), state)
+			require.True(t, apierrors.IsNotFound(server.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{})))
+		})
+	}
 }
