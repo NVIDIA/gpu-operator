@@ -2008,6 +2008,11 @@ func TestServiceMonitor(t *testing.T) {
 						HonorLabels:      new(true),
 						AdditionalLabels: map[string]string{"a": "b"},
 						Relabelings:      []*promv1.RelabelConfig{{Action: "keep"}},
+						MetricRelabelings: []*promv1.RelabelConfig{{
+							Action:       "replace",
+							SourceLabels: []promv1.LabelName{"exported_namespace"},
+							TargetLabel:  "namespace",
+						}},
 					},
 				},
 			},
@@ -2026,6 +2031,11 @@ func TestServiceMonitor(t *testing.T) {
 						HonorLabels:   true,
 						RelabelConfigs: []promv1.RelabelConfig{{
 							Action: "keep",
+						}},
+						MetricRelabelConfigs: []promv1.RelabelConfig{{
+							Action:       "replace",
+							SourceLabels: []promv1.LabelName{"exported_namespace"},
+							TargetLabel:  "namespace",
 						}},
 					}},
 				},

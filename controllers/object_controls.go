@@ -5012,6 +5012,16 @@ func applyServiceMonitorCustomEdits(desiredState *gpuv1.ServiceMonitorConfig, cu
 		}
 		currentState.Spec.Endpoints[0].RelabelConfigs = relabelConfigs
 	}
+
+	if desiredState.MetricRelabelings != nil {
+		metricRelabelConfigs := make([]promv1.RelabelConfig, len(desiredState.MetricRelabelings))
+		for i, relabel := range desiredState.MetricRelabelings {
+			if relabel != nil {
+				metricRelabelConfigs[i] = *relabel
+			}
+		}
+		currentState.Spec.Endpoints[0].MetricRelabelConfigs = metricRelabelConfigs
+	}
 }
 
 // ServiceMonitor creates ServiceMonitor object
