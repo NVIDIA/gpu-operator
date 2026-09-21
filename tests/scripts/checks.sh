@@ -241,13 +241,17 @@ print_driver_upgrade_debug() {
 }
 
 wait_for_driver_upgrade_done() {
-	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
+	local gpu_node_count
 	local current_time=0
+	local node_resource
+	local upgrade_state
+
+	gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present --no-headers | wc -l)
 	echo "waiting for the gpu driver upgrade to complete"
 	while :; do
 		local upgraded_count=0
-		for node in $(kubectl get nodes -o NAME); do
-			upgrade_state=$(kubectl get $node -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}')
+		for node_resource in $(kubectl get nodes -o NAME); do
+			upgrade_state=$(kubectl get "$node_resource" -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}')
 			if [ "${upgrade_state}" = "upgrade-done" ]; then
 				upgraded_count=$((${upgraded_count} + 1))
 			fi
