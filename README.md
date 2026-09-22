@@ -1,6 +1,6 @@
 [![license](https://img.shields.io/github/license/NVIDIA/gpu-operator?style=flat-square)](https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/LICENSE)
-[![pipeline status](https://gitlab.com/nvidia/kubernetes/gpu-operator/badges/master/pipeline.svg)](https://gitlab.com/nvidia/kubernetes/gpu-operator/-/pipelines)
-[![coverage report](https://gitlab.com/nvidia/kubernetes/gpu-operator/badges/master/coverage.svg)](https://gitlab.com/nvidia/kubernetes/gpu-operator/-/pipelines)
+[![pipeline status](https://github.com/NVIDIA/gpu-operator/actions/workflows/ci.yaml/badge.svg)](https://github.com/NVIDIA/gpu-operator/actions/workflows/ci.yaml)
+[![coverage report](https://coveralls.io/repos/github/NVIDIA/gpu-operator/badge.svg?branch=main)](https://coveralls.io/github/NVIDIA/gpu-operator?branch=main)
 
 # NVIDIA GPU Operator
 
