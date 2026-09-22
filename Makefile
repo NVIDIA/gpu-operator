@@ -143,7 +143,7 @@ push-bundle-image: build-bundle-image
 CMDS := $(patsubst ./cmd/%/,%,$(sort $(dir $(wildcard ./cmd/*/))))
 CMD_TARGETS := $(patsubst %,cmd-%, $(CMDS))
 
-CHECK_TARGETS := lint license-check validate-modules validate-generated-assets
+CHECK_TARGETS := lint license-check validate-modules validate-generated-assets test-tools
 MAKE_TARGETS := build check coverage cmds $(CMD_TARGETS) $(CHECK_TARGETS)
 DOCKER_TARGETS := $(patsubst %,docker-%, $(MAKE_TARGETS))
 .PHONY: $(MAKE_TARGETS) $(DOCKER_TARGETS)
@@ -192,15 +192,26 @@ license-check:
 
 .PHONY: third-party-notices
 third-party-notices: install-tools
-	@bash tools/generate-third-party-notices.sh
+	@bash tools/generate-third-party-notices.sh repo
 
-.PHONY: check-third-party-notices
-check-third-party-notices: third-party-notices
-	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."
-	@git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null 2>&1 \
-		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make third-party-notices' and commit the result."; exit 1; }
-	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
-		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
+.PHONY: release-third-party-notices
+release-third-party-notices: install-tools
+	@set -e; \
+	output="$${OUTPUT:-$$(mktemp "$${TMPDIR:-/tmp}/gpu-operator-release-notices.XXXXXX")}"; \
+	tag="$(RELEASE_TAG)"; \
+	if [ -z "$$tag" ]; then \
+		tag="v0.0.0-local-$$(git rev-parse --short HEAD)"; \
+		git -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag -f "$$tag" >/dev/null; \
+		trap 'git tag -d "'"$$tag"'" >/dev/null 2>&1 || true' EXIT; \
+	fi; \
+	bash tools/generate-third-party-notices.sh release --release-tag "$$tag" --output "$$output"; \
+	echo "Release notices written to $$output"
+
+.PHONY: test-tools
+test-tools:
+	@for t in tools/*_test.sh; do \
+		bash "$$t" || exit 1; \
+	done
 
 # Apply go fmt to the codebase
 fmt:
