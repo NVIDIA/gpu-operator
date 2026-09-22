@@ -1,0 +1,8 @@
+# Curated identifiers for license files bundling more than one license.
+# Add a row only after reading the vendored file yourself; joining with SPDX
+# AND asserts both apply, and a slash would read as a choice between them.
+# package	license_identifier	observed_contents
+go.yaml.in/yaml/v2	Apache-2.0 AND MIT	ships LICENSE (Apache-2.0) and LICENSE.libyaml (MIT, for the Go port of libyaml) as two files; go-licenses reports only the Apache-2.0 LICENSE
+go.yaml.in/yaml/v3	Apache-2.0 AND MIT	single LICENSE opening "This project is covered by two different licenses: MIT and Apache", with a full-text MIT section and an Apache-2.0 section; go-licenses reports only MIT
+github.com/opencontainers/go-digest	Apache-2.0 AND CC-BY-SA-4.0	ships LICENSE (Apache-2.0) for the code and LICENSE.docs (CC-BY-SA-4.0) for the specification text; go-licenses reports only the Apache-2.0 LICENSE
+gopkg.in/yaml.v3	Apache-2.0 AND MIT	single LICENSE opening "This project is covered by two different licenses: MIT and Apache", with a NOTICE alongside it; go-licenses reports only MIT. Retired from the module graph but still needed to regenerate releases up to v26.7.0
