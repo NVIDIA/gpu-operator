@@ -1,0 +1,216 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Third-Party Notices Release Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Release tag'
+        required: true
+        type: string
+      attach_to_release:
+        description: 'Attach the generated document to the GitHub Release for the tag'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: linux-amd64-cpu4
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.generate.outputs.artifact_name }}
+      resolved_sha: ${{ steps.resolve.outputs.resolved_sha }}
+    steps:
+      - name: Validate the requested ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          if [[ ! "${INPUT_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]]; then
+            echo "::error::'${INPUT_REF}' is not a release tag."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the ref to be a tag on the checked-out commit
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          tag_commit="$(git rev-parse --verify --quiet "refs/tags/${INPUT_REF}^{commit}")" \
+            || { echo "::error::'${INPUT_REF}' is not a tag in this repository."; exit 1; }
+          if [[ "$(git rev-parse HEAD)" != "${tag_commit}" ]]; then
+            echo "::error::tag '${INPUT_REF}' points at ${tag_commit}, not the checked-out commit."
+            exit 1
+          fi
+
+      - name: Require the tag to be a supported release
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          EARLIEST_SUPPORTED_TAG: v26.7.0
+        run: |
+          # Compare the numeric release only: sort -V orders prerelease suffixes
+          # differently on GNU and BSD, and the floor does not depend on them.
+          requested="${INPUT_REF#v}"
+          requested="${requested%%[!0-9.]*}"
+          oldest="$(printf '%s\n%s\n' "${EARLIEST_SUPPORTED_TAG#v}" "${requested}" \
+            | LC_ALL=C sort -V | head -1)"
+          if [[ "${oldest}" != "${EARLIEST_SUPPORTED_TAG#v}" ]]; then
+            echo "::error::'${INPUT_REF}' predates ${EARLIEST_SUPPORTED_TAG}, the earliest release this tooling describes."
+            exit 1
+          fi
+
+      - name: Check out the notices tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: .notices-tooling
+          persist-credentials: false
+
+      - name: Use the current tooling against the release's sources
+        run: |
+          rm -rf tools
+          mv .notices-tooling/tools tools
+          rm -rf .notices-tooling
+
+      - name: Resolve the ref to a commit
+        id: resolve
+        run: echo "resolved_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Get Golang version
+        run: |
+          GOLANG_VERSION=$( grep "GOLANG_VERSION ?=" versions.mk )
+          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
+
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Setup Go Proxy
+        id: setup-go-proxy
+        uses: nv-gha-runners/setup-artifactory-go-proxy@a15ec16ff434e8ca3b0f76919f902080e66ebc14 # main
+
+      - name: Generate the release notices
+        id: generate
+        env:
+          GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          make install-tools
+          artifact_name="gpu-operator-${INPUT_REF#v}-THIRD_PARTY_NOTICES.md"
+          bash tools/generate-third-party-notices.sh release \
+            --release-tag "${INPUT_REF}" \
+            --output "${RUNNER_TEMP}/${artifact_name}"
+          {
+            echo "artifact_name=${artifact_name}"
+            echo "artifact_path=${RUNNER_TEMP}/${artifact_name}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload the notices artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.generate.outputs.artifact_name }}
+          path: ${{ steps.generate.outputs.artifact_path }}
+          if-no-files-found: error
+
+      - name: Summarize
+        env:
+          ARTIFACT_NAME: ${{ steps.generate.outputs.artifact_name }}
+          INPUT_REF: ${{ inputs.ref }}
+          RESOLVED_SHA: ${{ steps.resolve.outputs.resolved_sha }}
+        run: |
+          {
+            echo "### Third-party notices generated"
+            echo
+            echo "- Artifact: \`${ARTIFACT_NAME}\`"
+            echo "- Tag: \`${INPUT_REF}\`"
+            echo "- Commit: \`${RESOLVED_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  attach-to-release:
+    if: ${{ inputs.attach_to_release }}
+    needs: [generate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the release and the tag to match the generated document
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_REF: ${{ inputs.ref }}
+          ARTIFACT_NAME: ${{ needs.generate.outputs.artifact_name }}
+          RESOLVED_SHA: ${{ needs.generate.outputs.resolved_sha }}
+        run: |
+          tag_commit="$(git rev-parse --verify --quiet "refs/tags/${INPUT_REF}^{commit}")" \
+            || { echo "::error::'${INPUT_REF}' is not a tag in this repository."; exit 1; }
+          if [[ "${tag_commit}" != "${RESOLVED_SHA}" ]]; then
+            echo "::error::tag '${INPUT_REF}' now points at ${tag_commit}, but the document was generated from ${RESOLVED_SHA}."
+            exit 1
+          fi
+          gh release view "${INPUT_REF}" >/dev/null \
+            || { echo "::error::no GitHub Release exists for tag '${INPUT_REF}'."; exit 1; }
+          existing_assets="$(gh release view "${INPUT_REF}" --json assets --jq '.assets[].name')" \
+            || { echo "::error::could not list the assets of release '${INPUT_REF}'."; exit 1; }
+          if printf '%s\n' "${existing_assets}" | grep -Fxq "${ARTIFACT_NAME}"; then
+            echo "::error::release '${INPUT_REF}' already has an asset named '${ARTIFACT_NAME}'; delete it first to replace it."
+            exit 1
+          fi
+
+      - name: Download the notices artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.generate.outputs.artifact_name }}
+          path: ${{ runner.temp }}/notices
+
+      - name: Attach the notices to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_REF: ${{ inputs.ref }}
+          ARTIFACT_PATH: ${{ runner.temp }}/notices/${{ needs.generate.outputs.artifact_name }}
+        run: gh release upload "${INPUT_REF}" "${ARTIFACT_PATH}"
+
+      - name: Summarize
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          ARTIFACT_NAME: ${{ needs.generate.outputs.artifact_name }}
+        run: |
+          {
+            echo "### Third-party notices attached"
+            echo
+            echo "- Asset: \`${ARTIFACT_NAME}\`"
+            echo "- Release: \`${INPUT_REF}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
