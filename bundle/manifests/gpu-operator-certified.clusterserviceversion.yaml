@@ -162,10 +162,6 @@ metadata:
           },
           "spec": {
             "draDriver": {
-              "repository": "nvcr.io/nvidia",
-              "image": "dra-driver-nvidia-gpu",
-              "version": "v0.4.1",
-              "imagePullPolicy": "IfNotPresent",
               "computeDomains": {
                 "enabled": true
               }
