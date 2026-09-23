@@ -253,8 +253,7 @@ def update_alm_examples(csv, image_refs):
     annotations = csv.get("metadata", {}).get("annotations", {})
     alm_examples = annotations.get("alm-examples")
     driver_ref = image_refs.get("driver")
-    dra_driver_ref = image_refs.get("draDriver")
-    if not alm_examples or not (driver_ref or dra_driver_ref):
+    if not alm_examples or not driver_ref:
         return
 
     examples = json.loads(alm_examples)
@@ -263,9 +262,6 @@ def update_alm_examples(csv, image_refs):
         spec = example.setdefault("spec", {})
         if example.get("kind") == "NVIDIADriver" and driver_ref:
             update_image_reference_fields(spec, driver_ref)
-        elif example.get("kind") == "GPUCluster" and dra_driver_ref:
-            dra_driver = spec.setdefault("draDriver", {})
-            update_image_reference_fields(dra_driver, dra_driver_ref)
 
     annotations["alm-examples"] = LiteralBlock(json.dumps(examples, indent=2))
 
