@@ -975,6 +975,11 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		return gpuv1.Disabled, nil
 	}
 
+	// Convergence is tracked apart from the reported state: a control that reports
+	// Disabled is intentionally off rather than unfinished. Reusing result here would
+	// skip the reclaim below under the default exporter configuration, where the
+	// optional read-pods ClusterRole and ClusterRoleBinding always report Disabled.
+	converged := true
 	for _, fs := range n.controls[n.idx] {
 		stat, err := fs(*n)
 		if err != nil {
@@ -984,6 +989,18 @@ func (n *ClusterPolicyController) step() (gpuv1.State, error) {
 		if stat != gpuv1.Ready {
 			// mark overall status of this component as not-ready and continue with other resources, while this becomes ready
 			result = stat
+		}
+		if stat == gpuv1.NotReady {
+			converged = false
+		}
+	}
+
+	// Objects a previous configuration superseded are reclaimed only once every control
+	// of this state converged: deleting them earlier would leave the operands that still
+	// reference them pointing at objects that no longer exist.
+	if converged {
+		if err := n.cleanupSupersededDCGMExporterServiceAccount(n.ctx); err != nil {
+			return gpuv1.NotReady, err
 		}
 	}
 

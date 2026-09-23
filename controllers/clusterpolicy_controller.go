@@ -279,7 +279,9 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, condErr
 		}
 	}
-	return ctrl.Result{}, nil
+	// ServiceAccounts, including BYO identities, are not watched. Recheck ready
+	// policies so deletion or replacement cannot leave their status stale indefinitely.
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 // clusterPolicyNotReadyMessage formats a condition message with operand states and additional not-ready reasons.
