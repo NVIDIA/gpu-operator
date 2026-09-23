@@ -43,10 +43,23 @@ spec:
         ports:
         - name: "dcgm"
           containerPort: 5555
+        # A hostengine that started without NVML (e.g. before the driver
+        # modules were loaded) keeps listening on 5555 but sees no GPUs and
+        # never re-initialises. Check GPU visibility, but only while a driver
+        # is present, so a planned driver restart does not loop the hostengine.
         livenessProbe:
-          tcpSocket:
-            port: 5555
-          initialDelaySeconds: 15
+          exec:
+            command:
+            - sh
+            - -c
+            - >-
+              if [ -e /dev/dxg ] || grep -q '^nvidia ' /proc/modules;
+              then dcgmi discovery -l | grep -qE '^[1-9][0-9]* GPUs? found';
+              else exit 0; fi
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 15
+          failureThreshold: 3
         readinessProbe:
           tcpSocket:
             port: 5555
