@@ -28,6 +28,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // RepoConfigPathMap indicates standard OS specific paths for repository configuration files
@@ -155,6 +156,21 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
 			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.RepoConfig.Name, itemsToInclude))
+
+			// expose any node-local package repositories referenced by the repo configuration
+			// (e.g. "URIs: file:///opt/local-packages") to the driver container
+			if nodeLocalPaths := cr.Spec.RepoConfigNodeLocalPaths(); len(nodeLocalPaths) > 0 {
+				repoVolumes, repoVolumeMounts, err := utils.NodeLocalRepoVolumes(nodeLocalPaths)
+				if err != nil {
+					return nil, fmt.Errorf("ERROR: invalid repoConfig.nodeLocalPaths: %w", err)
+				}
+				logger.Info("Mounting node-local package repositories into the driver container", "nodeLocalPaths", nodeLocalPaths)
+				additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, repoVolumeMounts...)
+				additionalCfgs.Volumes = append(additionalCfgs.Volumes, repoVolumes...)
+			}
+		} else if len(cr.Spec.RepoConfigNodeLocalPaths()) > 0 {
+			return nil, fmt.Errorf("ERROR: repoConfig.nodeLocalPaths is set but repoConfig.name is empty; " +
+				"nodeLocalPaths only applies when a custom repository configuration is provided")
 		}
 
 		// set any custom ssl key/certificate configuration provided
