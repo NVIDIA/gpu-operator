@@ -36,7 +36,7 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      priorityClassName: system-node-critical
+      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" | quote }}
       serviceAccountName: nvidia-dcgm-dra
       # Gate scheduling on the per-component deploy label so the k8s-driver-manager
       # can pause it to drain DCGM off a node during a driver reload.
