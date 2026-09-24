@@ -4740,6 +4740,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	maps.Copy(obj.Labels, n.singleton.Spec.Daemonsets.Labels)
+	enforceDCGMCommonLabel(obj)
 
 	// Daemonsets will always have at least one annotation applied, so allocate if necessary
 	if obj.Annotations == nil {
@@ -4786,6 +4787,27 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("DaemonSet identical, skipping update", "name", obj.Name)
 	}
 	return isDaemonSetReady(obj.Name, n), nil
+}
+
+func enforceDCGMCommonLabel(obj *appsv1.DaemonSet) {
+	var key string
+	switch obj.Name {
+	case "nvidia-dcgm", "nvidia-dcgm-dra":
+		key = "nvidia.com/gpu-operator.dcgm"
+	case "nvidia-dcgm-exporter", "nvidia-dcgm-exporter-dra":
+		key = "nvidia.com/gpu-operator.dcgm-exporter"
+	default:
+		return
+	}
+
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	obj.Labels[key] = "true"
+	if obj.Spec.Template.Labels == nil {
+		obj.Spec.Template.Labels = make(map[string]string)
+	}
+	obj.Spec.Template.Labels[key] = "true"
 }
 
 // isDaemonsetSpecChanged returns true if the spec has changed between existing one

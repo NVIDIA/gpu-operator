@@ -3,6 +3,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-dcgm
+    nvidia.com/gpu-operator.dcgm: "true"
   name: nvidia-dcgm
   namespace: "FILLED BY THE OPERATOR"
   annotations:
@@ -15,6 +16,7 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm
+        nvidia.com/gpu-operator.dcgm: "true"
     spec:
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm: "true"
