@@ -1,0 +1,61 @@
+suite: operator deployment
+templates:
+  - operator.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+chart:
+  appVersion: "v25.0.0"
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}
+
+  - it: prefers operator.version over Chart.AppVersion when set
+    set:
+      operator:
+        version: v25.99.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: nvcr.io/nvidia/gpu-operator:v25.99.0
+
+  - it: switches to --zap-devel when develMode is enabled
+    set:
+      operator:
+        logging:
+          develMode: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --zap-devel
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --zap-time-encoding=epoch
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --zap-log-level=info
+
+  - it: omits priorityClassName when explicitly cleared
+    set:
+      operator:
+        priorityClassName: ""
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
+  - it: renders imagePullSecrets when configured
+    set:
+      operator:
+        imagePullSecrets:
+          - my-pull-secret
+          - other-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: my-pull-secret
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: other-secret

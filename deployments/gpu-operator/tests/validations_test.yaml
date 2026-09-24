@@ -1,0 +1,42 @@
+suite: input validations
+templates:
+  - validations.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: renders nothing with the default values
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when nri plugin is enabled but CDI is disabled
+    set:
+      cdi:
+        enabled: false
+        nriPluginEnabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "the NRI Plugin cannot be enabled when CDI is disabled"
+
+  - it: fails when nri plugin is enabled but the container toolkit is disabled
+    set:
+      cdi:
+        enabled: true
+        nriPluginEnabled: true
+      toolkit:
+        enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "the NRI Plugin cannot be enabled when the Container Toolkit is disabled"
+
+  - it: succeeds when nri plugin is enabled with CDI and toolkit both enabled
+    set:
+      cdi:
+        enabled: true
+        nriPluginEnabled: true
+      toolkit:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
