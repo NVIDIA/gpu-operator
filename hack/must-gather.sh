@@ -277,6 +277,91 @@ done
 
 echo ""
 echo "#"
+echo "# Kubernetes Events (operator namespace)"
+echo "#"
+echo ""
+
+echo "Get events in ${OPERATOR_NAMESPACE} (sorted by last timestamp, default TTL is 1h)"
+$K get events \
+    -n "${OPERATOR_NAMESPACE}" \
+    --sort-by='.lastTimestamp' \
+    > "${ARTIFACT_DIR}/events_operator_namespace.log" 2>&1 || true
+
+echo ""
+echo "#"
+echo "# GPU Node Upgrade State"
+echo "#"
+echo ""
+
+echo "Get upgrade-related annotations and labels for GPU nodes"
+for node in $(echo "$gpu_pci_nodes"); do
+    node_name=$(echo "${node}" | cut -d/ -f2)
+    echo "=== ${node_name} ===" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Upgrade annotations:" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get "${node}" -ojsonpath='{.metadata.annotations}' 2>/dev/null \
+        | tr ',' '\n' \
+        | grep -E 'nvidia.com/gpu-driver' \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" 2>/dev/null || echo "  (none)" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Upgrade state label:" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get "${node}" -ojsonpath='{.metadata.labels.nvidia\.com/gpu-driver-upgrade-state}' 2>/dev/null \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" || true
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Node conditions (Ready, SchedulingDisabled, etc.):" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get "${node}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" || true
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Unschedulable:" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get "${node}" -ojsonpath='{.spec.unschedulable}' 2>/dev/null \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" || true
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Driver pod controller-revision-hash:" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get pods -n "${OPERATOR_NAMESPACE}" -lapp.kubernetes.io/component=nvidia-driver --field-selector "spec.nodeName=${node_name}" \
+        -ojsonpath='{.items[0].metadata.labels.controller-revision-hash}' 2>/dev/null \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" || true
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+
+    echo "# Events on node (upgrade-related):" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+    $K get events -A --field-selector "involvedObject.name=${node_name},involvedObject.kind=Node" \
+        --sort-by='.lastTimestamp' \
+        2>/dev/null \
+        >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state" || true
+    echo "" >> "${ARTIFACT_DIR}/gpu_nodes.upgrade_state"
+done
+
+echo ""
+echo "#"
+echo "# Controller Revisions (operand DaemonSets)"
+echo "#"
+echo ""
+
+echo "Get controller revisions in ${OPERATOR_NAMESPACE}"
+$K get controllerrevisions \
+    -n "${OPERATOR_NAMESPACE}" \
+    --sort-by='.revision' \
+    > "${ARTIFACT_DIR}/controller_revisions.log" 2>&1 || true
+
+echo "Get controller revision details (driver and other operands)"
+for controller_rev in $($K get controllerrevisions -n "${OPERATOR_NAMESPACE}" -oname 2>/dev/null); do
+    controller_rev_component=$($K get "${controller_rev}" -n "${OPERATOR_NAMESPACE}" -ojsonpath='{.metadata.labels.app\.kubernetes\.io/component}' 2>/dev/null || true)
+    if [ "${controller_rev_component}" = "nvidia-driver" ]; then
+        $K get "${controller_rev}" -n "${OPERATOR_NAMESPACE}" -oyaml \
+            >> "${ARTIFACT_DIR}/controller_revisions_driver.yaml" 2>&1 || true
+        echo "---" >> "${ARTIFACT_DIR}/controller_revisions_driver.yaml"
+    else
+        $K get "${controller_rev}" -n "${OPERATOR_NAMESPACE}" -oyaml \
+            >> "${ARTIFACT_DIR}/controller_revisions_other.yaml" 2>&1 || true
+        echo "---" >> "${ARTIFACT_DIR}/controller_revisions_other.yaml"
+    fi
+done
+
+echo ""
+echo "#"
 echo "# nvidia-bug-report.sh"
 echo "#"
 echo ""
