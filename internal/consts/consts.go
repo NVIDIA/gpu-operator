@@ -69,6 +69,8 @@ const (
 	DefaultNVIDIADriverName = "default"
 	// NVIDIADriverOwnerLabel is an operator-managed node label used to route each GPU node to one NVIDIADriver.
 	NVIDIADriverOwnerLabel = "nvidia.com/gpu-operator.driver.owner"
+	// SubscriptionVolumeNamePrefix identifies volumes and mounts managed for host subscriptions.
+	SubscriptionVolumeNamePrefix = "subscription-config-"
 
 	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
 	MinimumGDSVersionForOpenRM = "v2.17.5"

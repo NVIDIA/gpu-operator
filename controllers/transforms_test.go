@@ -19,7 +19,6 @@ package controllers
 import (
 	"path"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -4746,18 +4745,25 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
-	mockClient := fake.NewFakeClient(repoConfigMap)
-
+	certConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cert-config", Namespace: "test-ns"},
+		Data:       map[string]string{"ca.crt": "test certificate"},
+	}
 	testCases := []struct {
 		description                 string
 		osRelease                   string
 		osTag                       string
 		repoConfigEnabled           bool
+		repoConfigName              string
+		certConfigEnabled           bool
+		useHostSubscription         bool
+		transformTwice              bool
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
+		expectedSubscriptionMounts  map[string]string
 	}{
 		{
 			description:              "rhel with repo config skips host subscription mounts",
@@ -4776,11 +4782,64 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
 				"/etc/rhsm":                    corev1.HostPathDirectory,
 			},
+			expectedSubscriptionMounts: map[string]string{
+				"/etc/pki/entitlement":         "/run/secrets/etc-pki-entitlement",
+				"/etc/yum.repos.d/redhat.repo": "/run/secrets/redhat.repo",
+				"/etc/rhsm":                    "/run/secrets/rhsm",
+			},
+		},
+		{
+			description:              "rhel with repo config and host subscription mounts host subscription paths",
+			osRelease:                "rhel",
+			osTag:                    "rhel8.10",
+			repoConfigEnabled:        true,
+			useHostSubscription:      true,
+			certConfigEnabled:        true,
+			transformTwice:           true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+			expectedSubscriptionMounts: map[string]string{
+				"/etc/pki/entitlement":         "/run/secrets/etc-pki-entitlement",
+				"/etc/yum.repos.d/redhat.repo": "/run/secrets/redhat.repo",
+				"/etc/rhsm":                    "/run/secrets/rhsm",
+			},
+		},
+		{
+			description:              "rhel with colliding repo config name and host subscription mounts uses unique volume names",
+			osRelease:                "rhel",
+			osTag:                    "rhel8.10",
+			repoConfigEnabled:        true,
+			repoConfigName:           "subscription-config-0",
+			useHostSubscription:      true,
+			transformTwice:           true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+			expectedSubscriptionMounts: map[string]string{
+				"/etc/pki/entitlement":         "/run/secrets/etc-pki-entitlement",
+				"/etc/yum.repos.d/redhat.repo": "/run/secrets/redhat.repo",
+				"/etc/rhsm":                    "/run/secrets/rhsm",
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			repoConfigName := "test-repo-config"
+			if tc.repoConfigName != "" {
+				repoConfigName = tc.repoConfigName
+			}
+			configMap := repoConfigMap.DeepCopy()
+			configMap.Name = repoConfigName
+			certConfigName := certConfigMap.Name
+			mockClient := fake.NewFakeClient(configMap, certConfigMap)
 			ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
 				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
 			cpSpec := &gpuv1.ClusterPolicySpec{
@@ -4798,7 +4857,13 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				},
 			}
 			if tc.repoConfigEnabled {
-				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{ConfigMapName: "test-repo-config"}
+				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{
+					ConfigMapName:       repoConfigName,
+					UseHostSubscription: tc.useHostSubscription,
+				}
+			}
+			if tc.certConfigEnabled {
+				cpSpec.Driver.CertConfig = &gpuv1.DriverCertConfigSpec{Name: certConfigName}
 			}
 
 			err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
@@ -4810,22 +4875,206 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				gpuNodeOSTag:      tc.osTag,
 			})
 			require.NoError(t, err)
+			if tc.transformTwice {
+				err = TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
+					client:            mockClient,
+					runtime:           gpuv1.Containerd,
+					operatorNamespace: "test-ns",
+					logger:            ctrl.Log.WithName("test"),
+					gpuNodeOSRelease:  tc.osRelease,
+					gpuNodeOSTag:      tc.osTag,
+				})
+				require.NoError(t, err)
+			}
 
 			driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
 			require.NotNil(t, driverContainer)
+			if tc.repoConfigEnabled {
+				assertCustomRepoConfigForTransform(t, ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts, repoConfigName)
+			}
+			if tc.certConfigEnabled {
+				assertCustomCertConfigForTransform(t, ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts, certConfigName)
+			}
 			assertSubscriptionHostPathVolumesForTransform(t, ds.Spec.Template.Spec.Volumes, tc.expectedSubscriptionHostMap)
-			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMountForTransform(driverContainer.VolumeMounts))
+			assertSubscriptionVolumeMountPathsForTransform(t, ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts, tc.expectedSubscriptionMounts)
+			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMountForTransform(ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts))
+			assert.Equal(t, len(tc.expectedSubscriptionHostMap), subscriptionVolumeMountCountForTransform(ds.Spec.Template.Spec.Volumes, driverContainer.VolumeMounts))
+			assert.Equal(t, len(tc.expectedSubscriptionHostMap), subscriptionVolumeCountForTransform(ds.Spec.Template.Spec.Volumes))
+			assertUniqueVolumeNamesForTransform(t, ds.Spec.Template.Spec.Volumes)
+			assertUniqueVolumeMountPathsForTransform(t, driverContainer.VolumeMounts)
 		})
 	}
 }
 
-func hasSubscriptionVolumeMountForTransform(volumeMounts []corev1.VolumeMount) bool {
-	for _, volumeMount := range volumeMounts {
-		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
-			return true
+// assertCustomCertConfigForTransform verifies the custom certificate ConfigMap and its mount.
+func assertCustomCertConfigForTransform(t *testing.T, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, configMapName string) {
+	t.Helper()
+
+	var volume *corev1.Volume
+	for index := range volumes {
+		if volumes[index].Name == configMapName {
+			volume = &volumes[index]
+			break
 		}
 	}
-	return false
+	require.NotNil(t, volume, "missing custom certificate ConfigMap volume")
+	require.NotNil(t, volume.ConfigMap)
+	assert.Equal(t, configMapName, volume.ConfigMap.Name)
+
+	mountPath := "/etc/pki/ca-trust/extracted/pem/ca.crt"
+	configMapMounts := 0
+	for _, volumeMount := range volumeMounts {
+		if volumeMount.Name == configMapName && volumeMount.MountPath == mountPath {
+			configMapMounts++
+		}
+	}
+	assert.Equal(t, 1, configMapMounts, "expected one custom certificate volume mount %q at %q", configMapName, mountPath)
+}
+
+// assertCustomRepoConfigForTransform verifies the custom repository ConfigMap and its mount.
+func assertCustomRepoConfigForTransform(t *testing.T, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, configMapName string) {
+	t.Helper()
+
+	const (
+		mountPath = "/etc/yum.repos.d/custom.repo"
+	)
+
+	var configMapVolume *corev1.Volume
+	for index := range volumes {
+		if volumes[index].Name == configMapName {
+			configMapVolume = &volumes[index]
+			break
+		}
+	}
+	require.NotNil(t, configMapVolume, "missing custom repository ConfigMap volume")
+	require.NotNil(t, configMapVolume.ConfigMap)
+	assert.Equal(t, configMapName, configMapVolume.ConfigMap.Name)
+
+	configMapMounts := 0
+	for _, volumeMount := range volumeMounts {
+		if volumeMount.Name == configMapName && volumeMount.MountPath == mountPath {
+			configMapMounts++
+		}
+	}
+	assert.Equal(t, 1, configMapMounts, "expected one custom repository volume mount %q at %q", configMapName, mountPath)
+}
+
+// assertUniqueVolumeNamesForTransform verifies that each volume has a distinct name.
+func assertUniqueVolumeNamesForTransform(t *testing.T, volumes []corev1.Volume) {
+	t.Helper()
+
+	volumeNames := map[string]struct{}{}
+	for _, volume := range volumes {
+		_, found := volumeNames[volume.Name]
+		assert.Falsef(t, found, "duplicate volume name %q", volume.Name)
+		volumeNames[volume.Name] = struct{}{}
+	}
+}
+
+// assertUniqueVolumeMountPathsForTransform verifies that each volume mount has a distinct destination path.
+func assertUniqueVolumeMountPathsForTransform(t *testing.T, volumeMounts []corev1.VolumeMount) {
+	t.Helper()
+
+	mountPaths := map[string]struct{}{}
+	for _, volumeMount := range volumeMounts {
+		_, found := mountPaths[volumeMount.MountPath]
+		assert.Falsef(t, found, "duplicate volume mount path %q", volumeMount.MountPath)
+		mountPaths[volumeMount.MountPath] = struct{}{}
+	}
+}
+
+func TestRemoveSubscriptionMountsAndVolumesPreservesConfigMapVolume(t *testing.T) {
+	const configMapVolumeName = "subscription-config-custom"
+	driverContainer := &corev1.Container{
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: configMapVolumeName, MountPath: "/etc/yum.repos.d/custom.repo"},
+			{Name: "subscription-config-0", MountPath: "/run/secrets/redhat.repo"},
+		},
+	}
+	podSpec := &corev1.PodSpec{
+		Volumes: []corev1.Volume{
+			{
+				Name: configMapVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{},
+				},
+			},
+			{
+				Name: "subscription-config-0",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{},
+				},
+			},
+		},
+	}
+
+	removeSubscriptionMountsAndVolumes(driverContainer, podSpec)
+
+	require.Len(t, driverContainer.VolumeMounts, 1)
+	assert.Equal(t, configMapVolumeName, driverContainer.VolumeMounts[0].Name)
+	require.Len(t, podSpec.Volumes, 1)
+	assert.Equal(t, configMapVolumeName, podSpec.Volumes[0].Name)
+}
+
+func TestRemoveSubscriptionMountsAndVolumesWithNoResources(t *testing.T) {
+	driverContainer := &corev1.Container{}
+	podSpec := &corev1.PodSpec{}
+
+	removeSubscriptionMountsAndVolumes(driverContainer, podSpec)
+
+	assert.Empty(t, driverContainer.VolumeMounts)
+	assert.Empty(t, podSpec.Volumes)
+}
+
+// hasSubscriptionVolumeMountForTransform reports whether any host subscription volume is mounted.
+func hasSubscriptionVolumeMountForTransform(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) bool {
+	return subscriptionVolumeMountCountForTransform(volumes, volumeMounts) > 0
+}
+
+// subscriptionVolumeMountCountForTransform counts mounts managed by the subscription configuration.
+func subscriptionVolumeMountCountForTransform(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) int {
+	subscriptionVolumeNames := subscriptionVolumeNamesForTransform(volumes)
+	count := 0
+	for _, volumeMount := range volumeMounts {
+		if _, found := subscriptionVolumeNames[volumeMount.Name]; found {
+			count++
+		}
+	}
+	return count
+}
+
+// subscriptionVolumeCountForTransform counts volumes managed by the subscription configuration.
+func subscriptionVolumeCountForTransform(volumes []corev1.Volume) int {
+	return len(subscriptionVolumeNamesForTransform(volumes))
+}
+
+// subscriptionVolumeNamesForTransform returns names of host volumes managed for subscriptions.
+func subscriptionVolumeNamesForTransform(volumes []corev1.Volume) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, volume := range volumes {
+		if isHostSubscriptionVolume(volume) {
+			names[volume.Name] = struct{}{}
+		}
+	}
+	return names
+}
+
+// assertSubscriptionVolumeMountPathsForTransform verifies that subscription volumes have the expected mount paths.
+func assertSubscriptionVolumeMountPathsForTransform(t *testing.T, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, expected map[string]string) {
+	t.Helper()
+
+	mountsByName := map[string]corev1.VolumeMount{}
+	for _, volumeMount := range volumeMounts {
+		mountsByName[volumeMount.Name] = volumeMount
+	}
+	for _, volume := range volumes {
+		if !isHostSubscriptionVolume(volume) {
+			continue
+		}
+		volumeMount, found := mountsByName[volume.Name]
+		require.True(t, found, "missing volume mount for %q", volume.Name)
+		assert.Equal(t, expected[volume.HostPath.Path], volumeMount.MountPath)
+	}
 }
 
 func assertSubscriptionHostPathVolumesForTransform(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
@@ -4837,10 +5086,9 @@ func assertSubscriptionHostPathVolumesForTransform(t *testing.T, volumes []corev
 
 	actual := map[string]corev1.HostPathType{}
 	for _, volume := range volumes {
-		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+		if !isHostSubscriptionVolume(volume) {
 			continue
 		}
-		require.NotNil(t, volume.HostPath)
 		require.NotNil(t, volume.HostPath.Type)
 		actual[volume.HostPath.Path] = *volume.HostPath.Type
 	}
