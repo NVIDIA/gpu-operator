@@ -563,3 +563,76 @@ func TestGetSupportedGVKs(t *testing.T) {
 	}
 	assert.ElementsMatch(t, expectedGVKs, getSupportedGVKs())
 }
+
+func TestDaemonSetReadinessRequiresObservedGeneration(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		generation int64
+		observed   int64
+		desired    int32
+		available  int32
+		updated    int32
+		wantReady  bool
+	}{
+		"initial generation not observed": {1, 0, 2, 2, 2, false},
+		"previous generation still ready": {3, 2, 2, 2, 2, false},
+		"current generation ready":        {3, 3, 2, 2, 2, true},
+		"newer observed generation":       {3, 4, 2, 2, 2, true},
+		"current generation rolling out":  {3, 3, 2, 2, 1, false},
+		"current generation unavailable":  {3, 3, 2, 1, 2, false},
+		"zero nodes not observed":         {3, 2, 0, 0, 0, false},
+		"zero nodes observed":             {3, 3, 0, 0, 0, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ds := &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: tc.generation},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     tc.observed,
+					DesiredNumberScheduled: tc.desired,
+					NumberAvailable:        tc.available,
+					UpdatedNumberScheduled: tc.updated,
+				},
+			}
+			before := ds.DeepCopy()
+			ready, err := (&stateSkel{}).isDaemonSetReady(toUnstructuredDaemonSet(t, ds), logr.Discard())
+			require.NoError(t, err)
+			require.Equal(t, tc.wantReady, ready)
+			require.Equal(t, before, ds)
+		})
+	}
+}
+
+func TestGetSyncStateWaitsForDaemonSetController(t *testing.T) {
+	t.Parallel()
+
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "updating-operand", Namespace: "test-ns", Generation: 2},
+		Status: appsv1.DaemonSetStatus{
+			ObservedGeneration:     1,
+			DesiredNumberScheduled: 2,
+			CurrentNumberScheduled: 2,
+			NumberAvailable:        2,
+			UpdatedNumberScheduled: 2,
+		},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).
+		WithStatusSubresource(&appsv1.DaemonSet{}).WithObjects(ds).Build()
+	skel := newTestSkel(t, k8sClient)
+	objects := []*unstructured.Unstructured{newDaemonSetUnstructured(ds.Name, ds.Namespace)}
+
+	state, err := skel.getSyncState(context.Background(), objects)
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateNotReady), state)
+
+	current := &appsv1.DaemonSet{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(ds), current))
+	current.Status.ObservedGeneration = current.Generation
+	require.NoError(t, k8sClient.Status().Update(context.Background(), current))
+
+	state, err = skel.getSyncState(context.Background(), objects)
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateReady), state)
+}

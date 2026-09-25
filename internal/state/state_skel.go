@@ -538,7 +538,8 @@ func (s *stateSkel) isDaemonSetReady(uds *unstructured.Unstructured, reqLogger l
 		ds.Status.CurrentNumberScheduled == 0 {
 		return true, nil
 	}
-	if ds.Status.DesiredNumberScheduled != 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberAvailable &&
+	if ds.Status.ObservedGeneration >= ds.Generation &&
+		ds.Status.DesiredNumberScheduled != 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberAvailable &&
 		ds.Status.UpdatedNumberScheduled == ds.Status.NumberAvailable {
 		return true, nil
 	}
