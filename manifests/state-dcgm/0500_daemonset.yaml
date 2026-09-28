@@ -19,7 +19,7 @@ spec:
     matchLabels:
       app: nvidia-dcgm-dra
   updateStrategy:
-    type: {{ .Daemonsets.UpdateStrategy | default "RollingUpdate" }}
+    type: RollingUpdate
   template:
     metadata:
       labels:

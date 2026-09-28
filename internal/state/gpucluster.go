@@ -17,9 +17,11 @@
 package state
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -28,6 +30,34 @@ import (
 )
 
 // Helpers shared by the GPUCluster operand states (DRA driver, DCGM, ...).
+
+// renderGPUClusterObjects applies common GPUCluster policy after rendering so
+// each operand does not need to implement it in its templates.
+func (s *stateSkel) renderGPUClusterObjects(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, data any) ([]*unstructured.Unstructured, error) {
+	objs, err := s.renderObjects(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy := cr.Spec.Daemonsets.UpdateStrategy
+	if strategy == "" {
+		strategy = string(appsv1.RollingUpdateDaemonSetStrategyType)
+	}
+	for _, obj := range objs {
+		if obj.GetAPIVersion() != appsv1.SchemeGroupVersion.String() || obj.GetKind() != "DaemonSet" {
+			continue
+		}
+		if err := unstructured.SetNestedField(obj.Object, strategy, "spec", "updateStrategy", "type"); err != nil {
+			return nil, fmt.Errorf("failed to set update strategy for DaemonSet %s: %w", obj.GetName(), err)
+		}
+		// Keep each operand's existing rolling-update defaults, but never carry
+		// those settings into an OnDelete strategy.
+		if strategy == string(appsv1.OnDeleteDaemonSetStrategyType) {
+			unstructured.RemoveNestedField(obj.Object, "spec", "updateStrategy", "rollingUpdate")
+		}
+	}
+	return objs, nil
+}
 
 // dcgmEnabled reports whether the standalone DCGM hostengine operand is enabled.
 // The DRA stack defaults it to disabled, so it does not use the reused v1

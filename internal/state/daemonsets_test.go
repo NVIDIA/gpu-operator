@@ -18,6 +18,8 @@ package state
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,6 +29,7 @@ import (
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/render"
 )
 
 func TestGPUClusterDaemonSetUpdateStrategy(t *testing.T) {
@@ -47,7 +50,12 @@ func TestGPUClusterDaemonSetUpdateStrategy(t *testing.T) {
 			}{
 				"default":        {expectedType: appsv1.RollingUpdateDaemonSetStrategyType},
 				"rolling update": {strategy: "RollingUpdate", expectedType: appsv1.RollingUpdateDaemonSetStrategyType},
-				"on delete":      {strategy: "OnDelete", expectedType: appsv1.OnDeleteDaemonSetStrategyType},
+				"rolling update with settings": {
+					strategy:      "RollingUpdate",
+					rollingUpdate: &nvidiav1.RollingUpdateSpec{MaxUnavailable: "50%"},
+					expectedType:  appsv1.RollingUpdateDaemonSetStrategyType,
+				},
+				"on delete": {strategy: "OnDelete", expectedType: appsv1.OnDeleteDaemonSetStrategyType},
 				"on delete with rolling update settings": {
 					strategy:      "OnDelete",
 					rollingUpdate: &nvidiav1.RollingUpdateSpec{MaxUnavailable: "50%"},
@@ -76,6 +84,50 @@ func TestGPUClusterDaemonSetUpdateStrategy(t *testing.T) {
 						require.Nil(t, ds.Spec.UpdateStrategy.RollingUpdate)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestGPUClusterUpdateStrategyForNewOperand(t *testing.T) {
+	// A new operand inherits the policy without templating the requested strategy.
+	manifest := `apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: new-operand
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: new-operand-config
+data:
+  setting: unchanged
+`
+	path := filepath.Join(t.TempDir(), "operand.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(manifest), 0600))
+	s := stateSkel{renderer: render.NewRenderer([]string{path})}
+	for _, strategy := range []string{"", "RollingUpdate", "OnDelete"} {
+		t.Run("strategy="+strategy, func(t *testing.T) {
+			cr := sampleGPUCluster()
+			cr.Spec.Daemonsets.UpdateStrategy = strategy
+			baseline, err := s.renderObjects(context.Background(), nil)
+			require.NoError(t, err)
+			objs, err := s.renderGPUClusterObjects(context.Background(), cr, nil)
+			require.NoError(t, err)
+			require.Len(t, objs, 2)
+			require.Equal(t, baseline[1], objs[1], "non-DaemonSet objects must remain unchanged")
+			ds := findDaemonSet(t, objs)
+			if strategy == "OnDelete" {
+				require.Equal(t, appsv1.OnDeleteDaemonSetStrategyType, ds.Spec.UpdateStrategy.Type)
+				require.Nil(t, ds.Spec.UpdateStrategy.RollingUpdate)
+			} else {
+				require.Equal(t, baseline[0], objs[0], "operand rolling-update settings must remain unchanged")
 			}
 		})
 	}

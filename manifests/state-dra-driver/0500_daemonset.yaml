@@ -21,11 +21,9 @@ spec:
     matchLabels:
       app: nvidia-dra-driver-kubelet-plugin
   updateStrategy:
-    type: {{ .Daemonsets.UpdateStrategy | default "RollingUpdate" }}
-    {{- if ne .Daemonsets.UpdateStrategy "OnDelete" }}
+    type: RollingUpdate
     rollingUpdate:
       maxUnavailable: "100%"
-    {{- end }}
   template:
     metadata:
       labels:
