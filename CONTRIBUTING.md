@@ -33,7 +33,7 @@ github.com/
 │   ├── gpu-operator                 (CRD and controller logic that implements the reconciliation)
 │   ├── k8s-device-plugin            (NVIDIA Device Plugin for Kubernetes)
 │   ├── gpu-driver-container         (NVIDIA Driver qualified for data center GPUs)
-│   ├── nvidia-container-toolkit     (NVIDIA Container Toolkit, runtime for Docker)
+│   ├── nvidia-container-toolkit     (NVIDIA Container Toolkit, enables NVIDIA GPU support in container runtimes)
 │   ├── dcgm-exporter                (NVIDIA DCGM for monitoring and telemetry)
 │   ├── gpu-feature-discovery        (NVIDIA GPU Feature Discovery for Kubernetes)
 │   ├── mig-manager                  (NVIDIA Multi-Instance GPU Manager for Kubernetes)
