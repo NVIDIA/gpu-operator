@@ -1299,6 +1299,35 @@ func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
 	}
 }
 
+func TestMPSControlDaemonSignalTargetMatchesCommand(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, "assets/state-mps-control-daemon/0400_daemonset.yaml")
+	buffer, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+
+	ds := appsv1.DaemonSet{}
+	ser := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
+	_, _, err = ser.Decode(buffer, nil, &ds)
+	require.NoError(t, err)
+
+	mpsControlDaemon := findContainerByName(ds.Spec.Template.Spec.Containers, "mps-control-daemon-ctr")
+	require.NotNil(t, mpsControlDaemon)
+	require.NotEmpty(t, mpsControlDaemon.Command)
+
+	configManager := findContainerByName(ds.Spec.Template.Spec.Containers, "config-manager")
+	require.NotNil(t, configManager)
+
+	var processToSignal *corev1.EnvVar
+	for i := range configManager.Env {
+		if configManager.Env[i].Name == "PROCESS_TO_SIGNAL" {
+			processToSignal = &configManager.Env[i]
+			break
+		}
+	}
+	require.NotNil(t, processToSignal)
+	require.Equal(t, mpsControlDaemon.Command[0], processToSignal.Value)
+}
+
 // TestVGPUDeviceManagerReadinessGate verifies that the vGPU Device Manager's
 // vgpu-manager-validation init container waits for the vGPU Manager readiness
 // status file written in BOTH deployment modes: vgpu-manager-ready (vGPU
