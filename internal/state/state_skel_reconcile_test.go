@@ -142,8 +142,7 @@ func TestIsDaemonSetReadyErrors(t *testing.T) {
 	})
 }
 
-// Characterizes a known gap: the nonzero-desired branch of isDaemonSetReady does not
-// re-check ObservedGeneration, so status from a prior generation is reported ready.
+// Matching pod counts from an older generation do not confirm the current rollout.
 func TestIsDaemonSetReadyStaleGeneration(t *testing.T) {
 	staleDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Generation: 2},
@@ -158,7 +157,7 @@ func TestIsDaemonSetReadyStaleGeneration(t *testing.T) {
 	skel := &stateSkel{}
 	ready, err := skel.isDaemonSetReady(toUnstructuredDaemonSet(t, staleDaemonSet), logr.Discard())
 	require.NoError(t, err)
-	require.True(t, ready, "known gap: stale-generation status is currently treated as ready")
+	require.False(t, ready, "stale-generation status must not mark the current rollout ready")
 }
 
 func toUnstructuredDeployment(t *testing.T, deployment *appsv1.Deployment) *unstructured.Unstructured {
