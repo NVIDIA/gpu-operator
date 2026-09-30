@@ -27,8 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -104,6 +106,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if instance.HasDeletionTimestamp() {
 		return reconcile.Result{}, nil
+	}
+	// Refresh assignment even when configuration or selector validation stops reconciliation.
+	if err := r.updateAssignedNodeCount(ctx, instance); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	// Resolve the active cluster configuration (ClusterPolicy, GPUCluster, or both).
@@ -227,6 +233,47 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, condErr
 	}
 	return reconcile.Result{}, nil
+}
+
+// updateAssignedNodeCount reports observed ownership independently of driver pod readiness.
+func (r *NVIDIADriverReconciler) updateAssignedNodeCount(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) error {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.MatchingLabels{
+		consts.GPUPresentLabel:        "true",
+		consts.NVIDIADriverOwnerLabel: cr.Name,
+	}); err != nil {
+		return fmt.Errorf("failed to list GPU nodes assigned to NVIDIADriver %q: %w", cr.Name, err)
+	}
+
+	// Apply the selector separately so it cannot override the required GPU and owner labels.
+	selector := labels.SelectorFromSet(cr.Spec.NodeSelector)
+	var count int32
+	for _, node := range nodes.Items {
+		if selector.Matches(labels.Set(node.Labels)) {
+			count++
+		}
+	}
+
+	// Refetch on each retry to preserve concurrent readiness and condition updates.
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		instance := &nvidiav1alpha1.NVIDIADriver{}
+		if err := r.Get(ctx, client.ObjectKeyFromObject(cr), instance); err != nil {
+			return err
+		}
+		if instance.Status.AssignedNodeCount == count && instance.Status.State != "" {
+			return nil
+		}
+		// The status schema requires a valid state on the first status write.
+		if instance.Status.State == "" {
+			instance.Status.State = nvidiav1alpha1.NotReady
+		}
+		instance.Status.AssignedNodeCount = count
+		return r.Status().Update(ctx, instance)
+	}); err != nil {
+		return fmt.Errorf("failed to update assigned node count for NVIDIADriver %q: %w", cr.Name, err)
+	}
+	cr.Status.AssignedNodeCount = count
+	return nil
 }
 
 func (r *NVIDIADriverReconciler) updateCrStatus(
@@ -410,10 +457,12 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return err
 	}
 
+	// Include GPU-present nodes without NFD labels so every node contributing to the
+	// assigned count can trigger a refresh when created, relabeled, or deleted.
 	nodePredicate := predicate.TypedFuncs[*corev1.Node]{
 		CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
-			return hasGPULabels(labels)
+			return hasGPULabels(labels) || labels[consts.GPUPresentLabel] == "true"
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
 			logger := log.FromContext(ctx)
@@ -421,7 +470,10 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			oldLabels := e.ObjectOld.GetLabels()
 			nodeName := e.ObjectNew.GetName()
 
-			needsUpdate := hasGPULabels(newLabels) && !maps.Equal(newLabels, oldLabels)
+			// Check old labels too so GPU-label removal can decrease the assigned count.
+			hadGPU := hasGPULabels(oldLabels) || oldLabels[consts.GPUPresentLabel] == "true"
+			hasGPU := hasGPULabels(newLabels) || newLabels[consts.GPUPresentLabel] == "true"
+			needsUpdate := (hadGPU || hasGPU) && !maps.Equal(newLabels, oldLabels)
 
 			if needsUpdate {
 				logger.Info("Node labels have been changed",
@@ -432,7 +484,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
 			labels := e.Object.GetLabels()
-			return hasGPULabels(labels)
+			return hasGPULabels(labels) || labels[consts.GPUPresentLabel] == "true"
 		},
 	}
 
