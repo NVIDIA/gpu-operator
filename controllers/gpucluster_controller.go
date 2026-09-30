@@ -139,7 +139,7 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 		// no state reported an error, so we are waiting on operand pods
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, "Waiting for operand pods to be ready"); condErr != nil {
+		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.OperandNotReady, gpuClusterOperandNotReadyMessage(managerStatus.StatesStatus)); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
 		}
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -153,6 +153,22 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// newly-created ClusterPolicy) are detected and reconciled even while ready;
 	// only DaemonSets are watched, and the ready path is otherwise event-driven.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// gpuClusterOperandNotReadyMessage builds the OperandNotReady condition message, listing
+// the states whose operand pods are not yet ready.
+func gpuClusterOperandNotReadyMessage(results []state.Result) string {
+	statesNotReady := []string{}
+	for _, result := range results {
+		if result.Status == state.SyncStateNotReady || result.Status == state.SyncStateError {
+			statesNotReady = append(statesNotReady, result.StateName)
+		}
+	}
+	msg := "Waiting for operand pods to be ready"
+	if len(statesNotReady) > 0 {
+		msg = fmt.Sprintf("%s; states not ready: %v", msg, statesNotReady)
+	}
+	return msg
 }
 
 // validatePrerequisites checks the cross-CR rules that gate DRA enablement, returning
