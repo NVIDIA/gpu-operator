@@ -67,29 +67,33 @@ func (u *clusterPolicyUpdater) updateConditions(ctx context.Context, cr *nvidiav
 	switch statusType {
 	case Ready:
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:    Ready,
-			Status:  metav1.ConditionTrue,
-			Reason:  reason,
-			Message: message,
+			Type:               Ready,
+			Status:             metav1.ConditionTrue,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: instance.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:   Error,
-			Status: metav1.ConditionFalse,
-			Reason: Ready,
+			Type:               Error,
+			Status:             metav1.ConditionFalse,
+			Reason:             Ready,
+			ObservedGeneration: instance.Generation,
 		})
 	case Error:
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:   Ready,
-			Status: metav1.ConditionFalse,
-			Reason: Error,
+			Type:               Ready,
+			Status:             metav1.ConditionFalse,
+			Reason:             Error,
+			ObservedGeneration: instance.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:    Error,
-			Status:  metav1.ConditionTrue,
-			Reason:  reason,
-			Message: message,
+			Type:               Error,
+			Status:             metav1.ConditionTrue,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: instance.Generation,
 		})
 	default:
 		return fmt.Errorf("unknown status type provided: %s", statusType)
