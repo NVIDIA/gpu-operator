@@ -215,6 +215,18 @@ func TestDRADriverMPSImagePullSecrets(t *testing.T) {
 	}
 }
 
+func TestDRADriverRejectsConflictingHealthcheckPorts(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUCluster()
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+	cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck = &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))}
+	cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck = &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))}
+
+	_, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+
+	require.EqualError(t, err, "GPU and computeDomains healthcheck ports must differ: 52000")
+}
+
 func TestDRADriverValidationResources(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := fullSpecGPUCluster()
