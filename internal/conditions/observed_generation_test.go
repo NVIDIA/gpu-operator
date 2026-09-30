@@ -40,6 +40,15 @@ func TestConditionWritersSetObservedGeneration(t *testing.T) {
 		got := &nvidiav1.ClusterPolicy{}
 		require.NoError(t, client.Get(context.Background(), objectKey(object.Name), got))
 		assertObservedGenerations(t, got.Status.Conditions, generation)
+
+		errorObject := newClusterPolicy("cluster-policy-error")
+		errorObject.Generation = generation
+		errorClient := newClusterPolicyClient(t, errorObject)
+		require.NoError(t, NewClusterPolicyUpdater(errorClient).SetConditionsError(context.Background(), errorObject, Reconciled, "error"))
+
+		errorGot := &nvidiav1.ClusterPolicy{}
+		require.NoError(t, errorClient.Get(context.Background(), objectKey(errorObject.Name), errorGot))
+		assertObservedGenerations(t, errorGot.Status.Conditions, generation)
 	})
 
 	t.Run("NVIDIADriver", func(t *testing.T) {
@@ -51,6 +60,15 @@ func TestConditionWritersSetObservedGeneration(t *testing.T) {
 		got := &nvidiav1alpha1.NVIDIADriver{}
 		require.NoError(t, client.Get(context.Background(), objectKey(object.Name), got))
 		assertObservedGenerations(t, got.Status.Conditions, generation)
+
+		errorObject := newNvDriver("gpu-driver-error")
+		errorObject.Generation = generation
+		errorClient := newNvDriverClient(t, errorObject)
+		require.NoError(t, NewNvDriverUpdater(errorClient).SetConditionsError(context.Background(), errorObject, Reconciled, "error"))
+
+		errorGot := &nvidiav1alpha1.NVIDIADriver{}
+		require.NoError(t, errorClient.Get(context.Background(), objectKey(errorObject.Name), errorGot))
+		assertObservedGenerations(t, errorGot.Status.Conditions, generation)
 	})
 
 	t.Run("GPUCluster", func(t *testing.T) {
@@ -61,6 +79,14 @@ func TestConditionWritersSetObservedGeneration(t *testing.T) {
 
 		got := getGPUCluster(t, client, object.Name)
 		assertObservedGenerations(t, got.Status.Conditions, generation)
+
+		errorObject := newGPUCluster("gpu-cluster-error", "")
+		errorObject.Generation = generation
+		errorClient := newGPUClusterClient(t, errorObject)
+		require.NoError(t, NewGPUClusterUpdater(errorClient).SetConditionsError(context.Background(), errorObject, Reconciled, "error"))
+
+		errorGot := getGPUCluster(t, errorClient, errorObject.Name)
+		assertObservedGenerations(t, errorGot.Status.Conditions, generation)
 	})
 }
 
