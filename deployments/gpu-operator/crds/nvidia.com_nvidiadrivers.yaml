@@ -25,6 +25,9 @@ spec:
     - jsonPath: .spec.default
       name: Default
       type: boolean
+    - jsonPath: .status.assignedNodeCount
+      name: Nodes
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: string
@@ -1089,6 +1092,14 @@ spec:
           status:
             description: NVIDIADriverStatus defines the observed state of NVIDIADriver
             properties:
+              assignedNodeCount:
+                default: 0
+                description: |-
+                  AssignedNodeCount is the number of GPU-present nodes that match nodeSelector
+                  and are assigned to this NVIDIADriver, regardless of driver pod readiness.
+                format: int32
+                minimum: 0
+                type: integer
               conditions:
                 description: Conditions is a list of conditions representing the NVIDIADriver's
                   current state.
